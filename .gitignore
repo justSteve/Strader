@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+
+# Data (runtime, not tracked)
+data/
+
+# Claude Code local settings (security)
+.claude/settings.local.json
+
+# Beads runtime exclusions
+.beads/*.log
+.beads/*.tmp
+.beads/snapshots/

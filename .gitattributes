@@ -1,0 +1,25 @@
+# Auto-detect text files and normalize line endings
+* text=auto eol=lf
+
+# Explicitly declare text files
+*.ts text diff=typescript
+*.js text diff=javascript
+*.json text diff=json
+*.md text diff=markdown
+*.yaml text diff=yaml
+*.yml text diff=yaml
+*.sh text eol=lf diff=bash
+*.css text diff=css
+*.html text diff=html
+
+# Binary files
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Lock files — generated, do not diff
+package-lock.json -diff
+yarn.lock -diff
