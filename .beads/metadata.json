@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "Strader",
+  "project_id": "ed65b8b2-f6da-462f-88a7-fef9a72c5919"
+}

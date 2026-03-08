@@ -18,3 +18,7 @@ data/
 .beads/*.log
 .beads/*.tmp
 .beads/snapshots/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
