@@ -7,6 +7,7 @@ dist/
 # Environment
 .env
 .env.local
+tokens/
 
 # Data (runtime, not tracked)
 data/
