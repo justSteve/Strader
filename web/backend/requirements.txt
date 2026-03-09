@@ -1,0 +1,14 @@
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+sqlalchemy==2.0.27
+asyncpg==0.29.0
+alembic==1.13.1
+redis==5.0.1
+websockets==12.0
+pydantic==2.6.1
+pydantic-settings==2.1.0
+httpx==0.26.0
+numpy==1.26.4
+scipy==1.12.0
+python-dateutil==2.8.2
+schwab-py==1.5.1
