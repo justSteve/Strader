@@ -9,8 +9,8 @@ import (
 	"github.com/gastown/strader-flytui/internal/data"
 )
 
-// renderPayoffCurve draws the butterfly tent shape using braille characters.
-// Overlays multiple DTE curves showing tent sharpening.
+// renderPayoffCurve draws the butterfly tent shape with multi-DTE overlay.
+// Uses Bresenham line drawing with color-coded profit/loss regions.
 func (m Model) renderPayoffCurve(w, h int) string {
 	if w < 10 || h < 5 {
 		return "Panel too small"
@@ -21,9 +21,9 @@ func (m Model) renderPayoffCurve(w, h int) string {
 		return "No payoff data"
 	}
 
-	// Reserve space for axes labels
+	// Reserve space for Y-axis labels, X-axis, and legend
 	chartW := w - 8
-	chartH := h - 3
+	chartH := h - 4
 	if chartW < 10 {
 		chartW = 10
 	}
@@ -31,28 +31,24 @@ func (m Model) renderPayoffCurve(w, h int) string {
 		chartH = 4
 	}
 
-	// Find data range
+	// Find unified data range across all curves
 	minPrice, maxPrice := points[0].Price, points[len(points)-1].Price
-	minPnL, maxPnL := points[0].PnL, points[0].PnL
-	for _, p := range points {
-		if p.PnL < minPnL {
-			minPnL = p.PnL
-		}
-		if p.PnL > maxPnL {
-			maxPnL = p.PnL
-		}
-	}
-	// Also check DTE curves for range
+	minPnL, maxPnL := findPnLRange(points)
+
 	for _, curve := range m.data.PayoffByDTE.Curves {
-		for _, p := range curve {
-			if p.PnL < minPnL {
-				minPnL = p.PnL
-			}
-			if p.PnL > maxPnL {
-				maxPnL = p.PnL
-			}
+		lo, hi := findPnLRange(curve)
+		if lo < minPnL {
+			minPnL = lo
+		}
+		if hi > maxPnL {
+			maxPnL = hi
 		}
 	}
+
+	// Add margin
+	margin := (maxPnL - minPnL) * 0.05
+	minPnL -= margin
+	maxPnL += margin
 
 	pnlRange := maxPnL - minPnL
 	if pnlRange == 0 {
@@ -63,7 +59,7 @@ func (m Model) renderPayoffCurve(w, h int) string {
 		priceRange = 1
 	}
 
-	// Create character grid
+	// Character + color grids
 	grid := make([][]rune, chartH)
 	colorGrid := make([][]lipgloss.Color, chartH)
 	for i := range grid {
@@ -74,60 +70,53 @@ func (m Model) renderPayoffCurve(w, h int) string {
 		}
 	}
 
-	// Find zero line
-	zeroY := chartH - 1 - int(float64(chartH-1)*(0-minPnL)/pnlRange)
-	if zeroY < 0 {
-		zeroY = 0
-	}
-	if zeroY >= chartH {
-		zeroY = chartH - 1
-	}
-
 	// Draw zero line
+	zeroY := clampInt(chartH-1-int(float64(chartH-1)*(0-minPnL)/pnlRange), 0, chartH-1)
 	for x := 0; x < chartW; x++ {
 		if grid[zeroY][x] == ' ' {
 			grid[zeroY][x] = '─'
-			colorGrid[zeroY][x] = ColorOverlay
+			colorGrid[zeroY][x] = ColorOverlay0
 		}
 	}
 
-	// Plot DTE curves (dimmer) first
-	dteOrder := []string{"30", "15", "7", "1"}
-	dteColors := []lipgloss.Color{
-		lipgloss.Color("#585b70"),
-		lipgloss.Color("#7f849c"),
-		lipgloss.Color("#9399b2"),
-		ColorYellow,
+	// Draw breakeven markers
+	for _, be := range m.data.Strategy.Breakevens {
+		bx := clampInt(int(float64(chartW-1)*(be-minPrice)/priceRange), 0, chartW-1)
+		if grid[zeroY][bx] == '─' {
+			grid[zeroY][bx] = '┼'
+			colorGrid[zeroY][bx] = ColorYellow
+		}
 	}
+
+	// Plot DTE curves (dim to bright: 30D, 15D, 7D, 1D)
+	dteOrder := []string{"30", "15", "7", "1"}
+	dteColors := []lipgloss.Color{ColorDTE30, ColorDTE15, ColorDTE7, ColorDTE1}
+	dteChars := []rune{'·', '·', '·', '•'}
 
 	for ci, dte := range dteOrder {
 		curve, ok := m.data.PayoffByDTE.Curves[dte]
 		if !ok {
 			continue
 		}
-		plotPoints(grid, colorGrid, curve, chartW, chartH, minPrice, priceRange, minPnL, pnlRange, dteColors[ci])
+		plotCurve(grid, colorGrid, curve, chartW, chartH, minPrice, priceRange, minPnL, pnlRange, dteColors[ci], dteChars[ci])
 	}
 
-	// Plot expiration curve (main) on top
-	plotPoints(grid, colorGrid, points, chartW, chartH, minPrice, priceRange, minPnL, pnlRange, ColorText)
+	// Plot expiration curve on top — the definitive tent shape
+	plotCurve(grid, colorGrid, points, chartW, chartH, minPrice, priceRange, minPnL, pnlRange, ColorText, '●')
 
-	// Color profit green, loss red for expiration curve
+	// Color-code expiration curve: green above zero, red below
 	for _, p := range points {
-		x := int(float64(chartW-1) * (p.Price - minPrice) / priceRange)
-		y := chartH - 1 - int(float64(chartH-1)*(p.PnL-minPnL)/pnlRange)
-		if x >= 0 && x < chartW && y >= 0 && y < chartH {
-			if p.PnL > 0 {
-				colorGrid[y][x] = ColorGreen
-			} else if p.PnL < 0 {
-				colorGrid[y][x] = ColorRed
-			}
+		x := clampInt(int(float64(chartW-1)*(p.Price-minPrice)/priceRange), 0, chartW-1)
+		y := clampInt(chartH-1-int(float64(chartH-1)*(p.PnL-minPnL)/pnlRange), 0, chartH-1)
+		if p.PnL > 0 {
+			colorGrid[y][x] = ColorGreen
+		} else if p.PnL < 0 {
+			colorGrid[y][x] = ColorRed
 		}
 	}
 
 	// Render grid to string
 	var lines []string
-
-	// Y-axis labels
 	for row := 0; row < chartH; row++ {
 		pnl := maxPnL - float64(row)*(pnlRange)/float64(chartH-1)
 		label := fmt.Sprintf("%+5.1f", pnl)
@@ -136,7 +125,7 @@ func (m Model) renderPayoffCurve(w, h int) string {
 		}
 
 		var rowStr strings.Builder
-		rowStr.WriteString(SubtitleStyle.Render(label) + " ")
+		rowStr.WriteString(SubtitleStyle.Render(label) + " \u2502")
 		for col := 0; col < chartW; col++ {
 			ch := string(grid[row][col])
 			if colorGrid[row][col] != "" {
@@ -148,8 +137,11 @@ func (m Model) renderPayoffCurve(w, h int) string {
 	}
 
 	// X-axis
-	xAxis := strings.Repeat(" ", 7)
+	xAxis := strings.Repeat(" ", 8)
 	step := chartW / 5
+	if step < 1 {
+		step = 1
+	}
 	for i := 0; i <= 4; i++ {
 		x := i * step
 		price := minPrice + float64(x)*priceRange/float64(chartW-1)
@@ -162,41 +154,34 @@ func (m Model) renderPayoffCurve(w, h int) string {
 	}
 	lines = append(lines, SubtitleStyle.Render(xAxis))
 
-	// Legend
-	legend := fmt.Sprintf("  %s Exp  %s 1D  %s 7D  %s 15D  %s 30D",
-		lipgloss.NewStyle().Foreground(ColorText).Render("*"),
-		lipgloss.NewStyle().Foreground(dteColors[3]).Render("*"),
-		lipgloss.NewStyle().Foreground(dteColors[2]).Render("*"),
-		lipgloss.NewStyle().Foreground(dteColors[1]).Render("*"),
-		lipgloss.NewStyle().Foreground(dteColors[0]).Render("*"),
-	)
+	// Legend with colored markers
+	legend := "  "
+	legend += lipgloss.NewStyle().Foreground(ColorText).Render("● Exp") + "  "
+	legend += lipgloss.NewStyle().Foreground(ColorDTE1).Render("• 1D") + "  "
+	legend += lipgloss.NewStyle().Foreground(ColorDTE7).Render("· 7D") + "  "
+	legend += lipgloss.NewStyle().Foreground(ColorDTE15).Render("· 15D") + "  "
+	legend += lipgloss.NewStyle().Foreground(ColorDTE30).Render("· 30D") + "  "
+	legend += DimStyle.Render("┼ B/E")
 	lines = append(lines, legend)
 
-	result := strings.Join(lines, "\n")
-
-	// Pad to fill height
-	resultLines := strings.Split(result, "\n")
-	for len(resultLines) < h {
-		resultLines = append(resultLines, "")
-	}
-
-	return strings.Join(resultLines[:h], "\n")
+	return padLines(strings.Join(lines, "\n"), h)
 }
 
-func plotPoints(grid [][]rune, colorGrid [][]lipgloss.Color, points []data.PayoffPoint, w, h int, minPrice, priceRange, minPnL, pnlRange float64, color lipgloss.Color) {
+// plotCurve draws a series of payoff points onto the grid using Bresenham lines.
+func plotCurve(grid [][]rune, colorGrid [][]lipgloss.Color, points []data.PayoffPoint, w, h int, minPrice, priceRange, minPnL, pnlRange float64, color lipgloss.Color, ch rune) {
 	for i := 0; i < len(points)-1; i++ {
-		x0 := int(float64(w-1) * (points[i].Price - minPrice) / priceRange)
-		y0 := h - 1 - int(float64(h-1)*(points[i].PnL-minPnL)/pnlRange)
-		x1 := int(float64(w-1) * (points[i+1].Price - minPrice) / priceRange)
-		y1 := h - 1 - int(float64(h-1)*(points[i+1].PnL-minPnL)/pnlRange)
-
-		drawLine(grid, colorGrid, x0, y0, x1, y1, w, h, color)
+		x0 := clampInt(int(float64(w-1)*(points[i].Price-minPrice)/priceRange), 0, w-1)
+		y0 := clampInt(h-1-int(float64(h-1)*(points[i].PnL-minPnL)/pnlRange), 0, h-1)
+		x1 := clampInt(int(float64(w-1)*(points[i+1].Price-minPrice)/priceRange), 0, w-1)
+		y1 := clampInt(h-1-int(float64(h-1)*(points[i+1].PnL-minPnL)/pnlRange), 0, h-1)
+		bresenham(grid, colorGrid, x0, y0, x1, y1, w, h, color, ch)
 	}
 }
 
-func drawLine(grid [][]rune, colorGrid [][]lipgloss.Color, x0, y0, x1, y1, w, h int, color lipgloss.Color) {
-	dx := abs(x1 - x0)
-	dy := abs(y1 - y0)
+// bresenham draws a line between two points on the grid.
+func bresenham(grid [][]rune, colorGrid [][]lipgloss.Color, x0, y0, x1, y1, w, h int, color lipgloss.Color, ch rune) {
+	dx := intAbs(x1 - x0)
+	dy := intAbs(y1 - y0)
 	sx, sy := 1, 1
 	if x0 > x1 {
 		sx = -1
@@ -208,8 +193,8 @@ func drawLine(grid [][]rune, colorGrid [][]lipgloss.Color, x0, y0, x1, y1, w, h 
 
 	for {
 		if x0 >= 0 && x0 < w && y0 >= 0 && y0 < h {
-			if grid[y0][x0] == ' ' || grid[y0][x0] == '─' {
-				grid[y0][x0] = '*'
+			if grid[y0][x0] == ' ' || grid[y0][x0] == '─' || grid[y0][x0] == '·' {
+				grid[y0][x0] = ch
 			}
 			colorGrid[y0][x0] = color
 		}
@@ -228,6 +213,32 @@ func drawLine(grid [][]rune, colorGrid [][]lipgloss.Color, x0, y0, x1, y1, w, h 
 	}
 }
 
-func abs(x int) int {
+func findPnLRange(points []data.PayoffPoint) (float64, float64) {
+	if len(points) == 0 {
+		return 0, 0
+	}
+	mn, mx := points[0].PnL, points[0].PnL
+	for _, p := range points {
+		if p.PnL < mn {
+			mn = p.PnL
+		}
+		if p.PnL > mx {
+			mx = p.PnL
+		}
+	}
+	return mn, mx
+}
+
+func intAbs(x int) int {
 	return int(math.Abs(float64(x)))
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }

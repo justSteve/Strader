@@ -9,99 +9,112 @@ import (
 	"github.com/gastown/strader-flytui/internal/graphics"
 )
 
-const sidebarWidth = 24
-
+// View renders the complete TUI frame.
 func (m Model) View() string {
 	if !m.ready {
-		return "Loading Strader Fly TUI..."
+		return "\n  Loading Strader Fly TUI..."
+	}
+
+	// Minimum viable terminal size
+	if m.width < 60 || m.height < 20 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+			NegativeStyle.Render("Terminal too small\nNeed at least 60x20"))
 	}
 
 	if m.showHelp {
 		return m.renderHelp()
 	}
 
-	mainW := m.width - sidebarWidth - 4 // borders
-	if mainW < 20 {
-		mainW = 20
-	}
-	bodyH := m.height - 6 // bottom strip + margins
+	mainW := m.mainPanelWidth()
+	bodyH := m.bodyHeight()
 
-	// Sidebar panels
+	// Build sidebar
 	sidebar := m.renderSidebar(bodyH)
 
-	// Main panel
+	// Build main panel
 	main := m.renderMainPanel(mainW, bodyH)
 
 	// Join sidebar + main horizontally
 	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, main)
 
-	// Bottom strip with view selector
+	// Bottom strip
 	strip := m.renderBottomStrip()
 
 	return lipgloss.JoinVertical(lipgloss.Left, body, strip)
 }
 
+// renderSidebar builds the three stacked left panels: Legs, Position, Strategy.
 func (m Model) renderSidebar(totalH int) string {
-	legsH := totalH * 35 / 100
+	innerW := sidebarWidth - 4 // inside border + padding
+
+	// Proportional distribution — legs gets less, position more
+	legsH := totalH * 30 / 100
 	posH := totalH * 40 / 100
 	stratH := totalH - legsH - posH
 
-	legs := m.renderLegsPanel(sidebarWidth-2, legsH-2)
-	pos := m.renderPositionPanel(sidebarWidth-2, posH-2)
-	strat := m.renderStrategyPanel(sidebarWidth-2, stratH-2)
+	// Minimum heights
+	if legsH < 6 {
+		legsH = 6
+	}
+	if posH < 8 {
+		posH = 8
+	}
+	if stratH < 6 {
+		stratH = 6
+	}
+
+	legs := m.renderLegsPanel(innerW, legsH-2)
+	pos := m.renderPositionPanel(innerW, posH-2)
+	strat := m.renderStrategyPanel(innerW, stratH-2)
 
 	return lipgloss.JoinVertical(lipgloss.Left, legs, pos, strat)
 }
 
+// renderLegsPanel shows butterfly legs with selection indicators.
 func (m Model) renderLegsPanel(w, h int) string {
 	var lines []string
 	for i, leg := range m.data.Strategy.Legs {
-		// Selection indicator from slit
 		prefix := "  "
 		if i == m.selectedLeg && m.focusPanel == PanelLegs {
-			prefix = "\u25b6 " // ▶ when focused
+			prefix = HighlightStyle.Render("\u25b6 ") // ▶ focused
 		} else if i == m.selectedLeg {
-			prefix = "\u25cf " // ● when selected but unfocused
+			prefix = MauveStyle.Render("\u25cf ") // ● selected unfocused
 		}
 
 		sign := "+"
 		if leg.Side == "sell" {
 			sign = "-"
 		}
-		qty := leg.Qty
 		strike := fmt.Sprintf("%.0f", leg.Strike)
 		optType := strings.ToUpper(leg.Type[:1])
-		delta := fmt.Sprintf("\u0394%+.2f", leg.Greeks.Delta) // Δ prefix
+		delta := fmt.Sprintf("\u0394%+.2f", leg.Greeks.Delta)
 
-		line := fmt.Sprintf("%s%s%d %s%s", prefix, sign, qty, strike, optType)
-		deltaStr := ValueStyle(leg.Greeks.Delta).Render(delta)
-		pad := w - lipgloss.Width(line) - lipgloss.Width(delta) - 1
+		left := fmt.Sprintf("%s%s%d %s%s", prefix, sign, leg.Qty, strike, optType)
+		deltaRendered := ValueStyle(leg.Greeks.Delta).Render(delta)
+
+		pad := w - lipgloss.Width(left) - lipgloss.Width(delta) - 1
 		if pad < 1 {
 			pad = 1
 		}
-		lines = append(lines, line+strings.Repeat(" ", pad)+deltaStr)
+		lines = append(lines, left+strings.Repeat(" ", pad)+deltaRendered)
 	}
 
-	content := strings.Join(lines, "\n")
-	for len(strings.Split(content, "\n")) < h {
-		content += "\n"
-	}
-
-	style := m.panelStyle(PanelLegs, w, h)
-	title := TitleStyle.Render(" Legs ")
-	return style.Render(title + "\n" + content)
+	content := padLines(strings.Join(lines, "\n"), h)
+	style := m.panelStyle(PanelLegs, sidebarWidth-2, h)
+	return style.Render(TitleStyle.Render(" Legs ") + "\n" + content)
 }
 
+// renderPositionPanel shows aggregate Greeks and P&L metrics.
 func (m Model) renderPositionPanel(w, h int) string {
 	agg := m.data.Strategy.Aggregate
 	strat := m.data.Strategy
 
-	// Unicode Greek symbols from slit
 	rows := []struct{ label, value string }{
 		{"Net \u0394", fmt.Sprintf("%+.2f", agg.Delta)},
 		{"Net \u0393", fmt.Sprintf("%+.4f", agg.Gamma)},
 		{"Net \u0398", fmt.Sprintf("%+.2f", agg.Theta)},
 		{"Net V", fmt.Sprintf("%+.2f", agg.Vega)},
+		{"", ""}, // separator
 		{"Debit", fmt.Sprintf("%.2f", strat.NetDebit)},
 		{"MaxP", fmt.Sprintf("%.2f", strat.MaxProfit)},
 		{"MaxL", fmt.Sprintf("%.2f", strat.MaxLoss)},
@@ -110,16 +123,25 @@ func (m Model) renderPositionPanel(w, h int) string {
 
 	var lines []string
 	for _, r := range rows {
+		if r.label == "" {
+			lines = append(lines, DimStyle.Render(strings.Repeat("─", w-2)))
+			continue
+		}
+
 		pad := w - len(r.label) - len(r.value) - 2
 		if pad < 1 {
 			pad = 1
 		}
 		val := r.value
 		switch r.label {
-		case "Net \u0394", "Net \u0393", "Net \u0398", "Net V":
-			var v float64
-			fmt.Sscanf(r.value, "%f", &v)
-			val = ValueStyle(v).Render(r.value)
+		case "Net \u0394":
+			val = ValueStyle(agg.Delta).Render(r.value)
+		case "Net \u0393":
+			val = ValueStyle(agg.Gamma).Render(r.value)
+		case "Net \u0398":
+			val = ValueStyle(agg.Theta).Render(r.value)
+		case "Net V":
+			val = ValueStyle(agg.Vega).Render(r.value)
 		case "MaxP":
 			val = PositiveStyle.Render(r.value)
 		case "MaxL":
@@ -128,54 +150,51 @@ func (m Model) renderPositionPanel(w, h int) string {
 		lines = append(lines, SubtitleStyle.Render(r.label)+strings.Repeat(" ", pad)+val)
 	}
 
-	content := strings.Join(lines, "\n")
-	for len(strings.Split(content, "\n")) < h {
-		content += "\n"
-	}
-
-	style := m.panelStyle(PanelPosition, w, h)
-	title := TitleStyle.Render(" Position ")
-	return style.Render(title + "\n" + content)
+	content := padLines(strings.Join(lines, "\n"), h)
+	style := m.panelStyle(PanelPosition, sidebarWidth-2, h)
+	return style.Render(TitleStyle.Render(" Position ") + "\n" + content)
 }
 
+// renderStrategyPanel shows strategy type selector with DTE info.
 func (m Model) renderStrategyPanel(w, h int) string {
 	var lines []string
-	for i, v := range m.strategies {
+	for i, name := range m.strategies {
 		prefix := "  "
+		style := SubtitleStyle
 		if i == m.strategyIdx && m.focusPanel == PanelStrategy {
 			prefix = HighlightStyle.Render("\u25b6 ") // ▶
-			v = HighlightStyle.Render(v)
+			style = HighlightStyle
 		} else if i == m.strategyIdx {
-			prefix = HighlightStyle.Render("\u25cf ") // ●
-			v = HighlightStyle.Render(v)
-		} else {
-			v = SubtitleStyle.Render(v)
+			prefix = MauveStyle.Render("\u25cf ") // ●
+			style = MauveStyle
 		}
-		lines = append(lines, prefix+v)
+		lines = append(lines, prefix+style.Render(name))
 	}
 
-	// DTE and expiration from slit
 	lines = append(lines, "")
-	lines = append(lines, SubtitleStyle.Render(
-		fmt.Sprintf("DTE: %d  Exp: %s", m.data.Strategy.DTE, m.data.Strategy.Expiration)))
-
-	content := strings.Join(lines, "\n")
-	for len(strings.Split(content, "\n")) < h {
-		content += "\n"
+	dte := m.data.Strategy.DTE
+	dteStyle := PositiveStyle
+	if dte <= 3 {
+		dteStyle = NegativeStyle
+	} else if dte <= 7 {
+		dteStyle = HighlightStyle
 	}
+	lines = append(lines, SubtitleStyle.Render("DTE: ")+dteStyle.Render(fmt.Sprintf("%d", dte))+
+		SubtitleStyle.Render("  "+m.data.Strategy.Expiration))
 
-	style := m.panelStyle(PanelStrategy, w, h)
-	title := TitleStyle.Render(" Strategy ")
-	return style.Render(title + "\n" + content)
+	content := padLines(strings.Join(lines, "\n"), h)
+	style := m.panelStyle(PanelStrategy, sidebarWidth-2, h)
+	return style.Render(TitleStyle.Render(" Strategy ") + "\n" + content)
 }
 
+// renderMainPanel renders the large right panel based on active view or bitmap mode.
 func (m Model) renderMainPanel(w, h int) string {
 	var content string
 	var title string
 
 	if m.bitmapMode {
 		title = "TV Screenshot"
-		img, err := graphics.RenderImage(m.imagePath, w-2, h-2)
+		img, err := graphics.RenderImage(m.imagePath, w-4, h-3)
 		if err != nil {
 			content = NegativeStyle.Render(fmt.Sprintf("Image error: %v", err))
 		} else {
@@ -185,36 +204,38 @@ func (m Model) renderMainPanel(w, h int) string {
 		switch m.activeView {
 		case ViewPayoff:
 			title = "Payoff Curve [1]"
-			content = m.renderPayoffCurve(w-2, h-2)
+			content = m.renderPayoffCurve(w-4, h-3)
 		case ViewGEX:
 			title = "GEX Matrix [2]"
-			content = m.renderGEXMatrix(w-2, h-2)
+			content = m.renderGEXMatrix(w-4, h-3)
 		case ViewGreeks:
 			title = "Greek Profiles [3]"
-			content = m.renderGreekProfiles(w-2, h-2)
+			content = m.renderGreekProfiles(w-4, h-3)
 		case ViewHeatmap:
 			title = "Profit Heatmap [4]"
-			content = m.renderProfitHeatmap(w-2, h-2)
+			content = m.renderProfitHeatmap(w-4, h-3)
 		case ViewDashboard:
 			title = "Position Dashboard [5]"
-			content = m.renderDashboard(w-2, h-2)
+			content = m.renderDashboard(w-4, h-3)
 		}
 	}
 
-	style := m.panelStyle(PanelMain, w, h)
-	titleRendered := TitleStyle.Render(" " + title + " ")
-	return style.Render(titleRendered + "\n" + content)
+	style := m.panelStyle(PanelMain, w-2, h)
+	titleStr := TitleStyle.Render(" " + title + " ")
+	return style.Render(titleStr + "\n" + content)
 }
 
-// renderBottomStrip renders the bottom bar with mini Greek sparklines (ntcharts),
-// a view selector showing the active view, and a BITMAP indicator.
+// renderBottomStrip renders mini Greek sparklines (ntcharts), view selector, and status.
 func (m Model) renderBottomStrip() string {
 	gs := m.data.GreeksByStrike
 	stripW := m.width - 4
 
-	sparkW := (stripW - 40) / 4
+	sparkW := (stripW - 48) / 4
 	if sparkW < 5 {
 		sparkW = 5
+	}
+	if sparkW > 20 {
+		sparkW = 20
 	}
 
 	type miniGreek struct {
@@ -254,8 +275,8 @@ func (m Model) renderBottomStrip() string {
 		parts = append(parts, " "+label+" "+sl.View()+" ")
 	}
 
-	// View selector bar from slit
-	viewName := "["
+	// View selector with active highlight
+	viewSel := "["
 	views := []struct {
 		key  string
 		mode ViewMode
@@ -263,69 +284,104 @@ func (m Model) renderBottomStrip() string {
 		{"1:Payoff", ViewPayoff},
 		{"2:GEX", ViewGEX},
 		{"3:Greeks", ViewGreeks},
-		{"4:Heatmap", ViewHeatmap},
+		{"4:Heat", ViewHeatmap},
 		{"5:Dash", ViewDashboard},
 	}
 	for i, v := range views {
-		if v.mode == m.activeView {
-			viewName += MauveStyle.Render(v.key)
+		if v.mode == m.activeView && !m.bitmapMode {
+			viewSel += MauveStyle.Render(v.key)
 		} else {
-			viewName += SubtitleStyle.Render(v.key)
+			viewSel += SubtitleStyle.Render(v.key)
 		}
 		if i < len(views)-1 {
-			viewName += " "
+			viewSel += " "
 		}
 	}
-	viewName += "]"
+	viewSel += "]"
 
 	bm := ""
 	if m.bitmapMode {
-		bm = HighlightStyle.Render(" [BITMAP]")
+		bm = HighlightStyle.Render(" BITMAP")
 	}
-	status := viewName + bm + SubtitleStyle.Render(" ?=help q=quit")
+
+	// Focus indicator
+	focusNames := map[Panel]string{
+		PanelLegs:     "Legs",
+		PanelPosition: "Pos",
+		PanelStrategy: "Strat",
+		PanelMain:     "Main",
+	}
+	focus := lipgloss.NewStyle().Foreground(ColorBlue).Bold(true).
+		Render("\u25c6" + focusNames[m.focusPanel]) // ◆
+
+	status := viewSel + bm + " " + focus + SubtitleStyle.Render(" ?=help q=quit")
 
 	strip := strings.Join(parts, "\u2502") + "  " + status
 
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ColorOverlay).
+		BorderForeground(ColorOverlay0).
 		Width(m.width - 2)
 
 	return borderStyle.Render(strip)
 }
 
+// renderHelp shows the keyboard reference overlay.
 func (m Model) renderHelp() string {
-	help := `
-  Strader Fly TUI - Keyboard Reference
+	title := TitleStyle.Render("  Strader Fly TUI \u2014 Keyboard Reference")
 
-  Navigation
-  ----------
-  Tab / Shift+Tab   Cycle panel focus
-  j / k             Move within panel
-  1                 Payoff Curve
-  2                 GEX Matrix
-  3                 Greek Profiles
-  4                 Profit Heatmap
-  5                 Position Dashboard
-  v                 Toggle bitmap mode
-  ?                 Toggle this help
-  q                 Quit
-`
+	sections := []string{
+		title,
+		"",
+		HighlightStyle.Render("  Navigation"),
+		DimStyle.Render("  " + strings.Repeat("─", 40)),
+		fmt.Sprintf("  %s  %s", lipgloss.NewStyle().Foreground(ColorTeal).Width(20).Render("Tab / Shift+Tab"), "Cycle panel focus"),
+		fmt.Sprintf("  %s  %s", lipgloss.NewStyle().Foreground(ColorTeal).Width(20).Render("j / k / ↑ / ↓"), "Move within panel"),
+		"",
+		HighlightStyle.Render("  Views"),
+		DimStyle.Render("  " + strings.Repeat("─", 40)),
+		fmt.Sprintf("  %s  %s", lipgloss.NewStyle().Foreground(ColorTeal).Width(20).Render("1"), "Payoff Curve"),
+		fmt.Sprintf("  %s  %s", lipgloss.NewStyle().Foreground(ColorTeal).Width(20).Render("2"), "GEX Matrix"),
+		fmt.Sprintf("  %s  %s", lipgloss.NewStyle().Foreground(ColorTeal).Width(20).Render("3"), "Greek Profiles"),
+		fmt.Sprintf("  %s  %s", lipgloss.NewStyle().Foreground(ColorTeal).Width(20).Render("4"), "Profit Heatmap"),
+		fmt.Sprintf("  %s  %s", lipgloss.NewStyle().Foreground(ColorTeal).Width(20).Render("5"), "Position Dashboard"),
+		fmt.Sprintf("  %s  %s", lipgloss.NewStyle().Foreground(ColorTeal).Width(20).Render("v"), "Toggle bitmap mode"),
+		"",
+		HighlightStyle.Render("  General"),
+		DimStyle.Render("  " + strings.Repeat("─", 40)),
+		fmt.Sprintf("  %s  %s", lipgloss.NewStyle().Foreground(ColorTeal).Width(20).Render("?"), "Toggle this help"),
+		fmt.Sprintf("  %s  %s", lipgloss.NewStyle().Foreground(ColorTeal).Width(20).Render("q"), "Quit"),
+	}
+
+	helpText := strings.Join(sections, "\n")
+
 	style := lipgloss.NewStyle().
 		Border(lipgloss.DoubleBorder()).
 		BorderForeground(ColorBlue).
 		Padding(1, 2).
-		Width(50).
+		Width(52).
 		Foreground(ColorText)
 
-	centered := lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-		style.Render(help))
-	return centered
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+		style.Render(helpText))
 }
 
+// panelStyle returns the appropriate border style for a panel based on focus state.
 func (m Model) panelStyle(p Panel, w, h int) lipgloss.Style {
 	if p == m.focusPanel {
 		return ActiveBorderStyle.Width(w).Height(h)
 	}
 	return InactiveBorderStyle.Width(w).Height(h)
+}
+
+// padLines pads content to fill h lines.
+func padLines(content string, h int) string {
+	lines := strings.Split(content, "\n")
+	for len(lines) < h {
+		lines = append(lines, "")
+	}
+	if len(lines) > h {
+		lines = lines[:h]
+	}
+	return strings.Join(lines, "\n")
 }

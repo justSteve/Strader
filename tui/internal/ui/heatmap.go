@@ -12,13 +12,14 @@ import (
 )
 
 // renderProfitHeatmap renders strike (X) vs DTE (Y) with color intensity = P&L.
+// Uses half-block characters with graduated color intensity for a smooth heatmap.
 func (m Model) renderProfitHeatmap(w, h int) string {
 	curves := m.data.PayoffByDTE.Curves
 	if len(curves) == 0 {
 		return "No heatmap data"
 	}
 
-	// Sort DTE keys descending
+	// Sort DTE keys descending (high DTE at top)
 	var dteKeys []int
 	for k := range curves {
 		d, _ := strconv.Atoi(k)
@@ -26,7 +27,7 @@ func (m Model) renderProfitHeatmap(w, h int) string {
 	}
 	sort.Sort(sort.Reverse(sort.IntSlice(dteKeys)))
 
-	// Interpolate additional DTE rows
+	// Interpolate additional DTE rows for smoother gradient
 	allDTEs := interpolateDTEs(dteKeys)
 
 	prices := m.data.PayoffCurve.Points
@@ -36,7 +37,7 @@ func (m Model) renderProfitHeatmap(w, h int) string {
 
 	labelW := 6
 	hmW := w - labelW - 2
-	hmH := h - 4
+	hmH := h - 6
 	if hmW < 10 {
 		hmW = 10
 	}
@@ -44,7 +45,7 @@ func (m Model) renderProfitHeatmap(w, h int) string {
 		hmH = 4
 	}
 
-	// Find global P&L range
+	// Global P&L range
 	minPnL, maxPnL := 0.0, 0.0
 	for _, curve := range curves {
 		for _, p := range curve {
@@ -66,12 +67,48 @@ func (m Model) renderProfitHeatmap(w, h int) string {
 
 	var lines []string
 
-	// Title row
-	lines = append(lines, TitleStyle.Render("  DTE")+"  "+SubtitleStyle.Render(
-		fmt.Sprintf("%.0f%s%.0f", minPrice, strings.Repeat(" ", hmW-8), maxPrice)))
+	// Column headers — price labels
+	headerLine := strings.Repeat(" ", labelW+1)
+	headerStep := hmW / 5
+	if headerStep < 1 {
+		headerStep = 1
+	}
+	for i := 0; i <= 4; i++ {
+		x := i * headerStep
+		price := minPrice + float64(x)*priceRange/float64(hmW-1)
+		label := fmt.Sprintf("%.0f", price)
+		pad := headerStep - len(label)
+		if pad < 0 {
+			pad = 0
+		}
+		headerLine += label + strings.Repeat(" ", pad)
+	}
+	lines = append(lines, SubtitleStyle.Render(headerLine))
 
+	// Breakeven markers on a separator line
+	beLine := strings.Repeat(" ", labelW+1)
+	beChars := make([]rune, hmW)
+	for i := range beChars {
+		beChars[i] = '─'
+	}
+	for _, be := range m.data.Strategy.Breakevens {
+		bx := int(float64(hmW-1) * (be - minPrice) / priceRange)
+		if bx >= 0 && bx < hmW {
+			beChars[bx] = '╋'
+		}
+	}
+	// Mark center strike
+	center := m.data.Strategy.Legs[1].Strike // middle leg
+	cx := int(float64(hmW-1) * (center - minPrice) / priceRange)
+	if cx >= 0 && cx < hmW {
+		beChars[cx] = '▼'
+	}
+	beLine += DimStyle.Render(string(beChars))
+	lines = append(lines, beLine)
+
+	// Heatmap rows
 	for _, dte := range allDTEs {
-		if len(lines) >= hmH+1 {
+		if len(lines) >= hmH+2 {
 			break
 		}
 
@@ -79,17 +116,10 @@ func (m Model) renderProfitHeatmap(w, h int) string {
 
 		label := fmt.Sprintf("%3dd ", dte)
 		var rowStr strings.Builder
-		rowStr.WriteString(SubtitleStyle.Render(label))
+		rowStr.WriteString(SubtitleStyle.Render(label) + " ")
 
 		for _, pnl := range row {
-			ch, fg, bg := heatmapCell(pnl, minPnL, maxPnL)
-			style := lipgloss.NewStyle()
-			if fg != "" {
-				style = style.Foreground(fg)
-			}
-			if bg != "" {
-				style = style.Background(bg)
-			}
+			ch, style := heatmapCellStyled(pnl, minPnL, maxPnL)
 			rowStr.WriteString(style.Render(string(ch)))
 		}
 		lines = append(lines, rowStr.String())
@@ -97,20 +127,67 @@ func (m Model) renderProfitHeatmap(w, h int) string {
 
 	// Legend
 	lines = append(lines, "")
-	legend := fmt.Sprintf("  %s Loss  %s Break-even  %s Profit",
-		NegativeStyle.Render("##"),
-		SubtitleStyle.Render(".."),
-		PositiveStyle.Render("##"))
+	legend := "  " +
+		lipgloss.NewStyle().Background(lipgloss.Color("#2a1520")).Foreground(ColorRed).Render("░") +
+		NegativeStyle.Render(" Loss") + "  " +
+		DimStyle.Render("·") + SubtitleStyle.Render(" Break-even") + "  " +
+		lipgloss.NewStyle().Background(lipgloss.Color("#1a2a1a")).Foreground(ColorGreen).Render("░") +
+		PositiveStyle.Render(" Profit") + "  " +
+		HighlightStyle.Render("▼") + SubtitleStyle.Render(" Center") + "  " +
+		DimStyle.Render("╋") + SubtitleStyle.Render(" B/E")
 	lines = append(lines, legend)
 
-	result := strings.Join(lines, "\n")
-	resultLines := strings.Split(result, "\n")
-	for len(resultLines) < h {
-		resultLines = append(resultLines, "")
-	}
-	return strings.Join(resultLines[:h], "\n")
+	return padLines(strings.Join(lines, "\n"), h)
 }
 
+// heatmapCellStyled returns a character and style for a heatmap cell.
+// Uses background color with graduated intensity for a proper heatmap effect.
+func heatmapCellStyled(pnl, minPnL, maxPnL float64) (rune, lipgloss.Style) {
+	if maxPnL == minPnL {
+		return ' ', lipgloss.NewStyle()
+	}
+
+	if pnl > 0.1 {
+		intensity := math.Min(pnl/maxPnL, 1.0)
+		// Graduated green: darker bg for low intensity, brighter for high
+		var bg, fg lipgloss.Color
+		if intensity > 0.8 {
+			bg = lipgloss.Color("#1a3a1a")
+			fg = ColorGreen
+			return '\u2588', lipgloss.NewStyle().Foreground(fg).Background(bg) // █
+		} else if intensity > 0.5 {
+			bg = lipgloss.Color("#1a2a1a")
+			fg = ColorGreen
+			return '\u2593', lipgloss.NewStyle().Foreground(fg).Background(bg) // ▓
+		} else if intensity > 0.2 {
+			bg = lipgloss.Color("#1a2518")
+			fg = lipgloss.Color("#6aaa6a")
+			return '\u2592', lipgloss.NewStyle().Foreground(fg).Background(bg) // ▒
+		}
+		return '\u2591', lipgloss.NewStyle().Foreground(lipgloss.Color("#4a8a4a")) // ░
+	} else if pnl < -0.1 {
+		intensity := math.Min(math.Abs(pnl)/math.Abs(minPnL), 1.0)
+		var bg, fg lipgloss.Color
+		if intensity > 0.8 {
+			bg = lipgloss.Color("#3a1520")
+			fg = ColorRed
+			return '\u2588', lipgloss.NewStyle().Foreground(fg).Background(bg)
+		} else if intensity > 0.5 {
+			bg = lipgloss.Color("#2a1520")
+			fg = ColorRed
+			return '\u2593', lipgloss.NewStyle().Foreground(fg).Background(bg)
+		} else if intensity > 0.2 {
+			bg = lipgloss.Color("#251518")
+			fg = lipgloss.Color("#aa5a5a")
+			return '\u2592', lipgloss.NewStyle().Foreground(fg).Background(bg)
+		}
+		return '\u2591', lipgloss.NewStyle().Foreground(lipgloss.Color("#8a4a4a"))
+	}
+
+	return '\u00B7', lipgloss.NewStyle().Foreground(ColorSubtext0) // near-zero: middle dot
+}
+
+// interpolateDTEs adds midpoint DTEs between existing keys for smoother heatmap.
 func interpolateDTEs(keys []int) []int {
 	if len(keys) < 2 {
 		return keys
@@ -118,17 +195,22 @@ func interpolateDTEs(keys []int) []int {
 	var result []int
 	for i := 0; i < len(keys)-1; i++ {
 		result = append(result, keys[i])
-		mid := (keys[i] + keys[i+1]) / 2
-		if mid != keys[i] && mid != keys[i+1] {
-			result = append(result, mid)
+		// Add 2 intermediate points for smoother gradient
+		gap := keys[i] - keys[i+1]
+		if gap > 2 {
+			result = append(result, keys[i]-gap/3)
+			result = append(result, keys[i]-2*gap/3)
+		} else if gap > 1 {
+			result = append(result, keys[i]-gap/2)
 		}
 	}
 	result = append(result, keys[len(keys)-1])
 	return result
 }
 
+// interpolateRow generates a row of P&L values for a specific DTE by linear
+// interpolation between known DTE curves.
 func interpolateRow(curves map[string][]data.PayoffPoint, dteKeys []int, dte, w int, minPrice, priceRange float64) []float64 {
-	// Find bracketing DTEs
 	loDTE := dteKeys[len(dteKeys)-1]
 	hiDTE := dteKeys[0]
 	for _, d := range dteKeys {
@@ -167,6 +249,7 @@ func interpolateRow(curves map[string][]data.PayoffPoint, dteKeys []int, dte, w 
 	return row
 }
 
+// lookupPnL finds the P&L at a specific price by linear interpolation on a curve.
 func lookupPnL(curve []data.PayoffPoint, price float64) float64 {
 	if len(curve) == 0 {
 		return 0
@@ -181,29 +264,4 @@ func lookupPnL(curve []data.PayoffPoint, price float64) float64 {
 		return curve[0].PnL
 	}
 	return curve[len(curve)-1].PnL
-}
-
-func heatmapCell(pnl, minPnL, maxPnL float64) (rune, lipgloss.Color, lipgloss.Color) {
-	if maxPnL == minPnL {
-		return ' ', ColorSubtext, ""
-	}
-
-	if pnl > 0 {
-		intensity := math.Min(pnl/maxPnL, 1.0)
-		if intensity > 0.7 {
-			return '\u2588', ColorGreen, "" // full block
-		} else if intensity > 0.3 {
-			return '\u2593', ColorGreen, "" // dark shade
-		}
-		return '\u2591', ColorGreen, "" // light shade
-	} else if pnl < 0 {
-		intensity := math.Min(math.Abs(pnl)/math.Abs(minPnL), 1.0)
-		if intensity > 0.7 {
-			return '\u2588', ColorRed, ""
-		} else if intensity > 0.3 {
-			return '\u2593', ColorRed, ""
-		}
-		return '\u2591', ColorRed, ""
-	}
-	return '\u00B7', ColorSubtext, "" // middle dot
 }

@@ -7,52 +7,54 @@ import (
 	btable "github.com/evertras/bubble-table/table"
 )
 
-// View modes for the main panel
+// ViewMode selects what the main panel displays.
 type ViewMode int
 
 const (
-	ViewPayoff ViewMode = iota
-	ViewGEX
-	ViewGreeks
-	ViewHeatmap
-	ViewDashboard
+	ViewPayoff    ViewMode = iota // 1
+	ViewGEX                       // 2
+	ViewGreeks                    // 3
+	ViewHeatmap                   // 4
+	ViewDashboard                 // 5
 )
 
-// Focus panels
+// Panel identifies which panel has keyboard focus.
 type Panel int
 
 const (
-	PanelLegs Panel = iota
+	PanelLegs     Panel = iota
 	PanelPosition
 	PanelStrategy
 	PanelMain
-	PanelCount // sentinel
+	panelCount // sentinel for cycling
 )
 
+// Model is the top-level Bubble Tea model for the Strader Fly TUI.
 type Model struct {
-	data       *data.ButterflyData
-	width      int
-	height     int
-	ready      bool
+	data   *data.ButterflyData
+	width  int
+	height int
+	ready  bool
+
+	// View state
 	activeView ViewMode
 	focusPanel Panel
 	bitmapMode bool
+	showHelp   bool
 
-	// Sidebar state
+	// Sidebar navigation
 	selectedLeg int
 	strategyIdx int
 	strategies  []string
 
-	// GEX table (bubble-table)
+	// GEX table (evertras/bubble-table)
 	gexTable btable.Model
 
-	// Help overlay
-	showHelp bool
-
-	// Image path for bitmap mode
+	// Image path for bitmap toggle
 	imagePath string
 }
 
+// NewModel creates the initial model from loaded data.
 func NewModel(d *data.ButterflyData, imagePath string) Model {
 	m := Model{
 		data:       d,
@@ -77,7 +79,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
-		mainW := m.width - sidebarWidth - 4
+		mainW := m.mainPanelWidth()
 		if mainW < 20 {
 			mainW = 20
 		}
@@ -86,21 +88,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleKey processes all keyboard input — lazygit-style navigation.
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Help overlay intercepts all keys
 	if m.showHelp {
 		m.showHelp = false
 		return m, nil
 	}
 
-	switch msg.String() {
+	key := msg.String()
+
+	switch key {
 	case "q", "ctrl+c":
 		return m, tea.Quit
+
+	// Panel focus cycling
 	case "tab":
-		m.focusPanel = (m.focusPanel + 1) % PanelCount
+		m.focusPanel = (m.focusPanel + 1) % panelCount
 		return m, nil
 	case "shift+tab":
-		m.focusPanel = (m.focusPanel - 1 + PanelCount) % PanelCount
+		m.focusPanel = (m.focusPanel - 1 + panelCount) % panelCount
 		return m, nil
+
+	// View switching (works regardless of focus)
 	case "1":
 		m.activeView = ViewPayoff
 		m.bitmapMode = false
@@ -116,16 +126,23 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "5":
 		m.activeView = ViewDashboard
 		m.bitmapMode = false
+
+	// Bitmap toggle
 	case "v":
 		m.bitmapMode = !m.bitmapMode
+
+	// Vertical navigation within focused panel
 	case "j", "down":
 		m.navigateDown()
 	case "k", "up":
 		m.navigateUp()
+
+	// Help
 	case "?":
 		m.showHelp = !m.showHelp
+
 	default:
-		// Forward to GEX table when it's focused
+		// Forward unhandled keys to GEX table when it's active
 		if m.focusPanel == PanelMain && m.activeView == ViewGEX && !m.bitmapMode {
 			var cmd tea.Cmd
 			m.gexTable, cmd = m.gexTable.Update(msg)
@@ -167,4 +184,23 @@ func (m *Model) navigateUp() {
 			m.gexTable, _ = m.gexTable.Update(tea.KeyMsg{Type: tea.KeyUp})
 		}
 	}
+}
+
+// Layout helpers
+const sidebarWidth = 26
+
+func (m Model) mainPanelWidth() int {
+	w := m.width - sidebarWidth - 4
+	if w < 20 {
+		return 20
+	}
+	return w
+}
+
+func (m Model) bodyHeight() int {
+	h := m.height - 5 // bottom strip
+	if h < 10 {
+		return 10
+	}
+	return h
 }
