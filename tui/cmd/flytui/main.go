@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-	// Find data directory relative to executable or working directory
 	dataDir := findDataDir()
 
 	d, err := data.Load(filepath.Join(dataDir, "butterfly-sample.json"))
@@ -31,7 +30,6 @@ func main() {
 }
 
 func findDataDir() string {
-	// Try relative paths from common locations
 	candidates := []string{
 		"tui/data",
 		"data",
@@ -43,5 +41,5 @@ func findDataDir() string {
 			return c
 		}
 	}
-	return "tui/data" // fallback
+	return "tui/data"
 }
