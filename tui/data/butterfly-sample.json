@@ -1,0 +1,120 @@
+{
+  "underlying": {
+    "symbol": "SPX",
+    "price": 5842.50,
+    "change": -12.30,
+    "changePct": -0.21,
+    "iv30": 14.2,
+    "iv60": 15.8
+  },
+  "strategy": {
+    "name": "Long Call Butterfly",
+    "type": "butterfly",
+    "variant": "standard",
+    "expiration": "2026-03-20",
+    "dte": 11,
+    "netDebit": 3.40,
+    "maxProfit": 6.60,
+    "maxLoss": 3.40,
+    "breakevens": [5833.40, 5846.60],
+    "legs": [
+      {
+        "strike": 5830,
+        "type": "call",
+        "side": "buy",
+        "qty": 1,
+        "premium": 18.20,
+        "iv": 13.8,
+        "greeks": { "delta": 0.62, "gamma": 0.0032, "theta": -1.85, "vega": 4.12 }
+      },
+      {
+        "strike": 5840,
+        "type": "call",
+        "side": "sell",
+        "qty": 2,
+        "premium": 12.50,
+        "iv": 13.5,
+        "greeks": { "delta": 0.52, "gamma": 0.0035, "theta": -1.92, "vega": 4.28 }
+      },
+      {
+        "strike": 5850,
+        "type": "call",
+        "side": "buy",
+        "qty": 1,
+        "premium": 8.10,
+        "iv": 13.9,
+        "greeks": { "delta": 0.42, "gamma": 0.0031, "theta": -1.78, "vega": 4.05 }
+      }
+    ],
+    "aggregate": {
+      "delta": 0.0,
+      "gamma": -0.0007,
+      "theta": 0.19,
+      "vega": -0.39
+    }
+  },
+  "payoffCurve": {
+    "description": "P&L at expiration across underlying price range",
+    "points": [
+      {"price": 5810, "pnl": -3.40},
+      {"price": 5815, "pnl": -3.40},
+      {"price": 5820, "pnl": -3.40},
+      {"price": 5825, "pnl": -3.40},
+      {"price": 5830, "pnl": -3.40},
+      {"price": 5832, "pnl": -1.40},
+      {"price": 5834, "pnl": 0.60},
+      {"price": 5836, "pnl": 2.60},
+      {"price": 5838, "pnl": 4.60},
+      {"price": 5840, "pnl": 6.60},
+      {"price": 5842, "pnl": 4.60},
+      {"price": 5844, "pnl": 2.60},
+      {"price": 5846, "pnl": 0.60},
+      {"price": 5848, "pnl": -1.40},
+      {"price": 5850, "pnl": -3.40},
+      {"price": 5855, "pnl": -3.40},
+      {"price": 5860, "pnl": -3.40},
+      {"price": 5865, "pnl": -3.40},
+      {"price": 5870, "pnl": -3.40}
+    ]
+  },
+  "payoffByDTE": {
+    "description": "P&L curves at different days-to-expiration showing tent sharpening",
+    "curves": {
+      "30": [
+        {"price": 5810, "pnl": -2.10}, {"price": 5820, "pnl": -1.50}, {"price": 5830, "pnl": -0.40},
+        {"price": 5835, "pnl": 0.80}, {"price": 5840, "pnl": 1.60}, {"price": 5845, "pnl": 0.70},
+        {"price": 5850, "pnl": -0.50}, {"price": 5860, "pnl": -1.60}, {"price": 5870, "pnl": -2.20}
+      ],
+      "15": [
+        {"price": 5810, "pnl": -2.80}, {"price": 5820, "pnl": -2.40}, {"price": 5830, "pnl": -1.20},
+        {"price": 5835, "pnl": 1.40}, {"price": 5840, "pnl": 3.80}, {"price": 5845, "pnl": 1.30},
+        {"price": 5850, "pnl": -1.30}, {"price": 5860, "pnl": -2.50}, {"price": 5870, "pnl": -2.90}
+      ],
+      "7": [
+        {"price": 5810, "pnl": -3.10}, {"price": 5820, "pnl": -3.00}, {"price": 5830, "pnl": -2.20},
+        {"price": 5835, "pnl": 2.00}, {"price": 5840, "pnl": 5.20}, {"price": 5845, "pnl": 1.90},
+        {"price": 5850, "pnl": -2.30}, {"price": 5860, "pnl": -3.10}, {"price": 5870, "pnl": -3.20}
+      ],
+      "1": [
+        {"price": 5810, "pnl": -3.35}, {"price": 5820, "pnl": -3.35}, {"price": 5830, "pnl": -3.20},
+        {"price": 5835, "pnl": 3.10}, {"price": 5840, "pnl": 6.40}, {"price": 5845, "pnl": 3.00},
+        {"price": 5850, "pnl": -3.25}, {"price": 5860, "pnl": -3.38}, {"price": 5870, "pnl": -3.40}
+      ]
+    }
+  },
+  "greeksByStrike": {
+    "description": "Greek values across strike range — shows the sign-flip zones",
+    "strikes": [5810, 5815, 5820, 5825, 5830, 5835, 5840, 5845, 5850, 5855, 5860, 5865, 5870],
+    "delta":   [0.00, 0.01, 0.03, 0.06, 0.10, 0.06, 0.00, -0.06, -0.10, -0.06, -0.03, -0.01, 0.00],
+    "gamma":   [0.001, 0.002, 0.003, 0.002, -0.001, -0.004, -0.007, -0.004, -0.001, 0.002, 0.003, 0.002, 0.001],
+    "theta":   [-0.02, -0.04, -0.06, -0.02, 0.05, 0.12, 0.19, 0.12, 0.05, -0.02, -0.06, -0.04, -0.02],
+    "vega":    [0.05, 0.10, 0.18, 0.08, -0.10, -0.28, -0.39, -0.28, -0.10, 0.08, 0.18, 0.10, 0.05]
+  },
+  "gexMatrix": {
+    "description": "Gamma Exposure by strike — sample dealer positioning data",
+    "strikes": [5800, 5810, 5820, 5830, 5840, 5850, 5860, 5870, 5880],
+    "callGex":  [120, 185, 340, 520, 890, 410, 280, 150, 95],
+    "putGex":   [-80, -140, -260, -380, -610, -290, -180, -110, -65],
+    "netGex":   [40, 45, 80, 140, 280, 120, 100, 40, 30]
+  }
+}
