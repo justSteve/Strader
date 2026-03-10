@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/NimbleMarkets/ntcharts/sparkline"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gastown/strader-flytui/internal/graphics"
 )
@@ -34,7 +35,7 @@ func (m Model) View() string {
 	// Join sidebar + main horizontally
 	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, main)
 
-	// Bottom strip
+	// Bottom strip with view selector
 	strip := m.renderBottomStrip()
 
 	return lipgloss.JoinVertical(lipgloss.Left, body, strip)
@@ -54,7 +55,15 @@ func (m Model) renderSidebar(totalH int) string {
 
 func (m Model) renderLegsPanel(w, h int) string {
 	var lines []string
-	for _, leg := range m.data.Strategy.Legs {
+	for i, leg := range m.data.Strategy.Legs {
+		// Selection indicator from slit
+		prefix := "  "
+		if i == m.selectedLeg && m.focusPanel == PanelLegs {
+			prefix = "\u25b6 " // ▶ when focused
+		} else if i == m.selectedLeg {
+			prefix = "\u25cf " // ● when selected but unfocused
+		}
+
 		sign := "+"
 		if leg.Side == "sell" {
 			sign = "-"
@@ -62,11 +71,11 @@ func (m Model) renderLegsPanel(w, h int) string {
 		qty := leg.Qty
 		strike := fmt.Sprintf("%.0f", leg.Strike)
 		optType := strings.ToUpper(leg.Type[:1])
-		delta := fmt.Sprintf("%.2f", leg.Greeks.Delta)
+		delta := fmt.Sprintf("\u0394%+.2f", leg.Greeks.Delta) // Δ prefix
 
-		line := fmt.Sprintf("%s%d %s%s", sign, qty, strike, optType)
-		deltaStr := ValueStyle(leg.Greeks.Delta).Render(fmt.Sprintf("D%s", delta))
-		pad := w - lipgloss.Width(line) - lipgloss.Width(delta) - 3
+		line := fmt.Sprintf("%s%s%d %s%s", prefix, sign, qty, strike, optType)
+		deltaStr := ValueStyle(leg.Greeks.Delta).Render(delta)
+		pad := w - lipgloss.Width(line) - lipgloss.Width(delta) - 1
 		if pad < 1 {
 			pad = 1
 		}
@@ -87,10 +96,11 @@ func (m Model) renderPositionPanel(w, h int) string {
 	agg := m.data.Strategy.Aggregate
 	strat := m.data.Strategy
 
+	// Unicode Greek symbols from slit
 	rows := []struct{ label, value string }{
-		{"Net D", fmt.Sprintf("%+.2f", agg.Delta)},
-		{"Net G", fmt.Sprintf("%+.4f", agg.Gamma)},
-		{"Net T", fmt.Sprintf("%+.2f", agg.Theta)},
+		{"Net \u0394", fmt.Sprintf("%+.2f", agg.Delta)},
+		{"Net \u0393", fmt.Sprintf("%+.4f", agg.Gamma)},
+		{"Net \u0398", fmt.Sprintf("%+.2f", agg.Theta)},
 		{"Net V", fmt.Sprintf("%+.2f", agg.Vega)},
 		{"Debit", fmt.Sprintf("%.2f", strat.NetDebit)},
 		{"MaxP", fmt.Sprintf("%.2f", strat.MaxProfit)},
@@ -105,9 +115,8 @@ func (m Model) renderPositionPanel(w, h int) string {
 			pad = 1
 		}
 		val := r.value
-		// Color-code the Greek values
 		switch r.label {
-		case "Net D", "Net G", "Net T", "Net V":
+		case "Net \u0394", "Net \u0393", "Net \u0398", "Net V":
 			var v float64
 			fmt.Sscanf(r.value, "%f", &v)
 			val = ValueStyle(v).Render(r.value)
@@ -130,18 +139,25 @@ func (m Model) renderPositionPanel(w, h int) string {
 }
 
 func (m Model) renderStrategyPanel(w, h int) string {
-	variants := []string{"Standard Fly", "Iron Fly", "Broken Wing"}
 	var lines []string
-	for i, v := range variants {
+	for i, v := range m.strategies {
 		prefix := "  "
-		if i == m.strategyIdx {
-			prefix = HighlightStyle.Render("> ")
+		if i == m.strategyIdx && m.focusPanel == PanelStrategy {
+			prefix = HighlightStyle.Render("\u25b6 ") // ▶
+			v = HighlightStyle.Render(v)
+		} else if i == m.strategyIdx {
+			prefix = HighlightStyle.Render("\u25cf ") // ●
 			v = HighlightStyle.Render(v)
 		} else {
 			v = SubtitleStyle.Render(v)
 		}
 		lines = append(lines, prefix+v)
 	}
+
+	// DTE and expiration from slit
+	lines = append(lines, "")
+	lines = append(lines, SubtitleStyle.Render(
+		fmt.Sprintf("DTE: %d  Exp: %s", m.data.Strategy.DTE, m.data.Strategy.Expiration)))
 
 	content := strings.Join(lines, "\n")
 	for len(strings.Split(content, "\n")) < h {
@@ -190,28 +206,85 @@ func (m Model) renderMainPanel(w, h int) string {
 	return style.Render(titleRendered + "\n" + content)
 }
 
+// renderBottomStrip renders the bottom bar with mini Greek sparklines (ntcharts),
+// a view selector showing the active view, and a BITMAP indicator.
 func (m Model) renderBottomStrip() string {
-	greekLabels := []string{"D", "G", "T", "V"}
-	greekData := [][]float64{
-		m.data.GreeksByStrike.Delta,
-		m.data.GreeksByStrike.Gamma,
-		m.data.GreeksByStrike.Theta,
-		m.data.GreeksByStrike.Vega,
-	}
-	greekColors := []lipgloss.Color{ColorGreen, ColorMauve, ColorYellow, ColorRed}
+	gs := m.data.GreeksByStrike
+	stripW := m.width - 4
 
-	sparkWidth := (m.width - 8) / 4
-	if sparkWidth < 8 {
-		sparkWidth = 8
+	sparkW := (stripW - 40) / 4
+	if sparkW < 5 {
+		sparkW = 5
 	}
 
-	var sparks []string
-	for i, label := range greekLabels {
-		spark := renderMiniSparkline(greekData[i], sparkWidth, greekColors[i])
-		sparks = append(sparks, lipgloss.NewStyle().Foreground(greekColors[i]).Render(label)+" "+spark)
+	type miniGreek struct {
+		label  string
+		values []float64
+		color  lipgloss.Color
+	}
+	greeks := []miniGreek{
+		{"\u0394", gs.Delta, ColorGreen},
+		{"\u0393", gs.Gamma, ColorMauve},
+		{"\u0398", gs.Theta, ColorYellow},
+		{"V", gs.Vega, ColorBlue},
 	}
 
-	strip := lipgloss.JoinHorizontal(lipgloss.Center, sparks[0], "  ", sparks[1], "  ", sparks[2], "  ", sparks[3])
+	var parts []string
+	for _, g := range greeks {
+		if len(g.values) == 0 {
+			continue
+		}
+		minV, _ := greekMinMax(g.values)
+		offset := 0.0
+		if minV < 0 {
+			offset = -minV
+		}
+		scaled := make([]float64, len(g.values))
+		for i, v := range g.values {
+			scaled[i] = v + offset
+		}
+
+		sl := sparkline.New(sparkW, 1,
+			sparkline.WithStyle(lipgloss.NewStyle().Foreground(g.color)),
+		)
+		sl.PushAll(scaled)
+		sl.Draw()
+
+		label := lipgloss.NewStyle().Foreground(g.color).Bold(true).Render(g.label)
+		parts = append(parts, " "+label+" "+sl.View()+" ")
+	}
+
+	// View selector bar from slit
+	viewName := "["
+	views := []struct {
+		key  string
+		mode ViewMode
+	}{
+		{"1:Payoff", ViewPayoff},
+		{"2:GEX", ViewGEX},
+		{"3:Greeks", ViewGreeks},
+		{"4:Heatmap", ViewHeatmap},
+		{"5:Dash", ViewDashboard},
+	}
+	for i, v := range views {
+		if v.mode == m.activeView {
+			viewName += MauveStyle.Render(v.key)
+		} else {
+			viewName += SubtitleStyle.Render(v.key)
+		}
+		if i < len(views)-1 {
+			viewName += " "
+		}
+	}
+	viewName += "]"
+
+	bm := ""
+	if m.bitmapMode {
+		bm = HighlightStyle.Render(" [BITMAP]")
+	}
+	status := viewName + bm + SubtitleStyle.Render(" ?=help q=quit")
+
+	strip := strings.Join(parts, "\u2502") + "  " + status
 
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -255,45 +328,4 @@ func (m Model) panelStyle(p Panel, w, h int) lipgloss.Style {
 		return ActiveBorderStyle.Width(w).Height(h)
 	}
 	return InactiveBorderStyle.Width(w).Height(h)
-}
-
-// renderMiniSparkline renders a small sparkline using block characters.
-func renderMiniSparkline(values []float64, width int, color lipgloss.Color) string {
-	if len(values) == 0 {
-		return ""
-	}
-
-	// Normalize values to 0-7 range for block characters
-	minV, maxV := values[0], values[0]
-	for _, v := range values {
-		if v < minV {
-			minV = v
-		}
-		if v > maxV {
-			maxV = v
-		}
-	}
-
-	blocks := []rune{' ', '\u2581', '\u2582', '\u2583', '\u2584', '\u2585', '\u2586', '\u2587', '\u2588'}
-	rangeV := maxV - minV
-	if rangeV == 0 {
-		rangeV = 1
-	}
-
-	// Resample to fit width
-	result := make([]rune, width)
-	for i := 0; i < width; i++ {
-		idx := i * (len(values) - 1) / (width - 1)
-		if idx >= len(values) {
-			idx = len(values) - 1
-		}
-		normalized := (values[idx] - minV) / rangeV
-		blockIdx := int(normalized * 8)
-		if blockIdx > 8 {
-			blockIdx = 8
-		}
-		result[i] = blocks[blockIdx]
-	}
-
-	return lipgloss.NewStyle().Foreground(color).Render(string(result))
 }

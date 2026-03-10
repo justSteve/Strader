@@ -2,136 +2,73 @@ package ui
 
 import (
 	"fmt"
-	"math"
-	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	btable "github.com/evertras/bubble-table/table"
 )
 
-// renderGEXMatrix renders the Gamma Exposure table with color-coded values.
-func (m Model) renderGEXMatrix(w, h int) string {
+const (
+	colStrike  = "strike"
+	colCallGEX = "callgex"
+	colPutGEX  = "putgex"
+	colNetGEX  = "netgex"
+)
+
+func (m Model) buildGEXTable(width int) btable.Model {
 	gex := m.data.GEXMatrix
-	if len(gex.Strikes) == 0 {
-		return "No GEX data"
+	colW := (width - 4) / 4
+	if colW < 10 {
+		colW = 10
 	}
 
-	// Find max magnitude for intensity scaling
-	maxMag := 0.0
-	for _, v := range gex.CallGEX {
-		if math.Abs(v) > maxMag {
-			maxMag = math.Abs(v)
-		}
-	}
-	for _, v := range gex.PutGEX {
-		if math.Abs(v) > maxMag {
-			maxMag = math.Abs(v)
-		}
-	}
-	if maxMag == 0 {
-		maxMag = 1
+	columns := []btable.Column{
+		btable.NewColumn(colStrike, "Strike", colW),
+		btable.NewColumn(colCallGEX, "Call GEX", colW),
+		btable.NewColumn(colPutGEX, "Put GEX", colW),
+		btable.NewColumn(colNetGEX, "Net GEX", colW),
 	}
 
-	// Column widths
-	strikeW := 8
-	gexW := 10
+	rows := make([]btable.Row, len(gex.Strikes))
+	for i := range gex.Strikes {
+		rows[i] = btable.NewRow(btable.RowData{
+			colStrike:  fmt.Sprintf("%.0f", gex.Strikes[i]),
+			colCallGEX: gexCell(gex.CallGEX[i]),
+			colPutGEX:  gexCell(gex.PutGEX[i]),
+			colNetGEX:  gexCell(gex.NetGEX[i]),
+		})
+	}
 
-	// Header
-	header := fmt.Sprintf("%-*s %*s %*s %*s",
-		strikeW, "Strike",
-		gexW, "Call GEX",
-		gexW, "Put GEX",
-		gexW, "Net GEX")
-	headerStyled := lipgloss.NewStyle().
+	baseStyle := lipgloss.NewStyle().
+		Foreground(ColorText).
+		Padding(0, 1)
+
+	headerStyle := lipgloss.NewStyle().
 		Foreground(ColorBlue).
 		Bold(true).
-		Render(header)
+		Padding(0, 1)
 
-	sep := lipgloss.NewStyle().
-		Foreground(ColorOverlay).
-		Render(strings.Repeat("─", strikeW+gexW*3+3))
+	t := btable.New(columns).
+		WithRows(rows).
+		WithBaseStyle(baseStyle).
+		HeaderStyle(headerStyle).
+		Focused(true).
+		SortByDesc(colNetGEX).
+		WithTargetWidth(width - 2)
 
-	var lines []string
-	lines = append(lines, headerStyled)
-	lines = append(lines, sep)
-
-	for i, strike := range gex.Strikes {
-		callV := gex.CallGEX[i]
-		putV := gex.PutGEX[i]
-		netV := gex.NetGEX[i]
-
-		strikeStr := fmt.Sprintf("%-*s", strikeW, fmt.Sprintf("%.0f", strike))
-
-		callStr := gexValueStyled(callV, maxMag, gexW)
-		putStr := gexValueStyled(putV, maxMag, gexW)
-		netStr := gexValueStyled(netV, maxMag, gexW)
-
-		// Highlight the ATM strike
-		if strike == 5840 {
-			strikeStr = HighlightStyle.Render(strikeStr)
-		} else {
-			strikeStr = lipgloss.NewStyle().Foreground(ColorText).Render(strikeStr)
-		}
-
-		line := strikeStr + " " + callStr + " " + putStr + " " + netStr
-		lines = append(lines, line)
-	}
-
-	// Bar visualization
-	lines = append(lines, "")
-	lines = append(lines, TitleStyle.Render("Net GEX Distribution"))
-	maxNet := 0.0
-	for _, v := range gex.NetGEX {
-		if v > maxNet {
-			maxNet = v
-		}
-	}
-	barW := w - 14
-	if barW < 10 {
-		barW = 10
-	}
-	for i, strike := range gex.Strikes {
-		barLen := int(float64(barW) * gex.NetGEX[i] / maxNet)
-		if barLen < 0 {
-			barLen = 0
-		}
-		bar := strings.Repeat("█", barLen)
-		label := fmt.Sprintf("%.0f ", strike)
-
-		intensity := gex.NetGEX[i] / maxNet
-		var barColor lipgloss.Color
-		if intensity > 0.7 {
-			barColor = ColorGreen
-		} else if intensity > 0.3 {
-			barColor = ColorYellow
-		} else {
-			barColor = ColorOverlay
-		}
-
-		lines = append(lines, SubtitleStyle.Render(label)+lipgloss.NewStyle().Foreground(barColor).Render(bar))
-	}
-
-	result := strings.Join(lines, "\n")
-	resultLines := strings.Split(result, "\n")
-	for len(resultLines) < h {
-		resultLines = append(resultLines, "")
-	}
-	return strings.Join(resultLines[:h], "\n")
+	return t
 }
 
-func gexValueStyled(v, maxMag float64, width int) string {
-	str := fmt.Sprintf("%*s", width, fmt.Sprintf("%+.0f", v))
-	intensity := math.Abs(v) / maxMag
-
+func gexCell(v float64) string {
+	s := fmt.Sprintf("%+.0f", v)
 	if v > 0 {
-		if intensity > 0.5 {
-			return lipgloss.NewStyle().Foreground(ColorGreen).Bold(true).Render(str)
-		}
-		return lipgloss.NewStyle().Foreground(ColorGreen).Render(str)
+		return PositiveStyle.Render(s)
 	} else if v < 0 {
-		if intensity > 0.5 {
-			return lipgloss.NewStyle().Foreground(ColorRed).Bold(true).Render(str)
-		}
-		return lipgloss.NewStyle().Foreground(ColorRed).Render(str)
+		return NegativeStyle.Render(s)
 	}
-	return lipgloss.NewStyle().Foreground(ColorText).Render(str)
+	return s
+}
+
+func (m Model) renderGEXMatrix(w, h int) string {
+	title := TitleStyle.Render("GEX Matrix \u2014 Gamma Exposure by Strike") + "\n\n"
+	return title + m.gexTable.View()
 }

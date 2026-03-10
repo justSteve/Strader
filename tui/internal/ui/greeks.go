@@ -2,173 +2,114 @@ package ui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
+	"github.com/NimbleMarkets/ntcharts/sparkline"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// renderGreekProfiles renders 4 sparkline panels for delta/gamma/theta/vega
-// across the strike range, with zero-crossing labels.
+// renderGreekProfiles renders 4 sparklines (delta, gamma, theta, vega) across strike range
+// using ntcharts sparkline with configurable height.
 func (m Model) renderGreekProfiles(w, h int) string {
-	greeks := m.data.GreeksByStrike
-	if len(greeks.Strikes) == 0 {
-		return "No Greeks data"
+	title := TitleStyle.Render("Greek Profiles \u2014 Across Strike Range") + "\n"
+
+	gs := m.data.GreeksByStrike
+	if len(gs.Strikes) == 0 {
+		return title + "No data"
 	}
 
-	profiles := []struct {
-		name   string
-		symbol string
-		data   []float64
-		color  lipgloss.Color
-	}{
-		{"Delta", "D", greeks.Delta, ColorGreen},
-		{"Gamma", "G", greeks.Gamma, ColorMauve},
-		{"Theta", "T", greeks.Theta, ColorYellow},
-		{"Vega", "V", greeks.Vega, ColorRed},
-	}
-
-	panelH := (h - 2) / 4
-	if panelH < 3 {
-		panelH = 3
-	}
 	sparkW := w - 16
+	sparkH := (h - 6) / 4
+	if sparkH < 2 {
+		sparkH = 2
+	}
+	if sparkW < 10 {
+		return title + "Terminal too small"
+	}
 
-	var sections []string
+	type greekProfile struct {
+		name   string
+		values []float64
+		color  lipgloss.Color
+	}
+	profiles := []greekProfile{
+		{"\u0394 Delta", gs.Delta, ColorGreen},
+		{"\u0393 Gamma", gs.Gamma, ColorMauve},
+		{"\u0398 Theta", gs.Theta, ColorYellow},
+		{"V Vega", gs.Vega, ColorBlue},
+	}
+
+	var sb strings.Builder
+	sb.WriteString(title)
 
 	for _, prof := range profiles {
-		// Find zero crossing
-		zeroCross := ""
-		for i := 0; i < len(prof.data)-1; i++ {
-			if (prof.data[i] >= 0 && prof.data[i+1] < 0) || (prof.data[i] <= 0 && prof.data[i+1] > 0) {
-				zeroCross = fmt.Sprintf("%.0f", greeks.Strikes[i])
-				break
-			}
+		// Scale values to positive range for sparkline (ntcharts requires non-negative)
+		minV, maxV := greekMinMax(prof.values)
+		offset := 0.0
+		if minV < 0 {
+			offset = -minV
+		}
+		scaled := make([]float64, len(prof.values))
+		for i, v := range prof.values {
+			scaled[i] = v + offset
 		}
 
-		// Find min/max
-		minV, maxV := prof.data[0], prof.data[0]
-		for _, v := range prof.data {
-			if v < minV {
-				minV = v
-			}
-			if v > maxV {
-				maxV = v
-			}
-		}
+		sl := sparkline.New(sparkW, sparkH,
+			sparkline.WithMaxValue(maxV+offset),
+			sparkline.WithStyle(lipgloss.NewStyle().Foreground(prof.color)),
+		)
+		sl.PushAll(scaled)
+		sl.Draw()
 
-		// Build sparkline with block chars
-		sparkline := renderSparklineChart(prof.data, sparkW, panelH-1, prof.color)
+		label := lipgloss.NewStyle().
+			Width(12).
+			Foreground(prof.color).
+			Bold(true).
+			Render(prof.name)
 
-		// Header line
-		header := lipgloss.NewStyle().Foreground(prof.color).Bold(true).Render(
-			fmt.Sprintf(" %s %-6s", prof.symbol, prof.name))
-		rangeStr := SubtitleStyle.Render(
-			fmt.Sprintf("[%+.3f..%+.3f]", minV, maxV))
+		zeroCross := findZeroCrossing(prof.values, gs.Strikes)
 
-		crossStr := ""
+		sb.WriteString(label + sl.View() + "\n")
+		info := fmt.Sprintf("             min:%+.4f  max:%+.4f", minV, maxV)
 		if zeroCross != "" {
-			crossStr = lipgloss.NewStyle().Foreground(ColorYellow).Render(
-				fmt.Sprintf(" 0@%s", zeroCross))
+			info += "  zero:" + zeroCross
 		}
-
-		sections = append(sections, header+"  "+rangeStr+crossStr)
-		sections = append(sections, sparkline)
-		sections = append(sections, "") // spacer
+		sb.WriteString(SubtitleStyle.Render(info) + "\n")
 	}
 
-	// X-axis with strike labels
-	xLabels := "         "
-	step := sparkW / 5
-	for i := 0; i <= 4; i++ {
-		idx := i * (len(greeks.Strikes) - 1) / 4
-		if idx >= len(greeks.Strikes) {
-			idx = len(greeks.Strikes) - 1
-		}
-		label := fmt.Sprintf("%.0f", greeks.Strikes[idx])
-		pad := step - len(label)
-		if pad < 0 {
-			pad = 0
-		}
-		xLabels += label + strings.Repeat(" ", pad)
+	// Strike axis labels
+	sb.WriteString("\n")
+	sb.WriteString(SubtitleStyle.Render(fmt.Sprintf("             %.0f", gs.Strikes[0])))
+	padding := sparkW - 10
+	if padding > 0 {
+		sb.WriteString(strings.Repeat(" ", padding))
 	}
-	sections = append(sections, SubtitleStyle.Render(xLabels))
+	sb.WriteString(SubtitleStyle.Render(fmt.Sprintf("%.0f", gs.Strikes[len(gs.Strikes)-1])))
 
-	result := strings.Join(sections, "\n")
-	resultLines := strings.Split(result, "\n")
-	for len(resultLines) < h {
-		resultLines = append(resultLines, "")
-	}
-	return strings.Join(resultLines[:h], "\n")
+	return sb.String()
 }
 
-// renderSparklineChart renders a multi-row sparkline using block characters.
-func renderSparklineChart(values []float64, w, h int, color lipgloss.Color) string {
-	if len(values) == 0 || w <= 0 || h <= 0 {
-		return ""
-	}
-
-	// Find min/max
-	minV, maxV := values[0], values[0]
-	for _, v := range values {
-		if v < minV {
-			minV = v
+func greekMinMax(vals []float64) (float64, float64) {
+	mn, mx := math.MaxFloat64, -math.MaxFloat64
+	for _, v := range vals {
+		if v < mn {
+			mn = v
 		}
-		if v > maxV {
-			maxV = v
+		if v > mx {
+			mx = v
 		}
 	}
-	rangeV := maxV - minV
-	if rangeV == 0 {
-		rangeV = 1
-	}
+	return mn, mx
+}
 
-	// Resample values to width
-	resampled := make([]float64, w)
-	for i := 0; i < w; i++ {
-		srcIdx := float64(i) * float64(len(values)-1) / float64(w-1)
-		lo := int(srcIdx)
-		hi := lo + 1
-		if hi >= len(values) {
-			hi = len(values) - 1
+func findZeroCrossing(vals []float64, strikes []float64) string {
+	for i := 1; i < len(vals); i++ {
+		if (vals[i-1] > 0 && vals[i] < 0) || (vals[i-1] < 0 && vals[i] > 0) {
+			frac := vals[i-1] / (vals[i-1] - vals[i])
+			cross := strikes[i-1] + frac*(strikes[i]-strikes[i-1])
+			return fmt.Sprintf("~%.0f", cross)
 		}
-		frac := srcIdx - float64(lo)
-		resampled[i] = values[lo]*(1-frac) + values[hi]*frac
 	}
-
-	// Blocks per character cell: using 8 sub-levels
-	blocks := []rune{' ', '\u2581', '\u2582', '\u2583', '\u2584', '\u2585', '\u2586', '\u2587', '\u2588'}
-	totalLevels := h * 8
-
-	// Normalize values to [0, totalLevels]
-	normalized := make([]int, w)
-	for i, v := range resampled {
-		n := int(float64(totalLevels) * (v - minV) / rangeV)
-		if n < 0 {
-			n = 0
-		}
-		if n > totalLevels {
-			n = totalLevels
-		}
-		normalized[i] = n
-	}
-
-	// Build grid bottom-up
-	var rows []string
-	for row := h - 1; row >= 0; row-- {
-		var line strings.Builder
-		line.WriteString("         ") // left margin
-		for col := 0; col < w; col++ {
-			level := normalized[col] - row*8
-			if level <= 0 {
-				line.WriteRune(' ')
-			} else if level >= 8 {
-				line.WriteRune(blocks[8])
-			} else {
-				line.WriteRune(blocks[level])
-			}
-		}
-		rows = append([]string{lipgloss.NewStyle().Foreground(color).Render(line.String())}, rows...)
-	}
-
-	return strings.Join(rows, "\n")
+	return ""
 }
