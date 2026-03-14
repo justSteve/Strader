@@ -1,0 +1,2 @@
+{"id":"st-001","type":"task","status":"closed","created":"2026-03-14","closed":"2026-03-14","description":"Python environment setup: fix .gitignore, organize Schwab scripts to /brokers/schwab, configure venv"}
+{"id":"st-002","type":"task","status":"open","created":"2026-03-14","description":"Tastytrade API integration: review justSteve/tastytrade repo, create brokers/tastytrade, baseline auth flow"}

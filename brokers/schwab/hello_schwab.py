@@ -33,7 +33,7 @@ def main():
 
     print("Authenticating with Schwab API...")
     try:
-        c = auth.easy_client(api_key, app_secret, callback_url, token_path)
+        c = auth.easy_client(api_key, app_secret, callback_url, token_path, interactive=False)
         print("✓ Authentication successful")
     except Exception as e:
         print(f"[ALERT] Authentication failed: {e}")
@@ -61,3 +61,4 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+

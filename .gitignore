@@ -7,7 +7,6 @@ dist/
 # Environment
 .env
 .env.local
-tokens/
 
 # Data (runtime, not tracked)
 data/
@@ -20,13 +19,13 @@ data/
 .beads/*.tmp
 .beads/snapshots/
 
-# Dolt database files (added by bd init)
-.dolt/
-*.db
-
-# Gas Town (added by gt)
-.runtime/
-.claude/
-.logs/
+# Python
 __pycache__/
-tui/flytui
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
