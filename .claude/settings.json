@@ -4,6 +4,9 @@
       "Edit(*)",
       "Write(*)",
       "MultiEdit(*)",
+      "Read(*)",
+      "Glob(*)",
+      "Grep(*)",
       "Bash(cd *)",
       "Bash(echo *)",
       "Bash(pwd *)",
@@ -15,10 +18,10 @@
       "Bash(gh *)",
       "Bash(gt *)",
       "Bash(bd *)",
-      "Bash(bun *)",
       "Bash(npm *)",
       "Bash(npx *)",
       "Bash(node *)",
+      "Bash(python3 *)",
       "Bash(curl *)",
       "Bash(bash *)",
       "Bash(sh *)",
@@ -42,10 +45,7 @@
       "Bash(timeout *)",
       "Bash(tee *)",
       "mcp__fetch__fetch",
-      "mcp__github__*",
-      "Read(*)",
-      "Glob(*)",
-      "Grep(*)"
+      "mcp__github__*"
     ],
     "deny": [
       "Read(.env)",
@@ -54,8 +54,6 @@
       "Read(**/.env.*)",
       "Read(**/*credentials*)",
       "Read(**/*secret*)",
-      "Read(//**/id_rsa)",
-      "Read(//**/id_ed25519)",
       "Edit(.env)",
       "Edit(.env.*)",
       "Edit(**/.env)",
@@ -75,5 +73,56 @@
       },
       "type": "stdio"
     }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/root/projects/gtOps/ECC/hooks/perm-audit-hook.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "inotifywait -m -e modify /var/moo/strader/positions.jsonl",
+            "description": "position-change-alert: position-change-alert: position-change-alert: Reactive: position-change-alert (file_change)"
+          },
+          {
+            "type": "command",
+            "command": "claude --skill greeks-analysis",
+            "description": "position-change-alert: position-change-alert: position-change-alert: Reactive: position-change-alert (file_change)"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "claude --skill risk-limit-enforcement",
+            "description": "risk-breach: risk-breach: Reactive: risk-breach (skill_output)"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "claude --skill entry-signal-evaluation --context \"Incoming market intel from Discord. Evaluate for actionable trade setups. Cross-reference with current positions.\"",
+            "description": "discord-intel: Reactive: discord-intel (channel_message)"
+          }
+        ],
+        "matcher": "capability == \"discord-intel\""
+      }
+    ]
   }
 }

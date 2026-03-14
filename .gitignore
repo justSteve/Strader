@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+tui/flytui
 
 # Environment
 .env
@@ -10,6 +11,7 @@ dist/
 
 # Data (runtime, not tracked)
 data/
+tokens/
 
 # Claude Code local settings (security)
 .claude/settings.local.json
