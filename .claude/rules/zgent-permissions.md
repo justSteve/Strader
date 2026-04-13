@@ -19,7 +19,7 @@ Strader is a Consumer tier zgent — it consumes intel from service providers an
 - Use environment variables or gitignored .env files
 
 ## MCP Access
-- TradeStation MCP server for market data and order APIs
+- TradingView MCP server for chart control, market data, Pine Script, and screenshot capture (owned instrument)
 - Fetch MCP for external data retrieval
 - GitHub MCP for repository operations (own repo only)
 
