@@ -13,7 +13,7 @@
       "Bash(true *)",
       "Bash(git *)",
       "Bash(gh *)",
-      "Bash(gt *)",
+      "Bash(gc *)",
       "Bash(bd *)",
       "Bash(bun *)",
       "Bash(npm *)",
@@ -43,6 +43,7 @@
       "Bash(tee *)",
       "mcp__fetch__fetch",
       "mcp__github__*",
+      "mcp__tradingview__*",
       "Read(*)",
       "Glob(*)",
       "Grep(*)"
@@ -63,17 +64,12 @@
     ]
   },
   "mcpServers": {
-    "tradestation": {
-      "command": "npx",
+    "tradingview": {
+      "command": "node",
       "args": [
-        "-y",
-        "@tradestation/mcp-server"
+        "/root/projects/tradingview-mcp/src/server.js"
       ],
-      "env": {
-        "TS_API_KEY": "${TS_API_KEY}",
-        "TS_API_SECRET": "${TS_API_SECRET}"
-      },
-      "type": "stdio"
+      "env": {}
     }
   }
 }
