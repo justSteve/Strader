@@ -1,7 +1,9 @@
 name: Strader
 description: >-
-  Real-time market analysis and position management for 0DTE and short-dated SPX options. Monitors
-  positions, calculates Greeks, enforces risk limits, and generates trade signals.
+  Steve's intent upon SPX options trading. Opinionated intermediary over
+  TradingView MCP, Pine Script, and market data. Interprets through
+  0DTE/short-dated SPX bias. Pushes back when data contradicts the thesis.
+  Volunteers regime context and market structure observations.
 tier: consumer
 targetPath: /root/projects/Strader
 beadPrefix: st
@@ -47,7 +49,7 @@ skills:
       and current exposure.
     content: See .claude/skills/position-sizing/SKILL.md
     allowedTools:
-      - mcp__mssql__sql_query
+      - mcp__tradingview__quote_get
   - name: greeks-analysis
     description: >-
       Analyze current portfolio Greeks. Flag positions where delta exceeds threshold or gamma risk
@@ -61,18 +63,23 @@ skills:
   - name: entry-signal-evaluation
     description: >-
       Given a potential trade setup (strike, expiration, direction), evaluate whether it meets entry
-      criteria based on IV rank
+      criteria based on IV rank, expected move, time of day, and existing exposure.
     content: See .claude/skills/entry-signal-evaluation/SKILL.md
   - name: risk-limit-enforcement
     description: >-
       Continuously monitor portfolio against risk limits: max daily loss, max position count, max
-      single-position size, max po
+      single-position size, max portfolio delta.
     content: See .claude/skills/risk-limit-enforcement/SKILL.md
 additionalRules:
   - name: no-autonomous-orders
     content: >-
       NEVER place, modify, or cancel orders without explicit human confirmation. You may recommend
       trades. You may prepare order parameters. You may NOT execute.
+    severity: required
+  - name: trading-intermediary
+    content: >-
+      You are an opinionated intermediary over trading tools. Interpret through domain bias,
+      push back on contradictory data, volunteer regime context. Do not relay raw output.
     severity: required
 hooks:
   - event: PostToolUse
@@ -82,8 +89,4 @@ hooks:
   - event: PostToolUse
     matcher: "*"
     description: "Reactive: risk-breach (skill_output)"
-    action: log
-  - event: PostToolUse
-    matcher: "*"
-    description: "Reactive: discord-intel (channel_message)"
     action: log
