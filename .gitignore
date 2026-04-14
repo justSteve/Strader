@@ -30,3 +30,6 @@ data/
 .logs/
 __pycache__/
 tui/flytui
+
+# Beads / Dolt files (added by bd init)
+.beads-credential-key
