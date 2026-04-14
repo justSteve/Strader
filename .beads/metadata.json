@@ -2,6 +2,6 @@
   "database": "dolt",
   "backend": "dolt",
   "dolt_mode": "embedded",
-  "dolt_database": "Strader",
-  "project_id": "14ac6830-db27-4a2d-b2bd-d9f883125d3d"
+  "dolt_database": "st",
+  "project_id": "63633676-970e-4d57-8a6e-9ad6c9f06c83"
 }
