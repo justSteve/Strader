@@ -26,10 +26,22 @@ data/
 
 # Gas Town (added by gt)
 .runtime/
-.claude/
 .logs/
 __pycache__/
 tui/flytui
 
 # Beads / Dolt files (added by bd init)
 .beads-credential-key
+
+# Enterprise standard entries
+.beads/beads.db
+.beads/beads.db-shm
+.beads/beads.db-wal
+.beads/daemon.lock
+.beads/daemon.log
+.beads/daemon.pid
+.beads/bd.sock
+.beads/.local_version
+.beads/last-touched
+.venv/
+*.pyc
