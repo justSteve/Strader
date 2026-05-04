@@ -45,3 +45,7 @@ tui/flytui
 .beads/last-touched
 .venv/
 *.pyc
+
+# Session state (checkpoint, snapshot — runtime only)
+.claude/state/
+session-briefing.md

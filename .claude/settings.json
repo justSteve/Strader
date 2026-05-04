@@ -15,6 +15,15 @@
       {
         "hooks": [
           {
+            "command": "/root/projects/Strader/.claude/hooks/scripts/session-start.sh",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      },
+      {
+        "hooks": [
+          {
             "command": "bd prime",
             "type": "command"
           }
