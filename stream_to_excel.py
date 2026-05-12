@@ -122,22 +122,20 @@ async def main():
 
     api_key = os.getenv('SCHWAB_API_KEY')
     app_secret = os.getenv('SCHWAB_APP_SECRET')
-    callback_url = os.getenv('SCHWAB_CALLBACK_URL', 'https://127.0.0.1:8182/')
     token_path = os.getenv('SCHWAB_TOKEN_PATH', './tokens/schwab_token.json')
 
     if not api_key or not app_secret:
         print("[ALERT] Missing SCHWAB_API_KEY or SCHWAB_APP_SECRET")
         return 1
 
-    # Check token exists
     if not Path(token_path).exists():
-        print("[ALERT] Token not found. Run hello_schwab.py first to authenticate.")
+        print(f"[ALERT] Token not found at {token_path}")
+        print("Run: schwab-generate-token.py to authenticate first")
         return 1
 
-    # Create client
     print("Connecting to Schwab API...")
     try:
-        c = auth.easy_client(api_key, app_secret, callback_url, token_path)
+        c = auth.client_from_token_file(token_path, api_key, app_secret)
         print("✓ Connected")
     except Exception as e:
         print(f"[ALERT] Authentication failed: {e}")

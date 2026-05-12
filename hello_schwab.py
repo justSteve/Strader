@@ -19,7 +19,7 @@ def main():
 
     api_key = os.getenv('SCHWAB_API_KEY')
     app_secret = os.getenv('SCHWAB_APP_SECRET')
-    callback_url = os.getenv('SCHWAB_CALLBACK_URL', 'https://127.0.0.1:8182/')
+    callback_url = os.getenv('SCHWAB_CALLBACK_URL', 'https://127.0.0.1:8182')
     token_path = os.getenv('SCHWAB_TOKEN_PATH', './tokens/schwab_token.json')
 
     if not api_key or not app_secret:
@@ -28,12 +28,14 @@ def main():
         print("Get credentials from https://developer.schwab.com")
         return 1
 
-    # Ensure token directory exists
-    Path(token_path).parent.mkdir(parents=True, exist_ok=True)
+    if not Path(token_path).exists():
+        print(f"[ALERT] Token not found at {token_path}")
+        print("Run: schwab-generate-token.py to authenticate first")
+        return 1
 
     print("Authenticating with Schwab API...")
     try:
-        c = auth.easy_client(api_key, app_secret, callback_url, token_path)
+        c = auth.client_from_token_file(token_path, api_key, app_secret)
         print("✓ Authentication successful")
     except Exception as e:
         print(f"[ALERT] Authentication failed: {e}")
@@ -48,10 +50,11 @@ def main():
 
         spx = data['$SPX']['quote']
         print("\n$SPX Quote:")
-        print(f"  Last:   {spx['lastPrice']:.2f}")
-        print(f"  Bid:    {spx['bidPrice']:.2f}")
-        print(f"  Ask:    {spx['askPrice']:.2f}")
-        print(f"  Change: {spx['netChange']:.2f} ({spx['netPercentChange']:.2f}%)")
+        print(f"  Last:   {spx.get('lastPrice', 0):.2f}")
+        print(f"  Close:  {spx.get('closePrice', 0):.2f}")
+        print(f"  High:   {spx.get('highPrice', 0):.2f}")
+        print(f"  Low:    {spx.get('lowPrice', 0):.2f}")
+        print(f"  Change: {spx.get('netChange', 0):.2f} ({spx.get('netPercentChange', 0):.2f}%)")
 
         return 0
 
