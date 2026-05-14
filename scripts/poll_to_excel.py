@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 """
 Poll market data from Schwab API and update Excel.
-Simpler alternative to streaming - polls every N seconds.
 Requires: xlwings, Excel running on Windows/Mac
 """
 import sys
-import os
 import time
 from datetime import datetime
 from pathlib import Path
 
-# Add schwab-py submodule to path
-sys.path.insert(0, 'lib/schwab-py')
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from schwab import auth
-from dotenv import load_dotenv
+from schwab.client import create_client
 
 try:
     import xlwings as xw
@@ -34,42 +30,34 @@ class ExcelUpdater:
         self.sheet = None
 
     def setup_workbook(self):
-        """Create or connect to Excel workbook"""
         try:
             self.wb = xw.Book(self.workbook_name)
-            print(f"✓ Connected to: {self.workbook_name}")
-        except:
+            print(f"  Connected to: {self.workbook_name}")
+        except Exception:
             self.wb = xw.Book()
             self.wb.save(self.workbook_name)
-            print(f"✓ Created: {self.workbook_name}")
+            print(f"  Created: {self.workbook_name}")
 
-        # Get or create sheet
         if "Quotes" in [s.name for s in self.wb.sheets]:
             self.sheet = self.wb.sheets["Quotes"]
             self.sheet.clear()
         else:
             self.sheet = self.wb.sheets.add("Quotes")
 
-        # Headers
         headers = ["Symbol", "Last", "Bid", "Ask", "Change", "Change %", "Volume", "Updated"]
         self.sheet.range("A1").value = [headers]
         self.sheet.range("A1:H1").font.bold = True
         self.sheet.range("A1:H1").color = (200, 200, 200)
 
     def update_quotes(self, symbols):
-        """Fetch and update quotes for symbols"""
         try:
-            # Fetch quotes
             r = self.client.get_quotes(symbols)
             r.raise_for_status()
             data = r.json()
-
             timestamp = datetime.now().strftime("%H:%M:%S")
 
-            # Update each symbol
             for row_idx, symbol in enumerate(symbols, start=2):
                 quote = data.get(symbol, {}).get('quote', {})
-
                 last = quote.get('lastPrice', 0)
                 bid = quote.get('bidPrice', 0)
                 ask = quote.get('askPrice', 0)
@@ -88,67 +76,42 @@ class ExcelUpdater:
                     timestamp
                 ]
 
-                # Color code change
                 change_cell = self.sheet.range(f"E{row_idx}")
                 if change > 0:
-                    change_cell.color = (200, 255, 200)  # Green
+                    change_cell.color = (200, 255, 200)
                 elif change < 0:
-                    change_cell.color = (255, 200, 200)  # Red
+                    change_cell.color = (255, 200, 200)
 
         except Exception as e:
             print(f"[ALERT] Update failed: {e}")
 
     def poll_loop(self, symbols, interval=5):
-        """Poll quotes at interval (seconds)"""
         print(f"\nPolling {symbols} every {interval}s")
         print("Press Ctrl+C to stop\n")
-
         try:
             while True:
                 self.update_quotes(symbols)
                 print(f"Updated {len(symbols)} symbols at {datetime.now().strftime('%H:%M:%S')}")
                 time.sleep(interval)
         except KeyboardInterrupt:
-            print("\n✓ Stopped polling")
+            print("\n  Stopped polling")
 
 
 def main():
-    """Main entry point"""
-    # Load environment
-    load_dotenv()
-
-    api_key = os.getenv('SCHWAB_API_KEY')
-    app_secret = os.getenv('SCHWAB_APP_SECRET')
-    token_path = os.getenv('SCHWAB_TOKEN_PATH', './tokens/schwab_token.json')
-
-    if not api_key or not app_secret:
-        print("[ALERT] Missing SCHWAB_API_KEY or SCHWAB_APP_SECRET")
-        return 1
-
-    if not Path(token_path).exists():
-        print(f"[ALERT] Token not found at {token_path}")
-        print("Run: schwab-generate-token.py to authenticate first")
-        return 1
-
     print("Connecting to Schwab API...")
     try:
-        c = auth.client_from_token_file(token_path, api_key, app_secret)
-        print("✓ Authenticated")
+        c = create_client()
+        print("  Authenticated")
     except Exception as e:
-        print(f"[ALERT] Authentication failed: {e}")
+        print(f"[ALERT] {e}")
         return 1
 
-    # Setup Excel
     print("Setting up Excel...")
     updater = ExcelUpdater(c)
     updater.setup_workbook()
 
-    # Define symbols to track
-    symbols = ['$SPX']  # Add more: ['$SPX', 'SPY', 'AAPL']
-
-    # Poll loop
+    symbols = ['$SPX']
     updater.poll_loop(symbols, interval=5)
-
     return 0
 
 

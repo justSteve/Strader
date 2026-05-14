@@ -1,0 +1,59 @@
+{
+  "symbol": "$SPX",
+  "status": "SUCCESS",
+  "strategy": "SINGLE",
+  "interval": 0.0,
+  "isDelayed": false,
+  "isIndex": true,
+  "daysToExpiration": 0,
+  "numberOfContracts": 4,
+  "putExpDateMap": {},
+  "callExpDateMap": {
+    "2026-05-14:0": {
+      "5840.0": [
+        {
+          "putCall": "CALL",
+          "symbol": "SPXW260514C05840000",
+          "description": "SPXW May 14 2026 5840 Call",
+          "bid": 12.50,
+          "ask": 13.00,
+          "last": 12.75,
+          "mark": 12.75,
+          "totalVolume": 1500,
+          "openInterest": 3200,
+          "volatility": 14.5,
+          "delta": 0.55,
+          "gamma": 0.025,
+          "theta": -8.50,
+          "vega": 0.15,
+          "strikePrice": 5840.0,
+          "expirationDate": "2026-05-14",
+          "daysToExpiration": 0,
+          "inTheMoney": true
+        }
+      ],
+      "5850.0": [
+        {
+          "putCall": "CALL",
+          "symbol": "SPXW260514C05850000",
+          "description": "SPXW May 14 2026 5850 Call",
+          "bid": 5.20,
+          "ask": 5.60,
+          "last": 5.40,
+          "mark": 5.40,
+          "totalVolume": 2800,
+          "openInterest": 5100,
+          "volatility": 13.8,
+          "delta": 0.42,
+          "gamma": 0.028,
+          "theta": -9.20,
+          "vega": 0.14,
+          "strikePrice": 5850.0,
+          "expirationDate": "2026-05-14",
+          "daysToExpiration": 0,
+          "inTheMoney": false
+        }
+      ]
+    }
+  }
+}

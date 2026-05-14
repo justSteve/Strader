@@ -1,0 +1,17 @@
+{
+  "$SPX": {
+    "assetMainType": "INDEX",
+    "symbol": "$SPX",
+    "quote": {
+      "lastPrice": 5850.25,
+      "closePrice": 5842.10,
+      "highPrice": 5865.40,
+      "lowPrice": 5835.60,
+      "netChange": 8.15,
+      "netPercentChange": 0.14,
+      "totalVolume": 0,
+      "52WeekHigh": 6100.00,
+      "52WeekLow": 4950.00
+    }
+  }
+}

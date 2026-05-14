@@ -109,6 +109,21 @@ These are the domains you have opinions about — not bounded functions you exec
 - Central Time zone reference for all session timing
 - Python development — custom indicators, LuxAlgo augmentation, pattern detection automation
 
+## Schwab API — Hard Gate
+
+The agent cannot execute code that touches the live Schwab API. Enforced at the permissions layer: `python3`, `bash`, `sh`, `curl`, `source`, `echo`, and `touch` are NOT auto-allowed — every use prompts Steve. Gate key and token paths are hard-denied.
+
+- **Write code** in `schwab/` and `scripts/` — the agent's job
+- **Run tests** via `python3 -m pytest` — explicitly allowed, no prompt
+- **Test with mocks** via `schwab/mock/client.py` — safe, no credentials
+- **Read live market data** — `schwab/readers/` scripts are auto-allowed:
+  - `.venv/bin/python3 schwab/readers/quote.py '$SPX' '/ES'`
+  - `.venv/bin/python3 schwab/readers/chain.py '$SPX' --strikes 20 --dte 7`
+- **Never execute** other live API code — no execution path is auto-allowed
+- **Steve runs reviewed code** via `./scripts/run.sh <script.py>`
+
+See `.claude/rules/schwab-api-gate.md` for full details.
+
 ## Primary Instrument
 
 **TradingView MCP** (owned) — the primary interface for chart data, indicators, and market state.

@@ -1,5 +1,16 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/root/projects/Strader/.claude/hooks/scripts/schwab-gate.sh",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      }
+    ],
     "PreCompact": [
       {
         "hooks": [
@@ -32,22 +43,12 @@
       }
     ]
   },
-  "mcpServers": {
-    "tradingview": {
-      "args": [
-        "/root/projects/tradingview-mcp/src/server.js"
-      ],
-      "command": "node",
-      "env": {}
-    }
-  },
   "permissions": {
     "allow": [
       "Edit(*)",
       "Write(*)",
       "MultiEdit(*)",
       "Bash(cd *)",
-      "Bash(echo *)",
       "Bash(pwd *)",
       "Bash(which *)",
       "Bash(test *)",
@@ -60,14 +61,9 @@
       "Bash(npm *)",
       "Bash(npx *)",
       "Bash(node *)",
-      "Bash(curl *)",
-      "Bash(bash *)",
-      "Bash(sh *)",
-      "Bash(source *)",
       "Bash(cp *)",
       "Bash(mv *)",
       "Bash(rm *)",
-      "Bash(touch *)",
       "Bash(chmod *)",
       "Bash(mkdir *)",
       "Bash(ls *)",
@@ -82,8 +78,10 @@
       "Bash(jq *)",
       "Bash(timeout *)",
       "Bash(tee *)",
-      "Bash(python3 *)",
       "Bash(pip *)",
+      "Bash(python3 -m pytest *)",
+      "Bash(.venv/bin/python3 schwab/readers/quote.py *)",
+      "Bash(.venv/bin/python3 schwab/readers/chain.py *)",
       "mcp__fetch__fetch",
       "mcp__github__*",
       "mcp__tradingview__*",
@@ -103,7 +101,11 @@
       "Edit(.env)",
       "Edit(.env.*)",
       "Edit(**/.env)",
-      "Edit(**/.env.*)"
+      "Edit(**/.env.*)",
+      "Bash(*schwab_gate_key*)",
+      "Bash(*tokens/schwab*)",
+      "Bash(*.env*schwab*)",
+      "Bash(*schwab*.env*)"
     ]
   }
 }
