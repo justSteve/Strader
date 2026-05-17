@@ -11,6 +11,10 @@ Strader's codebase is a collection of standalone tools with no shared entity lay
 
 This spec defines the foundational data model that all of Strader's trading tooling builds on.
 
+## Global Conventions
+
+- **Timezone: US/Central throughout.** All `datetime` values are timezone-aware, US/Central. No UTC normalization, no Eastern. `ingest.py` converts at the boundary; everything inside `market/` is already Central.
+
 ## Design Principles
 
 1. **Strader's primary product is code, not real-time inference.** The entity model backs a library of coded indicators and decision rules that operate deterministically. Steve takes this code into the trading room. It works without Strader present.
@@ -158,7 +162,7 @@ Common fields on all signals:
 ```python
 @dataclass(frozen=True)
 class Signal:
-    timestamp: datetime
+    timestamp: datetime      # timezone-aware, US/Central
     source: str              # indicator name that produced this
     confidence: float        # 0.0 to 1.0
     reason: str              # one-line human-readable explanation
