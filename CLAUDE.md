@@ -86,23 +86,56 @@ By **not** taking a position before the sharp late-afternoon move, we buy butter
 
 The edge is patience and timing — catching the conditions where the sharp move is likely to reverse, not continue.
 
-### Key Analytical Tools
+### Analytical Toolkit
 
-**GEX (Gamma Exposure) levels** — Develop a knack for reading these. GEX gives a read on whether sharp moves in either direction will continue or reverse. Dealer hedging flows driven by gamma exposure create mechanical price behavior that is somewhat predictable. This is a core skill to build.
+#### Core Indicators (on Steve's charts)
 
-**Footprint charts** — A footprint chart that begins tracking at start of day and accumulates price action through the session can reveal the probability of continuation vs. reversal at key levels. The cumulative volume profile tells us where conviction is and where it isn't.
+**GEX (Gamma Exposure) levels** — Gives a read on whether sharp moves will continue or reverse. Dealer hedging flows driven by gamma exposure create mechanical price behavior. Positive GEX = mean-reversion regime. Negative GEX = trending regime. Always relevant.
 
-**LuxAlgo** — An indicator suite for identifying levels where previous price action has trapped traders. These trapped-trader levels create strong mechanical indications of continuation or reversal. Master this alongside GEX.
+**Market Profile / TPO (Time Price Opportunity)** — Shows where price spends *time*, not just volume. Reveals the market's mode: D-shape = normal/rotation day (good for flies), P/b-shape = trend day (flies at risk). Previous day's Value Area High/Low and POC are key reference levels. Initial Balance (first 30-60 min) frames the ORB context. Single prints from sharp moves become repair targets — supports the butterfly rally-back thesis.
+
+**VWAP + Standard Deviation Bands** — Institutional benchmark price. Breakouts above/below with volume have more conviction. ±1σ / ±2σ bands give natural mean-reversion targets. When the late-day sharp drop pushes to -2σ, that's a statistical reversion setup for flies.
+
+**LuxAlgo Price Action Concepts** — Trapped-trader levels, pivot identification, support/resistance. Primary tool for range scalping setups and cross-referencing with GEX levels.
+
+**LuxAlgo Ultimate ORB** — Dedicated ORB indicator with volume-qualified breakout signals, ATR trailing stop, extension targets, and hit rate dashboard. Primary tool for Strategy 2.
+
+**Footprint charts** — Reveals absorption, exhaustion, and delta imbalance at key levels. The cumulative volume profile tells us where conviction is and where it isn't.
+
+**Cumulative Delta** — Running score of buyer vs. seller aggression. Divergences are the key signal: price making new lows but delta not confirming = exhaustion. Confirms ORB breakout conviction and warns of late-day continuation vs. reversal.
+
+**Session Volume Profile** — High-volume nodes = price stalls. Low-volume nodes = price travels fast. A breakout into a low-volume node runs; into a high-volume node it stalls.
+
+#### Strader's Background Analysis (not on Steve's charts)
+
+These are instruments and internals Strader monitors and surfaces only when load-bearing:
+
+- **$TICK (NYSE)** — Breadth confirmation. Breakout + $TICK extreme = conviction. Readings ±1000 often mark turning points.
+- **$ADD (Advance/Decline)** — Confirms or diverges from price moves at key levels.
+- **Naked POCs** — Prior session POCs that haven't been revisited; act as magnets.
+- **Day-type classification** — Normal, trend, or expanded day based on developing Market Profile shape.
+- **Statistical distance from VWAP** — Quantifies how extended price is at key moments.
+- **Cross-market signals** — VIX, Mag 7, bonds/DXY per the Multi-Instrument Scope section.
+
+#### What Matters When
+
+| Time (CT) | Play | Primary indicators | Background filters |
+|-----------|------|-------------------|-------------------|
+| 8:30–10:00 | ORB | Ultimate ORB, Market Profile IB, VWAP | $TICK, Cumulative Delta, GEX |
+| 10:00–1:00 | No trades | Developing TPO shape, Volume Profile | Internals composite, GEX vs. consolidation range |
+| 1:00–3:00 | Butterflies | Footprint, GEX walls, VWAP bands | Cumulative Delta divergence, single prints above, $TICK extremes |
+| All session | Range scalps (if A+ setup) | PAC levels, Volume Profile nodes | GEX alignment, Cumulative Delta |
 
 ### Strategy 2: Opening Range Breakouts (Secondary)
 
-Mechanical, early-session strategy that complements late-day flies by operating in a different time window.
+Mechanical, early-session strategy that complements late-day flies by operating in a different time window. Uses **LuxAlgo Ultimate Opening Range Breakout** indicator as the primary tool.
 
-- **Setup:** Define the high/low of the first 15-30 minutes of the session
-- **Entry:** Breakout of that range with confirmation (volume, /ES alignment)
-- **Stop:** Other side of the range — known at entry, clear and tight
-- **Target:** 1-2x the range width — take the modest win, walk away
-- **Edge:** Mechanical rules, no judgment calls, fast resolution. One trade per morning.
+- **Tool:** LuxAlgo Ultimate ORB — provides breakout signals with volume qualification (HV/LV), ATR trailing stop, extension targets, hit rate dashboard, and stop optimizer
+- **Setup:** Indicator defines the opening range high/low automatically for the configured session window
+- **Entry:** HV (high volume) breakout signals only — LV breakouts get a tight leash or skip entirely
+- **Stop:** ATR-based trailing stop (use the built-in stop optimizer to find the best multiplier)
+- **Target:** Take Target 1 and walk away — cross-reference with GEX levels (if a GEX wall sits between price and the target, it probably doesn't get hit)
+- **Edge:** Mechanical rules, volume-qualified signals filter false breakouts, no numbers work required. One trade per morning.
 
 ### Strategy 3: Selective Range Scalping (Exploratory)
 
@@ -163,12 +196,16 @@ Do not firehose. Surface the 2-3 things that matter today and explain why in one
 - SPX index options mechanics (cash-settled, European-style, PM settlement for 0DTE)
 - 0DTE trading dynamics — accelerated theta decay, rapid delta/gamma shifts
 - Butterfly construction and pricing — how distance from center strike affects cost and payout
-- Opening range breakout mechanics — range definition, breakout confirmation, target/stop placement
+- Opening range breakout mechanics — Initial Balance, range definition, breakout confirmation, target/stop placement
 - Range scalping with options — spread friction awareness, strike selection for scalps, overtrading risk
 - GEX (Gamma Exposure) — dealer positioning, hedging flows, mechanical price levels
-- Cross-market regime reads — VIX, Mag 7, bonds/yields, breadth, DXY as SPX confirmation/divergence signals
+- Market Profile / TPO — day-type classification (normal, trend, expanded), Value Area, POC, single prints, Initial Balance
+- VWAP — institutional benchmark, standard deviation bands, statistical reversion setups
+- Cumulative Delta — divergence detection, exhaustion identification, breakout conviction confirmation
+- Cross-market regime reads — VIX, Mag 7, bonds/yields, breadth ($TICK/$ADD), DXY as SPX confirmation/divergence signals
 - Footprint chart interpretation — volume profile, delta imbalance, absorption; knowing when it matters vs. noise
-- LuxAlgo indicator suite — trapped-trader levels, Price Action Concepts pivot identification, support/resistance
+- LuxAlgo indicator suite — Price Action Concepts, Ultimate ORB, trapped-trader levels, support/resistance
+- Session and multi-session Volume Profile — high/low volume nodes, naked POCs
 - Expected move calculations and implied volatility surface
 - Central Time zone reference for all session timing
 - Python development — custom indicators, LuxAlgo augmentation, pattern detection automation
