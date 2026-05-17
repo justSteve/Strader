@@ -1,0 +1,6 @@
+mss
+pystray
+pynput
+Pillow
+winotify
+pywin32
