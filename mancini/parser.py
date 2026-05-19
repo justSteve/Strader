@@ -177,9 +177,10 @@ def parse_slides(recap_text: str) -> list[Slide]:
         end = headers[i + 1].start() if i + 1 < len(headers) else len(recap_text)
         body = recap_text[start:end].strip()
 
-        # Drop boilerplate paragraphs that repeat daily
         if body.startswith("I do this trade recap section"):
             continue
+
+        last_time = extract_time_anchor(section) or ""
 
         for sentence in split_sentences(body):
             time_ref = extract_time_anchor(sentence)
@@ -201,11 +202,12 @@ def match_captures(slides: list[Slide], capture_dir: str,
                    date: str = "") -> list[Slide]:
     """Match each slide to the nearest 5-min screen capture by time.
 
-    Capture files expected as: ES_HHMM.png (e.g. ES_0955.png)
-    or YYYYMMDD_HHMM.png. Falls back to nearest available.
+    Recognizes:
+      ES_YYYYMMDD_HHMM.png  (capture tool output)
+      ES_HHMM.png           (legacy short form)
+      YYYYMMDD_HHMM.png     (date-prefixed)
     """
     from pathlib import Path
-    import os
 
     cap_path = Path(capture_dir)
     if not cap_path.exists():
@@ -213,12 +215,19 @@ def match_captures(slides: list[Slide], capture_dir: str,
 
     captures = {}
     for f in sorted(cap_path.iterdir()):
-        if not f.suffix.lower() in ('.png', '.jpg', '.jpeg'):
+        if f.suffix.lower() not in ('.png', '.jpg', '.jpeg'):
             continue
-        time_match = re.search(r'(\d{2})(\d{2})(?:\.|\b)', f.stem)
-        if time_match:
-            minutes_from_midnight = int(time_match.group(1)) * 60 + int(time_match.group(2))
-            captures[minutes_from_midnight] = str(f)
+        m = re.search(r'(\d{8})_(\d{2})(\d{2})', f.stem)
+        if not m:
+            m = re.search(r'(?:^|_)(\d{2})(\d{2})$', f.stem)
+            if m:
+                hh, mm = int(m.group(1)), int(m.group(2))
+            else:
+                continue
+        else:
+            hh, mm = int(m.group(2)), int(m.group(3))
+        minutes_from_midnight = hh * 60 + mm
+        captures[minutes_from_midnight] = str(f)
 
     if not captures:
         return slides

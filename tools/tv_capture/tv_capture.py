@@ -87,8 +87,8 @@ def capture_screenshot():
 
     monitor_idx = get_monitor_for_window(tv_hwnd)
     SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = SCREENSHOT_DIR / f"tv_{timestamp}.png"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    filepath = SCREENSHOT_DIR / f"ES_{timestamp}.png"
 
     with mss.mss() as sct:
         monitor = sct.monitors[monitor_idx]
