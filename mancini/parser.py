@@ -39,6 +39,7 @@ class ManciniEmail:
     review_steps: list[ReviewStep] = field(default_factory=list)
     support_levels: list[Level] = field(default_factory=list)
     resistance_levels: list[Level] = field(default_factory=list)
+    key_levels: list[float] = field(default_factory=list)
     basic_themes: str = ""
     other: str = ""
 
@@ -283,6 +284,31 @@ def parse_email(plaintext: str, date: str = "", subject: str = "") -> ManciniEma
         review_steps=parse_review_steps(recap_text),
         support_levels=parse_levels(support_text),
         resistance_levels=parse_levels(resistance_text),
+        key_levels=extract_key_levels(plan_text),
         basic_themes=basic_themes,
         other=""
     )
+
+
+def extract_key_levels(plan_text: str) -> list[float]:
+    """Pull 4-digit prices Mancini names in bull/bear case + summary sections.
+
+    These are levels he explicitly cites, not just listed. Returned as a
+    deduplicated sorted list. Cross-referencing with the published S/R
+    arrays happens in the emitter.
+    """
+    case_text_parts = []
+    for header in ("Bull case", "Bear case", "In summary"):
+        pattern = re.compile(
+            rf'{re.escape(header)}[^\n]*?:.+?(?=(?:Bull case|Bear case|In summary|Unsubscribe)|\Z)',
+            re.DOTALL,
+        )
+        for m in pattern.finditer(plan_text):
+            case_text_parts.append(m.group(0))
+
+    if not case_text_parts:
+        return []
+
+    combined = " ".join(case_text_parts)
+    prices = re.findall(r'\b(7\d{3})\b', combined)
+    return sorted({float(p) for p in prices})
