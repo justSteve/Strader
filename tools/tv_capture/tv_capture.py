@@ -110,13 +110,10 @@ def capture():
     if not tv_hwnd:
         return False
 
-    try:
-        win32gui.SetForegroundWindow(tv_hwnd)
-    except Exception:
-        ctypes.windll.user32.AllowSetForegroundWindow(
-            win32process.GetCurrentProcessId())
-        win32gui.ShowWindow(tv_hwnd, win32con.SW_RESTORE)
-        win32gui.SetForegroundWindow(tv_hwnd)
+    ctypes.windll.user32.keybd_event(0x12, 0, 0, 0)
+    ctypes.windll.user32.keybd_event(0x12, 0, 2, 0)
+    win32gui.ShowWindow(tv_hwnd, win32con.SW_RESTORE)
+    win32gui.SetForegroundWindow(tv_hwnd)
 
     time.sleep(FLASH_DELAY_SEC)
 
@@ -141,7 +138,7 @@ def capture():
 
 
 HOTKEY = keyboard.HotKey(
-    keyboard.HotKey.parse("<ctrl>+<shift>+s"),
+    keyboard.HotKey.parse("<ctrl>+<shift>+b"),
     lambda: threading.Thread(target=_hotkey_capture, daemon=True).start(),
 )
 
@@ -163,14 +160,14 @@ def _on_release(key):
 
 
 def main():
-    log.info("TV Capture starting (process=%s, every %ds, hotkey=Ctrl+Shift+S)",
+    log.info("TV Capture starting (process=%s, every %ds, hotkey=Ctrl+Shift+B)",
              PROCESS_NAME, CAPTURE_INTERVAL_SEC)
     log.info("Output: %s", SCREENSHOT_DIR)
 
     listener = keyboard.Listener(on_press=_on_press, on_release=_on_release)
     HOTKEY._listener = listener
     listener.start()
-    log.info("Hotkey listener active: Ctrl+Shift+S")
+    log.info("Hotkey listener active: Ctrl+Shift+B")
 
     log.info("Initial capture...")
     capture()
