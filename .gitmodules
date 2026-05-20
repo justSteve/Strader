@@ -1,3 +1,4 @@
 [submodule "lib/schwab-py"]
 	path = lib/schwab-py
 	url = https://github.com/justSteve/schwab-py
+	branch = hobbled-readonly

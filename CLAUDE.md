@@ -210,9 +210,11 @@ Do not firehose. Surface the 2-3 things that matter today and explain why in one
 - Central Time zone reference for all session timing
 - Python development — custom indicators, LuxAlgo augmentation, pattern detection automation
 
-## Schwab API — Hard Gate
+## Schwab API — Hard Gate (two layers)
 
-The agent cannot execute code that touches the live Schwab API. Enforced at the permissions layer: `python3`, `bash`, `sh`, `curl`, `source`, `echo`, and `touch` are NOT auto-allowed — every use prompts Steve. Gate key and token paths are hard-denied.
+**Structural gate (the lib):** `lib/schwab-py` tracks the `hobbled-readonly` branch of justSteve/schwab-py. Account / order / transaction methods have been physically removed from the library. Calling `client.place_order(...)`, `client.get_account(...)`, etc. raises `AttributeError` — the methods literally don't exist. See the DEFENSE NOTE in `lib/schwab-py/schwab/client/base.py` for the exhaustive list. Restoring any removed method requires an explicit, reviewed diff against the DEFENSE NOTE on the fork.
+
+**Behavioral gate (the agent):** The agent cannot execute code that touches the live Schwab API. Enforced at the permissions layer: `python3`, `bash`, `sh`, `curl`, `source`, `echo`, and `touch` are NOT auto-allowed — every use prompts Steve. Gate key (`~/.schwab_gate_key`) and token paths are hard-denied.
 
 - **Write code** in `schwab/` and `scripts/` — the agent's job
 - **Run tests** via `python3 -m pytest` — explicitly allowed, no prompt
