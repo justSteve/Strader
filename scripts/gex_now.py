@@ -139,7 +139,7 @@ def main() -> int:
         return 0
 
     print(f"Per-strike GEX (sorted by |magnitude|), strikes within ±{args.window} of spot {spot:.0f}:")
-    print(f"  {'strike':>8}  {'Δspot':>+7}  {'GEX ($B)':>10}  {'role':<12}")
+    print(f"  {'strike':>8}  {'Δspot':>7}  {'GEX ($B)':>10}  {'role':<12}")
     print(f"  {'─'*8}  {'─'*7}  {'─'*10}  {'─'*12}")
     for k in sorted(nearby.keys(), key=lambda x: abs(nearby[x]), reverse=True):
         gex_b = nearby[k] / 1e9
