@@ -102,7 +102,9 @@ def _verify_client(client) -> None:
     2026-05-20: a freshly-issued valid token was restored over because
     the verify check probed /trader/v1/userPreference and 401'd.
     """
-    resp = client.get_market_hours(["EQUITY"])
+    # schwab-py enforces enums by default — pass the enum, not the string.
+    from schwab.client.base import BaseClient
+    resp = client.get_market_hours([BaseClient.MarketHours.Market.EQUITY])
     resp.raise_for_status()
     return None
 
