@@ -14,8 +14,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from market.entities.quote import Quote
 from market.entities.trade import Trade
-from market.ingest.databento import trade_from_databento
+from market.ingest.databento import quote_from_databento, trade_from_databento
 
 CENTRAL = ZoneInfo("America/Chicago")
 
@@ -28,6 +29,17 @@ class FakeTradeMsg:
     pretty_price: float
     size: int
     side: str
+
+
+@dataclass
+class FakeMBP1Msg:
+    """Stand-in for databento_dbn.MBP1Msg with only the fields we use."""
+    instrument_id: int
+    pretty_ts_event: datetime
+    pretty_bid_px_00: float
+    bid_sz_00: int
+    pretty_ask_px_00: float
+    ask_sz_00: int
 
 
 def test_trade_from_databento_resolves_symbol():
@@ -98,3 +110,53 @@ def test_trade_from_databento_accepts_int_side():
     )
     trade = trade_from_databento(record, {1: "AAPL"})
     assert trade.side == "B"
+
+
+def test_quote_from_databento_resolves_symbol_and_fields():
+    record = FakeMBP1Msg(
+        instrument_id=42,
+        pretty_ts_event=datetime(2026, 5, 20, 14, 30, 0, tzinfo=timezone.utc),
+        pretty_bid_px_00=298.50,
+        bid_sz_00=100,
+        pretty_ask_px_00=298.55,
+        ask_sz_00=200,
+    )
+    quote = quote_from_databento(record, {42: "AAPL"})
+
+    assert isinstance(quote, Quote)
+    assert quote.symbol == "AAPL"
+    assert quote.bid_price == 298.50
+    assert quote.bid_size == 100
+    assert quote.ask_price == 298.55
+    assert quote.ask_size == 200
+    assert quote.mid == pytest.approx(298.525)
+    assert quote.spread == pytest.approx(0.05)
+
+
+def test_quote_from_databento_normalizes_to_central():
+    record = FakeMBP1Msg(
+        instrument_id=1,
+        pretty_ts_event=datetime(2026, 5, 20, 14, 30, 0, tzinfo=timezone.utc),
+        pretty_bid_px_00=200.0,
+        bid_sz_00=10,
+        pretty_ask_px_00=200.05,
+        ask_sz_00=20,
+    )
+    quote = quote_from_databento(record, {1: "AAPL"})
+    assert quote.ts.tzinfo == CENTRAL
+    assert quote.ts.hour == 9
+    assert quote.ts.minute == 30
+
+
+def test_quote_from_databento_unknown_instrument_id_yields_empty_symbol():
+    record = FakeMBP1Msg(
+        instrument_id=999,
+        pretty_ts_event=datetime(2026, 5, 20, 14, 30, 0, tzinfo=timezone.utc),
+        pretty_bid_px_00=100.0,
+        bid_sz_00=1,
+        pretty_ask_px_00=100.05,
+        ask_sz_00=1,
+    )
+    quote = quote_from_databento(record, {})
+    assert quote.symbol == ""
+    assert quote.instrument_id == 999

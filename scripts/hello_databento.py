@@ -75,21 +75,33 @@ def main() -> int:
         stype_in=args.stype,
     )
 
-    print(f"Subscribed. Waiting for first {args.count} trade(s)...\n")
+    is_quote_schema = args.schema in ("mbp-1", "tbbo")
+    record_label = "quote(s)" if is_quote_schema else "trade(s)"
+    print(f"Subscribed. Waiting for first {args.count} {record_label}...\n")
 
     received = 0
     try:
-        for trade in client.trades():
-            received += 1
-            print(f"  [{received}] {trade.ts.isoformat()}  {trade.symbol:<10}  "
-                  f"{trade.price:>12.4f}  size={trade.size:<6}  side={trade.side}")
-            if received >= args.count:
-                break
+        if is_quote_schema:
+            for quote in client.quotes():
+                received += 1
+                print(f"  [{received}] {quote.ts.isoformat()}  {quote.symbol:<10}  "
+                      f"bid {quote.bid_price:>10.4f}x{quote.bid_size:<5}  "
+                      f"ask {quote.ask_price:>10.4f}x{quote.ask_size:<5}  "
+                      f"spread={quote.spread:.4f}")
+                if received >= args.count:
+                    break
+        else:
+            for trade in client.trades():
+                received += 1
+                print(f"  [{received}] {trade.ts.isoformat()}  {trade.symbol:<10}  "
+                      f"{trade.price:>12.4f}  size={trade.size:<6}  side={trade.side}")
+                if received >= args.count:
+                    break
     except KeyboardInterrupt:
         print("\nInterrupted.")
     finally:
         client.close()
-        print(f"\nDisconnected. Received {received} trade(s).")
+        print(f"\nDisconnected. Received {received} {record_label}.")
 
     return 0 if received > 0 else 2
 

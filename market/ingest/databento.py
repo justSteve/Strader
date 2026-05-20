@@ -22,8 +22,9 @@ from typing import Iterator
 from zoneinfo import ZoneInfo
 
 from databento import Live
-from databento_dbn import SymbolMappingMsg, TradeMsg
+from databento_dbn import MBP1Msg, SymbolMappingMsg, TradeMsg
 
+from market.entities.quote import Quote
 from market.entities.trade import Trade
 
 CENTRAL = ZoneInfo("America/Chicago")
@@ -50,6 +51,20 @@ def trade_from_databento(record: "TradeMsg", symbol_map: dict[int, str]) -> Trad
         price=float(record.pretty_price),
         size=int(record.size),
         side=side,  # type: ignore[arg-type]
+    )
+
+
+def quote_from_databento(record: "MBP1Msg", symbol_map: dict[int, str]) -> Quote:
+    """Convert a Databento MBP1Msg (top-of-book) into a typed Quote entity."""
+    symbol = symbol_map.get(record.instrument_id, "")
+    return Quote(
+        ts=record.pretty_ts_event.astimezone(CENTRAL),
+        symbol=symbol,
+        instrument_id=int(record.instrument_id),
+        bid_price=float(record.pretty_bid_px_00),
+        bid_size=int(record.bid_sz_00),
+        ask_price=float(record.pretty_ask_px_00),
+        ask_size=int(record.ask_sz_00),
     )
 
 
@@ -110,6 +125,19 @@ class LiveClient:
                 continue
             if isinstance(record, TradeMsg):
                 yield trade_from_databento(record, self._symbol_map)
+
+    def quotes(self) -> Iterator[Quote]:
+        """Yield typed Quote entities (top-of-book snapshots) from MBP-1/TBBO.
+
+        Symbol-mapping records are absorbed silently. Subscribe with schema
+        'mbp-1' or 'tbbo' before iterating.
+        """
+        for record in self._client:
+            if isinstance(record, SymbolMappingMsg):
+                self._symbol_map[int(record.instrument_id)] = record.stype_in_symbol
+                continue
+            if isinstance(record, MBP1Msg):
+                yield quote_from_databento(record, self._symbol_map)
 
     def close(self) -> None:
         """Disconnect from the gateway. Safe to call multiple times."""
