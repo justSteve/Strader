@@ -94,10 +94,18 @@ def _restore(bak: Path | None, token_path: Path) -> None:
 
 
 def _verify_client(client) -> None:
-    """Make one cheap API call to confirm the new token actually works."""
-    resp = client.get_user_preferences()
+    """Make one cheap MARKET-DATA API call to confirm the new token works.
+
+    Critical: this MUST be a market-data endpoint (marketdata/v1/...) and
+    NOT a trader endpoint (trader/v1/...). A token provisioned for
+    market-data-only will 401 on trader endpoints even when it is fully
+    valid for chains, quotes, and bars — the actual use case of this
+    project. Picking the wrong verify endpoint caused a real outage
+    2026-05-20: a freshly-issued valid token was restored over because
+    the verify check probed /trader/v1/userPreference and 401'd.
+    """
+    resp = client.get_market_hours(["EQUITY"])
     resp.raise_for_status()
-    # Don't print the payload — it includes account numbers.
     return None
 
 
@@ -169,10 +177,26 @@ def main() -> int:
     try:
         _verify_client(client)
     except Exception as e:
-        print(f"[ERROR] new token written but verification call failed: {e}",
+        # IMPORTANT: do NOT auto-restore on verify failure. The freshly
+        # issued token may still be valid for the actual use case (market
+        # data) even if our verify endpoint refused it. Stash the new
+        # token aside, keep .bak intact, and let the operator decide.
+        rescue_path = token_path.with_suffix(token_path.suffix + ".new")
+        try:
+            shutil.copy2(token_path, rescue_path)
+        except Exception:
+            pass
+        print(f"[WARN] verify failed: {e}", file=sys.stderr)
+        print(f"[WARN] new token preserved at:  {rescue_path}", file=sys.stderr)
+        print(f"[WARN] previous token preserved at:  {bak}",
+              file=sys.stderr) if bak else None
+        print(f"[WARN] active token at:  {token_path}", file=sys.stderr)
+        print(f"[WARN] If your downstream use case is market-data and verify",
               file=sys.stderr)
-        print("[restore] reverting to previous token", file=sys.stderr)
-        _restore(bak, token_path)
+        print(f"[WARN] hit a trader-namespace 401, the new token is probably",
+              file=sys.stderr)
+        print(f"[WARN] fine. Try it before restoring the backup.",
+              file=sys.stderr)
         return 4
 
     print(f"✓ New token written to {token_path}")
