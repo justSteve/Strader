@@ -80,6 +80,12 @@ def parse_args() -> argparse.Namespace:
                    help="Underlying symbol (default: $SPX)")
     p.add_argument("--expiry", default=None,
                    help="ISO expiry YYYY-MM-DD (default: today)")
+    p.add_argument("--strikes", type=int, default=30,
+                   help="Strikes above and below ATM to request (default: 30 → 60 total). "
+                        "Bounding this is critical — an unbounded SPX chain query 502s Schwab.")
+    p.add_argument("--dte", type=int, default=0,
+                   help="Max days-to-expiration for the chain query "
+                        "(default: 0 = today only).")
     p.add_argument("--window", type=int, default=50,
                    help="± points around spot to show in by-strike table")
     return p.parse_args()
@@ -90,9 +96,19 @@ def main() -> int:
     expiry = (date.fromisoformat(args.expiry)
               if args.expiry else date.today())
 
-    print(f"[{datetime.now():%H:%M:%S}] Fetching {args.symbol} chain for {expiry}...")
+    from datetime import timedelta
+    to_date = date.today() + timedelta(days=args.dte)
+
+    print(f"[{datetime.now():%H:%M:%S}] Fetching {args.symbol} chain for "
+          f"{expiry}  (strike_count={args.strikes}, to_date={to_date})...")
     client = _create_client()
-    resp = client.get_option_chain(symbol=args.symbol)
+    resp = client.get_option_chain(
+        symbol=args.symbol,
+        strike_count=args.strikes,
+        from_date=date.today(),
+        to_date=to_date,
+        include_underlying_quote=True,
+    )
     resp.raise_for_status()
     data = resp.json()
 
