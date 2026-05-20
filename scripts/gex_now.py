@@ -22,21 +22,16 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
-# Make 'market' importable, but append so site-packages 'schwab' wins.
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+# Win the schwab package-name collision: the Strader project root has a
+# local `schwab/` directory that shadows the schwab-py library when CWD
+# puts the project root on sys.path first. Inserting the lib's parent at
+# sys.path[0] forces schwab to resolve to the hobbled fork.
+_LIB_SCHWAB_PY = Path(__file__).resolve().parent.parent / "lib" / "schwab-py"
+sys.path.insert(0, str(_LIB_SCHWAB_PY))
 
-# Force schwab to resolve from site-packages, not the local shadowing package.
-_local_schwab = sys.modules.pop("schwab", None)
-import schwab as _schwab_lib  # noqa: F401  — re-resolve via site-packages
-if "schwab" not in sys.modules or sys.modules["schwab"].__file__ and \
-        "Strader/schwab/" in (sys.modules["schwab"].__file__ or ""):
-    # Still pointing at the local package — last-resort: prepend venv site-packages.
-    import site
-    for sp in site.getsitepackages():
-        if sp not in sys.path:
-            sys.path.insert(0, sp)
-    sys.modules.pop("schwab", None)
-    import schwab as _schwab_lib  # noqa: F401
+# Expose project root for `market.*` imports — append so the lib path
+# above wins any schwab resolution.
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from schwab import auth as schwab_auth  # noqa: E402
 

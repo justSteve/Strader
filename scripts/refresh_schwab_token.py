@@ -35,20 +35,18 @@ import shutil
 import sys
 from pathlib import Path
 
-# Make 'market' importable; append so site-packages 'schwab' wins.
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+# Win the schwab package-name collision: the Strader project root has a
+# local `schwab/` directory (Strader's own wrapper) that shadows the
+# schwab-py library when CWD or script dir puts the project root on
+# sys.path first. The PEP 660 editable install loses against regular
+# path lookup. Inserting the lib's parent directly at sys.path[0]
+# forces schwab to resolve to the hobbled fork.
+_LIB_SCHWAB_PY = Path(__file__).resolve().parent.parent / "lib" / "schwab-py"
+sys.path.insert(0, str(_LIB_SCHWAB_PY))
 
-# Force schwab to resolve from site-packages, not the local shadowing package.
-sys.modules.pop("schwab", None)
-import schwab as _schwab_lib  # noqa: F401  — re-resolve via site-packages
-if sys.modules["schwab"].__file__ and \
-        "Strader/schwab/" in (sys.modules["schwab"].__file__ or ""):
-    import site
-    for sp in site.getsitepackages():
-        if sp not in sys.path:
-            sys.path.insert(0, sp)
-    sys.modules.pop("schwab", None)
-    import schwab as _schwab_lib  # noqa: F401
+# Also expose project root for `market.*` imports — append so it loses
+# to the lib path above for any schwab resolution.
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from schwab import auth as schwab_auth  # noqa: E402
 
