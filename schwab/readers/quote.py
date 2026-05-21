@@ -13,10 +13,9 @@ def main():
     symbols = sys.argv[1:] or ['$SPX', '/ES']
     c = create_client()
 
-    if len(symbols) == 1:
-        r = c.get_quote(symbols[0])
-    else:
-        r = c.get_quotes(symbols)
+    # Always use get_quotes (plural): the singular form interpolates the symbol
+    # into the URL path and 400s on symbols with non-alphanumeric chars (st-oit).
+    r = c.get_quotes(symbols)
 
     r.raise_for_status()
     data = r.json()

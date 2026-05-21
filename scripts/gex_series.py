@@ -115,7 +115,10 @@ def _try_quote(client, symbol: str) -> float | None:
     print alongside SPX so cross-references against ES-based charts (LuxAlgo
     order blocks, etc.) account for the cash-vs-futures basis."""
     try:
-        resp = client.get_quote(symbol)
+        # get_quotes (plural) sends symbol as query param; get_quote (singular)
+        # interpolates into the path and double-slashes for symbols like /ESM26.
+        # See st-oit and schwab-py base.py:176-179.
+        resp = client.get_quotes([symbol])
         resp.raise_for_status()
         payload = resp.json()
         # Schwab quote shape varies by instrument type; try common paths.
