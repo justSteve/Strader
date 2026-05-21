@@ -27,8 +27,15 @@ import httpx
 ROOT = Path(__file__).resolve().parent.parent
 BASE_URL = "https://api.gex.bot/v2"
 USER_AGENT = "Strader-Probe/0.1 (st-rks)"
-TIMEOUT_S = 1.0
+# Cold-connection timeout. Spec says steady-state polling should run at <= 1s,
+# but TLS 1.3 setup + any IPv6/IPv4 fallback eats that on first connect. 5s
+# gives the handshake room without masking real outages.
+TIMEOUT_S = 5.0
 RATE_DELAY_S = 1.1
+# WSL on this distro returns ENETUNREACH on IPv6. Binding the local socket to
+# the IPv4 any-address forces IPv4-only connections, dodging the broken AAAA
+# route. Remove once WSL IPv6 is fixed at the substrate level.
+LOCAL_ADDR_V4 = "0.0.0.0"
 
 
 def load_env() -> dict[str, str]:
@@ -88,7 +95,8 @@ def main() -> int:
         print("ERROR: GEXBOT_API_KEY not found in .env", file=sys.stderr)
         return 2
 
-    with httpx.Client() as client:
+    transport = httpx.HTTPTransport(local_address=LOCAL_ADDR_V4)
+    with httpx.Client(transport=transport) as client:
         # Public, no auth — confirms baseline reachability.
         probe(client, "/tickers", authed=False, api_key=None)
         time.sleep(RATE_DELAY_S)
