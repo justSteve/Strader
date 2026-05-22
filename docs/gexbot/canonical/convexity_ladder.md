@@ -76,11 +76,11 @@ for the measurement framework.
 
 6. **Transition points = pivots** (independent of vol regime). Where convexity flips sign across strikes, incentives change. These should align with the "transition points" referenced in `dex_ladder.md`.
 
-7. **Convexity ladder ≠ GEX profile — do not confuse the axes.** This ladder nets **long vs short** contracts (regardless of call/put). The separate GEX profile (green/red) nets **calls vs puts** (regardless of long/short). Per Jasper's Discord Q&A:
+7. **Convexity ladder ≠ GEX profile — do not confuse the axes.** This ladder nets **long vs short** contracts (regardless of call/put), with **cyan = long gamma, purple = short gamma**. The separate GEX profile (green/red) nets **calls vs puts** (regardless of long/short). Per Jasper's Discord Q&A:
    - **call/put gex** → measure of directional (up/down) convexity
    - **long/short gamma** → measure of momentum/reversion (continuation or fade)
 
-   A trade decision typically wants both: GEX profile picks the *level*; this ladder predicts the *behavior at that level* (continuation vs reversion). See [`principal_discord.md`](principal_discord.md) and [`gex_profile.md`](gex_profile.md).
+   A trade decision typically wants both: GEX profile picks the *level*; this ladder predicts the *behavior at that level* (continuation vs reversion). See [`principal_discord.md`](principal_discord.md) (two Jasper Q&As, the second of which fixes the cyan/purple mapping and gives his personal scan order: cyan first for reversion zones, purple as "afterthought") and [`gex_profile.md`](gex_profile.md).
 
 ## Revision log
 

@@ -53,11 +53,11 @@ for the measurement framework to validate against corpus data.
 
 4. **Net imbalance principle matters for measurement framework.** When comparing GexBot's `major_positive` and `major_negative` against actual price behavior, the prediction is about *net imbalance* concentrations, not gross flow. Falsification needs to be measured against the right metric.
 
-5. **GEX axis vs gamma-ladder axis — do not confuse.** The GEX profile here nets **calls vs puts** (regardless of long/short). The separate gamma ladder (purple/cyan) nets **long vs short** (regardless of call/put). A short call shows as green in the GEX profile because its call-ness is what's netted here. Per Jasper's Discord Q&A:
+5. **GEX axis vs gamma-ladder axis — do not confuse.** The GEX profile here nets **calls vs puts** (regardless of long/short). The separate gamma ladder (cyan = long gamma, purple = short gamma) nets **long vs short** (regardless of call/put). A short call shows as green in the GEX profile because its call-ness is what's netted here. Per Jasper's Discord Q&A:
    - **call/put gex** → measure of directional (up/down) convexity
    - **long/short gamma** → measure of momentum/reversion (continuation or fade)
 
-   See [`principal_discord.md`](principal_discord.md) (Jasper Q&A) for the full disambiguation. For the long/short axis itself, see [`convexity_ladder.md`](convexity_ladder.md).
+   See [`principal_discord.md`](principal_discord.md) (two Jasper Q&As, the second of which fixes the cyan/purple mapping) for the full disambiguation. For the long/short axis itself, see [`convexity_ladder.md`](convexity_ladder.md).
 
 ## Revision log
 
