@@ -61,6 +61,13 @@ for the measurement framework to validate against corpus data.
 
 6. **UI: gamma toggle.** Per John M's confirmation in the same 2025-02-21 thread, GexBot ships a "gamma switch" toggle that flips the chart between (a) cyan/purple gamma view and (b) PUTS/CALLS bought-vs-sold view. Toggling between them during a live session is John's recommended way to verify the cyan = long gamma = long puts OR long calls mapping in real time.
 
+7. **Net GEX sign convention: customer perspective.** Per Jasper's 2025-03-05 2:59 PM confirmation (`principal_discord.md` entry 7), the GEX profile is the **customer's net GEX view**, not the MM's. The customer-perspective convention established for the convexity ladder (entry 5) extends here. Operationally:
+   - Green call-gex spike at strike → customer net-long calls there → bullish positioning by the customer side
+   - Red put-gex spike at strike → customer net-long puts there → bearish positioning by the customer side
+   - Sign flips for MM perspective; never read MM-side from these colors directly.
+
+8. **Net convexity > call/put alone for pivot/pin prediction.** Per the same 2025-03-05 Q&A, Jasper agrees that the gamma ladder (long/short axis) gives more consistent pivot signals than the GEX profile (call/put axis) alone. The asker noted "put gamma levels do not need to always act as pivot points or as pinning points," which Jasper effectively endorses with "yes well imo at least. there's a case for both." Operational read: **lead with the gamma ladder for pivot identification; use the GEX profile for directional convexity bias.**
+
 ## Revision log
 
 - 2026-05-22: Initial canonical capture from `documentation - gexbot.html` saved 2026-05-20. Promoted by Steve direction same day.

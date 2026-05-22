@@ -197,6 +197,13 @@ See entries 3, 4, 5 below for the full exchange.
   cyan / positive convexity) all refer to the same ladder positions.
   Resolves the strike-level "positive gamma" terminology in Freddy's
   paper. Top disambiguation table updated to carry the equivalence.
+- 2026-05-22: Entry 7 added — Jasper 2025-03-05 2:59 PM. Two
+  confirmations: (a) net convexity is more reliable for MM-reaction
+  prediction than call/put alone (with "both views have value"
+  caveat); (b) NET GEX IS CUSTOMER PERSPECTIVE, not MM. The
+  customer-perspective convention now formally extends to the GEX
+  profile, not just the convexity ladder. gex_profile.md updated to
+  carry this explicitly.
 
 ---
 
@@ -473,3 +480,82 @@ Freddy's paper still uses "Positive Gamma" at two different scopes:
 2. **Strike level** — "positive gamma zones" describes per-strike concentration
 
 John's equivalence resolves the strike-level usage (positive gamma at strike = long gamma at strike = cyan = positive convexity at strike). The environment-level usage is a separate issue — Freddy is using MM-talk for environment classification, which Jasper has already flagged for deprecation (entry 5).
+
+---
+
+## 2025-03-05 2:59 PM — Jasper, net convexity vs call/put + GEX is customer-perspective
+
+**Channel:** GexBot Discord (channel not captured)
+**Date:** 2025-03-05 (Jasper's second response is timestamped 2:59 PM)
+**Speakers:** unattributed asker → Jasper "jass" (two responses)
+
+### Q (asker)
+
+> It seems like net convexity is a better indicator for the MM
+> reaction to gex than call/put?
+> The put gamma levels do not need to be always act as pivot points
+> or as pinning points. But the net gamma for long and short do that
+> more consistently?
+>
+> Also the net GEX is the market participant's net GEX view right? not MM?
+
+### A1 (Jasper)
+
+> yes well imo at least. there's a case for both
+
+### A2 (Jasper, 2:59 PM — direct reply to the customer-perspective question)
+
+> correct
+
+### What this confirms
+
+1. **Net convexity (long/short axis) > call/put alone for MM-reaction
+   prediction.** Jasper agrees with the asker's read: aggregating to
+   long/short produces more consistent pivot/pin signals than reading
+   call vs put concentrations alone. *But* he caveats "there's a case
+   for both" — the GEX profile carries directional convexity
+   information the gamma ladder doesn't, so both views remain useful.
+   The operational implication: **lead with the gamma ladder
+   (cyan/purple) when looking for pivot levels; use the GEX profile
+   (green/red) for directional convexity bias.**
+2. **Net GEX is customer perspective, NOT MM perspective.** Jasper
+   directly confirms with "correct." This extends the
+   customer-perspective convention (already established for the
+   convexity ladder in entry 5) to the GEX profile as well. **Both
+   visualizations are customer-perspective.** Any MM-perspective read
+   requires inverting the sign.
+
+### Operational implications
+
+- **Read order for finding pivot/pin levels:** start with the gamma
+  ladder. Cyan bars are the most reliable pivot signals (per Jasper's
+  agreement here + entry 5's "pivot at customer long gamma"). The GEX
+  profile is the *complement*, not the primary lens, for pivot
+  identification.
+- **Reading the GEX profile:** sign convention is customer side. A
+  green spike at a strike = customer net-long call exposure there =
+  customer is positioned for upside at that strike. Red spike = the
+  symmetric down-side put position.
+- **Why "both views have value" matters:** John's earlier statement
+  (entry 6) gave the equivalence — long gamma = positive convexity at
+  strikes. Jasper is now saying that despite the equivalence at the
+  per-strike level, the *aggregation* (net long/short vs net call/put)
+  produces different signals across the chain. The gamma ladder's
+  long/short net is the smoother indicator of where price will *react*
+  ; the GEX profile's call/put net is the directional bias indicator.
+
+### Why this matters for our measurement framework
+
+The canonical sign convention for GEX is now nailed down. When we
+compare our corpus-derived GEX readings against expected behavior, we
+should anchor on:
+
+- A positive call-gex spike → customer-long-calls concentration → bullish positioning at strike
+- A negative put-gex spike → customer-long-puts concentration → bearish positioning at strike
+- Customer flow drives the sign; dealer behavior is the consequence
+
+The asker's specific claim ("put gamma levels do not always act as
+pivots") is now operationally justifiable: pivots come from the
+*aggregate* gamma exposure at the strike, not from the put-side
+contribution alone. A strike with heavy put gex but offsetting call
+gex may not pivot.
