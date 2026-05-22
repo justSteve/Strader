@@ -79,9 +79,26 @@ Concrete entry rule:
 3. Enter in the direction of the cross
 4. Stop loss = the OTHER side of the crossed level (very tight; example: 10–12 NQ points)
 5. Target = the *next* excess gamma level in the trade direction
+6. **If stopped out, re-enter when price re-crosses the level in your bias direction** — getting stopped does not invalidate the read, only the timing
 
 Result: tight stops + larger targets, opposite of conventional "futures
 need wide stops" advice. Discipline produces the asymmetry.
+
+**Re-entry rule source:** Step 6 is not in the video itself — it comes
+from Freddy's follow-up Discord post the day after, quoting Jasper:
+
+> Jass emphasis on entering on the high net convexity, tight SL if price
+> breaks that level against you but entering again of price moves on
+> your bias.
+
+(Freddy Sarmiento [PP], Discord #theory-questions, 2025-01-25 12:23 PM —
+see [`discord_quotes.md`](discord_quotes.md))
+
+The rule changes the win/loss math materially: without it, "tight SL"
+means most setups end as small losses. With re-entry, the structure
+becomes "many small losses + occasional larger wins on the trade that
+ran" — which is what makes the algorithmic profile work and is why
+Freddy frames discipline as the source of the asymmetry.
 
 ## 4. The discipline failure he documents [HIGH]
 
