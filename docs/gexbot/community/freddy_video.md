@@ -54,6 +54,35 @@ One exception: the **maximum negative gamma** strike itself is treated as
 a magnet/target, not a no-trade zone — price tends to be pulled toward
 it.
 
+### Convexity defined
+
+Freddy uses "high net convexity" and "excess gamma" interchangeably. The
+explicit definition comes from his Discord follow-up:
+
+> Convexity is the non-linear relationship between the underlying price
+> and the options, measured by gamma.
+
+(Discord #theory-questions, 2025-01-28 — see [`discord_quotes.md`](discord_quotes.md))
+
+Gamma *is* the measurement of convexity. When the video says "high net
+convexity bar" the meaning is "the strike where the aggregate
+non-linearity of dealer hedging obligations is concentrated." Quoting
+Jasper through Freddy: "convexity is a key concept option traders
+understand well... and that convexity is key for us Futures traders too."
+
+### The binary choice (Discord restatement)
+
+The same Discord post sharpens the video's framing into a binary:
+
+> Two options: trade in between excess of gamma levels, where the
+> probability to get into a range, consolidation etc... and hit stop
+> losses more often... or wait for the excess of gamma levels, where
+> there is an "imbalance" of gamma and convexity.
+
+There is no third option. Trading the between-zone produces stops;
+trading the imbalance produces edge. This is the operational form of
+the "no-trade zone" derivation in the actionable section below.
+
 ## 2. Level-to-level mean reversion [HIGH]
 
 *[12:00–14:30]*
@@ -83,6 +112,18 @@ Concrete entry rule:
 
 Result: tight stops + larger targets, opposite of conventional "futures
 need wide stops" advice. Discipline produces the asymmetry.
+
+### Exit discipline (Discord 2025-01-27)
+
+> Moves that could give me more than 1-3 ratios, take profits in 50% or
+> more and leave a runner.
+
+(Freddy Sarmiento, Discord #theory-questions, 2025-01-27 10:43 AM)
+
+Three concrete numbers: target R:R ≥ 1:3 (minimum). Scale 50% off at
+the first major level reached. Leave the remainder as a runner to the
+next level. Freddy frames this as "not home runs, but moves that could
+give me more than 1-3 ratios" — explicitly anti-greedy.
 
 **Re-entry rule source:** Step 6 is not in the video itself — it comes
 from Freddy's follow-up Discord post the day after, quoting Jasper:
@@ -164,18 +205,38 @@ not address this regime modulation in the video. The canonical text
 governs in rising-vol sessions; this table only applies cleanly under
 declining or stable vol.
 
-## 7. Why NDX, not QQQ (institutional vs retail) [HIGH]
+## 7. Instrument selection — SPX big-picture, SPY directional, never QQQ [HIGH]
 
-*[15:00–17:00]*
+*[15:00–17:00]* + Discord 2025-01-27
 
-Freddy notes GexBot tracks NDX rather than QQQ deliberately. Reasoning:
+In the video Freddy explains the QQQ avoidance:
 
 - QQQ contracts: $50–$400 within first standard deviation → retail-scale → flow is muddied by small participants
 - NDX contracts: $1,600–$116,000 within first standard deviation → institutional-scale → flow reflects sophisticated positioning
 
-The implication for our work: same principle says **SPX is the
-institutional read; SPY is muddied by retail**. Our corpus correctly
-focuses on SPX state endpoints, not SPY.
+His Discord follow-up nuances the SPX/SPY mapping in a way the video
+doesn't:
+
+> I don't look QQQ at all, instead I look at SPX for a bigger picture
+> and SPY to confirm directional moves. I used to trade ES by looking at
+> SPY, simply because SPX is mainly used for institutions to hedge,
+> while SPY is directional… I believe both, retails and institutions
+> use SPY; if you have a look the documentation in gexbot, they mention
+> something similar for gamma in SPY.
+
+(Discord #theory-questions, 2025-01-27 10:43 AM)
+
+**Operational pattern:** SPX is the *positioning* read (where
+institutions have placed hedges). SPY is the *direction confirmation*
+read (where actual buying/selling pressure resolves). Use SPX gamma
+levels to define where to act; use SPY behavior at those levels to
+confirm direction. QQQ is excluded entirely.
+
+This is a meaningful correction to the simple "SPX = institutional, SPY
+= retail" framing. Both audiences trade SPY actively; what makes SPX
+distinctively institutional is the *hedging* use case, not the
+participant mix. The GexBot docs reference Freddy mentions for this is
+worth a follow-up search.
 
 ## 8. Volatility skew/smile shape read [HIGH — slide recovered]
 
@@ -251,7 +312,7 @@ breakdown coming → he just waited for the gamma cross to enter.
 
 ## 10. Bias toward algorithmic / rule-based execution [HIGH]
 
-*[01:18–01:35]* and throughout
+*[01:18–01:35]* and throughout, + Discord 2025-01-29
 
 Freddy frames GexBot as making futures trading "algorithmic in fashion."
 He emphasizes:
@@ -263,6 +324,89 @@ He emphasizes:
 
 Not "automate the execution" — but "follow the rules without
 discretion."
+
+### Mental model — "gamma levels are pivots"
+
+Freddy's Discord one-liner that compresses the methodology:
+
+> Think of this gamma levels as pivots, where you put a tight SL and
+> look for a good move in your favour. The difference with other
+> methodologies / technical analysis, etc, is that here, we see what
+> really moves the market, institutions interacting with the market, in
+> specific levels with volumes that create an impact.
+
+(Discord #theory-questions, 2025-01-29 7:05 AM)
+
+Two takeaways: (1) *pivots* is the right word — levels around which
+risk is defined and sentiment turns. (2) The differentiator from
+classical TA is causal, not statistical: TA shows pattern recurrence,
+gamma shows the *institutional footprint that produces the pattern*.
+Gamma isn't "another indicator" — it's the upstream cause.
+
+## 11. Gamma-profile shift as the sentiment signal [Discord-sourced]
+
+*Discord #theory-questions, 2025-01-27 10:43 AM*
+
+The video framing is "trade between gamma levels in the direction the
+profile suggests." The Discord clarification adds the regime-change
+signal: when GexBot's computation of the *max* gamma level itself
+relocates, that is the sentiment change — not the price action that
+follows it.
+
+Freddy's worked example from Jan 27:
+
+> NQ rallies, I was long when the market opened, gamma confirmed my
+> view, then I had a gamma target (max gamma excess at 21,606 when NQ
+> was at 21,332). Then what happened? we hit Max negative gamma at
+> 21,417 (I took profits 50%, left a runner) and the large top side
+> target — Max gamma at 21,606 — shifted to 21,051. Is that a shift in
+> sentiment? 100% yes… so took small profits on my last 50% and gamma
+> level at 21,203 confirmed the downtrend.
+
+**Mechanics:** GexBot recomputes the max gamma strike continuously from
+the underlying flow. When the strike relocates from above-spot (21,606)
+to below-spot (21,051), it's because positioning has flipped — dealer
+obligations have moved from "defend the upside" to "defend the
+downside." Treating this recomputation as a directional signal (rather
+than as noise in the indicator) is the operational rule.
+
+**Decision protocol from the example:**
+
+1. Initial setup: max gamma above, trade long toward it
+2. Take 50% profit at the next gamma level reached (here: max negative gamma as magnet/target — see §1 exception)
+3. Watch for max gamma to *relocate*
+4. If max gamma flips polarity (above-spot → below-spot, or vice versa) → close remainder, reverse bias
+5. Confirm new direction with the next gamma cross trigger
+
+The runner that survives the partial exit gets stopped by the regime
+flip, not by an arbitrary trailing stop.
+
+## 12. Zero gamma line as regime delimiter [Discord-sourced]
+
+*Discord #theory-questions, 2025-01-27 10:43 AM*
+
+> I look classic to see if we are above zero gamma or below.
+
+("classic" is presumably a chart view name in the GexBot UI — not yet
+documented in our canonical files; worth resolving from the GexBot docs
+or interface.)
+
+**Zero gamma** is the underlying price level at which aggregate dealer
+gamma flips sign. Above it, dealers are net long gamma (mean-reverting
+behavior — they sell into strength, buy into weakness). Below it,
+dealers are net short gamma (amplifying behavior — they sell into
+weakness, buy into strength).
+
+This is the regime delimiter the canonical [`gamma_vanna_video.md`](../canonical/gamma_vanna_video.md)
+section 3 describes mechanistically. Freddy treats it as a first-look
+filter:
+
+- **Spot above zero gamma:** expect mean-reversion behavior at gamma levels; favor scalp setups
+- **Spot below zero gamma:** expect amplification; entries are higher-conviction trend trades but with materially wider drawdowns possible between levels
+
+Combine with the §1 binary (at-level vs between-level) and §11
+(gamma-shift = sentiment): the full read-order is **zero-gamma regime →
+nearest excess gamma level → cross trigger → gamma-shift watch**.
 
 ---
 
