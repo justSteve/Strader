@@ -103,6 +103,45 @@ One exception: the **maximum negative gamma** strike itself is treated as
 a magnet/target, not a no-trade zone — price tends to be pulled toward
 it.
 
+### Max negative gamma operates in two modes
+
+Freddy clarified in a later Discord post that the max-negative-gamma
+strike isn't only a magnet. It can resolve two ways:
+
+1. **Magnet / mean reversion** (default mode): price gets pulled toward
+   the strike, then mean-reverts away. This is the use Freddy puts it
+   to most often.
+2. **Breakout trigger** (when price crosses through with strength):
+   if price actually breaks above (or below) max neg gamma rather than
+   reverting, the level flips from magnet to *accelerator*.
+
+Freddy's mechanism for mode 2:
+
+> If the price is strong enough to break through (for example, moving
+> from below to above), it can act as a trigger. If there's a positive
+> excess of gamma above, my thinking is that whoever placed that
+> maximum negative gamma position is now underwater, and market makers
+> would need to hedge in the futures market, adding fuel to the move.
+> (Discord, see [`discord_quotes.md`](discord_quotes.md))
+
+This is the same gamma-squeeze mechanism as [§13](#13-the-gamma-squeeze-loop-and-who-hedges)
+but applied specifically to the max-neg-gamma level: cross it →
+positions are underwater → forced hedging accelerates the move →
+especially powerful if a positive-excess-gamma magnet sits in the
+direction of the break.
+
+### Only the maximum matters
+
+Freddy is explicit that this exception applies *only* to the maximum
+negative gamma strike, not to large negative gamma levels in general:
+
+> I only pay attention to maximum negative gamma levels, keeping my
+> trading as simple as possible.
+
+Other negative-gamma levels — even visually large ones — remain
+no-trade transition zones. The asymmetric treatment of max neg gamma is
+operational simplification, not a universal rule about negative gamma.
+
 ### Convexity defined
 
 Freddy uses "high net convexity" and "excess gamma" interchangeably. He
@@ -169,19 +208,52 @@ There is no third option. Trading the between-zone produces stops;
 trading the imbalance produces edge. This is the operational form of
 the "no-trade zone" derivation in the actionable section below.
 
-## 2. Level-to-level mean reversion [HIGH]
+## 2. Level-to-level mean reversion [MED — vocabulary unstable]
 
 *[12:00–14:30]*
 
-Freddy maps GexBot's gamma model to classical volume-profile language:
+Freddy maps GexBot's gamma model to classical volume-profile language.
+The *operational substance* is consistent across his statements but the
+*HVN/LVN labels* he applies are inconsistent. The mechanics are:
 
-- Excess gamma levels = "high value nodes" in volume-profile terms
-- Spaces between = "low value nodes"
-- Trade *the low value nodes toward the high value nodes*, expecting price to magnetize toward concentration
-- High value nodes pull price in once approached, then either mean-revert away or continue to the next high value node
+- Excess gamma levels = where institutional positioning concentrates → magnets, pivots, targets
+- Spaces between = transition zones with no concentration → where price traverses but doesn't settle
+- Trade direction: enter near one excess-gamma level, target the next
+- "Price trades level to level"
 
-His framing: "price trades level to level." The trade is the move from
-one excess-gamma level to the next.
+### Vocabulary inconsistency, flagged
+
+In the Jan 24 video *[~14:00]* Freddy explicitly equates max negative
+gamma with "the high value node" (HVN). In a later Discord post (see
+[`discord_quotes.md`](discord_quotes.md)) he calls positive excess gamma
+levels "pivots (LVNs)" because price tends to move away from them.
+
+Both can't be right under classical volume-profile semantics (HVN =
+where price spends time, LVN = where it doesn't). Freddy's vocabulary
+appears to have shifted across sessions, or the transcript noise on the
+Jan 24 passage flipped what he actually said.
+
+**The mapping that's coherent with the canonical model:**
+- *In a falling-vol regime* (most common, per canonical
+  [`convexity_ladder.md`](../canonical/convexity_ladder.md)): positive
+  convexity stalls price → price spends time near the level → behaves
+  like an HVN. Negative convexity is transit → behaves like an LVN.
+- *In a rising-vol regime*: polarity flips — positive convexity passes
+  through (LVN-like), negative convexity stalls (HVN-like).
+
+So the HVN/LVN mapping is **vol-regime-dependent**, not a fixed
+property of positive vs negative gamma. Freddy's vocabulary inconsistency
+likely reflects whichever regime he was looking at in each session.
+Don't carry the labels as universal; carry the operational substance
+(trade between levels, target the next level).
+
+### Operational substance (stable across statements)
+
+His framing — "price trades level to level" — is the durable claim. The
+trade is the move from one excess-gamma level to the next. What changes
+session to session is whether the next level acts as a wall (stall and
+revert) or a magnet that gets passed through, and that's governed by
+the vol regime, not the volume-profile vocabulary.
 
 ## 3. Entry mechanics — gamma cross confirmation [HIGH]
 

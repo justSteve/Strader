@@ -213,3 +213,88 @@ mnemonic for vocabulary recall.
 The poster explicitly asked for a principal answer ("let's see if Jass
 explain it better"). If Jasper followed up in the thread, that response
 would be canonical-tier and belongs in `../canonical/principal_discord.md`.
+
+---
+
+## Date unknown — Q&A with Freddy on max negative gamma
+
+**Channel:** GexBot Discord (channel not captured)
+**Date:** not captured in source paste (Steve to confirm)
+**Speakers:** unattributed asker (question references one of Freddy's
+videos) → Freddy Sarmiento (answer)
+
+### Q
+
+> Hi Fredy, Have a question on this video... You mentioned in the
+> video that we should enter trades at Long gamma (ie.. LVN (in volume
+> profile terms). We shouldn't be entering trades in Short gamma
+> nodes. Exception being "max" short gamma. You said in the video that
+> max short gamma is equivalent to HVN. That it provides for a pivot
+> to go higher to the next LVN or reversion to the lower LVN. My
+> question is that this rule applies only to "max" short gamma node or
+> if we see any large short gamma node, same rule will apply. Is it
+> any type of max short gamma node or should we check TruGex to see if
+> its max Short Put gamma node or max long put gamma node. Also in
+> volume profile if we should check to see if its a short straddle or
+> what type of Short gamma this is. Any clarification you can provide
+> will be greatly appreciated.
+
+### A (Freddy)
+
+> Think of those positive excess gamma levels as pivots (LVNs), where
+> price tends to move away from those LVNs. Negative gamma levels, on
+> the other hand, are just transition areas. However, the maximum
+> negative gamma level seems to be a key area where I often see
+> significant activity—either mean-reverting or, if the price is
+> strong enough to break through (for example, moving from below to
+> above), it can act as a trigger. If there's a positive excess of
+> gamma above, my thinking is that whoever placed that maximum
+> negative gamma position is now underwater, and market makers would
+> need to hedge in the futures market, adding fuel to the move.
+>
+> I only pay attention to maximum negative gamma levels, keeping my
+> trading as simple as possible. Lately, I've been taking quick scalps
+> with MN minis—1, 2, or 3 contracts—around those maximum negative
+> gamma areas. However, another approach is to develop a broader
+> market view, confirm it with gamma nodes, and trade accordingly.
+
+### What's new vs existing docs
+
+1. **Max neg gamma operates in two modes** — magnet (mean reversion,
+   already in §1 exception) AND **breakout trigger** if price actually
+   crosses through. Slotted into [`freddy_methodology.md` §1](freddy_methodology.md#1-central-rule--trade-only-on-excess-gamma-never-on-negative-gamma-high)
+   as a new subsection.
+2. **Breakout mechanism** explicit: positions sitting at the level go
+   underwater after the cross → forced MM hedging in futures →
+   accelerates the move → especially strong if positive excess gamma
+   sits in the direction of the break. Same mechanism as §13 gamma
+   squeeze, but at the max-neg-gamma level specifically.
+3. **Only the MAXIMUM matters, not any large neg gamma** — Freddy
+   explicit. Other negative gamma levels remain transition zones
+   regardless of visual size. Asymmetric treatment is operational
+   simplification.
+4. **Scalping pattern** — Freddy notes he's been taking quick scalps
+   with MN (Micro NQ) futures, 1-3 contracts, around max neg gamma
+   areas. Sizing detail not in earlier docs.
+
+### Vocabulary inconsistency surfaced
+
+In this answer Freddy calls **positive excess gamma levels** "pivots
+(LVNs)" — but in the Jan 24 video he equates **max negative gamma** with
+the HVN. The labels are inverted across statements. Operational
+substance is unchanged (trade between levels, target the next level);
+only the volume-profile vocabulary is unstable. Documented in
+[`freddy_methodology.md` §2](freddy_methodology.md#2-level-to-level-mean-reversion-med--vocabulary-unstable)
+with the resolution: HVN/LVN mapping is vol-regime-dependent, not a
+fixed property of positive vs negative gamma.
+
+### Unresolved sub-questions
+
+The asker raised three specific questions Freddy didn't address:
+
+1. Does max neg gamma break down further by composition — max short-put vs max long-put gamma? (TruGex granularity question)
+2. Does the structure matter — is a short-straddle max neg gamma different from a single-side one?
+3. Implied: how does the canonical orderflow-classification (customer-long vs customer-short, see [`canonical/options_profile.md`](../canonical/options_profile.md)) interact with the max-neg-gamma read?
+
+These are operationally meaningful — the asker is asking the right
+questions. Worth posing to Jasper or John directly.
