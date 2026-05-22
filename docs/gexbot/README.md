@@ -14,7 +14,7 @@ logic*. Mixing them in one place destroys that signal.
 | Box | What lives here | Mutability |
 |---|---|---|
 | `canonical/` | Verbatim vendor-published documentation. The contract we measure against. | Immutable until vendor updates. Each change recorded in revision log. |
-| `community/` | Practitioner / Discord / community methodology (e.g. `community/freddy_video.md`). Secondary sources interpreting the canonical. | Updated freely as new sources appear. |
+| `community/` | Practitioner / Discord / community methodology (e.g. `community/freddy_methodology.md`). Secondary sources interpreting the canonical. | Updated freely as new sources appear. |
 | `transcripts/` | Primary-source recordings for any community content (e.g. video transcripts). Cited by `community/*.md` files. | Append-only — original recordings are evidence. |
 | `gexbot.spec3.yaml` | OpenAPI spec (canonical, machine-readable). | Immutable until vendor updates. |
 
@@ -58,7 +58,7 @@ verifiable source and a measurable comparison.
 | `canonical/vanna_charm_ladder.md` | -Vanna / Charm Ladder (beta) — late-day dominance over gamma, polarity-flip dynamics |
 | `canonical/convexity_ladder.md` | Convexity Ladder — vol-regime polarity table, 0DTE pinning mechanism |
 | `canonical/metrics_math.md` | GEX/DEX/VEX/Charm formulas + 2 vendor-recommended teaching videos linked |
-| `community/freddy_video.md` | Restructured 2026-05-22 to cite canonical as primary |
+| `community/freddy_methodology.md` | Restructured 2026-05-22 to cite canonical as primary |
 | `transcripts/2026-01-24_freddy_trading_with_gamma.{txt,json}` | Full 55-min auto-captioned transcript |
 | `gexbot.spec3.yaml` | OpenAPI v2.2.0, pulled 2026-05-21 from nfa-llc/gexbot-openapi master |
 | Comparison framework | Bead `st-cgb` (P2), deferred until corpus has ~5-10 days of data |

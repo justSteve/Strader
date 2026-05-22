@@ -21,7 +21,7 @@ vs existing docs, where it gets slotted.
 
 ## 2025-01-25 — Freddy Sarmiento, #theory-questions
 
-**Speaker:** Freddy Sarmiento `[PP]` — Moderator, Discord community member, NQ futures trader (the speaker in the [Trading with Gamma video](freddy_video.md))
+**Speaker:** Freddy Sarmiento `[PP]` — Moderator, Discord community member, NQ futures trader (the speaker in the [Trading with Gamma video](freddy_methodology.md))
 **Time:** 12:23 PM
 **Posted:** day after the Trading with Gamma video (2025-01-24)
 
@@ -29,9 +29,9 @@ vs existing docs, where it gets slotted.
 
 ### Three rules embedded
 
-1. **Algorithmic execution** — already covered, [`freddy_video.md` §10](freddy_video.md).
-2. **Enter on high net convexity** (= excess gamma) — already covered, [`freddy_video.md` §3](freddy_video.md) step 1–3.
-3. **Re-entry after stop-out** — **new**, now slotted as [`freddy_video.md` §3 step 6](freddy_video.md).
+1. **Algorithmic execution** — already covered, [`freddy_methodology.md` §10](freddy_methodology.md).
+2. **Enter on high net convexity** (= excess gamma) — already covered, [`freddy_methodology.md` §3](freddy_methodology.md) step 1–3.
+3. **Re-entry after stop-out** — **new**, now slotted as [`freddy_methodology.md` §3 step 6](freddy_methodology.md).
 
 ### Why the re-entry rule matters
 
@@ -67,11 +67,11 @@ Worth a search next time we're crawling the Discord archive.
 
 ### What's new vs existing docs
 
-1. **SPX/SPY/QQQ nuance** — refines [`freddy_video.md` §7](freddy_video.md): SPX = positioning (institutional hedge), SPY = directional confirmation. Not "SPX institutional, SPY retail." Both audiences use SPY; the distinguishing feature of SPX is the *hedging* use case. Slotted into §7.
-2. **R:R discipline** — explicit numbers: ≥1:3 ratio, 50% off at first level, runner to next. Slotted into [§3](freddy_video.md).
-3. **Gamma profile SHIFT = sentiment signal** — when GexBot's max-gamma computation relocates (e.g., topside 21,606 → 21,051), that's the regime change. **NEW** — slotted as [§11](freddy_video.md).
-4. **Zero gamma line** as regime delimiter — above = mean-reverting, below = amplifying. The "classic" view name is a likely GexBot UI reference not yet in our canonical docs. **NEW** — slotted as [§12](freddy_video.md).
-5. **"Try not to think directional"** — Jasper's framing. Reinforces algorithmic-execution discipline ([§10](freddy_video.md)).
+1. **SPX/SPY/QQQ nuance** — refines [`freddy_methodology.md` §7](freddy_methodology.md): SPX = positioning (institutional hedge), SPY = directional confirmation. Not "SPX institutional, SPY retail." Both audiences use SPY; the distinguishing feature of SPX is the *hedging* use case. Slotted into §7.
+2. **R:R discipline** — explicit numbers: ≥1:3 ratio, 50% off at first level, runner to next. Slotted into [§3](freddy_methodology.md).
+3. **Gamma profile SHIFT = sentiment signal** — when GexBot's max-gamma computation relocates (e.g., topside 21,606 → 21,051), that's the regime change. **NEW** — slotted as [§11](freddy_methodology.md).
+4. **Zero gamma line** as regime delimiter — above = mean-reverting, below = amplifying. The "classic" view name is a likely GexBot UI reference not yet in our canonical docs. **NEW** — slotted as [§12](freddy_methodology.md).
+5. **"Try not to think directional"** — Jasper's framing. Reinforces algorithmic-execution discipline ([§10](freddy_methodology.md)).
 
 ### Worth following up
 
@@ -93,8 +93,8 @@ the docs site.
 
 ### What's new vs existing docs
 
-1. **Explicit convexity definition** — "non-linear relationship between the underlying price and the options, measured by gamma." Folds into [§1](freddy_video.md) as the definition for "high net convexity."
-2. **Binary choice framing** — between-levels (range, stops) vs at-levels (imbalance, edge). Sharper than the video's framing of the same idea. Folded into [§1](freddy_video.md).
+1. **Explicit convexity definition** — "non-linear relationship between the underlying price and the options, measured by gamma." Folds into [§1](freddy_methodology.md) as the definition for "high net convexity."
+2. **Binary choice framing** — between-levels (range, stops) vs at-levels (imbalance, edge). Sharper than the video's framing of the same idea. Folded into [§1](freddy_methodology.md).
 3. **Trend-continuation as the other outcome at gamma levels** — the video emphasizes mean reversion; this notes gamma levels also produce trend continuation. Worth verifying when this distinction matters operationally (likely: positive gamma regime → mean reversion at levels; negative gamma regime → trend continuation through levels — consistent with §12 zero-gamma regime read).
 
 ### Canonicity note
@@ -116,7 +116,7 @@ mentioned"). Same canonical-by-attribution pattern as 2025-01-25.
 Two framing additions, no new mechanics:
 
 1. **"Gamma levels as pivots"** — a useful one-word handle for the mental model. Pivots in trader vocabulary = levels around which sentiment turns and risk is defined. Marries §3 (tight SL around the level) with §11 (the level is where regime can flip).
-2. **The differentiator from TA** — explicit statement that TA shows pattern recurrence, gamma shows institutional footprint. Adds to [§10](freddy_video.md) (algorithmic execution) and [§1](freddy_video.md) (why these levels at all). Not "gamma instead of TA" — "gamma is what the institutions actually did; TA is the trace of what the institutions did, post-hoc."
+2. **The differentiator from TA** — explicit statement that TA shows pattern recurrence, gamma shows institutional footprint. Adds to [§10](freddy_methodology.md) (algorithmic execution) and [§1](freddy_methodology.md) (why these levels at all). Not "gamma instead of TA" — "gamma is what the institutions actually did; TA is the trace of what the institutions did, post-hoc."
 
 No new operational rules. Both points fold into existing sections as
 brief addenda rather than new sections.

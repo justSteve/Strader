@@ -1,4 +1,4 @@
-# GexBot Methodology — Freddy (community video, ~2026-01-24)
+# Freddy Sarmiento — GexBot Methodology
 
 **This is a community / secondary source.** The canonical statements
 about the GexBot model live in `../canonical/`. Where this document and
@@ -6,10 +6,20 @@ canonical disagree, canonical wins. Read the canonical docs first;
 this is here to capture how a practitioner applies them, not to redefine
 them.
 
-Synthesis of a 55-min community explainer video the GexBot team points to
-as a good introduction. Speaker is **Freddy**, an NQ futures trader and
-member of the GexBot Discord. He credits **Jasper** and **John**
-(GexBot's principals) as the source of the model he's applying.
+This document is a synthesis of two sources, anchored by the video and
+extended by ongoing Discord posts:
+
+1. **Trading with Gamma — Jan 24** (2026-01-24, 55:24) — the original
+   community video the GexBot team points to as a good introduction.
+2. **Discord #theory-questions** — Freddy's follow-up posts that extend
+   the video methodology (re-entry rule, R:R discipline, gamma-shift
+   signal, zero-gamma regime line, pivots framing). Each section below
+   tags its source. Verbatim quotes archived in [`discord_quotes.md`](discord_quotes.md).
+
+Speaker is **Freddy Sarmiento `[PP]` (Moderator)**, an NQ futures trader
+and member of the GexBot Discord. He credits **Jasper** ("Jass") and
+**John**, GexBot's principals, as the source of the model he's
+applying.
 
 This document is a faithful synthesis, **not** an endorsement or
 operational instruction. It exists as a reference so future Strader

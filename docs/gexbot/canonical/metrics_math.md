@@ -149,7 +149,7 @@ for the measurement framework.
 
 4. **Charm has a useful aggregation property vanna doesn't:** charm is per-hour, so 0DTE charm + 1DTE charm + N-DTE charm can be summed for total charm impact. Vanna is expiry-specific because it models that-expiry's IV collapse. For our SPX 0DTE late-day work this means: vanna_zero is the right pull; charm can be cross-checked against charm_zero + charm_one if we want aggregate dealer hedging pressure.
 
-5. **The threshold-passing from `community/freddy_video.md`** ("net -vanna becomes relevant beyond $800MM in magnitude on SPX in the last hour") is consistent with this math — net vex is the capital required to hedge total IV collapse across the chain, and $800MM × the chain's hedge multiplier translates to a force that exceeds typical dealer-positioning noise.
+5. **The threshold-passing from `community/freddy_methodology.md`** ("net -vanna becomes relevant beyond $800MM in magnitude on SPX in the last hour") is consistent with this math — net vex is the capital required to hedge total IV collapse across the chain, and $800MM × the chain's hedge multiplier translates to a force that exceeds typical dealer-positioning noise.
 
 ## Revision log
 
