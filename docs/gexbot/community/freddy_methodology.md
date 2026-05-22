@@ -26,6 +26,39 @@ operational instruction. It exists as a reference so future Strader
 sessions have a baseline of "what one experienced practitioner says
 GexBot looks like in use," to compare against the corpus we build.
 
+### Vocabulary note — MM-talk is being deprecated
+
+Freddy's video and Discord posts frequently use **market-maker
+perspective** language ("MMs short gamma," "MMs forced to hedge," etc.).
+This is intuitive for futures traders but isn't the canonical
+convention.
+
+In a 2025-02-21 Discord exchange, Jasper explicitly stated GexBot's
+convention:
+
+> We don't think in terms of MM — everything is in terms of customer.
+> That's what you'll find if you read my docs.
+> ([`../canonical/principal_discord.md`](../canonical/principal_discord.md))
+
+He added: "I'm going to ask Fredy to change this language."
+
+What this means for reading this document:
+- Freddy's mechanical descriptions of MM hedging behavior (§13 squeeze
+  loop, etc.) are correct in substance — MMs DO hedge that way
+- The *terminology* he uses (MM long gamma, MM short gamma) is the
+  inverse of canonical (customer long gamma, customer short gamma)
+- When in doubt, flip to customer perspective: "MM long gamma" =
+  customer SHORT gamma = purple/violet bars; "MM short gamma" =
+  customer LONG gamma = cyan bars
+- The operational substance is identical; the labels are inverted
+
+The canonical operational rule for the gamma ladder, in customer
+perspective:
+
+> Pivot at customer long gamma (cyan). Move through customer short
+> gamma (purple). That's all you really need.
+> (Jasper, [`../canonical/principal_discord.md`](../canonical/principal_discord.md))
+
 ## Sources
 
 ### Video 1 — "Trading with Gamma - Jan 24"

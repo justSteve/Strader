@@ -80,7 +80,15 @@ for the measurement framework.
    - **call/put gex** → measure of directional (up/down) convexity
    - **long/short gamma** → measure of momentum/reversion (continuation or fade)
 
-   A trade decision typically wants both: GEX profile picks the *level*; this ladder predicts the *behavior at that level* (continuation vs reversion). See [`principal_discord.md`](principal_discord.md) (two Jasper Q&As, the second of which fixes the cyan/purple mapping and gives his personal scan order: cyan first for reversion zones, purple as "afterthought") and [`gex_profile.md`](gex_profile.md).
+   A trade decision typically wants both: GEX profile picks the *level*; this ladder predicts the *behavior at that level* (continuation vs reversion). See [`principal_discord.md`](principal_discord.md) for the full Q&A series, including the 2025-02-21 closing exchange where Jasper establishes the canonical operational rule.
+
+8. **The canonical operational rule (Jasper, 2025-02-21):** customer-perspective always.
+
+   > **Pivot at customer long gamma (cyan). Move through customer short gamma (purple). That's all you really need.**
+
+   "Pivot" means price reverses at the level (cyan zones stall and revert). "Move through" means price traverses without stalling (purple zones are transit areas). This compresses the vol-regime modulation in observation 2 and the transition-points-as-pivots in observation 6 into a single default heuristic. The vol-regime polarity flip remains the override: in rising vol, the polarity inverts.
+
+9. **NEW from Q&A: negative gamma line aligns with the volume-profile POC.** GexBot staff stated (2025-02 exchange) that the negative gamma line on the convexity ladder falls at the Point of Control — the volume-profile price with the highest traded volume, where indecisive trading concentrates. Worth investigating: if this holds across sessions, the gamma ladder gives us a derivable POC estimate without needing a separate volume profile pull.
 
 ## Revision log
 

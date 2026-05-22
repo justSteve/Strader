@@ -151,34 +151,22 @@ These are practitioner reads from a principal, not a vendor-spec rule.
 Treat as how Jasper-the-trader uses the ladder, not as a definition of
 what the ladder means.
 
-### Customer-vs-dealer perspective: flagged ambiguity
+### Customer-vs-dealer perspective: RESOLVED below
 
-Jasper's reversion/continuation mapping reads naturally from a *dealer*
-perspective:
-- *Dealer long gamma* (stabilizing limit-buys below + limit-sells above) → reversion ✓
-- *Dealer short gamma* (forced to chase moves) → amplification/continuation ✓
+I initially flagged a customer-vs-dealer perspective ambiguity here.
+**It's resolved by the three-Q&A exchange that follows** (entries on
+2025-02-21 with Guido and the unattributed staff/Jasper closing). The
+ladder is **customer perspective** throughout. Jasper's "long gamma →
+reversion" is reconciled via vol-regime modulation (positive convexity
+stalls in falling vol; that's what produces the reversion at cyan
+levels) — not via a perspective flip.
 
-But the canonical [`convexity_ladder.md`](convexity_ladder.md) text
-defines the ladder from a *customer* perspective: "Long calls and long
-puts represent long customer gex." Customer-long is the inverse of
-dealer-long.
+The operational rule Jasper gave to close the question:
 
-Two interpretations remain:
-1. The gamma ladder plots **dealer perspective**, and "long customer
-   gex" in the convexity_ladder.md text is describing *which side
-   originated the position*, not how the ladder colors it. Under this
-   reading Jasper's terminology is internally consistent and the
-   ladder color = dealer side.
-2. The gamma ladder plots **customer perspective** (literally), and
-   Jasper's casual "long gamma → reversion" is using dealer-side
-   trading vocabulary applied to customer-side ladder colors — same
-   words, opposite signs.
+> We pivot at customer long gamma, but move through customer short
+> gamma. That's all you really need.
 
-We don't have a clean canonical statement disambiguating these.
-Operationally it doesn't matter much because the *behavior* (cyan zones
-are reversion-y, purple zones are continuation-y) is captured by
-Jasper. But the perspective question is worth posing to Jasper directly
-if a future opportunity arises.
+See entries 3, 4, 5 below for the full exchange.
 
 ### Cross-references
 
@@ -196,3 +184,222 @@ if a future opportunity arises.
   question). Corrected the gamma-ladder color mapping (long=cyan,
   short=purple) — my earlier guess was inverted. Surfaced the
   customer-vs-dealer perspective ambiguity as unresolved.
+- 2026-05-22: Three more Q&As added (entries 3, 4, 5 — Guido asking +
+  GexBot staff answering + John M confirming + Jasper closing) that
+  RESOLVE the customer-vs-dealer ambiguity. Convention: always think
+  customer-perspective. Operational rule: pivot at cyan (customer long
+  gamma), move through purple (customer short gamma). Annotated GexBot
+  screenshot added to `images/customer_long_short_gamma_annotated.jpg`.
+  Jasper indicated he'll ask Freddy to deprecate MM-perspective
+  language; a vocabulary note has been added to community/freddy_methodology.md.
+
+---
+
+## 2025-02-XX — Guido + GexBot staff, on Convexity Ladder color zones
+
+**Channel:** GexBot Discord (channel not captured)
+**Date:** 2025-02 (day not captured; follow-up confirms 2025-02-21)
+**Speakers:** Guido (community) → GexBot staff (unattributed in the
+paste — likely John based on the response style and the fact that the
+later turn references "John's diagram")
+
+### Q (Guido)
+
+> Please clarify the terms, how would both "ZONES" look like for a
+> Gexbot users point of view in terms of colors:
+>
+> **Point 1.** Convexity Ladder = options profile, gamma, cyan and violet
+>
+> The positive/right side, cyan color: Market participants classified
+> as investors own long call or put, which means on the other hand,
+> market makers are on the short side. Now the question is: Positive
+> Gamma zones are what? I understand that you mean Cyan color. But
+> this would not be the same as positive gamma itself because a long
+> put has negative gamma in terms of gex profile (Red color)
+>
+> This leads to the 2. question, **point 2**, A. Declining volatility
+> environment, market makers are Long Gamma
+>
+> To which part in the Convexity Ladder does this belong when you
+> write "market makers are Long Gamma"? I understand you mean the
+> bars with the violet color? (but they have both positive and
+> negative gamma, so it is not clear for me if you describe this
+> situation as Positive Gamma)
+>
+> For example, **point 4.**, Practical Trading Applications, Strategy 1,
+> ... When in negative gamma — means the bars with violet color?
+
+### A (GexBot staff)
+
+> Guido, "Buying" Puts or calls creates Positive Gamma, "Selling"
+> calls or puts creates negative gamma. Don't confuse the red and
+> green from Gex profile with the cyan and purple of the gamma chart.
+> As far as Profile Comparison open and read the 3rd attachment to
+> envision the process. The negative gamma line in 3rd attachment is
+> at the Point of Control, (POC), where a lot of indecisive trade
+> occurs. Maybe study this type of theory before adding in the Long/
+> Short Volatility part. Hope this helps.
+
+### The attached graphic
+
+The "3rd attachment" referenced is an annotated GexBot screenshot of
+NQ_NDX from 2024-11-20, archived at
+[`images/customer_long_short_gamma_annotated.jpg`](images/customer_long_short_gamma_annotated.jpg).
+
+![Customer Long/Short Gamma annotated screenshot](images/customer_long_short_gamma_annotated.jpg)
+
+Vendor annotations on the graphic:
+
+> Customer "Long Gamma" vs. "Short Gamma"
+> Customer Long contracts vs. Short contracts.
+>
+> Customer places a position in the Index and hedges through the
+> options. The M.M.'s take the opposite side.
+
+And further down:
+
+> Long Gamma position is essentially "Long Volatility". The Customer
+> is expecting a move away from the long gamma positions. So if spot
+> price moves down to 20600.00, a reversion is assumed or expected.
+>
+> If price is moving up and a "Long Gamma" position enters the market
+> it could very well cap the rise and act as resistance, forcing a
+> reversion downward. (Same process in reverse for the downside).
+
+### What this confirms / adds
+
+1. **Two distinct sign rules.** The GEX profile (green/red) signs by
+   call-vs-put. The gamma chart (cyan/purple) signs by long-vs-short
+   contracts (= positive vs negative gamma, since buying any option
+   creates positive gamma).
+2. **Buy = positive gamma, sell = negative gamma** — stated cleanly,
+   regardless of call/put. This is the textbook truth and resolves
+   Guido's confusion about long puts.
+3. **NEW: negative gamma line aligns with the Point of Control (POC).**
+   The volume-profile POC is where the most volume traded. Staff says
+   the negative gamma line falls there because that's where indecisive
+   (rangebound) trading concentrates. Worth investigating
+   operationally — if confirmed across sessions, this lets us derive
+   a POC estimate purely from gamma data.
+
+---
+
+## 2025-02-21 7:55 AM — Guido follow-up + John M confirmation
+
+**Channel:** GexBot Discord (channel not captured)
+**Date:** 2025-02-21
+**Speakers:** Guido (community) → John M (= John Kirby, GexBot principal)
+
+### Q (Guido, confirming his understanding)
+
+> John, thank you for the examples. I understand in general, that
+> calls create positive gamma exposure, means underlying has to be
+> bought for a hedge. In the Gex profile Call gamma is green,
+> regardless who is supposed to be on the long or short side of this
+> call. In the convexity profile it is different because it is
+> classified in customers, so if a customer is long, the bars are in
+> cyan color, regardless if it is a long put or a long call. Right?
+>
+> My question above was just to clarify, which point of view is taken
+> in the paper. So to understand your answer right: If there is
+> written, that market makers are Long gamma, it means for us that we
+> are in a low convexity zone an the price is in the area of the
+> profile with violet color. Right? My questions were just about the
+> terminology which is used in the paper, not about the system itself.
+
+### A (John M)
+
+> Yes, cyan is long gamma, (long puts or calls). Just toggle that
+> gamma switch on/ off to switch back to the PUTS/ CALLS bought/ sold
+> view to confirm for yourself during the day.
+
+### What this confirms
+
+1. **Cyan = long gamma = long puts OR long calls** (customer
+   perspective, customer-bought side). Confirms Guido's reading.
+2. **The customer-long classification is at the CONTRACT level** —
+   if a customer is long ANY contract (call OR put), it lands in
+   cyan. The call/put distinction is the GEX axis, not the gamma
+   axis.
+3. **NEW: UI toggle.** GexBot ships a "gamma switch" that flips the
+   chart between (a) cyan/purple gamma view and (b) PUTS/CALLS
+   bought/sold view. Toggling between them is John's recommended way
+   to verify the mapping during a live session.
+
+Note Guido's framing of "market makers are Long gamma → violet bars" —
+he's correctly reasoning by inversion. If MM is long gamma, customer
+is short gamma, customer-short shows as violet. John doesn't directly
+confirm Guido's MM-inversion logic, but the next Q&A (below) does.
+
+---
+
+## 2025-02-XX — Closing exchange, customer-perspective convention
+
+**Channel:** GexBot Discord (channel not captured)
+**Date:** same thread as above (2025-02-21 or shortly after)
+**Speakers:** Guido (community) → unattributed GexBot staff (likely
+**Jasper** — "my docs" phrasing + referring to John in the third
+person + the authority to deprecate Freddy's language)
+
+### Q (Guido)
+
+> To be precise, if "market makers are Long Gamma", means violet bars
+> for us?
+
+### A (likely Jasper)
+
+> I'm going to ask Fredy to change this language.
+>
+> Yes technically violet bars would indicate MM long gamma.
+>
+> But there's a reason we don't think in terms of MM — everything is
+> in terms of customer. That's what you'll find if you read my docs.
+>
+> John's diagram is correct. We pivot at customer long gamma, but
+> move through customer short gamma. That's all you really need.
+
+### What this establishes — the canonical operational rule
+
+This is the most operationally compressed canonical statement we have
+about the gamma ladder. Three things land here:
+
+1. **Convention: customer perspective only.** "We don't think in terms
+   of MM — everything is in terms of customer." If a community source
+   talks about MM-long-gamma or MM-short-gamma, that's their own
+   conversion; the *canonical* axis is customer.
+2. **Freddy's MM-perspective vocabulary is being deprecated.** Jasper
+   explicitly says "I'm going to ask Fredy to change this language."
+   Freddy's videos and Discord posts use MM-perspective language
+   freely; canonical convention will be customer-perspective going
+   forward. A vocabulary note has been added to
+   [`../community/freddy_methodology.md`](../community/freddy_methodology.md).
+3. **The two-line operational rule:**
+
+   > **Pivot at customer long gamma (cyan).**
+   > **Move through customer short gamma (purple/violet).**
+   > That's all you really need.
+
+   This is the cleanest canonical statement of the gamma ladder's
+   trading meaning we have. It compresses everything in
+   [`convexity_ladder.md`](convexity_ladder.md) (vol-regime modulation,
+   distribution shape, transition points as pivots) into a two-line
+   default heuristic.
+
+### Why this resolves the perspective ambiguity in entry 2
+
+In the second Q&A on this page I flagged a customer-vs-dealer
+perspective question as unresolved. This exchange resolves it: the
+ladder is **strictly customer perspective**, and any apparent
+contradiction with dealer-side intuition is bridged by vol-regime
+modulation, not by switching axes.
+
+Jasper's "long gamma (cyan) for poor liq (possible reversion) zones"
+in the second Q&A is consistent with this entry's rule: customer long
+gamma = pivot = price reverts at the level = poor liquidity (price
+doesn't spend volume there because dealers' offsetting positions
+absorb the order flow).
+
+Jasper's "short gamma above for long continuation" (also from entry 2)
+is consistent with "move through customer short gamma": for a long
+trade to continue upward, you want purple bars above so price has
+room to move through them.

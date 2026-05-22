@@ -57,7 +57,9 @@ for the measurement framework to validate against corpus data.
    - **call/put gex** → measure of directional (up/down) convexity
    - **long/short gamma** → measure of momentum/reversion (continuation or fade)
 
-   See [`principal_discord.md`](principal_discord.md) (two Jasper Q&As, the second of which fixes the cyan/purple mapping) for the full disambiguation. For the long/short axis itself, see [`convexity_ladder.md`](convexity_ladder.md).
+   See [`principal_discord.md`](principal_discord.md) for the full Q&A series — including the 2025-02-21 closing exchange that establishes the customer-perspective convention and the two-line operational rule: **pivot at customer long gamma (cyan), move through customer short gamma (purple).** For the long/short axis itself, see [`convexity_ladder.md`](convexity_ladder.md).
+
+6. **UI: gamma toggle.** Per John M's confirmation in the same 2025-02-21 thread, GexBot ships a "gamma switch" toggle that flips the chart between (a) cyan/purple gamma view and (b) PUTS/CALLS bought-vs-sold view. Toggling between them during a live session is John's recommended way to verify the cyan = long gamma = long puts OR long calls mapping in real time.
 
 ## Revision log
 
