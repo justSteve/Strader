@@ -223,6 +223,15 @@ See entries 3, 4, 5 below for the full exchange.
   futures, not bullish positioning; (c) worked example — ES $5237
   puts sold at 9:50 AM, broken through by 10:15. Plus the Freddy
   channel URL is captured: youtube.com/@gextrading.
+- 2026-05-22: Entry 10 added — Jasper 2025-04-09 4:30 PM Q&A with
+  Andy. Compresses the regime rule into a default+exception form:
+  for 0DTE, falling-vol regime is *almost always* the default, so
+  the canonical pivot-at-long-gamma rule applies most days. Exception
+  is pre-event sessions (CPI/FOMC/NFP) where rising vol flips long
+  gamma into a breakout trigger. Plus a live trade narrative showing
+  the rule getting updated mid-session ("revving long 216 tho due
+  to incoming 50 minute algo"). Two follow-up flags: what is the
+  50-minute algo; what is the state-degens channel.
 
 ---
 
@@ -781,3 +790,103 @@ for all the Freddy videos already in our community/ docs
   §1 max-neg-gamma exception — this Q&A adds nuance: even the
   max-neg-gamma magnet can fail when the regime is strongly
   directional. Worth flagging in §1 as a regime caveat.
+
+---
+
+## 2025-04-09 4:30 PM — Jasper, regime rule of thumb (0DTE-as-default)
+
+**Channel:** GexBot Discord (channel not captured)
+**Date:** 2025-04-09, 4:26 → 4:30 PM
+**Speakers:** Andy (community, new to GEX) → Jasper "jass" (Moderator)
+
+### Q (Andy)
+
+> ok this might be a dumb question but how can you tell if price is
+> going to keep trending or breakout
+>
+> New to gex
+
+### A (Jasper)
+
+> that's a hard question lol.
+>
+> my rule of thumb is to look for reversion at long gamma. this is
+> usually the case in falling volatility regimes (which for 0dte is
+> almost always).
+>
+> in case of rising volatility (preceding an event) then long gamma
+> for pressing a breakout
+>
+> i faded major long gamma here near EOD ⁠state-degens⁠ (did end up
+> bailing and revving long 216 tho due to incoming 50 minute algo)
+
+### Three confirmations land
+
+#### 1. The default rule for 0DTE
+
+> Reversion at long gamma. This is usually the case in falling
+> volatility regimes (which for 0dte is almost always).
+
+Jasper's parenthetical is the operationally significant claim: **for
+0DTE, falling-vol regime is the default**. The polarity-flip in
+[`convexity_ladder.md`](convexity_ladder.md) observation 2 lays out
+both regimes; this Q&A says for 0DTE-specifically you can assume
+falling-vol unless there's a specific reason not to.
+
+The implication: the default 0DTE rule **is** the canonical pivot-at-
+cyan rule (entry 5). Most days, that's the right read. Don't reach for
+the rising-vol alternative without a reason.
+
+#### 2. The exception: pre-event sessions
+
+> In case of rising volatility (preceding an event) then long gamma
+> for pressing a breakout.
+
+Pre-event sessions (CPI, FOMC, NFP, etc.) are when vol is being bid
+up. In those windows, long-gamma levels flip from **reversion zones**
+to **breakout triggers** — exactly the canonical polarity flip but
+stated as Jasper's operational rule.
+
+The full default-vs-exception structure for 0DTE:
+
+| Regime | Cyan (long gamma) | Trigger |
+|---|---|---|
+| Falling vol (default for 0DTE) | Pivot / reversion | Pre-set |
+| Rising vol (pre-event) | Breakout press | Specific event on the calendar |
+
+#### 3. Live trade narrative
+
+> I faded major long gamma here near EOD ⁠state-degens⁠ (did end up
+> bailing and revving long 216 tho due to incoming 50 minute algo)
+
+Jasper is *applying* his own rule in real time. The reference to
+"state-degens" is a Discord channel name where the trade was likely
+called. The "50 minute algo" is a specific late-EOD algorithmic
+pattern he watches for — worth following up if more context emerges
+about what that algorithm does mechanically.
+
+This is also worth noting because it shows the rule is *contingent*:
+Jasper faded long gamma (his default rule), then bailed and reversed
+when he detected a different signal coming (the 50-minute algo). The
+rule of thumb isn't a static prediction — it's a Bayesian prior that
+gets updated as new evidence arrives.
+
+### Cross-references
+
+- [`convexity_ladder.md`](convexity_ladder.md) observation 2 — the
+  canonical polarity-flip table this Q&A operationalizes
+- Entry 5 (Jasper closing exchange) — the canonical "pivot at customer
+  long gamma" rule. Entry 10 adds the regime modulation conditions.
+- Entry 9 (stockholm/John, prior entry) — documents the failure mode
+  when sustained directional flow overrides the polarity. Two
+  entries together give the regime-modulation rule + its limit.
+
+### Follow-up flags
+
+- **What is the "50 minute algo"?** Jasper references it as a known
+  pattern. Worth catching context if it comes up again. Could be a
+  rebalancing algo, a hedging algo, or a flow pattern documented
+  elsewhere in Discord.
+- **state-degens channel** — a Discord channel name; could be the
+  trading-call channel where Jasper posts setups in real time. Useful
+  to know if we ever crawl Discord systematically.
