@@ -1,5 +1,11 @@
 # GexBot Methodology — Freddy (community video, ~2026-01-24)
 
+**This is a community / secondary source.** The canonical statements
+about the GexBot model live in `../canonical/`. Where this document and
+canonical disagree, canonical wins. Read the canonical docs first;
+this is here to capture how a practitioner applies them, not to redefine
+them.
+
 Synthesis of a 55-min community explainer video the GexBot team points to
 as a good introduction. Speaker is **Freddy**, an NQ futures trader and
 member of the GexBot Discord. He credits **Jasper** and **John**
@@ -106,15 +112,20 @@ Then he overlays GexBot's excess gamma levels. **Confluence between the
 two sets of levels = high-probability trade.** Gamma without technical
 confluence is a skip.
 
-## 6. Directional bias from orderflow classification [HIGH]
+## 6. Directional bias from orderflow classification — Freddy's application
 
 *[31:00–34:30]*
 
-This is the most direct use of GexBot's State-tier classification. Freddy
-reads the *kind* of activity at each strike (per GexBot's per-strike
-classification of customer-buy vs customer-sell across calls and puts):
+**Canonical source: `../canonical/options_profile.md`.** The bias logic
+itself is GexBot's published model (customer-long = wall, customer-short
+= accelerator, driven by EV asymmetry between long and short option
+positions). Freddy is *applying* the canonical rule, not stating it.
+Where this section's table and the canonical text disagree, canonical
+wins.
 
-| Pattern at a strike | Bias |
+Freddy's practical table for reading the Options Profile at each strike:
+
+| Pattern at a strike | Bias (per Freddy's narration) |
 |---|---|
 | Selling of calls (customer SELL-CALL excess) | Bearish — expect downside follow-through |
 | Buying of calls (customer BUY-CALL excess) | Bullish |
@@ -126,6 +137,15 @@ classification of customer-buy vs customer-sell across calls and puts):
 His Friday short setup used exactly this: max gamma resistance above
 spot + the negative gamma above came from sold calls (bearish) + GexBot
 docs explicitly call high gamma nodes "targets" → cross below = short.
+
+**Important nuance not covered by Freddy:** the canonical docs (see
+`../canonical/options_profile.md`) state that this bias logic is the
+*default-vol-regime* behavior. In a **rising volatility regime**, walls
+become vulnerable and short-side strikes can actually *invert* to act as
+walls (sellers add to inventory rather than hedging out). Freddy does
+not address this regime modulation in the video. The canonical text
+governs in rising-vol sessions; this table only applies cleanly under
+declining or stable vol.
 
 ## 7. Why NDX, not QQQ (institutional vs retail) [HIGH]
 
@@ -155,6 +175,13 @@ Confidence on the specific mappings is LOW because the audio garbled the
 slope direction descriptions. The general intuition (skew shape implies
 regime) is consistent with standard options trading literature but the
 specific operational rules need re-verification.
+
+**Note:** the canonical docs cover a related but distinct concept — how
+*rising vs falling* volatility (not skew shape) modulates the wall vs
+accelerator behavior. See `../canonical/options_profile.md` "Volatility
+regime modulation." Skew *shape* and vol *trajectory* are two different
+things; only the latter is canonically documented at the time of this
+write-up.
 
 ## 9. Time-compression at retested levels (non-gamma input) [HIGH]
 
