@@ -26,8 +26,8 @@ trail.
 | `dex_ladder.md` | same | DEX Ladder — delta exposure per strike, the "options order book" framing, vol-regime modulation of DEX usefulness |
 | `vanna_charm_ladder.md` | same | -Vanna / Charm Ladder — beta-tagged, late-day dominance over gamma, polarity-flip behavior across spot |
 | `convexity_ladder.md` | same | Convexity Ladder — risk-not-direction read, vol-regime polarity table (positive stalls in falling vol, negative stalls in rising vol), 0DTE pinning mechanism |
-| (future) `metrics_math.md` | <https://www.gexbot.com/metrics> | GEX, DEX, VEX, Charm formulas (the math behind the indicators) |
-| (future) `api_reference.md` | <https://www.gexbot.com/apidocs> + `../gexbot.spec3.yaml` | Endpoint behaviors, rate limits, auth |
+| `metrics_math.md` | <https://www.gexbot.com/metrics> | GEX, DEX, VEX, Charm formulas (the math behind the indicators); two vendor-recommended teaching videos linked at the end |
+| (future) `api_reference.md` | <https://www.gexbot.com/apidocs> + `../gexbot.spec3.yaml` | Endpoint behaviors, rate limits, auth (probably redundant with the OpenAPI spec; defer until clear value) |
 
 Files are added as the corresponding GexBot content is ingested. Empty
 slots above are planned, not promised.

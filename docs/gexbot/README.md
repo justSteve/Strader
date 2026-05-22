@@ -57,7 +57,9 @@ verifiable source and a measurable comparison.
 | `canonical/dex_ladder.md` | DEX Ladder — delta exposure per strike, vol-regime modulation of DEX usefulness |
 | `canonical/vanna_charm_ladder.md` | -Vanna / Charm Ladder (beta) — late-day dominance over gamma, polarity-flip dynamics |
 | `canonical/convexity_ladder.md` | Convexity Ladder — vol-regime polarity table, 0DTE pinning mechanism |
+| `canonical/metrics_math.md` | GEX/DEX/VEX/Charm formulas + 2 vendor-recommended teaching videos linked |
 | `community/freddy_video.md` | Restructured 2026-05-22 to cite canonical as primary |
 | `transcripts/2026-01-24_freddy_trading_with_gamma.{txt,json}` | Full 55-min auto-captioned transcript |
 | `gexbot.spec3.yaml` | OpenAPI v2.2.0, pulled 2026-05-21 from nfa-llc/gexbot-openapi master |
 | Comparison framework | Bead `st-cgb` (P2), deferred until corpus has ~5-10 days of data |
+| Vendor video transcripts | Pending — `-RhSCoElB9Y` (Vanna and Charm Exposure), `zfkOCc2evEk` (Gamma and Vanna exposures). Steve to acquire transcripts next session. |
