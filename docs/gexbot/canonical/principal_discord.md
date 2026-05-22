@@ -204,6 +204,16 @@ See entries 3, 4, 5 below for the full exchange.
   customer-perspective convention now formally extends to the GEX
   profile, not just the convexity ladder. gex_profile.md updated to
   carry this explicitly.
+- 2026-05-22: Entry 8 added — John Kirby 2025-03-27 11:01-11:05 AM
+  Q&A with TommyCirj. Two takeaways: (a) Net OI correlates with gamma
+  all-else-equal but gamma also depends on price/time/vol — counting
+  contracts alone is inadequate; (b) GexBot's orderflow-classification
+  approach is fundamentally different from naive Call OI − Put OI
+  vendors. Plus TommyCirj's useful pedagogical framing: dealer-long-
+  calls and dealer-long-puts differ in initial hedge setup (short vs
+  long stock) but produce IDENTICAL dynamic hedging (sell on rises,
+  buy on drops = stabilizing) — useful corrective to Freddy's
+  mechanism inversion in OrderFlow Part 2.
 
 ---
 
@@ -559,3 +569,95 @@ pivots") is now operationally justifiable: pivots come from the
 *aggregate* gamma exposure at the strike, not from the put-side
 contribution alone. A strike with heavy put gex but offsetting call
 gex may not pivot.
+
+---
+
+## 2025-03-27 11:01–11:05 AM — John Kirby, Net OI as gamma proxy + competitor approach
+
+**Channel:** GexBot Discord (channel not captured)
+**Date:** 2025-03-27 11:01 AM (first exchange) → 11:05 AM (closing)
+**Speakers:** TommyCirj (community) ↔ John Kirby (Moderator)
+
+### Q1 (TommyCirj, 11:01 AM)
+
+> If we were to know the Net OI at a given strike, would the larger
+> the volume/OI suggest larger gamma exposure?
+
+### A1 (John Kirby, 11:01 AM)
+
+> All else equal, yes. But gamma depends on price, time, and
+> volatility. So its complicated.
+
+### TommyCirj follow-up (11:03 AM)
+
+> yes. I have seen a lot of companies basically look at Call OI -
+> Put OI = positive/negative gamma, which then create a gex profile
+> of only negative gamma essentially below and positive gamma above
+> a particular midpoint
+>
+> where as yes long gamma means dealers are long, although they
+> would be selling the underlying if they were long calls and
+> buying the underlying if they were long puts
+>
+> what I am trying to find is a profile that depicts that flow
+
+### A2 (John Kirby, 11:05 AM)
+
+> yea, well you found it.
+
+### What this establishes
+
+#### 1. Net OI is a partial gamma proxy
+
+John confirms volume/OI does correlate with gamma exposure
+*all-else-equal*, but immediately caveats: **gamma is a function of
+price, time, and volatility, not just OI**. This echoes the
+`metrics_math.md` "how many" ladder:
+
+- Open interest (gold standard, T+1 OCC tallies)
+- Volume (intraday proxy, gross)
+- Orderflow classification (GexBot's edge — net imbalance, not gross flow)
+
+OI alone tells you "how many contracts." To get to gamma you also need
+the Greeks at that strike — which depend on the underlying price,
+time-to-expiry, and IV.
+
+#### 2. GexBot vs the naive Call OI − Put OI approach
+
+TommyCirj describes what *other vendors* do: compute `Call OI − Put OI`
+at each strike and label the result as positive/negative gamma. This
+produces a profile where everything below a midpoint is "negative
+gamma" and everything above is "positive gamma." The polarity is
+forced by the midpoint, not derived from positioning.
+
+John's "yea, well you found it" implicitly endorses GexBot's approach
+as the correct alternative. GexBot's orderflow-classification model
+(see [`metrics_math.md`](metrics_math.md) "Orderflow Classification")
+identifies *who originated the position* — the customer-long vs
+customer-short distinction — instead of imposing a polarity from
+strike location. The naive approach can't distinguish "long call at
+strike X" from "short call at strike X" since both contribute
+identically to call OI.
+
+#### 3. Dealer-long-call vs dealer-long-put — same dynamic hedge, different initial setup
+
+TommyCirj's framing is pedagogically useful: **dealer long gamma**
+exists in two flavors that look different but behave the same:
+
+- **Dealer long calls** → calls have positive delta → dealer initially SHORTS stock to offset → as stock rises, call delta grows → dealer sells more stock → as stock falls, dealer covers
+- **Dealer long puts** → puts have negative delta → dealer initially LONGS stock to offset → as stock falls, put delta grows more negative → dealer buys more stock → as stock rises, dealer sells
+
+Both end up with the *same* dynamic hedging pattern: **sell on rises,
+buy on drops = stabilizing**. The initial hedge direction differs
+(short stock vs long stock) but the response to price moves is
+identical. This is why canonical
+[`gamma_vanna_video.md`](gamma_vanna_video.md) §3 can correctly say
+"MM long gamma → stabilizing" without specifying whether the MM is
+long calls or long puts — both produce the same behavior.
+
+This framing is also a useful corrective to the mechanism inversion in
+Freddy's OrderFlow Part 2 video (see
+[`../community/freddy_orderflow_series.md`](../community/freddy_orderflow_series.md)
+Part 2 "Mechanism inversion" section). Freddy attributed long-gamma
+hedging behavior to MM short gamma; TommyCirj articulates the correct
+long-gamma behavior here and John endorses.
