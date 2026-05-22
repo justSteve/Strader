@@ -1,0 +1,1167 @@
+[
+  {
+    "start": 6.24,
+    "duration": 3.149,
+    "text": "[Music]"
+  },
+  {
+    "start": 12.86,
+    "duration": 6.15,
+    "text": "[Music]"
+  },
+  {
+    "start": 25.16,
+    "duration": 7.739,
+    "text": "[Music]"
+  },
+  {
+    "start": 33.76,
+    "duration": 3.2,
+    "text": "buying a call"
+  },
+  {
+    "start": 34.719,
+    "duration": 3.201,
+    "text": "forces a market maker to delta hedge"
+  },
+  {
+    "start": 36.96,
+    "duration": 3.119,
+    "text": "this position"
+  },
+  {
+    "start": 37.92,
+    "duration": 4.08,
+    "text": "by buying stock proportional to a line"
+  },
+  {
+    "start": 40.079,
+    "duration": 2.881,
+    "text": "going perpendicular to the data of the"
+  },
+  {
+    "start": 42.0,
+    "duration": 2.879,
+    "text": "option"
+  },
+  {
+    "start": 42.96,
+    "duration": 3.919,
+    "text": "the delta is the slope of the piano of"
+  },
+  {
+    "start": 44.879,
+    "duration": 3.761,
+    "text": "the option at the current price"
+  },
+  {
+    "start": 46.879,
+    "duration": 4.081,
+    "text": "the act of delta hedging by the market"
+  },
+  {
+    "start": 48.64,
+    "duration": 4.559,
+    "text": "maker essentially rotates their p"
+  },
+  {
+    "start": 50.96,
+    "duration": 3.2,
+    "text": "l profile for the option such that the"
+  },
+  {
+    "start": 53.199,
+    "duration": 3.601,
+    "text": "data is flat"
+  },
+  {
+    "start": 54.16,
+    "duration": 3.919,
+    "text": "at the current price as mentioned in a"
+  },
+  {
+    "start": 56.8,
+    "duration": 3.04,
+    "text": "previous video"
+  },
+  {
+    "start": 58.079,
+    "duration": 3.441,
+    "text": "changes in the price creates gamma"
+  },
+  {
+    "start": 59.84,
+    "duration": 3.6,
+    "text": "exposure for market makers"
+  },
+  {
+    "start": 61.52,
+    "duration": 3.999,
+    "text": "and forces them to dynamically adjust"
+  },
+  {
+    "start": 63.44,
+    "duration": 2.64,
+    "text": "their data hedge by buying or selling"
+  },
+  {
+    "start": 65.519,
+    "duration": 1.92,
+    "text": "stock"
+  },
+  {
+    "start": 66.08,
+    "duration": 3.6,
+    "text": "proportional to a line going"
+  },
+  {
+    "start": 67.439,
+    "duration": 3.761,
+    "text": "perpendicular to the new delta"
+  },
+  {
+    "start": 69.68,
+    "duration": 3.6,
+    "text": "when the line is pointing in the right"
+  },
+  {
+    "start": 71.2,
+    "duration": 2.959,
+    "text": "direction the market makers are forced"
+  },
+  {
+    "start": 73.28,
+    "duration": 2.4,
+    "text": "to buy"
+  },
+  {
+    "start": 74.159,
+    "duration": 4.0,
+    "text": "whereas when the line is pointing in the"
+  },
+  {
+    "start": 75.68,
+    "duration": 4.56,
+    "text": "left direction they are forced to sell"
+  },
+  {
+    "start": 78.159,
+    "duration": 3.521,
+    "text": "this process essentially keeps rotating"
+  },
+  {
+    "start": 80.24,
+    "duration": 3.28,
+    "text": "their p l profile"
+  },
+  {
+    "start": 81.68,
+    "duration": 3.68,
+    "text": "to ensure that the delta slope is always"
+  },
+  {
+    "start": 83.52,
+    "duration": 4.0,
+    "text": "flat at the current price"
+  },
+  {
+    "start": 85.36,
+    "duration": 3.2,
+    "text": "more details regarding delta hedging of"
+  },
+  {
+    "start": 87.52,
+    "duration": 3.76,
+    "text": "gamma exposure"
+  },
+  {
+    "start": 88.56,
+    "duration": 4.72,
+    "text": "is explained in a previous video however"
+  },
+  {
+    "start": 91.28,
+    "duration": 3.36,
+    "text": "the delta of an option can change"
+  },
+  {
+    "start": 93.28,
+    "duration": 3.6,
+    "text": "independently of prices of the"
+  },
+  {
+    "start": 94.64,
+    "duration": 4.159,
+    "text": "underlying this can be due to changes"
+  },
+  {
+    "start": 96.88,
+    "duration": 3.84,
+    "text": "implied of volatility or time"
+  },
+  {
+    "start": 98.799,
+    "duration": 4.081,
+    "text": "which create banner and charm exposures"
+  },
+  {
+    "start": 100.72,
+    "duration": 4.48,
+    "text": "for market makers respectively"
+  },
+  {
+    "start": 102.88,
+    "duration": 3.76,
+    "text": "to understand vanner and charm it may be"
+  },
+  {
+    "start": 105.2,
+    "duration": 3.04,
+    "text": "easier to not think of data as the"
+  },
+  {
+    "start": 106.64,
+    "duration": 3.839,
+    "text": "current slope of an options p"
+  },
+  {
+    "start": 108.24,
+    "duration": 3.28,
+    "text": "l profile but to instead think of data"
+  },
+  {
+    "start": 110.479,
+    "duration": 3.521,
+    "text": "as the probability"
+  },
+  {
+    "start": 111.52,
+    "duration": 3.919,
+    "text": "that an option will go in the money"
+  },
+  {
+    "start": 114.0,
+    "duration": 3.759,
+    "text": "price changes can be modeled"
+  },
+  {
+    "start": 115.439,
+    "duration": 4.161,
+    "text": "to follow certain distributions most"
+  },
+  {
+    "start": 117.759,
+    "duration": 3.36,
+    "text": "price changes could be small with a few"
+  },
+  {
+    "start": 119.6,
+    "duration": 2.479,
+    "text": "large price changes occurring on the"
+  },
+  {
+    "start": 121.119,
+    "duration": 2.801,
+    "text": "tails"
+  },
+  {
+    "start": 122.079,
+    "duration": 3.36,
+    "text": "or the distribution could develop in"
+  },
+  {
+    "start": 123.92,
+    "duration": 3.28,
+    "text": "such a way that it widens"
+  },
+  {
+    "start": 125.439,
+    "duration": 4.001,
+    "text": "to include larger price swings on the"
+  },
+  {
+    "start": 127.2,
+    "duration": 3.119,
+    "text": "tails when thinking of implied"
+  },
+  {
+    "start": 129.44,
+    "duration": 3.2,
+    "text": "volatility"
+  },
+  {
+    "start": 130.319,
+    "duration": 4.0,
+    "text": "and its effect on price changes one can"
+  },
+  {
+    "start": 132.64,
+    "duration": 3.84,
+    "text": "think of implied volatility as"
+  },
+  {
+    "start": 134.319,
+    "duration": 3.601,
+    "text": "influencing the probability distribution"
+  },
+  {
+    "start": 136.48,
+    "duration": 3.92,
+    "text": "of price changes"
+  },
+  {
+    "start": 137.92,
+    "duration": 3.92,
+    "text": "when implied volatility is low price"
+  },
+  {
+    "start": 140.4,
+    "duration": 2.24,
+    "text": "changes are clustered and typically"
+  },
+  {
+    "start": 141.84,
+    "duration": 3.119,
+    "text": "smaller"
+  },
+  {
+    "start": 142.64,
+    "duration": 4.239,
+    "text": "as implied volatility increases the"
+  },
+  {
+    "start": 144.959,
+    "duration": 4.721,
+    "text": "probability distribution widens"
+  },
+  {
+    "start": 146.879,
+    "duration": 4.481,
+    "text": "and has increased variance or deviation"
+  },
+  {
+    "start": 149.68,
+    "duration": 2.48,
+    "text": "similarly when thinking about the effect"
+  },
+  {
+    "start": 151.36,
+    "duration": 2.56,
+    "text": "of time"
+  },
+  {
+    "start": 152.16,
+    "duration": 3.76,
+    "text": "when there is more time until an option"
+  },
+  {
+    "start": 153.92,
+    "duration": 3.92,
+    "text": "expires there is a higher chance for"
+  },
+  {
+    "start": 155.92,
+    "duration": 4.24,
+    "text": "larger price movements to occur"
+  },
+  {
+    "start": 157.84,
+    "duration": 4.08,
+    "text": "as an option becomes closer to expiring"
+  },
+  {
+    "start": 160.16,
+    "duration": 3.84,
+    "text": "the chance of large price swings"
+  },
+  {
+    "start": 161.92,
+    "duration": 4.08,
+    "text": "starts to diminish and one may expect"
+  },
+  {
+    "start": 164.0,
+    "duration": 5.599,
+    "text": "price changes to start clustering"
+  },
+  {
+    "start": 166.0,
+    "duration": 5.44,
+    "text": "and details to start narrowing in"
+  },
+  {
+    "start": 169.599,
+    "duration": 3.841,
+    "text": "thus to understand how market makers"
+  },
+  {
+    "start": 171.44,
+    "duration": 3.76,
+    "text": "down to hedge their banner exposure"
+  },
+  {
+    "start": 173.44,
+    "duration": 4.0,
+    "text": "one can take an example of a market"
+  },
+  {
+    "start": 175.2,
+    "duration": 3.84,
+    "text": "maker with shorten in the money call"
+  },
+  {
+    "start": 177.44,
+    "duration": 3.519,
+    "text": "the probability that the option will"
+  },
+  {
+    "start": 179.04,
+    "duration": 3.279,
+    "text": "expire in the money is represented by"
+  },
+  {
+    "start": 180.959,
+    "duration": 3.841,
+    "text": "the shaded blue area"
+  },
+  {
+    "start": 182.319,
+    "duration": 3.361,
+    "text": "that is in the money market makers with"
+  },
+  {
+    "start": 184.8,
+    "duration": 2.64,
+    "text": "short calls"
+  },
+  {
+    "start": 185.68,
+    "duration": 4.24,
+    "text": "must delta hedge themselves by being"
+  },
+  {
+    "start": 187.44,
+    "duration": 2.96,
+    "text": "long stock the size of this long stock"
+  },
+  {
+    "start": 189.92,
+    "duration": 2.56,
+    "text": "hedge"
+  },
+  {
+    "start": 190.4,
+    "duration": 3.68,
+    "text": "is proportional to the blue shaded area"
+  },
+  {
+    "start": 192.48,
+    "duration": 4.08,
+    "text": "that is in the money"
+  },
+  {
+    "start": 194.08,
+    "duration": 3.92,
+    "text": "as implied volatility decreases the"
+  },
+  {
+    "start": 196.56,
+    "duration": 3.52,
+    "text": "chances of the option expiring"
+  },
+  {
+    "start": 198.0,
+    "duration": 4.159,
+    "text": "in the money increases meaning that the"
+  },
+  {
+    "start": 200.08,
+    "duration": 2.799,
+    "text": "market maker has delta hedge their vanna"
+  },
+  {
+    "start": 202.159,
+    "duration": 3.041,
+    "text": "exposure"
+  },
+  {
+    "start": 202.879,
+    "duration": 3.121,
+    "text": "by being long more stock as implied"
+  },
+  {
+    "start": 205.2,
+    "duration": 2.88,
+    "text": "volatility"
+  },
+  {
+    "start": 206.0,
+    "duration": 4.08,
+    "text": "increases the chances of the option"
+  },
+  {
+    "start": 208.08,
+    "duration": 3.84,
+    "text": "expiring in the money decreases"
+  },
+  {
+    "start": 210.08,
+    "duration": 3.76,
+    "text": "thus the market maker must data hedge"
+  },
+  {
+    "start": 211.92,
+    "duration": 3.2,
+    "text": "their vena exposure by reducing their"
+  },
+  {
+    "start": 213.84,
+    "duration": 4.479,
+    "text": "long stock exposure"
+  },
+  {
+    "start": 215.12,
+    "duration": 5.039,
+    "text": "by selling some of it as another example"
+  },
+  {
+    "start": 218.319,
+    "duration": 3.361,
+    "text": "this is a market maker who is long and"
+  },
+  {
+    "start": 220.159,
+    "duration": 3.121,
+    "text": "out of the money call"
+  },
+  {
+    "start": 221.68,
+    "duration": 3.6,
+    "text": "the probability that the option will"
+  },
+  {
+    "start": 223.28,
+    "duration": 2.8,
+    "text": "expire in the money is represented by"
+  },
+  {
+    "start": 225.28,
+    "duration": 3.519,
+    "text": "the blue shaded"
+  },
+  {
+    "start": 226.08,
+    "duration": 3.92,
+    "text": "area that is in the money market makers"
+  },
+  {
+    "start": 228.799,
+    "duration": 3.121,
+    "text": "who are long calls"
+  },
+  {
+    "start": 230.0,
+    "duration": 3.04,
+    "text": "must delta hedge themselves by being"
+  },
+  {
+    "start": 231.92,
+    "duration": 3.039,
+    "text": "short stopped"
+  },
+  {
+    "start": 233.04,
+    "duration": 3.6,
+    "text": "the size of the short stock hedge is"
+  },
+  {
+    "start": 234.959,
+    "duration": 3.041,
+    "text": "proportional to the shader blue area"
+  },
+  {
+    "start": 236.64,
+    "duration": 3.84,
+    "text": "that is in the money"
+  },
+  {
+    "start": 238.0,
+    "duration": 4.08,
+    "text": "as implied volatility increases the"
+  },
+  {
+    "start": 240.48,
+    "duration": 2.88,
+    "text": "chances of the option expiring in the"
+  },
+  {
+    "start": 242.08,
+    "duration": 3.2,
+    "text": "money increases"
+  },
+  {
+    "start": 243.36,
+    "duration": 3.92,
+    "text": "meaning that the market maker must data"
+  },
+  {
+    "start": 245.28,
+    "duration": 3.039,
+    "text": "hedge their vana exposure by being short"
+  },
+  {
+    "start": 247.28,
+    "duration": 3.44,
+    "text": "or stock"
+  },
+  {
+    "start": 248.319,
+    "duration": 4.081,
+    "text": "as implied volatility decreases the"
+  },
+  {
+    "start": 250.72,
+    "duration": 4.159,
+    "text": "chances of the option expiring in the"
+  },
+  {
+    "start": 252.4,
+    "duration": 4.399,
+    "text": "money decreases thus the market maker"
+  },
+  {
+    "start": 254.879,
+    "duration": 3.92,
+    "text": "must data hedge their vana exposure"
+  },
+  {
+    "start": 256.799,
+    "duration": 3.921,
+    "text": "by reducing their short stock exposure"
+  },
+  {
+    "start": 258.799,
+    "duration": 2.96,
+    "text": "by carrying buying or covering some with"
+  },
+  {
+    "start": 260.72,
+    "duration": 2.72,
+    "text": "it back"
+  },
+  {
+    "start": 261.759,
+    "duration": 3.601,
+    "text": "the way market makers doubt to hedge"
+  },
+  {
+    "start": 263.44,
+    "duration": 3.6,
+    "text": "their charm exposure is essentially"
+  },
+  {
+    "start": 265.36,
+    "duration": 3.92,
+    "text": "identical in principle to the way they"
+  },
+  {
+    "start": 267.04,
+    "duration": 4.159,
+    "text": "delta hedge their vanna exposure"
+  },
+  {
+    "start": 269.28,
+    "duration": 3.359,
+    "text": "in the same way that implied volatility"
+  },
+  {
+    "start": 271.199,
+    "duration": 3.121,
+    "text": "changes the probability"
+  },
+  {
+    "start": 272.639,
+    "duration": 4.081,
+    "text": "that an option will expire in the money"
+  },
+  {
+    "start": 274.32,
+    "duration": 4.4,
+    "text": "and thus changes the delta of the option"
+  },
+  {
+    "start": 276.72,
+    "duration": 3.84,
+    "text": "time until the option expires also"
+  },
+  {
+    "start": 278.72,
+    "duration": 3.84,
+    "text": "changes the probability that an option"
+  },
+  {
+    "start": 280.56,
+    "duration": 3.28,
+    "text": "expires in the money and can change the"
+  },
+  {
+    "start": 282.56,
+    "duration": 3.6,
+    "text": "delta of an option"
+  },
+  {
+    "start": 283.84,
+    "duration": 4.24,
+    "text": "independent of price movements thus"
+  },
+  {
+    "start": 286.16,
+    "duration": 2.64,
+    "text": "charm exposure is analogous to banner"
+  },
+  {
+    "start": 288.08,
+    "duration": 3.119,
+    "text": "exposure"
+  },
+  {
+    "start": 288.8,
+    "duration": 4.08,
+    "text": "and that less time until exploration has"
+  },
+  {
+    "start": 291.199,
+    "duration": 2.801,
+    "text": "the same effect as decreasing implied"
+  },
+  {
+    "start": 292.88,
+    "duration": 2.48,
+    "text": "volatility"
+  },
+  {
+    "start": 294.0,
+    "duration": 3.12,
+    "text": "by narrowing the probability"
+  },
+  {
+    "start": 295.36,
+    "duration": 3.6,
+    "text": "distribution of price changes"
+  },
+  {
+    "start": 297.12,
+    "duration": 3.76,
+    "text": "whereas more time until exploration has"
+  },
+  {
+    "start": 298.96,
+    "duration": 2.799,
+    "text": "the same effect as increasing implied"
+  },
+  {
+    "start": 300.88,
+    "duration": 3.2,
+    "text": "volatility"
+  },
+  {
+    "start": 301.759,
+    "duration": 3.921,
+    "text": "by widening the probability of price"
+  },
+  {
+    "start": 304.08,
+    "duration": 3.52,
+    "text": "changes"
+  },
+  {
+    "start": 305.68,
+    "duration": 4.079,
+    "text": "to see the effect that market makers"
+  },
+  {
+    "start": 307.6,
+    "duration": 3.68,
+    "text": "delta hedging vavana and charm exposures"
+  },
+  {
+    "start": 309.759,
+    "duration": 3.521,
+    "text": "can have when combined"
+  },
+  {
+    "start": 311.28,
+    "duration": 3.44,
+    "text": "take an example of a market where many"
+  },
+  {
+    "start": 313.28,
+    "duration": 2.0,
+    "text": "investors have bought out of the money"
+  },
+  {
+    "start": 314.72,
+    "duration": 2.88,
+    "text": "puts"
+  },
+  {
+    "start": 315.28,
+    "duration": 3.6,
+    "text": "thus leaving market makers short out of"
+  },
+  {
+    "start": 317.6,
+    "duration": 3.36,
+    "text": "the money puts"
+  },
+  {
+    "start": 318.88,
+    "duration": 4.08,
+    "text": "since market makers are short puts they"
+  },
+  {
+    "start": 320.96,
+    "duration": 4.0,
+    "text": "are exposed to potential infinite losses"
+  },
+  {
+    "start": 322.96,
+    "duration": 4.0,
+    "text": "of the price of the underlying goes down"
+  },
+  {
+    "start": 324.96,
+    "duration": 4.4,
+    "text": "and thus must sell or short the"
+  },
+  {
+    "start": 326.96,
+    "duration": 4.56,
+    "text": "underlying stock to hedge themselves"
+  },
+  {
+    "start": 329.36,
+    "duration": 4.32,
+    "text": "as time goes by provided that there are"
+  },
+  {
+    "start": 331.52,
+    "duration": 4.16,
+    "text": "no large changes in the current price"
+  },
+  {
+    "start": 333.68,
+    "duration": 3.519,
+    "text": "the passing of time reduces the amount"
+  },
+  {
+    "start": 335.68,
+    "duration": 3.359,
+    "text": "of days until expiry"
+  },
+  {
+    "start": 337.199,
+    "duration": 3.681,
+    "text": "thus slightly reducing the probability"
+  },
+  {
+    "start": 339.039,
+    "duration": 4.16,
+    "text": "that these puts go in the money"
+  },
+  {
+    "start": 340.88,
+    "duration": 4.08,
+    "text": "thus delta hedging charm exposure forces"
+  },
+  {
+    "start": 343.199,
+    "duration": 3.201,
+    "text": "the market maker to buy back a small"
+  },
+  {
+    "start": 344.96,
+    "duration": 2.88,
+    "text": "amount of stock"
+  },
+  {
+    "start": 346.4,
+    "duration": 3.12,
+    "text": "many reasons could lead to implied"
+  },
+  {
+    "start": 347.84,
+    "duration": 3.6,
+    "text": "volatility decreasing"
+  },
+  {
+    "start": 349.52,
+    "duration": 3.92,
+    "text": "which could be due to structural reasons"
+  },
+  {
+    "start": 351.44,
+    "duration": 4.16,
+    "text": "and the vix curve or simply because"
+  },
+  {
+    "start": 353.44,
+    "duration": 4.4,
+    "text": "investors have over bid for put options"
+  },
+  {
+    "start": 355.6,
+    "duration": 3.2,
+    "text": "and anticipation of a market event"
+  },
+  {
+    "start": 357.84,
+    "duration": 3.84,
+    "text": "whatever the reason"
+  },
+  {
+    "start": 358.8,
+    "duration": 3.28,
+    "text": "when implied volatility decreases this"
+  },
+  {
+    "start": 361.68,
+    "duration": 2.239,
+    "text": "again"
+  },
+  {
+    "start": 362.08,
+    "duration": 4.0,
+    "text": "reduces the probability that these puts"
+  },
+  {
+    "start": 363.919,
+    "duration": 3.84,
+    "text": "go in the money thus market makers"
+  },
+  {
+    "start": 366.08,
+    "duration": 3.6,
+    "text": "hedging their vana exposure"
+  },
+  {
+    "start": 367.759,
+    "duration": 4.241,
+    "text": "forces the market makers to buy back"
+  },
+  {
+    "start": 369.68,
+    "duration": 3.92,
+    "text": "more stock the effect of market makers"
+  },
+  {
+    "start": 372.0,
+    "duration": 2.72,
+    "text": "delta hedging both their banner and"
+  },
+  {
+    "start": 373.6,
+    "duration": 3.28,
+    "text": "charm exposures"
+  },
+  {
+    "start": 374.72,
+    "duration": 4.0,
+    "text": "by buying stock can push up the price of"
+  },
+  {
+    "start": 376.88,
+    "duration": 3.439,
+    "text": "the underlying provided that the market"
+  },
+  {
+    "start": 378.72,
+    "duration": 3.52,
+    "text": "has bought enough options"
+  },
+  {
+    "start": 380.319,
+    "duration": 3.521,
+    "text": "this increase in price itself also"
+  },
+  {
+    "start": 382.24,
+    "duration": 3.44,
+    "text": "reduces the probability"
+  },
+  {
+    "start": 383.84,
+    "duration": 3.359,
+    "text": "that these puts will go in the money"
+  },
+  {
+    "start": 385.68,
+    "duration": 2.72,
+    "text": "which is thus another way to think of"
+  },
+  {
+    "start": 387.199,
+    "duration": 3.521,
+    "text": "gamma exposure"
+  },
+  {
+    "start": 388.4,
+    "duration": 3.12,
+    "text": "that is gamma exposure is the change in"
+  },
+  {
+    "start": 390.72,
+    "duration": 2.24,
+    "text": "probability"
+  },
+  {
+    "start": 391.52,
+    "duration": 3.119,
+    "text": "that an option of looks fire in the"
+  },
+  {
+    "start": 392.96,
+    "duration": 3.2,
+    "text": "money according to changes in the"
+  },
+  {
+    "start": 394.639,
+    "duration": 3.761,
+    "text": "underlying price"
+  },
+  {
+    "start": 396.16,
+    "duration": 3.759,
+    "text": "thus market makers must delta hedge"
+  },
+  {
+    "start": 398.4,
+    "duration": 4.72,
+    "text": "their gamma exposure by buying more"
+  },
+  {
+    "start": 399.919,
+    "duration": 3.201,
+    "text": "stock in this situation"
+  },
+  {
+    "start": 403.44,
+    "duration": 3.68,
+    "text": "these increases in price can help"
+  },
+  {
+    "start": 405.199,
+    "duration": 3.681,
+    "text": "further reduce implied volatility"
+  },
+  {
+    "start": 407.12,
+    "duration": 3.68,
+    "text": "which when coupled with the simple"
+  },
+  {
+    "start": 408.88,
+    "duration": 3.84,
+    "text": "passing of time and the slow pushing"
+  },
+  {
+    "start": 410.8,
+    "duration": 3.04,
+    "text": "upper prices that all this delta hedging"
+  },
+  {
+    "start": 412.72,
+    "duration": 3.12,
+    "text": "can cause"
+  },
+  {
+    "start": 413.84,
+    "duration": 4.0,
+    "text": "means that market makers are effectively"
+  },
+  {
+    "start": 415.84,
+    "duration": 4.32,
+    "text": "supporting the markets constantly"
+  },
+  {
+    "start": 417.84,
+    "duration": 3.68,
+    "text": "until the options expire once the"
+  },
+  {
+    "start": 420.16,
+    "duration": 2.8,
+    "text": "options expire however"
+  },
+  {
+    "start": 421.52,
+    "duration": 4.079,
+    "text": "this constant bidding for stock by"
+  },
+  {
+    "start": 422.96,
+    "duration": 4.4,
+    "text": "market makers is taken out of the market"
+  },
+  {
+    "start": 425.599,
+    "duration": 4.481,
+    "text": "leaving it potentially vulnerable to"
+  },
+  {
+    "start": 427.36,
+    "duration": 4.64,
+    "text": "large changes in price"
+  },
+  {
+    "start": 430.08,
+    "duration": 3.76,
+    "text": "in markets that are dominated by the use"
+  },
+  {
+    "start": 432.0,
+    "duration": 3.44,
+    "text": "of options knowledge of how market"
+  },
+  {
+    "start": 433.84,
+    "duration": 3.68,
+    "text": "makers must delta hedge"
+  },
+  {
+    "start": 435.44,
+    "duration": 4.0,
+    "text": "their banner and charm exposures can be"
+  },
+  {
+    "start": 437.52,
+    "duration": 4.32,
+    "text": "taken advantage of by investors"
+  },
+  {
+    "start": 439.44,
+    "duration": 3.92,
+    "text": "to identify the likely effect the market"
+  },
+  {
+    "start": 441.84,
+    "duration": 5.6,
+    "text": "makers will have on prices"
+  },
+  {
+    "start": 443.36,
+    "duration": 4.08,
+    "text": "at particular times and in particular"
+  },
+  {
+    "start": 448.84,
+    "duration": 3.0,
+    "text": "volatility"
+  },
+  {
+    "start": 456.0,
+    "duration": 2.08,
+    "text": "you"
+  }
+]

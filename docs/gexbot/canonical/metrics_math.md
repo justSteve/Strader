@@ -118,18 +118,17 @@ devtools-to-video cli tool", "YouTube video player 2") — those are
 not the actual video titles, just embed defaults. The real titles,
 resolved via WebFetch:
 
-| ID | Title | URL |
-|---|---|---|
-| `-RhSCoElB9Y` | Vanna and Charm Exposure | <https://www.youtube.com/watch?v=-RhSCoElB9Y> |
-| `zfkOCc2evEk` | Gamma and Vanna exposures | <https://www.youtube.com/watch?v=zfkOCc2evEk> |
+| ID | Title | URL | Synthesis |
+|---|---|---|---|
+| `zfkOCc2evEk` | Gamma and Vanna exposures | <https://www.youtube.com/watch?v=zfkOCc2evEk> | [`gamma_vanna_video.md`](gamma_vanna_video.md) |
+| `-RhSCoElB9Y` | Vanna and Charm Exposure | <https://www.youtube.com/watch?v=-RhSCoElB9Y> | [`vanna_charm_video.md`](vanna_charm_video.md) |
 
 GexBot channel: <https://www.youtube.com/@gexbot>
 
-Vendor-published video content is part of the canonical surface. If
-their content is operationally relevant to our reading of the metrics,
-they should be transcribed (same pattern as Freddy's community video:
-auto-captions to `transcripts/`, synthesis to `community/` if useful)
-and cross-referenced from here.
+Both videos were transcribed and synthesized 2026-05-22 (bead `st-9e3`).
+Transcripts live in `transcripts/`; the synthesis docs above quote
+heavily from the cleaned transcript with documented mistranscription
+fixes. Vendor-published video content is part of the canonical surface.
 
 ---
 

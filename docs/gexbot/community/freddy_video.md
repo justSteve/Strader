@@ -160,28 +160,60 @@ The implication for our work: same principle says **SPX is the
 institutional read; SPY is muddied by retail**. Our corpus correctly
 focuses on SPX state endpoints, not SPY.
 
-## 8. Volatility skew/smile shape read [LOW — verify against GexBot docs]
+## 8. Volatility skew/smile shape read [HIGH — slide recovered]
 
 *[17:30–19:30]*
 
-Freddy references reading the IV curve shape, but this section is the
-murkiest in the transcript. The general claim, as I can read it:
+Freddy is reading off a four-panel slide titled **"path of least
+resistance (as vols go to zero, i.e. expire)"**. Slide image:
+[`images/freddy_skew_slide.jpg`](images/freddy_skew_slide.jpg).
 
-- **Vertical/flat skew** (his Friday example) → "ball can go either way easily" → expect motion in either direction
-- **Downward slope** → easier to go down (puts richer)
-- **Bowl/curve shape** → options expensive on both sides → price tends to get trapped in a range
+### Axes (critical — easy to misread)
 
-Confidence on the specific mappings is LOW because the audio garbled the
-slope direction descriptions. The general intuition (skew shape implies
-regime) is consistent with standard options trading literature but the
-specific operational rules need re-verification.
+The chart is **not** a price-over-time chart. Both axes are state at one
+moment:
 
-**Note:** the canonical docs cover a related but distinct concept — how
-*rising vs falling* volatility (not skew shape) modulates the wall vs
-accelerator behavior. See `../canonical/options_profile.md` "Volatility
-regime modulation." Skew *shape* and vol *trajectory* are two different
-things; only the latter is canonically documented at the time of this
-write-up.
+- **Vertical axis = strike price** (high strikes at top, low strikes at bottom)
+- **Horizontal axis = implied volatility level** (high IV to the right, low IV to the left)
+- **Spot price** = the horizontal dashed line crossing the middle
+- **Green dashed curve** = call vols (the IV of every call strike, connected)
+- **Red dashed curve** = put vols
+- **Yellow** = the implied direction of the "ball" (where price gets pulled)
+
+A naive left-to-right text-reading of slope direction will invert the
+interpretation. The slope is telling you *where the wall is*, not which
+way price has been going.
+
+### The four shapes
+
+| Panel | Curve shape | Above-spot IV | Below-spot IV | Path of least resistance |
+|---|---|---|---|---|
+| Top-left | Slopes top-left → bottom-right | Low (cheap calls, no wall) | High (expensive puts, wall) | **Up easy** |
+| Top-middle | Bowl / smile (curves bow outward) | High (wall) | High (wall) | **Stuck in middle** (range) |
+| Top-right | Slopes top-right → bottom-left | High (expensive calls, wall) | Low (cheap puts, no wall) | **Down easy** |
+| Bottom | Vertical (both curves parallel to spot) | Equal | Equal | **No imbalance** — can move either way |
+
+The bottom panel is Freddy's Friday case ("no hills, no valleys, no
+imbalance present"), which is why he kept emphasizing that price could
+"easily go up or easily go down" that session.
+
+### The mechanism
+
+The slide's subtitle — "as vols go to zero, i.e. expire" — is the key.
+The shape predicts where spot will be drawn *by expiry*, not the next
+tick. As time decays, IV mechanically goes to zero. Strikes with the
+*most* IV today carry the most positioning weight; as that premium burns
+off, dealer hedging pulls price *away from* the high-IV walls and
+*toward* the low-IV side. So a wall isn't a hard barrier — it's a
+gravity well to be pushed away from.
+
+### Relationship to the canonical regime modulation
+
+The canonical docs (`../canonical/options_profile.md` "Volatility regime
+modulation") cover a distinct concept: how *rising vs falling* IV (vol
+*trajectory*) modulates wall-vs-accelerator behavior. The slide here
+covers skew *shape* at one instant. The two are independent inputs to
+the same trading decision and should not be conflated.
 
 ## 9. Time-compression at retested levels (non-gamma input) [HIGH]
 
@@ -245,17 +277,17 @@ to the State-tier responses we're already capturing:
 
 ## What needs verification before operational use
 
-1. Section 8 (skew/smile mappings) — re-watch the video or check GexBot's
-   metrics page for the canonical interpretation. The transcript was
-   noisiest here.
-2. Whether Freddy's "selling of calls = bearish in nature" lines up with
+1. Whether Freddy's "selling of calls = bearish in nature" lines up with
    the *direction* GexBot's `mini_contracts` columns label customer
    activity. Pending Discord answer.
-3. The specific NQ-point thresholds Freddy uses for stops (he cites
+2. The specific NQ-point thresholds Freddy uses for stops (he cites
    10–12 pts on NQ) don't translate 1:1 to SPX without rescaling — NQ at
    22000 vs SPX at 7400 means SPX equivalents are roughly 1/3 the
    numeric magnitude. We should derive scaling empirically from the
    corpus, not borrow Freddy's numbers directly.
+3. Section 8 slide is captured from the community video, not GexBot's
+   own documentation. If Jasper has posted a canonical version of this
+   four-shape framework in Discord, that supersedes this synthesis.
 
 ## Source provenance
 

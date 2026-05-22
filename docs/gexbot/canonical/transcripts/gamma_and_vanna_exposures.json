@@ -1,0 +1,1317 @@
+[
+  {
+    "start": 34.08,
+    "duration": 3.2,
+    "text": "[Music]"
+  },
+  {
+    "start": 35.44,
+    "duration": 2.639,
+    "text": "the stock market is a ledger of who is"
+  },
+  {
+    "start": 37.28,
+    "duration": 3.68,
+    "text": "willing to buy"
+  },
+  {
+    "start": 38.079,
+    "duration": 4.081,
+    "text": "or sell at what price orders can come in"
+  },
+  {
+    "start": 40.96,
+    "duration": 3.04,
+    "text": "as limit orders which"
+  },
+  {
+    "start": 42.16,
+    "duration": 3.12,
+    "text": "execute at the price stated or a better"
+  },
+  {
+    "start": 44.0,
+    "duration": 3.52,
+    "text": "price whereas"
+  },
+  {
+    "start": 45.28,
+    "duration": 4.56,
+    "text": "stop orders execute market orders when"
+  },
+  {
+    "start": 47.52,
+    "duration": 3.84,
+    "text": "the price reaches a predetermined level"
+  },
+  {
+    "start": 49.84,
+    "duration": 3.92,
+    "text": "however the stock market has become"
+  },
+  {
+    "start": 51.36,
+    "duration": 3.839,
+    "text": "heavily dependent on the use of options"
+  },
+  {
+    "start": 53.76,
+    "duration": 3.6,
+    "text": "calls are the right to buy at a"
+  },
+  {
+    "start": 55.199,
+    "duration": 2.801,
+    "text": "specified price whereas puts are the"
+  },
+  {
+    "start": 57.36,
+    "duration": 3.199,
+    "text": "right to sell"
+  },
+  {
+    "start": 58.0,
+    "duration": 4.079,
+    "text": "at a certain price when buying options a"
+  },
+  {
+    "start": 60.559,
+    "duration": 2.64,
+    "text": "market maker is normally on the other"
+  },
+  {
+    "start": 62.079,
+    "duration": 3.201,
+    "text": "side of the trade"
+  },
+  {
+    "start": 63.199,
+    "duration": 3.761,
+    "text": "these market makers are exposed to p l"
+  },
+  {
+    "start": 65.28,
+    "duration": 3.839,
+    "text": "profiles that are the opposite"
+  },
+  {
+    "start": 66.96,
+    "duration": 3.6,
+    "text": "of the party buying from them market"
+  },
+  {
+    "start": 69.119,
+    "duration": 2.961,
+    "text": "makers are not interested in taking"
+  },
+  {
+    "start": 70.56,
+    "duration": 2.879,
+    "text": "directional bets in the market"
+  },
+  {
+    "start": 72.08,
+    "duration": 2.719,
+    "text": "but instead make money from the"
+  },
+  {
+    "start": 73.439,
+    "duration": 3.36,
+    "text": "commissions they get for simply"
+  },
+  {
+    "start": 74.799,
+    "duration": 2.881,
+    "text": "providing liquidity and the derivatives"
+  },
+  {
+    "start": 76.799,
+    "duration": 2.64,
+    "text": "market"
+  },
+  {
+    "start": 77.68,
+    "duration": 3.2,
+    "text": "this market makers can make money as"
+  },
+  {
+    "start": 79.439,
+    "duration": 3.121,
+    "text": "long as they hatch themselves"
+  },
+  {
+    "start": 80.88,
+    "duration": 3.2,
+    "text": "and keep the exposure on their ex"
+  },
+  {
+    "start": 82.56,
+    "duration": 4.4,
+    "text": "positions neutral under"
+  },
+  {
+    "start": 84.08,
+    "duration": 3.52,
+    "text": "until the option expires or is exercised"
+  },
+  {
+    "start": 86.96,
+    "duration": 2.08,
+    "text": "to do this"
+  },
+  {
+    "start": 87.6,
+    "duration": 3.36,
+    "text": "market makers need to hedge their"
+  },
+  {
+    "start": 89.04,
+    "duration": 2.719,
+    "text": "exposures in a process called the delta"
+  },
+  {
+    "start": 90.96,
+    "duration": 2.4,
+    "text": "hedging"
+  },
+  {
+    "start": 91.759,
+    "duration": 3.04,
+    "text": "the first exposure that we will look at"
+  },
+  {
+    "start": 93.36,
+    "duration": 3.439,
+    "text": "is gamma exposure"
+  },
+  {
+    "start": 94.799,
+    "duration": 3.28,
+    "text": "as an example this is a market maker who"
+  },
+  {
+    "start": 96.799,
+    "duration": 3.121,
+    "text": "is sure to call"
+  },
+  {
+    "start": 98.079,
+    "duration": 3.441,
+    "text": "the slope and the p l at the current"
+  },
+  {
+    "start": 99.92,
+    "duration": 3.839,
+    "text": "price is the current"
+  },
+  {
+    "start": 101.52,
+    "duration": 3.44,
+    "text": "delta of the option the market maker"
+  },
+  {
+    "start": 103.759,
+    "duration": 2.72,
+    "text": "first of the buy stock"
+  },
+  {
+    "start": 104.96,
+    "duration": 3.839,
+    "text": "that is proportional to a line going"
+  },
+  {
+    "start": 106.479,
+    "duration": 4.081,
+    "text": "perpendicular to this delta slope"
+  },
+  {
+    "start": 108.799,
+    "duration": 3.121,
+    "text": "by doing this the market maker"
+  },
+  {
+    "start": 110.56,
+    "duration": 4.08,
+    "text": "effectively changes the p"
+  },
+  {
+    "start": 111.92,
+    "duration": 4.4,
+    "text": "l profile to one that is rotated such"
+  },
+  {
+    "start": 114.64,
+    "duration": 4.64,
+    "text": "that the delta slope is flat"
+  },
+  {
+    "start": 116.32,
+    "duration": 2.96,
+    "text": "at the current price"
+  },
+  {
+    "start": 120.96,
+    "duration": 3.68,
+    "text": "the process is the opposite from market"
+  },
+  {
+    "start": 122.799,
+    "duration": 3.441,
+    "text": "maker that is short a put"
+  },
+  {
+    "start": 124.64,
+    "duration": 3.36,
+    "text": "since the line perpendicular to the"
+  },
+  {
+    "start": 126.24,
+    "duration": 3.84,
+    "text": "delta slope is pointing to the left"
+  },
+  {
+    "start": 128.0,
+    "duration": 4.0,
+    "text": "direction this time instead of the right"
+  },
+  {
+    "start": 130.08,
+    "duration": 3.6,
+    "text": "the market make itself a proportional"
+  },
+  {
+    "start": 132.0,
+    "duration": 3.12,
+    "text": "amount of shares in order to doubt to"
+  },
+  {
+    "start": 133.68,
+    "duration": 3.199,
+    "text": "hedge themselves"
+  },
+  {
+    "start": 135.12,
+    "duration": 3.68,
+    "text": "in doing this the market makers can"
+  },
+  {
+    "start": 136.879,
+    "duration": 5.281,
+    "text": "create new p l profiles"
+  },
+  {
+    "start": 138.8,
+    "duration": 4.96,
+    "text": "which make up the delta hedged positions"
+  },
+  {
+    "start": 142.16,
+    "duration": 3.12,
+    "text": "this creates two general states that"
+  },
+  {
+    "start": 143.76,
+    "duration": 3.36,
+    "text": "market makers can be in"
+  },
+  {
+    "start": 145.28,
+    "duration": 4.16,
+    "text": "when market makers are short calls or"
+  },
+  {
+    "start": 147.12,
+    "duration": 4.479,
+    "text": "short puts the market makers have short"
+  },
+  {
+    "start": 149.44,
+    "duration": 4.24,
+    "text": "gamma or negative gamma exposure"
+  },
+  {
+    "start": 151.599,
+    "duration": 4.161,
+    "text": "when market make is a long calls or long"
+  },
+  {
+    "start": 153.68,
+    "duration": 2.32,
+    "text": "puts the market makers have long gamma"
+  },
+  {
+    "start": 155.76,
+    "duration": 2.72,
+    "text": "or"
+  },
+  {
+    "start": 156.0,
+    "duration": 3.92,
+    "text": "positive camera exposure as the price"
+  },
+  {
+    "start": 158.48,
+    "duration": 3.6,
+    "text": "changes the market maker must"
+  },
+  {
+    "start": 159.92,
+    "duration": 4.399,
+    "text": "dynamically adjust their delta hedges"
+  },
+  {
+    "start": 162.08,
+    "duration": 4.239,
+    "text": "which essentially keeps re-rotating"
+  },
+  {
+    "start": 164.319,
+    "duration": 3.601,
+    "text": "their p l profile to ensure that their"
+  },
+  {
+    "start": 166.319,
+    "duration": 2.881,
+    "text": "delta slope is always flat at the"
+  },
+  {
+    "start": 167.92,
+    "duration": 3.44,
+    "text": "current price"
+  },
+  {
+    "start": 169.2,
+    "duration": 3.36,
+    "text": "when a market maker is long a call"
+  },
+  {
+    "start": 171.36,
+    "duration": 3.2,
+    "text": "decreases in the price"
+  },
+  {
+    "start": 172.56,
+    "duration": 3.679,
+    "text": "forces the market maker to buy more"
+  },
+  {
+    "start": 174.56,
+    "duration": 4.0,
+    "text": "stock"
+  },
+  {
+    "start": 176.239,
+    "duration": 6.321,
+    "text": "on the other hand increases in the price"
+  },
+  {
+    "start": 178.56,
+    "duration": 4.0,
+    "text": "forces the market maker to sell more"
+  },
+  {
+    "start": 182.84,
+    "duration": 4.44,
+    "text": "stock"
+  },
+  {
+    "start": 185.44,
+    "duration": 3.84,
+    "text": "this is true not just for market makers"
+  },
+  {
+    "start": 187.28,
+    "duration": 3.36,
+    "text": "who are long calls but also for market"
+  },
+  {
+    "start": 189.28,
+    "duration": 3.44,
+    "text": "makers who are long puts"
+  },
+  {
+    "start": 190.64,
+    "duration": 3.76,
+    "text": "meaning market makers who are long gamma"
+  },
+  {
+    "start": 192.72,
+    "duration": 3.2,
+    "text": "by knowing how market makers will be"
+  },
+  {
+    "start": 194.4,
+    "duration": 2.64,
+    "text": "forced to delta hedge according to"
+  },
+  {
+    "start": 195.92,
+    "duration": 3.599,
+    "text": "changes in price"
+  },
+  {
+    "start": 197.04,
+    "duration": 4.16,
+    "text": "one can implicitly know at what prices"
+  },
+  {
+    "start": 199.519,
+    "duration": 2.961,
+    "text": "market makers would need to place buy"
+  },
+  {
+    "start": 201.2,
+    "duration": 3.119,
+    "text": "and sell orders"
+  },
+  {
+    "start": 202.48,
+    "duration": 3.28,
+    "text": "when market make is a long gamma this"
+  },
+  {
+    "start": 204.319,
+    "duration": 1.92,
+    "text": "has the effect of putting limit buys"
+  },
+  {
+    "start": 205.76,
+    "duration": 2.88,
+    "text": "below"
+  },
+  {
+    "start": 206.239,
+    "duration": 3.36,
+    "text": "and limit sales above thus stabilizing"
+  },
+  {
+    "start": 208.64,
+    "duration": 2.8,
+    "text": "markets"
+  },
+  {
+    "start": 209.599,
+    "duration": 3.2,
+    "text": "if a wave of new cell orders ends up"
+  },
+  {
+    "start": 211.44,
+    "duration": 3.12,
+    "text": "pushing the price down"
+  },
+  {
+    "start": 212.799,
+    "duration": 4.16,
+    "text": "the limit orders that market makers are"
+  },
+  {
+    "start": 214.56,
+    "duration": 2.88,
+    "text": "forced to make help push the prices back"
+  },
+  {
+    "start": 216.959,
+    "duration": 3.121,
+    "text": "up"
+  },
+  {
+    "start": 217.44,
+    "duration": 4.079,
+    "text": "likewise limit sales at the other end"
+  },
+  {
+    "start": 220.08,
+    "duration": 2.32,
+    "text": "ensure that rising prices are pushed"
+  },
+  {
+    "start": 221.519,
+    "duration": 3.121,
+    "text": "back down"
+  },
+  {
+    "start": 222.4,
+    "duration": 5.6,
+    "text": "thus when market makers along gamma the"
+  },
+  {
+    "start": 224.64,
+    "duration": 5.84,
+    "text": "market tends to be mean reverting"
+  },
+  {
+    "start": 228.0,
+    "duration": 4.159,
+    "text": "when market make is a short gamma market"
+  },
+  {
+    "start": 230.48,
+    "duration": 3.92,
+    "text": "makers are forced to buy when prices"
+  },
+  {
+    "start": 232.159,
+    "duration": 4.08,
+    "text": "rise and salary when prices fall"
+  },
+  {
+    "start": 234.4,
+    "duration": 4.0,
+    "text": "thus when market makers are short gamma"
+  },
+  {
+    "start": 236.239,
+    "duration": 4.64,
+    "text": "implicitly they have sell stops below"
+  },
+  {
+    "start": 238.4,
+    "duration": 4.479,
+    "text": "and buy stops above the current price"
+  },
+  {
+    "start": 240.879,
+    "duration": 3.521,
+    "text": "small decreases in price can thus become"
+  },
+  {
+    "start": 242.879,
+    "duration": 2.401,
+    "text": "amplified by the selling of market"
+  },
+  {
+    "start": 244.4,
+    "duration": 3.039,
+    "text": "makers"
+  },
+  {
+    "start": 245.28,
+    "duration": 3.92,
+    "text": "thus negative gamma in the market leads"
+  },
+  {
+    "start": 247.439,
+    "duration": 5.201,
+    "text": "to amplified price movements"
+  },
+  {
+    "start": 249.2,
+    "duration": 3.44,
+    "text": "both up and down"
+  },
+  {
+    "start": 252.799,
+    "duration": 3.44,
+    "text": "by accumulating the different types of"
+  },
+  {
+    "start": 254.48,
+    "duration": 2.56,
+    "text": "options that market makers are long and"
+  },
+  {
+    "start": 256.239,
+    "duration": 2.801,
+    "text": "short of"
+  },
+  {
+    "start": 257.04,
+    "duration": 3.039,
+    "text": "one can construct a rough estimate of"
+  },
+  {
+    "start": 259.04,
+    "duration": 3.12,
+    "text": "the aggregate p"
+  },
+  {
+    "start": 260.079,
+    "duration": 3.441,
+    "text": "r profile that market makers on a whole"
+  },
+  {
+    "start": 262.16,
+    "duration": 2.96,
+    "text": "are exposed to"
+  },
+  {
+    "start": 263.52,
+    "duration": 3.28,
+    "text": "this can be used to create an implied"
+  },
+  {
+    "start": 265.12,
+    "duration": 3.44,
+    "text": "order book that shows where market"
+  },
+  {
+    "start": 266.8,
+    "duration": 2.8,
+    "text": "makers will be forced to place buy or"
+  },
+  {
+    "start": 268.56,
+    "duration": 3.199,
+    "text": "sell orders"
+  },
+  {
+    "start": 269.6,
+    "duration": 4.0,
+    "text": "according to the price when the option"
+  },
+  {
+    "start": 271.759,
+    "duration": 3.601,
+    "text": "market becomes large enough the delta"
+  },
+  {
+    "start": 273.6,
+    "duration": 2.8,
+    "text": "hedging by market makers can become the"
+  },
+  {
+    "start": 275.36,
+    "duration": 3.279,
+    "text": "primary driver"
+  },
+  {
+    "start": 276.4,
+    "duration": 3.2,
+    "text": "of prices in the stock market in such"
+  },
+  {
+    "start": 278.639,
+    "duration": 2.801,
+    "text": "conditions"
+  },
+  {
+    "start": 279.6,
+    "duration": 3.52,
+    "text": "by knowing the implied order book"
+  },
+  {
+    "start": 281.44,
+    "duration": 3.199,
+    "text": "traders can identify certain points"
+  },
+  {
+    "start": 283.12,
+    "duration": 2.4,
+    "text": "where prices are likely to become"
+  },
+  {
+    "start": 284.639,
+    "duration": 2.881,
+    "text": "anchored to"
+  },
+  {
+    "start": 285.52,
+    "duration": 3.28,
+    "text": "and regions where prices are likely to"
+  },
+  {
+    "start": 287.52,
+    "duration": 3.84,
+    "text": "move in one direction"
+  },
+  {
+    "start": 288.8,
+    "duration": 2.56,
+    "text": "or another"
+  },
+  {
+    "start": 292.639,
+    "duration": 3.601,
+    "text": "it is thus tempting to think that when"
+  },
+  {
+    "start": 294.32,
+    "duration": 3.92,
+    "text": "market make is a short gamer this can"
+  },
+  {
+    "start": 296.24,
+    "duration": 3.519,
+    "text": "lead to sustained and perpetual selling"
+  },
+  {
+    "start": 298.24,
+    "duration": 2.399,
+    "text": "which eventually crashes the stock"
+  },
+  {
+    "start": 299.759,
+    "duration": 2.801,
+    "text": "market"
+  },
+  {
+    "start": 300.639,
+    "duration": 3.681,
+    "text": "however market gamma rarely goes"
+  },
+  {
+    "start": 302.56,
+    "duration": 3.6,
+    "text": "negative to understand why"
+  },
+  {
+    "start": 304.32,
+    "duration": 3.52,
+    "text": "one must realize that in order for"
+  },
+  {
+    "start": 306.16,
+    "duration": 4.08,
+    "text": "market makers to be short gamma"
+  },
+  {
+    "start": 307.84,
+    "duration": 4.16,
+    "text": "investors need to bid for options the"
+  },
+  {
+    "start": 310.24,
+    "duration": 2.16,
+    "text": "bidding of options has a tendency to"
+  },
+  {
+    "start": 312.0,
+    "duration": 2.96,
+    "text": "increase"
+  },
+  {
+    "start": 312.4,
+    "duration": 3.359,
+    "text": "implied volatility increases in implied"
+  },
+  {
+    "start": 314.96,
+    "duration": 2.72,
+    "text": "volatility"
+  },
+  {
+    "start": 315.759,
+    "duration": 3.921,
+    "text": "decreases the gamma exposure of market"
+  },
+  {
+    "start": 317.68,
+    "duration": 3.76,
+    "text": "makers and thus reduces the amount of"
+  },
+  {
+    "start": 319.68,
+    "duration": 3.519,
+    "text": "voucher hedging that they must do to"
+  },
+  {
+    "start": 321.44,
+    "duration": 3.84,
+    "text": "hedge their gamma exposure"
+  },
+  {
+    "start": 323.199,
+    "duration": 3.681,
+    "text": "however implied volatility also creates"
+  },
+  {
+    "start": 325.28,
+    "duration": 3.28,
+    "text": "a new type of exposure that market"
+  },
+  {
+    "start": 326.88,
+    "duration": 5.36,
+    "text": "makers must delta hedge against"
+  },
+  {
+    "start": 328.56,
+    "duration": 3.68,
+    "text": "which is their banner exposure"
+  },
+  {
+    "start": 333.52,
+    "duration": 4.0,
+    "text": "delta hedging vana exposure depends on"
+  },
+  {
+    "start": 335.44,
+    "duration": 3.199,
+    "text": "the increases and decreases in implied"
+  },
+  {
+    "start": 337.52,
+    "duration": 3.6,
+    "text": "volatility"
+  },
+  {
+    "start": 338.639,
+    "duration": 4.801,
+    "text": "and the moneyness of the option this can"
+  },
+  {
+    "start": 341.12,
+    "duration": 4.56,
+    "text": "be a little tricky to remember at first"
+  },
+  {
+    "start": 343.44,
+    "duration": 4.24,
+    "text": "so for the purpose of this video we will"
+  },
+  {
+    "start": 345.68,
+    "duration": 3.519,
+    "text": "focus on the effects of a market when"
+  },
+  {
+    "start": 347.68,
+    "duration": 2.4,
+    "text": "investors have been selling out of the"
+  },
+  {
+    "start": 349.199,
+    "duration": 3.041,
+    "text": "money puts"
+  },
+  {
+    "start": 350.08,
+    "duration": 4.88,
+    "text": "thus leaving market makers long out of"
+  },
+  {
+    "start": 352.24,
+    "duration": 2.72,
+    "text": "the money puts"
+  },
+  {
+    "start": 355.68,
+    "duration": 3.6,
+    "text": "in environments where investors are not"
+  },
+  {
+    "start": 357.52,
+    "duration": 3.28,
+    "text": "able to collect enough yield on safer"
+  },
+  {
+    "start": 359.28,
+    "duration": 3.28,
+    "text": "fixed income assets"
+  },
+  {
+    "start": 360.8,
+    "duration": 3.44,
+    "text": "investors can engage in selling out of"
+  },
+  {
+    "start": 362.56,
+    "duration": 3.199,
+    "text": "the money puts to get a constant stream"
+  },
+  {
+    "start": 364.24,
+    "duration": 4.239,
+    "text": "of yield which is known as risk"
+  },
+  {
+    "start": 365.759,
+    "duration": 3.921,
+    "text": "premier harvesting by selling puts this"
+  },
+  {
+    "start": 368.479,
+    "duration": 3.28,
+    "text": "leaves the market makers"
+  },
+  {
+    "start": 369.68,
+    "duration": 3.6,
+    "text": "long gamma which essentially puts limit"
+  },
+  {
+    "start": 371.759,
+    "duration": 3.361,
+    "text": "buys under current prices"
+  },
+  {
+    "start": 373.28,
+    "duration": 4.0,
+    "text": "and helps create a mean reverting"
+  },
+  {
+    "start": 375.12,
+    "duration": 3.6,
+    "text": "environment drops in prices causes"
+  },
+  {
+    "start": 377.28,
+    "duration": 4.08,
+    "text": "market makers to buy this"
+  },
+  {
+    "start": 378.72,
+    "duration": 4.16,
+    "text": "thus helping push prices back up selling"
+  },
+  {
+    "start": 381.36,
+    "duration": 3.76,
+    "text": "is also typically accompanied by"
+  },
+  {
+    "start": 382.88,
+    "duration": 3.68,
+    "text": "increases in implied volatility"
+  },
+  {
+    "start": 385.12,
+    "duration": 3.04,
+    "text": "market makers who are long out of the"
+  },
+  {
+    "start": 386.56,
+    "duration": 3.28,
+    "text": "money puts must hedge their vana"
+  },
+  {
+    "start": 388.16,
+    "duration": 2.4,
+    "text": "exposure when implied volatility"
+  },
+  {
+    "start": 389.84,
+    "duration": 3.44,
+    "text": "increases"
+  },
+  {
+    "start": 390.56,
+    "duration": 3.6,
+    "text": "by buying more this also helps support"
+  },
+  {
+    "start": 393.28,
+    "duration": 2.88,
+    "text": "prices"
+  },
+  {
+    "start": 394.16,
+    "duration": 4.0,
+    "text": "thus if selling in the market leads to"
+  },
+  {
+    "start": 396.16,
+    "duration": 3.68,
+    "text": "increases in implied volatility"
+  },
+  {
+    "start": 398.16,
+    "duration": 3.12,
+    "text": "market makers are forced to support"
+  },
+  {
+    "start": 399.84,
+    "duration": 3.199,
+    "text": "prices even further"
+  },
+  {
+    "start": 401.28,
+    "duration": 3.44,
+    "text": "the net effect is that the market makers"
+  },
+  {
+    "start": 403.039,
+    "duration": 2.321,
+    "text": "hedge their both their gamma and vanna"
+  },
+  {
+    "start": 404.72,
+    "duration": 2.72,
+    "text": "exposures"
+  },
+  {
+    "start": 405.36,
+    "duration": 4.32,
+    "text": "by buying more whenever prices fall and"
+  },
+  {
+    "start": 407.44,
+    "duration": 3.92,
+    "text": "implied volatility increases"
+  },
+  {
+    "start": 409.68,
+    "duration": 3.04,
+    "text": "however if a large enough wave of"
+  },
+  {
+    "start": 411.36,
+    "duration": 3.2,
+    "text": "selling was to occur that can"
+  },
+  {
+    "start": 412.72,
+    "duration": 3.599,
+    "text": "sufficiently overcome the implied buy"
+  },
+  {
+    "start": 414.56,
+    "duration": 3.359,
+    "text": "orders of market market makers"
+  },
+  {
+    "start": 416.319,
+    "duration": 4.0,
+    "text": "this can cause those puts to suddenly"
+  },
+  {
+    "start": 417.919,
+    "duration": 4.481,
+    "text": "become in the money as the puts become"
+  },
+  {
+    "start": 420.319,
+    "duration": 3.761,
+    "text": "in the money market makers must now"
+  },
+  {
+    "start": 422.4,
+    "duration": 3.44,
+    "text": "suddenly hedge the event exposure"
+  },
+  {
+    "start": 424.08,
+    "duration": 5.119,
+    "text": "by selling a lot of stock due to the"
+  },
+  {
+    "start": 425.84,
+    "duration": 3.359,
+    "text": "high implied volatility"
+  },
+  {
+    "start": 430.479,
+    "duration": 5.041,
+    "text": "this helps to push down prices abruptly"
+  },
+  {
+    "start": 433.44,
+    "duration": 3.92,
+    "text": "the sudden drop in prices can cause"
+  },
+  {
+    "start": 435.52,
+    "duration": 4.16,
+    "text": "investors to become very nervous and"
+  },
+  {
+    "start": 437.36,
+    "duration": 3.76,
+    "text": "start buying out of the money puts"
+  },
+  {
+    "start": 439.68,
+    "duration": 3.04,
+    "text": "these out of the money puts create"
+  },
+  {
+    "start": 441.12,
+    "duration": 3.68,
+    "text": "negative gamma in the market which"
+  },
+  {
+    "start": 442.72,
+    "duration": 3.199,
+    "text": "forces market makers to sell more as"
+  },
+  {
+    "start": 444.8,
+    "duration": 3.76,
+    "text": "prices drop"
+  },
+  {
+    "start": 445.919,
+    "duration": 4.081,
+    "text": "amplifying downward movements in price"
+  },
+  {
+    "start": 448.56,
+    "duration": 3.28,
+    "text": "market makers must also"
+  },
+  {
+    "start": 450.0,
+    "duration": 4.24,
+    "text": "sell more as implied volatility"
+  },
+  {
+    "start": 451.84,
+    "duration": 3.199,
+    "text": "increases while the market maker's short"
+  },
+  {
+    "start": 454.24,
+    "duration": 3.44,
+    "text": "puts remain"
+  },
+  {
+    "start": 455.039,
+    "duration": 3.841,
+    "text": "out of the money the combined effect of"
+  },
+  {
+    "start": 457.68,
+    "duration": 4.079,
+    "text": "market make is selling"
+  },
+  {
+    "start": 458.88,
+    "duration": 4.879,
+    "text": "to hedge with gamma and vanner exposures"
+  },
+  {
+    "start": 461.759,
+    "duration": 3.921,
+    "text": "accelerates downward movements and price"
+  },
+  {
+    "start": 463.759,
+    "duration": 3.44,
+    "text": "which can cause more investors to buy"
+  },
+  {
+    "start": 465.68,
+    "duration": 3.6,
+    "text": "more out of the money puts"
+  },
+  {
+    "start": 467.199,
+    "duration": 3.28,
+    "text": "further exacerbating negative gamma and"
+  },
+  {
+    "start": 469.28,
+    "duration": 4.639,
+    "text": "nevada exposures"
+  },
+  {
+    "start": 470.479,
+    "duration": 5.521,
+    "text": "in a vicious cycle however when implied"
+  },
+  {
+    "start": 473.919,
+    "duration": 4.081,
+    "text": "volatility does decrease"
+  },
+  {
+    "start": 476.0,
+    "duration": 3.759,
+    "text": "market makers will be forced to buy back"
+  },
+  {
+    "start": 478.0,
+    "duration": 2.479,
+    "text": "or cover whatever stock they were"
+  },
+  {
+    "start": 479.759,
+    "duration": 3.201,
+    "text": "selling or"
+  },
+  {
+    "start": 480.479,
+    "duration": 4.4,
+    "text": "shorting to hedge their banner exposure"
+  },
+  {
+    "start": 482.96,
+    "duration": 4.0,
+    "text": "one common way this can happen is simply"
+  },
+  {
+    "start": 484.879,
+    "duration": 4.32,
+    "text": "due to the expiration of options"
+  },
+  {
+    "start": 486.96,
+    "duration": 3.679,
+    "text": "which the market makers must react to by"
+  },
+  {
+    "start": 489.199,
+    "duration": 3.601,
+    "text": "buying back whatever stock they were"
+  },
+  {
+    "start": 490.639,
+    "duration": 4.161,
+    "text": "selling or shorting during the downturn"
+  },
+  {
+    "start": 492.8,
+    "duration": 3.28,
+    "text": "this massive amount of buying can cause"
+  },
+  {
+    "start": 494.8,
+    "duration": 3.92,
+    "text": "huge rebound"
+  },
+  {
+    "start": 496.08,
+    "duration": 2.64,
+    "text": "in prices"
+  },
+  {
+    "start": 499.52,
+    "duration": 2.88,
+    "text": "knowledge of how market makers are"
+  },
+  {
+    "start": 500.8,
+    "duration": 3.119,
+    "text": "forced to hedge their camera and then"
+  },
+  {
+    "start": 502.4,
+    "duration": 3.76,
+    "text": "exposures can be used by"
+  },
+  {
+    "start": 503.919,
+    "duration": 3.28,
+    "text": "investors to identify conditional"
+  },
+  {
+    "start": 506.16,
+    "duration": 2.879,
+    "text": "probabilities"
+  },
+  {
+    "start": 507.199,
+    "duration": 3.361,
+    "text": "where the market makers are likely to"
+  },
+  {
+    "start": 509.039,
+    "duration": 5.281,
+    "text": "push prices up or down"
+  },
+  {
+    "start": 510.56,
+    "duration": 3.76,
+    "text": "based on changes in price and implied"
+  },
+  {
+    "start": 518.839,
+    "duration": 3.0,
+    "text": "volatility"
+  },
+  {
+    "start": 524.8,
+    "duration": 2.08,
+    "text": "you"
+  }
+]
