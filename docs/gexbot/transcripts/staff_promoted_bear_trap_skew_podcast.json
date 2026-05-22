@@ -1,0 +1,6472 @@
+[
+  {
+    "start": 0.12,
+    "duration": 4.02,
+    "text": "welcome back everybody this is John"
+  },
+  {
+    "start": 2.22,
+    "duration": 4.92,
+    "text": "Kirby from the bear trap Discord podcast"
+  },
+  {
+    "start": 4.14,
+    "duration": 5.82,
+    "text": "my co-host is Vic all chart credits as"
+  },
+  {
+    "start": 7.14,
+    "duration": 4.499,
+    "text": "always go out to awk this is a SKU"
+  },
+  {
+    "start": 9.96,
+    "duration": 4.2,
+    "text": "special and I'm talking pretty special"
+  },
+  {
+    "start": 11.639,
+    "duration": 4.681,
+    "text": "because we have around two hours of"
+  },
+  {
+    "start": 14.16,
+    "duration": 4.74,
+    "text": "content I've tried to segment it up for"
+  },
+  {
+    "start": 16.32,
+    "duration": 4.98,
+    "text": "you guys so we have more uh digestible"
+  },
+  {
+    "start": 18.9,
+    "duration": 5.16,
+    "text": "chunks around 20 minutes three of them"
+  },
+  {
+    "start": 21.3,
+    "duration": 5.1,
+    "text": "in this first uh podcast and then we're"
+  },
+  {
+    "start": 24.06,
+    "duration": 5.459,
+    "text": "gonna release episode four which has the"
+  },
+  {
+    "start": 26.4,
+    "duration": 5.58,
+    "text": "second half of all this material"
+  },
+  {
+    "start": 29.519,
+    "duration": 5.161,
+    "text": "um please do share the podcast with as"
+  },
+  {
+    "start": 31.98,
+    "duration": 4.8,
+    "text": "many people as possible subscribe in"
+  },
+  {
+    "start": 34.68,
+    "duration": 3.42,
+    "text": "whatever form you see fit and give us"
+  },
+  {
+    "start": 36.78,
+    "duration": 3.779,
+    "text": "feedback we're always looking for new"
+  },
+  {
+    "start": 38.1,
+    "duration": 3.72,
+    "text": "topics new ideas even new charts to"
+  },
+  {
+    "start": 40.559,
+    "duration": 3.261,
+    "text": "create"
+  },
+  {
+    "start": 41.82,
+    "duration": 6.78,
+    "text": "um yeah so we're going to be covering"
+  },
+  {
+    "start": 43.82,
+    "duration": 7.66,
+    "text": "skew fomc CPI and then some psychology"
+  },
+  {
+    "start": 48.6,
+    "duration": 5.16,
+    "text": "stuff as well alright enjoy everybody"
+  },
+  {
+    "start": 51.48,
+    "duration": 4.739,
+    "text": "we've got this set up here"
+  },
+  {
+    "start": 53.76,
+    "duration": 4.319,
+    "text": "John Kirby here has set up these"
+  },
+  {
+    "start": 56.219,
+    "duration": 5.16,
+    "text": "uh these charts here just to kind of"
+  },
+  {
+    "start": 58.079,
+    "duration": 6.001,
+    "text": "show us what the difference in skus"
+  },
+  {
+    "start": 61.379,
+    "duration": 4.201,
+    "text": "look like over time and and sort of what"
+  },
+  {
+    "start": 64.08,
+    "duration": 2.52,
+    "text": "they're implying"
+  },
+  {
+    "start": 65.58,
+    "duration": 3.719,
+    "text": "um"
+  },
+  {
+    "start": 66.6,
+    "duration": 6.12,
+    "text": "so first off like how do you use skew I"
+  },
+  {
+    "start": 69.299,
+    "duration": 6.18,
+    "text": "mean just in general do you use it a lot"
+  },
+  {
+    "start": 72.72,
+    "duration": 5.52,
+    "text": "well I mean usually my Approach is to"
+  },
+  {
+    "start": 75.479,
+    "duration": 6.121,
+    "text": "understand sort of the theory behind any"
+  },
+  {
+    "start": 78.24,
+    "duration": 5.879,
+    "text": "given indicator so that I can know"
+  },
+  {
+    "start": 81.6,
+    "duration": 5.1,
+    "text": "um what's going into it before I try to"
+  },
+  {
+    "start": 84.119,
+    "duration": 4.561,
+    "text": "figure out you know how how I want to"
+  },
+  {
+    "start": 86.7,
+    "duration": 3.419,
+    "text": "use it because otherwise"
+  },
+  {
+    "start": 88.68,
+    "duration": 3.06,
+    "text": "um you can get crazy shifts like we're"
+  },
+  {
+    "start": 90.119,
+    "duration": 4.261,
+    "text": "going to see in this video and if you"
+  },
+  {
+    "start": 91.74,
+    "duration": 3.78,
+    "text": "don't know what they what they truly"
+  },
+  {
+    "start": 94.38,
+    "duration": 2.16,
+    "text": "mean"
+  },
+  {
+    "start": 95.52,
+    "duration": 2.4,
+    "text": "um then all of a sudden all your"
+  },
+  {
+    "start": 96.54,
+    "duration": 2.46,
+    "text": "readings are going to go crazy and"
+  },
+  {
+    "start": 97.92,
+    "duration": 2.82,
+    "text": "you'll think that things are relevant"
+  },
+  {
+    "start": 99.0,
+    "duration": 3.659,
+    "text": "that aren't and so forth so"
+  },
+  {
+    "start": 100.74,
+    "duration": 4.32,
+    "text": "all right so what is your what is your"
+  },
+  {
+    "start": 102.659,
+    "duration": 5.041,
+    "text": "essentially your general concept or your"
+  },
+  {
+    "start": 105.06,
+    "duration": 5.04,
+    "text": "understanding of what what the purpose"
+  },
+  {
+    "start": 107.7,
+    "duration": 6.599,
+    "text": "of this SKU is like"
+  },
+  {
+    "start": 110.1,
+    "duration": 5.699,
+    "text": "yeah so skew is um really just a fancy"
+  },
+  {
+    "start": 114.299,
+    "duration": 4.32,
+    "text": "way of saying we're going to take the"
+  },
+  {
+    "start": 115.799,
+    "duration": 4.741,
+    "text": "implied volatility of every option along"
+  },
+  {
+    "start": 118.619,
+    "duration": 3.061,
+    "text": "the chain"
+  },
+  {
+    "start": 120.54,
+    "duration": 2.82,
+    "text": "um and then we're going to graph them"
+  },
+  {
+    "start": 121.68,
+    "duration": 3.719,
+    "text": "all together which is what you see here"
+  },
+  {
+    "start": 123.36,
+    "duration": 3.48,
+    "text": "right so it's going from these are is"
+  },
+  {
+    "start": 125.399,
+    "duration": 3.78,
+    "text": "obviously just the strike prices from"
+  },
+  {
+    "start": 126.84,
+    "duration": 4.44,
+    "text": "275 to 450 and then these are the"
+  },
+  {
+    "start": 129.179,
+    "duration": 4.741,
+    "text": "implied volatilities the reason it says"
+  },
+  {
+    "start": 131.28,
+    "duration": 4.319,
+    "text": "volatility at the mid here is because"
+  },
+  {
+    "start": 133.92,
+    "duration": 3.179,
+    "text": "um every option price has a bid in an"
+  },
+  {
+    "start": 135.599,
+    "duration": 3.601,
+    "text": "ask and the mid is just right between"
+  },
+  {
+    "start": 137.099,
+    "duration": 4.261,
+    "text": "them so we take the mid price and then"
+  },
+  {
+    "start": 139.2,
+    "duration": 4.08,
+    "text": "we back calculate the implied volatility"
+  },
+  {
+    "start": 141.36,
+    "duration": 5.22,
+    "text": "from how the Market's pricing the"
+  },
+  {
+    "start": 143.28,
+    "duration": 5.459,
+    "text": "options and what I love about aux charts"
+  },
+  {
+    "start": 146.58,
+    "duration": 5.519,
+    "text": "here is he's showing he also shows you"
+  },
+  {
+    "start": 148.739,
+    "duration": 5.761,
+    "text": "the historical IV for the for different"
+  },
+  {
+    "start": 152.099,
+    "duration": 4.621,
+    "text": "periods so you see those little"
+  },
+  {
+    "start": 154.5,
+    "duration": 3.84,
+    "text": "horizontal lines it's kind of hard to"
+  },
+  {
+    "start": 156.72,
+    "duration": 3.3,
+    "text": "see in the video but you see that yeah"
+  },
+  {
+    "start": 158.34,
+    "duration": 3.96,
+    "text": "there you go so you can see the"
+  },
+  {
+    "start": 160.02,
+    "duration": 3.84,
+    "text": "historical and the implied"
+  },
+  {
+    "start": 162.3,
+    "duration": 5.1,
+    "text": "and"
+  },
+  {
+    "start": 163.86,
+    "duration": 5.7,
+    "text": "do you ever use these at all either"
+  },
+  {
+    "start": 167.4,
+    "duration": 3.66,
+    "text": "yeah I mean I think I think it's a"
+  },
+  {
+    "start": 169.56,
+    "duration": 3.42,
+    "text": "little it's a little tricky nowadays"
+  },
+  {
+    "start": 171.06,
+    "duration": 4.98,
+    "text": "right so I wouldn't necessarily be one"
+  },
+  {
+    "start": 172.98,
+    "duration": 6.119,
+    "text": "of uh want to be using like I don't know"
+  },
+  {
+    "start": 176.04,
+    "duration": 5.16,
+    "text": "this IV 90 or hv60 because we're in such"
+  },
+  {
+    "start": 179.099,
+    "duration": 3.601,
+    "text": "an intense bear market right now we know"
+  },
+  {
+    "start": 181.2,
+    "duration": 3.24,
+    "text": "that things are a little crazy right now"
+  },
+  {
+    "start": 182.7,
+    "duration": 3.42,
+    "text": "or like this week I mean you're saying"
+  },
+  {
+    "start": 184.44,
+    "duration": 3.96,
+    "text": "those are a little lagging is what"
+  },
+  {
+    "start": 186.12,
+    "duration": 5.039,
+    "text": "you're saying exactly yeah so you're"
+  },
+  {
+    "start": 188.4,
+    "duration": 6.9,
+    "text": "leaning more towards using like the IV"
+  },
+  {
+    "start": 191.159,
+    "duration": 5.94,
+    "text": "30 or 20 in the HB 20. yeah I think that"
+  },
+  {
+    "start": 195.3,
+    "duration": 3.659,
+    "text": "like your understanding of time has to"
+  },
+  {
+    "start": 197.099,
+    "duration": 3.541,
+    "text": "change with the market right and like if"
+  },
+  {
+    "start": 198.959,
+    "duration": 2.941,
+    "text": "the Market's moving really quickly then"
+  },
+  {
+    "start": 200.64,
+    "duration": 3.42,
+    "text": "your indicator should move a little"
+  },
+  {
+    "start": 201.9,
+    "duration": 5.28,
+    "text": "quicker too and that's hard to do right"
+  },
+  {
+    "start": 204.06,
+    "duration": 5.94,
+    "text": "and so then if you're also doing that"
+  },
+  {
+    "start": 207.18,
+    "duration": 5.76,
+    "text": "then are you focusing on more on the"
+  },
+  {
+    "start": 210.0,
+    "duration": 4.62,
+    "text": "skus that are closer uh to where we are"
+  },
+  {
+    "start": 212.94,
+    "duration": 4.92,
+    "text": "versus you know maybe looking out a"
+  },
+  {
+    "start": 214.62,
+    "duration": 5.88,
+    "text": "couple months or looking yeah in general"
+  },
+  {
+    "start": 217.86,
+    "duration": 5.099,
+    "text": "because volatility is mean reverting"
+  },
+  {
+    "start": 220.5,
+    "duration": 3.959,
+    "text": "um these really far out skus"
+  },
+  {
+    "start": 222.959,
+    "duration": 3.661,
+    "text": "um they have a tendency to look really"
+  },
+  {
+    "start": 224.459,
+    "duration": 4.381,
+    "text": "similar to each other uh regardless of"
+  },
+  {
+    "start": 226.62,
+    "duration": 4.32,
+    "text": "the market condition right right um bull"
+  },
+  {
+    "start": 228.84,
+    "duration": 3.479,
+    "text": "market bear Market I mean this guy out"
+  },
+  {
+    "start": 230.94,
+    "duration": 4.859,
+    "text": "here is going to look like this guy out"
+  },
+  {
+    "start": 232.319,
+    "duration": 5.761,
+    "text": "here yeah it's and and um"
+  },
+  {
+    "start": 235.799,
+    "duration": 4.561,
+    "text": "right these are color-coded I mean I"
+  },
+  {
+    "start": 238.08,
+    "duration": 4.56,
+    "text": "think most people can see this pretty"
+  },
+  {
+    "start": 240.36,
+    "duration": 3.659,
+    "text": "intuitively but um and this Q chart"
+  },
+  {
+    "start": 242.64,
+    "duration": 2.7,
+    "text": "isn't particularly important this is"
+  },
+  {
+    "start": 244.019,
+    "duration": 3.241,
+    "text": "just a random one that we picked the"
+  },
+  {
+    "start": 245.34,
+    "duration": 3.42,
+    "text": "reason right is because it looks more or"
+  },
+  {
+    "start": 247.26,
+    "duration": 3.36,
+    "text": "less normal and then we're going to get"
+  },
+  {
+    "start": 248.76,
+    "duration": 5.16,
+    "text": "into some bizarre skew later in the"
+  },
+  {
+    "start": 250.62,
+    "duration": 4.979,
+    "text": "video right yeah well okay so with with"
+  },
+  {
+    "start": 253.92,
+    "duration": 3.539,
+    "text": "that being said"
+  },
+  {
+    "start": 255.599,
+    "duration": 4.801,
+    "text": "um would you say that the further out"
+  },
+  {
+    "start": 257.459,
+    "duration": 4.381,
+    "text": "skus look more normal just because the"
+  },
+  {
+    "start": 260.4,
+    "duration": 4.68,
+    "text": "position people are taking more"
+  },
+  {
+    "start": 261.84,
+    "duration": 5.4,
+    "text": "positions on The Closer dated ones you"
+  },
+  {
+    "start": 265.08,
+    "duration": 4.08,
+    "text": "know they're or they're just you know"
+  },
+  {
+    "start": 267.24,
+    "duration": 4.26,
+    "text": "you know people are doing what you're"
+  },
+  {
+    "start": 269.16,
+    "duration": 5.34,
+    "text": "you're saying is hey I'm not even"
+  },
+  {
+    "start": 271.5,
+    "duration": 5.4,
+    "text": "worried about that expiry right so it"
+  },
+  {
+    "start": 274.5,
+    "duration": 3.9,
+    "text": "just kind of sits there and looks normal"
+  },
+  {
+    "start": 276.9,
+    "duration": 3.72,
+    "text": "I think I think that's part of it"
+  },
+  {
+    "start": 278.4,
+    "duration": 3.9,
+    "text": "another way that I would put it is the"
+  },
+  {
+    "start": 280.62,
+    "duration": 4.38,
+    "text": "more the further away we are from"
+  },
+  {
+    "start": 282.3,
+    "duration": 5.28,
+    "text": "something the more it is the case that"
+  },
+  {
+    "start": 285.0,
+    "duration": 5.88,
+    "text": "structural market conditions are gonna"
+  },
+  {
+    "start": 287.58,
+    "duration": 7.14,
+    "text": "Drive pricing rather than current"
+  },
+  {
+    "start": 290.88,
+    "duration": 5.58,
+    "text": "catalysts and what I mean by that is"
+  },
+  {
+    "start": 294.72,
+    "duration": 3.66,
+    "text": "um people who are buying these puts all"
+  },
+  {
+    "start": 296.46,
+    "duration": 4.32,
+    "text": "the way out in you know December 30th"
+  },
+  {
+    "start": 298.38,
+    "duration": 3.599,
+    "text": "2022 this isn't even far out expert I"
+  },
+  {
+    "start": 300.78,
+    "duration": 3.96,
+    "text": "mean if we're going to talk really far"
+  },
+  {
+    "start": 301.979,
+    "duration": 4.921,
+    "text": "out we'd be talking leaps and so forth"
+  },
+  {
+    "start": 304.74,
+    "duration": 5.459,
+    "text": "um but it doesn't really matter because"
+  },
+  {
+    "start": 306.9,
+    "duration": 5.1,
+    "text": "you kind of get the idea uh so people"
+  },
+  {
+    "start": 310.199,
+    "duration": 3.961,
+    "text": "who are buying those puts this is sort"
+  },
+  {
+    "start": 312.0,
+    "duration": 3.24,
+    "text": "of portfolio protection territory right"
+  },
+  {
+    "start": 314.16,
+    "duration": 1.8,
+    "text": "and"
+  },
+  {
+    "start": 315.24,
+    "duration": 2.88,
+    "text": "um"
+  },
+  {
+    "start": 315.96,
+    "duration": 3.42,
+    "text": "it's not something that a Speculator is"
+  },
+  {
+    "start": 318.12,
+    "duration": 3.06,
+    "text": "going to be buying well that's a good"
+  },
+  {
+    "start": 319.38,
+    "duration": 5.039,
+    "text": "point hold on because that's why the SKU"
+  },
+  {
+    "start": 321.18,
+    "duration": 4.68,
+    "text": "looks normal here right because it's"
+  },
+  {
+    "start": 324.419,
+    "duration": 3.78,
+    "text": "sort of"
+  },
+  {
+    "start": 325.86,
+    "duration": 4.38,
+    "text": "it's sort of like people are just hedged"
+  },
+  {
+    "start": 328.199,
+    "duration": 5.161,
+    "text": "that's when I see this I just go people"
+  },
+  {
+    "start": 330.24,
+    "duration": 7.14,
+    "text": "are hedged this is my first thought"
+  },
+  {
+    "start": 333.36,
+    "duration": 6.72,
+    "text": "because yeah like literally every expiry"
+  },
+  {
+    "start": 337.38,
+    "duration": 4.2,
+    "text": "it just looks normal because it should"
+  },
+  {
+    "start": 340.08,
+    "duration": 3.179,
+    "text": "be left leaning"
+  },
+  {
+    "start": 341.58,
+    "duration": 3.959,
+    "text": "it should be left leading the reason it"
+  },
+  {
+    "start": 343.259,
+    "duration": 4.801,
+    "text": "should be left leaning is because by and"
+  },
+  {
+    "start": 345.539,
+    "duration": 5.641,
+    "text": "large people use options for protection"
+  },
+  {
+    "start": 348.06,
+    "duration": 5.1,
+    "text": "as insurance and when people want to go"
+  },
+  {
+    "start": 351.18,
+    "duration": 3.9,
+    "text": "long they buy stock which means that"
+  },
+  {
+    "start": 353.16,
+    "duration": 3.78,
+    "text": "there isn't as much demand for options"
+  },
+  {
+    "start": 355.08,
+    "duration": 3.36,
+    "text": "on the upside because not a lot of"
+  },
+  {
+    "start": 356.94,
+    "duration": 3.0,
+    "text": "people are using options to play the"
+  },
+  {
+    "start": 358.44,
+    "duration": 4.38,
+    "text": "upside"
+  },
+  {
+    "start": 359.94,
+    "duration": 5.34,
+    "text": "um and the other side of that too John"
+  },
+  {
+    "start": 362.82,
+    "duration": 3.599,
+    "text": "is the uh in people are long shares like"
+  },
+  {
+    "start": 365.28,
+    "duration": 3.6,
+    "text": "you're saying but what are they doing"
+  },
+  {
+    "start": 366.419,
+    "duration": 4.741,
+    "text": "when they're long shares for protection"
+  },
+  {
+    "start": 368.88,
+    "duration": 5.7,
+    "text": "they're either buying puts as protection"
+  },
+  {
+    "start": 371.16,
+    "duration": 5.16,
+    "text": "or selling calls right exactly if those"
+  },
+  {
+    "start": 374.58,
+    "duration": 3.48,
+    "text": "Shares are doing well then they're"
+  },
+  {
+    "start": 376.32,
+    "duration": 3.48,
+    "text": "selling calls which is why even in a"
+  },
+  {
+    "start": 378.06,
+    "duration": 4.199,
+    "text": "bull market you end up with a SKU that"
+  },
+  {
+    "start": 379.8,
+    "duration": 3.959,
+    "text": "looks kind of like this right where"
+  },
+  {
+    "start": 382.259,
+    "duration": 3.841,
+    "text": "um well what happens when they sell the"
+  },
+  {
+    "start": 383.759,
+    "duration": 4.201,
+    "text": "calls out of the money what it's going"
+  },
+  {
+    "start": 386.1,
+    "duration": 3.12,
+    "text": "to happen to the SKU"
+  },
+  {
+    "start": 387.96,
+    "duration": 3.0,
+    "text": "when they're selling out of the money"
+  },
+  {
+    "start": 389.22,
+    "duration": 3.599,
+    "text": "calls the SKU is going to look even more"
+  },
+  {
+    "start": 390.96,
+    "duration": 3.84,
+    "text": "like this like it's gonna right and the"
+  },
+  {
+    "start": 392.819,
+    "duration": 4.921,
+    "text": "reason for it is because so we talked"
+  },
+  {
+    "start": 394.8,
+    "duration": 6.42,
+    "text": "about implied volatility as sort of this"
+  },
+  {
+    "start": 397.74,
+    "duration": 4.98,
+    "text": "uh metric for you know you it's in the"
+  },
+  {
+    "start": 401.22,
+    "duration": 3.24,
+    "text": "it's in the name right it's like the"
+  },
+  {
+    "start": 402.72,
+    "duration": 3.36,
+    "text": "price of this option tells you how much"
+  },
+  {
+    "start": 404.46,
+    "duration": 3.48,
+    "text": "of a move you would need for that option"
+  },
+  {
+    "start": 406.08,
+    "duration": 3.36,
+    "text": "to be worth money and so implied"
+  },
+  {
+    "start": 407.94,
+    "duration": 3.599,
+    "text": "volatility what it does is it gives you"
+  },
+  {
+    "start": 409.44,
+    "duration": 5.099,
+    "text": "a way to normalize"
+  },
+  {
+    "start": 411.539,
+    "duration": 4.681,
+    "text": "um the implication of that option uh for"
+  },
+  {
+    "start": 414.539,
+    "duration": 2.401,
+    "text": "the strike price"
+  },
+  {
+    "start": 416.22,
+    "duration": 2.94,
+    "text": "um"
+  },
+  {
+    "start": 416.94,
+    "duration": 3.599,
+    "text": "I don't can you do you think that was"
+  },
+  {
+    "start": 419.16,
+    "duration": 2.4,
+    "text": "clear maybe you can clarify that even"
+  },
+  {
+    "start": 420.539,
+    "duration": 2.88,
+    "text": "more"
+  },
+  {
+    "start": 421.56,
+    "duration": 3.84,
+    "text": "I would say you know whenever I think of"
+  },
+  {
+    "start": 423.419,
+    "duration": 3.961,
+    "text": "the implied fall it's"
+  },
+  {
+    "start": 425.4,
+    "duration": 3.84,
+    "text": "you know it is like that I want to see I"
+  },
+  {
+    "start": 427.38,
+    "duration": 4.5,
+    "text": "want to see a skew like this normally if"
+  },
+  {
+    "start": 429.24,
+    "duration": 4.26,
+    "text": "I want to get long it can still ride up"
+  },
+  {
+    "start": 431.88,
+    "duration": 4.08,
+    "text": "the left side but yeah your implied"
+  },
+  {
+    "start": 433.5,
+    "duration": 4.08,
+    "text": "volatility is simply telling you"
+  },
+  {
+    "start": 435.96,
+    "duration": 3.42,
+    "text": "the range"
+  },
+  {
+    "start": 437.58,
+    "duration": 3.119,
+    "text": "in that yes in that time period you're"
+  },
+  {
+    "start": 439.38,
+    "duration": 3.9,
+    "text": "saying look"
+  },
+  {
+    "start": 440.699,
+    "duration": 4.641,
+    "text": "it's going to be able to move in this"
+  },
+  {
+    "start": 443.28,
+    "duration": 4.68,
+    "text": "you know in this type of way"
+  },
+  {
+    "start": 445.34,
+    "duration": 5.139,
+    "text": "within this time period and this is what"
+  },
+  {
+    "start": 447.96,
+    "duration": 4.739,
+    "text": "people are basically pricing in is a big"
+  },
+  {
+    "start": 450.479,
+    "duration": 3.84,
+    "text": "move now are they always right you know"
+  },
+  {
+    "start": 452.699,
+    "duration": 3.961,
+    "text": "are they pricing it incorrectly that's"
+  },
+  {
+    "start": 454.319,
+    "duration": 4.861,
+    "text": "where you get into like okay guys you"
+  },
+  {
+    "start": 456.66,
+    "duration": 4.379,
+    "text": "know we've got one expiry and we'll see"
+  },
+  {
+    "start": 459.18,
+    "duration": 3.959,
+    "text": "some of these later that's just crazy"
+  },
+  {
+    "start": 461.039,
+    "duration": 4.321,
+    "text": "and then everything else is normal"
+  },
+  {
+    "start": 463.139,
+    "duration": 3.78,
+    "text": "you know obviously you're not by I"
+  },
+  {
+    "start": 465.36,
+    "duration": 3.72,
+    "text": "wouldn't buy into that you wouldn't want"
+  },
+  {
+    "start": 466.919,
+    "duration": 4.141,
+    "text": "to be long premium into a situation like"
+  },
+  {
+    "start": 469.08,
+    "duration": 3.72,
+    "text": "so you can start getting into"
+  },
+  {
+    "start": 471.06,
+    "duration": 4.859,
+    "text": "you know the market is a little bit"
+  },
+  {
+    "start": 472.8,
+    "duration": 4.38,
+    "text": "dislocated here yeah and and I think"
+  },
+  {
+    "start": 475.919,
+    "duration": 3.241,
+    "text": "what's absolutely essential to"
+  },
+  {
+    "start": 477.18,
+    "duration": 3.48,
+    "text": "understand in order to be able to"
+  },
+  {
+    "start": 479.16,
+    "duration": 2.879,
+    "text": "process those charts and that's why I"
+  },
+  {
+    "start": 480.66,
+    "duration": 3.36,
+    "text": "was saying this at the beginning that we"
+  },
+  {
+    "start": 482.039,
+    "duration": 3.361,
+    "text": "want to understand the theory is because"
+  },
+  {
+    "start": 484.02,
+    "duration": 3.48,
+    "text": "yes"
+  },
+  {
+    "start": 485.4,
+    "duration": 3.54,
+    "text": "um implied volatility is about that it's"
+  },
+  {
+    "start": 487.5,
+    "duration": 4.199,
+    "text": "about you know how much of a move the"
+  },
+  {
+    "start": 488.94,
+    "duration": 4.5,
+    "text": "options are implying but really it's"
+  },
+  {
+    "start": 491.699,
+    "duration": 5.34,
+    "text": "just a measure of option supply versus"
+  },
+  {
+    "start": 493.44,
+    "duration": 5.4,
+    "text": "demand these are Supply demand curves"
+  },
+  {
+    "start": 497.039,
+    "duration": 4.021,
+    "text": "um it is saying like if you look at that"
+  },
+  {
+    "start": 498.84,
+    "duration": 3.78,
+    "text": "300 strike put right there and you're"
+  },
+  {
+    "start": 501.06,
+    "duration": 3.12,
+    "text": "looking that it's trading at you know a"
+  },
+  {
+    "start": 502.62,
+    "duration": 4.259,
+    "text": "37.5"
+  },
+  {
+    "start": 504.18,
+    "duration": 4.739,
+    "text": "uh implied ball what that means is that"
+  },
+  {
+    "start": 506.879,
+    "duration": 4.981,
+    "text": "there's a lot more demand for that put"
+  },
+  {
+    "start": 508.919,
+    "duration": 5.401,
+    "text": "than there is Supply relative to the 325"
+  },
+  {
+    "start": 511.86,
+    "duration": 5.28,
+    "text": "which is trading at 32.5 implied ball"
+  },
+  {
+    "start": 514.32,
+    "duration": 5.04,
+    "text": "does that make sense yeah it does make"
+  },
+  {
+    "start": 517.14,
+    "duration": 4.259,
+    "text": "sense uh but"
+  },
+  {
+    "start": 519.36,
+    "duration": 4.559,
+    "text": "um there's that other the other side of"
+  },
+  {
+    "start": 521.399,
+    "duration": 5.341,
+    "text": "it too is that you know we talked about"
+  },
+  {
+    "start": 523.919,
+    "duration": 5.581,
+    "text": "this too that the implied vol"
+  },
+  {
+    "start": 526.74,
+    "duration": 5.94,
+    "text": "you know way out of the money"
+  },
+  {
+    "start": 529.5,
+    "duration": 4.68,
+    "text": "is higher right so I don't think it"
+  },
+  {
+    "start": 532.68,
+    "duration": 3.3,
+    "text": "necessarily means there's way more"
+  },
+  {
+    "start": 534.18,
+    "duration": 3.3,
+    "text": "demand it just means that it's farther"
+  },
+  {
+    "start": 535.98,
+    "duration": 4.44,
+    "text": "out of the money"
+  },
+  {
+    "start": 537.48,
+    "duration": 5.58,
+    "text": "you know what I mean yeah it's it's sort"
+  },
+  {
+    "start": 540.42,
+    "duration": 4.26,
+    "text": "of I think I think these two sides of it"
+  },
+  {
+    "start": 543.06,
+    "duration": 3.6,
+    "text": "are kind of interacting right because on"
+  },
+  {
+    "start": 544.68,
+    "duration": 5.279,
+    "text": "the one hand it's like there's"
+  },
+  {
+    "start": 546.66,
+    "duration": 6.299,
+    "text": "um I would say that if there were a ton"
+  },
+  {
+    "start": 549.959,
+    "duration": 5.341,
+    "text": "of sellers of those 300s then the price"
+  },
+  {
+    "start": 552.959,
+    "duration": 3.961,
+    "text": "of the 300s would go down lowering the"
+  },
+  {
+    "start": 555.3,
+    "duration": 2.82,
+    "text": "implied ball"
+  },
+  {
+    "start": 556.92,
+    "duration": 2.28,
+    "text": "um so it's like it's kind of a"
+  },
+  {
+    "start": 558.12,
+    "duration": 2.52,
+    "text": "combination of two it's like we have the"
+  },
+  {
+    "start": 559.2,
+    "duration": 3.78,
+    "text": "market structural conditions which are"
+  },
+  {
+    "start": 560.64,
+    "duration": 3.9,
+    "text": "going to create this type of skew and"
+  },
+  {
+    "start": 562.98,
+    "duration": 3.24,
+    "text": "then on top of that we have these Supply"
+  },
+  {
+    "start": 564.54,
+    "duration": 4.14,
+    "text": "demand Dynamics which are going to then"
+  },
+  {
+    "start": 566.22,
+    "duration": 5.1,
+    "text": "modify it by you know a couple of extra"
+  },
+  {
+    "start": 568.68,
+    "duration": 5.52,
+    "text": "percentage points or something like that"
+  },
+  {
+    "start": 571.32,
+    "duration": 5.04,
+    "text": "um no I I get it yeah and I you know you"
+  },
+  {
+    "start": 574.2,
+    "duration": 4.199,
+    "text": "can look at it that way and and I would"
+  },
+  {
+    "start": 576.36,
+    "duration": 6.06,
+    "text": "say broadly you would look at it that"
+  },
+  {
+    "start": 578.399,
+    "duration": 6.841,
+    "text": "way supply and demand uh curve I I but"
+  },
+  {
+    "start": 582.42,
+    "duration": 4.14,
+    "text": "that's the thing though is uh you know"
+  },
+  {
+    "start": 585.24,
+    "duration": 3.06,
+    "text": "when you're getting way out of the money"
+  },
+  {
+    "start": 586.56,
+    "duration": 4.5,
+    "text": "and you say even that you know that"
+  },
+  {
+    "start": 588.3,
+    "duration": 5.28,
+    "text": "curve out in just December is going to"
+  },
+  {
+    "start": 591.06,
+    "duration": 5.399,
+    "text": "be more normalized I wouldn't even look"
+  },
+  {
+    "start": 593.58,
+    "duration": 4.439,
+    "text": "at that one and like in this case but to"
+  },
+  {
+    "start": 596.459,
+    "duration": 4.801,
+    "text": "your point it makes sense"
+  },
+  {
+    "start": 598.019,
+    "duration": 4.921,
+    "text": "I I agree I mean I think I and I think"
+  },
+  {
+    "start": 601.26,
+    "duration": 2.88,
+    "text": "um I just realized instead of supply and"
+  },
+  {
+    "start": 602.94,
+    "duration": 3.0,
+    "text": "demand curve what I should be talking"
+  },
+  {
+    "start": 604.14,
+    "duration": 3.36,
+    "text": "about is for those of you who have taken"
+  },
+  {
+    "start": 605.94,
+    "duration": 3.72,
+    "text": "you know intro to econ or whatever it's"
+  },
+  {
+    "start": 607.5,
+    "duration": 5.04,
+    "text": "just a utility curve"
+  },
+  {
+    "start": 609.66,
+    "duration": 5.1,
+    "text": "um right it's like let's talk about the"
+  },
+  {
+    "start": 612.54,
+    "duration": 3.66,
+    "text": "close one here let's um okay yeah let's"
+  },
+  {
+    "start": 614.76,
+    "duration": 3.24,
+    "text": "talk about let's talk about the close"
+  },
+  {
+    "start": 616.2,
+    "duration": 4.199,
+    "text": "the close expiry here that we're looking"
+  },
+  {
+    "start": 618.0,
+    "duration": 4.5,
+    "text": "at like say it's say it's October 5th"
+  },
+  {
+    "start": 620.399,
+    "duration": 4.56,
+    "text": "what where is that on our chart here"
+  },
+  {
+    "start": 622.5,
+    "duration": 5.339,
+    "text": "October 5th is just this top revenue on"
+  },
+  {
+    "start": 624.959,
+    "duration": 5.301,
+    "text": "the left side though uh it looks like oh"
+  },
+  {
+    "start": 627.839,
+    "duration": 6.421,
+    "text": "oh yeah"
+  },
+  {
+    "start": 630.26,
+    "duration": 5.259,
+    "text": "on October 5th here so we were we were"
+  },
+  {
+    "start": 634.26,
+    "duration": 3.84,
+    "text": "right in this uh what would you call"
+  },
+  {
+    "start": 635.519,
+    "duration": 3.601,
+    "text": "that an island formation"
+  },
+  {
+    "start": 638.1,
+    "duration": 3.54,
+    "text": "um"
+  },
+  {
+    "start": 639.12,
+    "duration": 3.96,
+    "text": "right under the linear like the linear"
+  },
+  {
+    "start": 641.64,
+    "duration": 3.9,
+    "text": "regression the weekly uh or the daily"
+  },
+  {
+    "start": 643.08,
+    "duration": 4.199,
+    "text": "linear so that's a midpoint of of the"
+  },
+  {
+    "start": 645.54,
+    "duration": 4.38,
+    "text": "daily right"
+  },
+  {
+    "start": 647.279,
+    "duration": 4.56,
+    "text": "so look look at the curve right before"
+  },
+  {
+    "start": 649.92,
+    "duration": 6.06,
+    "text": "the drop"
+  },
+  {
+    "start": 651.839,
+    "duration": 6.541,
+    "text": "on October 5th October 7th"
+  },
+  {
+    "start": 655.98,
+    "duration": 5.58,
+    "text": "yeah the drop happened on the seventh do"
+  },
+  {
+    "start": 658.38,
+    "duration": 5.519,
+    "text": "you have do you have uh skus that go"
+  },
+  {
+    "start": 661.56,
+    "duration": 4.86,
+    "text": "forward yeah I do"
+  },
+  {
+    "start": 663.899,
+    "duration": 5.281,
+    "text": "um Let me let me see the next like the"
+  },
+  {
+    "start": 666.42,
+    "duration": 3.84,
+    "text": "next iteration of this all right so this"
+  },
+  {
+    "start": 669.18,
+    "duration": 3.719,
+    "text": "was"
+  },
+  {
+    "start": 670.26,
+    "duration": 5.22,
+    "text": "um yeah this is October let me just"
+  },
+  {
+    "start": 672.899,
+    "duration": 5.401,
+    "text": "check that double check that date here"
+  },
+  {
+    "start": 675.48,
+    "duration": 4.74,
+    "text": "uh okay 2020 yeah this is the the fifth"
+  },
+  {
+    "start": 678.3,
+    "duration": 3.9,
+    "text": "and then this is the seventh"
+  },
+  {
+    "start": 680.22,
+    "duration": 4.22,
+    "text": "so this is the seven so this is that"
+  },
+  {
+    "start": 682.2,
+    "duration": 5.4,
+    "text": "drop right uh-huh"
+  },
+  {
+    "start": 684.44,
+    "duration": 5.139,
+    "text": "and uh let's see does it show you down"
+  },
+  {
+    "start": 687.6,
+    "duration": 3.54,
+    "text": "there what time you pulled that that was"
+  },
+  {
+    "start": 689.579,
+    "duration": 3.841,
+    "text": "pulled"
+  },
+  {
+    "start": 691.14,
+    "duration": 3.06,
+    "text": "um yeah it should that was 11 in the"
+  },
+  {
+    "start": 693.42,
+    "duration": 2.28,
+    "text": "morning"
+  },
+  {
+    "start": 694.2,
+    "duration": 4.56,
+    "text": "okay"
+  },
+  {
+    "start": 695.7,
+    "duration": 4.5,
+    "text": "and see how like I was saying earlier"
+  },
+  {
+    "start": 698.76,
+    "duration": 3.12,
+    "text": "um"
+  },
+  {
+    "start": 700.2,
+    "duration": 4.199,
+    "text": "look what happened to the to the"
+  },
+  {
+    "start": 701.88,
+    "duration": 4.5,
+    "text": "expiries uh what's that one at the"
+  },
+  {
+    "start": 704.399,
+    "duration": 5.481,
+    "text": "bottom I know the coloring is weird can"
+  },
+  {
+    "start": 706.38,
+    "duration": 6.36,
+    "text": "you tell that one that dropped way down"
+  },
+  {
+    "start": 709.88,
+    "duration": 5.86,
+    "text": "which exp is that the closest expiry or"
+  },
+  {
+    "start": 712.74,
+    "duration": 4.46,
+    "text": "is that October 10th or"
+  },
+  {
+    "start": 715.74,
+    "duration": 4.98,
+    "text": "um"
+  },
+  {
+    "start": 717.2,
+    "duration": 5.62,
+    "text": "I honestly I could not it's hard to tell"
+  },
+  {
+    "start": 720.72,
+    "duration": 4.559,
+    "text": "I know but you may be able to tell by"
+  },
+  {
+    "start": 722.82,
+    "duration": 3.84,
+    "text": "the the skew on the right you know you"
+  },
+  {
+    "start": 725.279,
+    "duration": 3.24,
+    "text": "know what I'm pretty sure I know what it"
+  },
+  {
+    "start": 726.66,
+    "duration": 3.66,
+    "text": "is I'm pretty sure that's the one on the"
+  },
+  {
+    "start": 728.519,
+    "duration": 3.961,
+    "text": "10th and you remember the reason for"
+  },
+  {
+    "start": 730.32,
+    "duration": 3.84,
+    "text": "that would be that just everybody is"
+  },
+  {
+    "start": 732.48,
+    "duration": 2.94,
+    "text": "currently piling into options for the"
+  },
+  {
+    "start": 734.16,
+    "duration": 3.84,
+    "text": "seventh because we're in the middle of a"
+  },
+  {
+    "start": 735.42,
+    "duration": 4.26,
+    "text": "big drop and so then the you know the"
+  },
+  {
+    "start": 738.0,
+    "duration": 4.38,
+    "text": "demand for these guys on the 10th"
+  },
+  {
+    "start": 739.68,
+    "duration": 3.96,
+    "text": "actually goes down even though for the"
+  },
+  {
+    "start": 742.38,
+    "duration": 3.0,
+    "text": "next day it's going to go up so that"
+  },
+  {
+    "start": 743.64,
+    "duration": 3.48,
+    "text": "that's definitely what that is well okay"
+  },
+  {
+    "start": 745.38,
+    "duration": 3.899,
+    "text": "so hold on let me let me pull that out"
+  },
+  {
+    "start": 747.12,
+    "duration": 3.899,
+    "text": "again because you can see over on the"
+  },
+  {
+    "start": 749.279,
+    "duration": 3.18,
+    "text": "right the lower the number on the right"
+  },
+  {
+    "start": 751.019,
+    "duration": 3.961,
+    "text": "side"
+  },
+  {
+    "start": 752.459,
+    "duration": 4.141,
+    "text": "is going to be the higher the ski the"
+  },
+  {
+    "start": 754.98,
+    "duration": 4.32,
+    "text": "the higher the skew like the higher the"
+  },
+  {
+    "start": 756.6,
+    "duration": 5.52,
+    "text": "left tail so go to the very right there"
+  },
+  {
+    "start": 759.3,
+    "duration": 5.039,
+    "text": "um over to the uh to the data box oh"
+  },
+  {
+    "start": 762.12,
+    "duration": 4.2,
+    "text": "okay okay it'll it'll tell you the skew"
+  },
+  {
+    "start": 764.339,
+    "duration": 4.62,
+    "text": "amount and so you can see the lower the"
+  },
+  {
+    "start": 766.32,
+    "duration": 5.16,
+    "text": "number the higher the left tail"
+  },
+  {
+    "start": 768.959,
+    "duration": 4.56,
+    "text": "um and so that one's kind of about the"
+  },
+  {
+    "start": 771.48,
+    "duration": 3.859,
+    "text": "same"
+  },
+  {
+    "start": 773.519,
+    "duration": 4.32,
+    "text": "yeah"
+  },
+  {
+    "start": 775.339,
+    "duration": 4.421,
+    "text": "the 07s"
+  },
+  {
+    "start": 777.839,
+    "duration": 4.8,
+    "text": "um for the very day that we were"
+  },
+  {
+    "start": 779.76,
+    "duration": 4.379,
+    "text": "crashing that skew was uh really intense"
+  },
+  {
+    "start": 782.639,
+    "duration": 3.361,
+    "text": "like that left Hill was really high and"
+  },
+  {
+    "start": 784.139,
+    "duration": 4.081,
+    "text": "then the next two experts actually got"
+  },
+  {
+    "start": 786.0,
+    "duration": 3.899,
+    "text": "kind of normalized yeah sort of they"
+  },
+  {
+    "start": 788.22,
+    "duration": 3.059,
+    "text": "started coming and coming back down a"
+  },
+  {
+    "start": 789.899,
+    "duration": 2.88,
+    "text": "little bit as folks were maybe"
+  },
+  {
+    "start": 791.279,
+    "duration": 3.541,
+    "text": "monetizing I bet you they were"
+  },
+  {
+    "start": 792.779,
+    "duration": 4.201,
+    "text": "monetizing those dates"
+  },
+  {
+    "start": 794.82,
+    "duration": 5.579,
+    "text": "and then you had retail and zero DTE"
+  },
+  {
+    "start": 796.98,
+    "duration": 4.979,
+    "text": "buying from the seventh yeah so you get"
+  },
+  {
+    "start": 800.399,
+    "duration": 3.301,
+    "text": "this kind of push and pull Dynamic right"
+  },
+  {
+    "start": 801.959,
+    "duration": 3.781,
+    "text": "where if all of a sudden we're having a"
+  },
+  {
+    "start": 803.7,
+    "duration": 4.02,
+    "text": "hell of a move right now everybody wants"
+  },
+  {
+    "start": 805.74,
+    "duration": 4.44,
+    "text": "to be in the options that are for right"
+  },
+  {
+    "start": 807.72,
+    "duration": 4.44,
+    "text": "now and so I want you to look ahead here"
+  },
+  {
+    "start": 810.18,
+    "duration": 5.04,
+    "text": "to the Big Green candle that everybody"
+  },
+  {
+    "start": 812.16,
+    "duration": 5.4,
+    "text": "got uh you know sort of"
+  },
+  {
+    "start": 815.22,
+    "duration": 3.84,
+    "text": "most people got kind of offsides of the"
+  },
+  {
+    "start": 817.56,
+    "duration": 3.14,
+    "text": "big gap down and then the rip so what's"
+  },
+  {
+    "start": 819.06,
+    "duration": 5.579,
+    "text": "what day is that"
+  },
+  {
+    "start": 820.7,
+    "duration": 6.699,
+    "text": "October 13th I hope real quick though oh"
+  },
+  {
+    "start": 824.639,
+    "duration": 5.94,
+    "text": "it's right here so we're on October 7th"
+  },
+  {
+    "start": 827.399,
+    "duration": 4.62,
+    "text": "here go back to October 7th SKU yeah and"
+  },
+  {
+    "start": 830.579,
+    "duration": 4.021,
+    "text": "then let's let's see if we can find"
+  },
+  {
+    "start": 832.019,
+    "duration": 5.82,
+    "text": "October 14th SKU"
+  },
+  {
+    "start": 834.6,
+    "duration": 5.4,
+    "text": "it was 0.123 and which one of these is"
+  },
+  {
+    "start": 837.839,
+    "duration": 5.701,
+    "text": "it on here you think"
+  },
+  {
+    "start": 840.0,
+    "duration": 5.579,
+    "text": "0.123 would suggest it's pretty flat I"
+  },
+  {
+    "start": 843.54,
+    "duration": 4.08,
+    "text": "think I think it's probably either this"
+  },
+  {
+    "start": 845.579,
+    "duration": 4.44,
+    "text": "guy right here or this red guy up here"
+  },
+  {
+    "start": 847.62,
+    "duration": 4.08,
+    "text": "all right so this is what I want to"
+  },
+  {
+    "start": 850.019,
+    "duration": 4.5,
+    "text": "sort of focus on when it comes to"
+  },
+  {
+    "start": 851.7,
+    "duration": 5.759,
+    "text": "looking at the skew is uh looking into"
+  },
+  {
+    "start": 854.519,
+    "duration": 4.861,
+    "text": "the next couple expiries because this is"
+  },
+  {
+    "start": 857.459,
+    "duration": 3.961,
+    "text": "where you're gonna be like okay"
+  },
+  {
+    "start": 859.38,
+    "duration": 4.5,
+    "text": "you know we're cratering you shouldn't"
+  },
+  {
+    "start": 861.42,
+    "duration": 3.9,
+    "text": "buy puts for the most part on a day like"
+  },
+  {
+    "start": 863.88,
+    "duration": 3.12,
+    "text": "this"
+  },
+  {
+    "start": 865.32,
+    "duration": 4.319,
+    "text": "like if you're going to continue to be"
+  },
+  {
+    "start": 867.0,
+    "duration": 4.62,
+    "text": "bearish you are over in other words"
+  },
+  {
+    "start": 869.639,
+    "duration": 5.521,
+    "text": "you're overpaying by uh let's see how"
+  },
+  {
+    "start": 871.62,
+    "duration": 6.12,
+    "text": "much is that like 15 ball points at"
+  },
+  {
+    "start": 875.16,
+    "duration": 4.799,
+    "text": "least that's right and you have way less"
+  },
+  {
+    "start": 877.74,
+    "duration": 4.62,
+    "text": "time too so that's the other issue and"
+  },
+  {
+    "start": 879.959,
+    "duration": 5.101,
+    "text": "and so there's a really good case If"
+  },
+  {
+    "start": 882.36,
+    "duration": 5.039,
+    "text": "You're Gonna Play directional puts here"
+  },
+  {
+    "start": 885.06,
+    "duration": 4.94,
+    "text": "in this case then you got to find the"
+  },
+  {
+    "start": 887.399,
+    "duration": 6.06,
+    "text": "expiry that's the cheapest"
+  },
+  {
+    "start": 890.0,
+    "duration": 5.26,
+    "text": "right which is clearly right here yeah"
+  },
+  {
+    "start": 893.459,
+    "duration": 4.5,
+    "text": "so then you go to that expire and you go"
+  },
+  {
+    "start": 895.26,
+    "duration": 5.16,
+    "text": "well shoot let me go buy some of these"
+  },
+  {
+    "start": 897.959,
+    "duration": 4.921,
+    "text": "uh or or you go buy some of the uh the"
+  },
+  {
+    "start": 900.42,
+    "duration": 3.539,
+    "text": "next one up which isn't bad because if"
+  },
+  {
+    "start": 902.88,
+    "duration": 2.88,
+    "text": "you're paying a little bit of extra"
+  },
+  {
+    "start": 903.959,
+    "duration": 3.781,
+    "text": "points but you get more time that's not"
+  },
+  {
+    "start": 905.76,
+    "duration": 4.199,
+    "text": "that big of a deal"
+  },
+  {
+    "start": 907.74,
+    "duration": 4.74,
+    "text": "yeah and and so that's where I'm I'm"
+  },
+  {
+    "start": 909.959,
+    "duration": 6.721,
+    "text": "using the IV lines as well on the left"
+  },
+  {
+    "start": 912.48,
+    "duration": 6.539,
+    "text": "because if you're looking at IV 30"
+  },
+  {
+    "start": 916.68,
+    "duration": 4.8,
+    "text": "or even if even if the strike at the"
+  },
+  {
+    "start": 919.019,
+    "duration": 4.861,
+    "text": "expiry is below IV 90 well then that's"
+  },
+  {
+    "start": 921.48,
+    "duration": 4.44,
+    "text": "super cheap right it is I mean these"
+  },
+  {
+    "start": 923.88,
+    "duration": 3.42,
+    "text": "guys were insanely cheap at this point"
+  },
+  {
+    "start": 925.92,
+    "duration": 4.2,
+    "text": "so you had a situation where the"
+  },
+  {
+    "start": 927.3,
+    "duration": 5.039,
+    "text": "Market's cratering or probably uh let's"
+  },
+  {
+    "start": 930.12,
+    "duration": 3.42,
+    "text": "see in the middle of the day I don't"
+  },
+  {
+    "start": 932.339,
+    "duration": 2.461,
+    "text": "know I don't remember what the pattern"
+  },
+  {
+    "start": 933.54,
+    "duration": 4.14,
+    "text": "looked like throughout the day if it was"
+  },
+  {
+    "start": 934.8,
+    "duration": 4.32,
+    "text": "just kind of a meltdown but I don't"
+  },
+  {
+    "start": 937.68,
+    "duration": 3.18,
+    "text": "think it was just like a straight drop"
+  },
+  {
+    "start": 939.12,
+    "duration": 3.6,
+    "text": "that's probably why you saw some of"
+  },
+  {
+    "start": 940.86,
+    "duration": 3.719,
+    "text": "these expiries dropping off as folks are"
+  },
+  {
+    "start": 942.72,
+    "duration": 2.9,
+    "text": "monetizing them that's when you get into"
+  },
+  {
+    "start": 944.579,
+    "duration": 3.961,
+    "text": "them again"
+  },
+  {
+    "start": 945.62,
+    "duration": 5.32,
+    "text": "because you still had the huge drop that"
+  },
+  {
+    "start": 948.54,
+    "duration": 4.32,
+    "text": "came you know a couple days later you"
+  },
+  {
+    "start": 950.94,
+    "duration": 4.86,
+    "text": "still could have uh played those those"
+  },
+  {
+    "start": 952.86,
+    "duration": 5.52,
+    "text": "options all right so let's go forward"
+  },
+  {
+    "start": 955.8,
+    "duration": 6.36,
+    "text": "okay so we wanted next date was the 13th"
+  },
+  {
+    "start": 958.38,
+    "duration": 6.5,
+    "text": "yeah yep all right let's get this guy"
+  },
+  {
+    "start": 962.16,
+    "duration": 2.72,
+    "text": "there we go"
+  },
+  {
+    "start": 965.16,
+    "duration": 4.2,
+    "text": "interesting"
+  },
+  {
+    "start": 967.139,
+    "duration": 3.601,
+    "text": "so whenever I see the frowny face like"
+  },
+  {
+    "start": 969.36,
+    "duration": 3.0,
+    "text": "this"
+  },
+  {
+    "start": 970.74,
+    "duration": 2.82,
+    "text": "what is this do you remember what this"
+  },
+  {
+    "start": 972.36,
+    "duration": 3.3,
+    "text": "was right you remember what happened on"
+  },
+  {
+    "start": 973.56,
+    "duration": 2.7,
+    "text": "the 13th"
+  },
+  {
+    "start": 975.66,
+    "duration": 2.46,
+    "text": "um"
+  },
+  {
+    "start": 976.26,
+    "duration": 5.46,
+    "text": "I mean I know that there was a reversal"
+  },
+  {
+    "start": 978.12,
+    "duration": 5.1,
+    "text": "but uh CPI dude CPI yeah okay so this is"
+  },
+  {
+    "start": 981.72,
+    "duration": 4.32,
+    "text": "this is where I kept saying I was"
+  },
+  {
+    "start": 983.22,
+    "duration": 5.76,
+    "text": "looking at this SKU I remember this"
+  },
+  {
+    "start": 986.04,
+    "duration": 4.44,
+    "text": "and I'm just going guys I don't think"
+  },
+  {
+    "start": 988.98,
+    "duration": 4.799,
+    "text": "it's gonna be a reversal I did this on"
+  },
+  {
+    "start": 990.48,
+    "duration": 7.58,
+    "text": "fomc too but it's like whenever you see"
+  },
+  {
+    "start": 993.779,
+    "duration": 4.281,
+    "text": "this right here what does this tell you"
+  },
+  {
+    "start": 998.1,
+    "duration": 3.12,
+    "text": "well"
+  },
+  {
+    "start": 999.3,
+    "duration": 5.099,
+    "text": "all right so I I talked to my buddy"
+  },
+  {
+    "start": 1001.22,
+    "duration": 5.94,
+    "text": "who's uh been a market maker for okay"
+  },
+  {
+    "start": 1004.399,
+    "duration": 5.161,
+    "text": "cool a little while now uh not not a ton"
+  },
+  {
+    "start": 1007.16,
+    "duration": 3.66,
+    "text": "maybe like five years or so but um what"
+  },
+  {
+    "start": 1009.56,
+    "duration": 2.219,
+    "text": "he was telling me is that when he looks"
+  },
+  {
+    "start": 1010.82,
+    "duration": 2.819,
+    "text": "at this"
+  },
+  {
+    "start": 1011.779,
+    "duration": 3.98,
+    "text": "um this tells him that"
+  },
+  {
+    "start": 1013.639,
+    "duration": 2.12,
+    "text": "um"
+  },
+  {
+    "start": 1016.18,
+    "duration": 6.64,
+    "text": "how would I put it that"
+  },
+  {
+    "start": 1019.06,
+    "duration": 6.279,
+    "text": "we know or rather market makers know"
+  },
+  {
+    "start": 1022.82,
+    "duration": 6.18,
+    "text": "that a move is coming right right it's"
+  },
+  {
+    "start": 1025.339,
+    "duration": 7.021,
+    "text": "we're have a binary event and so the Vol"
+  },
+  {
+    "start": 1029.0,
+    "duration": 4.919,
+    "text": "right here is being priced really high"
+  },
+  {
+    "start": 1032.36,
+    "duration": 3.479,
+    "text": "um but the Vol on the Tails is being"
+  },
+  {
+    "start": 1033.919,
+    "duration": 5.221,
+    "text": "priced less because typically when we"
+  },
+  {
+    "start": 1035.839,
+    "duration": 5.58,
+    "text": "have a binary event we get a measured"
+  },
+  {
+    "start": 1039.14,
+    "duration": 4.319,
+    "text": "move of some kind in other words it's"
+  },
+  {
+    "start": 1041.419,
+    "duration": 3.241,
+    "text": "not it's not an unlimited move and we"
+  },
+  {
+    "start": 1043.459,
+    "duration": 3.541,
+    "text": "know when it's going to happen which"
+  },
+  {
+    "start": 1044.66,
+    "duration": 4.7,
+    "text": "actually decreases risk so much somewhat"
+  },
+  {
+    "start": 1047.0,
+    "duration": 4.86,
+    "text": "on the tail sure does that make sense"
+  },
+  {
+    "start": 1049.36,
+    "duration": 5.319,
+    "text": "okay I know it makes perfect sense it"
+  },
+  {
+    "start": 1051.86,
+    "duration": 4.14,
+    "text": "makes perfect sense I think so what I"
+  },
+  {
+    "start": 1054.679,
+    "duration": 3.481,
+    "text": "was just checking is I wanted to make"
+  },
+  {
+    "start": 1056.0,
+    "duration": 5.1,
+    "text": "sure that so we got this at that's good"
+  },
+  {
+    "start": 1058.16,
+    "duration": 4.86,
+    "text": "so we got this at 6am 7 A.M or so so"
+  },
+  {
+    "start": 1061.1,
+    "duration": 3.3,
+    "text": "this was the day before the fomc which"
+  },
+  {
+    "start": 1063.02,
+    "duration": 3.0,
+    "text": "makes sense because that's the shape"
+  },
+  {
+    "start": 1064.4,
+    "duration": 2.639,
+    "text": "that we're seeing"
+  },
+  {
+    "start": 1066.02,
+    "duration": 3.96,
+    "text": "um"
+  },
+  {
+    "start": 1067.039,
+    "duration": 4.981,
+    "text": "what what I actually see something a"
+  },
+  {
+    "start": 1069.98,
+    "duration": 4.199,
+    "text": "little bit uh"
+  },
+  {
+    "start": 1072.02,
+    "duration": 3.36,
+    "text": "uh different Happening Here in the sense"
+  },
+  {
+    "start": 1074.179,
+    "duration": 3.0,
+    "text": "that"
+  },
+  {
+    "start": 1075.38,
+    "duration": 4.14,
+    "text": "um because what what's gonna happen"
+  },
+  {
+    "start": 1077.179,
+    "duration": 5.941,
+    "text": "right is that this upside down"
+  },
+  {
+    "start": 1079.52,
+    "duration": 4.38,
+    "text": "uh this frown has to turn into a smile"
+  },
+  {
+    "start": 1083.12,
+    "duration": 2.939,
+    "text": "um"
+  },
+  {
+    "start": 1083.9,
+    "duration": 4.139,
+    "text": "right it's gonna try to turn into a"
+  },
+  {
+    "start": 1086.059,
+    "duration": 3.721,
+    "text": "smirk right yeah"
+  },
+  {
+    "start": 1088.039,
+    "duration": 4.201,
+    "text": "yeah"
+  },
+  {
+    "start": 1089.78,
+    "duration": 4.32,
+    "text": "um and as that happens"
+  },
+  {
+    "start": 1092.24,
+    "duration": 4.5,
+    "text": "um the this fall is going to come down"
+  },
+  {
+    "start": 1094.1,
+    "duration": 4.02,
+    "text": "this fall is going to come up and then"
+  },
+  {
+    "start": 1096.74,
+    "duration": 3.0,
+    "text": "this guy's gonna stay more or less the"
+  },
+  {
+    "start": 1098.12,
+    "duration": 3.419,
+    "text": "same so this is what it looks like when"
+  },
+  {
+    "start": 1099.74,
+    "duration": 3.48,
+    "text": "the entire Market is preparing for a"
+  },
+  {
+    "start": 1101.539,
+    "duration": 2.401,
+    "text": "binary gotcha yeah yeah yeah you're"
+  },
+  {
+    "start": 1103.22,
+    "duration": 1.56,
+    "text": "right you're right you're right you're"
+  },
+  {
+    "start": 1103.94,
+    "duration": 3.72,
+    "text": "right"
+  },
+  {
+    "start": 1104.78,
+    "duration": 5.46,
+    "text": "they Gap it down and then and then what"
+  },
+  {
+    "start": 1107.66,
+    "duration": 3.78,
+    "text": "happens is the skew normalizes on that"
+  },
+  {
+    "start": 1110.24,
+    "duration": 3.059,
+    "text": "gap down"
+  },
+  {
+    "start": 1111.44,
+    "duration": 3.18,
+    "text": "and that's what pushes us back on and"
+  },
+  {
+    "start": 1113.299,
+    "duration": 3.12,
+    "text": "that's what you just go okay well"
+  },
+  {
+    "start": 1114.62,
+    "duration": 3.72,
+    "text": "everybody's hedged again or everybody's"
+  },
+  {
+    "start": 1116.419,
+    "duration": 4.201,
+    "text": "too far to one side and then you go"
+  },
+  {
+    "start": 1118.34,
+    "duration": 4.56,
+    "text": "higher yeah and that's why I was saying"
+  },
+  {
+    "start": 1120.62,
+    "duration": 3.84,
+    "text": "if this guy needs to look like this it"
+  },
+  {
+    "start": 1122.9,
+    "duration": 3.48,
+    "text": "means that puts need to get way more"
+  },
+  {
+    "start": 1124.46,
+    "duration": 3.42,
+    "text": "expensive calls need to stay around the"
+  },
+  {
+    "start": 1126.38,
+    "duration": 4.14,
+    "text": "same and at the money balls need to come"
+  },
+  {
+    "start": 1127.88,
+    "duration": 4.26,
+    "text": "down yeah um and that means that we get"
+  },
+  {
+    "start": 1130.52,
+    "duration": 4.019,
+    "text": "fixed suppression which is exactly what"
+  },
+  {
+    "start": 1132.14,
+    "duration": 4.56,
+    "text": "we got and then that actually enforces"
+  },
+  {
+    "start": 1134.539,
+    "duration": 3.961,
+    "text": "uh College share buying which is what"
+  },
+  {
+    "start": 1136.7,
+    "duration": 3.9,
+    "text": "pushes us all the way up and so talk"
+  },
+  {
+    "start": 1138.5,
+    "duration": 4.44,
+    "text": "about how the SKU"
+  },
+  {
+    "start": 1140.6,
+    "duration": 4.26,
+    "text": "is going to come down and it's going to"
+  },
+  {
+    "start": 1142.94,
+    "duration": 3.9,
+    "text": "normalize with the rest of them too"
+  },
+  {
+    "start": 1144.86,
+    "duration": 4.679,
+    "text": "right so like that's where you get you"
+  },
+  {
+    "start": 1146.84,
+    "duration": 5.16,
+    "text": "know your extremely high IV right now"
+  },
+  {
+    "start": 1149.539,
+    "duration": 4.281,
+    "text": "versus the rest of the expiries so that"
+  },
+  {
+    "start": 1152.0,
+    "duration": 4.559,
+    "text": "entire SKU is going to shift lower"
+  },
+  {
+    "start": 1153.82,
+    "duration": 4.359,
+    "text": "exactly yeah and so it's almost like"
+  },
+  {
+    "start": 1156.559,
+    "duration": 3.901,
+    "text": "from a visual perspective you have to"
+  },
+  {
+    "start": 1158.179,
+    "duration": 3.841,
+    "text": "imagine that that in the passage of time"
+  },
+  {
+    "start": 1160.46,
+    "duration": 3.599,
+    "text": "and this is something that will kind of"
+  },
+  {
+    "start": 1162.02,
+    "duration": 4.44,
+    "text": "be able to see with um our last couple"
+  },
+  {
+    "start": 1164.059,
+    "duration": 4.321,
+    "text": "slides or whatever but with the passage"
+  },
+  {
+    "start": 1166.46,
+    "duration": 5.16,
+    "text": "of time this guy just has to actually"
+  },
+  {
+    "start": 1168.38,
+    "duration": 6.74,
+    "text": "mold itself and blend into these it has"
+  },
+  {
+    "start": 1171.62,
+    "duration": 3.5,
+    "text": "to almost fade away right"
+  },
+  {
+    "start": 1175.76,
+    "duration": 4.26,
+    "text": "um Let me let me fast forward to fomc"
+  },
+  {
+    "start": 1178.1,
+    "duration": 3.3,
+    "text": "because these aren't as important I was"
+  },
+  {
+    "start": 1180.02,
+    "duration": 3.0,
+    "text": "just filling in the gaps for the rest of"
+  },
+  {
+    "start": 1181.4,
+    "duration": 3.84,
+    "text": "the month here"
+  },
+  {
+    "start": 1183.02,
+    "duration": 4.38,
+    "text": "um you know 15th we get we get back to a"
+  },
+  {
+    "start": 1185.24,
+    "duration": 4.319,
+    "text": "normal SQ or around here"
+  },
+  {
+    "start": 1187.4,
+    "duration": 5.04,
+    "text": "um and then this is what was this"
+  },
+  {
+    "start": 1189.559,
+    "duration": 4.5,
+    "text": "this is the 26th we're gonna go to the"
+  },
+  {
+    "start": 1192.44,
+    "duration": 4.739,
+    "text": "beginning of this week which is the 31st"
+  },
+  {
+    "start": 1194.059,
+    "duration": 5.101,
+    "text": "uh Halloween Monday of this week this"
+  },
+  {
+    "start": 1197.179,
+    "duration": 3.301,
+    "text": "past week and that's what we were"
+  },
+  {
+    "start": 1199.16,
+    "duration": 3.18,
+    "text": "looking like on Monday this past week"
+  },
+  {
+    "start": 1200.48,
+    "duration": 3.66,
+    "text": "and so as you can kind of see right it's"
+  },
+  {
+    "start": 1202.34,
+    "duration": 3.839,
+    "text": "like pretty normal in the sense that"
+  },
+  {
+    "start": 1204.14,
+    "duration": 3.48,
+    "text": "it's not unlike the first chart that we"
+  },
+  {
+    "start": 1206.179,
+    "duration": 4.86,
+    "text": "were looking at which is this guy but"
+  },
+  {
+    "start": 1207.62,
+    "duration": 5.28,
+    "text": "it's a lot flatter it's a lot flatter"
+  },
+  {
+    "start": 1211.039,
+    "duration": 3.741,
+    "text": "um I don't know what that means what"
+  },
+  {
+    "start": 1212.9,
+    "duration": 6.18,
+    "text": "does it mean for it to me"
+  },
+  {
+    "start": 1214.78,
+    "duration": 6.46,
+    "text": "if it's flatter I always think of as uh"
+  },
+  {
+    "start": 1219.08,
+    "duration": 6.18,
+    "text": "essentially participants"
+  },
+  {
+    "start": 1221.24,
+    "duration": 7.86,
+    "text": "they're either not not as hedged"
+  },
+  {
+    "start": 1225.26,
+    "duration": 6.539,
+    "text": "because they're maybe a little unsure"
+  },
+  {
+    "start": 1229.1,
+    "duration": 4.199,
+    "text": "and so that's that's what I always think"
+  },
+  {
+    "start": 1231.799,
+    "duration": 3.901,
+    "text": "of they're not really driving for"
+  },
+  {
+    "start": 1233.299,
+    "duration": 3.901,
+    "text": "protection they're not really hedged but"
+  },
+  {
+    "start": 1235.7,
+    "duration": 3.0,
+    "text": "they're also not really buying a bunch"
+  },
+  {
+    "start": 1237.2,
+    "duration": 4.38,
+    "text": "of calls either"
+  },
+  {
+    "start": 1238.7,
+    "duration": 4.859,
+    "text": "and so I would say when I see a flat"
+  },
+  {
+    "start": 1241.58,
+    "duration": 4.14,
+    "text": "like that I just wait for I'm waiting"
+  },
+  {
+    "start": 1243.559,
+    "duration": 3.841,
+    "text": "for something to happen yeah nothing"
+  },
+  {
+    "start": 1245.72,
+    "duration": 3.66,
+    "text": "nothing's happening here yet and so this"
+  },
+  {
+    "start": 1247.4,
+    "duration": 3.54,
+    "text": "was the beginning of the day on Monday"
+  },
+  {
+    "start": 1249.38,
+    "duration": 3.659,
+    "text": "of this week right and this whole week"
+  },
+  {
+    "start": 1250.94,
+    "duration": 4.8,
+    "text": "for context is about preparing for the"
+  },
+  {
+    "start": 1253.039,
+    "duration": 5.461,
+    "text": "fomc on Wednesday which was November 2nd"
+  },
+  {
+    "start": 1255.74,
+    "duration": 4.559,
+    "text": "let's see where's where's it on the"
+  },
+  {
+    "start": 1258.5,
+    "duration": 2.82,
+    "text": "chart here which is Wednesday here on"
+  },
+  {
+    "start": 1260.299,
+    "duration": 4.801,
+    "text": "the left side"
+  },
+  {
+    "start": 1261.32,
+    "duration": 7.739,
+    "text": "um so this is 10 31 which was right here"
+  },
+  {
+    "start": 1265.1,
+    "duration": 6.06,
+    "text": "it was this doji up here yep and is this"
+  },
+  {
+    "start": 1269.059,
+    "duration": 4.441,
+    "text": "uh what time of day was this one so this"
+  },
+  {
+    "start": 1271.16,
+    "duration": 4.019,
+    "text": "is 9 26 and over the course of Monday"
+  },
+  {
+    "start": 1273.5,
+    "duration": 3.48,
+    "text": "what was happening is people were"
+  },
+  {
+    "start": 1275.179,
+    "duration": 4.62,
+    "text": "getting positioned and that's why this"
+  },
+  {
+    "start": 1276.98,
+    "duration": 5.4,
+    "text": "is actually also Monday yep"
+  },
+  {
+    "start": 1279.799,
+    "duration": 4.921,
+    "text": "uh yeah isn't that crazy that's a huge"
+  },
+  {
+    "start": 1282.38,
+    "duration": 3.36,
+    "text": "shift and it's just intraday entered a"
+  },
+  {
+    "start": 1284.72,
+    "duration": 4.02,
+    "text": "huge shift"
+  },
+  {
+    "start": 1285.74,
+    "duration": 4.5,
+    "text": "and look at the skew so so go go back to"
+  },
+  {
+    "start": 1288.74,
+    "duration": 4.14,
+    "text": "the previous one there"
+  },
+  {
+    "start": 1290.24,
+    "duration": 4.08,
+    "text": "is that excuse this was run at 9 26 so"
+  },
+  {
+    "start": 1292.88,
+    "duration": 4.5,
+    "text": "that was like right before the open for"
+  },
+  {
+    "start": 1294.32,
+    "duration": 4.5,
+    "text": "you correct yeah okay and is that our"
+  },
+  {
+    "start": 1297.38,
+    "duration": 3.86,
+    "text": "expiry down there at the very bottom"
+  },
+  {
+    "start": 1298.82,
+    "duration": 5.04,
+    "text": "around 17.5"
+  },
+  {
+    "start": 1301.24,
+    "duration": 5.38,
+    "text": "uh excuse me that's the day before so"
+  },
+  {
+    "start": 1303.86,
+    "duration": 5.4,
+    "text": "okay it's still showing the day before"
+  },
+  {
+    "start": 1306.62,
+    "duration": 4.08,
+    "text": "right yeah showing the Friday okay we"
+  },
+  {
+    "start": 1309.26,
+    "duration": 3.6,
+    "text": "should just ignore this guy right yeah"
+  },
+  {
+    "start": 1310.7,
+    "duration": 4.32,
+    "text": "ignore that one so okay perfect so our"
+  },
+  {
+    "start": 1312.86,
+    "duration": 5.04,
+    "text": "actual expiry"
+  },
+  {
+    "start": 1315.02,
+    "duration": 4.68,
+    "text": "is matched up"
+  },
+  {
+    "start": 1317.9,
+    "duration": 3.54,
+    "text": "so this is end of day"
+  },
+  {
+    "start": 1319.7,
+    "duration": 3.599,
+    "text": "this is no not even because we're"
+  },
+  {
+    "start": 1321.44,
+    "duration": 5.219,
+    "text": "pulling it a lot in today this is just 9"
+  },
+  {
+    "start": 1323.299,
+    "duration": 6.12,
+    "text": "47 right so this is 50. okay so huge"
+  },
+  {
+    "start": 1326.659,
+    "duration": 5.461,
+    "text": "shift here look at the one previous"
+  },
+  {
+    "start": 1329.419,
+    "duration": 4.26,
+    "text": "look at the one free that you ran at 926"
+  },
+  {
+    "start": 1332.12,
+    "duration": 5.28,
+    "text": "yeah"
+  },
+  {
+    "start": 1333.679,
+    "duration": 7.441,
+    "text": "where's our expiry here uh November 2nd"
+  },
+  {
+    "start": 1337.4,
+    "duration": 6.72,
+    "text": "which one is ours it should be uh this"
+  },
+  {
+    "start": 1341.12,
+    "duration": 5.46,
+    "text": "guy right here all right sorry you know"
+  },
+  {
+    "start": 1344.12,
+    "duration": 4.08,
+    "text": "what's interesting is that this IV is"
+  },
+  {
+    "start": 1346.58,
+    "duration": 4.02,
+    "text": "it's normalized like you were saying"
+  },
+  {
+    "start": 1348.2,
+    "duration": 4.68,
+    "text": "before it has come back into sort of its"
+  },
+  {
+    "start": 1350.6,
+    "duration": 5.22,
+    "text": "band here into the you know the normal"
+  },
+  {
+    "start": 1352.88,
+    "duration": 5.12,
+    "text": "distribution yeah there's hv20 right"
+  },
+  {
+    "start": 1355.82,
+    "duration": 2.18,
+    "text": "here"
+  },
+  {
+    "start": 1358.64,
+    "duration": 4.2,
+    "text": "yeah yeah and all of them are in there"
+  },
+  {
+    "start": 1360.98,
+    "duration": 3.12,
+    "text": "so you're going okay the market is just"
+  },
+  {
+    "start": 1362.84,
+    "duration": 3.54,
+    "text": "kind of chilling it's kind of"
+  },
+  {
+    "start": 1364.1,
+    "duration": 3.6,
+    "text": "equilibrium uh that's kind of what I'd"
+  },
+  {
+    "start": 1366.38,
+    "duration": 2.82,
+    "text": "be thinking and then go to the next one"
+  },
+  {
+    "start": 1367.7,
+    "duration": 3.979,
+    "text": "this was like what 20 minutes later"
+  },
+  {
+    "start": 1369.2,
+    "duration": 4.979,
+    "text": "right into the open"
+  },
+  {
+    "start": 1371.679,
+    "duration": 4.0,
+    "text": "and people were hammering like I would"
+  },
+  {
+    "start": 1374.179,
+    "duration": 4.401,
+    "text": "just think people are hammering calls"
+  },
+  {
+    "start": 1375.679,
+    "duration": 5.221,
+    "text": "here exactly every they were like"
+  },
+  {
+    "start": 1378.58,
+    "duration": 5.86,
+    "text": "hammering them because even the other"
+  },
+  {
+    "start": 1380.9,
+    "duration": 5.58,
+    "text": "skus even going way out uh you know just"
+  },
+  {
+    "start": 1384.44,
+    "duration": 4.52,
+    "text": "the way the smirk looks compared to what"
+  },
+  {
+    "start": 1386.48,
+    "duration": 4.98,
+    "text": "you would normally see in a bear Market"
+  },
+  {
+    "start": 1388.96,
+    "duration": 5.26,
+    "text": "it's sort of Leaning for bullish here"
+  },
+  {
+    "start": 1391.46,
+    "duration": 4.62,
+    "text": "like really a lot yeah and"
+  },
+  {
+    "start": 1394.22,
+    "duration": 4.68,
+    "text": "I would get nervous here like I'm going"
+  },
+  {
+    "start": 1396.08,
+    "duration": 5.18,
+    "text": "to somewhere at the top like in my"
+  },
+  {
+    "start": 1398.9,
+    "duration": 4.5,
+    "text": "opinion that's what I'm thinking"
+  },
+  {
+    "start": 1401.26,
+    "duration": 3.88,
+    "text": "and I mean let's let's break that down"
+  },
+  {
+    "start": 1403.4,
+    "duration": 3.18,
+    "text": "because this is all useful things we're"
+  },
+  {
+    "start": 1405.14,
+    "duration": 3.779,
+    "text": "gonna we're gonna go and interpret the"
+  },
+  {
+    "start": 1406.58,
+    "duration": 3.42,
+    "text": "actual fomc SKU and so there are two"
+  },
+  {
+    "start": 1408.919,
+    "duration": 3.961,
+    "text": "things that you said there that seemed"
+  },
+  {
+    "start": 1410.0,
+    "duration": 4.14,
+    "text": "really uh useful to me and important one"
+  },
+  {
+    "start": 1412.88,
+    "duration": 3.0,
+    "text": "is you look at this and you think"
+  },
+  {
+    "start": 1414.14,
+    "duration": 2.88,
+    "text": "they're hammering calls why they're"
+  },
+  {
+    "start": 1415.88,
+    "duration": 3.12,
+    "text": "buying a lot of calls that's going to"
+  },
+  {
+    "start": 1417.02,
+    "duration": 4.2,
+    "text": "make the price of the calls go up which"
+  },
+  {
+    "start": 1419.0,
+    "duration": 4.02,
+    "text": "is going to increase the volatility"
+  },
+  {
+    "start": 1421.22,
+    "duration": 3.3,
+    "text": "that's implied at the calls right that's"
+  },
+  {
+    "start": 1423.02,
+    "duration": 3.72,
+    "text": "what you see"
+  },
+  {
+    "start": 1424.52,
+    "duration": 4.019,
+    "text": "um but your Trader mind isn't thinking"
+  },
+  {
+    "start": 1426.74,
+    "duration": 4.02,
+    "text": "oh they're hammering calls we got to go"
+  },
+  {
+    "start": 1428.539,
+    "duration": 3.601,
+    "text": "up that's not what we're thinking what"
+  },
+  {
+    "start": 1430.76,
+    "duration": 3.419,
+    "text": "we're thinking is"
+  },
+  {
+    "start": 1432.14,
+    "duration": 3.96,
+    "text": "what would happen if we were to go down"
+  },
+  {
+    "start": 1434.179,
+    "duration": 4.681,
+    "text": "puts are getting so cheap right now"
+  },
+  {
+    "start": 1436.1,
+    "duration": 3.9,
+    "text": "relative to calls exactly that's a"
+  },
+  {
+    "start": 1438.86,
+    "duration": 2.88,
+    "text": "problem"
+  },
+  {
+    "start": 1440.0,
+    "duration": 3.539,
+    "text": "well you got to think of it like the"
+  },
+  {
+    "start": 1441.74,
+    "duration": 3.6,
+    "text": "normal Trader that likes to trade"
+  },
+  {
+    "start": 1443.539,
+    "duration": 4.441,
+    "text": "reversals which is sort of like an"
+  },
+  {
+    "start": 1445.34,
+    "duration": 4.02,
+    "text": "options Trader in general you want to"
+  },
+  {
+    "start": 1447.98,
+    "duration": 3.66,
+    "text": "for the most part you're trying to get a"
+  },
+  {
+    "start": 1449.36,
+    "duration": 3.059,
+    "text": "good bet for your money and this is"
+  },
+  {
+    "start": 1451.64,
+    "duration": 3.84,
+    "text": "something"
+  },
+  {
+    "start": 1452.419,
+    "duration": 5.101,
+    "text": "that jam croissant taught me a lot is"
+  },
+  {
+    "start": 1455.48,
+    "duration": 4.26,
+    "text": "just like you know just listening to his"
+  },
+  {
+    "start": 1457.52,
+    "duration": 4.92,
+    "text": "podcast was buy the buy the Tails when"
+  },
+  {
+    "start": 1459.74,
+    "duration": 4.2,
+    "text": "they're cheap you know and own the Tails"
+  },
+  {
+    "start": 1462.44,
+    "duration": 4.739,
+    "text": "like you don't want to be owning calls"
+  },
+  {
+    "start": 1463.94,
+    "duration": 5.46,
+    "text": "here into 45 IV when"
+  },
+  {
+    "start": 1467.179,
+    "duration": 4.98,
+    "text": "you know 98 days out"
+  },
+  {
+    "start": 1469.4,
+    "duration": 4.08,
+    "text": "the IV is basically down around 25 Also"
+  },
+  {
+    "start": 1472.159,
+    "duration": 4.321,
+    "text": "let's let's talk about this in context"
+  },
+  {
+    "start": 1473.48,
+    "duration": 4.5,
+    "text": "45 IV on those calls and you're I think"
+  },
+  {
+    "start": 1476.48,
+    "duration": 5.4,
+    "text": "at this point we had a vix that was"
+  },
+  {
+    "start": 1477.98,
+    "duration": 7.02,
+    "text": "around I mean what like 27 I think yeah"
+  },
+  {
+    "start": 1481.88,
+    "duration": 5.46,
+    "text": "something like that so yeah the premium"
+  },
+  {
+    "start": 1485.0,
+    "duration": 4.38,
+    "text": "that you're paying on and also IV is"
+  },
+  {
+    "start": 1487.34,
+    "duration": 3.9,
+    "text": "generally higher than a historical of"
+  },
+  {
+    "start": 1489.38,
+    "duration": 3.659,
+    "text": "all or realized of all so yeah you're"
+  },
+  {
+    "start": 1491.24,
+    "duration": 3.54,
+    "text": "paying a premium upon a premium upon a"
+  },
+  {
+    "start": 1493.039,
+    "duration": 3.241,
+    "text": "premium just to buy those calls and look"
+  },
+  {
+    "start": 1494.78,
+    "duration": 3.0,
+    "text": "where the price is this is what I always"
+  },
+  {
+    "start": 1496.28,
+    "duration": 3.6,
+    "text": "wanted this is where you're trying to"
+  },
+  {
+    "start": 1497.78,
+    "duration": 4.8,
+    "text": "identify where the fomo is happening"
+  },
+  {
+    "start": 1499.88,
+    "duration": 5.64,
+    "text": "look where Price is Right Now on the"
+  },
+  {
+    "start": 1502.58,
+    "duration": 6.42,
+    "text": "chart on the price chart it's at three"
+  },
+  {
+    "start": 1505.52,
+    "duration": 5.18,
+    "text": "nine like 385 390 is where they opened"
+  },
+  {
+    "start": 1509.0,
+    "duration": 6.38,
+    "text": "up and then reversed it"
+  },
+  {
+    "start": 1510.7,
+    "duration": 7.359,
+    "text": "386.73 yeah yeah so folks in general"
+  },
+  {
+    "start": 1515.38,
+    "duration": 6.039,
+    "text": "this doesn't look like there's funds"
+  },
+  {
+    "start": 1518.059,
+    "duration": 5.821,
+    "text": "trying to break us higher to 400 here"
+  },
+  {
+    "start": 1521.419,
+    "duration": 4.081,
+    "text": "it looks like it looks like fomo to me"
+  },
+  {
+    "start": 1523.88,
+    "duration": 3.12,
+    "text": "like people are trying to play for that"
+  },
+  {
+    "start": 1525.5,
+    "duration": 3.0,
+    "text": "that 400"
+  },
+  {
+    "start": 1527.0,
+    "duration": 3.779,
+    "text": "well here's here's another way to"
+  },
+  {
+    "start": 1528.5,
+    "duration": 3.659,
+    "text": "understand that this expiry looks like"
+  },
+  {
+    "start": 1530.779,
+    "duration": 3.541,
+    "text": "this what do the other guys look like"
+  },
+  {
+    "start": 1532.159,
+    "duration": 3.721,
+    "text": "yep"
+  },
+  {
+    "start": 1534.32,
+    "duration": 4.44,
+    "text": "yeah so if you look at this you're going"
+  },
+  {
+    "start": 1535.88,
+    "duration": 4.14,
+    "text": "this isn't a normal investment SKU this"
+  },
+  {
+    "start": 1538.76,
+    "duration": 4.86,
+    "text": "is just kind of"
+  },
+  {
+    "start": 1540.02,
+    "duration": 5.88,
+    "text": "this thing is so dislocated and"
+  },
+  {
+    "start": 1543.62,
+    "duration": 4.74,
+    "text": "and so like in the chat always be like"
+  },
+  {
+    "start": 1545.9,
+    "duration": 4.68,
+    "text": "yeah I don't like the skin here you know"
+  },
+  {
+    "start": 1548.36,
+    "duration": 5.04,
+    "text": "because it just looks it just looks bad"
+  },
+  {
+    "start": 1550.58,
+    "duration": 4.26,
+    "text": "it doesn't look normal and uh are you"
+  },
+  {
+    "start": 1553.4,
+    "duration": 4.399,
+    "text": "ready for what happens next I think this"
+  },
+  {
+    "start": 1554.84,
+    "duration": 6.48,
+    "text": "is a good time yep boom"
+  },
+  {
+    "start": 1557.799,
+    "duration": 5.801,
+    "text": "yeah so there you go and and what time"
+  },
+  {
+    "start": 1561.32,
+    "duration": 4.38,
+    "text": "was that run yeah so this is still early"
+  },
+  {
+    "start": 1563.6,
+    "duration": 3.6,
+    "text": "this is 2 p.m on that same day right and"
+  },
+  {
+    "start": 1565.7,
+    "duration": 3.18,
+    "text": "this is still in the doji day right so"
+  },
+  {
+    "start": 1567.2,
+    "duration": 3.479,
+    "text": "we're not or wait this is yeah this is"
+  },
+  {
+    "start": 1568.88,
+    "duration": 3.299,
+    "text": "the dojo day so nothing's happening we"
+  },
+  {
+    "start": 1570.679,
+    "duration": 4.38,
+    "text": "still have that mad SKU but remember"
+  },
+  {
+    "start": 1572.179,
+    "duration": 4.801,
+    "text": "that was at 45 IV and think about"
+  },
+  {
+    "start": 1575.059,
+    "duration": 4.561,
+    "text": "wearing this little check mark is it's"
+  },
+  {
+    "start": 1576.98,
+    "duration": 5.579,
+    "text": "down at 34 ID so you just lost 10 points"
+  },
+  {
+    "start": 1579.62,
+    "duration": 5.1,
+    "text": "of all on those guys and so you see what"
+  },
+  {
+    "start": 1582.559,
+    "duration": 5.1,
+    "text": "happens is that folks they're they're"
+  },
+  {
+    "start": 1584.72,
+    "duration": 5.339,
+    "text": "buying these crazy crazy calls at"
+  },
+  {
+    "start": 1587.659,
+    "duration": 3.541,
+    "text": "extreme elevation and you everybody's"
+  },
+  {
+    "start": 1590.059,
+    "duration": 3.661,
+    "text": "done it you know when you first start"
+  },
+  {
+    "start": 1591.2,
+    "duration": 3.959,
+    "text": "trading you don't know any better so you"
+  },
+  {
+    "start": 1593.72,
+    "duration": 4.02,
+    "text": "you know you just think the price is"
+  },
+  {
+    "start": 1595.159,
+    "duration": 5.161,
+    "text": "going to keep going up keep going up and"
+  },
+  {
+    "start": 1597.74,
+    "duration": 3.96,
+    "text": "even if it stays where it's at you just"
+  },
+  {
+    "start": 1600.32,
+    "duration": 4.459,
+    "text": "lost money"
+  },
+  {
+    "start": 1601.7,
+    "duration": 6.66,
+    "text": "exactly and it's so fast"
+  },
+  {
+    "start": 1604.779,
+    "duration": 5.441,
+    "text": "yeah and so the normal Trader is going"
+  },
+  {
+    "start": 1608.36,
+    "duration": 5.64,
+    "text": "well you know the best bet here is just"
+  },
+  {
+    "start": 1610.22,
+    "duration": 5.939,
+    "text": "to sell you the call right because even"
+  },
+  {
+    "start": 1614.0,
+    "duration": 3.84,
+    "text": "if it stays here"
+  },
+  {
+    "start": 1616.159,
+    "duration": 3.721,
+    "text": "you know you're going to catch 20 points"
+  },
+  {
+    "start": 1617.84,
+    "duration": 3.959,
+    "text": "on the IV"
+  },
+  {
+    "start": 1619.88,
+    "duration": 4.2,
+    "text": "exactly yeah"
+  },
+  {
+    "start": 1621.799,
+    "duration": 3.48,
+    "text": "it's just like unless it's just the most"
+  },
+  {
+    "start": 1624.08,
+    "duration": 4.38,
+    "text": "insane"
+  },
+  {
+    "start": 1625.279,
+    "duration": 4.5,
+    "text": "most insane Catalyst of all time uh"
+  },
+  {
+    "start": 1628.46,
+    "duration": 3.66,
+    "text": "about to come which is like it never"
+  },
+  {
+    "start": 1629.779,
+    "duration": 4.621,
+    "text": "happens dude I mean this is this is an"
+  },
+  {
+    "start": 1632.12,
+    "duration": 4.919,
+    "text": "easy calendar trade so you just you sell"
+  },
+  {
+    "start": 1634.4,
+    "duration": 4.98,
+    "text": "this call and you buy this guy yeah um"
+  },
+  {
+    "start": 1637.039,
+    "duration": 4.38,
+    "text": "and it doesn't cost you very much and"
+  },
+  {
+    "start": 1639.38,
+    "duration": 4.02,
+    "text": "like and that's what people do that's"
+  },
+  {
+    "start": 1641.419,
+    "duration": 5.281,
+    "text": "what people do especially in a liquid"
+  },
+  {
+    "start": 1643.4,
+    "duration": 4.98,
+    "text": "index like like a spy you know you're"
+  },
+  {
+    "start": 1646.7,
+    "duration": 5.88,
+    "text": "gonna have all the Traders looking at"
+  },
+  {
+    "start": 1648.38,
+    "duration": 5.64,
+    "text": "the SKU structure and the Smart Ones the"
+  },
+  {
+    "start": 1652.58,
+    "duration": 2.88,
+    "text": "ones that you don't really want to bet"
+  },
+  {
+    "start": 1654.02,
+    "duration": 2.639,
+    "text": "against because they're putting the odds"
+  },
+  {
+    "start": 1655.46,
+    "duration": 3.42,
+    "text": "in their favor"
+  },
+  {
+    "start": 1656.659,
+    "duration": 4.02,
+    "text": "that you don't want to be you don't want"
+  },
+  {
+    "start": 1658.88,
+    "duration": 3.539,
+    "text": "to be trying to buy those those calls"
+  },
+  {
+    "start": 1660.679,
+    "duration": 3.0,
+    "text": "into that and so if you're not going to"
+  },
+  {
+    "start": 1662.419,
+    "duration": 2.701,
+    "text": "buy into it either you're going to do"
+  },
+  {
+    "start": 1663.679,
+    "duration": 4.021,
+    "text": "what you're going to sit there or you're"
+  },
+  {
+    "start": 1665.12,
+    "duration": 4.62,
+    "text": "going to sell sell the call"
+  },
+  {
+    "start": 1667.7,
+    "duration": 4.38,
+    "text": "this is where we want to start this is"
+  },
+  {
+    "start": 1669.74,
+    "duration": 4.98,
+    "text": "this is how we opened on the day of FOC"
+  },
+  {
+    "start": 1672.08,
+    "duration": 4.5,
+    "text": "so let's just do fomc now"
+  },
+  {
+    "start": 1674.72,
+    "duration": 3.72,
+    "text": "um and I have these are super granular I"
+  },
+  {
+    "start": 1676.58,
+    "duration": 3.54,
+    "text": "have like one for every hour basically"
+  },
+  {
+    "start": 1678.44,
+    "duration": 2.82,
+    "text": "of the day might not be laptopuric I'm"
+  },
+  {
+    "start": 1680.12,
+    "duration": 3.72,
+    "text": "trying to think what the actual word is"
+  },
+  {
+    "start": 1681.26,
+    "duration": 3.419,
+    "text": "but yeah keep going sorry"
+  },
+  {
+    "start": 1683.84,
+    "duration": 4.199,
+    "text": "um"
+  },
+  {
+    "start": 1684.679,
+    "duration": 5.401,
+    "text": "yeah so uh you can see here pretty"
+  },
+  {
+    "start": 1688.039,
+    "duration": 4.861,
+    "text": "clearly because we're hitting the actual"
+  },
+  {
+    "start": 1690.08,
+    "duration": 4.5,
+    "text": "day of FMC we have the hump on the most"
+  },
+  {
+    "start": 1692.9,
+    "duration": 3.54,
+    "text": "recent X3 and then everything else is"
+  },
+  {
+    "start": 1694.58,
+    "duration": 3.66,
+    "text": "kind of flat because nobody knows what"
+  },
+  {
+    "start": 1696.44,
+    "duration": 3.3,
+    "text": "to expect on the other ones and then we"
+  },
+  {
+    "start": 1698.24,
+    "duration": 4.26,
+    "text": "have that same ball structure that we"
+  },
+  {
+    "start": 1699.74,
+    "duration": 3.84,
+    "text": "just discussed for CPI"
+  },
+  {
+    "start": 1702.5,
+    "duration": 4.08,
+    "text": "um"
+  },
+  {
+    "start": 1703.58,
+    "duration": 4.32,
+    "text": "so yeah yeah look at that IV man I mean"
+  },
+  {
+    "start": 1706.58,
+    "duration": 2.64,
+    "text": "if you're if you're sitting here with"
+  },
+  {
+    "start": 1707.9,
+    "duration": 3.24,
+    "text": "this"
+  },
+  {
+    "start": 1709.22,
+    "duration": 4.02,
+    "text": "you can essentially"
+  },
+  {
+    "start": 1711.14,
+    "duration": 4.68,
+    "text": "almost guarantee you're gonna make money"
+  },
+  {
+    "start": 1713.24,
+    "duration": 3.78,
+    "text": "if you just if you if you just buy one"
+  },
+  {
+    "start": 1715.82,
+    "duration": 2.94,
+    "text": "of the tails"
+  },
+  {
+    "start": 1717.02,
+    "duration": 5.759,
+    "text": "right correct yeah"
+  },
+  {
+    "start": 1718.76,
+    "duration": 5.76,
+    "text": "yeah and it's so it it's either that or"
+  },
+  {
+    "start": 1722.779,
+    "duration": 4.38,
+    "text": "almost no matter what you could just"
+  },
+  {
+    "start": 1724.52,
+    "duration": 5.519,
+    "text": "sell the middle right"
+  },
+  {
+    "start": 1727.159,
+    "duration": 5.4,
+    "text": "you could yeah you can I mean if you're"
+  },
+  {
+    "start": 1730.039,
+    "duration": 3.721,
+    "text": "you could have sold basically the issue"
+  },
+  {
+    "start": 1732.559,
+    "duration": 2.881,
+    "text": "with these sorts of events is that"
+  },
+  {
+    "start": 1733.76,
+    "duration": 3.24,
+    "text": "there's so much whip song right you"
+  },
+  {
+    "start": 1735.44,
+    "duration": 3.3,
+    "text": "could buy anything or sell anything and"
+  },
+  {
+    "start": 1737.0,
+    "duration": 4.799,
+    "text": "make money on it if your timing is good"
+  },
+  {
+    "start": 1738.74,
+    "duration": 4.679,
+    "text": "and if your timing is wrong uh the you"
+  },
+  {
+    "start": 1741.799,
+    "duration": 4.021,
+    "text": "know the converse is true"
+  },
+  {
+    "start": 1743.419,
+    "duration": 5.521,
+    "text": "well the timing is really just in into"
+  },
+  {
+    "start": 1745.82,
+    "duration": 4.68,
+    "text": "the event right there's a on fomc"
+  },
+  {
+    "start": 1748.94,
+    "duration": 4.02,
+    "text": "there's the one o'clock event and then"
+  },
+  {
+    "start": 1750.5,
+    "duration": 6.0,
+    "text": "there's the 1 30 event when pal comes"
+  },
+  {
+    "start": 1752.96,
+    "duration": 6.12,
+    "text": "out yes for CST and then uh for uh EST"
+  },
+  {
+    "start": 1756.5,
+    "duration": 4.5,
+    "text": "people uh 2 p.m and 2 30. right that's"
+  },
+  {
+    "start": 1759.08,
+    "duration": 4.38,
+    "text": "CST yep"
+  },
+  {
+    "start": 1761.0,
+    "duration": 4.2,
+    "text": "and so that's your that's your timing"
+  },
+  {
+    "start": 1763.46,
+    "duration": 3.18,
+    "text": "and then so you don't have to really"
+  },
+  {
+    "start": 1765.2,
+    "duration": 2.88,
+    "text": "worry about the timing you already know"
+  },
+  {
+    "start": 1766.64,
+    "duration": 3.18,
+    "text": "that"
+  },
+  {
+    "start": 1768.08,
+    "duration": 3.479,
+    "text": "that's all these volts are gonna stay"
+  },
+  {
+    "start": 1769.82,
+    "duration": 3.78,
+    "text": "elevated I guess I guess what I meant is"
+  },
+  {
+    "start": 1771.559,
+    "duration": 3.48,
+    "text": "like positioning right because I I mean"
+  },
+  {
+    "start": 1773.6,
+    "duration": 3.299,
+    "text": "you could have made money off of both"
+  },
+  {
+    "start": 1775.039,
+    "duration": 4.02,
+    "text": "Tails if you bought and sold them at the"
+  },
+  {
+    "start": 1776.899,
+    "duration": 4.621,
+    "text": "right time because we got"
+  },
+  {
+    "start": 1779.059,
+    "duration": 5.34,
+    "text": "um I think we under realized uh uh"
+  },
+  {
+    "start": 1781.52,
+    "duration": 6.3,
+    "text": "versus implied uh last time I looked on"
+  },
+  {
+    "start": 1784.399,
+    "duration": 5.16,
+    "text": "for um what do you mean by that I mean"
+  },
+  {
+    "start": 1787.82,
+    "duration": 3.42,
+    "text": "that the options Market was implying a"
+  },
+  {
+    "start": 1789.559,
+    "duration": 3.961,
+    "text": "larger move than we actually got right"
+  },
+  {
+    "start": 1791.24,
+    "duration": 5.22,
+    "text": "yeah so and that's usually what happens"
+  },
+  {
+    "start": 1793.52,
+    "duration": 4.92,
+    "text": "right yeah isn't there always uh there's"
+  },
+  {
+    "start": 1796.46,
+    "duration": 3.48,
+    "text": "usually you know options Market that's"
+  },
+  {
+    "start": 1798.44,
+    "duration": 3.839,
+    "text": "why the implied ball is always higher"
+  },
+  {
+    "start": 1799.94,
+    "duration": 4.02,
+    "text": "than the historical because you know"
+  },
+  {
+    "start": 1802.279,
+    "duration": 4.681,
+    "text": "everybody's always expecting a bigger"
+  },
+  {
+    "start": 1803.96,
+    "duration": 5.099,
+    "text": "move than actually that actually occurs"
+  },
+  {
+    "start": 1806.96,
+    "duration": 4.68,
+    "text": "yeah I know that because I had a I"
+  },
+  {
+    "start": 1809.059,
+    "duration": 6.24,
+    "text": "remember having like 376 puts"
+  },
+  {
+    "start": 1811.64,
+    "duration": 6.539,
+    "text": "um that um you know I lost like"
+  },
+  {
+    "start": 1815.299,
+    "duration": 4.86,
+    "text": "10 cents on them or something like that"
+  },
+  {
+    "start": 1818.179,
+    "duration": 3.48,
+    "text": "um and so I was like okay clearly I"
+  },
+  {
+    "start": 1820.159,
+    "duration": 3.421,
+    "text": "overpaid for these"
+  },
+  {
+    "start": 1821.659,
+    "duration": 2.701,
+    "text": "um I don't remember when I was on them"
+  },
+  {
+    "start": 1823.58,
+    "duration": 1.5,
+    "text": "but"
+  },
+  {
+    "start": 1824.36,
+    "duration": 1.74,
+    "text": "um"
+  },
+  {
+    "start": 1825.08,
+    "duration": 2.459,
+    "text": "anyway"
+  },
+  {
+    "start": 1826.1,
+    "duration": 3.12,
+    "text": "um Let me let me move through these a"
+  },
+  {
+    "start": 1827.539,
+    "duration": 3.721,
+    "text": "little bit quickly because it was very"
+  },
+  {
+    "start": 1829.22,
+    "duration": 3.9,
+    "text": "cool to see how these this ski was"
+  },
+  {
+    "start": 1831.26,
+    "duration": 3.0,
+    "text": "changing over the course of that CPI day"
+  },
+  {
+    "start": 1833.12,
+    "duration": 2.46,
+    "text": "right"
+  },
+  {
+    "start": 1834.26,
+    "duration": 3.0,
+    "text": "um and I know you called it better than"
+  },
+  {
+    "start": 1835.58,
+    "duration": 3.24,
+    "text": "I did I was seeing I think something"
+  },
+  {
+    "start": 1837.26,
+    "duration": 3.36,
+    "text": "different than you were seeing so"
+  },
+  {
+    "start": 1838.82,
+    "duration": 4.56,
+    "text": "that'll be interesting yeah what do you"
+  },
+  {
+    "start": 1840.62,
+    "duration": 4.74,
+    "text": "mean by that okay so"
+  },
+  {
+    "start": 1843.38,
+    "duration": 4.2,
+    "text": "um I'm gonna go through them"
+  },
+  {
+    "start": 1845.36,
+    "duration": 4.319,
+    "text": "[Music]"
+  },
+  {
+    "start": 1847.58,
+    "duration": 3.599,
+    "text": "okay that's that's where I started to"
+  },
+  {
+    "start": 1849.679,
+    "duration": 3.181,
+    "text": "see something"
+  },
+  {
+    "start": 1851.179,
+    "duration": 3.0,
+    "text": "you see how it's turning into that s"
+  },
+  {
+    "start": 1852.86,
+    "duration": 3.36,
+    "text": "shape"
+  },
+  {
+    "start": 1854.179,
+    "duration": 3.841,
+    "text": "it was an S shape here and then the S"
+  },
+  {
+    "start": 1856.22,
+    "duration": 4.02,
+    "text": "shape went away"
+  },
+  {
+    "start": 1858.02,
+    "duration": 5.039,
+    "text": "and then it"
+  },
+  {
+    "start": 1860.24,
+    "duration": 4.5,
+    "text": "came back ever so slightly and this was"
+  },
+  {
+    "start": 1863.059,
+    "duration": 5.041,
+    "text": "right before the event was I remember"
+  },
+  {
+    "start": 1864.74,
+    "duration": 5.88,
+    "text": "exactly this is this is 157 so for you"
+  },
+  {
+    "start": 1868.1,
+    "duration": 3.66,
+    "text": "that's uh whatever 1257 right right"
+  },
+  {
+    "start": 1870.62,
+    "duration": 3.539,
+    "text": "right"
+  },
+  {
+    "start": 1871.76,
+    "duration": 5.1,
+    "text": "um that's so it's so interesting how the"
+  },
+  {
+    "start": 1874.159,
+    "duration": 4.981,
+    "text": "market is flat right into it"
+  },
+  {
+    "start": 1876.86,
+    "duration": 4.08,
+    "text": "yeah and I was I I took this guy to be"
+  },
+  {
+    "start": 1879.14,
+    "duration": 3.899,
+    "text": "indicative I was like oh look at this"
+  },
+  {
+    "start": 1880.94,
+    "duration": 5.52,
+    "text": "and I wanted to trade for that pocket so"
+  },
+  {
+    "start": 1883.039,
+    "duration": 7.02,
+    "text": "I had an iron Condor set up to profit"
+  },
+  {
+    "start": 1886.46,
+    "duration": 5.939,
+    "text": "off of this little zone right here right"
+  },
+  {
+    "start": 1890.059,
+    "duration": 5.281,
+    "text": "um and then I once I saw this SKU I was"
+  },
+  {
+    "start": 1892.399,
+    "duration": 5.52,
+    "text": "like oh man it's gone I'm gonna be"
+  },
+  {
+    "start": 1895.34,
+    "duration": 4.14,
+    "text": "messed up and then I saw this one and"
+  },
+  {
+    "start": 1897.919,
+    "duration": 3.24,
+    "text": "that gave me which one that one gave me"
+  },
+  {
+    "start": 1899.48,
+    "duration": 4.199,
+    "text": "hopium right I was looking at that and I"
+  },
+  {
+    "start": 1901.159,
+    "duration": 4.5,
+    "text": "was like oh it doesn't work"
+  },
+  {
+    "start": 1903.679,
+    "duration": 3.421,
+    "text": "um and then of course you know I did"
+  },
+  {
+    "start": 1905.659,
+    "duration": 3.361,
+    "text": "phenomenally at first because it went"
+  },
+  {
+    "start": 1907.1,
+    "duration": 4.559,
+    "text": "right into my range and then the trade"
+  },
+  {
+    "start": 1909.02,
+    "duration": 4.74,
+    "text": "got wrecked well that's the other thing"
+  },
+  {
+    "start": 1911.659,
+    "duration": 3.781,
+    "text": "about uh about the price action too"
+  },
+  {
+    "start": 1913.76,
+    "duration": 3.299,
+    "text": "because you can look at the SKU but the"
+  },
+  {
+    "start": 1915.44,
+    "duration": 4.38,
+    "text": "skus Vera is going to be very very"
+  },
+  {
+    "start": 1917.059,
+    "duration": 5.401,
+    "text": "delayed too and"
+  },
+  {
+    "start": 1919.82,
+    "duration": 6.18,
+    "text": "you know a lot of times you gotta"
+  },
+  {
+    "start": 1922.46,
+    "duration": 5.699,
+    "text": "in my mind I think of what is the market"
+  },
+  {
+    "start": 1926.0,
+    "duration": 3.48,
+    "text": "going to do first to really trap"
+  },
+  {
+    "start": 1928.159,
+    "duration": 2.461,
+    "text": "somebody I'm always thinking trap"
+  },
+  {
+    "start": 1929.48,
+    "duration": 2.939,
+    "text": "they're always trying to trap somebody"
+  },
+  {
+    "start": 1930.62,
+    "duration": 5.1,
+    "text": "and it's not really a trap it's just"
+  },
+  {
+    "start": 1932.419,
+    "duration": 4.921,
+    "text": "liquidity grab yeah and so where is the"
+  },
+  {
+    "start": 1935.72,
+    "duration": 4.079,
+    "text": "liquidity going to be on a flat skew"
+  },
+  {
+    "start": 1937.34,
+    "duration": 3.839,
+    "text": "like that and where are they going to"
+  },
+  {
+    "start": 1939.799,
+    "duration": 3.901,
+    "text": "move it first before the real move"
+  },
+  {
+    "start": 1941.179,
+    "duration": 4.141,
+    "text": "happens and it's typically going to be"
+  },
+  {
+    "start": 1943.7,
+    "duration": 2.9,
+    "text": "in a flat skew like that's going to be"
+  },
+  {
+    "start": 1945.32,
+    "duration": 4.079,
+    "text": "up"
+  },
+  {
+    "start": 1946.6,
+    "duration": 5.579,
+    "text": "they're going to rip it up no you're"
+  },
+  {
+    "start": 1949.399,
+    "duration": 5.4,
+    "text": "totally right and I got faded right"
+  },
+  {
+    "start": 1952.179,
+    "duration": 5.261,
+    "text": "that's what happens everybody gets faded"
+  },
+  {
+    "start": 1954.799,
+    "duration": 4.141,
+    "text": "eventually but it's like you know if"
+  },
+  {
+    "start": 1957.44,
+    "duration": 4.68,
+    "text": "you're trying if you're trading for the"
+  },
+  {
+    "start": 1958.94,
+    "duration": 4.979,
+    "text": "pin it's going to be different and I"
+  },
+  {
+    "start": 1962.12,
+    "duration": 4.32,
+    "text": "don't think on fomc you should ever"
+  },
+  {
+    "start": 1963.919,
+    "duration": 4.681,
+    "text": "trade for the pin until maybe all the"
+  },
+  {
+    "start": 1966.44,
+    "duration": 5.099,
+    "text": "balls kind of been worked out you know I"
+  },
+  {
+    "start": 1968.6,
+    "duration": 5.28,
+    "text": "I know that now man yeah yeah well and"
+  },
+  {
+    "start": 1971.539,
+    "duration": 4.38,
+    "text": "and so that's the other thing too is uh"
+  },
+  {
+    "start": 1973.88,
+    "duration": 3.899,
+    "text": "is if you're trading for the pin on a"
+  },
+  {
+    "start": 1975.919,
+    "duration": 3.541,
+    "text": "high IV day"
+  },
+  {
+    "start": 1977.779,
+    "duration": 2.88,
+    "text": "that doesn't really make a whole lot of"
+  },
+  {
+    "start": 1979.46,
+    "duration": 2.88,
+    "text": "sense"
+  },
+  {
+    "start": 1980.659,
+    "duration": 3.301,
+    "text": "no you're you're right because it's"
+  },
+  {
+    "start": 1982.34,
+    "duration": 5.219,
+    "text": "almost like you're trying to stop a"
+  },
+  {
+    "start": 1983.96,
+    "duration": 5.64,
+    "text": "freight train with like I don't know uh"
+  },
+  {
+    "start": 1987.559,
+    "duration": 4.921,
+    "text": "a piece of straw or something I don't"
+  },
+  {
+    "start": 1989.6,
+    "duration": 4.98,
+    "text": "know like it's it's moving so fast and"
+  },
+  {
+    "start": 1992.48,
+    "duration": 4.799,
+    "text": "it and it and it veers off the rails"
+  },
+  {
+    "start": 1994.58,
+    "duration": 4.5,
+    "text": "it's it's um exponentially harder to"
+  },
+  {
+    "start": 1997.279,
+    "duration": 3.78,
+    "text": "know where it's going to end up the more"
+  },
+  {
+    "start": 1999.08,
+    "duration": 4.319,
+    "text": "momentum it has right"
+  },
+  {
+    "start": 2001.059,
+    "duration": 6.301,
+    "text": "um you're better off you're better off"
+  },
+  {
+    "start": 2003.399,
+    "duration": 6.061,
+    "text": "waiting until that big explosion happens"
+  },
+  {
+    "start": 2007.36,
+    "duration": 6.299,
+    "text": "and then going and selling calls against"
+  },
+  {
+    "start": 2009.46,
+    "duration": 7.319,
+    "text": "it 100 yeah even if it kept melting up"
+  },
+  {
+    "start": 2013.659,
+    "duration": 5.041,
+    "text": "you're still gonna catch the IV"
+  },
+  {
+    "start": 2016.779,
+    "duration": 4.561,
+    "text": "yeah yeah"
+  },
+  {
+    "start": 2018.7,
+    "duration": 4.92,
+    "text": "and so and then and then you know"
+  },
+  {
+    "start": 2021.34,
+    "duration": 4.079,
+    "text": "looking at it from a standpoint of like"
+  },
+  {
+    "start": 2023.62,
+    "duration": 4.02,
+    "text": "okay so what are participants doing if"
+  },
+  {
+    "start": 2025.419,
+    "duration": 3.841,
+    "text": "ski was flat you know participants don't"
+  },
+  {
+    "start": 2027.64,
+    "duration": 3.36,
+    "text": "know what's happening but IV is pricing"
+  },
+  {
+    "start": 2029.26,
+    "duration": 3.48,
+    "text": "at a high move"
+  },
+  {
+    "start": 2031.0,
+    "duration": 4.019,
+    "text": "um they're gonna move it up into that"
+  },
+  {
+    "start": 2032.74,
+    "duration": 4.38,
+    "text": "into that upper range which we're"
+  },
+  {
+    "start": 2035.019,
+    "duration": 4.02,
+    "text": "already at on a daily and that's that's"
+  },
+  {
+    "start": 2037.12,
+    "duration": 3.419,
+    "text": "exactly what happened dude it came right"
+  },
+  {
+    "start": 2039.039,
+    "duration": 2.88,
+    "text": "in right here always gonna do that"
+  },
+  {
+    "start": 2040.539,
+    "duration": 3.421,
+    "text": "they're going to move it right into that"
+  },
+  {
+    "start": 2041.919,
+    "duration": 5.1,
+    "text": "that upper range where everybody's mat"
+  },
+  {
+    "start": 2043.96,
+    "duration": 4.56,
+    "text": "you know retail is essentially Max fomo"
+  },
+  {
+    "start": 2047.019,
+    "duration": 3.6,
+    "text": "because they're they're wanting that"
+  },
+  {
+    "start": 2048.52,
+    "duration": 3.42,
+    "text": "breakout they always want the Breakout"
+  },
+  {
+    "start": 2050.619,
+    "duration": 3.06,
+    "text": "and then they're and then they're just"
+  },
+  {
+    "start": 2051.94,
+    "duration": 3.479,
+    "text": "gonna crush it they're gonna Crush IV"
+  },
+  {
+    "start": 2053.679,
+    "duration": 3.601,
+    "text": "they're gonna cry everybody's gonna buy"
+  },
+  {
+    "start": 2055.419,
+    "duration": 4.021,
+    "text": "puts the smart money is buying puts or"
+  },
+  {
+    "start": 2057.28,
+    "duration": 3.78,
+    "text": "selling calls as usual"
+  },
+  {
+    "start": 2059.44,
+    "duration": 4.199,
+    "text": "this is what everybody's done for 40"
+  },
+  {
+    "start": 2061.06,
+    "duration": 4.319,
+    "text": "years and"
+  },
+  {
+    "start": 2063.639,
+    "duration": 3.841,
+    "text": "they're probably not even buying into"
+  },
+  {
+    "start": 2065.379,
+    "duration": 4.081,
+    "text": "zero DTE players are buying that that"
+  },
+  {
+    "start": 2067.48,
+    "duration": 3.72,
+    "text": "expiration but I think smart money is"
+  },
+  {
+    "start": 2069.46,
+    "duration": 4.439,
+    "text": "buying out in the into these other"
+  },
+  {
+    "start": 2071.2,
+    "duration": 4.5,
+    "text": "expiries absolutely and and what we saw"
+  },
+  {
+    "start": 2073.899,
+    "duration": 4.5,
+    "text": "I mean skipping ahead a little bit but"
+  },
+  {
+    "start": 2075.7,
+    "duration": 4.139,
+    "text": "what we saw on Friday was uh the"
+  },
+  {
+    "start": 2078.399,
+    "duration": 4.081,
+    "text": "liquidation of those puts that they got"
+  },
+  {
+    "start": 2079.839,
+    "duration": 5.04,
+    "text": "on fomc probably exactly and so they"
+  },
+  {
+    "start": 2082.48,
+    "duration": 4.98,
+    "text": "just sit they just sit there and let"
+  },
+  {
+    "start": 2084.879,
+    "duration": 4.681,
+    "text": "and basically I think what they do is"
+  },
+  {
+    "start": 2087.46,
+    "duration": 4.74,
+    "text": "they sit there and they let those"
+  },
+  {
+    "start": 2089.56,
+    "duration": 5.279,
+    "text": "those fomo buyers there at the fomc top"
+  },
+  {
+    "start": 2092.2,
+    "duration": 5.04,
+    "text": "they just get liquidated for the next"
+  },
+  {
+    "start": 2094.839,
+    "duration": 4.321,
+    "text": "couple days yeah because they were"
+  },
+  {
+    "start": 2097.24,
+    "duration": 4.74,
+    "text": "buying calls you know not just that day"
+  },
+  {
+    "start": 2099.16,
+    "duration": 5.459,
+    "text": "but they're also buying High IV calls on"
+  },
+  {
+    "start": 2101.98,
+    "duration": 3.9,
+    "text": "the next couple expiries and so as those"
+  },
+  {
+    "start": 2104.619,
+    "duration": 4.021,
+    "text": "start coming down let me see the next"
+  },
+  {
+    "start": 2105.88,
+    "duration": 4.56,
+    "text": "couple skews on that"
+  },
+  {
+    "start": 2108.64,
+    "duration": 3.3,
+    "text": "um Let me let me break down first I just"
+  },
+  {
+    "start": 2110.44,
+    "duration": 4.08,
+    "text": "wanted to say that the reason I play for"
+  },
+  {
+    "start": 2111.94,
+    "duration": 5.46,
+    "text": "this pocket is because these zones where"
+  },
+  {
+    "start": 2114.52,
+    "duration": 5.76,
+    "text": "you see that implies are low this is"
+  },
+  {
+    "start": 2117.4,
+    "duration": 5.939,
+    "text": "where price is probably going to go not"
+  },
+  {
+    "start": 2120.28,
+    "duration": 5.7,
+    "text": "if the SKU is is not left-tailed though"
+  },
+  {
+    "start": 2123.339,
+    "duration": 4.621,
+    "text": "not if a skew is not left tail it I"
+  },
+  {
+    "start": 2125.98,
+    "duration": 3.84,
+    "text": "always think of like price is good price"
+  },
+  {
+    "start": 2127.96,
+    "duration": 2.82,
+    "text": "is going to try to go where the IV is"
+  },
+  {
+    "start": 2129.82,
+    "duration": 3.36,
+    "text": "lowest"
+  },
+  {
+    "start": 2130.78,
+    "duration": 4.2,
+    "text": "yes yeah yeah that's exactly so you're"
+  },
+  {
+    "start": 2133.18,
+    "duration": 3.72,
+    "text": "playing for the pocket like say is this"
+  },
+  {
+    "start": 2134.98,
+    "duration": 3.96,
+    "text": "SKU specifically that you were playing"
+  },
+  {
+    "start": 2136.9,
+    "duration": 3.719,
+    "text": "for it maybe wasn't it was probably a"
+  },
+  {
+    "start": 2138.94,
+    "duration": 3.0,
+    "text": "combination but if it was this one that"
+  },
+  {
+    "start": 2140.619,
+    "duration": 3.661,
+    "text": "you were looking at and trying to play"
+  },
+  {
+    "start": 2141.94,
+    "duration": 4.32,
+    "text": "for that pocket it doesn't make sense"
+  },
+  {
+    "start": 2144.28,
+    "duration": 4.319,
+    "text": "now in hindsight because"
+  },
+  {
+    "start": 2146.26,
+    "duration": 3.9,
+    "text": "the puts were way cheaper and if puts"
+  },
+  {
+    "start": 2148.599,
+    "duration": 4.621,
+    "text": "her cheaper than calls something's off"
+  },
+  {
+    "start": 2150.16,
+    "duration": 5.4,
+    "text": "so okay but here's why it did make sense"
+  },
+  {
+    "start": 2153.22,
+    "duration": 3.6,
+    "text": "okay um and this is where it gets a"
+  },
+  {
+    "start": 2155.56,
+    "duration": 3.18,
+    "text": "little bit less"
+  },
+  {
+    "start": 2156.82,
+    "duration": 3.84,
+    "text": "skewy"
+  },
+  {
+    "start": 2158.74,
+    "duration": 3.54,
+    "text": "um the"
+  },
+  {
+    "start": 2160.66,
+    "duration": 2.82,
+    "text": "so so when I was looking at this I was"
+  },
+  {
+    "start": 2162.28,
+    "duration": 3.78,
+    "text": "thinking about"
+  },
+  {
+    "start": 2163.48,
+    "duration": 4.5,
+    "text": "um okay we're gonna get 75 bips I know"
+  },
+  {
+    "start": 2166.06,
+    "duration": 3.84,
+    "text": "that already the market knows that in"
+  },
+  {
+    "start": 2167.98,
+    "duration": 3.599,
+    "text": "other words after event we're probably"
+  },
+  {
+    "start": 2169.9,
+    "duration": 3.12,
+    "text": "it's going to give us a boost up so I"
+  },
+  {
+    "start": 2171.579,
+    "duration": 3.481,
+    "text": "was expecting an immediate boost up"
+  },
+  {
+    "start": 2173.02,
+    "duration": 3.78,
+    "text": "right after the event which and what"
+  },
+  {
+    "start": 2175.06,
+    "duration": 3.9,
+    "text": "that would do is if this was already a"
+  },
+  {
+    "start": 2176.8,
+    "duration": 4.68,
+    "text": "pocket it would actually start to kill"
+  },
+  {
+    "start": 2178.96,
+    "duration": 4.02,
+    "text": "these puts a little bit more and then it"
+  },
+  {
+    "start": 2181.48,
+    "duration": 2.639,
+    "text": "would almost be like the entire pocket"
+  },
+  {
+    "start": 2182.98,
+    "duration": 2.639,
+    "text": "would shift over and then you'd have"
+  },
+  {
+    "start": 2184.119,
+    "duration": 3.601,
+    "text": "something that looks kind of like a u"
+  },
+  {
+    "start": 2185.619,
+    "duration": 5.101,
+    "text": "around over here so I was thinking about"
+  },
+  {
+    "start": 2187.72,
+    "duration": 5.58,
+    "text": "how this view was going to move"
+  },
+  {
+    "start": 2190.72,
+    "duration": 5.28,
+    "text": "um as the event progressed interesting"
+  },
+  {
+    "start": 2193.3,
+    "duration": 6.779,
+    "text": "wow wow wow okay I would have never"
+  },
+  {
+    "start": 2196.0,
+    "duration": 5.82,
+    "text": "thought that so you were thinking so on"
+  },
+  {
+    "start": 2200.079,
+    "duration": 4.76,
+    "text": "that logic you're thinking that you're"
+  },
+  {
+    "start": 2201.82,
+    "duration": 6.539,
+    "text": "gonna create a u around a certain point"
+  },
+  {
+    "start": 2204.839,
+    "duration": 6.041,
+    "text": "as the puts were dying but why would the"
+  },
+  {
+    "start": 2208.359,
+    "duration": 4.98,
+    "text": "put IV as they're dying why would it"
+  },
+  {
+    "start": 2210.88,
+    "duration": 3.239,
+    "text": "create a higher left tail to create the"
+  },
+  {
+    "start": 2213.339,
+    "duration": 3.0,
+    "text": "U"
+  },
+  {
+    "start": 2214.119,
+    "duration": 4.141,
+    "text": "because this whole thing is going to"
+  },
+  {
+    "start": 2216.339,
+    "duration": 2.641,
+    "text": "move down"
+  },
+  {
+    "start": 2218.26,
+    "duration": 2.7,
+    "text": "um"
+  },
+  {
+    "start": 2218.98,
+    "duration": 3.54,
+    "text": "I see what you're saying but no that it"
+  },
+  {
+    "start": 2220.96,
+    "duration": 3.36,
+    "text": "still doesn't make sense in in this case"
+  },
+  {
+    "start": 2222.52,
+    "duration": 3.96,
+    "text": "because look at the further out expires"
+  },
+  {
+    "start": 2224.32,
+    "duration": 2.94,
+    "text": "too no I think I think you're right I"
+  },
+  {
+    "start": 2226.48,
+    "duration": 2.7,
+    "text": "think this is what I was thinking"
+  },
+  {
+    "start": 2227.26,
+    "duration": 4.14,
+    "text": "thinking and I think it made no it makes"
+  },
+  {
+    "start": 2229.18,
+    "duration": 3.6,
+    "text": "no sense I think you're right well yeah"
+  },
+  {
+    "start": 2231.4,
+    "duration": 3.6,
+    "text": "right I know I know what you're saying"
+  },
+  {
+    "start": 2232.78,
+    "duration": 5.1,
+    "text": "too so yeah but so that's why"
+  },
+  {
+    "start": 2235.0,
+    "duration": 4.68,
+    "text": "hindsight's 2020 but uh"
+  },
+  {
+    "start": 2237.88,
+    "duration": 4.199,
+    "text": "yeah in this case"
+  },
+  {
+    "start": 2239.68,
+    "duration": 5.34,
+    "text": "you can't you can't I don't think just"
+  },
+  {
+    "start": 2242.079,
+    "duration": 4.561,
+    "text": "as a Trader just from my perspective you"
+  },
+  {
+    "start": 2245.02,
+    "duration": 4.02,
+    "text": "can't trade"
+  },
+  {
+    "start": 2246.64,
+    "duration": 5.58,
+    "text": "for what you think is going to happen"
+  },
+  {
+    "start": 2249.04,
+    "duration": 5.579,
+    "text": "you can only trade the probability"
+  },
+  {
+    "start": 2252.22,
+    "duration": 4.859,
+    "text": "okay if you think the SKU is going to"
+  },
+  {
+    "start": 2254.619,
+    "duration": 5.46,
+    "text": "end up like the shape"
+  },
+  {
+    "start": 2257.079,
+    "duration": 4.621,
+    "text": "in the future then you're probably wrong"
+  },
+  {
+    "start": 2260.079,
+    "duration": 3.361,
+    "text": "right"
+  },
+  {
+    "start": 2261.7,
+    "duration": 4.139,
+    "text": "the only thing you can the only thing"
+  },
+  {
+    "start": 2263.44,
+    "duration": 4.679,
+    "text": "you can bet on is that the skew is gonna"
+  },
+  {
+    "start": 2265.839,
+    "duration": 4.381,
+    "text": "essentially turn into a smirk that's"
+  },
+  {
+    "start": 2268.119,
+    "duration": 3.901,
+    "text": "really it that's also why you don't buy"
+  },
+  {
+    "start": 2270.22,
+    "duration": 4.619,
+    "text": "naked calls here right like that's why I"
+  },
+  {
+    "start": 2272.02,
+    "duration": 4.68,
+    "text": "have an IC that's uh hitting precisely"
+  },
+  {
+    "start": 2274.839,
+    "duration": 3.24,
+    "text": "this range at this point and if I you"
+  },
+  {
+    "start": 2276.7,
+    "duration": 3.12,
+    "text": "know if I wanted to deploy more capital"
+  },
+  {
+    "start": 2278.079,
+    "duration": 4.081,
+    "text": "I would have had one right here and then"
+  },
+  {
+    "start": 2279.82,
+    "duration": 4.5,
+    "text": "I would have had uh you know maybe a"
+  },
+  {
+    "start": 2282.16,
+    "duration": 4.14,
+    "text": "couple of naked puts down here or maybe"
+  },
+  {
+    "start": 2284.32,
+    "duration": 4.14,
+    "text": "an IC down here and there there it makes"
+  },
+  {
+    "start": 2286.3,
+    "duration": 4.5,
+    "text": "way more sense because"
+  },
+  {
+    "start": 2288.46,
+    "duration": 4.74,
+    "text": "so now now you're getting into where the"
+  },
+  {
+    "start": 2290.8,
+    "duration": 3.96,
+    "text": "real smart money and this is just where"
+  },
+  {
+    "start": 2293.2,
+    "duration": 4.08,
+    "text": "we're learning but the real smart money"
+  },
+  {
+    "start": 2294.76,
+    "duration": 4.319,
+    "text": "is playing this SKU like that"
+  },
+  {
+    "start": 2297.28,
+    "duration": 3.12,
+    "text": "yes you can you can deploy Capital"
+  },
+  {
+    "start": 2299.079,
+    "duration": 3.121,
+    "text": "everywhere which means that you can play"
+  },
+  {
+    "start": 2300.4,
+    "duration": 3.24,
+    "text": "all the probabilities along the line"
+  },
+  {
+    "start": 2302.2,
+    "duration": 4.8,
+    "text": "well a lot of times what they'll do is"
+  },
+  {
+    "start": 2303.64,
+    "duration": 5.219,
+    "text": "they'll go look historically like in"
+  },
+  {
+    "start": 2307.0,
+    "duration": 3.839,
+    "text": "this case historically Ivy is super low"
+  },
+  {
+    "start": 2308.859,
+    "duration": 5.281,
+    "text": "across the board and this is something"
+  },
+  {
+    "start": 2310.839,
+    "duration": 5.28,
+    "text": "gem talks about so all I'm doing is I'm"
+  },
+  {
+    "start": 2314.14,
+    "duration": 3.66,
+    "text": "selling calls to finance puts at this"
+  },
+  {
+    "start": 2316.119,
+    "duration": 3.601,
+    "text": "point yeah"
+  },
+  {
+    "start": 2317.8,
+    "duration": 3.84,
+    "text": "like if you're if you're if if you're"
+  },
+  {
+    "start": 2319.72,
+    "duration": 2.94,
+    "text": "just if you just got a 100 million"
+  },
+  {
+    "start": 2321.64,
+    "duration": 2.939,
+    "text": "dollars"
+  },
+  {
+    "start": 2322.66,
+    "duration": 4.439,
+    "text": "you know you're just buying these puts"
+  },
+  {
+    "start": 2324.579,
+    "duration": 5.221,
+    "text": "like and you're just it's free it's free"
+  },
+  {
+    "start": 2327.099,
+    "duration": 4.801,
+    "text": "money essentially and so if you if you"
+  },
+  {
+    "start": 2329.8,
+    "duration": 4.2,
+    "text": "have the capital to wait it out you're"
+  },
+  {
+    "start": 2331.9,
+    "duration": 3.78,
+    "text": "always going to be right right that's"
+  },
+  {
+    "start": 2334.0,
+    "duration": 3.72,
+    "text": "what I mean is it's free money at this"
+  },
+  {
+    "start": 2335.68,
+    "duration": 3.96,
+    "text": "point for say you've got"
+  },
+  {
+    "start": 2337.72,
+    "duration": 3.42,
+    "text": "you know I'm trying to always think"
+  },
+  {
+    "start": 2339.64,
+    "duration": 3.18,
+    "text": "about like what is a hedge fund manager"
+  },
+  {
+    "start": 2341.14,
+    "duration": 3.719,
+    "text": "do I'm like I'm not not there but you"
+  },
+  {
+    "start": 2342.82,
+    "duration": 4.32,
+    "text": "know like if I had a billion dollars I'm"
+  },
+  {
+    "start": 2344.859,
+    "duration": 5.781,
+    "text": "taking you know"
+  },
+  {
+    "start": 2347.14,
+    "duration": 6.24,
+    "text": "you know half of it in Long shares okay"
+  },
+  {
+    "start": 2350.64,
+    "duration": 5.26,
+    "text": "a bunch of it in cash and then I'm"
+  },
+  {
+    "start": 2353.38,
+    "duration": 4.14,
+    "text": "taking a 10 of it and I'm just selling"
+  },
+  {
+    "start": 2355.9,
+    "duration": 2.58,
+    "text": "calls buying puts selling calls buying"
+  },
+  {
+    "start": 2357.52,
+    "duration": 3.12,
+    "text": "puts"
+  },
+  {
+    "start": 2358.48,
+    "duration": 3.48,
+    "text": "because it's essentially free"
+  },
+  {
+    "start": 2360.64,
+    "duration": 2.52,
+    "text": "yep"
+  },
+  {
+    "start": 2361.96,
+    "duration": 3.42,
+    "text": "and so"
+  },
+  {
+    "start": 2363.16,
+    "duration": 5.22,
+    "text": "at this point so if you're if you're"
+  },
+  {
+    "start": 2365.38,
+    "duration": 4.56,
+    "text": "sitting here looking at this if if big"
+  },
+  {
+    "start": 2368.38,
+    "duration": 3.42,
+    "text": "money is essentially thinking the same"
+  },
+  {
+    "start": 2369.94,
+    "duration": 5.34,
+    "text": "way I am they're selling the calls"
+  },
+  {
+    "start": 2371.8,
+    "duration": 5.88,
+    "text": "they're buying the puts for free yeah"
+  },
+  {
+    "start": 2375.28,
+    "duration": 4.68,
+    "text": "no definitely and so that and and"
+  },
+  {
+    "start": 2377.68,
+    "duration": 5.399,
+    "text": "eventually what what will happen is if"
+  },
+  {
+    "start": 2379.96,
+    "duration": 5.22,
+    "text": "we do get a move down again uh then we"
+  },
+  {
+    "start": 2383.079,
+    "duration": 4.26,
+    "text": "get that normal skew again right because"
+  },
+  {
+    "start": 2385.18,
+    "duration": 4.14,
+    "text": "then because then everybody else is now"
+  },
+  {
+    "start": 2387.339,
+    "duration": 3.901,
+    "text": "everybody else is doing that"
+  },
+  {
+    "start": 2389.32,
+    "duration": 3.24,
+    "text": "and it's just driving that IV up on the"
+  },
+  {
+    "start": 2391.24,
+    "duration": 3.119,
+    "text": "left side again"
+  },
+  {
+    "start": 2392.56,
+    "duration": 3.36,
+    "text": "and uh and then you just basically start"
+  },
+  {
+    "start": 2394.359,
+    "duration": 4.081,
+    "text": "selling puts"
+  },
+  {
+    "start": 2395.92,
+    "duration": 4.5,
+    "text": "against your positions or and continue"
+  },
+  {
+    "start": 2398.44,
+    "duration": 3.78,
+    "text": "selling calls against your positions and"
+  },
+  {
+    "start": 2400.42,
+    "duration": 3.9,
+    "text": "just letting the expiries work in your"
+  },
+  {
+    "start": 2402.22,
+    "duration": 4.92,
+    "text": "favor letting letting time work in your"
+  },
+  {
+    "start": 2404.32,
+    "duration": 5.4,
+    "text": "favorites the market is always trying to"
+  },
+  {
+    "start": 2407.14,
+    "duration": 4.92,
+    "text": "normalize into a carry trade"
+  },
+  {
+    "start": 2409.72,
+    "duration": 4.379,
+    "text": "um yeah so okay so then yeah basically"
+  },
+  {
+    "start": 2412.06,
+    "duration": 4.799,
+    "text": "it flattened out and and this is um"
+  },
+  {
+    "start": 2414.099,
+    "duration": 5.461,
+    "text": "those calls found out this is uh"
+  },
+  {
+    "start": 2416.859,
+    "duration": 5.341,
+    "text": "uh 12 30 EST"
+  },
+  {
+    "start": 2419.56,
+    "duration": 4.86,
+    "text": "um so as we get into the meeting and it"
+  },
+  {
+    "start": 2422.2,
+    "duration": 4.26,
+    "text": "just stayed like that man I mean came"
+  },
+  {
+    "start": 2424.42,
+    "duration": 4.679,
+    "text": "down a little here but this is still"
+  },
+  {
+    "start": 2426.46,
+    "duration": 5.04,
+    "text": "really not good for the bull case"
+  },
+  {
+    "start": 2429.099,
+    "duration": 4.321,
+    "text": "um stays not good that was interesting"
+  },
+  {
+    "start": 2431.5,
+    "duration": 4.44,
+    "text": "this was interesting"
+  },
+  {
+    "start": 2433.42,
+    "duration": 5.28,
+    "text": "um this was the one right before"
+  },
+  {
+    "start": 2435.94,
+    "duration": 5.88,
+    "text": "um but yeah and you see the Hedge the"
+  },
+  {
+    "start": 2438.7,
+    "duration": 4.2,
+    "text": "Hedge uh pressure that went up right"
+  },
+  {
+    "start": 2441.82,
+    "duration": 3.84,
+    "text": "into it"
+  },
+  {
+    "start": 2442.9,
+    "duration": 6.6,
+    "text": "but still the skew as far as like it's"
+  },
+  {
+    "start": 2445.66,
+    "duration": 5.52,
+    "text": "120 IV here okay so if you're looking at"
+  },
+  {
+    "start": 2449.5,
+    "duration": 3.42,
+    "text": "a smirk if you just put like a linear"
+  },
+  {
+    "start": 2451.18,
+    "duration": 5.179,
+    "text": "regression on there it's per like almost"
+  },
+  {
+    "start": 2452.92,
+    "duration": 3.439,
+    "text": "perfectly flat most likely"
+  },
+  {
+    "start": 2456.4,
+    "duration": 3.84,
+    "text": "um which tells you it's a problem for"
+  },
+  {
+    "start": 2458.32,
+    "duration": 4.56,
+    "text": "the call side because"
+  },
+  {
+    "start": 2460.24,
+    "duration": 3.839,
+    "text": "um because that's not normal SKU"
+  },
+  {
+    "start": 2462.88,
+    "duration": 4.68,
+    "text": "um"
+  },
+  {
+    "start": 2464.079,
+    "duration": 5.161,
+    "text": "no and that's in it's that's the other"
+  },
+  {
+    "start": 2467.56,
+    "duration": 3.96,
+    "text": "thing too it's just remembering where"
+  },
+  {
+    "start": 2469.24,
+    "duration": 4.859,
+    "text": "remembering where a normal SKU should"
+  },
+  {
+    "start": 2471.52,
+    "duration": 4.14,
+    "text": "look just let me go back to remind"
+  },
+  {
+    "start": 2474.099,
+    "duration": 5.061,
+    "text": "everybody right like let's look at what"
+  },
+  {
+    "start": 2475.66,
+    "duration": 3.5,
+    "text": "normal student looks like it's this"
+  },
+  {
+    "start": 2480.4,
+    "duration": 4.26,
+    "text": "that's a normal that's a normal like"
+  },
+  {
+    "start": 2482.68,
+    "duration": 4.8,
+    "text": "bear Market well I would say that's a"
+  },
+  {
+    "start": 2484.66,
+    "duration": 4.5,
+    "text": "normal hedged SKU yes"
+  },
+  {
+    "start": 2487.48,
+    "duration": 3.9,
+    "text": "okay it doesn't mean you don't you can't"
+  },
+  {
+    "start": 2489.16,
+    "duration": 4.439,
+    "text": "ride up to the left side as far as price"
+  },
+  {
+    "start": 2491.38,
+    "duration": 5.219,
+    "text": "goes but every time you try to ride up"
+  },
+  {
+    "start": 2493.599,
+    "duration": 4.621,
+    "text": "that left side as we get closer to the"
+  },
+  {
+    "start": 2496.599,
+    "duration": 3.061,
+    "text": "expiry it's just going to want to come"
+  },
+  {
+    "start": 2498.22,
+    "duration": 2.639,
+    "text": "back it's going to want to come back to"
+  },
+  {
+    "start": 2499.66,
+    "duration": 2.52,
+    "text": "those Pockets that you were talking"
+  },
+  {
+    "start": 2500.859,
+    "duration": 2.941,
+    "text": "about where you're trying to play these"
+  },
+  {
+    "start": 2502.18,
+    "duration": 3.84,
+    "text": "Pockets look at those Pockets there on"
+  },
+  {
+    "start": 2503.8,
+    "duration": 5.039,
+    "text": "this on this particular skew chart"
+  },
+  {
+    "start": 2506.02,
+    "duration": 5.64,
+    "text": "where are the pockets on the chart"
+  },
+  {
+    "start": 2508.839,
+    "duration": 5.221,
+    "text": "right down here actually yeah and even"
+  },
+  {
+    "start": 2511.66,
+    "duration": 4.02,
+    "text": "further out so you know smart money what"
+  },
+  {
+    "start": 2514.06,
+    "duration": 4.2,
+    "text": "are they doing they're going look I got"
+  },
+  {
+    "start": 2515.68,
+    "duration": 5.76,
+    "text": "we got expiries going out into November"
+  },
+  {
+    "start": 2518.26,
+    "duration": 7.5,
+    "text": "and I can basically buy these"
+  },
+  {
+    "start": 2521.44,
+    "duration": 9.659,
+    "text": "I can buy these for 22.5 IV and I could"
+  },
+  {
+    "start": 2525.76,
+    "duration": 7.38,
+    "text": "sell these puts for 35. yep yeah yeah"
+  },
+  {
+    "start": 2531.099,
+    "duration": 3.361,
+    "text": "yeah and as time moves on it's just"
+  },
+  {
+    "start": 2533.14,
+    "duration": 4.08,
+    "text": "gonna go there or it's just gonna"
+  },
+  {
+    "start": 2534.46,
+    "duration": 4.92,
+    "text": "eventually go there as long as this as"
+  },
+  {
+    "start": 2537.22,
+    "duration": 4.32,
+    "text": "long as this holds"
+  },
+  {
+    "start": 2539.38,
+    "duration": 4.08,
+    "text": "that's that's so actually that was kind"
+  },
+  {
+    "start": 2541.54,
+    "duration": 3.059,
+    "text": "of eye-opening for me because you just"
+  },
+  {
+    "start": 2543.46,
+    "duration": 2.7,
+    "text": "when you ask like where's the pocket"
+  },
+  {
+    "start": 2544.599,
+    "duration": 3.24,
+    "text": "heroes like right there I actually"
+  },
+  {
+    "start": 2546.16,
+    "duration": 3.6,
+    "text": "hadn't thought whenever I look at a skew"
+  },
+  {
+    "start": 2547.839,
+    "duration": 3.541,
+    "text": "like this I always kind of thought oh"
+  },
+  {
+    "start": 2549.76,
+    "duration": 3.12,
+    "text": "there's no pocket there's no Edge to"
+  },
+  {
+    "start": 2551.38,
+    "duration": 4.739,
+    "text": "reading this SKU and that's not true"
+  },
+  {
+    "start": 2552.88,
+    "duration": 5.4,
+    "text": "clearly 400 is the mid price here like"
+  },
+  {
+    "start": 2556.119,
+    "duration": 5.041,
+    "text": "it's not the MIP it's not the spot right"
+  },
+  {
+    "start": 2558.28,
+    "duration": 5.7,
+    "text": "but it's the mid neutral of all price"
+  },
+  {
+    "start": 2561.16,
+    "duration": 5.64,
+    "text": "right um kind of and it's cheap I mean"
+  },
+  {
+    "start": 2563.98,
+    "duration": 4.8,
+    "text": "if you think about where vix is that at"
+  },
+  {
+    "start": 2566.8,
+    "duration": 3.86,
+    "text": "this particular point I think vix is 30"
+  },
+  {
+    "start": 2568.78,
+    "duration": 4.98,
+    "text": "or 28 or something"
+  },
+  {
+    "start": 2570.66,
+    "duration": 5.98,
+    "text": "and you know essentially vix is gonna"
+  },
+  {
+    "start": 2573.76,
+    "duration": 5.22,
+    "text": "try not vix isn't going to try but the"
+  },
+  {
+    "start": 2576.64,
+    "duration": 3.719,
+    "text": "market participants you know they're"
+  },
+  {
+    "start": 2578.98,
+    "duration": 3.54,
+    "text": "they're going to be playing for these"
+  },
+  {
+    "start": 2580.359,
+    "duration": 4.081,
+    "text": "they don't want to pay smart money's not"
+  },
+  {
+    "start": 2582.52,
+    "duration": 5.339,
+    "text": "trying to pay 40 percent"
+  },
+  {
+    "start": 2584.44,
+    "duration": 5.58,
+    "text": "okay for for puts"
+  },
+  {
+    "start": 2587.859,
+    "duration": 4.98,
+    "text": "yeah they're not they're not I mean"
+  },
+  {
+    "start": 2590.02,
+    "duration": 8.12,
+    "text": "unless there's a a cataclysmic event"
+  },
+  {
+    "start": 2592.839,
+    "duration": 5.301,
+    "text": "about to occur to take us to spy 275"
+  },
+  {
+    "start": 2598.359,
+    "duration": 3.121,
+    "text": "then and you can play for that if you"
+  },
+  {
+    "start": 2600.52,
+    "duration": 3.839,
+    "text": "want to"
+  },
+  {
+    "start": 2601.48,
+    "duration": 5.58,
+    "text": "but it just doesn't make any sense on a"
+  },
+  {
+    "start": 2604.359,
+    "duration": 5.521,
+    "text": "probability distribution so um it might"
+  },
+  {
+    "start": 2607.06,
+    "duration": 4.92,
+    "text": "it might sense now is the way I think"
+  },
+  {
+    "start": 2609.88,
+    "duration": 3.6,
+    "text": "about it now is I played simply every"
+  },
+  {
+    "start": 2611.98,
+    "duration": 2.52,
+    "text": "day I just try to play for the"
+  },
+  {
+    "start": 2613.48,
+    "duration": 4.2,
+    "text": "distribution"
+  },
+  {
+    "start": 2614.5,
+    "duration": 4.859,
+    "text": "yep okay because it doesn't if you have"
+  },
+  {
+    "start": 2617.68,
+    "duration": 3.54,
+    "text": "done that for the last 40 years and just"
+  },
+  {
+    "start": 2619.359,
+    "duration": 3.601,
+    "text": "played for the distribution you're"
+  },
+  {
+    "start": 2621.22,
+    "duration": 4.5,
+    "text": "killing the market right even if you got"
+  },
+  {
+    "start": 2622.96,
+    "duration": 4.92,
+    "text": "blown up once or twice well that's"
+  },
+  {
+    "start": 2625.72,
+    "duration": 4.74,
+    "text": "that's what I do uh in my in my really"
+  },
+  {
+    "start": 2627.88,
+    "duration": 4.739,
+    "text": "big portfolio in the sense of I wait for"
+  },
+  {
+    "start": 2630.46,
+    "duration": 3.899,
+    "text": "us to hit like one and a half standard"
+  },
+  {
+    "start": 2632.619,
+    "duration": 5.161,
+    "text": "deviation two standard deviation on a"
+  },
+  {
+    "start": 2634.359,
+    "duration": 5.341,
+    "text": "weekly you know 10 period 20 period lows"
+  },
+  {
+    "start": 2637.78,
+    "duration": 4.44,
+    "text": "and then I sell puts there and like hey"
+  },
+  {
+    "start": 2639.7,
+    "duration": 4.74,
+    "text": "I got destroyed on some of my Amazon put"
+  },
+  {
+    "start": 2642.22,
+    "duration": 5.7,
+    "text": "sales on I have a crowdstrike uh put"
+  },
+  {
+    "start": 2644.44,
+    "duration": 6.0,
+    "text": "cell that you know fell 10 off earnings"
+  },
+  {
+    "start": 2647.92,
+    "duration": 4.5,
+    "text": "um and you know what I'm gonna be"
+  },
+  {
+    "start": 2650.44,
+    "duration": 3.72,
+    "text": "completely fine because they're out for"
+  },
+  {
+    "start": 2652.42,
+    "duration": 3.06,
+    "text": "December"
+  },
+  {
+    "start": 2654.16,
+    "duration": 4.98,
+    "text": "um and at some point between now and"
+  },
+  {
+    "start": 2655.48,
+    "duration": 5.46,
+    "text": "December we're gonna revert to uh a nice"
+  },
+  {
+    "start": 2659.14,
+    "duration": 3.24,
+    "text": "little pocket and then I'm gonna just"
+  },
+  {
+    "start": 2660.94,
+    "duration": 2.879,
+    "text": "either roll them or they're gonna expire"
+  },
+  {
+    "start": 2662.38,
+    "duration": 3.479,
+    "text": "it worthless or whatever and I don't"
+  },
+  {
+    "start": 2663.819,
+    "duration": 3.54,
+    "text": "really have to worry right right and"
+  },
+  {
+    "start": 2665.859,
+    "duration": 3.781,
+    "text": "that's the other thing too is if you're"
+  },
+  {
+    "start": 2667.359,
+    "duration": 3.901,
+    "text": "playing for the the dimensions right you"
+  },
+  {
+    "start": 2669.64,
+    "duration": 4.679,
+    "text": "got the time"
+  },
+  {
+    "start": 2671.26,
+    "duration": 5.88,
+    "text": "and then you've got the distribution"
+  },
+  {
+    "start": 2674.319,
+    "duration": 4.5,
+    "text": "right and so you have all these you have"
+  },
+  {
+    "start": 2677.14,
+    "duration": 3.719,
+    "text": "all these data points that are edges for"
+  },
+  {
+    "start": 2678.819,
+    "duration": 4.561,
+    "text": "yourself if you combine them so this is"
+  },
+  {
+    "start": 2680.859,
+    "duration": 4.381,
+    "text": "what I've been doing is combining okay I"
+  },
+  {
+    "start": 2683.38,
+    "duration": 3.239,
+    "text": "need to know where open interest is I"
+  },
+  {
+    "start": 2685.24,
+    "duration": 2.579,
+    "text": "need to know where the distributions are"
+  },
+  {
+    "start": 2686.619,
+    "duration": 2.7,
+    "text": "in the SKU I need to know where the"
+  },
+  {
+    "start": 2687.819,
+    "duration": 2.701,
+    "text": "distributions are in the volume profile"
+  },
+  {
+    "start": 2689.319,
+    "duration": 4.141,
+    "text": "I need to know where the distributions"
+  },
+  {
+    "start": 2690.52,
+    "duration": 4.559,
+    "text": "are on the gecks yeah okay where and"
+  },
+  {
+    "start": 2693.46,
+    "duration": 3.06,
+    "text": "then you start with the edges and work"
+  },
+  {
+    "start": 2695.079,
+    "duration": 4.26,
+    "text": "your way in"
+  },
+  {
+    "start": 2696.52,
+    "duration": 5.16,
+    "text": "yes and I think implied Vol in that"
+  },
+  {
+    "start": 2699.339,
+    "duration": 3.841,
+    "text": "whole or sorry these uh SKU charts and"
+  },
+  {
+    "start": 2701.68,
+    "duration": 2.82,
+    "text": "that whole picture what they're telling"
+  },
+  {
+    "start": 2703.18,
+    "duration": 3.3,
+    "text": "you is"
+  },
+  {
+    "start": 2704.5,
+    "duration": 3.06,
+    "text": "um if I'm about to go out and make a"
+  },
+  {
+    "start": 2706.48,
+    "duration": 2.22,
+    "text": "purchase first of all they'll tell you"
+  },
+  {
+    "start": 2707.56,
+    "duration": 3.0,
+    "text": "where the market is going to tend"
+  },
+  {
+    "start": 2708.7,
+    "duration": 3.54,
+    "text": "towards over time"
+  },
+  {
+    "start": 2710.56,
+    "duration": 3.72,
+    "text": "um but"
+  },
+  {
+    "start": 2712.24,
+    "duration": 3.96,
+    "text": "um sort of on a more the more granular"
+  },
+  {
+    "start": 2714.28,
+    "duration": 3.539,
+    "text": "information is coming from the oi and"
+  },
+  {
+    "start": 2716.2,
+    "duration": 2.82,
+    "text": "the gecks and so forth but if you want"
+  },
+  {
+    "start": 2717.819,
+    "duration": 2.461,
+    "text": "to go out and play it and especially if"
+  },
+  {
+    "start": 2719.02,
+    "duration": 2.7,
+    "text": "you want to go out and play with options"
+  },
+  {
+    "start": 2720.28,
+    "duration": 4.079,
+    "text": "I feel like if you're not looking at"
+  },
+  {
+    "start": 2721.72,
+    "duration": 4.26,
+    "text": "skew you're not looking at"
+  },
+  {
+    "start": 2724.359,
+    "duration": 4.381,
+    "text": "um it's almost like you're going"
+  },
+  {
+    "start": 2725.98,
+    "duration": 5.7,
+    "text": "shopping online and you're only looking"
+  },
+  {
+    "start": 2728.74,
+    "duration": 4.14,
+    "text": "at the product on I don't know uh the"
+  },
+  {
+    "start": 2731.68,
+    "duration": 3.0,
+    "text": "brand name website and you're not"
+  },
+  {
+    "start": 2732.88,
+    "duration": 3.36,
+    "text": "checking Amazon too to see if it's"
+  },
+  {
+    "start": 2734.68,
+    "duration": 3.659,
+    "text": "cheaper over there you're not looking"
+  },
+  {
+    "start": 2736.24,
+    "duration": 3.96,
+    "text": "for deals correct and that's all the"
+  },
+  {
+    "start": 2738.339,
+    "duration": 3.841,
+    "text": "market is man I've told you a couple"
+  },
+  {
+    "start": 2740.2,
+    "duration": 3.72,
+    "text": "times now it's like your job is to look"
+  },
+  {
+    "start": 2742.18,
+    "duration": 4.439,
+    "text": "at the market like if I hired you right"
+  },
+  {
+    "start": 2743.92,
+    "duration": 5.04,
+    "text": "now and I said look all I want you to do"
+  },
+  {
+    "start": 2746.619,
+    "duration": 4.681,
+    "text": "I'm gonna fire you if you don't do this"
+  },
+  {
+    "start": 2748.96,
+    "duration": 5.159,
+    "text": "is just go look at the market and just"
+  },
+  {
+    "start": 2751.3,
+    "duration": 5.7,
+    "text": "essentially try to make it efficient"
+  },
+  {
+    "start": 2754.119,
+    "duration": 4.2,
+    "text": "be as be as efficient as possible with"
+  },
+  {
+    "start": 2757.0,
+    "duration": 4.079,
+    "text": "with the money"
+  },
+  {
+    "start": 2758.319,
+    "duration": 4.561,
+    "text": "I don't care what it is yeah you know"
+  },
+  {
+    "start": 2761.079,
+    "duration": 4.26,
+    "text": "just go in there and your whole job the"
+  },
+  {
+    "start": 2762.88,
+    "duration": 4.92,
+    "text": "only way you get paid is essentially"
+  },
+  {
+    "start": 2765.339,
+    "duration": 4.98,
+    "text": "just to play the distribution and just"
+  },
+  {
+    "start": 2767.8,
+    "duration": 5.1,
+    "text": "play it as efficiently as possible"
+  },
+  {
+    "start": 2770.319,
+    "duration": 3.721,
+    "text": "no that makes sense and and so when you"
+  },
+  {
+    "start": 2772.9,
+    "duration": 2.699,
+    "text": "look at a ski like this a normal"
+  },
+  {
+    "start": 2774.04,
+    "duration": 5.22,
+    "text": "investment SKU it's just going to be"
+  },
+  {
+    "start": 2775.599,
+    "duration": 5.881,
+    "text": "like okay yeah we might not go to 400"
+  },
+  {
+    "start": 2779.26,
+    "duration": 5.04,
+    "text": "but every time you try to push to the"
+  },
+  {
+    "start": 2781.48,
+    "duration": 4.619,
+    "text": "left every time spot tries to drop"
+  },
+  {
+    "start": 2784.3,
+    "duration": 3.0,
+    "text": "that's just going to be more and more"
+  },
+  {
+    "start": 2786.099,
+    "duration": 4.26,
+    "text": "fuel"
+  },
+  {
+    "start": 2787.3,
+    "duration": 5.279,
+    "text": "to rip it back up again yeah because as"
+  },
+  {
+    "start": 2790.359,
+    "duration": 6.96,
+    "text": "those Tails start to run as those Tails"
+  },
+  {
+    "start": 2792.579,
+    "duration": 7.5,
+    "text": "down to 275 into 300 and even 325 and"
+  },
+  {
+    "start": 2797.319,
+    "duration": 5.821,
+    "text": "350 as those Tails start to go out of"
+  },
+  {
+    "start": 2800.079,
+    "duration": 5.401,
+    "text": "the money based on time as the as the"
+  },
+  {
+    "start": 2803.14,
+    "duration": 3.959,
+    "text": "essentially the Delta curve shrinks"
+  },
+  {
+    "start": 2805.48,
+    "duration": 4.74,
+    "text": "you know that's just going to be way"
+  },
+  {
+    "start": 2807.099,
+    "duration": 5.581,
+    "text": "more fuel for people to start covering"
+  },
+  {
+    "start": 2810.22,
+    "duration": 5.639,
+    "text": "let's let's put it this way as price"
+  },
+  {
+    "start": 2812.68,
+    "duration": 6.32,
+    "text": "moves lower it has steeper and steeper"
+  },
+  {
+    "start": 2815.859,
+    "duration": 6.0,
+    "text": "too there you go yeah to go down"
+  },
+  {
+    "start": 2819.0,
+    "duration": 4.599,
+    "text": "exactly yes as you as you're climbing up"
+  },
+  {
+    "start": 2821.859,
+    "duration": 6.201,
+    "text": "it's going to be harder and harder for"
+  },
+  {
+    "start": 2823.599,
+    "duration": 4.461,
+    "text": "participants to pay money for protection"
+  }
+]
