@@ -51,9 +51,13 @@ verifiable source and a measurable comparison.
 
 | File | Status |
 |---|---|
-| `canonical/README.md` | Stub |
-| `canonical/options_profile.md` | First canonical extract — OP description, customer-long-vs-short bias logic, wall/accelerator behavior, volatility regime modulation |
+| `canonical/README.md` | Layout + contract |
+| `canonical/options_profile.md` | OP description, customer-long-vs-short bias logic, wall/accelerator behavior, volatility regime modulation |
+| `canonical/gex_profile.md` | GEX Profile — orderflow-classification engine, high/low gamma nodes, full/latest/next variants |
+| `canonical/dex_ladder.md` | DEX Ladder — delta exposure per strike, vol-regime modulation of DEX usefulness |
+| `canonical/vanna_charm_ladder.md` | -Vanna / Charm Ladder (beta) — late-day dominance over gamma, polarity-flip dynamics |
+| `canonical/convexity_ladder.md` | Convexity Ladder — vol-regime polarity table, 0DTE pinning mechanism |
 | `community/freddy_video.md` | Restructured 2026-05-22 to cite canonical as primary |
 | `transcripts/2026-01-24_freddy_trading_with_gamma.{txt,json}` | Full 55-min auto-captioned transcript |
 | `gexbot.spec3.yaml` | OpenAPI v2.2.0, pulled 2026-05-21 from nfa-llc/gexbot-openapi master |
-| Comparison framework | Not yet started — bead pending |
+| Comparison framework | Bead `st-cgb` (P2), deferred until corpus has ~5-10 days of data |

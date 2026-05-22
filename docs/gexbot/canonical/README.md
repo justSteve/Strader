@@ -21,8 +21,11 @@ trail.
 
 | File | Source page | Covers |
 |---|---|---|
-| `options_profile.md` | <https://www.gexbot.com/documentation> (state section) | Options Profile, customer-long-vs-short bias logic, wall/accelerator behavior, **volatility regime modulation** |
-| (future) `state_indicators.md` | same | GEX Profile, DEX Ladder, Convexity Ladder, -Vanna/Charm Ladders |
+| `options_profile.md` | <https://www.gexbot.com/documentation> (state section) | Options Profile (OP), customer-long-vs-short bias logic, wall/accelerator behavior, **volatility regime modulation** |
+| `gex_profile.md` | same | GEX Profile — orderflow-classification model, high/low gamma nodes, full/latest/next variants |
+| `dex_ladder.md` | same | DEX Ladder — delta exposure per strike, the "options order book" framing, vol-regime modulation of DEX usefulness |
+| `vanna_charm_ladder.md` | same | -Vanna / Charm Ladder — beta-tagged, late-day dominance over gamma, polarity-flip behavior across spot |
+| `convexity_ladder.md` | same | Convexity Ladder — risk-not-direction read, vol-regime polarity table (positive stalls in falling vol, negative stalls in rising vol), 0DTE pinning mechanism |
 | (future) `metrics_math.md` | <https://www.gexbot.com/metrics> | GEX, DEX, VEX, Charm formulas (the math behind the indicators) |
 | (future) `api_reference.md` | <https://www.gexbot.com/apidocs> + `../gexbot.spec3.yaml` | Endpoint behaviors, rate limits, auth |
 
