@@ -298,3 +298,81 @@ The asker raised three specific questions Freddy didn't address:
 
 These are operationally meaningful — the asker is asking the right
 questions. Worth posing to Jasper or John directly.
+
+---
+
+## Date unknown — Freddy on his vocabulary choice (vol-focused framing)
+
+**Channel:** GexBot Discord (likely same thread as the John Kirby Q&A series)
+**Date:** not captured (post-2025-02-21; written in response to the
+discussion about changing his language)
+**Speaker:** Freddy Sarmiento `[PP]`
+
+### Freddy's response (verbatim)
+
+> I understand the language can be somewhat misleading, but I have
+> transitioned away from linear-directional thinking towards a more
+> volatility-focused approach. When you look at the Convexity ladder,
+> the cyan bars represent what I interpret as positive excess of
+> gamma, regardless of whether they originate from calls or puts. They
+> act as pivots, and options traders are not concerned with whether
+> the price is rising or falling—what matters is that the price moves
+> away from the cyan level.
+>
+> For example, yesterday we had cyan bars originating from puts, while
+> on other days, they stem from calls. On Wednesday, we observed a
+> bull put spread—a bullish/stable structure created by selling puts
+> and buying puts. Again, options traders are indifferent to the
+> direction; their focus is purely on movement.
+>
+> These cyan bars provide an insightful way to classify significant
+> market flows—specifically, excess gamma. Therefore, I view these
+> positive excess of gamma levels as points where price is likely to
+> react, either upwards or downwards, and I seek to engage with the
+> market at these levels.
+>
+> Just to get deep in my understanding and new way of thinking, when
+> someone on Wednesday, initiated that bull put spread—selling puts
+> and using the premium to buy puts a few strikes lower. Simply put,
+> if the market rallies, they profit from their short position; if
+> the market remains stable above that level, they also profit; and
+> if the market dips, they make money on their long put. Of course,
+> this is a very simplified view, as they are likely hedging against
+> other assets.
+>
+> But notice—this strategy isn't driven by directional thinking; it's
+> centred on volatility. That's why I am making a conscious effort to
+> move away from the traditional bull/bear, long/short or put/call
+> mindset. I may see a put trade, but without the full picture, I
+> can't determine its true intent. Instead, by focusing on the cyan
+> bars—positive excess of gamma—I recognise that price is likely to
+> react at those levels due to hedging activity, and I trade
+> accordingly.
+>
+> I forgot to mention—one of the reasons Gexbot is so effective when
+> analysing the GEX profile and the Convexity ladder is that these
+> tools measure gamma imbalances across puts and calls. And that is
+> what truly matters: identifying where these imbalances exist.
+>
+> If market makers can perfectly match buyers with sellers, there is
+> no need for hedging in the futures market. However, when an
+> imbalance arises, it creates the necessity for hedging activity,
+> which in turn influences price action.
+
+### Key takeaways
+
+1. **Freddy's strike-level "positive gamma" usage is intentional, not sloppy.** He's deliberately using vol-focused vocabulary that maps to "cyan = positive excess of gamma" — which is canonical-compatible per John Kirby's 2025-02-21 8:04 AM equivalence (positive gamma = long gamma = cyan = positive convexity).
+2. **NEW operational framing: direction-agnostic at cyan levels.** Don't read cyan as "price will go up" or "price will go down" — read it as "price will *react and move away*." The mode of departure (up vs down) requires other inputs (vol regime, surrounding structure, etc.).
+3. **Bull put spread example.** Customer sells higher-strike puts and buys lower-strike puts. Profits in three regimes (rally, stable, modest dip). The strategy is **direction-agnostic, vol-focused**. On the convexity ladder this would produce mixed signals: purple at the short-put strike (customer short → negative convexity), cyan at the long-put strike (customer long → positive convexity). Reading this as "bullish" or "bearish" is exactly the directional trap Freddy is moving away from.
+4. **Orderflow-classification mechanism restated** (matches canonical [`../canonical/metrics_math.md`](../canonical/metrics_math.md) "Orderflow Classification"): matched buyers/sellers → no hedging needed → no price impact. Imbalance → forced hedging → price impact. The GEX profile and convexity ladder both measure these imbalances; that's their edge.
+5. **What this changes about Freddy's paper.** The strike-level vocabulary in the paper is OK if you read "positive gamma" as Freddy intends it (= cyan = positive convexity at the strike). What's still deprecated is the **environment-level** "MMs are Long Gamma" framing for the overall regime — that's MM-perspective and Jasper's deprecation request still applies to that usage.
+
+### Why he hasn't changed the paper
+
+He's not refusing — he's explaining that his vocabulary at the strike
+level is INTENTIONAL and serves a methodological purpose: stripping
+out direction to focus on movement. The two perspectives (Jasper's
+"think customer always" vs Freddy's "think movement, not direction")
+aren't actually in conflict at the strike level. They diverge at the
+environment level, where Freddy's paper still uses MM-talk for regime
+classification — and that part of the paper still needs updating.

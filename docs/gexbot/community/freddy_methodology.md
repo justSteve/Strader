@@ -26,38 +26,60 @@ operational instruction. It exists as a reference so future Strader
 sessions have a baseline of "what one experienced practitioner says
 GexBot looks like in use," to compare against the corpus we build.
 
-### Vocabulary note — MM-talk is being deprecated
+### Vocabulary note — two scopes, only one needs translating
 
-Freddy's video and Discord posts frequently use **market-maker
-perspective** language ("MMs short gamma," "MMs forced to hedge," etc.).
-This is intuitive for futures traders but isn't the canonical
-convention.
+Freddy uses gamma-perspective language at two different scopes. They
+need to be handled differently:
 
-In a 2025-02-21 Discord exchange, Jasper explicitly stated GexBot's
-convention:
+**Strike-level "positive gamma" / "negative gamma" → canonical-compatible.**
+
+When Freddy talks about cyan bars at a strike as "positive excess of
+gamma," he is using a deliberate vol-focused framing that maps cleanly
+through John Kirby's 2025-02-21 equivalence:
+
+> Positive gamma (Freddy) = Long gamma (UI) = Cyan (color) = Positive convexity (vendor docs)
+> Negative gamma (Freddy) = Short gamma (UI) = Purple (color) = Negative convexity (vendor docs)
+
+At strike level, Freddy's vocabulary is consistent with canonical. His
+defense (see [`discord_quotes.md`](discord_quotes.md), "Freddy on his
+vocabulary choice"): he's *intentionally* stripped direction (call/put,
+bull/bear) from his read to focus purely on whether a level will produce
+a reaction. "Options traders are indifferent to the direction; their
+focus is purely on movement." Cyan bars are pivots regardless of
+whether they originated from calls, puts, or a complex spread like a
+bull put spread.
+
+**Environment-level "MMs are Long Gamma" → still deprecated.**
+
+When Freddy uses MM-perspective at the regime level — as in his
+"Understanding the Convexity Ladder" paper §2 ("Declining vol →
+MMs are Long Gamma → Positive Gamma environment") — that's the part
+Jasper called out:
 
 > We don't think in terms of MM — everything is in terms of customer.
 > That's what you'll find if you read my docs.
-> ([`../canonical/principal_discord.md`](../canonical/principal_discord.md))
+> I'm going to ask Fredy to change this language.
+> (Jasper, [`../canonical/principal_discord.md`](../canonical/principal_discord.md))
 
-He added: "I'm going to ask Fredy to change this language."
+When you encounter MM-perspective regime statements in this document or
+in [`freddy_convexity_paper.md`](freddy_convexity_paper.md), translate
+through:
 
-What this means for reading this document:
-- Freddy's mechanical descriptions of MM hedging behavior (§13 squeeze
-  loop, etc.) are correct in substance — MMs DO hedge that way
-- The *terminology* he uses (MM long gamma, MM short gamma) is the
-  inverse of canonical (customer long gamma, customer short gamma)
-- When in doubt, flip to customer perspective: "MM long gamma" =
-  customer SHORT gamma = purple/violet bars; "MM short gamma" =
-  customer LONG gamma = cyan bars
-- The operational substance is identical; the labels are inverted
+- "MMs are Long Gamma" environment = customers net short gamma overall (purple-heavy chain)
+- "MMs are Short Gamma" environment = customers net long gamma overall (cyan-heavy chain)
+- The behavioral claim (declining vol stalls price at gamma levels; rising vol amplifies) remains correct under either perspective — only the labels invert.
 
-The canonical operational rule for the gamma ladder, in customer
-perspective:
+**The canonical operational rule for the gamma ladder, in customer
+perspective:**
 
 > Pivot at customer long gamma (cyan). Move through customer short
 > gamma (purple). That's all you really need.
 > (Jasper, [`../canonical/principal_discord.md`](../canonical/principal_discord.md))
+
+This rule applies cleanly under either Freddy's strike-level vol-focused
+framing or the canonical customer-perspective convention. The two
+perspectives diverge at the environment-level vocabulary, not at the
+operational level.
 
 ## Sources
 
