@@ -28,8 +28,21 @@ Translation table (paper → canonical):
 |---|---|---|
 | "MMs are Long Gamma" / "Positive Gamma" environment | Customers net short gamma (purple); MM is on the long side of the matched book | Purple-heavy chain |
 | "MMs are Short Gamma" / "Negative Gamma" environment | Customers net long gamma (cyan); MM is on the short side | Cyan-heavy chain |
-| "Positive gamma zones" (at the strike level) | Customer long gamma at the strike = cyan bars | Cyan |
-| "Negative gamma zones" (at the strike level) | Customer short gamma at the strike = purple bars | Purple |
+| "Positive gamma zones" (at the strike level) | Customer long gamma at the strike = cyan bars = positive convexity | Cyan |
+| "Negative gamma zones" (at the strike level) | Customer short gamma at the strike = purple bars = negative convexity | Purple |
+
+### The strike-level equivalence (John Kirby, 2025-02-21 8:04 AM)
+
+For the *strike-level* "positive gamma" usage in the paper, John gave
+the canonical four-way equivalence directly:
+
+> "Positive gamma" (Freddy paper) = "Long gamma" (UI label) = Cyan (color) = "Positive convexity" (vendor docs)
+
+These four labels refer to the same ladder positions. A reader who
+keeps the equivalence in mind can read the paper's strike-level claims
+without translation. The *environment-level* usage ("MMs are Long
+Gamma" as a regime descriptor) is the part that needs translation
+through the table above.
 
 When Freddy says "MMs are Long Gamma → buy on drops, sell on rises →
 stabilizing," that's textbook for the MM side. In customer-perspective

@@ -64,7 +64,7 @@ This Q&A resolves a confusion latent in the vendor docs: GexBot ships
 | Ladder | Netting axis | Visualization | Operational question |
 |---|---|---|---|
 | **GEX profile** (green/red) | Calls vs puts (ignores long/short) | Green = call gex imbalance, Red = put gex imbalance | "What direction does the *convexity* point — up or down?" |
-| **Gamma ladder** (purple/cyan) | Long vs short contracts (ignores call/put) | **Cyan = long gamma, Purple = short gamma** (confirmed by Jasper in the second Q&A below) | "Will dealer hedging *amplify* moves or *fade* them?" |
+| **Gamma ladder** (purple/cyan) | Long vs short contracts (ignores call/put) | **Cyan = long gamma = positive convexity, Purple = short gamma = negative convexity** (per John Kirby 2025-02-21 8:04 AM, the gamma-ladder colors are an exact relabeling of the canonical "positive/negative convexity" terms in [`convexity_ladder.md`](convexity_ladder.md)) | "Will dealer hedging *amplify* moves or *fade* them?" |
 
 The two readings answer two different questions and should not be
 substituted for each other. Freddy's confusion came from reading
@@ -192,6 +192,11 @@ See entries 3, 4, 5 below for the full exchange.
   screenshot added to `images/customer_long_short_gamma_annotated.jpg`.
   Jasper indicated he'll ask Freddy to deprecate MM-perspective
   language; a vocabulary note has been added to community/freddy_methodology.md.
+- 2026-05-22: Entry 6 added — John Kirby's 2025-02-21 8:04 AM post
+  giving the gamma↔convexity equivalence. Three labels (long gamma /
+  cyan / positive convexity) all refer to the same ladder positions.
+  Resolves the strike-level "positive gamma" terminology in Freddy's
+  paper. Top disambiguation table updated to carry the equivalence.
 
 ---
 
@@ -403,3 +408,68 @@ Jasper's "short gamma above for long continuation" (also from entry 2)
 is consistent with "move through customer short gamma": for a long
 trade to continue upward, you want purple bars above so price has
 room to move through them.
+
+---
+
+## 2025-02-21 8:04 AM — John Kirby, gamma ↔ convexity equivalence
+
+**Channel:** GexBot Discord (same thread as the entries above)
+**Date:** 2025-02-21 8:04 AM (9 minutes after John's prior post)
+**Speakers:** community asker (likely Guido — same thread) → John
+Kirby (Moderator)
+
+### Q (community asker)
+
+> Thank You! It would help to mention that in the context of this
+> paper a "Positive gamma zone" is the same as long gamma (which is
+> cyan). Fredy wrote positive gamma, but he ment long gamma. Besides
+> that, the paper is great!
+
+### A (John Kirby)
+
+> Call/Put gamma imbalance (green/red on gex profile)
+> Long/Short gamma (cyan/purple on convexity ladder). This is the
+> same as the Positive/Negative convexity I refer to in the docs.
+
+### Why this matters — the canonical equivalence
+
+John gives us the cleanest dual-axis canonical statement we have. Two
+things land:
+
+1. **The two-axis structure restated** (now confirmed by both
+   principals — Jasper in entries 1 and 5, John here):
+   - GEX profile axis = call vs put = green/red
+   - Gamma ladder axis = long vs short = cyan/purple
+2. **The gamma↔convexity equivalence — NEW.** John explicitly equates
+   the gamma-ladder colors with the vendor docs' "positive/negative
+   convexity" terms:
+
+   | Gamma ladder color | Gamma label | Convexity label |
+   |---|---|---|
+   | Cyan | Long gamma | Positive convexity |
+   | Purple | Short gamma | Negative convexity |
+
+   These three labels refer to the **same thing**. The docs use
+   "convexity" with sign; the UI labels use "gamma" with side; both
+   resolve to the same ladder, the same colors, the same positions.
+
+### What this resolves for Freddy's paper
+
+The asker proposed an inline correction for Freddy's paper: "positive
+gamma zone = long gamma (cyan)." John's reply confirms the
+equivalence. So Freddy's "positive gamma" terminology in the paper IS
+canonical — it just maps through:
+
+> "positive gamma" (Freddy paper) = long gamma (UI) = cyan (color) = positive convexity (vendor docs)
+
+All four phrases refer to the customer-long zones. This SHOULD have
+been spelled out in the paper but wasn't. A reader who keeps the
+equivalence in mind can read Freddy's paper without getting confused.
+
+### Lingering nuance — environment vs strike-level positive gamma
+
+Freddy's paper still uses "Positive Gamma" at two different scopes:
+1. **Environment level** — "Declining vol environment: MMs are Long Gamma (Positive Gamma)" describes overall market positioning
+2. **Strike level** — "positive gamma zones" describes per-strike concentration
+
+John's equivalence resolves the strike-level usage (positive gamma at strike = long gamma at strike = cyan = positive convexity at strike). The environment-level usage is a separate issue — Freddy is using MM-talk for environment classification, which Jasper has already flagged for deprecation (entry 5).

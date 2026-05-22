@@ -90,6 +90,15 @@ for the measurement framework.
 
 9. **NEW from Q&A: negative gamma line aligns with the volume-profile POC.** GexBot staff stated (2025-02 exchange) that the negative gamma line on the convexity ladder falls at the Point of Control — the volume-profile price with the highest traded volume, where indecisive trading concentrates. Worth investigating: if this holds across sessions, the gamma ladder gives us a derivable POC estimate without needing a separate volume profile pull.
 
+10. **Convexity ↔ gamma label equivalence (John Kirby, 2025-02-21 8:04 AM):** The vendor docs' "positive/negative convexity" terms and the UI's "long/short gamma" labels are the *same data with different vocabulary*.
+
+    | Vendor docs term | UI gamma-ladder label | Color |
+    |---|---|---|
+    | Positive convexity | Long gamma | Cyan |
+    | Negative convexity | Short gamma | Purple |
+
+    "Positive convexity" in this file's vendor quotation is identical to "long gamma" in the operational docs. No conversion needed. See [`principal_discord.md`](principal_discord.md) entry 6 for the verbatim statement.
+
 ## Revision log
 
 - 2026-05-22: Initial canonical capture from `documentation - gexbot.html` saved 2026-05-20.
