@@ -81,6 +81,15 @@ perspective:
 | **Subject** | Definition of convexity (Lamborghini analogy) plus a review of another Friday's NQ session showcasing two pattern types |
 | **Transcript** | [`../transcripts/freddy_what_is_convexity.txt`](../transcripts/freddy_what_is_convexity.txt) |
 
+### Video 3 — Freddy's "Understanding the Convexity Ladder" paper
+
+Not a video — a 3-page teaching paper Freddy authored on the Convexity
+Ladder and its role in market structure. Covers regime-level reads (the
+two vol environments, three trading strategies) that sit above the
+trade-by-trade tactics in the two videos. Synthesis in
+[`freddy_convexity_paper.md`](freddy_convexity_paper.md). Carries the
+same MM-vocabulary deprecation note as below.
+
 ### Discord posts
 
 Verbatim archive in [`discord_quotes.md`](discord_quotes.md). Sections
