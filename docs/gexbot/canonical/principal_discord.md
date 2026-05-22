@@ -214,6 +214,15 @@ See entries 3, 4, 5 below for the full exchange.
   long stock) but produce IDENTICAL dynamic hedging (sell on rises,
   buy on drops = stabilizing) — useful corrective to Freddy's
   mechanism inversion in OrderFlow Part 2.
+- 2026-05-22: Entry 9 added — John Kirby 2025-04-04 Q&A with
+  stockholm. Documents a FAILURE MODE of the pivot-at-gamma-levels
+  rule: sustained directional pressure in a put-dominated regime can
+  overwhelm dealer hedging. Three operational points: (a) gamma rules
+  presume dealer hedging is dominant flow, not always true; (b)
+  put-selling-above-spot at very high IV is often a HEDGE for short
+  futures, not bullish positioning; (c) worked example — ES $5237
+  puts sold at 9:50 AM, broken through by 10:15. Plus the Freddy
+  channel URL is captured: youtube.com/@gextrading.
 
 ---
 
@@ -661,3 +670,114 @@ Freddy's OrderFlow Part 2 video (see
 Part 2 "Mechanism inversion" section). Freddy attributed long-gamma
 hedging behavior to MM short gamma; TommyCirj articulates the correct
 long-gamma behavior here and John endorses.
+
+---
+
+## 2025-04-04 — John Kirby on when gamma levels fail to hold
+
+**Channel:** GexBot Discord (channel not captured)
+**Date:** 2025-04-04, 11:21 AM → 12:39 PM
+**Speakers:** stockholm (community) ↔ John Kirby ("John M", Moderator)
+
+This Q&A is important because it documents a **failure mode** of the
+"pivot at gamma levels" rule. The asker observes negative gamma levels
+failing to stop a downside move; John explains why.
+
+### Q1 (stockholm, 11:21 AM)
+
+> negative gamma levels don't seem to be stopping the move. Why is that?
+
+### A1 (John M, 12:14 PM)
+
+> Selling Calls and Selling Puts creates Negative Gamma. It also dumps
+> more liquidity into the markets pushing the market lower. We are
+> also in a "Put" dominated environment.
+
+### Q2 — stockholm's correct mechanical objection (12:19 PM)
+
+> yes but short puts and long puts are counteracting forces from a
+> delta hedging perspective.
+>
+> Long puts will create selling pressure where as short puts will
+> create buying pressure.
+>
+> Im not following why the DEX from short puts is not acting as a
+> stop for the falling markets
+
+### A2 (John M, 12:24 PM)
+
+> Until some sort of positive news flow enters the market to establish
+> short covering and call buying, "Dealers" have to keep selling
+> futures while they are below specific Gamma levels. Their selling
+> is completely outweighing any of the options positions.
+>
+> Did you happen to take note of the "Put Selling" above spot price
+> this morning. There were quite a few attempts where they sold Puts
+> pricing 70% volatility. I would gather that these Put Sales were
+> just hedges for the pounding they were doing on futures.
+
+### A3 (John M, 12:39 PM — worked example)
+
+> They came in and sold a few thousand of the ES $5237.00 Puts at
+> 9:50 am. and by 10:15 they smashed right through them. Those key
+> concepts regarding gamma are from Freddie's YouTube class.
+> <https://www.youtube.com/@gextrading>
+
+### What this establishes
+
+#### 1. Gamma rules have limits — sustained directional pressure can overrun them
+
+The pivot-at-gamma-levels rule (per Jasper, entry 5) and the
+short-put-creates-buy-support intuition (per stockholm's mechanical
+argument) both presume that **dealer hedging is the dominant flow at
+the level**. In a "put dominated environment" with sustained selling,
+that presumption fails: directional flow from real-money sellers can
+exceed the hedging buy pressure that short-put dealers would otherwise
+provide.
+
+**stockholm's mechanical argument is correct** in normal regimes. It
+just doesn't apply when the directional pressure dominates. John
+doesn't dispute the mechanics — he explains why they don't bind here.
+
+#### 2. The "put selling above spot as hedge" pattern
+
+John identifies a specific tactical structure visible that morning:
+institutions **selling puts above spot at 70% IV** as a hedge for
+their primary short-futures position. The put sale isn't a bullish
+bet — it's premium collection on positions they expect to expire
+worthless, used to cushion the short futures.
+
+Operational read: when you see put-selling at very high IV ABOVE spot
+in a falling market, do not interpret it as bullish positioning at
+the level. It's likely the cover, not the trade.
+
+#### 3. The failed-pivot worked example
+
+ES $5237 puts: "a few thousand" sold at 9:50 AM → "smashed right
+through them" by 10:15. About 25 minutes from sale to break. Strong
+short-side pressure can take out put-sale supports within minutes,
+not hours.
+
+#### 4. Freddy's channel URL captured
+
+> Those key concepts regarding gamma are from Freddie's YouTube class.
+> <https://www.youtube.com/@gextrading>
+
+John confirms Freddy's channel is `@gextrading`. This is the source
+for all the Freddy videos already in our community/ docs
+(`freddy_methodology.md`, `freddy_orderflow_series.md`).
+
+### Cross-references
+
+- [`gex_profile.md`](gex_profile.md) observation 8 — the canonical
+  basis for "lead with the gamma ladder for pivots." This Q&A
+  documents *when* that rule fails.
+- [`convexity_ladder.md`](convexity_ladder.md) "Risk reading vs
+  direction reading" — canonical vendor text already says the
+  convexity ladder is "less about discerning direction, and more
+  about measuring risk." This Q&A operationalizes when that risk
+  reading should NOT be inverted into a direction call.
+- [`../community/freddy_methodology.md`](../community/freddy_methodology.md)
+  §1 max-neg-gamma exception — this Q&A adds nuance: even the
+  max-neg-gamma magnet can fail when the regime is strongly
+  directional. Worth flagging in §1 as a regime caveat.
