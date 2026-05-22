@@ -1,0 +1,437 @@
+[
+  {
+    "start": 2.76,
+    "duration": 4.079,
+    "text": "hey everyone welcome back to the channel"
+  },
+  {
+    "start": 5.04,
+    "duration": 4.0,
+    "text": "today we're diving into one of the most"
+  },
+  {
+    "start": 6.839,
+    "duration": 4.321,
+    "text": "crucial Concepts in trading realized"
+  },
+  {
+    "start": 9.04,
+    "duration": 4.4,
+    "text": "versus implied volatility let's break it"
+  },
+  {
+    "start": 11.16,
+    "duration": 4.479,
+    "text": "down in simple terms shall we all right"
+  },
+  {
+    "start": 13.44,
+    "duration": 4.48,
+    "text": "think of a car driving on a road if it's"
+  },
+  {
+    "start": 15.639,
+    "duration": 4.241,
+    "text": "cruising at a steady 40 mph without"
+  },
+  {
+    "start": 17.92,
+    "duration": 5.4,
+    "text": "sudden speed changes that's low"
+  },
+  {
+    "start": 19.88,
+    "duration": 6.28,
+    "text": "volatility but if it speeds up to 80 mph"
+  },
+  {
+    "start": 23.32,
+    "duration": 6.4,
+    "text": "suddenly slows to 10 mph then jumps to"
+  },
+  {
+    "start": 26.16,
+    "duration": 5.199,
+    "text": "100 mph that's high volatility now apply"
+  },
+  {
+    "start": 29.72,
+    "duration": 3.359,
+    "text": "this to the stock market if the price"
+  },
+  {
+    "start": 31.359,
+    "duration": 4.841,
+    "text": "moves in a straight line with small"
+  },
+  {
+    "start": 33.079,
+    "duration": 5.121,
+    "text": "changes that's low realized volatility"
+  },
+  {
+    "start": 36.2,
+    "duration": 4.24,
+    "text": "if the price jumps up and down"
+  },
+  {
+    "start": 38.2,
+    "duration": 4.96,
+    "text": "unpredictably that's high realized"
+  },
+  {
+    "start": 40.44,
+    "duration": 5.799,
+    "text": "volatility next let's talk about the key"
+  },
+  {
+    "start": 43.16,
+    "duration": 5.2,
+    "text": "difference between realized and implied"
+  },
+  {
+    "start": 46.239,
+    "duration": 4.48,
+    "text": "volatility imagine you own a weather"
+  },
+  {
+    "start": 48.36,
+    "duration": 3.92,
+    "text": "Insurance business realized volatility"
+  },
+  {
+    "start": 50.719,
+    "duration": 4.0,
+    "text": "is what actually happens with the"
+  },
+  {
+    "start": 52.28,
+    "duration": 4.84,
+    "text": "weather if it's stable your payouts are"
+  },
+  {
+    "start": 54.719,
+    "duration": 4.561,
+    "text": "low if hurricanes hit unexpectedly"
+  },
+  {
+    "start": 57.12,
+    "duration": 4.72,
+    "text": "payouts are high implied volatility on"
+  },
+  {
+    "start": 59.28,
+    "duration": 4.64,
+    "text": "the other hand is the forecast what"
+  },
+  {
+    "start": 61.84,
+    "duration": 4.319,
+    "text": "people think will happen in the future"
+  },
+  {
+    "start": 63.92,
+    "duration": 4.839,
+    "text": "if they expect hurricanes they'll pay"
+  },
+  {
+    "start": 66.159,
+    "duration": 5.6,
+    "text": "more for insurance even if the storm"
+  },
+  {
+    "start": 68.759,
+    "duration": 5.601,
+    "text": "never comes in options trading realized"
+  },
+  {
+    "start": 71.759,
+    "duration": 6.441,
+    "text": "volatility is how much the ndx NASDAQ"
+  },
+  {
+    "start": 74.36,
+    "duration": 5.64,
+    "text": "100 actually moves implied volatility IV"
+  },
+  {
+    "start": 78.2,
+    "duration": 4.0,
+    "text": "is how much the options Market expects"
+  },
+  {
+    "start": 80.0,
+    "duration": 4.479,
+    "text": "ndx to move in the future now how does"
+  },
+  {
+    "start": 82.2,
+    "duration": 5.44,
+    "text": "an options seller make money in a slow"
+  },
+  {
+    "start": 84.479,
+    "duration": 5.041,
+    "text": "down Trend imagine a casino owner he"
+  },
+  {
+    "start": 87.64,
+    "duration": 4.4,
+    "text": "makes money when gamblers overestimate"
+  },
+  {
+    "start": 89.52,
+    "duration": 4.52,
+    "text": "their ch chances of winning now let's"
+  },
+  {
+    "start": 92.04,
+    "duration": 5.32,
+    "text": "say an options seller writes a contract"
+  },
+  {
+    "start": 94.04,
+    "duration": 5.2,
+    "text": "expecting ndx to have big swings High IV"
+  },
+  {
+    "start": 97.36,
+    "duration": 3.92,
+    "text": "but the market moves down slowly at a"
+  },
+  {
+    "start": 99.24,
+    "duration": 4.159,
+    "text": "constant Pace because the market is"
+  },
+  {
+    "start": 101.28,
+    "duration": 4.839,
+    "text": "moving in a predictable controlled way"
+  },
+  {
+    "start": 103.399,
+    "duration": 6.881,
+    "text": "low realized volatility the options"
+  },
+  {
+    "start": 106.119,
+    "duration": 6.04,
+    "text": "seller profits why because options were"
+  },
+  {
+    "start": 110.28,
+    "duration": 4.72,
+    "text": "priced as if the market would swing"
+  },
+  {
+    "start": 112.159,
+    "duration": 5.361,
+    "text": "wildly High implied volatility but that"
+  },
+  {
+    "start": 115.0,
+    "duration": 5.079,
+    "text": "didn't happen so as long as the market"
+  },
+  {
+    "start": 117.52,
+    "duration": 4.959,
+    "text": "continues in a steady downtrend the"
+  },
+  {
+    "start": 120.079,
+    "duration": 4.68,
+    "text": "seller keeps pocketing the premiums but"
+  },
+  {
+    "start": 122.479,
+    "duration": 4.32,
+    "text": "here's where the game changes imagine"
+  },
+  {
+    "start": 124.759,
+    "duration": 5.28,
+    "text": "you're riding a bike downhill at a"
+  },
+  {
+    "start": 126.799,
+    "duration": 5.481,
+    "text": "steady Pace low realized volatility you"
+  },
+  {
+    "start": 130.039,
+    "duration": 4.961,
+    "text": "feel in control no surprises you're"
+  },
+  {
+    "start": 132.28,
+    "duration": 5.0,
+    "text": "adjusting smoothly making money suddenly"
+  },
+  {
+    "start": 135.0,
+    "duration": 3.8,
+    "text": "there's a sharp U-turn you weren't"
+  },
+  {
+    "start": 137.28,
+    "duration": 4.08,
+    "text": "prepared for this move you were"
+  },
+  {
+    "start": 138.8,
+    "duration": 4.439,
+    "text": "expecting things to continue steadily"
+  },
+  {
+    "start": 141.36,
+    "duration": 4.32,
+    "text": "you have to react fast slam the brakes"
+  },
+  {
+    "start": 143.239,
+    "duration": 4.681,
+    "text": "and shift gears this is exactly what"
+  },
+  {
+    "start": 145.68,
+    "duration": 4.44,
+    "text": "happens when ndx suddenly reverses"
+  },
+  {
+    "start": 147.92,
+    "duration": 4.84,
+    "text": "Direction after a steady trend the"
+  },
+  {
+    "start": 150.12,
+    "duration": 5.64,
+    "text": "relationship between realized volatility"
+  },
+  {
+    "start": 152.76,
+    "duration": 5.16,
+    "text": "and implied volatility shifts the market"
+  },
+  {
+    "start": 155.76,
+    "duration": 4.16,
+    "text": "moves more than expected option sellers"
+  },
+  {
+    "start": 157.92,
+    "duration": 4.2,
+    "text": "who are making easy money now panic and"
+  },
+  {
+    "start": 159.92,
+    "duration": 4.84,
+    "text": "adjust their positions causing even more"
+  },
+  {
+    "start": 162.12,
+    "duration": 4.6,
+    "text": "volatility so why does this happen"
+  },
+  {
+    "start": 164.76,
+    "duration": 4.68,
+    "text": "options pricing is based on future"
+  },
+  {
+    "start": 166.72,
+    "duration": 5.159,
+    "text": "expectations IV when the market is"
+  },
+  {
+    "start": 169.44,
+    "duration": 5.24,
+    "text": "predictable realized volatility stays"
+  },
+  {
+    "start": 171.879,
+    "duration": 5.041,
+    "text": "low and sellers profit when the market"
+  },
+  {
+    "start": 174.68,
+    "duration": 5.199,
+    "text": "surprises everyone with a big move or"
+  },
+  {
+    "start": 176.92,
+    "duration": 5.319,
+    "text": "reversal realized volatility spikes and"
+  },
+  {
+    "start": 179.879,
+    "duration": 4.601,
+    "text": "option sellers are suddenly in trouble"
+  },
+  {
+    "start": 182.239,
+    "duration": 4.521,
+    "text": "to sum it all up if the market trends"
+  },
+  {
+    "start": 184.48,
+    "duration": 4.52,
+    "text": "steadily option sellers win because"
+  },
+  {
+    "start": 186.76,
+    "duration": 4.88,
+    "text": "realized volatility stays lower than"
+  },
+  {
+    "start": 189.0,
+    "duration": 4.92,
+    "text": "implied volatility but if a sudden"
+  },
+  {
+    "start": 191.64,
+    "duration": 4.56,
+    "text": "reversal happens realized volatility"
+  },
+  {
+    "start": 193.92,
+    "duration": 4.64,
+    "text": "jumps breaking the stable relationship"
+  },
+  {
+    "start": 196.2,
+    "duration": 4.36,
+    "text": "with implied volatility this leads to"
+  },
+  {
+    "start": 198.56,
+    "duration": 5.039,
+    "text": "unexpected market movement forcing"
+  },
+  {
+    "start": 200.56,
+    "duration": 4.56,
+    "text": "option sellers to adjust often at a loss"
+  },
+  {
+    "start": 203.599,
+    "duration": 3.761,
+    "text": "all right that's it for today if you"
+  },
+  {
+    "start": 205.12,
+    "duration": 4.319,
+    "text": "found this video helpful don't forget to"
+  },
+  {
+    "start": 207.36,
+    "duration": 4.4,
+    "text": "like And subscribe catch you in the next"
+  },
+  {
+    "start": 209.439,
+    "duration": 2.321,
+    "text": "one"
+  }
+]

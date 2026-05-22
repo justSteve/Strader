@@ -112,6 +112,15 @@ trade-by-trade tactics in the two videos. Synthesis in
 [`freddy_convexity_paper.md`](freddy_convexity_paper.md). Carries the
 same MM-vocabulary deprecation note as below.
 
+### OrderFlow educational series (separate file)
+
+Freddy has begun a multi-part series introducing GexBot's OrderFlow
+tool (a subscription tier Strader doesn't currently use). Synthesized
+separately in [`freddy_orderflow_series.md`](freddy_orderflow_series.md)
+because the format is narrator-style explainers rather than trade
+reviews, and the underlying tool isn't part of our current corpus.
+Part 1 covers realized vs implied volatility foundation.
+
 ### Discord posts
 
 Verbatim archive in [`discord_quotes.md`](discord_quotes.md). Sections
