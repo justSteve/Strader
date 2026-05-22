@@ -120,3 +120,96 @@ Two framing additions, no new mechanics:
 
 No new operational rules. Both points fold into existing sections as
 brief addenda rather than new sections.
+
+---
+
+## Date unknown — community Q&A — "lifted vols" / "depressed vols"
+
+**Channel:** GexBot Discord (channel not captured in source)
+**Date:** not captured in source paste (Steve to confirm)
+**Speakers:** unattributed question (someone asking for vocabulary
+clarification) → unattributed answer (reads like Freddy Sarmiento:
+"for us Futures traders" voice + "let's see if Jass explain it better"
+sign-off; not confirmed)
+
+### Q
+
+> But when Jass and others talk about "lifted vols" or "depress vols",
+> what are they talking about. Or if this has been answered already,
+> can someone point me to it. Or is it as simple as lifted vols means
+> volatility is rising.
+
+### A
+
+> I understand it like this:
+>
+> **Lifted Vols (Rising Implied Volatility):**
+> This means implied volatility has increased.
+> It often happens when traders are aggressively buying options (calls
+> or puts) because demand pushes prices higher, which in turn increases
+> IV.
+> "Higher IV makes options more expensive."
+>
+> **Depressed Vols (Falling Implied Volatility):**
+> This means implied volatility has decreased.
+> Usually happens when traders are selling options aggressively,
+> reducing demand, and causing IV to drop.
+> Common in calm or bullish markets when risk perception is low.
+> "Lower IV makes options cheaper."
+>
+> Example:
+> If a big trader sells a large volume of SPX straddles (selling both
+> puts and calls), market makers will adjust their pricing models and
+> depress implied volatility.
+>
+> Easy way to remember — at least for me:
+>
+> Lifted Vols = Higher IV (Buying pressure, uncertainty, EXPENSIVE options)
+> Depressed Vols = Lower IV (Selling pressure, calm markets, CHEAPER options)
+>
+> and for us Futures traders, as options are more expensive, may create
+> — reversion — and as options are cheap, may create continuation…
+>
+> But let's see if Jass explain it better
+
+### Vocabulary table
+
+| Phrase | Meaning | Driver | Option price | Trader implication (community-derived) |
+|---|---|---|---|---|
+| **Lifted vols** | Rising IV | Aggressive option buying | Expensive | Possible reversion |
+| **Depressed vols** | Falling IV | Aggressive option selling | Cheap | Possible continuation |
+
+### Canonical cross-references
+
+The mechanism here is canonically documented:
+
+- [`canonical/gamma_vanna_video.md`](../canonical/gamma_vanna_video.md) §5
+  ("Why market gamma rarely goes net-negative") states the bid-up
+  dynamic verbatim: "in order for market makers to be short gamma,
+  investors need to bid for options. The bidding of options has a
+  tendency to increase implied volatility."
+- [`canonical/options_profile.md`](../canonical/options_profile.md)
+  "Volatility regime modulation" covers how *rising* vs *falling* vol
+  modulates wall-vs-accelerator behavior. The community implication
+  here (expensive→reversion, cheap→continuation) is consistent with
+  the *falling-vol-stalls-positive-convexity* leg of that table but
+  needs verification against the full polarity matrix.
+- [`canonical/convexity_ladder.md`](../canonical/convexity_ladder.md)
+  observation 2 — the explicit polarity flip table for positive vs
+  negative convexity under rising vs falling vol regimes.
+
+### Caveat
+
+The "expensive→reversion / cheap→continuation" rule is the answerer's
+own intuition (note the "may create" hedge). It's a useful first-pass
+heuristic but it's *not* principal-attributed and the canonical regime
+modulation is more nuanced — what reverts and what continues depends
+on the convexity sign at the strike *and* the vol-regime direction.
+Use the canonical polarity table for trade-decision-grade reads; this
+mnemonic for vocabulary recall.
+
+### Worth following up
+
+The poster explicitly asked for a principal answer ("let's see if Jass
+explain it better"). If Jasper followed up in the thread, that response
+would be canonical-tier and belongs in `../canonical/principal_discord.md`.
