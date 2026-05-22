@@ -26,19 +26,58 @@ operational instruction. It exists as a reference so future Strader
 sessions have a baseline of "what one experienced practitioner says
 GexBot looks like in use," to compare against the corpus we build.
 
-## Source
+## Sources
+
+### Video 1 — "Trading with Gamma - Jan 24"
 
 | | |
 |---|---|
-| **Video URL** | <https://www.youtube.com/watch?v=vnb92d3lVFs> |
-| **Title** | "Trading with Gamma - Jan 24" |
-| **Speaker** | Freddy (GexBot Discord community member, NQ futures trader) |
+| **URL** | <https://www.youtube.com/watch?v=vnb92d3lVFs> |
 | **Length** | 55:24, 1092 transcript snippets |
-| **Transcript** | Auto-captioned via `youtube-transcript-api`. Audio quality: speaker has an accent; conceptual content captured cleanly, jargon is noisy. Common mistranscriptions: "GubO" / "Guest boots" / "GP" / "gets boot" → GexBot. "Cella" → seller. "tie stops" → tight stops. "CES" → customer. "Trace" / "tray" → traded. "Mason money" → making money. |
-| **Primary source** | [`docs/gexbot/transcripts/2026-01-24_freddy_trading_with_gamma.txt`](transcripts/2026-01-24_freddy_trading_with_gamma.txt) (with timestamps every 60s) |
+| **Date** | 2025-01-24 |
+| **Subject** | A full trade-by-trade review of his Friday Jan 24 NQ session |
+| **Transcript** | [`../transcripts/2026-01-24_freddy_trading_with_gamma.txt`](../transcripts/2026-01-24_freddy_trading_with_gamma.txt) |
 
-Every claim below cites a transcript timestamp range. To verify, search
-the timestamped txt for the cited minute marker.
+### Video 2 — "What is Convexity"
+
+| | |
+|---|---|
+| **URL** | <https://www.youtube.com/watch?v=yTCRHW0eLNE> |
+| **Length** | 25:50, 520 transcript snippets |
+| **Date** | unknown (post-2025-01-24; references back to Video 1) |
+| **Subject** | Definition of convexity (Lamborghini analogy) plus a review of another Friday's NQ session showcasing two pattern types |
+| **Transcript** | [`../transcripts/freddy_what_is_convexity.txt`](../transcripts/freddy_what_is_convexity.txt) |
+
+### Discord posts
+
+Verbatim archive in [`discord_quotes.md`](discord_quotes.md). Sections
+below cite individual posts by date where they extend video material.
+
+### Transcription noise
+
+Auto-captioned, speaker has a noticeable accent. Conceptual content
+captures cleanly; jargon is noisy. Common mistranscriptions across
+both videos:
+
+| As transcribed | Actual term |
+|---|---|
+| `GubO`, `Guest boots`, `GP`, `gets boot`, `guas`, `gubo`, `getb` | GexBot |
+| `GMA`, `GAMA`, `gama`, `camera` (rare) | gamma |
+| `complexity` | convexity |
+| `Cella` | seller |
+| `tie stops` | tight stops |
+| `CES` | customer |
+| `Trace`, `tray` | trades / traded |
+| `Mason money` | making money |
+| `John` (when preceding "24") | Jan (Jan 24) |
+| `Delta H`, `Delta new Neal` | delta neutral / delta hedged |
+| `Lo` (mid-phrase) | low / little |
+| `enq`, `inq`, `in Q`, `D andq` | NQ |
+| `Vold surface`, `vol surface` | vol surface |
+
+Every claim below cites a transcript timestamp range and which video.
+To verify, search the relevant timestamped txt for the cited minute
+marker.
 
 ## Confidence flags
 
@@ -66,19 +105,56 @@ it.
 
 ### Convexity defined
 
-Freddy uses "high net convexity" and "excess gamma" interchangeably. The
-explicit definition comes from his Discord follow-up:
+Freddy uses "high net convexity" and "excess gamma" interchangeably. He
+gives the definition twice — once in Discord, once in Video 2 — and
+makes the equation explicit:
 
 > Convexity is the non-linear relationship between the underlying price
 > and the options, measured by gamma.
+> (Discord #theory-questions, 2025-01-28)
 
-(Discord #theory-questions, 2025-01-28 — see [`discord_quotes.md`](discord_quotes.md))
+> If you guys are new trading with gamma and new to the GexBot channel,
+> you can think of convexity as another term for gamma exposure. So
+> basically convexity is the same as gamma exposure. So when the gamma
+> is high… the option's delta changes rapidly for small moves in the
+> underlying, leading to a curve, nonlinear relationship between the
+> option price and the underlying price.
+> (Video 2 "What is Convexity" *[04:30–05:30]*)
 
-Gamma *is* the measurement of convexity. When the video says "high net
-convexity bar" the meaning is "the strike where the aggregate
-non-linearity of dealer hedging obligations is concentrated." Quoting
-Jasper through Freddy: "convexity is a key concept option traders
-understand well... and that convexity is key for us Futures traders too."
+**Convexity is the shape; gamma is the measurement.** Same phenomenon,
+two words. GexBot uses "convexity" rather than "gex" in their UI to
+keep the visceral, non-linear quality of the relationship front-of-mind
+(see canonical [`convexity_ladder.md`](../canonical/convexity_ladder.md)).
+
+#### The Lamborghini analogy (Video 2 *[01:30–03:00]*)
+
+Freddy's explanation for newcomers — the cleanest concrete framing in
+the methodology:
+
+> Imagine you're driving your nice Lamborghini and you turn 15° to the
+> left. In a low convexity environment, you turn your steering wheel a
+> little to the left, the car also turns a little — proportionally.
+> That's low convexity: you move 15° to the left and the car moves a
+> little, proportionally to the left as well.
+>
+> But when you have high convexity and you move the steering wheel the
+> same 15°, this small turn of the wheel suddenly makes the car turn
+> sharply. That curve in the response is analogous to high convexity.
+
+The mapping:
+- **Steering wheel input** = underlying price change
+- **Car response** = option delta change
+- **Low convexity** = option's delta moves proportionally to underlying
+- **High convexity** = option's delta moves *more than* proportionally
+
+This is why high-convexity strikes are where dealer hedging cascades:
+a small move in the underlying forces a *disproportionately large*
+rebalance, which itself moves the underlying further — the gamma
+squeeze loop ([§13](#13-the-gamma-squeeze-loop-and-who-hedges)).
+
+Quoting Jasper through Freddy: "Convexity is a key concept option
+traders understand well... and that convexity is key for us Futures
+traders too."
 
 ### The binary choice (Discord restatement)
 
@@ -417,6 +493,131 @@ filter:
 Combine with the §1 binary (at-level vs between-level) and §11
 (gamma-shift = sentiment): the full read-order is **zero-gamma regime →
 nearest excess gamma level → cross trigger → gamma-shift watch**.
+
+## 13. The gamma squeeze loop, and who hedges [HIGH]
+
+*Video 2 [03:00–05:00] and [11:00–13:00]*
+
+In Video 1 the discussion of dealer hedging is implicit. Video 2 makes
+the mechanism explicit and adds a meaningful nuance: **it is not only
+market makers who hedge dynamically.**
+
+> It's not only the market makers who actually have to hedge. Most of
+> the options traders in the NDX, they are sophisticated options
+> traders, so they don't put an option and leave it like that — they
+> actually dynamically hedge that option in the NQ market too.
+> *[Video 2, ~11:30]*
+
+This is operationally significant. The "flow" visible at excess-gamma
+levels is the *aggregate* of MM hedging + sophisticated participant
+hedging, not just MM hedging. The institutional positioning Freddy
+trades around is built by parties on both sides of the dealer book.
+
+### The squeeze loop
+
+Freddy walks through the bullish gamma-squeeze loop on Friday's trade
+(Video 2):
+
+1. Spot starts moving up toward an excess-gamma level (big OTM call,
+   157 contracts — likely a single institution)
+2. High-convexity environment: small move in NQ causes
+   *disproportionately large* delta changes on those options
+3. Dealers + sophisticated participants are forced to buy NQ to re-hedge
+4. That buying pushes NQ further up
+5. Higher NQ → more delta change at those strikes → more forced buying
+6. Loop continues until the gamma magnet is reached or until volatility
+   regime flips
+
+> If NQ moves a little bit up, then all these market makers and options
+> participants as well, they say "now my gamma is telling me that I
+> have to buy more"… and as they buy more NQ, NQ goes up… and then if
+> NQ goes up very quick as we saw on Friday, the gamma says "now you
+> are no [longer] delta neutral, you need to buy more in NQ"… it's a
+> loop and the futures send higher and higher. *[Video 2, ~04:30]*
+
+He calls this **the gamma squeeze**. The mirror-image loop runs on the
+downside when the dominant excess-gamma strike is below spot and
+negative-convexity. Same mechanism, opposite sign.
+
+### Vol-regime modulation (passing reference)
+
+In Video 2 *[~10:00]* Freddy mentions briefly:
+
+> Usually these massive levels tend to work as a support or resistance,
+> [but it] depends of if we're in a high volatility or low volatility
+> environment… that's something we'll talk about in future videos.
+
+He doesn't develop it. The canonical version of this — positive
+convexity stalls in falling vol but is passed through in rising vol;
+negative convexity flips the opposite way — lives in
+[`../canonical/convexity_ladder.md`](../canonical/convexity_ladder.md)
+"Convexity Ladder and the Volatility Environment." Cross-reference
+when the regime is in doubt.
+
+## 14. Two trade patterns — magnet vs resistance/exhaustion [HIGH]
+
+*Video 2 [06:00–25:00], full session walkthrough*
+
+In Video 2 Freddy retroactively reviews a Friday's session and
+categorizes the day into two distinct trade types. This sharpens the
+entry-mechanics framing from §3 by making the trade-context explicit:
+*what kind of gamma situation is this?*
+
+### Pattern A: Magnet trade
+
+A single excess-gamma strike dominates — large enough that its
+positioning weight overwhelms everything else on the chain. Spot is
+some distance from it, and the strike pulls price toward itself via the
+dealer-hedging mechanism in §13.
+
+Worked example from Video 2 *[07:00–13:00]*:
+- 09:35 ET: a 157-contract bought-call (NDX) lands as a massive excess
+  gamma strike above spot at 21,833
+- Spot at 21,800 has no significant gamma below to support, the lone
+  big magnet above
+- Bias: long, target = the magnet
+- Confirmation: market structure (higher highs and higher lows) — the
+  confluence requirement from §5 still applies
+- Trade: long, taking partial profit at intermediate excess-gamma
+  levels per §3 R:R rule
+
+Freddy notes: "That's a tricky trade to be honest because I like to
+enter only on levels of gamma, but when you have this big gamma
+which… is bigger than anything… 157 contracts in the NDX market is
+quite a lot." The size of the imbalance overrides the usual entry
+discipline.
+
+### Pattern B: Resistance + exhaustion trade
+
+The dominant excess gamma is on the *opposite* side of spot from the
+trade direction — it acts as a wall the underlying repeatedly fails to
+break. Time-compression at retests (§9) confirms the wall is holding
+and the defenders behind it are getting weaker, and the short trade
+sets up on the eventual failure.
+
+Worked example from Video 2 *[14:00–22:00]*:
+- 12:30 ET: spot near max negative gamma, attempts to break it
+- Three retests, each with shorter time between them and lower highs
+  on the rally attempts
+- Pattern is exactly §9's time-compression read
+- Break of structural support → short trade
+- First target: next excess-gamma level down (acts as magnet)
+- Final target: max negative gamma below — price went there "to the
+  tick and bounced" in his words *[Video 2, ~22:00]*
+
+### When to expect each pattern
+
+The two patterns map naturally to the zero-gamma regime read (§12):
+- **Pattern A (magnet)** dominates when the chain has one or two
+  oversized strikes that overwhelm everything else — usually means a
+  single institution has taken a directional bet that day
+- **Pattern B (resistance/exhaustion)** dominates when the chain has
+  well-distributed positioning with clear max-positive/max-negative
+  poles — the normal day
+
+Reading the convexity ladder shape at the open (concentrated vs
+distributed — see canonical [`convexity_ladder.md`](../canonical/convexity_ladder.md))
+gives you the session-character bias before the first trade.
 
 ---
 

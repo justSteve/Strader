@@ -1,0 +1,2602 @@
+[
+  {
+    "start": 1.2,
+    "duration": 5.32,
+    "text": "hello um I want"
+  },
+  {
+    "start": 3.799,
+    "duration": 5.081,
+    "text": "to bring this short video I promise it's"
+  },
+  {
+    "start": 6.52,
+    "duration": 5.88,
+    "text": "going to be short because what I do"
+  },
+  {
+    "start": 8.88,
+    "duration": 7.159,
+    "text": "every night I review the trading day and"
+  },
+  {
+    "start": 12.4,
+    "duration": 7.4,
+    "text": "I want to see what um what I miss or"
+  },
+  {
+    "start": 16.039,
+    "duration": 7.56,
+    "text": "what I could improve with um um reading"
+  },
+  {
+    "start": 19.8,
+    "duration": 5.639,
+    "text": "GMA or reading the guas and this is"
+  },
+  {
+    "start": 23.599,
+    "duration": 5.6,
+    "text": "something very important I want to show"
+  },
+  {
+    "start": 25.439,
+    "duration": 7.481,
+    "text": "you today because on Friday uh we have"
+  },
+  {
+    "start": 29.199,
+    "duration": 7.081,
+    "text": "two very Trace that you will see again"
+  },
+  {
+    "start": 32.92,
+    "duration": 6.52,
+    "text": "and again and again when you use the uh"
+  },
+  {
+    "start": 36.28,
+    "duration": 5.439,
+    "text": "the tool from gubo right with a little"
+  },
+  {
+    "start": 39.44,
+    "duration": 6.16,
+    "text": "bit of Market structure you could"
+  },
+  {
+    "start": 41.719,
+    "duration": 6.36,
+    "text": "actually um combine with G which is"
+  },
+  {
+    "start": 45.6,
+    "duration": 5.4,
+    "text": "basically the most important part of"
+  },
+  {
+    "start": 48.079,
+    "duration": 5.64,
+    "text": "this analysis and and you basically will"
+  },
+  {
+    "start": 51.0,
+    "duration": 5.48,
+    "text": "have like trads with high probability of"
+  },
+  {
+    "start": 53.719,
+    "duration": 5.921,
+    "text": "success right so we need to understand"
+  },
+  {
+    "start": 56.48,
+    "duration": 7.48,
+    "text": "um that as I say before these bars are"
+  },
+  {
+    "start": 59.64,
+    "duration": 5.839,
+    "text": "here are like high net convexity right"
+  },
+  {
+    "start": 63.96,
+    "duration": 5.44,
+    "text": "or excess of"
+  },
+  {
+    "start": 65.479,
+    "duration": 6.401,
+    "text": "gamma we are Futures Traders and I want"
+  },
+  {
+    "start": 69.4,
+    "duration": 6.12,
+    "text": "to make this video uh because few of the"
+  },
+  {
+    "start": 71.88,
+    "duration": 5.32,
+    "text": "guys new guys coming into the channel um"
+  },
+  {
+    "start": 75.52,
+    "duration": 4.84,
+    "text": "you know they they come in here they see"
+  },
+  {
+    "start": 77.2,
+    "duration": 5.2,
+    "text": "all these oh wait a second this is the"
+  },
+  {
+    "start": 80.36,
+    "duration": 3.68,
+    "text": "options profile this is the excess of"
+  },
+  {
+    "start": 82.4,
+    "duration": 5.96,
+    "text": "GMA this is"
+  },
+  {
+    "start": 84.04,
+    "duration": 5.96,
+    "text": "convexity what is complexity right so I"
+  },
+  {
+    "start": 88.36,
+    "duration": 4.48,
+    "text": "I was thinking about how to explain"
+  },
+  {
+    "start": 90.0,
+    "duration": 6.479,
+    "text": "complexity and and and why so important"
+  },
+  {
+    "start": 92.84,
+    "duration": 6.08,
+    "text": "for the analysis we do every day and and"
+  },
+  {
+    "start": 96.479,
+    "duration": 5.441,
+    "text": "and I think the best way to explain it"
+  },
+  {
+    "start": 98.92,
+    "duration": 5.08,
+    "text": "is like this so if if you bear with me"
+  },
+  {
+    "start": 101.92,
+    "duration": 5.799,
+    "text": "and keep this concept in mind but"
+  },
+  {
+    "start": 104.0,
+    "duration": 5.32,
+    "text": "complexity is how curve or nonlinear"
+  },
+  {
+    "start": 107.719,
+    "duration": 4.72,
+    "text": "this is very important"
+  },
+  {
+    "start": 109.32,
+    "duration": 6.92,
+    "text": "nonlinear the options price response is"
+  },
+  {
+    "start": 112.439,
+    "duration": 8.121,
+    "text": "to movements in the order line right"
+  },
+  {
+    "start": 116.24,
+    "duration": 7.72,
+    "text": "so let me do an example here if"
+  },
+  {
+    "start": 120.56,
+    "duration": 7.08,
+    "text": "imagine you driving your nice um your"
+  },
+  {
+    "start": 123.96,
+    "duration": 10.44,
+    "text": "nice Lamborghini right and you go your"
+  },
+  {
+    "start": 127.64,
+    "duration": 9.56,
+    "text": "nice Lamborghini and you turn 15° to the"
+  },
+  {
+    "start": 134.4,
+    "duration": 6.479,
+    "text": "left in a low"
+  },
+  {
+    "start": 137.2,
+    "duration": 7.16,
+    "text": "convexity um environment if when you"
+  },
+  {
+    "start": 140.879,
+    "duration": 6.561,
+    "text": "turn your 15° to the left you turn your"
+  },
+  {
+    "start": 144.36,
+    "duration": 7.239,
+    "text": "steering wheel a little to the left the"
+  },
+  {
+    "start": 147.44,
+    "duration": 6.72,
+    "text": "car the car also turns a little"
+  },
+  {
+    "start": 151.599,
+    "duration": 5.081,
+    "text": "right that's does and it turns"
+  },
+  {
+    "start": 154.16,
+    "duration": 5.28,
+    "text": "proportionally that's like having a low"
+  },
+  {
+    "start": 156.68,
+    "duration": 6.08,
+    "text": "complexity right you move 15° to the"
+  },
+  {
+    "start": 159.44,
+    "duration": 5.92,
+    "text": "left and the car moves a little or"
+  },
+  {
+    "start": 162.76,
+    "duration": 4.119,
+    "text": "proportionally to the left as well but"
+  },
+  {
+    "start": 165.36,
+    "duration": 7.12,
+    "text": "when you have high"
+  },
+  {
+    "start": 166.879,
+    "duration": 5.601,
+    "text": "convexity and you move the car the same"
+  },
+  {
+    "start": 172.64,
+    "duration": 5.72,
+    "text": "15°"
+  },
+  {
+    "start": 175.04,
+    "duration": 7.24,
+    "text": "right if this a small turn of the wheel"
+  },
+  {
+    "start": 178.36,
+    "duration": 6.56,
+    "text": "suddenly makes the car turn sharply"
+  },
+  {
+    "start": 182.28,
+    "duration": 5.64,
+    "text": "right that curve in the response is"
+  },
+  {
+    "start": 184.92,
+    "duration": 5.92,
+    "text": "analogous to high convexity so in"
+  },
+  {
+    "start": 187.92,
+    "duration": 5.959,
+    "text": "options this means that as the"
+  },
+  {
+    "start": 190.84,
+    "duration": 7.64,
+    "text": "underlying um asset moves like we are"
+  },
+  {
+    "start": 193.879,
+    "duration": 7.761,
+    "text": "trading in Q the features on the Q right"
+  },
+  {
+    "start": 198.48,
+    "duration": 5.36,
+    "text": "if then Q moves a little bit to the"
+  },
+  {
+    "start": 201.64,
+    "duration": 5.04,
+    "text": "upside and I'm going to use the upside"
+  },
+  {
+    "start": 203.84,
+    "duration": 5.599,
+    "text": "example because that that what was"
+  },
+  {
+    "start": 206.68,
+    "duration": 4.639,
+    "text": "happening on Friday at least until 1:30"
+  },
+  {
+    "start": 209.439,
+    "duration": 5.681,
+    "text": "in the morning in the"
+  },
+  {
+    "start": 211.319,
+    "duration": 4.92,
+    "text": "afternoon so that options the Delta of"
+  },
+  {
+    "start": 215.12,
+    "duration": 3.8,
+    "text": "those"
+  },
+  {
+    "start": 216.239,
+    "duration": 6.481,
+    "text": "options doesn't change in the same"
+  },
+  {
+    "start": 218.92,
+    "duration": 6.48,
+    "text": "proportion it it basically they change"
+  },
+  {
+    "start": 222.72,
+    "duration": 5.4,
+    "text": "in a bigger magnitude which is important"
+  },
+  {
+    "start": 225.4,
+    "duration": 4.88,
+    "text": "to know and what happen with the when"
+  },
+  {
+    "start": 228.12,
+    "duration": 5.759,
+    "text": "the Delta change in a bigger magnitude"
+  },
+  {
+    "start": 230.28,
+    "duration": 8.239,
+    "text": "than the actual underlying basically"
+  },
+  {
+    "start": 233.879,
+    "duration": 7.481,
+    "text": "gamma will tell to um doesn't matter"
+  },
+  {
+    "start": 238.519,
+    "duration": 6.8,
+    "text": "client or Market m care you need to"
+  },
+  {
+    "start": 241.36,
+    "duration": 5.079,
+    "text": "hedge a lot more and you need to buy a"
+  },
+  {
+    "start": 245.319,
+    "duration": 4.12,
+    "text": "lot"
+  },
+  {
+    "start": 246.439,
+    "duration": 5.321,
+    "text": "more because we are in a high convexity"
+  },
+  {
+    "start": 249.439,
+    "duration": 4.36,
+    "text": "and you need to buy more so basically"
+  },
+  {
+    "start": 251.76,
+    "duration": 4.84,
+    "text": "that what happens what makes is"
+  },
+  {
+    "start": 253.799,
+    "duration": 5.921,
+    "text": "exaggerates so or makes the"
+  },
+  {
+    "start": 256.6,
+    "duration": 5.68,
+    "text": "enq uh of the Futures the underlying you"
+  },
+  {
+    "start": 259.72,
+    "duration": 6.64,
+    "text": "know goes Higher and Higher and it's"
+  },
+  {
+    "start": 262.28,
+    "duration": 8.56,
+    "text": "kind it's kind of um a loop because if"
+  },
+  {
+    "start": 266.36,
+    "duration": 6.52,
+    "text": "NQ moves a little bit up and then uh all"
+  },
+  {
+    "start": 270.84,
+    "duration": 5.52,
+    "text": "these market makers and and options"
+  },
+  {
+    "start": 272.88,
+    "duration": 6.039,
+    "text": "participant as well they they say oh"
+  },
+  {
+    "start": 276.36,
+    "duration": 4.88,
+    "text": "Jesus now my my GMA is telling me that I"
+  },
+  {
+    "start": 278.919,
+    "duration": 3.601,
+    "text": "have to buy more so they they need to"
+  },
+  {
+    "start": 281.24,
+    "duration": 5.28,
+    "text": "buy more"
+  },
+  {
+    "start": 282.52,
+    "duration": 7.8,
+    "text": "inq and as the price and as the buy more"
+  },
+  {
+    "start": 286.52,
+    "duration": 6.8,
+    "text": "enq will go up right and then if enq"
+  },
+  {
+    "start": 290.32,
+    "duration": 7.0,
+    "text": "goes up in in very quick as we saw on"
+  },
+  {
+    "start": 293.32,
+    "duration": 7.28,
+    "text": "Friday then the GMA say oh now you are"
+  },
+  {
+    "start": 297.32,
+    "duration": 6.24,
+    "text": "no Delta H you are no Delta new Neal you"
+  },
+  {
+    "start": 300.6,
+    "duration": 5.84,
+    "text": "need to buy more in Q and and and that"
+  },
+  {
+    "start": 303.56,
+    "duration": 5.44,
+    "text": "will happen is is is will send the the"
+  },
+  {
+    "start": 306.44,
+    "duration": 5.56,
+    "text": "Futures higher and and I believe this is"
+  },
+  {
+    "start": 309.0,
+    "duration": 4.84,
+    "text": "what is called the gamma um gamma"
+  },
+  {
+    "start": 312.0,
+    "duration": 3.16,
+    "text": "squeeze right and I think that's what"
+  },
+  {
+    "start": 313.84,
+    "duration": 3.84,
+    "text": "happened on"
+  },
+  {
+    "start": 315.16,
+    "duration": 5.479,
+    "text": "Friday so I hope this is this is very"
+  },
+  {
+    "start": 317.68,
+    "duration": 6.72,
+    "text": "clear this example of U where is"
+  },
+  {
+    "start": 320.639,
+    "duration": 5.921,
+    "text": "convexity low convexity high convexity"
+  },
+  {
+    "start": 324.4,
+    "duration": 5.919,
+    "text": "but what's really important if if you"
+  },
+  {
+    "start": 326.56,
+    "duration": 6.68,
+    "text": "guys are new um trading uh with gamma"
+  },
+  {
+    "start": 330.319,
+    "duration": 5.88,
+    "text": "and new to the guest boot"
+  },
+  {
+    "start": 333.24,
+    "duration": 6.44,
+    "text": "Channel you can think of convexity as"
+  },
+  {
+    "start": 336.199,
+    "duration": 6.12,
+    "text": "another term for gamma exposure right so"
+  },
+  {
+    "start": 339.68,
+    "duration": 5.28,
+    "text": "basically convexity is the same as gamma"
+  },
+  {
+    "start": 342.319,
+    "duration": 5.121,
+    "text": "exposure so when the gamma is high as we"
+  },
+  {
+    "start": 344.96,
+    "duration": 5.92,
+    "text": "saw before the options Delta change"
+  },
+  {
+    "start": 347.44,
+    "duration": 7.36,
+    "text": "rapidly for small moves in the underline"
+  },
+  {
+    "start": 350.88,
+    "duration": 6.759,
+    "text": "which is NQ or ES you know leading to a"
+  },
+  {
+    "start": 354.8,
+    "duration": 6.32,
+    "text": "curve nonlinear relationship between the"
+  },
+  {
+    "start": 357.639,
+    "duration": 6.641,
+    "text": "option price and the under lying price"
+  },
+  {
+    "start": 361.12,
+    "duration": 6.199,
+    "text": "right so it basically means as we said"
+  },
+  {
+    "start": 364.28,
+    "duration": 7.4,
+    "text": "before look if if the enq"
+  },
+  {
+    "start": 367.319,
+    "duration": 7.521,
+    "text": "moves a little and you know the option"
+  },
+  {
+    "start": 371.68,
+    "duration": 5.0,
+    "text": "price also Lo moves a little that's low"
+  },
+  {
+    "start": 374.84,
+    "duration": 4.84,
+    "text": "that's that's what happened in low"
+  },
+  {
+    "start": 376.68,
+    "duration": 5.68,
+    "text": "convexity but if there is a high"
+  },
+  {
+    "start": 379.68,
+    "duration": 5.32,
+    "text": "convexity and the options sorry the"
+  },
+  {
+    "start": 382.36,
+    "duration": 5.04,
+    "text": "underlying moves a little and the"
+  },
+  {
+    "start": 385.0,
+    "duration": 5.96,
+    "text": "options price move quite High quite a"
+  },
+  {
+    "start": 387.4,
+    "duration": 5.639,
+    "text": "lot more than the move from D andq"
+  },
+  {
+    "start": 390.96,
+    "duration": 4.239,
+    "text": "that's what happened in high convexity"
+  },
+  {
+    "start": 393.039,
+    "duration": 5.041,
+    "text": "what is that"
+  },
+  {
+    "start": 395.199,
+    "duration": 5.56,
+    "text": "important right if we go back to analyze"
+  },
+  {
+    "start": 398.08,
+    "duration": 6.399,
+    "text": "what happened on on"
+  },
+  {
+    "start": 400.759,
+    "duration": 6.521,
+    "text": "Friday right this is so for the new guys"
+  },
+  {
+    "start": 404.479,
+    "duration": 6.041,
+    "text": "this is the um the enq"
+  },
+  {
+    "start": 407.28,
+    "duration": 5.44,
+    "text": "prices and this is the gamma levels for"
+  },
+  {
+    "start": 410.52,
+    "duration": 5.56,
+    "text": "this um sorry"
+  },
+  {
+    "start": 412.72,
+    "duration": 7.199,
+    "text": "top which is options profile gamma we"
+  },
+  {
+    "start": 416.08,
+    "duration": 6.36,
+    "text": "tend to focus or I focus only on the"
+  },
+  {
+    "start": 419.919,
+    "duration": 5.28,
+    "text": "important levels High net complexity"
+  },
+  {
+    "start": 422.44,
+    "duration": 4.84,
+    "text": "sorry which is better to understand as"
+  },
+  {
+    "start": 425.199,
+    "duration": 7.12,
+    "text": "excess of gamma so basically this is"
+  },
+  {
+    "start": 427.28,
+    "duration": 11.12,
+    "text": "areas or levels where we understand um"
+  },
+  {
+    "start": 432.319,
+    "duration": 8.361,
+    "text": "there of big flows of GMA right so this"
+  },
+  {
+    "start": 438.4,
+    "duration": 5.4,
+    "text": "is this is the levels where we only"
+  },
+  {
+    "start": 440.68,
+    "duration": 5.4,
+    "text": "trade we don't trade any other level so"
+  },
+  {
+    "start": 443.8,
+    "duration": 4.64,
+    "text": "if we go back to the start of the"
+  },
+  {
+    "start": 446.08,
+    "duration": 4.04,
+    "text": "market all right the market starts at"
+  },
+  {
+    "start": 448.44,
+    "duration": 6.599,
+    "text": "9:30 and"
+  },
+  {
+    "start": 450.12,
+    "duration": 4.919,
+    "text": "and um I think around"
+  },
+  {
+    "start": 455.639,
+    "duration": 7.321,
+    "text": "9:35 something huge happen here we go"
+  },
+  {
+    "start": 459.68,
+    "duration": 5.199,
+    "text": "see come back focus on this line This"
+  },
+  {
+    "start": 462.96,
+    "duration": 7.88,
+    "text": "excess of gamma"
+  },
+  {
+    "start": 464.879,
+    "duration": 7.76,
+    "text": "here um that was around here you go"
+  },
+  {
+    "start": 470.84,
+    "duration": 5.799,
+    "text": "935"
+  },
+  {
+    "start": 472.639,
+    "duration": 8.201,
+    "text": "20 935 17 right so we were trading"
+  },
+  {
+    "start": 476.639,
+    "duration": 5.361,
+    "text": "around 21 8002"
+  },
+  {
+    "start": 480.84,
+    "duration": 5.72,
+    "text": "and"
+  },
+  {
+    "start": 482.0,
+    "duration": 7.36,
+    "text": "then we got this massive excess of GMA a"
+  },
+  {
+    "start": 486.56,
+    "duration": 8.12,
+    "text": "high net complexity right which is the"
+  },
+  {
+    "start": 489.36,
+    "duration": 7.119,
+    "text": "same it's huge right it's big so what is"
+  },
+  {
+    "start": 494.68,
+    "duration": 6.959,
+    "text": "this"
+  },
+  {
+    "start": 496.479,
+    "duration": 8.481,
+    "text": "um this is basically someone bought a"
+  },
+  {
+    "start": 501.639,
+    "duration": 6.641,
+    "text": "call which is which is big one is kind"
+  },
+  {
+    "start": 504.96,
+    "duration": 6.28,
+    "text": "of 157 contracts if I'm not if I'm not"
+  },
+  {
+    "start": 508.28,
+    "duration": 6.04,
+    "text": "wrong so so they bought that coal right"
+  },
+  {
+    "start": 511.24,
+    "duration": 6.359,
+    "text": "and that coal basically acts as a magnet"
+  },
+  {
+    "start": 514.32,
+    "duration": 6.839,
+    "text": "for the price so basically this was an"
+  },
+  {
+    "start": 517.599,
+    "duration": 6.161,
+    "text": "out of the money call but I don't want"
+  },
+  {
+    "start": 521.159,
+    "duration": 4.841,
+    "text": "to get into the client the market maker"
+  },
+  {
+    "start": 523.76,
+    "duration": 6.24,
+    "text": "but basically the easiest way to"
+  },
+  {
+    "start": 526.0,
+    "duration": 6.32,
+    "text": "understand this is um it's a magnet for"
+  },
+  {
+    "start": 530.0,
+    "duration": 5.44,
+    "text": "the price right we don't have gamma"
+  },
+  {
+    "start": 532.32,
+    "duration": 5.44,
+    "text": "below and and and we have some gamma"
+  },
+  {
+    "start": 535.44,
+    "duration": 4.56,
+    "text": "above but this one is massive and and"
+  },
+  {
+    "start": 537.76,
+    "duration": 5.639,
+    "text": "that just give us an idea"
+  },
+  {
+    "start": 540.0,
+    "duration": 6.8,
+    "text": "that the price might go there and and"
+  },
+  {
+    "start": 543.399,
+    "duration": 6.481,
+    "text": "and that give you the kind of bias to go"
+  },
+  {
+    "start": 546.8,
+    "duration": 5.64,
+    "text": "long right we don't have any other gamma"
+  },
+  {
+    "start": 549.88,
+    "duration": 4.28,
+    "text": "below to kind of support but basically"
+  },
+  {
+    "start": 552.44,
+    "duration": 4.48,
+    "text": "what you could do is like kind of use a"
+  },
+  {
+    "start": 554.16,
+    "duration": 4.08,
+    "text": "little bit of Market structure and and"
+  },
+  {
+    "start": 556.92,
+    "duration": 3.72,
+    "text": "have some sort of"
+  },
+  {
+    "start": 558.24,
+    "duration": 5.839,
+    "text": "confirmation in in your analysis that"
+  },
+  {
+    "start": 560.64,
+    "duration": 5.04,
+    "text": "the price might go um there right so"
+  },
+  {
+    "start": 564.079,
+    "duration": 3.561,
+    "text": "basically the most important part that"
+  },
+  {
+    "start": 565.68,
+    "duration": 4.64,
+    "text": "we know is like this is going to be a"
+  },
+  {
+    "start": 567.64,
+    "duration": 5.96,
+    "text": "magnet because it's huge that"
+  },
+  {
+    "start": 570.32,
+    "duration": 5.92,
+    "text": "that gamma is massive and it's a call"
+  },
+  {
+    "start": 573.6,
+    "duration": 4.2,
+    "text": "someone bought with a call right so"
+  },
+  {
+    "start": 576.24,
+    "duration": 5.039,
+    "text": "that's that's"
+  },
+  {
+    "start": 577.8,
+    "duration": 6.64,
+    "text": "bullish it's big one so basically you"
+  },
+  {
+    "start": 581.279,
+    "duration": 7.281,
+    "text": "can use your Market structure and you"
+  },
+  {
+    "start": 584.44,
+    "duration": 7.8,
+    "text": "see um price is making higher like kind"
+  },
+  {
+    "start": 588.56,
+    "duration": 5.76,
+    "text": "of you got a big uh High here but then"
+  },
+  {
+    "start": 592.24,
+    "duration": 5.52,
+    "text": "prices start to make higher highs and"
+  },
+  {
+    "start": 594.32,
+    "duration": 6.199,
+    "text": "higher lows right so basically uh the"
+  },
+  {
+    "start": 597.76,
+    "duration": 5.24,
+    "text": "trade here you can go long RIS a little"
+  },
+  {
+    "start": 600.519,
+    "duration": 5.161,
+    "text": "bit that was that's a tricky trade to be"
+  },
+  {
+    "start": 603.0,
+    "duration": 6.12,
+    "text": "honest because I like to enter only on"
+  },
+  {
+    "start": 605.68,
+    "duration": 6.64,
+    "text": "on levels of gamma but when you have"
+  },
+  {
+    "start": 609.12,
+    "duration": 5.8,
+    "text": "this big gamma which actually you know"
+  },
+  {
+    "start": 612.32,
+    "duration": 5.079,
+    "text": "is is is bigger than anything you know"
+  },
+  {
+    "start": 614.92,
+    "duration": 5.76,
+    "text": "someone is actually putting a lot of"
+  },
+  {
+    "start": 617.399,
+    "duration": 6.361,
+    "text": "contracts here 157 contracts in the ndx"
+  },
+  {
+    "start": 620.68,
+    "duration": 5.12,
+    "text": "market is is quite a lot right so that's"
+  },
+  {
+    "start": 623.76,
+    "duration": 4.88,
+    "text": "the first trade you couldn't go um you"
+  },
+  {
+    "start": 625.8,
+    "duration": 7.52,
+    "text": "could have been long and your first"
+  },
+  {
+    "start": 628.64,
+    "duration": 8.879,
+    "text": "Target wouldn't be here at this level at"
+  },
+  {
+    "start": 633.32,
+    "duration": 6.8,
+    "text": "2183 36 sorry"
+  },
+  {
+    "start": 637.519,
+    "duration": 6.0,
+    "text": "right so basically just to give you"
+  },
+  {
+    "start": 640.12,
+    "duration": 7.12,
+    "text": "another view it wouldn't be like this so"
+  },
+  {
+    "start": 643.519,
+    "duration": 8.32,
+    "text": "but the important thing what happened um"
+  },
+  {
+    "start": 647.24,
+    "duration": 6.68,
+    "text": "usually usually um it depends of the"
+  },
+  {
+    "start": 651.839,
+    "duration": 4.481,
+    "text": "volatility and that's something that we"
+  },
+  {
+    "start": 653.92,
+    "duration": 5.4,
+    "text": "will kind of talk about it in Futures"
+  },
+  {
+    "start": 656.32,
+    "duration": 5.04,
+    "text": "videos is depends of if we're in a high"
+  },
+  {
+    "start": 659.32,
+    "duration": 4.12,
+    "text": "volatility of low volatility these"
+  },
+  {
+    "start": 661.36,
+    "duration": 5.64,
+    "text": "massive levels tends to work as a"
+  },
+  {
+    "start": 663.44,
+    "duration": 6.079,
+    "text": "support or resistance in this case"
+  },
+  {
+    "start": 667.0,
+    "duration": 4.48,
+    "text": "usually tends it tends to work as a"
+  },
+  {
+    "start": 669.519,
+    "duration": 4.12,
+    "text": "resistance right but look what happened"
+  },
+  {
+    "start": 671.48,
+    "duration": 4.84,
+    "text": "the price the price"
+  },
+  {
+    "start": 673.639,
+    "duration": 7.041,
+    "text": "cross easily the"
+  },
+  {
+    "start": 676.32,
+    "duration": 7.16,
+    "text": "level right and then he cross it easily"
+  },
+  {
+    "start": 680.68,
+    "duration": 6.24,
+    "text": "test it came back to test it and then"
+  },
+  {
+    "start": 683.48,
+    "duration": 7.2,
+    "text": "you know keep trading higher and that's"
+  },
+  {
+    "start": 686.92,
+    "duration": 5.56,
+    "text": "because of this that's because what I"
+  },
+  {
+    "start": 690.68,
+    "duration": 5.719,
+    "text": "was explaining oh sorry what I was"
+  },
+  {
+    "start": 692.48,
+    "duration": 6.68,
+    "text": "explaining before when we are in a high"
+  },
+  {
+    "start": 696.399,
+    "duration": 6.481,
+    "text": "complexity so as we were on"
+  },
+  {
+    "start": 699.16,
+    "duration": 6.239,
+    "text": "Friday right as the enq moves a little"
+  },
+  {
+    "start": 702.88,
+    "duration": 5.199,
+    "text": "the Delta of that all those options"
+  },
+  {
+    "start": 705.399,
+    "duration": 6.081,
+    "text": "change a lot right it doesn't change"
+  },
+  {
+    "start": 708.079,
+    "duration": 6.241,
+    "text": "proportionally to the move of the NQ and"
+  },
+  {
+    "start": 711.48,
+    "duration": 5.2,
+    "text": "Gamma is telling them uh market makers"
+  },
+  {
+    "start": 714.32,
+    "duration": 4.319,
+    "text": "or the uh options participants at that"
+  },
+  {
+    "start": 716.68,
+    "duration": 4.56,
+    "text": "time because something that I have"
+  },
+  {
+    "start": 718.639,
+    "duration": 4.681,
+    "text": "learned is that it's not only the market"
+  },
+  {
+    "start": 721.24,
+    "duration": 6.36,
+    "text": "makers who actually have to"
+  },
+  {
+    "start": 723.32,
+    "duration": 6.12,
+    "text": "H most of the options uh traders in the"
+  },
+  {
+    "start": 727.6,
+    "duration": 4.359,
+    "text": "ndx they are"
+  },
+  {
+    "start": 729.44,
+    "duration": 5.24,
+    "text": "sophisticated uh options Traders so they"
+  },
+  {
+    "start": 731.959,
+    "duration": 5.041,
+    "text": "they don't put an an option and they"
+  },
+  {
+    "start": 734.68,
+    "duration": 6.12,
+    "text": "live it like that they actually"
+  },
+  {
+    "start": 737.0,
+    "duration": 7.48,
+    "text": "dynamically H that option in the enq"
+  },
+  {
+    "start": 740.8,
+    "duration": 7.96,
+    "text": "market too right so I believe we were in"
+  },
+  {
+    "start": 744.48,
+    "duration": 5.479,
+    "text": "a in a um high convexity or high GMA"
+  },
+  {
+    "start": 748.76,
+    "duration": 3.8,
+    "text": "environment"
+  },
+  {
+    "start": 749.959,
+    "duration": 5.401,
+    "text": "and and and that's why that's why the"
+  },
+  {
+    "start": 752.56,
+    "duration": 6.279,
+    "text": "market keep going higher it's it's a"
+  },
+  {
+    "start": 755.36,
+    "duration": 7.4,
+    "text": "loop buying options sorry buying the the"
+  },
+  {
+    "start": 758.839,
+    "duration": 5.8,
+    "text": "NQ is going higher GMA tell the options"
+  },
+  {
+    "start": 762.76,
+    "duration": 5.4,
+    "text": "participant market makers they need to"
+  },
+  {
+    "start": 764.639,
+    "duration": 6.2,
+    "text": "buy more in Q to be delta neutral but"
+  },
+  {
+    "start": 768.16,
+    "duration": 4.88,
+    "text": "when they buy in Q and they do it quick"
+  },
+  {
+    "start": 770.839,
+    "duration": 3.24,
+    "text": "right they do it fast because they have"
+  },
+  {
+    "start": 773.04,
+    "duration": 4.32,
+    "text": "a high"
+  },
+  {
+    "start": 774.079,
+    "duration": 6.361,
+    "text": "convexity so the enq moved faster all"
+  },
+  {
+    "start": 777.36,
+    "duration": 5.64,
+    "text": "right on the way up and and the gamma"
+  },
+  {
+    "start": 780.44,
+    "duration": 5.36,
+    "text": "change again and the GMA tell all these"
+  },
+  {
+    "start": 783.0,
+    "duration": 5.88,
+    "text": "guys oh you need to buy more in Q to be"
+  },
+  {
+    "start": 785.8,
+    "duration": 6.599,
+    "text": "delta neutral so they buy more in Q and"
+  },
+  {
+    "start": 788.88,
+    "duration": 5.8,
+    "text": "you know it's like a loop and and it"
+  },
+  {
+    "start": 792.399,
+    "duration": 4.841,
+    "text": "keeps going higher and higher so that"
+  },
+  {
+    "start": 794.68,
+    "duration": 7.04,
+    "text": "was the first trade and that was coming"
+  },
+  {
+    "start": 797.24,
+    "duration": 6.839,
+    "text": "from this big big coal which is 157"
+  },
+  {
+    "start": 801.72,
+    "duration": 4.0,
+    "text": "contracts the"
+  },
+  {
+    "start": 804.079,
+    "duration": 6.0,
+    "text": "price"
+  },
+  {
+    "start": 805.72,
+    "duration": 8.0,
+    "text": "um basically goes there"
+  },
+  {
+    "start": 810.079,
+    "duration": 5.521,
+    "text": "and you can see how it's not perfectly"
+  },
+  {
+    "start": 813.72,
+    "duration": 4.239,
+    "text": "because we were in a kind of high GMA"
+  },
+  {
+    "start": 815.6,
+    "duration": 5.72,
+    "text": "environment but you see went to this"
+  },
+  {
+    "start": 817.959,
+    "duration": 5.841,
+    "text": "kind of level and it start to you know"
+  },
+  {
+    "start": 821.32,
+    "duration": 7.639,
+    "text": "stop let's put it that way it was sort"
+  },
+  {
+    "start": 823.8,
+    "duration": 8.52,
+    "text": "of um consolidation there and then the"
+  },
+  {
+    "start": 828.959,
+    "duration": 5.601,
+    "text": "market started to trade below but what's"
+  },
+  {
+    "start": 832.32,
+    "duration": 9.24,
+    "text": "important is and obviously we need a lot"
+  },
+  {
+    "start": 834.56,
+    "duration": 9.839,
+    "text": "of patience with this um when we go to"
+  },
+  {
+    "start": 841.56,
+    "duration": 7.88,
+    "text": "around uh what time is this uh that was"
+  },
+  {
+    "start": 844.399,
+    "duration": 7.601,
+    "text": "around um halfast 12 right so around ha"
+  },
+  {
+    "start": 849.44,
+    "duration": 8.519,
+    "text": "12 we have first of all we have some"
+  },
+  {
+    "start": 852.0,
+    "duration": 9.399,
+    "text": "elements to study we have um this big um"
+  },
+  {
+    "start": 857.959,
+    "duration": 7.041,
+    "text": "negative GMA and it's acting as a"
+  },
+  {
+    "start": 861.399,
+    "duration": 7.8,
+    "text": "resistance right remember we only want"
+  },
+  {
+    "start": 865.0,
+    "duration": 6.639,
+    "text": "to interact with the market in excess of"
+  },
+  {
+    "start": 869.199,
+    "duration": 4.721,
+    "text": "gamma because we know there are"
+  },
+  {
+    "start": 871.639,
+    "duration": 4.2,
+    "text": "participants here who enter the market"
+  },
+  {
+    "start": 873.92,
+    "duration": 2.96,
+    "text": "and affect the system and that's when"
+  },
+  {
+    "start": 875.839,
+    "duration": 4.201,
+    "text": "the market"
+  },
+  {
+    "start": 876.88,
+    "duration": 6.0,
+    "text": "moves and we also want to interact when"
+  },
+  {
+    "start": 880.04,
+    "duration": 6.0,
+    "text": "the market or or put Targets in our in"
+  },
+  {
+    "start": 882.88,
+    "duration": 5.879,
+    "text": "our trades when we are in the negative"
+  },
+  {
+    "start": 886.04,
+    "duration": 4.68,
+    "text": "maximum negative gamma apart from that"
+  },
+  {
+    "start": 888.759,
+    "duration": 5.361,
+    "text": "we tend to ignore all these negative"
+  },
+  {
+    "start": 890.72,
+    "duration": 7.679,
+    "text": "gamas right but look how interesting the"
+  },
+  {
+    "start": 894.12,
+    "duration": 6.959,
+    "text": "market um makes a high you know and then"
+  },
+  {
+    "start": 898.399,
+    "duration": 6.68,
+    "text": "it start to make a series of higher a"
+  },
+  {
+    "start": 901.079,
+    "duration": 7.68,
+    "text": "lower highs and lower lows right then"
+  },
+  {
+    "start": 905.079,
+    "duration": 9.241,
+    "text": "around halfast 12 it tends"
+  },
+  {
+    "start": 908.759,
+    "duration": 9.561,
+    "text": "to break this Max negative and it"
+  },
+  {
+    "start": 914.32,
+    "duration": 4.0,
+    "text": "couldn't right so it couldn't do"
+  },
+  {
+    "start": 918.36,
+    "duration": 7.0,
+    "text": "it we go here and we couldn't do it so"
+  },
+  {
+    "start": 922.44,
+    "duration": 6.0,
+    "text": "if you guys so um one of my videos I"
+  },
+  {
+    "start": 925.36,
+    "duration": 4.919,
+    "text": "think that was the analysis of um the"
+  },
+  {
+    "start": 928.44,
+    "duration": 5.519,
+    "text": "trading day on John"
+  },
+  {
+    "start": 930.279,
+    "duration": 6.48,
+    "text": "24 you see that I use these levels and I"
+  },
+  {
+    "start": 933.959,
+    "duration": 5.44,
+    "text": "use the um maximum negative gamma and"
+  },
+  {
+    "start": 936.759,
+    "duration": 6.52,
+    "text": "also the excess of gamma to enter my"
+  },
+  {
+    "start": 939.399,
+    "duration": 5.8,
+    "text": "trades but one of the reasons I S is as"
+  },
+  {
+    "start": 943.279,
+    "duration": 3.961,
+    "text": "I said before I wasn't in the Market at"
+  },
+  {
+    "start": 945.199,
+    "duration": 3.161,
+    "text": "this time but it's a pattern that you"
+  },
+  {
+    "start": 947.24,
+    "duration": 4.68,
+    "text": "tend to"
+  },
+  {
+    "start": 948.36,
+    "duration": 6.56,
+    "text": "see again and again and again and if you"
+  },
+  {
+    "start": 951.92,
+    "duration": 5.839,
+    "text": "and if you you know learn to to read"
+  },
+  {
+    "start": 954.92,
+    "duration": 5.08,
+    "text": "this GMA uh this excess of gamma High"
+  },
+  {
+    "start": 957.759,
+    "duration": 4.08,
+    "text": "net complexity"
+  },
+  {
+    "start": 960.0,
+    "duration": 3.8,
+    "text": "and and you can take very good trade so"
+  },
+  {
+    "start": 961.839,
+    "duration": 4.761,
+    "text": "let me explain it again"
+  },
+  {
+    "start": 963.8,
+    "duration": 6.479,
+    "text": "here so this is what we saw at the time"
+  },
+  {
+    "start": 966.6,
+    "duration": 7.52,
+    "text": "right so we saw that we make a high"
+  },
+  {
+    "start": 970.279,
+    "duration": 6.761,
+    "text": "right we start to make series of um"
+  },
+  {
+    "start": 974.12,
+    "duration": 6.199,
+    "text": "higher high sorry lower highs lower lows"
+  },
+  {
+    "start": 977.04,
+    "duration": 7.359,
+    "text": "lower highs lower lows oops lower highs"
+  },
+  {
+    "start": 980.319,
+    "duration": 8.88,
+    "text": "lower lows right lower high lower"
+  },
+  {
+    "start": 984.399,
+    "duration": 7.761,
+    "text": "low then the market tried to Rally but"
+  },
+  {
+    "start": 989.199,
+    "duration": 3.88,
+    "text": "it was you know it was contained here in"
+  },
+  {
+    "start": 992.16,
+    "duration": 4.919,
+    "text": "this"
+  },
+  {
+    "start": 993.079,
+    "duration": 6.32,
+    "text": "maximum um maximum negative gamma so"
+  },
+  {
+    "start": 997.079,
+    "duration": 5.281,
+    "text": "this maximum negative gamma is acting as"
+  },
+  {
+    "start": 999.399,
+    "duration": 6.601,
+    "text": "a resistance and that is why that's why"
+  },
+  {
+    "start": 1002.36,
+    "duration": 8.0,
+    "text": "with if you um manage to go long you"
+  },
+  {
+    "start": 1006.0,
+    "duration": 7.639,
+    "text": "know in a position so you got two stops"
+  },
+  {
+    "start": 1010.36,
+    "duration": 5.279,
+    "text": "for or two Targets so the first one is"
+  },
+  {
+    "start": 1013.639,
+    "duration": 4.801,
+    "text": "this one which is the"
+  },
+  {
+    "start": 1015.639,
+    "duration": 6.481,
+    "text": "maximum uh positive gamma which we know"
+  },
+  {
+    "start": 1018.44,
+    "duration": 6.999,
+    "text": "is a call you know we saw it is a call a"
+  },
+  {
+    "start": 1022.12,
+    "duration": 5.28,
+    "text": "positive call a buying of a call usually"
+  },
+  {
+    "start": 1025.439,
+    "duration": 5.281,
+    "text": "as I said before these calls works as a"
+  },
+  {
+    "start": 1027.4,
+    "duration": 6.639,
+    "text": "resistance when um depends of the"
+  },
+  {
+    "start": 1030.72,
+    "duration": 5.359,
+    "text": "volatility high or low volatility but"
+  },
+  {
+    "start": 1034.039,
+    "duration": 2.681,
+    "text": "sorry higher low volatility but because"
+  },
+  {
+    "start": 1036.079,
+    "duration": 4.401,
+    "text": "we"
+  },
+  {
+    "start": 1036.72,
+    "duration": 6.239,
+    "text": "were um I believe in a high um convexity"
+  },
+  {
+    "start": 1040.48,
+    "duration": 5.559,
+    "text": "environment or high gamma so this"
+  },
+  {
+    "start": 1042.959,
+    "duration": 7.161,
+    "text": "accelerates and start to go higher right"
+  },
+  {
+    "start": 1046.039,
+    "duration": 8.52,
+    "text": "and it's finding resistance here"
+  },
+  {
+    "start": 1050.12,
+    "duration": 5.52,
+    "text": "so what's important is uh let me delete"
+  },
+  {
+    "start": 1054.559,
+    "duration": 3.881,
+    "text": "all"
+  },
+  {
+    "start": 1055.64,
+    "duration": 4.919,
+    "text": "these is the trade that we could have"
+  },
+  {
+    "start": 1058.44,
+    "duration": 6.16,
+    "text": "done"
+  },
+  {
+    "start": 1060.559,
+    "duration": 9.761,
+    "text": "here resistance that became support you"
+  },
+  {
+    "start": 1064.6,
+    "duration": 9.04,
+    "text": "see it now have a look that how"
+  },
+  {
+    "start": 1070.32,
+    "duration": 6.12,
+    "text": "um the first time the"
+  },
+  {
+    "start": 1073.64,
+    "duration": 6.159,
+    "text": "market and if you see my video If you"
+  },
+  {
+    "start": 1076.44,
+    "duration": 5.599,
+    "text": "see my video from that day is exactly"
+  },
+  {
+    "start": 1079.799,
+    "duration": 5.081,
+    "text": "the same and that's what I'm looking for"
+  },
+  {
+    "start": 1082.039,
+    "duration": 6.64,
+    "text": "when I review my trade when the price"
+  },
+  {
+    "start": 1084.88,
+    "duration": 6.88,
+    "text": "tried to rally and come back to this um"
+  },
+  {
+    "start": 1088.679,
+    "duration": 6.521,
+    "text": "level right look how how long does it"
+  },
+  {
+    "start": 1091.76,
+    "duration": 6.6,
+    "text": "take it takes all this time to try to"
+  },
+  {
+    "start": 1095.2,
+    "duration": 7.0,
+    "text": "test so buyers they were try to push the"
+  },
+  {
+    "start": 1098.36,
+    "duration": 8.319,
+    "text": "price higher they found resistance very"
+  },
+  {
+    "start": 1102.2,
+    "duration": 7.92,
+    "text": "close to this maximum negative gamma and"
+  },
+  {
+    "start": 1106.679,
+    "duration": 7.041,
+    "text": "then they couldn't and sellers took over"
+  },
+  {
+    "start": 1110.12,
+    "duration": 5.84,
+    "text": "and sellers were more strong right and"
+  },
+  {
+    "start": 1113.72,
+    "duration": 4.6,
+    "text": "look how long does it how long did they"
+  },
+  {
+    "start": 1115.96,
+    "duration": 5.44,
+    "text": "take the price to kind of test again"
+  },
+  {
+    "start": 1118.32,
+    "duration": 5.8,
+    "text": "this support now the second"
+  },
+  {
+    "start": 1121.4,
+    "duration": 5.88,
+    "text": "time buyers try"
+  },
+  {
+    "start": 1124.12,
+    "duration": 6.6,
+    "text": "to push the price higher and they"
+  },
+  {
+    "start": 1127.28,
+    "duration": 6.2,
+    "text": "couldn't right they couldn't and sellers"
+  },
+  {
+    "start": 1130.72,
+    "duration": 5.52,
+    "text": "push again but these sellers are not"
+  },
+  {
+    "start": 1133.48,
+    "duration": 5.079,
+    "text": "like you know as the normal technical"
+  },
+  {
+    "start": 1136.24,
+    "duration": 5.04,
+    "text": "analysis they say oh you know sellers"
+  },
+  {
+    "start": 1138.559,
+    "duration": 5.081,
+    "text": "are stronger but we know we have a"
+  },
+  {
+    "start": 1141.28,
+    "duration": 5.92,
+    "text": "barrier here we have a big resistance"
+  },
+  {
+    "start": 1143.64,
+    "duration": 7.56,
+    "text": "coming from this negative gamma and have"
+  },
+  {
+    "start": 1147.2,
+    "duration": 7.64,
+    "text": "a look how long did they take for those"
+  },
+  {
+    "start": 1151.2,
+    "duration": 6.599,
+    "text": "um sellers to push the price so is is"
+  },
+  {
+    "start": 1154.84,
+    "duration": 6.079,
+    "text": "every time the time they take every time"
+  },
+  {
+    "start": 1157.799,
+    "duration": 5.521,
+    "text": "the sellers are changing and and and are"
+  },
+  {
+    "start": 1160.919,
+    "duration": 4.76,
+    "text": "more strong that the buyers is becoming"
+  },
+  {
+    "start": 1163.32,
+    "duration": 5.599,
+    "text": "shter so the third"
+  },
+  {
+    "start": 1165.679,
+    "duration": 4.601,
+    "text": "time let's put in Orange the third time"
+  },
+  {
+    "start": 1168.919,
+    "duration": 7.281,
+    "text": "they"
+  },
+  {
+    "start": 1170.28,
+    "duration": 9.12,
+    "text": "came right they came in a shorter time"
+  },
+  {
+    "start": 1176.2,
+    "duration": 5.719,
+    "text": "in a shorter time frame so we have a"
+  },
+  {
+    "start": 1179.4,
+    "duration": 5.0,
+    "text": "high we have a lower"
+  },
+  {
+    "start": 1181.919,
+    "duration": 5.88,
+    "text": "high we have a lower"
+  },
+  {
+    "start": 1184.4,
+    "duration": 6.639,
+    "text": "high sorry a lower high and every time"
+  },
+  {
+    "start": 1187.799,
+    "duration": 7.041,
+    "text": "they come to test this support is"
+  },
+  {
+    "start": 1191.039,
+    "duration": 6.561,
+    "text": "shorter and shorter Until It Breaks"
+  },
+  {
+    "start": 1194.84,
+    "duration": 4.4,
+    "text": "right so that wouldn't be I was knowing"
+  },
+  {
+    "start": 1197.6,
+    "duration": 3.959,
+    "text": "the market I wasn't there but it"
+  },
+  {
+    "start": 1199.24,
+    "duration": 5.439,
+    "text": "wouldn't be a really nice trade to short"
+  },
+  {
+    "start": 1201.559,
+    "duration": 6.961,
+    "text": "the market here knowing"
+  },
+  {
+    "start": 1204.679,
+    "duration": 6.961,
+    "text": "that we have a big resistance for gamma"
+  },
+  {
+    "start": 1208.52,
+    "duration": 5.08,
+    "text": "the price couldn't break it and on the"
+  },
+  {
+    "start": 1211.64,
+    "duration": 3.68,
+    "text": "other hand on the other hand we have"
+  },
+  {
+    "start": 1213.6,
+    "duration": 5.16,
+    "text": "this kind of a structure in the market"
+  },
+  {
+    "start": 1215.32,
+    "duration": 7.2,
+    "text": "that you know I see it so many times"
+  },
+  {
+    "start": 1218.76,
+    "duration": 6.68,
+    "text": "that my eyes as you know when I see I"
+  },
+  {
+    "start": 1222.52,
+    "duration": 4.6,
+    "text": "say okay this is what's happening so and"
+  },
+  {
+    "start": 1225.44,
+    "duration": 3.96,
+    "text": "always the same and and this is just"
+  },
+  {
+    "start": 1227.12,
+    "duration": 4.84,
+    "text": "Market structure it's not you know"
+  },
+  {
+    "start": 1229.4,
+    "duration": 4.8,
+    "text": "subjective Mark technical analysis it's"
+  },
+  {
+    "start": 1231.96,
+    "duration": 5.8,
+    "text": "just Market the structure and it's very"
+  },
+  {
+    "start": 1234.2,
+    "duration": 7.32,
+    "text": "easy to see you know and when you"
+  },
+  {
+    "start": 1237.76,
+    "duration": 6.399,
+    "text": "combine with GMA you know this GMA is a"
+  },
+  {
+    "start": 1241.52,
+    "duration": 3.76,
+    "text": "big big level that is being defended as"
+  },
+  {
+    "start": 1244.159,
+    "duration": 4.121,
+    "text": "a"
+  },
+  {
+    "start": 1245.28,
+    "duration": 6.04,
+    "text": "resistance and you're making lower highs"
+  },
+  {
+    "start": 1248.28,
+    "duration": 5.519,
+    "text": "and every time sellers they're taking"
+  },
+  {
+    "start": 1251.32,
+    "duration": 4.839,
+    "text": "less time so so basically buyers are"
+  },
+  {
+    "start": 1253.799,
+    "duration": 5.401,
+    "text": "exhausted and then voila we saw the"
+  },
+  {
+    "start": 1256.159,
+    "duration": 7.0,
+    "text": "price this wouldn't be the first Target"
+  },
+  {
+    "start": 1259.2,
+    "duration": 7.16,
+    "text": "right the at the next um kind of excess"
+  },
+  {
+    "start": 1263.159,
+    "duration": 7.081,
+    "text": "of gamma level um and you see how the"
+  },
+  {
+    "start": 1266.36,
+    "duration": 7.04,
+    "text": "price let me you see how the price go"
+  },
+  {
+    "start": 1270.24,
+    "duration": 7.4,
+    "text": "there and bounce and that's no"
+  },
+  {
+    "start": 1273.4,
+    "duration": 7.399,
+    "text": "coincidence so someone without um this"
+  },
+  {
+    "start": 1277.64,
+    "duration": 7.0,
+    "text": "knowledge of complexity of gamma uh"
+  },
+  {
+    "start": 1280.799,
+    "duration": 6.24,
+    "text": "gamma exposure um they wouldn't know"
+  },
+  {
+    "start": 1284.64,
+    "duration": 4.24,
+    "text": "they they would think oh you know they"
+  },
+  {
+    "start": 1287.039,
+    "duration": 3.24,
+    "text": "just use any other Tech technical"
+  },
+  {
+    "start": 1288.88,
+    "duration": 4.48,
+    "text": "analysis they make some lines or"
+  },
+  {
+    "start": 1290.279,
+    "duration": 6.041,
+    "text": "whatever but look how goes down to the"
+  },
+  {
+    "start": 1293.36,
+    "duration": 5.16,
+    "text": "tick and bounces it right obviously"
+  },
+  {
+    "start": 1296.32,
+    "duration": 5.28,
+    "text": "couldn't as we saw we it couldn't it"
+  },
+  {
+    "start": 1298.52,
+    "duration": 6.12,
+    "text": "couldn't contain the price so the next"
+  },
+  {
+    "start": 1301.6,
+    "duration": 7.04,
+    "text": "Target wouldn't be this one right and if"
+  },
+  {
+    "start": 1304.64,
+    "duration": 9.279,
+    "text": "we saw the um the graph"
+  },
+  {
+    "start": 1308.64,
+    "duration": 8.519,
+    "text": "here if someone was brave enough to keep"
+  },
+  {
+    "start": 1313.919,
+    "duration": 6.521,
+    "text": "the shore until the end of the day it"
+  },
+  {
+    "start": 1317.159,
+    "duration": 5.241,
+    "text": "wouldn't be until the next negative"
+  },
+  {
+    "start": 1320.44,
+    "duration": 8.56,
+    "text": "maximum negative"
+  },
+  {
+    "start": 1322.4,
+    "duration": 10.32,
+    "text": "gamma which was to the ti at"
+  },
+  {
+    "start": 1329.0,
+    "duration": 6.84,
+    "text": "21533 and you see how these levels work"
+  },
+  {
+    "start": 1332.72,
+    "duration": 6.8,
+    "text": "perfectly they just the market every"
+  },
+  {
+    "start": 1335.84,
+    "duration": 7.439,
+    "text": "time the market um goes to this maximum"
+  },
+  {
+    "start": 1339.52,
+    "duration": 6.48,
+    "text": "or uh excess of gamma it tends to have"
+  },
+  {
+    "start": 1343.279,
+    "duration": 5.561,
+    "text": "some reaction and it's no coincidence"
+  },
+  {
+    "start": 1346.0,
+    "duration": 6.039,
+    "text": "it's it's just the options participants"
+  },
+  {
+    "start": 1348.84,
+    "duration": 5.88,
+    "text": "are there affecting the Bold surface as"
+  },
+  {
+    "start": 1352.039,
+    "duration": 5.0,
+    "text": "affecting the systems and and market"
+  },
+  {
+    "start": 1354.72,
+    "duration": 3.959,
+    "text": "makers and all their options they need"
+  },
+  {
+    "start": 1357.039,
+    "duration": 4.64,
+    "text": "options Trader they need to hedge their"
+  },
+  {
+    "start": 1358.679,
+    "duration": 5.441,
+    "text": "positions that's why we see how the"
+  },
+  {
+    "start": 1361.679,
+    "duration": 4.081,
+    "text": "price have reaction on those levels and"
+  },
+  {
+    "start": 1364.12,
+    "duration": 4.96,
+    "text": "that's why we want to trade on those"
+  },
+  {
+    "start": 1365.76,
+    "duration": 5.919,
+    "text": "levels the price go to"
+  },
+  {
+    "start": 1369.08,
+    "duration": 4.88,
+    "text": "21533 and it stops and that's what it"
+  },
+  {
+    "start": 1371.679,
+    "duration": 6.161,
+    "text": "stops right this this is the maximum"
+  },
+  {
+    "start": 1373.96,
+    "duration": 7.52,
+    "text": "level of gamma and the price stops there"
+  },
+  {
+    "start": 1377.84,
+    "duration": 6.0,
+    "text": "so this is a nice way of I mean you you"
+  },
+  {
+    "start": 1381.48,
+    "duration": 4.64,
+    "text": "can trade the markets like with"
+  },
+  {
+    "start": 1383.84,
+    "duration": 4.439,
+    "text": "something which is a statistically proof"
+  },
+  {
+    "start": 1386.12,
+    "duration": 5.439,
+    "text": "and and and we know that that's"
+  },
+  {
+    "start": 1388.279,
+    "duration": 5.4,
+    "text": "happening you know is is options traders"
+  },
+  {
+    "start": 1391.559,
+    "duration": 6.201,
+    "text": "of of the options Market are actually"
+  },
+  {
+    "start": 1393.679,
+    "duration": 6.561,
+    "text": "affecting the Futures and what the guys"
+  },
+  {
+    "start": 1397.76,
+    "duration": 5.24,
+    "text": "in getb are doing is amazing because"
+  },
+  {
+    "start": 1400.24,
+    "duration": 5.4,
+    "text": "they are creating all these um you"
+  },
+  {
+    "start": 1403.0,
+    "duration": 4.36,
+    "text": "cannot get the same data anywhere else"
+  },
+  {
+    "start": 1405.64,
+    "duration": 3.56,
+    "text": "because what they doing they're they're"
+  },
+  {
+    "start": 1407.36,
+    "duration": 4.08,
+    "text": "taking their knowledge and say listen"
+  },
+  {
+    "start": 1409.2,
+    "duration": 5.52,
+    "text": "what is important is the excess of"
+  },
+  {
+    "start": 1411.44,
+    "duration": 5.52,
+    "text": "gamma because if we buy if we know that"
+  },
+  {
+    "start": 1414.72,
+    "duration": 5.76,
+    "text": "someone is buying a call but the market"
+  },
+  {
+    "start": 1416.96,
+    "duration": 6.44,
+    "text": "maker is m is is matching this call uh"
+  },
+  {
+    "start": 1420.48,
+    "duration": 4.88,
+    "text": "the buyer with a seller that that"
+  },
+  {
+    "start": 1423.4,
+    "duration": 4.879,
+    "text": "doesn't do anything it's just basically"
+  },
+  {
+    "start": 1425.36,
+    "duration": 6.16,
+    "text": "transferring one float from a buyer to a"
+  },
+  {
+    "start": 1428.279,
+    "duration": 6.0,
+    "text": "seller that that's nothing right but"
+  },
+  {
+    "start": 1431.52,
+    "duration": 5.68,
+    "text": "what they're interesting is like and and"
+  },
+  {
+    "start": 1434.279,
+    "duration": 4.961,
+    "text": "what the algorithm does is they look for"
+  },
+  {
+    "start": 1437.2,
+    "duration": 5.52,
+    "text": "this excess of GMA"
+  },
+  {
+    "start": 1439.24,
+    "duration": 6.679,
+    "text": "and and and and this excess of GMA or"
+  },
+  {
+    "start": 1442.72,
+    "duration": 5.64,
+    "text": "this imbalance of gamma is what we want"
+  },
+  {
+    "start": 1445.919,
+    "duration": 4.601,
+    "text": "to trade I I we don't want to trade in"
+  },
+  {
+    "start": 1448.36,
+    "duration": 4.48,
+    "text": "the middle because usually you have kind"
+  },
+  {
+    "start": 1450.52,
+    "duration": 4.84,
+    "text": "of range trade as I said before in the"
+  },
+  {
+    "start": 1452.84,
+    "duration": 5.52,
+    "text": "other videos but what you want to do you"
+  },
+  {
+    "start": 1455.36,
+    "duration": 4.52,
+    "text": "want to trade on these big levels and"
+  },
+  {
+    "start": 1458.36,
+    "duration": 3.12,
+    "text": "and and that's kind of two different"
+  },
+  {
+    "start": 1459.88,
+    "duration": 3.56,
+    "text": "trades the one that we have in the"
+  },
+  {
+    "start": 1461.48,
+    "duration": 4.16,
+    "text": "morning because the one that we have in"
+  },
+  {
+    "start": 1463.44,
+    "duration": 5.52,
+    "text": "the morning was a magnet you know a CO"
+  },
+  {
+    "start": 1465.64,
+    "duration": 5.08,
+    "text": "option and surely that's a magnet for"
+  },
+  {
+    "start": 1468.96,
+    "duration": 4.24,
+    "text": "the price because of the forces that"
+  },
+  {
+    "start": 1470.72,
+    "duration": 5.4,
+    "text": "market makers have to do they need to"
+  },
+  {
+    "start": 1473.2,
+    "duration": 5.44,
+    "text": "buy to hedge their positions you know to"
+  },
+  {
+    "start": 1476.12,
+    "duration": 5.24,
+    "text": "be delta neutral but this ones is"
+  },
+  {
+    "start": 1478.64,
+    "duration": 6.24,
+    "text": "different this is this is just price you"
+  },
+  {
+    "start": 1481.36,
+    "duration": 7.679,
+    "text": "know in the sense is is is just finding"
+  },
+  {
+    "start": 1484.88,
+    "duration": 6.799,
+    "text": "some activity on this uh excess of gamma"
+  },
+  {
+    "start": 1489.039,
+    "duration": 6.401,
+    "text": "and basically finding resistance as we"
+  },
+  {
+    "start": 1491.679,
+    "duration": 7.641,
+    "text": "saw in a in a maximum uh level of gamma"
+  },
+  {
+    "start": 1495.44,
+    "duration": 6.04,
+    "text": "as well um which is a negative"
+  },
+  {
+    "start": 1499.32,
+    "duration": 4.44,
+    "text": "the maximum level of GMA look how the"
+  },
+  {
+    "start": 1501.48,
+    "duration": 4.439,
+    "text": "price is just finding resistance there"
+  },
+  {
+    "start": 1503.76,
+    "duration": 5.6,
+    "text": "and it couldn't couldn't go"
+  },
+  {
+    "start": 1505.919,
+    "duration": 5.961,
+    "text": "higher and also how the price goes there"
+  },
+  {
+    "start": 1509.36,
+    "duration": 6.6,
+    "text": "to the ti to this maximum level of GMA"
+  },
+  {
+    "start": 1511.88,
+    "duration": 7.679,
+    "text": "and bounce so that's a nice um um you"
+  },
+  {
+    "start": 1515.96,
+    "duration": 5.16,
+    "text": "know a nice review that I did and and"
+  },
+  {
+    "start": 1519.559,
+    "duration": 4.161,
+    "text": "what's important is that you can use"
+  },
+  {
+    "start": 1521.12,
+    "duration": 4.72,
+    "text": "this and when you see in the future and"
+  },
+  {
+    "start": 1523.72,
+    "duration": 4.28,
+    "text": "we you see this structure is my favorite"
+  },
+  {
+    "start": 1525.84,
+    "duration": 4.6,
+    "text": "one because it happens all the time to"
+  },
+  {
+    "start": 1528.0,
+    "duration": 6.24,
+    "text": "break break the support res basically"
+  },
+  {
+    "start": 1530.44,
+    "duration": 5.0,
+    "text": "support levels um but I think that's"
+  },
+  {
+    "start": 1534.24,
+    "duration": 3.36,
+    "text": "that's what you guys have to do you have"
+  },
+  {
+    "start": 1535.44,
+    "duration": 5.119,
+    "text": "to go and do the review every night on"
+  },
+  {
+    "start": 1537.6,
+    "duration": 5.6,
+    "text": "on the trading day and you will start to"
+  },
+  {
+    "start": 1540.559,
+    "duration": 3.84,
+    "text": "discover very nice patterns anyway"
+  },
+  {
+    "start": 1543.2,
+    "duration": 2.68,
+    "text": "that's it for me I promise it was going"
+  },
+  {
+    "start": 1544.399,
+    "duration": 6.0,
+    "text": "to be a short video it was a little bit"
+  },
+  {
+    "start": 1545.88,
+    "duration": 4.519,
+    "text": "longer but uh see you next time"
+  }
+]
