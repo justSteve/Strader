@@ -216,12 +216,12 @@ Do not firehose. Surface the 2-3 things that matter today and explain why in one
 
 **Behavioral gate (the agent):** The agent cannot execute code that touches the live Schwab API. Enforced at the permissions layer: `python3`, `bash`, `sh`, `curl`, `source`, `echo`, and `touch` are NOT auto-allowed — every use prompts Steve. Gate key (`~/.schwab_gate_key`) and token paths are hard-denied.
 
-- **Write code** in `schwab/` and `scripts/` — the agent's job
+- **Write code** in `broker_schwab/` and `scripts/` — the agent's job
 - **Run tests** via `python3 -m pytest` — explicitly allowed, no prompt
-- **Test with mocks** via `schwab/mock/client.py` — safe, no credentials
-- **Read live market data** — `schwab/readers/` scripts are auto-allowed:
-  - `.venv/bin/python3 schwab/readers/quote.py '$SPX' '/ES'`
-  - `.venv/bin/python3 schwab/readers/chain.py '$SPX' --strikes 20 --dte 7`
+- **Test with mocks** via `broker_schwab/mock/client.py` — safe, no credentials
+- **Read live market data** — `broker_schwab/readers/` scripts are auto-allowed:
+  - `.venv/bin/python3 broker_schwab/readers/quote.py '$SPX' '/ES'`
+  - `.venv/bin/python3 broker_schwab/readers/chain.py '$SPX' --strikes 20 --dte 7`
 - **Never execute** other live API code — no execution path is auto-allowed
 - **Steve runs reviewed code** via `./scripts/run.sh <script.py>`
 

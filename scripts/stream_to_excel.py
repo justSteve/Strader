@@ -10,9 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from schwab.client import create_client
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'lib' / 'schwab-py'))
+from broker_schwab.client import create_client
 from schwab.streaming import StreamClient
 
 try:

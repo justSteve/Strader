@@ -42,7 +42,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import signal
 import sys
 import time
@@ -50,22 +49,16 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-# Win the schwab package-name collision: insert the lib path at sys.path[0]
-# BEFORE any schwab import so the lib's schwab/ wins over Strader's local.
-_LIB_SCHWAB_PY = Path(__file__).resolve().parent.parent / "lib" / "schwab-py"
-sys.path.insert(0, str(_LIB_SCHWAB_PY))
+# Add Strader root for `market.*` and `broker_schwab.*` imports. No sys.path
+# gymnastics needed for `schwab` — the upstream hobbled fork resolves cleanly
+# from site-packages now that st-8cx renamed the local wrapper.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Expose project root for `market.*` imports — append so the lib path
-# above wins any schwab resolution.
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-
-from schwab import auth as schwab_auth  # noqa: E402
-
+from broker_schwab.client import create_client  # noqa: E402
 from market.ingest import chain_from_schwab  # noqa: E402
 from market.indicators.gex_calc import compute_gex  # noqa: E402
 
 
-GATE_KEY = Path.home() / ".schwab_gate_key"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CENTRAL = ZoneInfo("America/Chicago")
 
@@ -75,38 +68,6 @@ _stop_flag = False
 def _handle_sigint(signum, frame):
     global _stop_flag
     _stop_flag = True
-
-
-def _load_dotenv() -> None:
-    env_path = PROJECT_ROOT / ".env"
-    if not env_path.exists():
-        return
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, val = line.partition("=")
-        key = key.strip()
-        val = val.split("#", 1)[0].strip()
-        if key and val and key not in os.environ:
-            os.environ[key] = val
-
-
-def _create_client():
-    if not GATE_KEY.exists():
-        raise RuntimeError(
-            "SCHWAB GATE: ~/.schwab_gate_key not found. "
-            f"Create with `touch {GATE_KEY}` to authorize."
-        )
-    _load_dotenv()
-    api_key = os.getenv("SCHWAB_API_KEY")
-    app_secret = os.getenv("SCHWAB_APP_SECRET")
-    token_path = os.getenv("SCHWAB_TOKEN_PATH", "./tokens/schwab_token.json")
-    if not api_key or not app_secret:
-        raise RuntimeError("Missing SCHWAB_API_KEY or SCHWAB_APP_SECRET in .env")
-    if not Path(token_path).exists():
-        raise RuntimeError(f"Token not found at {token_path}.")
-    return schwab_auth.client_from_token_file(token_path, api_key, app_secret)
 
 
 def _try_quote(client, symbol: str) -> float | None:
@@ -241,7 +202,7 @@ def main() -> int:
     print(f"  symbol={args.symbol}  interval={args.interval}s  "
           f"strikes={args.strikes}  dte={args.dte}  max_runs={args.max_runs}")
 
-    client = _create_client()
+    client = create_client()
 
     out_path = _output_path(args.symbol, output_dir)
     print(f"  output:  {out_path}")

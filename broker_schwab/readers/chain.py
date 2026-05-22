@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from schwab.client import create_client
+from broker_schwab.client import create_client
 
 
 def parse_args():

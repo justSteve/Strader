@@ -35,18 +35,10 @@ import shutil
 import sys
 from pathlib import Path
 
-# Win the schwab package-name collision: the Strader project root has a
-# local `schwab/` directory (Strader's own wrapper) that shadows the
-# schwab-py library when CWD or script dir puts the project root on
-# sys.path first. The PEP 660 editable install loses against regular
-# path lookup. Inserting the lib's parent directly at sys.path[0]
-# forces schwab to resolve to the hobbled fork.
-_LIB_SCHWAB_PY = Path(__file__).resolve().parent.parent / "lib" / "schwab-py"
-sys.path.insert(0, str(_LIB_SCHWAB_PY))
-
-# Also expose project root for `market.*` imports — append so it loses
-# to the lib path above for any schwab resolution.
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+# Add Strader root for `broker_schwab.*` imports. `schwab` resolves to the
+# upstream hobbled fork via site-packages — no sys.path tricks needed since
+# the local wrapper was renamed schwab/ → broker_schwab/ (st-8cx).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from schwab import auth as schwab_auth  # noqa: E402
 

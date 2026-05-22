@@ -14,12 +14,13 @@ if [ -z "$COMMAND" ]; then
 fi
 
 # Gate 1: Block python execution of any file that imports schwab
-# Exempt: schwab/readers/ — pre-approved read-only market data scripts
+# Exempt: broker_schwab/readers/ — pre-approved read-only market data scripts
+# (post st-8cx rename; old path was schwab/readers/)
 # Only check when command actually runs python (not grep, cat, etc.)
 if echo "$COMMAND" | grep -qE '(python3?|\./) '; then
   for PY_FILE in $(echo "$COMMAND" | grep -oE '[^ ;|&"'\'']+\.py' || true); do
     case "$PY_FILE" in
-      schwab/readers/*.py|*/schwab/readers/*.py) continue ;;
+      broker_schwab/readers/*.py|*/broker_schwab/readers/*.py) continue ;;
     esac
     if [ -f "$PY_FILE" ] && grep -qlE '^[[:space:]]*(import schwab|from schwab)' "$PY_FILE" 2>/dev/null; then
       echo "SCHWAB GATE: '$PY_FILE' imports schwab. Write code → Steve reviews → Steve runs." >&2
