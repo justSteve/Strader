@@ -274,6 +274,22 @@ Jasper closing entry immediately below.
   toggle to Gamma view for confirmation. Implicitly resolves Izzy's
   concern that gamma-filter loses info: use BOTH views, gamma is the
   confirmation layer not the primary read.
+- 2026-05-23 (bead st-zv6): New canonical entry appended — Jasper
+  2025-07-25 11:32 AM–11:58 AM exchange with aigonewrong. Three
+  doctrinal payloads: (a) reading net DEX across BOTH call and put
+  sides to infer vol regime; (b) the convexity-dump-then-ramp
+  pattern (lift → dump → ramp three-phase); (c) the operational rule
+  "those are the best longs tho. there's juice to lean on" — when
+  customer convexity gets dumped, the resulting position state is a
+  structurally supported long setup, with dealer hedging as the cause
+  of the directional follow-through. Two graphics archived in
+  `images/`: aigonewrong's NDX/SPX orderflow comparison + Jasper's
+  SPX convexity dump-ramp chart. First entry to use the "principal's
+  emoji reaction is canonical-confirming" attribution convention
+  (Steve 2026-05-23) — aigonewrong's 11:58 AM follow-up confirmed
+  via Jasper 👍 reaction. Includes operational tests for the
+  measurement framework (lift-dump detection thresholds, forward-
+  returns vs baseline).
 - 2026-05-23 (bead st-62v): Entries 3, 4, 9, 13 re-tiered and moved to
   [`../community/expert_qa.md`](../community/expert_qa.md). Reason:
   speaker is "John M" — a community contributor with no GexBot staff
@@ -868,3 +884,242 @@ hierarchy. Other tags seen so far: `[PP]` (Freddy — possibly "paying
 practitioner" or moderator-tier). No canonical statement on what each
 tag means; treat as context cues for the asker's familiarity with the
 system rather than canonical signal.
+
+---
+
+## 2025-07-25 11:32 AM – 11:58 AM — Jasper, on reading net DEX for vol regime + the convexity-dump-then-ramp pattern
+
+**Channel:** GexBot Discord, #theory-questions
+**Date:** 2025-07-25, 11:32 AM → 11:58 AM ET
+**Speakers:** aigonewrong (community) ↔ Jasper "jass" (Moderator)
+
+### Q1 (aigonewrong, 11:32 AM)
+
+> today's orderflow screenshot for NDX, SPX (2025-07-25 first 3 hrs).
+> still trying & learning to see if this can be incorporated for use
+> daily.
+> is my below understanding correct?
+> NDX: from DEX, looking like customers are net selling both calls
+> and puts.
+> SPX: from DEX, looking like customers (for now) are net buying both
+> calls and puts.
+
+aigonewrong attached the side-by-side NDX/SPX orderflow comparison:
+[`images/aigonewrong_2025-07-25_ndx_spx_dex_orderflow.jpg`](images/aigonewrong_2025-07-25_ndx_spx_dex_orderflow.jpg).
+
+![aigonewrong NDX vs SPX orderflow 2025-07-25](images/aigonewrong_2025-07-25_ndx_spx_dex_orderflow.jpg)
+
+Visible in the graphic: three-row orderflow comparison for each
+ticker (aggregate dex, net gex, net convexity), all panels covering
+9:30am–12:30pm 7/25/25. Bottom annotation summarizes:
+- **NDX:** net convexity down. DEX: call selling, put selling
+- **SPX:** net convexity neutral. DEX: call buying, put buying
+
+### A1 (Jasper, 11:41 AM)
+
+> yes, those reads are correct
+
+### Q2 (aigonewrong, 11:44 AM, citing the docs)
+
+> thanks @jass
+>
+> from the doc: "Negative call aggdex implies more call deltas sold
+> than bought, and vice versa for puts. So, when call aggdex is
+> negative and put aggdex is positive, participants have been broadly
+> shorting volatility over the course of the day. Different
+> underlyings trade differently. In a lower volatility environment,
+> SPX is primarily a short volatility and hedging instrument, so we
+> often see positive put aggdex, negative call aggdex, and moderately
+> negative net aggdex during uptrends."
+>
+> so today, VIX is trending lower (at 15 now).
+> for NDX, customers are short volatility.. and for whatever reason,
+> SPX traders are long volatility...
+
+### A2 (Jasper, 11:46 AM)
+
+> spx was lifting convexity (vol until about midday) where they
+> dumped the shit out of it and we finally ramped
+>
+> right now they're about neutral/short convexity on spx
+>
+> lmao they dumped convexity as i was bailing trying to short 420s nq
+>
+> that makes sense
+>
+> assholes
+>
+> **those are the best longs tho. there's juice to lean on.**
+>
+> right now since spx mostly short vol again tape is loosey goosey
+
+Jasper attached the SPX-only convexity chart:
+[`images/jasper_2025-07-25_spx_convexity_dump_ramp.jpg`](images/jasper_2025-07-25_spx_convexity_dump_ramp.jpg).
+
+![Jasper SPX convexity dump 2025-07-25](images/jasper_2025-07-25_spx_convexity_dump_ramp.jpg)
+
+Visible in the graphic: SPX 7/25/25 from 9:30am to ~12:45pm. Cyan
+line is net convexity ($MM); white line is spot price. The convexity
+line climbs through the morning from approximately −1500 to a peak
+of approximately +1700 around 11:30, then drops sharply between
+12:00 and 12:30 (tooltip at 12:08:22 reads `net convexity: 855.54`,
+declining). Spot price (white) breaks out and ramps from 6380 to
+approximately 6388 in the post-dump window. Major long gamma 6369.88;
+major short gamma 6386.16 per the tooltip.
+
+### Q3 (aigonewrong, 11:58 AM)
+
+> got it thanks.
+> long puts are getting out ... as spot goes up.
+> with that 6400 short call strike, volatility continues to dampen.
+> ??
+
+### A3 (Jasper, confirmed via 👍 reaction — no typed reply)
+
+Jasper acknowledged aigonewrong's read with a thumbs-up emoji
+reaction rather than a verbal response. Per Steve's 2026-05-23
+convention: an emoji reaction from a principal is canonical-
+confirming for the post being reacted to — the principal validated
+the read without restating it. The acknowledged content:
+
+1. **Long puts unwinding on upward spot moves.** Customer long-put
+   exposure decreases as spot trades higher — consistent with
+   delta-hedging mechanics (long puts have negative delta; as spot
+   rises, the put position becomes deeper OTM and is closed for
+   reduced loss / cash recovery).
+2. **6400 short call strike acting as a vol-dampener.** With
+   customers SHORT calls at 6400 (above spot at ~6388), any approach
+   toward 6400 sees dealers becoming MORE LONG the underlying via
+   their own buy-back hedging of those short calls — stabilizing
+   flow that dampens realized vol as price nears the strike.
+
+### What this establishes
+
+#### 1. Reading net DEX direction across BOTH call and put sides
+
+The DEX panel exposes net delta exposure (aggregated) signed by
+customer-buy-vs-sell, separately tracked for calls and puts. The
+canonical method Jasper confirms here:
+
+| Call aggdex | Put aggdex | Customer regime |
+|---|---|---|
+| Negative (net selling) | Negative (net selling) | **Short volatility** — customers writing premium on both sides |
+| Positive (net buying) | Positive (net buying) | **Long volatility** — customers paying premium on both sides |
+| Negative call + positive put | | Short call premium + long put premium — bearish hedging stance |
+| Positive call + negative put | | Long upside + short put premium — bullish positioning |
+
+The doctrinal payload: **read both sides simultaneously** to infer
+vol regime, don't read one side in isolation. NDX showing call
+selling AND put selling = customers are NET short vol regardless of
+direction; that's a distinct regime from "customers are short calls"
+(which would be directional bearish).
+
+#### 2. The convexity-dump-then-ramp pattern
+
+Jasper's SPX narrative for the morning maps to a canonical pattern:
+
+1. **Phase 1 — Lifting convexity (morning).** Customers buy convexity
+   (long options on both sides). Net convexity climbs. Vol is being
+   bid up.
+2. **Phase 2 — Dump (~12:00–12:30).** Holders of the morning's long
+   convexity sell out aggressively. Net convexity drops sharply
+   toward zero or negative.
+3. **Phase 3 — Ramp (post-dump).** Spot moves in a directional way
+   (here: upward). The dumping flow is **the structural support** —
+   former vol buyers becoming vol sellers means dealer hedging flips
+   from short-stock-against-long-customer-options to long-stock-
+   against-short-customer-options, which provides buy pressure into
+   any pullback.
+
+The 2025-07-25 SPX chart shows this exact sequence in 4 hours.
+
+#### 3. The "juice to lean on" operational rule
+
+Jasper's flagged statement: **"those are the best longs tho. there's
+juice to lean on."**
+
+Translation: when customer convexity gets dumped (sold), the
+resulting position state is one where a long-spot trade has
+asymmetric structural support. The dumping itself doesn't end the
+move — it sets up the follow-through. "Juice to lean on" = the
+dealer hedging flow provides cushion against pullbacks because
+dealers are now structurally long stock against their newly-acquired
+short-option positions (from customers selling them).
+
+This is the **dual** of the failure-mode pattern documented in
+[`../community/expert_qa.md`](../community/expert_qa.md) (John M /
+stockholm 2025-04-04): there, sustained directional pressure
+*overwhelmed* dealer hedging; here, dealer hedging is the *cause*
+of the directional follow-through.
+
+#### 4. Post-dump regime: "loosey goosey" tape
+
+Jasper's post-dump observation: "right now since spx mostly short
+vol again tape is loosey goosey." When customers are net SHORT vol
+(having sold off their long-convexity positions), dealer hedging is
+LIGHTER per move (smaller gamma exposure) and the tape doesn't have
+strong magnets in either direction. "Loosey goosey" = no significant
+pin/pivot levels currently dominating because the gamma profile is
+flat.
+
+This connects to the canonical convexity-ladder doctrine: high
+positive convexity = strong pivot levels (sticky); neutral/short
+convexity = weak levels (price moves freely). The intra-day regime
+change from "lifting convexity" → "short convexity" is the regime
+flip itself, observed in real time.
+
+### Operational reads for the measurement framework
+
+When we have corpus data covering days with this pattern:
+
+1. **Detect "lifting convexity" mornings**: net convexity trending
+   monotonically upward in the AM session. Mark as long-vol regime.
+2. **Detect the dump**: net convexity dropping >50% from peak within
+   a 30-minute window. Time-stamp the dump.
+3. **Test "juice to lean on"**: does a long entry within ~30 min
+   post-dump have asymmetric upside? Specifically:
+   - Compute forward returns 30/60/120 min after dump
+   - Compare to baseline forward returns when no dump occurred
+   - The Jasper claim predicts dumps mark asymmetric long opportunities
+4. **Test "loosey goosey" sequel**: post-dump, measure realized
+   vol-of-vol and gamma-magnet stickiness. The claim predicts
+   reduced magnet behavior at the standing gamma walls.
+
+This is one of the few canonical entries with a clean intra-day
+pattern testable at the corpus level.
+
+### Cross-references
+
+- [`convexity_ladder.md`](convexity_ladder.md) — the static convexity
+  ladder this dynamic pattern modulates
+- [`gex_profile.md`](gex_profile.md) — the call-vs-put GEX axis
+  complementary to the DEX axis discussed here
+- [`metrics_math.md`](metrics_math.md) — aggregate DEX formula
+- The Jasper closing-exchange entry above (customer-perspective
+  convention) — DEX is also customer-perspective; this entry extends
+  the convention to the DEX panel
+- The Jasper net-convexity-vs-call/put entry above — the
+  call-vs-put aggregation argument here is the dual of the
+  net-convexity aggregation; both views together give the full picture
+- [`../community/expert_qa.md`](../community/expert_qa.md) —
+  contrast with stockholm/John M failure mode: directional flow
+  overwhelms dealer hedging vs. dealer hedging causes the directional
+  flow
+
+### Follow-up flags
+
+- **6400 short call strike pin.** aigonewrong mentions vol dampening
+  with the 6400 short call. The strike-as-cap mechanism is worth a
+  worked example if we have intraday data — does SPX actually pin
+  toward 6400 in the post-dump session?
+- **Jasper's NQ 420 short.** Jasper mentions trying to short "420s
+  NQ" (probably a 0DTE option strike in NQ — would be a 23420 strike
+  given NDX context). Worth catching if more context comes up.
+- **"Best longs" frequency.** How often does the lift-dump-ramp
+  pattern repeat? Is it a daily occurrence or specific to certain
+  regimes (e.g., low VIX, sub-15)?
+- **Emoji-reaction canonicality.** This entry is the first to use
+  Steve's 2026-05-23 convention that a principal's emoji reaction
+  is canonical-confirming. Track how often this attribution form
+  appears in subsequent curation; if frequent, formalize in the
+  Source rules section at the top of this file.
