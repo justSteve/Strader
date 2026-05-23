@@ -50,5 +50,10 @@ def databento_path(d: date | None = None) -> Path:
     return day_dir(d) / "databento_opra.jsonl"
 
 
+def databento_glbx_es_path(d: date | None = None) -> Path:
+    """Per-day Databento GLBX.MDP3 ES.c.0 trades stream. [st-xc9]"""
+    return day_dir(d) / "databento_glbx_es.jsonl"
+
+
 def manifest_path(d: date | None = None) -> Path:
     return day_dir(d) / "manifest.json"
