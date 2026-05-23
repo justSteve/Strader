@@ -244,6 +244,20 @@ See entries 3, 4, 5 below for the full exchange.
   otherwise documented in our canonical files; likely a freshness
   filter analogous to OrderFlow spike concept. First [GOLD]-tagged
   asker seen — subscriber tag note added.
+- 2026-05-22: Entry 13 added — Izzy Q&A 2025-05-14/15 with John M
+  responses. Substantial exchange with three annotated graphics.
+  FOUR new patterns documented: (1) "Double warning" = Calls Sold +
+  Puts Bought at same level → bearish resistance; (2) "Bullish-Above/
+  Bearish-Below" = Calls Bought + Puts Bought at same level (or its
+  inverse) → clean pivot; (3) "Initial Point of Reversion" mechanism
+  — positive gamma stalls via profit-taking expectation, not just MM
+  hedging (explicit "this is the theory"); (4) Cross-day persistence
+  — gamma walls from prior session can carry over (5/13 → 5/14
+  worked example). Also captures the operational workflow: 15-20 min
+  post-open Options screenshot for markup → identify patterns →
+  toggle to Gamma view for confirmation. Implicitly resolves Izzy's
+  concern that gamma-filter loses info: use BOTH views, gamma is the
+  confirmation layer not the primary read.
 
 ---
 
@@ -1059,3 +1073,250 @@ hierarchy. Other tags seen so far: `[PP]` (Freddy — possibly "paying
 practitioner" or moderator-tier). No canonical statement on what each
 tag means; treat as context cues for the asker's familiarity with the
 system rather than canonical signal.
+
+---
+
+## 2025-05-14/15 — Izzy Q&A: gamma filter vs put/call composition (John worked example)
+
+**Channel:** GexBot Discord, theory-questions
+**Date:** Izzy initial post 2025-05-14 5:43 PM; yungissh 7:31 PM same day;
+John responses 2025-05-15 6:07 AM, 6:20 AM, 6:35 AM
+**Speakers:** Izzy (community) + yungissh (community) → John M (John
+Kirby, Moderator)
+
+This exchange is one of the most operationally rich Q&As in the series.
+Izzy raises the legitimate concern that the gamma filter (net long/short)
+loses put/call composition information; John responds by demonstrating
+how to read both views together rather than choosing one.
+
+### Q (Izzy, 5/14 5:43 PM)
+
+> I watched a tutorial video with Jas where he turns the gamma filter
+> on the state view to look for reversion trades. Basically that long
+> gamma acts as resistance and spot will pin to those levels.
+> Furthermore, that short gamma 'repels' spot and pushes spot towards
+> the next node of long gamma.
+>
+> However, isn't the whole point of gexbot is to have the order
+> classification of puts and calls, as not all short gamma is treated
+> the same? For example, if the long call near spot is acting as
+> resistance, doesn't it make a world of a difference whether the
+> short gamma is puts or calls? In order to act as an accelerant for
+> spot price, don't you want to enter where there are a large number
+> of trapped short gamma sellers? (short puts if price is trending
+> down, and short calls if price is trending up). Thus doesn't turning
+> on the gamma filter cause you to miss that information?
+>
+> what am I missing? Do most people prefer the above view without the
+> gamma filter on?
+>
+> Maybe a different way to ask the question — what is the perfect
+> trade setup that you could witness on gexbot? Wouldn't it be large
+> long gamma node, but also with short gamma pushing price toward the
+> long gamma? ie multi strike short calls below a large long call.
+> Wouldn't that be much different that multistrike short puts below a
+> large long call?
+
+Izzy attached a baseline SPX state screenshot showing the un-gamma-
+filtered view:
+[`images/john_izzy1_spx_state_baseline.jpg`](images/john_izzy1_spx_state_baseline.jpg).
+
+### Q (yungissh, 5/14 7:31 PM)
+
+> Let me know what you find out on this I'm trying to understand the
+> gamma filter better, from what I've seen and I could be wrong here
+> so please grain of salt as of late we've been attracted to the
+> largest gamma clusters whether above or below. Once we reach the
+> first wall we either attempt to break and fail fall back below or
+> break and mellow out between the two largest gamma nodes.
+
+### A1 (John, 5/15 6:07 AM — workflow and "double warning")
+
+> Izzy, take a look at this options view from yesterday, (05/14/2025).
+> Once the market opens and then settles in after 15-20 minutes
+> capture a screen shot for yourself to mark up. Note how I
+> immediately marked up "Calls Sold" and "Puts Bought" at the ES
+> $5919.00, both of these orders express a bearish morning outlook
+> for the market. We essentially have a "double" warning that for at
+> least the morning session keeping price above or getting above will
+> be difficult. That "Calls Sold" position grew to over 2000 contracts
+> into lunch hour. Now, once you have your "Options" view laid out,
+> toggle the button to show the "Gamma" view. The second diagram was
+> the "Gamma" view coming in to lunch just after European close where
+> you can see I labelled the possibilities for the afternoon.
+
+Attached graphic:
+[`images/john_izzy2_es_5919_double_warning.jpg`](images/john_izzy2_es_5919_double_warning.jpg).
+
+The graphic shows the Options view (no gamma filter) with John's
+markups. Visible patterns:
+- $5919 strike has BOTH "Calls Sold" (left orange) AND "Puts Bought" (right purple) — labeled with red arrows + text "CALLS SOLD AT $5919.00 RESISTANCE" and "PUTS BOUGHT AT $5919.00 BEARISH BET: RESISTANCE"
+- $5894, $5879: "PUTS BOUGHT" — additional bearish bets below
+- $5850: green-arrow-labeled "$5850.00 SUPPORT ZONE"
+- $5809: large purple bar far-left, labeled "PUTS SOLD LARGEST SUPPORT"
+- Cyan line shows price testing $5919 from below and getting rejected
+
+### A2 (John, 5/15 6:20 AM — hypothetical mechanism)
+
+> Hypothetical situation: Let's assume the ES is trading around
+> $5890.00 and we see a "Calls Bought" position come in up at ES
+> $5910.00, (Calls Bought would show up as "positive gamma".
+> Furthermore, as long as there isn't a larger negative gamma position
+> at the same price level to overtake the positive gamma you will see
+> the cyan blue line extend to the right of axis. In yesterday's
+> example the Calls Sold outweighed the Puts Bought hence the large
+> negative gamma line extending left of axis. Now, as price rises to
+> meet the "Calls Bought" at the $5910 price point we have to expect
+> some initial profit taking to occur. This is the theory behind the
+> "positive gamma" level being an initial "Point of Reversion". The
+> profit taking initially prevents price from going higher unless of
+> course the order flow is extremely bullish. If you read both
+> diagrams and put the context together we really needed stronger
+> order flow to move higher and the buyers weren't able to do the job.
+
+### A3 (John, 5/15 6:35 AM — Bullish Above / Bearish Below pattern)
+
+> Here is a view from last week. Take note of the yellow rectangle.
+> We had "Calls Bought" and "Puts Bought" on/at the same price level.
+> This now acts as your "Bullish Above/ Bearish Below". Practice
+> laying out the possibilities then match up your gamma view. The
+> second diagram is from 05/13/2025. This view shows how that ES
+> $5920.00 line became the "Resistance Problem" one day prior to the
+> $5920.00/ $5919.00 into 05/14/2025 in the first example, (from
+> above). Calls bought and Puts Bought on the same price level. (Also
+> works when Calls Sold/ Puts Sold at same level). I hope this helps.
+
+Attached graphic:
+[`images/john_izzy3_es_5920_battle_line_precursor.jpg`](images/john_izzy3_es_5920_battle_line_precursor.jpg).
+
+Visible: 5/13 view with price testing $5920 (annotated "$5920.00 IS
+THE NEW BATTLE LINE FOR NOW") with both Calls Bought and Puts Bought
+visible at that level. Large $5950 calls-bought bar above (green
+arrow) and large $5889 puts-bought bar below (red arrow).
+
+---
+
+### Four patterns documented in this exchange
+
+#### Pattern 1: Double-warning (Calls Sold + Puts Bought at same level)
+
+Both orders express a *bearish* outlook at the level. This is John's
+"double warning" — keeping price above or getting above will be
+difficult. Operationally: a level with this pattern is a high-
+confidence resistance.
+
+Visible at ES $5919 on 5/14 — both red-arrow-tagged in graphic
+[`images/john_izzy2_es_5919_double_warning.jpg`](images/john_izzy2_es_5919_double_warning.jpg).
+The symmetric inverse (Puts Sold + Calls Bought at same level) would
+be the "double warning" upward.
+
+#### Pattern 2: Bullish-Above / Bearish-Below (Calls Bought + Puts Bought at same level)
+
+Both orders are LONG options at the same level, but the call is a
+bullish bet (profits above) and the put is a bearish bet (profits
+below). The level becomes a clean pivot: above = bullish dominant,
+below = bearish dominant. Whoever holds the level wins.
+
+John also notes this works for the inverse: **Calls Sold + Puts Sold
+at the same level** also creates a Bullish-Above/Bearish-Below pivot
+(sellers profit if price stays AT the level, lose either direction).
+
+Visible at ES $5920 on 5/13 in graphic
+[`images/john_izzy3_es_5920_battle_line_precursor.jpg`](images/john_izzy3_es_5920_battle_line_precursor.jpg)
+— described as the "battle line."
+
+#### Pattern 3: Initial Point of Reversion (mechanism)
+
+Positive gamma levels stall price via **profit-taking expectation**,
+not just MM hedging. From John's 6:20 AM hypothetical:
+
+> Price rises to meet the Calls Bought at the $5910 price point. We
+> have to expect some initial profit taking to occur. This is the
+> theory behind the "positive gamma" level being an initial "Point of
+> Reversion". The profit taking initially prevents price from going
+> higher unless of course the order flow is extremely bullish.
+
+This is the **customer-flow** version of the pivot mechanism — the
+same mechanism noted in [`../community/freddy_orderflow_series.md`](../community/freddy_orderflow_series.md)
+Part 2 "Mechanism inversion" section. Customers take profit at their
+long-gamma strikes; that selling provides the wall, not pure MM gamma
+hedging. John makes this explicit: "this is the theory."
+
+The "unless of course the order flow is extremely bullish" caveat
+recovers Entry 9's failure mode — sustained directional pressure can
+overwhelm the profit-taking wall.
+
+#### Pattern 4: Cross-day persistence
+
+The $5920 line was the "battle line" on 5/13. It became the resistance
+problem at $5919/$5920 on 5/14. **Gamma walls from one session can
+persist into the next session**, especially when the underlying
+positioning carries over.
+
+Worth tracking: if a major level held (or failed) yesterday, expect
+it to be in play today. Don't reset gamma map at each session open.
+
+---
+
+### Workflow discipline (operational)
+
+From John's response, the explicit operational sequence:
+
+1. **Wait 15-20 minutes** after market open for initial volatility to settle
+2. **Screenshot the Options view** (no gamma filter) and mark it up — identify Calls Bought / Calls Sold / Puts Bought / Puts Sold concentrations
+3. **Look for the patterns**: double-warning, Bullish-Above/Bearish-Below, ITM call buying (entry 11 favorite signal)
+4. **Toggle to Gamma view** to confirm net polarity (cyan/purple extent at marked levels)
+5. **Layout possibilities for the session** based on what holds
+6. **Re-check the gamma view** at major sessions (European close = lunch hour in US)
+
+This is the workflow that *uses* the gamma filter as a confirmation
+layer rather than treating it as the primary view. It directly answers
+Izzy's concern.
+
+### How this resolves Izzy's three sub-questions
+
+**Q1: Doesn't the gamma filter cause you to miss put/call info?**
+A: Yes if you only look at the gamma view. But the operational
+workflow uses Options view FIRST for composition, then Gamma view
+for confirmation. The gamma filter is a complement, not a
+replacement, for the Options view.
+
+**Q2: Don't you want trapped short put sellers / short call sellers
+for acceleration?**
+A: Yes, and this is visible in the Options view (the COMPOSITION of
+short gamma at each strike), not directly in the gamma-filtered view.
+The gamma filter tells you the NET — for composition you go back to
+the Options view.
+
+**Q3: What's the perfect trade setup?**
+A: Implicitly, John shows it: a strike with the right pattern (double-
+warning, Bullish-Above/Bearish-Below, or just ITM call buying) +
+confirmation from the gamma view. The put-vs-call composition of the
+surrounding short gamma DOES matter and DOES change the read, exactly
+as Izzy intuited.
+
+### What John doesn't directly address
+
+Izzy explicitly asked: "what is the perfect trade setup that you
+could witness on gexbot? Wouldn't it be large long gamma node, but
+also with short gamma pushing price toward the long gamma? ie multi
+strike short calls below a large long call. Wouldn't that be much
+different than multistrike short puts below a large long call?"
+
+John demonstrates patterns but doesn't give a one-line "perfect
+setup" formula. The implicit answer from the patterns: the perfect
+setup is the convergence of a strong directional pattern (double-
+warning, Bullish-Above/Bearish-Below, or ITM call buying) WITH
+supportive gamma extension AND a clear orderflow narrative in the
+surrounding strikes. There isn't a single template — it's pattern
+recognition over multiple charts.
+
+### Cross-references
+
+- Entry 11 (John ITM-call-buying-as-support) — pattern that combines well with the Bullish-Above/Bearish-Below pivot
+- Entry 9 (stockholm/John failure mode) — sustained directional flow can overwhelm even these patterns
+- Entry 5 (Jasper's pivot-at-customer-long-gamma rule) — the canonical base rule these patterns refine
+- Entry 6 (John gamma↔convexity equivalence) — the structural equivalence Izzy is reasoning across
+- [`gex_profile.md`](gex_profile.md) — the green/red GEX axis Izzy references
+- [`convexity_ladder.md`](convexity_ladder.md) — the cyan/purple gamma axis Izzy references
+- [`../community/freddy_orderflow_series.md`](../community/freddy_orderflow_series.md) Part 2 mechanism note — the customer-flow mechanism John makes explicit ("profit taking → initial Point of Reversion") matches the corrected mechanism documented there
