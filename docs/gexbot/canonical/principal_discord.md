@@ -274,6 +274,33 @@ Jasper closing entry immediately below.
   toggle to Gamma view for confirmation. Implicitly resolves Izzy's
   concern that gamma-filter loses info: use BOTH views, gamma is the
   confirmation layer not the primary read.
+- 2026-05-23 (bead st-9w0): New canonical entry appended — Jasper
+  2025-10-17 10:45 AM Q&A with T46. **"Literally all i do"** —
+  Jasper compresses his entire trading method to a two-case
+  decision tree: rising vol → continuation at long gamma; falling
+  vol → reversion at long gamma. Restatement and reinforcement of
+  the 2025-04-09 regime rule of thumb (this is now doctrinally
+  stable across 6+ months of Discord). The meta-claim that "all of
+  it" is this rule has structural implications: all other canonical
+  infrastructure (Classic vs State, max-change-gex, vol surface,
+  GEX axes) exists to inform two decisions — regime and level.
+  Reconfirms falling-vol as the 0dte default.
+- 2026-05-23 (bead st-dsz): New canonical entry appended combining
+  TWO sequential Jasper threads — pensivelion 2025-09-29 9:45 PM
+  and Browniver 2025-10-01 1:05 PM. **GEX vs gamma canonical
+  definitions** restated and sharpened: GEX = net deltas (call/put
+  axis); gamma = net vol (long/short axis). **Repudiation of the
+  naive "paper buys puts, sells calls" assumption** — useless for
+  0dte/intraday. **Classic vs State product distinction**: Classic
+  = naive volume increment per contract; State = trade-classified
+  signed volume (e.g. +50 lots bought, −25 lots sold) using a vol
+  surface as reference. **Operational corollary**: Classic profile
+  shape is structurally biased (calls fill upside, puts fill
+  downside) because the naive assumption bakes in; State preserves
+  actual positioning. **Regime trading via State** — long-vol regime
+  → hotter tape; short-vol → grind. "Even for futures" caveat:
+  options regime predicts ES behavior. Two new role tags first seen:
+  `[end]` (pensivelion), `[PHUB]` (Browniver).
 - 2026-05-23 (bead st-o4i): New canonical entry appended — Jasper
   2025-09-28 2:49 PM Q&A with vqz `[MATH]`. The **two-signal
   fade-entry rule**: long gamma spike + downside (put) GEX spike →
@@ -1255,3 +1282,434 @@ trade-direction rule by adding the directional-GEX read.
   or call-GEX-on-upside accompanies it, and measure forward returns
   conditional on the alignment. Should produce a clean asymmetry
   between aligned and non-aligned signals if the rule holds.
+
+---
+
+## 2025-09-29 9:41 PM – 2025-10-01 1:08 PM — Jasper, GEX vs gamma definitions + Classic vs State (naive vs trade-classified GEX)
+
+This entry combines two sequential Discord exchanges Jasper used to
+develop one continuous doctrine: the foundational distinction
+between the GEX-profile and gamma-profile axes (2025-09-29), and the
+product-level difference between GexBot's "Classic" (naive) GEX and
+"State" (trade-classified) GEX (2025-10-01).
+
+**Channel:** GexBot Discord, #theory-questions
+**Dates:**
+- 2025-09-29, 9:41 PM → 10:29 PM ET — pensivelion + Jasper
+- 2025-10-01, 1:02 PM → 1:08 PM ET — Browniver + Jasper
+
+**Speakers:** pensivelion `[end]` (community) → Jasper "jass"
+(Moderator); Browniver `[PHUB]` (community) → Jasper "jass"
+(Moderator).
+
+The two threads are treated as one entry because Jasper's
+2025-10-01 explanation of Classic vs State directly continues the
+2025-09-29 discussion of the naive GEX assumption.
+
+---
+
+### Part 1 — 2025-09-29: GEX vs gamma definitions
+
+#### Q (pensivelion `[end]`, 9:41 PM)
+
+> Hey so. what's the difference between GEX being positive and
+> gamma being positive?
+
+#### A1 (Jasper, 9:45 PM)
+
+> with our terminology the original gex profile refers to netting
+> out call vs put gamma, irrespective of whether the initiator is
+> long or short. then gamma (under options profile) refers to
+> long/short gamma, irrespective of whether the transaction is call
+> or put.
+>
+> more practically you can think of gex profile as net long or short
+> deltas at some strike (since thats the dimension calls/puts lie
+> across) and gamma profile as net long or short vol (easier to
+> think of it in terms of straddles, whether customer lifted or
+> dumped the volatility at some strike)
+>
+> the original assumption around gex was that customers are always
+> long puts short calls hut that assumption is useless for
+> 0dte/intraday timeframe so actual classification (using a
+> volatility surface) is necessary
+
+#### A2 (Jasper, 10:29 PM — vol surface normalization aside)
+
+> tldr instead of using options prices there's a method to normalize
+> their values so that you can compare them apples to apples. (think
+> about when you're trying to determine whether a $0.02 OTM call is
+> fairly valued vs a $0.50 ATM call is fairly valued. comparing
+> their prices directly doesn't really make sense since their
+> moneyness is so different right? so converting prices into
+> volatilities normalizes this discrepancy). i recommend reading
+> investopedia for more.
+
+(The 10:29 PM content was sent twice — once as a normal message and
+once as a quoted re-post of the same text. Both are identical;
+captured once here.)
+
+---
+
+### Part 2 — 2025-10-01: Classic vs State product distinction
+
+#### Q (Browniver `[PHUB]`, 1:02 PM)
+
+> You are saying that the difference in GEX profile in classic and
+> state is "volatility surface classification" / outnetting naive
+> (meaning no classification) gex?
+> What does this mean for real life trading?
+> What does state show that classic does not and which one to use as
+> GEX?
+
+#### A1 (Jasper, 1:05 PM — the product-level distinction)
+
+> classic, like most other gex services, is just naively
+> incrementing volume of each option contract as it trades, and then
+> incorporates that into the gamma exposure calculation. state
+> classifies the trades of the option contract as buy or sell (so
+> the volume can be +50 which means 50 lots bot, or -25 which means
+> 25 lots sold, all cumulatively over the day) before then
+> calculating gex exposure with that
+>
+> you'll see in a lot of literature the naive assumption of paper
+> buys puts and sells calls, therefore dealer is short puts and
+> long calls, but that assumption is clearly just wrong
+
+#### A2 (Jasper, 1:08 PM — operational implications)
+
+> on the state ladder for SPX i can see if participants are all
+> selling vol or long vol which even for futures has a major impact
+> on price action (the regime). e.g. if everybody is long vol
+> (meaning buying options, not just puts but across the skew) then
+> im expecting hotter tape. if everybody's selling vol then there's
+> not much to do other than join some grind
+>
+> with respect to scalping level to level, state just better
+> indicates where shorts or longs are located on the profile.
+> classic (naive) gex profile generally fills out calls to the
+> upside, puts to the downside.
+
+---
+
+### What this establishes
+
+#### 1. The canonical GEX vs gamma definitions (restated and sharpened)
+
+Two distinct profiles, two distinct axes:
+
+| Profile | Netting axis | Practical translation |
+|---|---|---|
+| **GEX profile** (green/red) | Call vs put gamma (initiator long/short doesn't matter) | **Net long or short DELTAS at strike** — directional convexity |
+| **Gamma profile** (cyan/purple, under options profile) | Long vs short gamma (call vs put doesn't matter) | **Net long or short VOL at strike** — straddle-equivalent, customer lifted or dumped vol |
+
+This is the most operationally compressed canonical statement of
+the two-axis structure in this file. It matches and confirms the
+earlier canonical statements from the GEX-vs-gamma-ladder
+disambiguation entry (first entry) and the John Kirby
+gamma↔convexity equivalence entry above, but adds the **deltas vs
+vol** translation:
+
+- GEX profile = net deltas direction (call/put axis collapsing onto a directional read)
+- Gamma profile = net vol direction (long/short axis collapsing onto a vol-buying-vs-selling read)
+
+**Operational reads:**
+- GEX profile tells you **where direction is biased** at a strike
+  (call-heavy = upside magnet; put-heavy = downside magnet)
+- Gamma profile tells you **where vol is being bought or sold**
+  (long-gamma = customers paid for vol; short-gamma = customers
+  sold vol)
+
+A trade decision typically needs both: GEX for *level direction*,
+gamma for *vol regime at the level*.
+
+#### 2. Repudiation of the naive "paper buys puts, sells calls" assumption
+
+The legacy GEX literature (per Jasper) makes the assumption that
+customers are always long puts and short calls. This implies dealers
+are short puts and long calls. Jasper's verdict:
+
+> that assumption is clearly just wrong
+
+Specifically, for **0dte / intraday** timeframes, this assumption
+breaks down. Modern customer flow is dominated by 0dte trading where
+both calls and puts can be bought OR sold by either side; the naive
+sign convention produces incorrect inferences. **Actual classification
+of each trade as buy or sell — using a volatility surface — is
+required to produce a useful GEX read for intraday/0dte purposes.**
+
+This is a canonical statement that the GexBot product was built
+specifically because the naive assumption fails. Competitor / legacy
+GEX services (per Jasper's 10/01 message) still apply the naive
+assumption.
+
+#### 3. The Classic vs State product distinction
+
+| Product | Method | What it measures |
+|---|---|---|
+| **Classic GEX** | Naively increments volume per contract trade → into GEX calculation | Aggregate per-strike gamma exposure assuming naive sign |
+| **State GEX** | Classifies each trade as buy or sell using a vol surface → signed volume cumulative through the day → THEN computes GEX exposure | Customer-classified gamma exposure that preserves initiator side |
+
+Concrete example from Jasper: in State, a strike's volume might be
+**+50** (= 50 lots bought by customers) or **−25** (= 25 lots sold
+by customers). Classic doesn't preserve this sign — both register
+as 75 raw contracts traded with no directional information.
+
+**Operational corollary:** Classic GEX profiles "generally fill out
+calls to the upside, puts to the downside" — the naive assumption
+is *baked into the chart shape*. That's a structural artifact of
+the method, not a real read of positioning.
+
+#### 4. Vol surface classification — the technical machinery
+
+How GexBot State actually classifies a given trade as customer-buy
+or customer-sell: by comparing the executed option price to the
+volatility surface at that strike/expiry. The surface is the
+canonical reference for what the option *should* cost at that
+moneyness; trades printing above the surface implication tend to
+be customer-buys, below tend to be customer-sells.
+
+Jasper's $0.02-OTM-call-vs-$0.50-ATM-call example makes the point:
+comparing option prices directly is misleading because the prices
+already bake in moneyness differences. Volatility normalizes the
+comparison.
+
+For a deeper read Jasper recommends Investopedia on volatility
+surfaces. This entry doesn't reproduce that technical content; the
+key takeaway is that **State classification depends on the vol
+surface as reference**, which means State data quality depends on
+having a calibrated surface for each underlying.
+
+#### 5. Regime trading via State — operationally significant even for futures-only traders
+
+Jasper makes a notable claim that State enables a **regime read**:
+
+| Regime | State signal | Tape expectation |
+|---|---|---|
+| **Long-vol regime** | Customers buying options across the skew (both puts and calls) | **"Hotter tape"** — bigger moves, active trading environment |
+| **Short-vol regime** | Customers selling options across the skew | **"Join the grind"** — small moves, little to do |
+
+> on the state ladder for SPX i can see if participants are all
+> selling vol or long vol which even for futures has a major impact
+> on price action (the regime)
+
+The **"even for futures"** caveat is significant: the SPX options
+positioning regime predicts ES futures behavior. So traders who
+*only* trade futures still benefit from reading State (the upstream
+options flow drives the dealer hedging that drives the futures
+move).
+
+This is doctrinal payload for the measurement framework: classify
+each session as long-vol vs short-vol regime, then test whether
+forward realized vol (and forward price-move magnitude) is
+systematically higher in long-vol regimes.
+
+#### 6. Level-to-level scalping — State preserves the directional information Classic loses
+
+For the scalping use case:
+
+> state just better indicates where shorts or longs are located on
+> the profile. classic (naive) gex profile generally fills out
+> calls to the upside, puts to the downside.
+
+Classic's shape is misleading because it reflects the *naive
+assumption*, not the actual positioning. State's shape reflects
+the actual signed volume → genuine read of where customer longs vs
+shorts cluster.
+
+If using **State**, the pivot-at-customer-long-gamma rule
+(closing-exchange entry above) refers to *measured* long gamma. If
+using **Classic**, "long gamma" is whatever the naive sign
+convention labels as long — which may not match actual positioning.
+
+**Recommendation implicit in Jasper's framing:** use State for
+intraday/0dte work. Classic provides a smoothed structural picture
+that is not specifically wrong but lacks the actionable directional
+information.
+
+### Cross-references
+
+- The GEX-vs-gamma-ladder disambiguation entry above (Jasper, first
+  entry in this file) — the original canonical two-axis statement;
+  this entry restates and elaborates with the deltas-vs-vol mapping
+- The John Kirby gamma↔convexity equivalence entry above — the
+  long-gamma ↔ positive-convexity ↔ cyan equivalence; combined with
+  this entry's "gamma = net vol" framing, the operational chain is:
+  cyan bar = long gamma = positive convexity = customer net long
+  vol at strike
+- The Jasper net-convexity-vs-call/put entry above — where Jasper
+  first told us net long/short is the smoother indicator for
+  pivot/pin prediction; this entry now explains *why* (State
+  classification produces a cleaner signal than Classic naive
+  netting)
+- The Jasper 2025-07-25 convexity-dump entry above — operationalizes
+  the regime read introduced here (lifting convexity = long-vol
+  regime building; dump = transition to short-vol regime)
+- The Jasper 2025-09-28 two-signal fade-entry entry above — applies
+  the State classification to the trade-direction rule (long gamma
+  + directional GEX); the current entry explains why State's
+  signed-volume classification is what makes the directional-GEX
+  signal meaningful
+- [`gex_profile.md`](gex_profile.md) — the GEX axis (call vs put)
+- [`convexity_ladder.md`](convexity_ladder.md) — the gamma axis
+  (long vs short) and vol-regime modulation
+- [`metrics_math.md`](metrics_math.md) — the underlying GEX/DEX
+  formulas; the vol-surface classification step is upstream of
+  these
+
+### Follow-up flags
+
+- **The `[end]` role tag** (pensivelion). First seen. Joins `[PP]`,
+  `[GOLD]`, `[MATH]`, `[PHUB]` in the role-tag context-cue set.
+- **The `[PHUB]` role tag** (Browniver). Also first-time. No
+  canonical statement on what either tag indicates.
+- **Vol-surface implementation details.** Jasper references the
+  surface but doesn't describe the calibration. Worth a future
+  entry if more details surface in Discord — what's the calibration
+  cadence? What's the surface granularity (strike, expiry)? How
+  does it handle low-liquidity strikes?
+- **Regime test setup.** The long-vol vs short-vol regime
+  classification is corpus-testable: for each session, classify
+  using the State ladder (aggregate net-long vs net-short option
+  trades across the skew), then measure forward intraday RV and
+  range. The Jasper claim predicts long-vol regimes produce hotter
+  tape.
+- **Classic-vs-State quantitative comparison.** If the corpus has
+  both Classic and State data, a direct comparison of the two
+  profile shapes (and the trades they identify as long vs short)
+  would let us quantify how much information Classic loses. This
+  is independent of trading — it's a data-quality study.
+
+---
+
+## 2025-10-17 8:41 AM – 10:45 AM — Jasper, "literally all i do" — the regime-rule compression of his method
+
+A short, high-signal restatement of the regime rule with a closing
+meta-claim that compresses Jasper's entire trading method into a
+two-case decision tree.
+
+**Channel:** GexBot Discord, #theory-questions
+**Date:** 2025-10-17, 8:41 AM → 10:45 AM ET
+**Speakers:** T46 (community) → Jasper "jass" (Moderator)
+
+### Q (T46, 8:41 AM)
+
+> ok higher volatility...= stacked long gamma.... then is there a
+> method jass uses to trade off particular long gamma levels like
+> he has mentions in videos... or is there a different scheme he
+> trades???
+
+### A (Jasper, 10:45 AM)
+
+> if volatility is increasing (the tape is hot) lean on long gamma
+> to look for continuation trades. if volatiilty is decreasing (this
+> is the most common regime for 0dte fyi) then look for
+> reversions/fades off long gamma
+>
+> yes that is literally all i do
+
+### What this establishes
+
+#### 1. Restatement of the regime rule (consistency with 2025-04-09)
+
+The rule is identical in structure to the 2025-04-09 4:30 PM entry
+above (Jasper regime rule of thumb with Andy):
+
+| Vol regime | Long-gamma read | Action |
+|---|---|---|
+| **Rising vol** ("hot tape") | Continuation trigger | **Lean** — press breakout at long gamma |
+| **Falling vol** (default for 0dte) | Reversion zone | **Fade** — reversion off long gamma |
+
+The 2025-04-09 entry framed this as default-vs-exception for 0dte;
+this entry restates it as a clean two-case rule and confirms the
+0dte default ("the most common regime for 0dte fyi").
+
+The agreement across two Discord exchanges six months apart
+elevates this from "Jasper's rule of thumb" to **doctrinally stable
+canonical method**.
+
+#### 2. The "literally all i do" meta-claim
+
+The high-signal payload:
+
+> yes that is literally all i do
+
+Jasper compresses his entire trading method to this two-case
+decision tree. That has substantial implications for how to read
+the rest of the canonical material:
+
+- The Classic-vs-State distinction, the call/put GEX axis, the
+  long/short gamma axis, the max-change-gex freshness filter, the
+  vol-surface classification — **all of that infrastructure exists
+  to inform two decisions**: which regime are we in, and which
+  long-gamma levels to lean on or fade
+- The directional read (call vs put GEX, per the 2025-09-28
+  two-signal fade-entry rule) **specifies the direction** of the
+  long-gamma trade once the regime is identified
+- The 2025-07-25 convexity-dump-then-ramp pattern is a special case
+  of "lifting convexity = long-vol regime → press continuation; dump
+  = transition to short vol → look for the ramp's tail-end fade"
+
+**Operational implication:** when reading any other canonical entry,
+ask: which side of this two-case decision tree is the entry
+informing? If it doesn't inform either, it's infrastructure (the
+HOW) rather than method (the WHAT).
+
+#### 3. The 0dte default reconfirmed
+
+> if volatiilty is decreasing (this is the most common regime for
+> 0dte fyi)
+
+This reconfirms the 2025-04-09 claim that **for 0dte, falling-vol
+is the default regime**. Combining with this entry's main rule:
+the default 0dte trade is **reversion at long gamma**. Continuation
+at long gamma is the exception, reserved for rising-vol sessions
+(pre-event, CPI/FOMC/NFP windows).
+
+For a 0dte trader who can identify only "default" days (no event
+calendar pressure), the operational default is therefore: find
+long-gamma cluster, fade approaches to it. That's the base rate
+trade.
+
+### Cross-references
+
+- The Jasper 2025-04-09 regime rule of thumb entry above — the
+  original canonical statement of this rule (default-vs-exception
+  for 0dte). This entry restates and reinforces.
+- The Jasper 2025-09-28 two-signal fade-entry entry above — adds
+  the directional-GEX read on top of the regime rule. Together:
+  regime gives MODE (continuation vs reversion); directional GEX
+  gives SIDE (long vs short).
+- The Jasper 2025-07-25 convexity-dump-then-ramp entry above — a
+  special case of regime transition (lifting → dumping → tape
+  loosens) during a single session.
+- The Jasper 2025-09-29 / 2025-10-01 GEX-vs-gamma + Classic-vs-State
+  entry above — the infrastructure (which classification method,
+  which axis) that feeds into this method's two-case decision.
+- The closing-exchange entry above (Jasper customer-perspective
+  convention) — establishes the base pivot rule that this entry's
+  rule builds on.
+- [`convexity_ladder.md`](convexity_ladder.md) observation 2 — the
+  canonical polarity-flip table that this rule operationalizes.
+
+### Follow-up flags
+
+- **Method compression for documentation.** Jasper's "literally all
+  i do" suggests we should consider a top-level summary in the
+  canonical/ directory (e.g. `canonical/jasper_method.md` or
+  similar) that compresses the entire canonical doctrine into this
+  two-case decision tree, with all other canonical entries cited
+  as infrastructure. This would be a useful navigation aid for new
+  readers of the doctrine and a sharp test of canonical
+  completeness — anything that doesn't trace to one of the two
+  decisions is unmotivated detail.
+- **Regime classification operationalization.** The rule depends on
+  identifying "rising" vs "falling" vol. How is this measured
+  intraday? Is it VIX trend? Realized vol vs implied vol? Net
+  convexity trend (per the 2025-07-25 entry)? Worth a dedicated
+  entry if future Discord material surfaces the specific signal
+  Jasper uses.
+- **Continuation-side worked example.** This file has multiple
+  worked examples of the reversion case (2025-04-09 Andy, 2025-07-25
+  SPX dump-ramp tail). Less material on the continuation case. A
+  rising-vol pre-event worked example would round out the doctrine.
