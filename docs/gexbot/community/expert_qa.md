@@ -176,7 +176,7 @@ John Kirby)
 
 1. **Cyan = long gamma = long puts OR long calls** (customer
    perspective, customer-bought side). Confirms Guido's reading. This
-   matches the canonical Jasper/John Kirby statements; John M is
+   matches the canonical jass/John Kirby statements; John M is
    reproducing established doctrine.
 2. **The customer-long classification is at the CONTRACT level** — if
    a customer is long ANY contract (call OR put), it lands in cyan.
@@ -189,10 +189,10 @@ John Kirby)
 Note Guido's framing of "market makers are Long gamma → violet bars" —
 he's correctly reasoning by inversion. If MM is long gamma, customer
 is short gamma, customer-short shows as violet. John M doesn't
-directly confirm Guido's MM-inversion logic, but Jasper does in the
+directly confirm Guido's MM-inversion logic, but jass does in the
 closing exchange of the thread (see
 [`../canonical/principal_discord.md`](../canonical/principal_discord.md),
-entry on Jasper closing the customer-perspective convention).
+entry on jass closing the customer-perspective convention).
 
 ---
 
@@ -251,7 +251,7 @@ downside move; John M explains why.
 
 #### 1. Gamma rules have limits — sustained directional pressure can overrun them
 
-The pivot-at-gamma-levels rule (per Jasper, in
+The pivot-at-gamma-levels rule (per jass, in
 [`../canonical/principal_discord.md`](../canonical/principal_discord.md))
 and the short-put-creates-buy-support intuition (per stockholm's
 mechanical argument) both presume that **dealer hedging is the
@@ -571,7 +571,7 @@ recognition over multiple charts.
   entry on John Kirby ITM-call-buying-as-support — pattern that
   combines well with the Bullish-Above/Bearish-Below pivot
 - [`../canonical/principal_discord.md`](../canonical/principal_discord.md)
-  entry on Jasper's pivot-at-customer-long-gamma rule — the canonical
+  entry on jass's pivot-at-customer-long-gamma rule — the canonical
   base rule these patterns refine
 - [`../canonical/principal_discord.md`](../canonical/principal_discord.md)
   entry on John Kirby gamma↔convexity equivalence — the structural
@@ -705,7 +705,7 @@ So "major call gamma" is reversionary IF those calls were BOUGHT
 (positive gamma). If they were SOLD (negative gamma), the level
 behaves as liquidity-provision, not reversion. Same for puts. The
 reframing is consistent with the canonical "customer perspective"
-convention (see `../canonical/principal_discord.md`, Jasper closing
+convention (see `../canonical/principal_discord.md`, jass closing
 exchange entry).
 
 #### Pattern 2: The bus metaphor — customer-flow reversion mechanism
@@ -722,7 +722,7 @@ John M proposes:
 **This is a customer-flow explanation of reversion, NOT a
 dealer-hedging explanation.** It's distinct from (but complementary
 to) the canonical dealer-gamma-hedging story carried in
-`../canonical/convexity_ladder.md` and the Jasper canonical entries.
+`../canonical/convexity_ladder.md` and the jass canonical entries.
 
 #### Pattern 3: Side-by-side workflow recommendation
 
@@ -764,9 +764,9 @@ Reading: the principal **did not endorse** John M's bus-metaphor
 framing as canonical. We have no canonical equivalent of "reversion
 is customer profit-taking" — the canonical mechanism story remains
 dealer-hedging-based (see `../canonical/convexity_ladder.md` and the
-Jasper canonical entries). John M's customer-flow account is a
+jass canonical entries). John M's customer-flow account is a
 plausible community-tier extension but it has not been validated by
-Jasper or John Kirby.
+jass or John Kirby.
 
 **Operational implication for the measurement framework**: when
 testing reversion at long-gamma levels, test BOTH the canonical
@@ -795,16 +795,16 @@ those positions are positive (bought).
 ### Cross-references
 
 - [`../canonical/principal_discord.md`](../canonical/principal_discord.md)
-  Jasper closing-exchange entry — the canonical customer-perspective
+  jass closing-exchange entry — the canonical customer-perspective
   convention. John M's positive/negative gamma reframing is
   consistent.
 - [`../canonical/principal_discord.md`](../canonical/principal_discord.md)
-  Jasper 2025-09-28 two-signal fade-entry entry — gives the
+  jass 2025-09-28 two-signal fade-entry entry — gives the
   CONDITIONS for reversion to occur (long gamma + directional GEX
   alignment). joefriday's "doesn't always work" observation is
   partially explained by absent directional-GEX alignment.
 - [`../canonical/principal_discord.md`](../canonical/principal_discord.md)
-  Jasper 2025-04-22 max-change-gex entry — the multi-touch dynamic
+  jass 2025-04-22 max-change-gex entry — the multi-touch dynamic
   John M describes parallels the "freshness filter" notion: each
   touch updates the position state.
 - Prior Izzy entry above (2025-05-14/15) — John M's side-by-side

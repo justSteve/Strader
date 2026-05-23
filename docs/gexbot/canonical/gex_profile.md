@@ -53,7 +53,7 @@ for the measurement framework to validate against corpus data.
 
 4. **Net imbalance principle matters for measurement framework.** When comparing GexBot's `major_positive` and `major_negative` against actual price behavior, the prediction is about *net imbalance* concentrations, not gross flow. Falsification needs to be measured against the right metric.
 
-5. **GEX axis vs gamma-ladder axis — do not confuse.** The GEX profile here nets **calls vs puts** (regardless of long/short). The separate gamma ladder (cyan = long gamma, purple = short gamma) nets **long vs short** (regardless of call/put). A short call shows as green in the GEX profile because its call-ness is what's netted here. Per Jasper's Discord Q&A:
+5. **GEX axis vs gamma-ladder axis — do not confuse.** The GEX profile here nets **calls vs puts** (regardless of long/short). The separate gamma ladder (cyan = long gamma, purple = short gamma) nets **long vs short** (regardless of call/put). A short call shows as green in the GEX profile because its call-ness is what's netted here. Per jass's Discord Q&A:
    - **call/put gex** → measure of directional (up/down) convexity
    - **long/short gamma** → measure of momentum/reversion (continuation or fade)
 
@@ -61,14 +61,14 @@ for the measurement framework to validate against corpus data.
 
 6. **UI: gamma toggle.** Per John M's confirmation in the same 2025-02-21 thread, GexBot ships a "gamma switch" toggle that flips the chart between (a) cyan/purple gamma view and (b) PUTS/CALLS bought-vs-sold view. Toggling between them during a live session is John's recommended way to verify the cyan = long gamma = long puts OR long calls mapping in real time.
 
-7. **Net GEX sign convention: customer perspective.** Per Jasper's 2025-03-05 2:59 PM confirmation (`principal_discord.md` entry 7), the GEX profile is the **customer's net GEX view**, not the MM's. The customer-perspective convention established for the convexity ladder (entry 5) extends here. Operationally:
+7. **Net GEX sign convention: customer perspective.** Per jass's 2025-03-05 2:59 PM confirmation (`principal_discord.md` entry 7), the GEX profile is the **customer's net GEX view**, not the MM's. The customer-perspective convention established for the convexity ladder (entry 5) extends here. Operationally:
    - Green call-gex spike at strike → customer net-long calls there → bullish positioning by the customer side
    - Red put-gex spike at strike → customer net-long puts there → bearish positioning by the customer side
    - Sign flips for MM perspective; never read MM-side from these colors directly.
 
-8. **Net convexity > call/put alone for pivot/pin prediction.** Per the same 2025-03-05 Q&A, Jasper agrees that the gamma ladder (long/short axis) gives more consistent pivot signals than the GEX profile (call/put axis) alone. The asker noted "put gamma levels do not need to always act as pivot points or as pinning points," which Jasper effectively endorses with "yes well imo at least. there's a case for both." Operational read: **lead with the gamma ladder for pivot identification; use the GEX profile for directional convexity bias.**
+8. **Net convexity > call/put alone for pivot/pin prediction.** Per the same 2025-03-05 Q&A, jass agrees that the gamma ladder (long/short axis) gives more consistent pivot signals than the GEX profile (call/put axis) alone. The asker noted "put gamma levels do not need to always act as pivot points or as pinning points," which jass effectively endorses with "yes well imo at least. there's a case for both." Operational read: **lead with the gamma ladder for pivot identification; use the GEX profile for directional convexity bias.**
 
 ## Revision log
 
 - 2026-05-22: Initial canonical capture from `documentation - gexbot.html` saved 2026-05-20. Promoted by Steve direction same day.
-- 2026-05-22: Added observation 5 (GEX axis vs gamma-ladder axis disambiguation) sourced from Jasper Discord Q&A; archived in `principal_discord.md`.
+- 2026-05-22: Added observation 5 (GEX axis vs gamma-ladder axis disambiguation) sourced from jass Discord Q&A; archived in `principal_discord.md`.

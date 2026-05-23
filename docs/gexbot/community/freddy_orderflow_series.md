@@ -259,13 +259,13 @@ when canonical says MM long gamma is stabilizing).
 #### The operational conclusion is still correct
 
 Despite the mechanism error, Freddy's OPERATIONAL claim is the same
-as Jasper's canonical rule from
+as jass's canonical rule from
 [`../canonical/principal_discord.md`](../canonical/principal_discord.md):
 
 > Pivot at customer long gamma (cyan). Move through customer short
 > gamma (purple).
 
-Both Freddy and Jasper agree on **what** happens. They disagree on
+Both Freddy and jass agree on **what** happens. They disagree on
 **why**.
 
 #### The correct mechanism (per canonical + customer-flow nuance)
@@ -295,7 +295,7 @@ The result is the right rule with the wrong mechanism.
 
 ### What to carry forward operationally
 
-- The Convexity OF / GEX OF reading rules (long-gamma spike = reversion; short-gamma spike = continuation) are sound — they match Jasper's canonical rule
+- The Convexity OF / GEX OF reading rules (long-gamma spike = reversion; short-gamma spike = continuation) are sound — they match jass's canonical rule
 - The four-scenario framework (morning, scalping, event days, EOD) is the operational scaffold for using OrderFlow
 - The "read both charts together" requirement is the discipline that prevents false signals
 - The mechanism explanation in *[12:00]–[13:30]* should be read through canonical theory + the customer-flow nuance above, not taken at face value
@@ -303,7 +303,7 @@ The result is the right rule with the wrong mechanism.
 
 ### Confidence
 
-- Operational rules (reversion/continuation reading): HIGH (consistent with canonical Jasper rule)
+- Operational rules (reversion/continuation reading): HIGH (consistent with canonical jass rule)
 - Vocabulary (reversion/continuation/regime change): HIGH (consistent with Freddy's own vol-focused framing in Discord)
 - Mechanism explanation: LOW (gets MM hedging directions inverted; see warning above)
 - Worked examples (FOMC trade): MED (specific to one session, hard to validate without recording the chart)

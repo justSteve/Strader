@@ -10,7 +10,7 @@ documentation.
 - **Channel and date are mandatory.** Discord posts mutate (edits, deletes); the citation must let a future reader find the original even if it's gone.
 - **Speaker role tag preserved.** `[PP]`, "Moderator", "Member" etc. — that's the speaker's authority signal in the Discord context.
 - **Quote verbatim.** Discord posts are usually short enough to quote in full. Don't paraphrase the post itself; commentary goes below the quote.
-- **Tag canonicity.** When a community member is quoting a principal (Jasper "Jass", John), the *content* may carry canonical weight even though the *medium* is community. Note this in the per-quote commentary.
+- **Tag canonicity.** When a community member is quoting a principal (jass, John), the *content* may carry canonical weight even though the *medium* is community. Note this in the per-quote commentary.
 
 ## Layout
 
@@ -38,15 +38,15 @@ vs existing docs, where it gets slotted.
 Without it, "tight SL" means most setups end as small losses and the
 trader sees a poor hit rate. With it, the profile becomes "many small
 losses + occasional larger wins" — which is the algorithmic profile
-Sarmiento and Jasper both emphasize. The stop is for *timing risk*, not
+Sarmiento and jass both emphasize. The stop is for *timing risk*, not
 for *thesis invalidation*: if your gamma read was right, getting wicked
 out of the level once doesn't mean it stops being a magnet.
 
 ### Canonicity note
 
-Freddy is paraphrasing Jasper ("Jass emphasis on…"), so the *content*
+Freddy is paraphrasing jass ("Jass emphasis on…"), so the *content*
 is canonical-by-attribution even though the *medium* is community. If
-Jasper has stated this directly elsewhere (GexBot docs, a video, a
+jass has stated this directly elsewhere (GexBot docs, a video, a
 pinned Discord post), that source would supersede this paraphrase.
 Worth a search next time we're crawling the Discord archive.
 
@@ -71,7 +71,7 @@ Worth a search next time we're crawling the Discord archive.
 2. **R:R discipline** — explicit numbers: ≥1:3 ratio, 50% off at first level, runner to next. Slotted into [§3](freddy_methodology.md).
 3. **Gamma profile SHIFT = sentiment signal** — when GexBot's max-gamma computation relocates (e.g., topside 21,606 → 21,051), that's the regime change. **NEW** — slotted as [§11](freddy_methodology.md).
 4. **Zero gamma line** as regime delimiter — above = mean-reverting, below = amplifying. The "classic" view name is a likely GexBot UI reference not yet in our canonical docs. **NEW** — slotted as [§12](freddy_methodology.md).
-5. **"Try not to think directional"** — Jasper's framing. Reinforces algorithmic-execution discipline ([§10](freddy_methodology.md)).
+5. **"Try not to think directional"** — jass's framing. Reinforces algorithmic-execution discipline ([§10](freddy_methodology.md)).
 
 ### Worth following up
 
@@ -99,7 +99,7 @@ the docs site.
 
 ### Canonicity note
 
-Freddy attributes the convexity emphasis to Jasper again ("as Jass
+Freddy attributes the convexity emphasis to jass again ("as Jass
 mentioned"). Same canonical-by-attribution pattern as 2025-01-25.
 
 ---
@@ -211,7 +211,7 @@ mnemonic for vocabulary recall.
 ### Worth following up
 
 The poster explicitly asked for a principal answer ("let's see if Jass
-explain it better"). If Jasper followed up in the thread, that response
+explain it better"). If jass followed up in the thread, that response
 would be canonical-tier and belongs in `../canonical/principal_discord.md`.
 
 ---
@@ -297,7 +297,7 @@ The asker raised three specific questions Freddy didn't address:
 3. Implied: how does the canonical orderflow-classification (customer-long vs customer-short, see [`canonical/options_profile.md`](../canonical/options_profile.md)) interact with the max-neg-gamma read?
 
 These are operationally meaningful — the asker is asking the right
-questions. Worth posing to Jasper or John directly.
+questions. Worth posing to jass or John directly.
 
 ---
 
@@ -365,13 +365,13 @@ discussion about changing his language)
 2. **NEW operational framing: direction-agnostic at cyan levels.** Don't read cyan as "price will go up" or "price will go down" — read it as "price will *react and move away*." The mode of departure (up vs down) requires other inputs (vol regime, surrounding structure, etc.).
 3. **Bull put spread example.** Customer sells higher-strike puts and buys lower-strike puts. Profits in three regimes (rally, stable, modest dip). The strategy is **direction-agnostic, vol-focused**. On the convexity ladder this would produce mixed signals: purple at the short-put strike (customer short → negative convexity), cyan at the long-put strike (customer long → positive convexity). Reading this as "bullish" or "bearish" is exactly the directional trap Freddy is moving away from.
 4. **Orderflow-classification mechanism restated** (matches canonical [`../canonical/metrics_math.md`](../canonical/metrics_math.md) "Orderflow Classification"): matched buyers/sellers → no hedging needed → no price impact. Imbalance → forced hedging → price impact. The GEX profile and convexity ladder both measure these imbalances; that's their edge.
-5. **What this changes about Freddy's paper.** The strike-level vocabulary in the paper is OK if you read "positive gamma" as Freddy intends it (= cyan = positive convexity at the strike). What's still deprecated is the **environment-level** "MMs are Long Gamma" framing for the overall regime — that's MM-perspective and Jasper's deprecation request still applies to that usage.
+5. **What this changes about Freddy's paper.** The strike-level vocabulary in the paper is OK if you read "positive gamma" as Freddy intends it (= cyan = positive convexity at the strike). What's still deprecated is the **environment-level** "MMs are Long Gamma" framing for the overall regime — that's MM-perspective and jass's deprecation request still applies to that usage.
 
 ### Why he hasn't changed the paper
 
 He's not refusing — he's explaining that his vocabulary at the strike
 level is INTENTIONAL and serves a methodological purpose: stripping
-out direction to focus on movement. The two perspectives (Jasper's
+out direction to focus on movement. The two perspectives (jass's
 "think customer always" vs Freddy's "think movement, not direction")
 aren't actually in conflict at the strike level. They diverge at the
 environment level, where Freddy's paper still uses MM-talk for regime

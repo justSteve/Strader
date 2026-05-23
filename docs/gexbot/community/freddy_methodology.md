@@ -17,7 +17,7 @@ extended by ongoing Discord posts:
    tags its source. Verbatim quotes archived in [`discord_quotes.md`](discord_quotes.md).
 
 Speaker is **Freddy Sarmiento `[PP]` (Moderator)**, an NQ futures trader
-and member of the GexBot Discord. He credits **Jasper** ("Jass") and
+and member of the GexBot Discord. He credits **jass** ("Jass") and
 **John**, GexBot's principals, as the source of the model he's
 applying.
 
@@ -54,12 +54,12 @@ bull put spread.
 When Freddy uses MM-perspective at the regime level — as in his
 "Understanding the Convexity Ladder" paper §2 ("Declining vol →
 MMs are Long Gamma → Positive Gamma environment") — that's the part
-Jasper called out:
+jass called out:
 
 > We don't think in terms of MM — everything is in terms of customer.
 > That's what you'll find if you read my docs.
 > I'm going to ask Fredy to change this language.
-> (Jasper, [`../canonical/principal_discord.md`](../canonical/principal_discord.md))
+> (jass, [`../canonical/principal_discord.md`](../canonical/principal_discord.md))
 
 When you encounter MM-perspective regime statements in this document or
 in [`freddy_convexity_paper.md`](freddy_convexity_paper.md), translate
@@ -74,7 +74,7 @@ perspective:**
 
 > Pivot at customer long gamma (cyan). Move through customer short
 > gamma (purple). That's all you really need.
-> (Jasper, [`../canonical/principal_discord.md`](../canonical/principal_discord.md))
+> (jass, [`../canonical/principal_discord.md`](../canonical/principal_discord.md))
 
 This rule applies cleanly under either Freddy's strike-level vol-focused
 framing or the canonical customer-perspective convention. The two
@@ -264,7 +264,7 @@ a small move in the underlying forces a *disproportionately large*
 rebalance, which itself moves the underlying further — the gamma
 squeeze loop ([§13](#13-the-gamma-squeeze-loop-and-who-hedges)).
 
-Quoting Jasper through Freddy: "Convexity is a key concept option
+Quoting jass through Freddy: "Convexity is a key concept option
 traders understand well... and that convexity is key for us Futures
 traders too."
 
@@ -357,7 +357,7 @@ next level. Freddy frames this as "not home runs, but moves that could
 give me more than 1-3 ratios" — explicitly anti-greedy.
 
 **Re-entry rule source:** Step 6 is not in the video itself — it comes
-from Freddy's follow-up Discord post the day after, quoting Jasper:
+from Freddy's follow-up Discord post the day after, quoting jass:
 
 > Jass emphasis on entering on the high net convexity, tight SL if price
 > breaks that level against you but entering again of price moves on
@@ -803,7 +803,7 @@ to the State-tier responses we're already capturing:
    numeric magnitude. We should derive scaling empirically from the
    corpus, not borrow Freddy's numbers directly.
 3. Section 8 slide is captured from the community video, not GexBot's
-   own documentation. If Jasper has posted a canonical version of this
+   own documentation. If jass has posted a canonical version of this
    four-shape framework in Discord, that supersedes this synthesis.
 
 ## Source provenance

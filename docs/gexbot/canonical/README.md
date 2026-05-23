@@ -29,7 +29,7 @@ trail.
 | `metrics_math.md` | <https://www.gexbot.com/metrics> | GEX, DEX, VEX, Charm formulas (the math behind the indicators); two vendor-recommended teaching videos linked at the end |
 | `gamma_vanna_video.md` | <https://www.youtube.com/watch?v=zfkOCc2evEk> | Vendor-recommended video #1 — gamma exposure mechanics, the implied order book, why net gamma rarely goes negative, the vanna bridge |
 | `vanna_charm_video.md` | <https://www.youtube.com/watch?v=-RhSCoElB9Y> | Vendor-recommended video #2 — delta-as-ITM-probability reframing, four worked vanna cases, charm as time-substitution for vanna, the combined-mechanism rally/pin |
-| `principal_discord.md` | GexBot Discord (Jasper, John Kirby) | Principal-sourced Discord Q&A. Treated as first-party doctrine — supersedes community interpretations. Parallel to `../community/discord_quotes.md` but for staff voices. |
+| `principal_discord.md` | GexBot Discord (jass, John Kirby) | Principal-sourced Discord Q&A. Treated as first-party doctrine — supersedes community interpretations. Parallel to `../community/discord_quotes.md` but for staff voices. |
 | (future) `api_reference.md` | <https://www.gexbot.com/apidocs> + `../gexbot.spec3.yaml` | Endpoint behaviors, rate limits, auth (probably redundant with the OpenAPI spec; defer until clear value) |
 
 Files are added as the corresponding GexBot content is ingested. Empty

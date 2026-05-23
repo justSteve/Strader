@@ -76,13 +76,13 @@ for the measurement framework.
 
 6. **Transition points = pivots** (independent of vol regime). Where convexity flips sign across strikes, incentives change. These should align with the "transition points" referenced in `dex_ladder.md`.
 
-7. **Convexity ladder ≠ GEX profile — do not confuse the axes.** This ladder nets **long vs short** contracts (regardless of call/put), with **cyan = long gamma, purple = short gamma**. The separate GEX profile (green/red) nets **calls vs puts** (regardless of long/short). Per Jasper's Discord Q&A:
+7. **Convexity ladder ≠ GEX profile — do not confuse the axes.** This ladder nets **long vs short** contracts (regardless of call/put), with **cyan = long gamma, purple = short gamma**. The separate GEX profile (green/red) nets **calls vs puts** (regardless of long/short). Per jass's Discord Q&A:
    - **call/put gex** → measure of directional (up/down) convexity
    - **long/short gamma** → measure of momentum/reversion (continuation or fade)
 
-   A trade decision typically wants both: GEX profile picks the *level*; this ladder predicts the *behavior at that level* (continuation vs reversion). See [`principal_discord.md`](principal_discord.md) for the full Q&A series, including the 2025-02-21 closing exchange where Jasper establishes the canonical operational rule.
+   A trade decision typically wants both: GEX profile picks the *level*; this ladder predicts the *behavior at that level* (continuation vs reversion). See [`principal_discord.md`](principal_discord.md) for the full Q&A series, including the 2025-02-21 closing exchange where jass establishes the canonical operational rule.
 
-8. **The canonical operational rule (Jasper, 2025-02-21):** customer-perspective always.
+8. **The canonical operational rule (jass, 2025-02-21):** customer-perspective always.
 
    > **Pivot at customer long gamma (cyan). Move through customer short gamma (purple). That's all you really need.**
 
@@ -102,4 +102,4 @@ for the measurement framework.
 ## Revision log
 
 - 2026-05-22: Initial canonical capture from `documentation - gexbot.html` saved 2026-05-20.
-- 2026-05-22: Added observation 7 (axis disambiguation from GEX profile) sourced from Jasper Discord Q&A; archived in `principal_discord.md`.
+- 2026-05-22: Added observation 7 (axis disambiguation from GEX profile) sourced from jass Discord Q&A; archived in `principal_discord.md`.

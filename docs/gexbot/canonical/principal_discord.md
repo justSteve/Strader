@@ -1,7 +1,7 @@
 # GexBot Principals — Discord Q&A
 
 Canonical-tier archive of Discord posts authored by **GexBot's
-principals**: Jasper ("Jass") and John Kirby. When a principal answers
+principals**: jass and John Kirby. When a principal answers
 a question directly in Discord, the *content* carries canonical weight
 even though the *medium* is community.
 
@@ -11,7 +11,7 @@ sustained Q&A is preserved at
 [`../community/expert_qa.md`](../community/expert_qa.md) — community
 tier, not canonical. Treat any "John M" speaker tag as community
 unless the Discord role icon explicitly shows a GexBot staff role.
-This file holds only Jasper and John Kirby principal posts.
+This file holds only jass and John Kirby principal posts.
 
 ## Why a separate file from `community/discord_quotes.md`
 
@@ -20,14 +20,14 @@ This file holds only Jasper and John Kirby principal posts.
 - `community/expert_qa.md` archives sustained Q&A by John M (community
   contributor). Authority signal: practitioner experience and
   recognized community standing — but NOT vendor authority.
-- This file archives posts by GexBot principals (Jasper, John Kirby).
+- This file archives posts by GexBot principals (jass, John Kirby).
   Authority signal: vendor. These statements are first-party doctrine;
   they take precedence over community interpretations (including over
   John M's community-tier Q&A) per Steve's "where canonical and
   community disagree, canonical wins" rule.
 
 When a community member quotes a principal in a Discord post (e.g.
-Freddy paraphrasing Jasper), the verbatim quote goes in
+Freddy paraphrasing jass), the verbatim quote goes in
 `community/discord_quotes.md`. When John M answers, it goes in
 `community/expert_qa.md`. When a principal posts directly, it goes
 here.
@@ -46,11 +46,11 @@ here.
 
 ---
 
-## 2025-XX-XX — Jasper, on GEX vs gamma ladder disambiguation
+## 2025-XX-XX — jass, on GEX vs gamma ladder disambiguation
 
-**Channel:** GexBot Discord (channel not captured in source paste; likely #theory-questions based on subject matter)
+**Channel:** GexBot Discord, #theory-questions
 **Date:** not captured in source paste (Steve to confirm)
-**Speakers:** Freddy Sarmiento `[PP]` (question) → Jasper "Jass" + John Kirby tagged (Jasper answered)
+**Speakers:** Freddy Sarmiento `[PP]` (question) → jass + John Kirby tagged (jass answered)
 
 ### Q (Freddy Sarmiento)
 
@@ -60,7 +60,7 @@ here.
 >
 > I was expecting to see some excess of red gamma instead.
 
-### A (Jasper)
+### A (jass)
 
 > the "gex" profile is netted out calls vs puts, ignoring long/short.
 > the purple/cyan ladder "gamma" is long/short contracts, ignoring call/put
@@ -108,12 +108,12 @@ confirm; once nailed down, the heading date should be updated.
 
 ---
 
-## 2025-XX-XX — Jasper, on reading distributed negative convexity
+## 2025-XX-XX — jass, on reading distributed negative convexity
 
-**Channel:** GexBot Discord (channel not captured)
+**Channel:** GexBot Discord, #theory-questions
 **Date:** not captured in source paste (Steve to confirm)
 **Speakers:** unattributed asker (referencing the convexity-ladder
-metrics-card text) → Jasper "Jass"
+metrics-card text) → jass
 
 ### Q
 
@@ -130,7 +130,7 @@ metrics-card text) → Jasper "Jass"
 > well-distributed negative convexity looks? Trying to understand when
 > to worry about the purple lines and when to ignore them.
 
-### A (Jasper)
+### A (jass)
 
 > i think we're juts always eyeballing long gamma (cyan) for poor liq
 > (possible reversion) zones, and purple is more a… after thought-ish?
@@ -140,7 +140,7 @@ metrics-card text) → Jasper "Jass"
 
 ### What this confirms / corrects
 
-**Color mapping (correction of the prior table).** The first Jasper Q&A
+**Color mapping (correction of the prior table).** The first jass Q&A
 in this file just said "the purple/cyan ladder" without specifying
 which color was which. I (the synthesizer) initially guessed
 purple=long, cyan=short. This Q&A overrides that guess:
@@ -153,14 +153,14 @@ purple=long, cyan=short. This Q&A overrides that guess:
 That correction has been propagated to the disambiguation table above
 and to the cross-references in `gex_profile.md` and `convexity_ladder.md`.
 
-### Operational guidance from Jasper (his own practice)
+### Operational guidance from jass (his own practice)
 
 - He leads with the **cyan (long gamma)** lane when scanning — that's where he expects "poor liquidity (possible reversion)."
 - He treats the **purple (short gamma)** lane as "more an afterthought." Operationally secondary.
 - For a long SPX continuation trade, his preferred setup is **short gamma above** (purple stack above spot) — described as "liquidity providing."
 
 These are practitioner reads from a principal, not a vendor-spec rule.
-Treat as how Jasper-the-trader uses the ladder, not as a definition of
+Treat as how jass-the-trader uses the ladder, not as a definition of
 what the ladder means.
 
 ### Customer-vs-dealer perspective: RESOLVED
@@ -169,20 +169,20 @@ I initially flagged a customer-vs-dealer perspective ambiguity here.
 **It's resolved by the three-Q&A exchange that ran on 2025-02-21**:
 two community-tier Q&As (Guido + John M, now archived in
 [`../community/expert_qa.md`](../community/expert_qa.md)) plus the
-Jasper closing entry below. The ladder is **customer perspective**
-throughout. Jasper's "long gamma → reversion" is reconciled via
+jass closing entry below. The ladder is **customer perspective**
+throughout. jass's "long gamma → reversion" is reconciled via
 vol-regime modulation (positive convexity stalls in falling vol;
 that's what produces the reversion at cyan levels) — not via a
 perspective flip.
 
-The operational rule Jasper gave to close the question:
+The operational rule jass gave to close the question:
 
 > We pivot at customer long gamma, but move through customer short
 > gamma. That's all you really need.
 
 For the full exchange: see the Guido + John M entries in
 [`../community/expert_qa.md`](../community/expert_qa.md), then the
-Jasper closing entry immediately below.
+jass closing entry immediately below.
 
 ### Cross-references
 
@@ -192,28 +192,28 @@ Jasper closing entry immediately below.
 
 ## Revision log
 
-- 2026-05-22: File created with Jasper's GEX-vs-gamma-ladder
+- 2026-05-22: File created with jass's GEX-vs-gamma-ladder
   disambiguation Q&A as the first entry. Pattern: canonical-tier
   Discord archive paralleling `community/discord_quotes.md` for
   community-tier voices.
-- 2026-05-22: Second Jasper Q&A added (distributed neg convexity visual
+- 2026-05-22: Second jass Q&A added (distributed neg convexity visual
   question). Corrected the gamma-ladder color mapping (long=cyan,
   short=purple) — my earlier guess was inverted. Surfaced the
   customer-vs-dealer perspective ambiguity as unresolved.
 - 2026-05-22: Three more Q&As added (entries 3, 4, 5 — Guido asking +
-  GexBot staff answering + John M confirming + Jasper closing) that
+  GexBot staff answering + John M confirming + jass closing) that
   RESOLVE the customer-vs-dealer ambiguity. Convention: always think
   customer-perspective. Operational rule: pivot at cyan (customer long
   gamma), move through purple (customer short gamma). Annotated GexBot
   screenshot added to `images/customer_long_short_gamma_annotated.jpg`.
-  Jasper indicated he'll ask Freddy to deprecate MM-perspective
+  jass indicated he'll ask Freddy to deprecate MM-perspective
   language; a vocabulary note has been added to community/freddy_methodology.md.
 - 2026-05-22: Entry 6 added — John Kirby's 2025-02-21 8:04 AM post
   giving the gamma↔convexity equivalence. Three labels (long gamma /
   cyan / positive convexity) all refer to the same ladder positions.
   Resolves the strike-level "positive gamma" terminology in Freddy's
   paper. Top disambiguation table updated to carry the equivalence.
-- 2026-05-22: Entry 7 added — Jasper 2025-03-05 2:59 PM. Two
+- 2026-05-22: Entry 7 added — jass 2025-03-05 2:59 PM. Two
   confirmations: (a) net convexity is more reliable for MM-reaction
   prediction than call/put alone (with "both views have value"
   caveat); (b) NET GEX IS CUSTOMER PERSPECTIVE, not MM. The
@@ -239,7 +239,7 @@ Jasper closing entry immediately below.
   futures, not bullish positioning; (c) worked example — ES $5237
   puts sold at 9:50 AM, broken through by 10:15. Plus the Freddy
   channel URL is captured: youtube.com/@gextrading.
-- 2026-05-22: Entry 10 added — Jasper 2025-04-09 4:30 PM Q&A with
+- 2026-05-22: Entry 10 added — jass 2025-04-09 4:30 PM Q&A with
   Andy. Compresses the regime rule into a default+exception form:
   for 0DTE, falling-vol regime is *almost always* the default, so
   the canonical pivot-at-long-gamma rule applies most days. Exception
@@ -254,7 +254,7 @@ Jasper closing entry immediately below.
   size is proportionally larger than OTM, creating stronger structural
   support per contract. Distinct sub-case of the cyan-bar rule —
   ITM long gamma > OTM long gamma for support force.
-- 2026-05-22: Entry 12 added — Jasper 2025-04-22 8:07 AM. Mechanics
+- 2026-05-22: Entry 12 added — jass 2025-04-22 8:07 AM. Mechanics
   of "max change gex" — updates every second; values are lookbacks
   since the ladder has no time axis. Flagged as a UI feature not
   otherwise documented in our canonical files; likely a freshness
@@ -274,9 +274,9 @@ Jasper closing entry immediately below.
   toggle to Gamma view for confirmation. Implicitly resolves Izzy's
   concern that gamma-filter loses info: use BOTH views, gamma is the
   confirmation layer not the primary read.
-- 2026-05-23 (bead st-9w0): New canonical entry appended — Jasper
+- 2026-05-23 (bead st-9w0): New canonical entry appended — jass
   2025-10-17 10:45 AM Q&A with T46. **"Literally all i do"** —
-  Jasper compresses his entire trading method to a two-case
+  jass compresses his entire trading method to a two-case
   decision tree: rising vol → continuation at long gamma; falling
   vol → reversion at long gamma. Restatement and reinforcement of
   the 2025-04-09 regime rule of thumb (this is now doctrinally
@@ -286,7 +286,7 @@ Jasper closing entry immediately below.
   GEX axes) exists to inform two decisions — regime and level.
   Reconfirms falling-vol as the 0dte default.
 - 2026-05-23 (bead st-dsz): New canonical entry appended combining
-  TWO sequential Jasper threads — pensivelion 2025-09-29 9:45 PM
+  TWO sequential jass threads — pensivelion 2025-09-29 9:45 PM
   and Browniver 2025-10-01 1:05 PM. **GEX vs gamma canonical
   definitions** restated and sharpened: GEX = net deltas (call/put
   axis); gamma = net vol (long/short axis). **Repudiation of the
@@ -301,7 +301,7 @@ Jasper closing entry immediately below.
   → hotter tape; short-vol → grind. "Even for futures" caveat:
   options regime predicts ES behavior. Two new role tags first seen:
   `[end]` (pensivelion), `[PHUB]` (Browniver).
-- 2026-05-23 (bead st-o4i): New canonical entry appended — Jasper
+- 2026-05-23 (bead st-o4i): New canonical entry appended — jass
   2025-09-28 2:49 PM Q&A with vqz `[MATH]`. The **two-signal
   fade-entry rule**: long gamma spike + downside (put) GEX spike →
   bid for reversion UP; long gamma + upside (call) GEX → short for
@@ -310,7 +310,7 @@ Jasper closing entry immediately below.
   "making it expensive = stepping in for reversion." First `[MATH]`
   role-tag asker observed; added to the role-tag context-cue set
   alongside `[PP]` and `[GOLD]`. No graphics in source thread.
-- 2026-05-23 (bead st-zv6): New canonical entry appended — Jasper
+- 2026-05-23 (bead st-zv6): New canonical entry appended — jass
   2025-07-25 11:32 AM–11:58 AM exchange with aigonewrong. Three
   doctrinal payloads: (a) reading net DEX across BOTH call and put
   sides to infer vol regime; (b) the convexity-dump-then-ramp
@@ -319,11 +319,11 @@ Jasper closing entry immediately below.
   customer convexity gets dumped, the resulting position state is a
   structurally supported long setup, with dealer hedging as the cause
   of the directional follow-through. Two graphics archived in
-  `images/`: aigonewrong's NDX/SPX orderflow comparison + Jasper's
+  `images/`: aigonewrong's NDX/SPX orderflow comparison + jass's
   SPX convexity dump-ramp chart. First entry to use the "principal's
   emoji reaction is canonical-confirming" attribution convention
   (Steve 2026-05-23) — aigonewrong's 11:58 AM follow-up confirmed
-  via Jasper 👍 reaction. Includes operational tests for the
+  via jass 👍 reaction. Includes operational tests for the
   measurement framework (lift-dump detection thresholds, forward-
   returns vs baseline).
 - 2026-05-23 (bead st-62v): Entries 3, 4, 9, 13 re-tiered and moved to
@@ -343,10 +343,10 @@ Jasper closing entry immediately below.
 
 ## 2025-02-XX — Closing exchange, customer-perspective convention
 
-**Channel:** GexBot Discord (channel not captured)
+**Channel:** GexBot Discord, #theory-questions
 **Date:** same thread as above (2025-02-21 or shortly after)
 **Speakers:** Guido (community) → unattributed GexBot staff (likely
-**Jasper** — "my docs" phrasing + referring to John in the third
+**jass** — "my docs" phrasing + referring to John in the third
 person + the authority to deprecate Freddy's language)
 
 ### Q (Guido)
@@ -354,7 +354,7 @@ person + the authority to deprecate Freddy's language)
 > To be precise, if "market makers are Long Gamma", means violet bars
 > for us?
 
-### A (likely Jasper)
+### A (likely jass)
 
 > I'm going to ask Fredy to change this language.
 >
@@ -375,7 +375,7 @@ about the gamma ladder. Three things land here:
    of MM — everything is in terms of customer." If a community source
    talks about MM-long-gamma or MM-short-gamma, that's their own
    conversion; the *canonical* axis is customer.
-2. **Freddy's MM-perspective vocabulary is being deprecated.** Jasper
+2. **Freddy's MM-perspective vocabulary is being deprecated.** jass
    explicitly says "I'm going to ask Fredy to change this language."
    Freddy's videos and Discord posts use MM-perspective language
    freely; canonical convention will be customer-perspective going
@@ -401,13 +401,13 @@ ladder is **strictly customer perspective**, and any apparent
 contradiction with dealer-side intuition is bridged by vol-regime
 modulation, not by switching axes.
 
-Jasper's "long gamma (cyan) for poor liq (possible reversion) zones"
+jass's "long gamma (cyan) for poor liq (possible reversion) zones"
 in the second Q&A is consistent with this entry's rule: customer long
 gamma = pivot = price reverts at the level = poor liquidity (price
 doesn't spend volume there because dealers' offsetting positions
 absorb the order flow).
 
-Jasper's "short gamma above for long continuation" (also from entry 2)
+jass's "short gamma above for long continuation" (also from entry 2)
 is consistent with "move through customer short gamma": for a long
 trade to continue upward, you want purple bars above so price has
 room to move through them.
@@ -444,7 +444,7 @@ John gives us the cleanest dual-axis canonical statement we have. Two
 things land:
 
 1. **The two-axis structure restated** (now confirmed by both
-   principals — Jasper in the GEX-vs-gamma-ladder disambiguation
+   principals — jass in the GEX-vs-gamma-ladder disambiguation
    entry and the closing customer-perspective entry, John here):
    - GEX profile axis = call vs put = green/red
    - Gamma ladder axis = long vs short = cyan/purple
@@ -480,15 +480,15 @@ Freddy's paper still uses "Positive Gamma" at two different scopes:
 1. **Environment level** — "Declining vol environment: MMs are Long Gamma (Positive Gamma)" describes overall market positioning
 2. **Strike level** — "positive gamma zones" describes per-strike concentration
 
-John's equivalence resolves the strike-level usage (positive gamma at strike = long gamma at strike = cyan = positive convexity at strike). The environment-level usage is a separate issue — Freddy is using MM-talk for environment classification, which Jasper has already flagged for deprecation in the closing-exchange entry above.
+John's equivalence resolves the strike-level usage (positive gamma at strike = long gamma at strike = cyan = positive convexity at strike). The environment-level usage is a separate issue — Freddy is using MM-talk for environment classification, which jass has already flagged for deprecation in the closing-exchange entry above.
 
 ---
 
-## 2025-03-05 2:59 PM — Jasper, net convexity vs call/put + GEX is customer-perspective
+## 2025-03-05 2:59 PM — jass, net convexity vs call/put + GEX is customer-perspective
 
-**Channel:** GexBot Discord (channel not captured)
-**Date:** 2025-03-05 (Jasper's second response is timestamped 2:59 PM)
-**Speakers:** unattributed asker → Jasper "jass" (two responses)
+**Channel:** GexBot Discord, #theory-questions
+**Date:** 2025-03-05 (jass's second response is timestamped 2:59 PM)
+**Speakers:** unattributed asker → jass (two responses)
 
 ### Q (asker)
 
@@ -500,18 +500,18 @@ John's equivalence resolves the strike-level usage (positive gamma at strike = l
 >
 > Also the net GEX is the market participant's net GEX view right? not MM?
 
-### A1 (Jasper)
+### A1 (jass)
 
 > yes well imo at least. there's a case for both
 
-### A2 (Jasper, 2:59 PM — direct reply to the customer-perspective question)
+### A2 (jass, 2:59 PM — direct reply to the customer-perspective question)
 
 > correct
 
 ### What this confirms
 
 1. **Net convexity (long/short axis) > call/put alone for MM-reaction
-   prediction.** Jasper agrees with the asker's read: aggregating to
+   prediction.** jass agrees with the asker's read: aggregating to
    long/short produces more consistent pivot/pin signals than reading
    call vs put concentrations alone. *But* he caveats "there's a case
    for both" — the GEX profile carries directional convexity
@@ -519,7 +519,7 @@ John's equivalence resolves the strike-level usage (positive gamma at strike = l
    The operational implication: **lead with the gamma ladder
    (cyan/purple) when looking for pivot levels; use the GEX profile
    (green/red) for directional convexity bias.**
-2. **Net GEX is customer perspective, NOT MM perspective.** Jasper
+2. **Net GEX is customer perspective, NOT MM perspective.** jass
    directly confirms with "correct." This extends the
    customer-perspective convention (already established for the
    convexity ladder in the closing-exchange entry above) to the GEX
@@ -530,7 +530,7 @@ John's equivalence resolves the strike-level usage (positive gamma at strike = l
 ### Operational implications
 
 - **Read order for finding pivot/pin levels:** start with the gamma
-  ladder. Cyan bars are the most reliable pivot signals (per Jasper's
+  ladder. Cyan bars are the most reliable pivot signals (per jass's
   agreement here + the closing-exchange entry's "pivot at customer
   long gamma"). The GEX
   profile is the *complement*, not the primary lens, for pivot
@@ -541,7 +541,7 @@ John's equivalence resolves the strike-level usage (positive gamma at strike = l
   symmetric down-side put position.
 - **Why "both views have value" matters:** John's earlier statement
   in the gamma↔convexity-equivalence entry above gave the equivalence
-  — long gamma = positive convexity at strikes. Jasper is now saying
+  — long gamma = positive convexity at strikes. jass is now saying
   that despite the equivalence at the
   per-strike level, the *aggregation* (net long/short vs net call/put)
   produces different signals across the chain. The gamma ladder's
@@ -568,7 +568,7 @@ gex may not pivot.
 
 ## 2025-03-27 11:01–11:05 AM — John Kirby, Net OI as gamma proxy + competitor approach
 
-**Channel:** GexBot Discord (channel not captured)
+**Channel:** GexBot Discord, #theory-questions
 **Date:** 2025-03-27 11:01 AM (first exchange) → 11:05 AM (closing)
 **Speakers:** TommyCirj (community) ↔ John Kirby (Moderator)
 
@@ -658,11 +658,11 @@ long-gamma behavior here and John endorses.
 
 ---
 
-## 2025-04-09 4:30 PM — Jasper, regime rule of thumb (0DTE-as-default)
+## 2025-04-09 4:30 PM — jass, regime rule of thumb (0DTE-as-default)
 
-**Channel:** GexBot Discord (channel not captured)
+**Channel:** GexBot Discord, #theory-questions
 **Date:** 2025-04-09, 4:26 → 4:30 PM
-**Speakers:** Andy (community, new to GEX) → Jasper "jass" (Moderator)
+**Speakers:** Andy (community, new to GEX) → jass (Moderator)
 
 ### Q (Andy)
 
@@ -671,7 +671,7 @@ long-gamma behavior here and John endorses.
 >
 > New to gex
 
-### A (Jasper)
+### A (jass)
 
 > that's a hard question lol.
 >
@@ -692,7 +692,7 @@ long-gamma behavior here and John endorses.
 > Reversion at long gamma. This is usually the case in falling
 > volatility regimes (which for 0dte is almost always).
 
-Jasper's parenthetical is the operationally significant claim: **for
+jass's parenthetical is the operationally significant claim: **for
 0DTE, falling-vol regime is the default**. The polarity-flip in
 [`convexity_ladder.md`](convexity_ladder.md) observation 2 lays out
 both regimes; this Q&A says for 0DTE-specifically you can assume
@@ -711,7 +711,7 @@ reason.
 Pre-event sessions (CPI, FOMC, NFP, etc.) are when vol is being bid
 up. In those windows, long-gamma levels flip from **reversion zones**
 to **breakout triggers** — exactly the canonical polarity flip but
-stated as Jasper's operational rule.
+stated as jass's operational rule.
 
 The full default-vs-exception structure for 0DTE:
 
@@ -725,14 +725,14 @@ The full default-vs-exception structure for 0DTE:
 > I faded major long gamma here near EOD ⁠state-degens⁠ (did end up
 > bailing and revving long 216 tho due to incoming 50 minute algo)
 
-Jasper is *applying* his own rule in real time. The reference to
+jass is *applying* his own rule in real time. The reference to
 "state-degens" is a Discord channel name where the trade was likely
 called. The "50 minute algo" is a specific late-EOD algorithmic
 pattern he watches for — worth following up if more context emerges
 about what that algorithm does mechanically.
 
 This is also worth noting because it shows the rule is *contingent*:
-Jasper faded long gamma (his default rule), then bailed and reversed
+jass faded long gamma (his default rule), then bailed and reversed
 when he detected a different signal coming (the 50-minute algo). The
 rule of thumb isn't a static prediction — it's a Bayesian prior that
 gets updated as new evidence arrives.
@@ -741,7 +741,7 @@ gets updated as new evidence arrives.
 
 - [`convexity_ladder.md`](convexity_ladder.md) observation 2 — the
   canonical polarity-flip table this Q&A operationalizes
-- Jasper closing-exchange entry above — the canonical "pivot at
+- jass closing-exchange entry above — the canonical "pivot at
   customer long gamma" rule. This entry adds the regime modulation
   conditions.
 - [`../community/expert_qa.md`](../community/expert_qa.md) — John M's
@@ -752,19 +752,19 @@ gets updated as new evidence arrives.
 
 ### Follow-up flags
 
-- **What is the "50 minute algo"?** Jasper references it as a known
+- **What is the "50 minute algo"?** jass references it as a known
   pattern. Worth catching context if it comes up again. Could be a
   rebalancing algo, a hedging algo, or a flow pattern documented
   elsewhere in Discord.
 - **state-degens channel** — a Discord channel name; could be the
-  trading-call channel where Jasper posts setups in real time. Useful
+  trading-call channel where jass posts setups in real time. Useful
   to know if we ever crawl Discord systematically.
 
 ---
 
 ## 2025-04-21 8:19 AM — John Kirby on ITM call increase as support
 
-**Channel:** GexBot Discord (channel not captured)
+**Channel:** GexBot Discord, #theory-questions
 **Date:** 2025-04-21, 8:19 AM
 **Speakers:** unattributed asker (new to GEX) → John Kirby (Moderator,
 GexBot principal — distinct identity from community contributor "John
@@ -831,7 +831,7 @@ either:
 
 ### Cross-references
 
-- Jasper closing-exchange entry above — the base pivot-at-long-gamma
+- jass closing-exchange entry above — the base pivot-at-long-gamma
   rule. This Q&A is a high-conviction sub-case of that rule.
 - [`../community/expert_qa.md`](../community/expert_qa.md) — John M's
   stockholm failure-mode entry describes when pivots *don't* hold
@@ -850,11 +850,11 @@ is initially a qualitative pattern recognition read.
 
 ---
 
-## 2025-04-22 8:07 AM — Jasper on "max change gex" mechanics
+## 2025-04-22 8:07 AM — jass on "max change gex" mechanics
 
-**Channel:** GexBot Discord (channel not captured)
+**Channel:** GexBot Discord, #theory-questions
 **Date:** 2025-04-22, 7:19 → 8:07 AM
-**Speakers:** Bass `[GOLD]` (community, GOLD-tier subscriber) → Jasper
+**Speakers:** Bass `[GOLD]` (community, GOLD-tier subscriber) → jass
 "jass" (Moderator)
 
 ### Q (Bass)
@@ -863,7 +863,7 @@ is initially a qualitative pattern recognition read.
 > before the strike is hit or (3) when the reaction in price is
 > taking place?
 
-### A (Jasper)
+### A (jass)
 
 > they update every second. theyre lookbacks since the ladder doesnt
 > have a time axis
@@ -923,11 +923,11 @@ system rather than canonical signal.
 
 ---
 
-## 2025-07-25 11:32 AM – 11:58 AM — Jasper, on reading net DEX for vol regime + the convexity-dump-then-ramp pattern
+## 2025-07-25 11:32 AM – 11:58 AM — jass, on reading net DEX for vol regime + the convexity-dump-then-ramp pattern
 
 **Channel:** GexBot Discord, #theory-questions
 **Date:** 2025-07-25, 11:32 AM → 11:58 AM ET
-**Speakers:** aigonewrong (community) ↔ Jasper "jass" (Moderator)
+**Speakers:** aigonewrong (community) ↔ jass (Moderator)
 
 ### Q1 (aigonewrong, 11:32 AM)
 
@@ -951,7 +951,7 @@ ticker (aggregate dex, net gex, net convexity), all panels covering
 - **NDX:** net convexity down. DEX: call selling, put selling
 - **SPX:** net convexity neutral. DEX: call buying, put buying
 
-### A1 (Jasper, 11:41 AM)
+### A1 (jass, 11:41 AM)
 
 > yes, those reads are correct
 
@@ -972,7 +972,7 @@ ticker (aggregate dex, net gex, net convexity), all panels covering
 > for NDX, customers are short volatility.. and for whatever reason,
 > SPX traders are long volatility...
 
-### A2 (Jasper, 11:46 AM)
+### A2 (jass, 11:46 AM)
 
 > spx was lifting convexity (vol until about midday) where they
 > dumped the shit out of it and we finally ramped
@@ -989,10 +989,10 @@ ticker (aggregate dex, net gex, net convexity), all panels covering
 >
 > right now since spx mostly short vol again tape is loosey goosey
 
-Jasper attached the SPX-only convexity chart:
+jass attached the SPX-only convexity chart:
 [`images/jasper_2025-07-25_spx_convexity_dump_ramp.jpg`](images/jasper_2025-07-25_spx_convexity_dump_ramp.jpg).
 
-![Jasper SPX convexity dump 2025-07-25](images/jasper_2025-07-25_spx_convexity_dump_ramp.jpg)
+![jass SPX convexity dump 2025-07-25](images/jasper_2025-07-25_spx_convexity_dump_ramp.jpg)
 
 Visible in the graphic: SPX 7/25/25 from 9:30am to ~12:45pm. Cyan
 line is net convexity ($MM); white line is spot price. The convexity
@@ -1010,9 +1010,9 @@ major short gamma 6386.16 per the tooltip.
 > with that 6400 short call strike, volatility continues to dampen.
 > ??
 
-### A3 (Jasper, confirmed via 👍 reaction — no typed reply)
+### A3 (jass, confirmed via 👍 reaction — no typed reply)
 
-Jasper acknowledged aigonewrong's read with a thumbs-up emoji
+jass acknowledged aigonewrong's read with a thumbs-up emoji
 reaction rather than a verbal response. Per Steve's 2026-05-23
 convention: an emoji reaction from a principal is canonical-
 confirming for the post being reacted to — the principal validated
@@ -1035,7 +1035,7 @@ the read without restating it. The acknowledged content:
 
 The DEX panel exposes net delta exposure (aggregated) signed by
 customer-buy-vs-sell, separately tracked for calls and puts. The
-canonical method Jasper confirms here:
+canonical method jass confirms here:
 
 | Call aggdex | Put aggdex | Customer regime |
 |---|---|---|
@@ -1052,7 +1052,7 @@ direction; that's a distinct regime from "customers are short calls"
 
 #### 2. The convexity-dump-then-ramp pattern
 
-Jasper's SPX narrative for the morning maps to a canonical pattern:
+jass's SPX narrative for the morning maps to a canonical pattern:
 
 1. **Phase 1 — Lifting convexity (morning).** Customers buy convexity
    (long options on both sides). Net convexity climbs. Vol is being
@@ -1071,7 +1071,7 @@ The 2025-07-25 SPX chart shows this exact sequence in 4 hours.
 
 #### 3. The "juice to lean on" operational rule
 
-Jasper's flagged statement: **"those are the best longs tho. there's
+jass's flagged statement: **"those are the best longs tho. there's
 juice to lean on."**
 
 Translation: when customer convexity gets dumped (sold), the
@@ -1090,7 +1090,7 @@ of the directional follow-through.
 
 #### 4. Post-dump regime: "loosey goosey" tape
 
-Jasper's post-dump observation: "right now since spx mostly short
+jass's post-dump observation: "right now since spx mostly short
 vol again tape is loosey goosey." When customers are net SHORT vol
 (having sold off their long-convexity positions), dealer hedging is
 LIGHTER per move (smaller gamma exposure) and the tape doesn't have
@@ -1116,7 +1116,7 @@ When we have corpus data covering days with this pattern:
    post-dump have asymmetric upside? Specifically:
    - Compute forward returns 30/60/120 min after dump
    - Compare to baseline forward returns when no dump occurred
-   - The Jasper claim predicts dumps mark asymmetric long opportunities
+   - The jass claim predicts dumps mark asymmetric long opportunities
 4. **Test "loosey goosey" sequel**: post-dump, measure realized
    vol-of-vol and gamma-magnet stickiness. The claim predicts
    reduced magnet behavior at the standing gamma walls.
@@ -1131,10 +1131,10 @@ pattern testable at the corpus level.
 - [`gex_profile.md`](gex_profile.md) — the call-vs-put GEX axis
   complementary to the DEX axis discussed here
 - [`metrics_math.md`](metrics_math.md) — aggregate DEX formula
-- The Jasper closing-exchange entry above (customer-perspective
+- The jass closing-exchange entry above (customer-perspective
   convention) — DEX is also customer-perspective; this entry extends
   the convention to the DEX panel
-- The Jasper net-convexity-vs-call/put entry above — the
+- The jass net-convexity-vs-call/put entry above — the
   call-vs-put aggregation argument here is the dual of the
   net-convexity aggregation; both views together give the full picture
 - [`../community/expert_qa.md`](../community/expert_qa.md) —
@@ -1148,7 +1148,7 @@ pattern testable at the corpus level.
   with the 6400 short call. The strike-as-cap mechanism is worth a
   worked example if we have intraday data — does SPX actually pin
   toward 6400 in the post-dump session?
-- **Jasper's NQ 420 short.** Jasper mentions trying to short "420s
+- **jass's NQ 420 short.** jass mentions trying to short "420s
   NQ" (probably a 0DTE option strike in NQ — would be a 23420 strike
   given NDX context). Worth catching if more context comes up.
 - **"Best longs" frequency.** How often does the lift-dump-ramp
@@ -1162,11 +1162,11 @@ pattern testable at the corpus level.
 
 ---
 
-## 2025-09-28 12:53 PM – 2:49 PM — Jasper, the two-signal fade-entry rule (long gamma + directional GEX)
+## 2025-09-28 12:53 PM – 2:49 PM — jass, the two-signal fade-entry rule (long gamma + directional GEX)
 
 **Channel:** GexBot Discord, #theory-questions
 **Date:** 2025-09-28, 12:53 PM → 2:49 PM ET
-**Speakers:** vqz `[MATH]` (community) → Jasper "jass" (Moderator)
+**Speakers:** vqz `[MATH]` (community) → jass (Moderator)
 
 ### Q (vqz, 12:53 PM)
 
@@ -1181,7 +1181,7 @@ pattern testable at the corpus level.
 > @jass sorry for the @ but would love to hear if Im interpreting
 > it correctly
 
-### A (Jasper, 2:49 PM)
+### A (jass, 2:49 PM)
 
 > yes. if you're looking to bid for reversion against spot selling
 > off, the ideal conditions are long gamma + downside (put) gex
@@ -1194,7 +1194,7 @@ pattern testable at the corpus level.
 
 #### The two-signal canonical fade-entry rule
 
-Jasper confirms vqz's read AND adds the symmetric inverse. The
+jass confirms vqz's read AND adds the symmetric inverse. The
 canonical rule:
 
 | Signal 1 (long gamma) | Signal 2 (directional GEX) | Action |
@@ -1209,7 +1209,7 @@ reversion).
 
 #### Mechanism: "making it expensive" = stepping in for reversion
 
-Jasper's exact phrasing: "this means someone's stepping in for
+jass's exact phrasing: "this means someone's stepping in for
 reversion and making downside expensive."
 
 Translation: when put GEX spikes on the downside, the put-side flow
@@ -1251,9 +1251,9 @@ trade-direction rule by adding the directional-GEX read.
 
 ### Cross-references
 
-- The Jasper closing-exchange entry above — base pivot-at-long-gamma
+- The jass closing-exchange entry above — base pivot-at-long-gamma
   rule. This entry adds direction.
-- The Jasper net-convexity-vs-call/put entry above — Jasper's prior
+- The jass net-convexity-vs-call/put entry above — jass's prior
   preference for net long/short over call/put alone for pivot
   prediction. This entry doesn't override that — net gamma still
   identifies the LEVEL; directional GEX adds the trade-DIRECTION.
@@ -1261,7 +1261,7 @@ trade-direction rule by adding the directional-GEX read.
   carrying the directional component of the rule
 - [`convexity_ladder.md`](convexity_ladder.md) — the long/short
   gamma axis (cyan/purple) carrying the level component of the rule
-- The Jasper 2025-07-25 entry above (convexity-dump pattern) — covers
+- The jass 2025-07-25 entry above (convexity-dump pattern) — covers
   WHAT changes during the day; this entry covers WHERE to act once
   the cluster is stable
 
@@ -1274,7 +1274,7 @@ trade-direction rule by adding the directional-GEX read.
   a quant-leaning subscriber tier or interest flag. Confirm if more
   context appears.
 - **Worked example needed.** This entry gives the rule but no live
-  trade narrative. If a future Discord thread shows Jasper applying
+  trade narrative. If a future Discord thread shows jass applying
   this rule with a chart annotation, that would be a strong
   companion entry.
 - **Corpus test design.** The two-signal rule is testable: for each
@@ -1285,9 +1285,9 @@ trade-direction rule by adding the directional-GEX read.
 
 ---
 
-## 2025-09-29 9:41 PM – 2025-10-01 1:08 PM — Jasper, GEX vs gamma definitions + Classic vs State (naive vs trade-classified GEX)
+## 2025-09-29 9:41 PM – 2025-10-01 1:08 PM — jass, GEX vs gamma definitions + Classic vs State (naive vs trade-classified GEX)
 
-This entry combines two sequential Discord exchanges Jasper used to
+This entry combines two sequential Discord exchanges jass used to
 develop one continuous doctrine: the foundational distinction
 between the GEX-profile and gamma-profile axes (2025-09-29), and the
 product-level difference between GexBot's "Classic" (naive) GEX and
@@ -1295,14 +1295,14 @@ product-level difference between GexBot's "Classic" (naive) GEX and
 
 **Channel:** GexBot Discord, #theory-questions
 **Dates:**
-- 2025-09-29, 9:41 PM → 10:29 PM ET — pensivelion + Jasper
-- 2025-10-01, 1:02 PM → 1:08 PM ET — Browniver + Jasper
+- 2025-09-29, 9:41 PM → 10:29 PM ET — pensivelion + jass
+- 2025-10-01, 1:02 PM → 1:08 PM ET — Browniver + jass
 
-**Speakers:** pensivelion `[end]` (community) → Jasper "jass"
-(Moderator); Browniver `[PHUB]` (community) → Jasper "jass"
+**Speakers:** pensivelion `[end]` (community) → jass
+(Moderator); Browniver `[PHUB]` (community) → jass
 (Moderator).
 
-The two threads are treated as one entry because Jasper's
+The two threads are treated as one entry because jass's
 2025-10-01 explanation of Classic vs State directly continues the
 2025-09-29 discussion of the naive GEX assumption.
 
@@ -1315,7 +1315,7 @@ The two threads are treated as one entry because Jasper's
 > Hey so. what's the difference between GEX being positive and
 > gamma being positive?
 
-#### A1 (Jasper, 9:45 PM)
+#### A1 (jass, 9:45 PM)
 
 > with our terminology the original gex profile refers to netting
 > out call vs put gamma, irrespective of whether the initiator is
@@ -1334,7 +1334,7 @@ The two threads are treated as one entry because Jasper's
 > 0dte/intraday timeframe so actual classification (using a
 > volatility surface) is necessary
 
-#### A2 (Jasper, 10:29 PM — vol surface normalization aside)
+#### A2 (jass, 10:29 PM — vol surface normalization aside)
 
 > tldr instead of using options prices there's a method to normalize
 > their values so that you can compare them apples to apples. (think
@@ -1362,7 +1362,7 @@ captured once here.)
 > What does state show that classic does not and which one to use as
 > GEX?
 
-#### A1 (Jasper, 1:05 PM — the product-level distinction)
+#### A1 (jass, 1:05 PM — the product-level distinction)
 
 > classic, like most other gex services, is just naively
 > incrementing volume of each option contract as it trades, and then
@@ -1376,7 +1376,7 @@ captured once here.)
 > buys puts and sells calls, therefore dealer is short puts and
 > long calls, but that assumption is clearly just wrong
 
-#### A2 (Jasper, 1:08 PM — operational implications)
+#### A2 (jass, 1:08 PM — operational implications)
 
 > on the state ladder for SPX i can see if participants are all
 > selling vol or long vol which even for futures has a major impact
@@ -1425,9 +1425,9 @@ gamma for *vol regime at the level*.
 
 #### 2. Repudiation of the naive "paper buys puts, sells calls" assumption
 
-The legacy GEX literature (per Jasper) makes the assumption that
+The legacy GEX literature (per jass) makes the assumption that
 customers are always long puts and short calls. This implies dealers
-are short puts and long calls. Jasper's verdict:
+are short puts and long calls. jass's verdict:
 
 > that assumption is clearly just wrong
 
@@ -1440,7 +1440,7 @@ required to produce a useful GEX read for intraday/0dte purposes.**
 
 This is a canonical statement that the GexBot product was built
 specifically because the naive assumption fails. Competitor / legacy
-GEX services (per Jasper's 10/01 message) still apply the naive
+GEX services (per jass's 10/01 message) still apply the naive
 assumption.
 
 #### 3. The Classic vs State product distinction
@@ -1450,7 +1450,7 @@ assumption.
 | **Classic GEX** | Naively increments volume per contract trade → into GEX calculation | Aggregate per-strike gamma exposure assuming naive sign |
 | **State GEX** | Classifies each trade as buy or sell using a vol surface → signed volume cumulative through the day → THEN computes GEX exposure | Customer-classified gamma exposure that preserves initiator side |
 
-Concrete example from Jasper: in State, a strike's volume might be
+Concrete example from jass: in State, a strike's volume might be
 **+50** (= 50 lots bought by customers) or **−25** (= 25 lots sold
 by customers). Classic doesn't preserve this sign — both register
 as 75 raw contracts traded with no directional information.
@@ -1469,12 +1469,12 @@ canonical reference for what the option *should* cost at that
 moneyness; trades printing above the surface implication tend to
 be customer-buys, below tend to be customer-sells.
 
-Jasper's $0.02-OTM-call-vs-$0.50-ATM-call example makes the point:
+jass's $0.02-OTM-call-vs-$0.50-ATM-call example makes the point:
 comparing option prices directly is misleading because the prices
 already bake in moneyness differences. Volatility normalizes the
 comparison.
 
-For a deeper read Jasper recommends Investopedia on volatility
+For a deeper read jass recommends Investopedia on volatility
 surfaces. This entry doesn't reproduce that technical content; the
 key takeaway is that **State classification depends on the vol
 surface as reference**, which means State data quality depends on
@@ -1482,7 +1482,7 @@ having a calibrated surface for each underlying.
 
 #### 5. Regime trading via State — operationally significant even for futures-only traders
 
-Jasper makes a notable claim that State enables a **regime read**:
+jass makes a notable claim that State enables a **regime read**:
 
 | Regime | State signal | Tape expectation |
 |---|---|---|
@@ -1522,14 +1522,14 @@ If using **State**, the pivot-at-customer-long-gamma rule
 using **Classic**, "long gamma" is whatever the naive sign
 convention labels as long — which may not match actual positioning.
 
-**Recommendation implicit in Jasper's framing:** use State for
+**Recommendation implicit in jass's framing:** use State for
 intraday/0dte work. Classic provides a smoothed structural picture
 that is not specifically wrong but lacks the actionable directional
 information.
 
 ### Cross-references
 
-- The GEX-vs-gamma-ladder disambiguation entry above (Jasper, first
+- The GEX-vs-gamma-ladder disambiguation entry above (jass, first
   entry in this file) — the original canonical two-axis statement;
   this entry restates and elaborates with the deltas-vs-vol mapping
 - The John Kirby gamma↔convexity equivalence entry above — the
@@ -1537,15 +1537,15 @@ information.
   this entry's "gamma = net vol" framing, the operational chain is:
   cyan bar = long gamma = positive convexity = customer net long
   vol at strike
-- The Jasper net-convexity-vs-call/put entry above — where Jasper
+- The jass net-convexity-vs-call/put entry above — where jass
   first told us net long/short is the smoother indicator for
   pivot/pin prediction; this entry now explains *why* (State
   classification produces a cleaner signal than Classic naive
   netting)
-- The Jasper 2025-07-25 convexity-dump entry above — operationalizes
+- The jass 2025-07-25 convexity-dump entry above — operationalizes
   the regime read introduced here (lifting convexity = long-vol
   regime building; dump = transition to short-vol regime)
-- The Jasper 2025-09-28 two-signal fade-entry entry above — applies
+- The jass 2025-09-28 two-signal fade-entry entry above — applies
   the State classification to the trade-direction rule (long gamma
   + directional GEX); the current entry explains why State's
   signed-volume classification is what makes the directional-GEX
@@ -1563,7 +1563,7 @@ information.
   `[GOLD]`, `[MATH]`, `[PHUB]` in the role-tag context-cue set.
 - **The `[PHUB]` role tag** (Browniver). Also first-time. No
   canonical statement on what either tag indicates.
-- **Vol-surface implementation details.** Jasper references the
+- **Vol-surface implementation details.** jass references the
   surface but doesn't describe the calibration. Worth a future
   entry if more details surface in Discord — what's the calibration
   cadence? What's the surface granularity (strike, expiry)? How
@@ -1572,7 +1572,7 @@ information.
   classification is corpus-testable: for each session, classify
   using the State ladder (aggregate net-long vs net-short option
   trades across the skew), then measure forward intraday RV and
-  range. The Jasper claim predicts long-vol regimes produce hotter
+  range. The jass claim predicts long-vol regimes produce hotter
   tape.
 - **Classic-vs-State quantitative comparison.** If the corpus has
   both Classic and State data, a direct comparison of the two
@@ -1582,15 +1582,15 @@ information.
 
 ---
 
-## 2025-10-17 8:41 AM – 10:45 AM — Jasper, "literally all i do" — the regime-rule compression of his method
+## 2025-10-17 8:41 AM – 10:45 AM — jass, "literally all i do" — the regime-rule compression of his method
 
 A short, high-signal restatement of the regime rule with a closing
-meta-claim that compresses Jasper's entire trading method into a
+meta-claim that compresses jass's entire trading method into a
 two-case decision tree.
 
 **Channel:** GexBot Discord, #theory-questions
 **Date:** 2025-10-17, 8:41 AM → 10:45 AM ET
-**Speakers:** T46 (community) → Jasper "jass" (Moderator)
+**Speakers:** T46 (community) → jass (Moderator)
 
 ### Q (T46, 8:41 AM)
 
@@ -1599,7 +1599,7 @@ two-case decision tree.
 > he has mentions in videos... or is there a different scheme he
 > trades???
 
-### A (Jasper, 10:45 AM)
+### A (jass, 10:45 AM)
 
 > if volatility is increasing (the tape is hot) lean on long gamma
 > to look for continuation trades. if volatiilty is decreasing (this
@@ -1613,7 +1613,7 @@ two-case decision tree.
 #### 1. Restatement of the regime rule (consistency with 2025-04-09)
 
 The rule is identical in structure to the 2025-04-09 4:30 PM entry
-above (Jasper regime rule of thumb with Andy):
+above (jass regime rule of thumb with Andy):
 
 | Vol regime | Long-gamma read | Action |
 |---|---|---|
@@ -1625,7 +1625,7 @@ this entry restates it as a clean two-case rule and confirms the
 0dte default ("the most common regime for 0dte fyi").
 
 The agreement across two Discord exchanges six months apart
-elevates this from "Jasper's rule of thumb" to **doctrinally stable
+elevates this from "jass's rule of thumb" to **doctrinally stable
 canonical method**.
 
 #### 2. The "literally all i do" meta-claim
@@ -1634,7 +1634,7 @@ The high-signal payload:
 
 > yes that is literally all i do
 
-Jasper compresses his entire trading method to this two-case
+jass compresses his entire trading method to this two-case
 decision tree. That has substantial implications for how to read
 the rest of the canonical material:
 
@@ -1673,20 +1673,20 @@ trade.
 
 ### Cross-references
 
-- The Jasper 2025-04-09 regime rule of thumb entry above — the
+- The jass 2025-04-09 regime rule of thumb entry above — the
   original canonical statement of this rule (default-vs-exception
   for 0dte). This entry restates and reinforces.
-- The Jasper 2025-09-28 two-signal fade-entry entry above — adds
+- The jass 2025-09-28 two-signal fade-entry entry above — adds
   the directional-GEX read on top of the regime rule. Together:
   regime gives MODE (continuation vs reversion); directional GEX
   gives SIDE (long vs short).
-- The Jasper 2025-07-25 convexity-dump-then-ramp entry above — a
+- The jass 2025-07-25 convexity-dump-then-ramp entry above — a
   special case of regime transition (lifting → dumping → tape
   loosens) during a single session.
-- The Jasper 2025-09-29 / 2025-10-01 GEX-vs-gamma + Classic-vs-State
+- The jass 2025-09-29 / 2025-10-01 GEX-vs-gamma + Classic-vs-State
   entry above — the infrastructure (which classification method,
   which axis) that feeds into this method's two-case decision.
-- The closing-exchange entry above (Jasper customer-perspective
+- The closing-exchange entry above (jass customer-perspective
   convention) — establishes the base pivot rule that this entry's
   rule builds on.
 - [`convexity_ladder.md`](convexity_ladder.md) observation 2 — the
@@ -1694,7 +1694,7 @@ trade.
 
 ### Follow-up flags
 
-- **Method compression for documentation.** Jasper's "literally all
+- **Method compression for documentation.** jass's "literally all
   i do" suggests we should consider a top-level summary in the
   canonical/ directory (e.g. `canonical/jasper_method.md` or
   similar) that compresses the entire canonical doctrine into this
@@ -1708,7 +1708,7 @@ trade.
   intraday? Is it VIX trend? Realized vol vs implied vol? Net
   convexity trend (per the 2025-07-25 entry)? Worth a dedicated
   entry if future Discord material surfaces the specific signal
-  Jasper uses.
+  jass uses.
 - **Continuation-side worked example.** This file has multiple
   worked examples of the reversion case (2025-04-09 Andy, 2025-07-25
   SPX dump-ramp tail). Less material on the continuation case. A

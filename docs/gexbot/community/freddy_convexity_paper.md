@@ -3,7 +3,7 @@
 **Source PDF:** [`papers/freddy_convexity_ladder.pdf`](papers/freddy_convexity_ladder.pdf)
 **Title:** "Understanding the Convexity Ladder and Its Role in Market Structure"
 **Author:** Freddy Sarmiento (community)
-**Date:** undated; predates 2025-02-21 (referenced in the Guido/Jasper
+**Date:** undated; predates 2025-02-21 (referenced in the Guido/jass
 Q&A thread on that date)
 **Length:** 3 pages
 
@@ -12,12 +12,12 @@ This is **the paper** Guido was citing in the `canonical/principal_discord.md`
 Trading Applications Strategy 1, ... When in negative gamma"). All of
 Guido's section/point numbers map directly to the structure below.
 
-## Vocabulary warning — MM-talk per Jasper's deprecation note
+## Vocabulary warning — MM-talk per jass's deprecation note
 
 The paper uses **market-maker perspective** language throughout
 ("Market Makers are Long Gamma," "MMs Short Gamma"). In a 2025-02-21
 Discord exchange ([`../canonical/principal_discord.md`](../canonical/principal_discord.md))
-Jasper explicitly stated GexBot's canonical convention is
+jass explicitly stated GexBot's canonical convention is
 **customer perspective** and added: "I'm going to ask Fredy to change
 this language." As of the latest version of this PDF that change has
 **not** been applied.
@@ -51,7 +51,7 @@ long-gamma hedging — but only in the *declining-vol* regime per the
 canonical convexity_ladder.md vol-regime modulation table.
 
 Read the substance through the canonical lens. Don't carry forward
-MM-talk into new writing — Jasper's request to standardize on
+MM-talk into new writing — jass's request to standardize on
 customer-perspective makes the paper's vocabulary the deprecated
 version.
 
@@ -147,7 +147,7 @@ Three strategies:
 ## How this slots vs other Strader docs
 
 - **Canonical baseline**: [`../canonical/convexity_ladder.md`](../canonical/convexity_ladder.md) (vendor-authored). The vol-regime modulation table is the rigorous version of Freddy's §2.
-- **Operational two-line rule** (Jasper, 2025-02-21): "Pivot at customer long gamma (cyan), move through customer short gamma (purple). That's all you really need." Lives in [`../canonical/principal_discord.md`](../canonical/principal_discord.md). Freddy's three strategies are the elaborated version of this rule.
+- **Operational two-line rule** (jass, 2025-02-21): "Pivot at customer long gamma (cyan), move through customer short gamma (purple). That's all you really need." Lives in [`../canonical/principal_discord.md`](../canonical/principal_discord.md). Freddy's three strategies are the elaborated version of this rule.
 - **Mechanism docs**: [`../canonical/gamma_vanna_video.md`](../canonical/gamma_vanna_video.md) covers WHY MM hedging stabilizes (when long gamma) or amplifies (when short gamma). The mechanism Freddy invokes in his §2 is documented canonically there.
 - **Freddy's other methodology**: [`freddy_methodology.md`](freddy_methodology.md) covers his entry mechanics, time-compression read, and the two trade-pattern archetypes. This paper covers the regime-level read that sits above those tactics.
 
@@ -159,6 +159,6 @@ Three strategies:
 
 ## What this paper gets wrong (or muddies)
 
-1. **MM-perspective vocabulary** — Jasper has flagged this for deprecation. Read through the translation table above.
+1. **MM-perspective vocabulary** — jass has flagged this for deprecation. Read through the translation table above.
 2. **Section 1 statement** "Positive Gamma zones = Price movement slows down" / "Negative Gamma zones = Price movement speeds up" is presented as universal. It's only true in the *declining-vol* regime. §2 addresses this but readers who stop at §1 will carry a false universal rule.
 3. **Conflation of environment-level positioning with strike-level positioning.** "MMs are Long Gamma (Positive Gamma)" describes the OVERALL regime; "positive gamma zones" describes per-strike concentration. Freddy uses the same word "positive gamma" for both. Causes the Guido-style confusion documented in `../canonical/principal_discord.md`.
