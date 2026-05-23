@@ -274,6 +274,15 @@ Jasper closing entry immediately below.
   toggle to Gamma view for confirmation. Implicitly resolves Izzy's
   concern that gamma-filter loses info: use BOTH views, gamma is the
   confirmation layer not the primary read.
+- 2026-05-23 (bead st-o4i): New canonical entry appended — Jasper
+  2025-09-28 2:49 PM Q&A with vqz `[MATH]`. The **two-signal
+  fade-entry rule**: long gamma spike + downside (put) GEX spike →
+  bid for reversion UP; long gamma + upside (call) GEX → short for
+  reversion DOWN. Sharpens the canonical pivot-at-long-gamma rule by
+  adding trade direction via the directional-GEX read. Mechanism:
+  "making it expensive = stepping in for reversion." First `[MATH]`
+  role-tag asker observed; added to the role-tag context-cue set
+  alongside `[PP]` and `[GOLD]`. No graphics in source thread.
 - 2026-05-23 (bead st-zv6): New canonical entry appended — Jasper
   2025-07-25 11:32 AM–11:58 AM exchange with aigonewrong. Three
   doctrinal payloads: (a) reading net DEX across BOTH call and put
@@ -1123,3 +1132,126 @@ pattern testable at the corpus level.
   is canonical-confirming. Track how often this attribution form
   appears in subsequent curation; if frequent, formalize in the
   Source rules section at the top of this file.
+
+---
+
+## 2025-09-28 12:53 PM – 2:49 PM — Jasper, the two-signal fade-entry rule (long gamma + directional GEX)
+
+**Channel:** GexBot Discord, #theory-questions
+**Date:** 2025-09-28, 12:53 PM → 2:49 PM ET
+**Speakers:** vqz `[MATH]` (community) → Jasper "jass" (Moderator)
+
+### Q (vqz, 12:53 PM)
+
+> So from what I've gathered by watching videos and just tryna get
+> some sort of understanding to the orderflow side of things, lets
+> say im looking to fade ES, what I want to see on the orderflow
+> side of things is a spike in Long gamma to the upside indicating
+> that liquidity has been taken, and that people are long vol so
+> price would like to move away from there and also a spike in gex
+> to the upside indicating that higher prices are more expensive
+>
+> @jass sorry for the @ but would love to hear if Im interpreting
+> it correctly
+
+### A (Jasper, 2:49 PM)
+
+> yes. if you're looking to bid for reversion against spot selling
+> off, the ideal conditions are long gamma + downside (put) gex
+> spiking. this means someone's stepping in for reversion and making
+> downside expensive. so spot price goes up
+>
+> conversely long gamma + upside (call) gex -> short
+
+### What this establishes
+
+#### The two-signal canonical fade-entry rule
+
+Jasper confirms vqz's read AND adds the symmetric inverse. The
+canonical rule:
+
+| Signal 1 (long gamma) | Signal 2 (directional GEX) | Action |
+|---|---|---|
+| Long gamma spike | Downside (put) GEX spiking | **Bid for reversion** — long entry against spot selling off |
+| Long gamma spike | Upside (call) GEX spiking | **Short** — sell against spot rallying |
+
+Both conditions must align — long gamma confirms vol-buying is the
+underlying flow at the level; directional GEX identifies which side
+is being made expensive (= which side has someone stepping in for
+reversion).
+
+#### Mechanism: "making it expensive" = stepping in for reversion
+
+Jasper's exact phrasing: "this means someone's stepping in for
+reversion and making downside expensive."
+
+Translation: when put GEX spikes on the downside, the put-side flow
+is dominated by put-buying (= customers paying premium against
+downside). That premium-paying flow is what *makes the downside
+expensive*. The flow itself represents reversion bidders — they're
+willing to pay to short downside, which means they expect spot to
+mean-revert UP from current levels. The dealer hedging of those long
+puts (delta-hedged short stock) provides the buy-pressure for the
+expected upward reversion.
+
+The symmetric case for call GEX spiking on upside is the same
+mechanism inverted: call-buying makes upside expensive, signals
+reversion sellers expecting spot to revert down, dealer hedging
+provides the sell-pressure.
+
+#### Operational refinement of the pivot-at-long-gamma rule
+
+This entry sharpens the canonical pivot rule from the closing-
+exchange entry above:
+
+- **Base rule** (closing exchange, 2025-02): pivot at customer long
+  gamma; move through customer short gamma
+- **This refinement** (vqz Q&A, 2025-09): the *direction* of the
+  pivot is given by the directional GEX spike at the same level
+
+Read order:
+
+1. Find the long-gamma cluster (= pivot candidate, per the base rule)
+2. Look at the directional GEX at that same strike/level
+3. If downside (put) GEX is spiking → pivot is **bidable** for
+   reversion UP
+4. If upside (call) GEX is spiking → pivot is **shortable** for
+   reversion DOWN
+5. If GEX is neutral/mixed → pivot is ambiguous; lower-confidence
+
+This converts the static "pivot at long gamma" into an actionable
+trade-direction rule by adding the directional-GEX read.
+
+### Cross-references
+
+- The Jasper closing-exchange entry above — base pivot-at-long-gamma
+  rule. This entry adds direction.
+- The Jasper net-convexity-vs-call/put entry above — Jasper's prior
+  preference for net long/short over call/put alone for pivot
+  prediction. This entry doesn't override that — net gamma still
+  identifies the LEVEL; directional GEX adds the trade-DIRECTION.
+- [`gex_profile.md`](gex_profile.md) — the call-vs-put GEX axis
+  carrying the directional component of the rule
+- [`convexity_ladder.md`](convexity_ladder.md) — the long/short
+  gamma axis (cyan/purple) carrying the level component of the rule
+- The Jasper 2025-07-25 entry above (convexity-dump pattern) — covers
+  WHAT changes during the day; this entry covers WHERE to act once
+  the cluster is stable
+
+### Follow-up flags
+
+- **The `[MATH]` role tag.** First `[MATH]`-tagged asker we've seen.
+  Joins the known set of role-tag context cues: `[PP]` (Freddy —
+  possibly "paying practitioner"), `[GOLD]` (paid-tier subscriber).
+  No canonical statement on what `[MATH]` indicates — speculation:
+  a quant-leaning subscriber tier or interest flag. Confirm if more
+  context appears.
+- **Worked example needed.** This entry gives the rule but no live
+  trade narrative. If a future Discord thread shows Jasper applying
+  this rule with a chart annotation, that would be a strong
+  companion entry.
+- **Corpus test design.** The two-signal rule is testable: for each
+  long-gamma cluster in the corpus, check whether put-GEX-on-downside
+  or call-GEX-on-upside accompanies it, and measure forward returns
+  conditional on the alignment. Should produce a clean asymmetry
+  between aligned and non-aligned signals if the rule holds.
