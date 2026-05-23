@@ -232,6 +232,12 @@ See entries 3, 4, 5 below for the full exchange.
   the rule getting updated mid-session ("revving long 216 tho due
   to incoming 50 minute algo"). Two follow-up flags: what is the
   50-minute algo; what is the state-degens channel.
+- 2026-05-22: Entry 11 added — John Kirby 2025-04-21 8:19 AM. Large
+  increase in ITM call buying = "one of my favorite signals" for
+  support. Mechanism: ITM calls have high delta (0.7-1.0) so MM hedge
+  size is proportionally larger than OTM, creating stronger structural
+  support per contract. Distinct sub-case of the cyan-bar rule —
+  ITM long gamma > OTM long gamma for support force.
 
 ---
 
@@ -890,3 +896,87 @@ gets updated as new evidence arrives.
 - **state-degens channel** — a Discord channel name; could be the
   trading-call channel where Jasper posts setups in real time. Useful
   to know if we ever crawl Discord systematically.
+
+---
+
+## 2025-04-21 8:19 AM — John Kirby on ITM call increase as support
+
+**Channel:** GexBot Discord (channel not captured)
+**Date:** 2025-04-21, 8:19 AM
+**Speakers:** unattributed asker (new to GEX) → John Kirby ("John M",
+Moderator)
+
+### Q
+
+> For those of us who are new, does such a large increase in ITM
+> calls usually act as support, as it did today? Thanks
+
+### A (John)
+
+> YES
+>
+> one of my favorite signals
+
+### What this establishes
+
+#### The signal: large increase in ITM call buying → price support
+
+A spike in customer buying of ITM (in-the-money) calls is one of
+John's named-favorite signals for identifying price support.
+
+#### Why it works (derived from canonical mechanism)
+
+ITM calls have **high delta** — typically 0.7 to ~1.0, vs OTM call
+deltas around 0.1 to 0.4. The delta is what determines the MM's stock
+hedge size:
+
+- Customer buys 1 ITM call (delta ~0.85) → MM is short delta -85 → MM buys ~85 shares
+- Customer buys 1 OTM call (delta ~0.25) → MM buys ~25 shares
+
+A large *increase* in ITM call buying therefore produces a
+proportionally *larger* stock-buying flow from MM hedging than the
+same notional in OTM calls. The MM stock buying is the structural
+support — and the higher the delta, the stronger the floor.
+
+#### Why this is a distinct subset of the cyan-bar reading
+
+The canonical operational rule from entry 5 ("pivot at customer long
+gamma") doesn't differentiate by moneyness — long gamma is long gamma
+on the convexity ladder. But this Q&A says: **long gamma at ITM
+strikes acts more strongly as support than long gamma at OTM
+strikes**, because of the mechanical hedge-size difference.
+
+For operational reads:
+- Cyan bar at ATM/OTM strike → standard pivot candidate
+- Cyan bar at ITM strike with significant size increase → John's
+  "favorite signal" — elevated-conviction support
+
+#### How to spot it on the chart
+
+This isn't directly visible from the convexity ladder alone (which
+nets long/short gamma by strike, not by moneyness vs spot). You need
+either:
+- The Options Profile view (which preserves call/put + strike, so ITM-
+  vs-OTM is just a comparison to spot)
+- The OrderFlow view (Convexity OF spikes that originate at strikes
+  inside the current spot range)
+- The toggle John mentioned in entry 4 (gamma view ↔ puts/calls view)
+  to verify which strikes the long-gamma flow is hitting
+
+### Cross-references
+
+- Entry 5 (Jasper closing exchange) — the base pivot-at-long-gamma
+  rule. This Q&A is a high-conviction sub-case of that rule.
+- Entry 9 (stockholm/John failure mode) — describes when pivots
+  *don't* hold. ITM call buying creates strong support but isn't
+  immune to overwhelming directional flow.
+- [`gex_profile.md`](gex_profile.md) — the Options Profile view that
+  preserves moneyness information.
+
+### Operational note
+
+A "large increase" is the qualifier — small ITM call buying happens
+all the time and doesn't trigger this signal. The pattern requires a
+*notable spike* in ITM call demand to be in John's "favorite signals"
+category. We don't have a quantitative threshold from John, so this
+is initially a qualitative pattern recognition read.
