@@ -587,6 +587,252 @@ recognition over multiple charts.
 
 ---
 
+## 2025-08-24 12:24 PM – 3:32 PM — joefriday + John M, on call vs put gamma reversion (John Kirby clarifying Q, no substantive answer)
+
+**Channel:** GexBot Discord, #theory-questions
+**Date:** 2025-08-24, 12:24 PM → 3:32 PM ET
+**Speakers:** joefriday (community) → John Kirby (Moderator, GexBot
+principal — clarifying question only) → joefriday (clarification) →
+John M (community contributor — substantive answer)
+
+**Tier note.** John Kirby asked a clarifying question but did NOT
+provide the substantive doctrinal answer. John M (community
+contributor) answered with the "bus metaphor" mechanism. This entry
+sits in the community-tier file because the doctrinal content is
+John M's. **John Kirby's non-response is significant** — the
+principal did not endorse John M's framing; the bus metaphor is
+community pattern recognition, not vendor-canonical mechanism.
+
+### Q1 (joefriday, 12:24 PM)
+
+> Why does major call gamma seem to be mean reversionary, but major
+> put gamma doesn't seem to have the same effect?
+
+### Clarifying Q (John Kirby, 12:35 PM — only contribution to the thread)
+
+> Which model, and what do you mean by mean reversionary?
+
+This is the only John Kirby contribution to the thread. He does not
+return with a substantive answer. The clarifying question is
+principal-voiced but carries no doctrine on its own — it flags that
+a precise read requires specifying which GexBot view ("model")
+joefriday is looking at.
+
+### Q1-bis (joefriday, 12:37 PM — narrows the question)
+
+> I was looking at the gexbot classic. I thought at some point
+> hearing that both call/put major gamma levels tended to be mean
+> reversionary. But I'm wondering if I was mistaken, since looking
+> at a bunch of historical days on gexbot twitter doesn't seem to
+> show that.
+
+joefriday narrows to the **gexbot classic** view and acknowledges
+the apparent asymmetry he observed might be a mis-recollection.
+
+### A2 (John M, 3:17 PM — the "bus" metaphor)
+
+> Joefriday, Buying Calls or Puts creates "Positive Gamma" and takes
+> liquidity. Selling Calls or Puts creates "Negative Gamma" and
+> provides liquidity. Think of a large 3,000 Calls bought (Positive
+> Gamma) as filling all the seats on a bus. (The bus is now full
+> and everyone is wondering who will get off first or, when they
+> see the first passenger get off they ask why is he getting off,
+> he must know something, and they begin to get nervous and start
+> exiting as well). Traders buy options out of the money and when
+> price moves close enough to their strike, they start taking
+> profits, hence the Reversion on initial approach. The same in
+> reverse for a large buy to open Put position. If you are going
+> to ask yourself about a "Major Call or Put position, remind
+> yourself to ask if it's positive or negative gamma. Get that
+> gamma chart up next to the options chart. If you are a State
+> subscriber you may find your questions answered by watching these
+> side by side.
+
+### A3 (John M, 3:26 PM — "Example from 08/19/2025")
+
+John M posted "Example from 08/19/2025" with an attached image. The
+image archived here:
+[`images/john_m_2025-08-19_gex_profile_example.jpg`](images/john_m_2025-08-19_gex_profile_example.jpg).
+
+![John M 08/19/2025 gex profile example](images/john_m_2025-08-19_gex_profile_example.jpg)
+
+Visible in the graphic: gex profile with strike axis on the left
+(6415–6556), spot at 6475.04 (white horizontal reference line), a
+dashed cyan reference line at 6478.86 (long gamma — the first
+cluster ahead of spot), and a dashed purple reference line at
+6490.56 (short gamma — negative-gamma resistance above the long
+gamma cluster). Cyan bars (long gamma) cluster around the spot zone
+and at 6450/6420; purple bars (short gamma) dominate the upside
+above 6485 and the downside below 6460. A small price line in the
+bottom-left corner shows spot's recent path leading into the long
+gamma cluster from below.
+
+Per John M's mechanism: spot is approaching the long-gamma level at
+6478.86 from below — the "first reversion candidate" by his bus
+metaphor — with negative-gamma resistance overhead at 6490.56 that
+would gate any blast-through.
+
+### A4 (John M, 3:32 PM — multi-touch dynamics)
+
+> Another thought for the example above. When the bus is full, those
+> 3000 Call Buyers, are now "Long", so now they have become
+> "Sellers". If there are too many "Sellers" and not enough buyers,
+> price has more difficulty going higher. On the reversion some
+> positions close, so now there are less sellers. Every subsequent
+> approach to that level has more "Longs" exiting. Once enough of
+> those "Longs" (sellers) exit, price has a chance to blast through
+> on 2nd or 3rd attempt unless there is resistance above in the
+> form of Negative Gamma. (Hope this helps.)
+
+---
+
+### Four pattern-recognitions from John M's answer
+
+These are community-tier observations, not vendor-confirmed doctrine.
+They are operationally useful as pattern hypotheses; do not treat as
+canonical mechanism without independent measurement support.
+
+#### Pattern 1: The reframing — positive/negative gamma, NOT call/put
+
+John M reframes joefriday's question. joefriday asked about call vs
+put major gamma asymmetry; John M answers that **the relevant axis
+is positive vs negative gamma, not call vs put**:
+
+- Buying calls OR puts → Positive Gamma (customer long convexity)
+- Selling calls OR puts → Negative Gamma (customer short convexity)
+
+So "major call gamma" is reversionary IF those calls were BOUGHT
+(positive gamma). If they were SOLD (negative gamma), the level
+behaves as liquidity-provision, not reversion. Same for puts. The
+reframing is consistent with the canonical "customer perspective"
+convention (see `../canonical/principal_discord.md`, Jasper closing
+exchange entry).
+
+#### Pattern 2: The bus metaphor — customer-flow reversion mechanism
+
+3,000 calls bought at a strike = "a full bus of longs." Mechanism
+John M proposes:
+
+1. Spot approaches strike from below
+2. Some early longs take profits → exit
+3. Remaining longs see the exits, get nervous → more exits
+4. The cumulative exit selling provides the resistance → spot
+   reverts
+
+**This is a customer-flow explanation of reversion, NOT a
+dealer-hedging explanation.** It's distinct from (but complementary
+to) the canonical dealer-gamma-hedging story carried in
+`../canonical/convexity_ladder.md` and the Jasper canonical entries.
+
+#### Pattern 3: Side-by-side workflow recommendation
+
+> Get that gamma chart up next to the options chart. If you are a
+> State subscriber you may find your questions answered by watching
+> these side by side.
+
+This restates the workflow John M recommended in the earlier Izzy
+exchange above (2025-05-14/15): Options view first for composition,
+Gamma view for confirmation. Same pattern from a different community
+contributor's question.
+
+#### Pattern 4: Multi-touch dynamics — bus emptying
+
+From the 3:32 PM follow-on:
+
+- 1st approach: many longs to exit → strong reversion
+- 2nd approach: fewer longs left → weaker reversion
+- 3rd+ approach: bus mostly empty → **blast-through unless negative
+  gamma resists from above**
+
+Operational implication: the FIRST touch of a long-gamma level is
+the highest-confidence reversion bid. Subsequent touches lose
+confidence as the supply of profit-takers depletes. The override
+condition is **negative gamma overhead** that re-establishes the
+cap.
+
+This pairs naturally with John M's 08/19/2025 example chart: long
+gamma at 6478.86 (first touch from below), short gamma at 6490.56
+overhead (the resistance ceiling that would gate a blast-through).
+
+### Why John Kirby's non-response is significant
+
+This thread is one of the cleanest demonstrations of the John M ≠
+John Kirby tier distinction. John Kirby engaged the thread (asked
+a clarifying question), then disengaged. John M provided the answer.
+
+Reading: the principal **did not endorse** John M's bus-metaphor
+framing as canonical. We have no canonical equivalent of "reversion
+is customer profit-taking" — the canonical mechanism story remains
+dealer-hedging-based (see `../canonical/convexity_ladder.md` and the
+Jasper canonical entries). John M's customer-flow account is a
+plausible community-tier extension but it has not been validated by
+Jasper or John Kirby.
+
+**Operational implication for the measurement framework**: when
+testing reversion at long-gamma levels, test BOTH the canonical
+dealer-hedging mechanism (long-gamma → dealer long stock →
+stabilizing hedging) AND John M's customer-flow mechanism
+(long-gamma → trapped longs → profit-taking on approach).
+Distinguishing them empirically might require checking whether
+reversion correlates with measured volume of option closes at the
+strike (John M's prediction) or with measured stock-buy flow from
+dealer hedging (the canonical prediction).
+
+### How this connects to joefriday's observed asymmetry
+
+joefriday's apparent observation — major call gamma reversionary
+but major put gamma not — is most plausibly explained by sample
+bias on Twitter. If GexBot Twitter posts emphasize trades around
+upside long-call clusters (more common in low-VIX uptrends), the
+apparent asymmetry is a sampling artifact, not a real asymmetry.
+
+John M's reframing (positive vs negative gamma, not call vs put)
+implicitly resolves the asymmetry: there IS no asymmetry IF the
+gamma is correctly classified by positive/negative. joefriday should
+expect reversion at both major call gamma AND major put gamma when
+those positions are positive (bought).
+
+### Cross-references
+
+- [`../canonical/principal_discord.md`](../canonical/principal_discord.md)
+  Jasper closing-exchange entry — the canonical customer-perspective
+  convention. John M's positive/negative gamma reframing is
+  consistent.
+- [`../canonical/principal_discord.md`](../canonical/principal_discord.md)
+  Jasper 2025-09-28 two-signal fade-entry entry — gives the
+  CONDITIONS for reversion to occur (long gamma + directional GEX
+  alignment). joefriday's "doesn't always work" observation is
+  partially explained by absent directional-GEX alignment.
+- [`../canonical/principal_discord.md`](../canonical/principal_discord.md)
+  Jasper 2025-04-22 max-change-gex entry — the multi-touch dynamic
+  John M describes parallels the "freshness filter" notion: each
+  touch updates the position state.
+- Prior Izzy entry above (2025-05-14/15) — John M's side-by-side
+  workflow recommendation, restated here from a different asker.
+
+### Follow-up flags
+
+- **Test the bus-emptying multi-touch claim.** John M's prediction:
+  first touch = strongest reversion, declining strength with each
+  approach until blast-through. Testable: classify each touch as
+  1st/2nd/3rd-N, measure forward returns 5/15/30 min, expect
+  monotonic decline in mean-reversion magnitude with touch count.
+- **Test the customer-flow vs dealer-hedging mechanisms.** Both
+  predict reversion at long-gamma levels but for different reasons.
+  Distinguishing them requires checking which trace signature
+  accompanies the reversion (option-close volume vs delta-hedge
+  stock flow).
+- **Confirm gexbot classic asymmetry observation.** joefriday
+  claimed Twitter historical days don't show reversion at major
+  put gamma. Worth checking the actual GexBot Twitter history — is
+  joefriday's observation accurate, or is it sample bias?
+- **John Kirby silence as data.** Track other instances where a
+  principal engages then disengages without endorsing the community
+  answer. If a pattern emerges, that's important meta-doctrine
+  about what John Kirby considers worth endorsing.
+
+---
+
 ## Revision log
 
 - 2026-05-23: File created from re-tier of four entries previously in
@@ -597,3 +843,14 @@ recognition over multiple charts.
   John Kirby (GexBot principal); content tier is community, not
   vendor-canonical. Channel attribution corrected to `#theory-questions`
   per Steve's 2026-05-23 confirmation.
+- 2026-05-23 (bead st-pyb): New entry appended — joefriday + John M
+  2025-08-24 thread on call vs put gamma reversion. **First entry to
+  preserve a John Kirby clarifying question without a substantive
+  follow-up from him** — meta-doctrine: principal engagement without
+  endorsement should be treated as community-tier. John M's "bus
+  metaphor" reframes the call/put question as a positive/negative
+  gamma question, gives a customer-flow reversion mechanism (distinct
+  from the canonical dealer-hedging account), and adds multi-touch
+  dynamics (1st touch strongest, declining until blast-through unless
+  negative-gamma resistance overhead). Graphic archived:
+  `images/john_m_2025-08-19_gex_profile_example.jpg`.
