@@ -274,6 +274,19 @@ jass closing entry immediately below.
   toggle to Gamma view for confirmation. Implicitly resolves Izzy's
   concern that gamma-filter loses info: use BOTH views, gamma is the
   confirmation layer not the primary read.
+- 2026-05-23 (bead st-39v): New canonical entry appended — jass
+  2026-01-02 1:27 PM Q&A with Sekiro. **Definitive per-row schema
+  for state-tier `mini_contracts` arrays**: col 0 = strike, col 1 =
+  call_ivol (verbatim jass), col 2 = put_ivol (verbatim jass), col 3
+  = endpoint-specific signed metric, col 4 = 3-element lookback
+  array (operationalizes the 2025-04-22 max-change-gex doctrine),
+  col 5 = flag, col 6 = reserved. jass clause "any of the options
+  profile structs" makes the schema uniform across all state-tier
+  options-profile endpoints. Plus a product-level constraint
+  (verbatim): "we do not provide option profile volume via the API
+  (including integrations). it's only provided through the site" —
+  with "not currently" on the roadmap. Cross-stream data (OPRA,
+  Schwab) is therefore mandatory for any per-strike volume measure.
 - 2026-05-23 (bead st-9w0): New canonical entry appended — jass
   2025-10-17 10:45 AM Q&A with T46. **"Literally all i do"** —
   jass compresses his entire trading method to a two-case
@@ -1713,3 +1726,163 @@ trade.
   worked examples of the reversion case (2025-04-09 Andy, 2025-07-25
   SPX dump-ramp tail). Less material on the continuation case. A
   rising-vol pre-event worked example would round out the doctrine.
+
+---
+
+## 2026-01-02 1:27 PM – 1:46 PM — jass, mini_contracts schema confirmation + option-profile volume not API-exposed
+
+This thread directly confirms the per-row schema for state-tier
+options-profile API responses (cols 1 and 2 are call_ivol and
+put_ivol), and documents a product-level limitation (per-strike
+options-profile *volume* is not exposed via the API — site-only).
+
+**Channel:** GexBot Discord, #theory-questions
+**Date:** 2026-01-02, 1:27 PM → 1:46 PM ET
+**Speakers:** Sekiro (community) ↔ jass (Moderator)
+
+The thread followed an earlier Sekiro question asking whether the
+`mini_contracts->call_ivol/put_ivol` fields in `/SPX/state/gamma`
+contained per-strike call/put **volume** data (Sekiro had read the
+field names as referring to volume).
+
+### A1 (jass, 1:27 PM — the schema confirmation)
+
+> yes, the second and third index in the mini_contracts array are
+> call_ivol then put_ivol (not named fields)
+>
+> and they're in any of the options profile structs
+
+### Q-clarification (Sekiro, 1:34 PM — realizing the field names mean IV not volume)
+
+> The data that i get in those fields is not volume, its call and
+> put IV.
+>
+> `[6860, 0.17, 0.17, 2056.82, [2159.72, 1988, 860.35], 0, null]`
+>
+> So should i be hitting some other endpoint if i want to get volume
+> data on a per strike?
+
+### A2 (jass, 1:35 PM — the volume limitation)
+
+> oh. i thought you were asking about vols. no currently we do not
+> provide option profile volume via the API (including integrations).
+> it's only provided through the site
+
+### Q (Sekiro, 1:42 PM)
+
+> Ok.
+>
+> Out of curiosity is that on the roadmap for future?
+
+### A3 (jass, 1:46 PM)
+
+> not currently
+
+### What this establishes
+
+#### 1. Per-row schema for state-tier options-profile responses
+
+The `mini_contracts` array is an array of arrays of numbers. Each
+inner array is one strike's row. Jass's "any of the options profile
+structs" clause means this schema applies uniformly across the
+state-tier options-profile endpoints (`gex_zero`, `gex_one`,
+`gex_full`, `gamma_zero`, `vanna_zero`, etc.) — only column 3 (the
+signed metric) changes meaning per endpoint.
+
+| Col | Field | Confirmed by | Type |
+|---|---|---|---|
+| 0 | strike | observed across samples | float (e.g. `6860`) |
+| 1 | **call_ivol** | jass 1:27 PM verbatim | float (decimal: `0.17` = 17%) |
+| 2 | **put_ivol** | jass 1:27 PM verbatim | float (decimal: `0.17` = 17%) |
+| 3 | signed metric (endpoint-specific) | observed; differs across endpoints same strike same minute | float (e.g. `2056.82` for gamma, `-0.35` for vanna_zero) |
+| 4 | lookback array | observed; 3-element; consistent with the 2025-04-22 max-change-gex entry above | array of 3 floats (e.g. `[2159.72, 1988, 860.35]`) |
+| 5 | flag | observed (always `0` in samples) | int |
+| 6 | reserved | observed (always `null` in samples) | null |
+
+The 3-element lookback array structure operationalizes jass's
+2025-04-22 statement that "max change gex" values are "lookbacks since
+the ladder doesn't have a time axis." Each strike carries its own
+lookback array; three elements suggests three different lookback
+windows (likely short / medium / longer; specific windows not yet
+documented by jass).
+
+#### 2. Per-strike options-profile VOLUME is NOT API-exposed
+
+Verbatim from jass: "we do not provide option profile volume via the
+API (including integrations). it's only provided through the site."
+Follow-up confirmed: "not currently" on the roadmap.
+
+This is a product-level constraint, not a temporary gap. **Anyone
+building on the State API cannot compute volume-weighted aggregates
+from `mini_contracts` alone.** Cross-stream volume from another
+source (OPRA trade tape, Schwab quote stream, etc.) is required.
+
+#### 3. Concrete sample (Sekiro's paste, fully decoded)
+
+```
+strike=6860  call_ivol=17%  put_ivol=17%  signed_metric=2056.82
+lookback=[2159.72, 1988.00, 860.35]  flag=0  reserved=null
+```
+
+Flat call/put IV skew at this strike (17% / 17%). The lookback array
+declines monotonically (2159 → 1988 → 860), consistent with the
+interpretation of three time-windowed max-changes where the metric's
+recent excursion is smaller than its longer-window excursion.
+
+### Cross-references
+
+- The jass 2025-04-22 max-change-gex entry above — establishes the
+  mechanics of the lookback array. This entry confirms its structural
+  position in the per-row schema (col 4) and its element count (3).
+- The jass 2025-09-29 / 2025-10-01 combined entry above (Classic vs
+  State distinction) — establishes that State carries
+  trade-classified signed-volume per strike. This entry now confirms
+  that *volume* itself (raw counts) is NOT in the State API; what IS
+  in the State API at each strike is the signed metric (col 3) which
+  is computed from the underlying classified flow.
+- The jass 2025-09-28 two-signal fade-entry rule (vqz entry above) —
+  depends on directional GEX reads. Now confirmed how to parse the
+  per-strike rows that drive those directional reads.
+- [`gex_profile.md`](gex_profile.md) — worth updating to reflect the
+  documented schema once the API integration code lands.
+- [`metrics_math.md`](metrics_math.md) — GEX formulas; the col-3
+  signed metric in `mini_contracts` is the per-strike GEX (or
+  per-strike vanna, charm, etc., depending on endpoint).
+
+### Implications for the measurement framework
+
+- **Cross-validation of IVs is now feasible**: we can compute implied
+  vol from corpus OPRA option trades (DataBento OPRA backfill running
+  as of 2026-05-23) and compare against `mini_contracts[:][1]` and
+  `[:][2]`. Agreement validates the vendor data; disagreement is a
+  data-quality finding worth investigating. This is the cleanest
+  early measurement check this entry enables.
+- **Volume aggregates require cross-stream data**: any per-strike
+  volume measure (e.g. "volume-weighted gamma exposure at the long-
+  gamma cluster") must come from OPRA trades or Schwab quotes, not
+  from `mini_contracts`. This is now a permanent constraint of the
+  State integration, not a temporary gap to wait on.
+- **Lookback array semantics need empirical mapping**: jass didn't
+  document which time windows the 3 elements correspond to. Worth
+  reverse-engineering by sampling state responses at regular
+  intervals and comparing the lookback values against observed
+  recent changes in the col-3 metric.
+
+### Follow-up flags
+
+- **Lookback array time windows.** Three elements per strike;
+  windows not documented. Probably short / medium / longer (e.g.
+  5min / 15min / 60min); empirically measurable by polling state
+  responses on a fixed cadence.
+- **`/state/{cat}/majors` spec-vs-impl divergence.** Steve's original
+  Discord question included a third part: the OpenAPI spec shows
+  `/state/{cat}/majors` accepts both classic and state categories,
+  but `/SPX/state/gamma_zero/majors` returns 400 with "Category must
+  be one of gex_full, gex_one or gex_zero." jass did not address this
+  part of the question in the captured thread. Worth catching if jass
+  addresses it later — could indicate the spec is aspirational vs the
+  implementation.
+- **Col 5 (flag) and col 6 (reserved) semantics.** Both always 0 /
+  null in observed samples. The schema names here are the
+  practitioner reading; vendor confirmation absent. If non-zero
+  values are ever observed in production, document them.
