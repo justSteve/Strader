@@ -238,6 +238,12 @@ See entries 3, 4, 5 below for the full exchange.
   size is proportionally larger than OTM, creating stronger structural
   support per contract. Distinct sub-case of the cyan-bar rule —
   ITM long gamma > OTM long gamma for support force.
+- 2026-05-22: Entry 12 added — Jasper 2025-04-22 8:07 AM. Mechanics
+  of "max change gex" — updates every second; values are lookbacks
+  since the ladder has no time axis. Flagged as a UI feature not
+  otherwise documented in our canonical files; likely a freshness
+  filter analogous to OrderFlow spike concept. First [GOLD]-tagged
+  asker seen — subscriber tag note added.
 
 ---
 
@@ -980,3 +986,76 @@ all the time and doesn't trigger this signal. The pattern requires a
 *notable spike* in ITM call demand to be in John's "favorite signals"
 category. We don't have a quantitative threshold from John, so this
 is initially a qualitative pattern recognition read.
+
+---
+
+## 2025-04-22 8:07 AM — Jasper on "max change gex" mechanics
+
+**Channel:** GexBot Discord (channel not captured)
+**Date:** 2025-04-22, 7:19 → 8:07 AM
+**Speakers:** Bass `[GOLD]` (community, GOLD-tier subscriber) → Jasper
+"jass" (Moderator)
+
+### Q (Bass)
+
+> this "max change gex" values change (1) once the strike is hit, (2)
+> before the strike is hit or (3) when the reaction in price is
+> taking place?
+
+### A (Jasper)
+
+> they update every second. theyre lookbacks since the ladder doesnt
+> have a time axis
+
+### What this establishes
+
+#### Two structural facts about "max change gex"
+
+1. **Updates every second.** Real-time continuous, not gated on price
+   events. Bass's three options ("once strike is hit," "before strike
+   is hit," "when reaction is happening") are all wrong — none of them
+   describe the actual mechanic.
+2. **Values are lookbacks.** Since the convexity ladder is plotted
+   strike-by-strike (no time axis), time information is injected via
+   lookback aggregation. Each strike's "max change" is the largest
+   shift observed in some recent window.
+
+#### Why this matters for measurement framework
+
+If we ever subscribe to or otherwise access this metric in the corpus,
+two things matter:
+
+- It's **derived, not raw**. Reproducing it requires the lookback window length and the aggregation method. Neither is documented in this Q&A.
+- It's **strike-localized**. Each strike has its own "max change" value, computed over the same lookback. So a single chart timestamp gives a fingerprint of which strikes have had the most recent activity.
+
+#### Why this is a useful pattern
+
+A "max change gex" spike at a strike says: that strike has recently
+*shifted* significantly. If the canonical pivot-at-long-gamma rule
+(entry 5) tells you *where* to act, "max change" tells you *which
+strike levels are getting attention right now* — a freshness filter
+on top of the static ladder.
+
+This is analogous to the Convexity OrderFlow / GEX OrderFlow signals
+Freddy describes in [`../community/freddy_orderflow_series.md`](../community/freddy_orderflow_series.md)
+Part 2 (spikes indicating fresh activity at strikes). "Max change gex"
+appears to be a similar "where's the recent action?" filter, but
+implemented as a lookback aggregate on the existing ladder rather
+than as a separate OrderFlow chart.
+
+### Flagged as undocumented UI feature
+
+"max change gex" isn't mentioned in our existing canonical files
+(`metrics_math.md`, `gex_profile.md`, `convexity_ladder.md`). It's a
+GexBot UI element we haven't surfaced. If we ever get a UI walkthrough
+or have access to the chart, this is one of several elements to
+identify and document.
+
+### Note on subscriber tags
+
+This is the first **[GOLD]**-tagged asker we've seen in the Q&A series.
+GOLD role suggests a paid-tier subscription within GexBot's Discord
+hierarchy. Other tags seen so far: `[PP]` (Freddy — possibly "paying
+practitioner" or moderator-tier). No canonical statement on what each
+tag means; treat as context cues for the asker's familiarity with the
+system rather than canonical signal.

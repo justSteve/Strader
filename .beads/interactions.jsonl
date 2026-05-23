@@ -75,3 +75,5 @@
 {"id":"int-96cca413","kind":"field_change","created_at":"2026-05-22T21:23:23.38218678Z","actor":"Steve","issue_id":"st-a0y","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-e6685fda","kind":"field_change","created_at":"2026-05-23T00:55:43.273796438Z","actor":"Steve","issue_id":"st-co2","extra":{"field":"status","new_value":"in_progress","old_value":"open"}}
 {"id":"int-6cb622ea","kind":"field_change","created_at":"2026-05-23T00:57:42.221193588Z","actor":"Steve","issue_id":"st-co2","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-c4c69387","kind":"field_change","created_at":"2026-05-23T00:59:07.256050663Z","actor":"Steve","issue_id":"st-qrl","extra":{"field":"status","new_value":"in_progress","old_value":"open"}}
+{"id":"int-e91be3bc","kind":"field_change","created_at":"2026-05-23T01:00:42.091629207Z","actor":"Steve","issue_id":"st-qrl","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
