@@ -113,6 +113,18 @@ class LiveClient:
             start=start,
         )
 
+    def tee_raw(self, stream, exception_callback=None) -> None:
+        """Tee the raw DBN byte stream to a writable binary IO — a lossless,
+        compact archive of *every* record and field (sequence, flags, ns ts,
+        SymbolMappingMsg) that the typed Trade projection drops.
+
+        Call after subscribe() and before iterating. databento writes a
+        complete DBN stream (metadata + records) to `stream`, replayable via
+        `databento.DBNStore.from_file()`. All subscriptions on this session
+        write to the same stream. The caller owns the handle (flush/close).
+        """
+        self._client.add_stream(stream, exception_callback=exception_callback)
+
     def trades(self) -> Iterator[Trade]:
         """Yield typed Trade entities. Blocks on the underlying stream.
 
@@ -121,7 +133,10 @@ class LiveClient:
         """
         for record in self._client:
             if isinstance(record, SymbolMappingMsg):
-                self._symbol_map[int(record.instrument_id)] = record.stype_in_symbol
+                # stype_OUT resolves the parent/continuous input symbol to the
+                # actual instrument (e.g. SPXW.OPT -> "SPXW  260608C05500000").
+                # stype_in_symbol would collapse every contract to the parent.
+                self._symbol_map[int(record.instrument_id)] = record.stype_out_symbol
                 continue
             if isinstance(record, TradeMsg):
                 yield trade_from_databento(record, self._symbol_map)
@@ -134,7 +149,10 @@ class LiveClient:
         """
         for record in self._client:
             if isinstance(record, SymbolMappingMsg):
-                self._symbol_map[int(record.instrument_id)] = record.stype_in_symbol
+                # stype_OUT resolves the parent/continuous input symbol to the
+                # actual instrument (e.g. SPXW.OPT -> "SPXW  260608C05500000").
+                # stype_in_symbol would collapse every contract to the parent.
+                self._symbol_map[int(record.instrument_id)] = record.stype_out_symbol
                 continue
             if isinstance(record, MBP1Msg):
                 yield quote_from_databento(record, self._symbol_map)

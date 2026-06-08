@@ -5,7 +5,9 @@ keyed by US/Central calendar date — `data/corpus/YYYY-MM-DD/`. Inside:
 
     schwab.jsonl            append-only, one row per intraday cycle
     gexbot.jsonl            append-only, one row per intraday cycle
-    databento_opra.jsonl    written once per day by the T+1 batch
+    databento_opra.jsonl    SPXW option trade ticks — T+1 batch and/or live
+                            stream (rows tagged provenance.source)
+    databento_glbx_es.jsonl ES front-month trade ticks — same two sources
     manifest.json           collection summary, errors, cycle counts
 
 Date keying uses US/Central because that's the convention the rest of the

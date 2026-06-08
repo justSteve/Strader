@@ -16,7 +16,7 @@ class Trade:
       - 'N' = unknown / not reported
     """
     ts: datetime          # event timestamp, US/Central
-    symbol: str           # raw symbol as subscribed (e.g. "ES.c.0", "AAPL")
+    symbol: str           # resolved instrument symbol (e.g. "SPXW  260608C05500000")
     instrument_id: int    # Databento internal id (for joining across records)
     price: float
     size: int
