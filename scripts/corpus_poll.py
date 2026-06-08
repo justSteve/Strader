@@ -13,8 +13,8 @@ Usage:
     # one-shot (cron-friendly)
     .venv/bin/python scripts/corpus_poll.py
 
-    # foreground loop, 5-min cadence, until Ctrl-C or --max-runs
-    .venv/bin/python scripts/corpus_poll.py --interval 300 --max-runs 78
+    # foreground loop, 1-min cadence, full RTH session (Ctrl-C or --max-runs)
+    .venv/bin/python scripts/corpus_poll.py --interval 60 --max-runs 390
 
 Failures in one stream don't stop the other. Both records always written;
 errors propagate into the manifest.
