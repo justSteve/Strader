@@ -1,10 +1,14 @@
 #!/bin/sh
+# gc-hook-stamp: 2026-05-24T08:10:01Z 100fa88e1abdfa370f67b093e8ae7d554eea1151-dirty
 # Installed by gc — forwards bd events to Gas City event log.
 # Args: $1=issue_id  $2=event_type  stdin=issue JSON
 GC_BIN="${GC_BIN:-gc}"
+HOOK_LOG="${BEADS_DIR:-.beads}/hooks.log"
 DATA=$(cat)
 PAYLOAD=$(printf '{"bead":%s}' "$DATA")
 title=$(echo "$DATA" | grep -o '"title":"[^"]*"' | head -1 | cut -d'"' -f4)
 (
-  "$GC_BIN" event emit bead.created --subject "$1" --message "$title" --payload "$PAYLOAD" >/dev/null 2>&1 || true
-) </dev/null >/dev/null 2>&1
+  "$GC_BIN" event emit bead.created --subject "$1" --message "$title" --payload "$PAYLOAD" 2>>"$HOOK_LOG" \
+    || echo "[$(date -u +%FT%TZ)] on_create $1: gc event emit bead.created failed (gc=$GC_BIN)" >>"$HOOK_LOG" 2>/dev/null \
+    || true
+) </dev/null >/dev/null 2>&1 &

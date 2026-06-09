@@ -49,3 +49,6 @@ tui/flytui
 # Session state (checkpoint, snapshot — runtime only)
 .claude/state/
 session-briefing.md
+
+# Beads / Dolt files (added by bd init)
+.beads/proxieddb/
