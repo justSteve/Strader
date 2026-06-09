@@ -87,7 +87,20 @@
       "mcp__tradingview__*",
       "Read(*)",
       "Glob(*)",
-      "Grep(*)"
+      "Grep(*)",
+      "Skill(checkpoint)",
+      "Skill(tap-in)",
+      "Skill(handoff)",
+      "Bash(column *)",
+      "Bash(curl *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(wc *)",
+      "Bash(date *)",
+      "Bash(echo *)",
+      "Write(/tmp/*)",
+      "Read(/tmp/*)",
+      "Write(.claude/state/**)"
     ],
     "deny": [
       "Read(.env)",
