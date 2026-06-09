@@ -1,37 +1,53 @@
-# DaysActivity - 2026-05-19
+# DaysActivity - 2026-06-08
 
-## 07:05 - Session Handoff [Mancini Pipeline — Cleanup, Archive, Replay, Post-Mortem]
+## 02:53 - Session Handoff [Datastream collection + late-day fly research]
 
-**Summary**: Closed st-w9l (Mancini Pine renderer). Cleaned getting-started scaffolding from mancini/, built archive structure, pulled May 19 email from Gmail, ran full pipeline (60 levels extracted). Added replay renderer (trade recap slides), post-mortem renderer (prior forecast vs actual action slides with level scorecard), and restored compositor/gallery from git for PNG slide generation. Aligned capture tool filename convention with parser (`ES_YYYYMMDD_HHMM.png`).
+**Summary**: Stood up forward datastream collection (Databento OPRA live, Schwab+GexBot 1-min poll) and built a fly-replay analysis tool + 246-day corpus batch that established the late-day butterfly edge is a **day-selection** problem, not blanket patience. (Session ran 06-08 evening past midnight; logged under 06-08.)
+
+**Datastreams collected today** (all 3): Databento OPRA streamed live ~11:20–15:15 CT (816,941 ticks, clean auto-stop, compacted 320MB→10.3MB, 31×); Schwab + GexBot ran via corpus_poll (Steve launched). OPRA live is covered by the $199/mo OPRA sub (no per-GB charge); ES has no live sub → stays T+1 batch.
+
+**Late-day fly batch verdict (246 days, 5-wide call, parity-centered at each day's pin):** wait→cheaper only **26%** of days (fly richens into pin on calm days); wait→less-drawdown mild ($0.35→$0.25, near-zero late on 51%); exit-whip ≥$0.50 on **17%** of days (validates "bank the near-max winner"); oracle payoff median +$3.63. Edge = identifying dislocation/whippy vs calm days.
 
 **Open Work**:
-- st-6mo: Mancini daily workflow — cleanup, archive, post-mortem + forecast pipeline (in progress, not yet committed)
-- st-lh3: bun convention (COO-routed, not actionable here)
-- TV capture tool (`tools/tv_capture/`) still not deployed to Windows — no screencaps available for PNG slide compositing
-- PNG slide deck cannot be generated until capture pipeline is running
+- **[NEXT SESSION] Interpret the 13:00–15:00 re-run** — running now in tmux moocity steves-desk:fly-batch → `data/measurement/fly_batch_1300.log` (per-day rows overwrote `data/measurement/fly_batch.jsonl`). Wider window better tests "wait longer than reasonable."
+- **[NEXT SESSION] "How well can we judge day-type (whippy), and how early?"** — Steve's key question. Day-type is non-stationary intraday (today: whippy early, settled final 1/2hr; a close-judgment wouldn't have held earlier). Full context in memory `project_pin_projection_research`.
+- **Daily-collection schedule** deferred — gate 2/3 (tomorrow's fresh launch must produce a real raw `.dbn` archive) before wiring the 12:55 CT cron + `--yesterday` compaction. Gate 1/3 (clean stop) + 3/3 (compaction 31×) passed.
+- **Pin-card logger** (log ~1pm GEX levels + settle daily) — offered, not built.
+- **Gate-posture decision** — whether to relax the behavioral Schwab gate for read-only collection (Tier 1/2/3 lean given; no config changed).
+- **[ALERT] Beads tracker still down** ("database st not found"); COO owns recovery. All session work committed bead-pending (referenced st-745 / st-1yp lineage), attach IDs retroactively.
 
-**Key Decisions**:
-- Archive structure: `mancini/archive/<date>/` holds raw email, parsed JSON, Pine indicator, replay, post-mortem, and slides
-- Compositor + gallery restored from git commit 07490cf after premature deletion
-- Capture filename convention aligned: `ES_YYYYMMDD_HHMM.png` (was `tv_YYYYMMDD_HHMMSS.png`)
-- Original PNG slide requirements retrieved from claude-monitor conversation log (87102730, May 16 session)
+**Tried**:
+- Databento live billing — wrongly asserted live is metered ($336/GB from `list_unit_prices`); Steve corrected: OPRA Standard sub covers live. `list_unit_prices` = pay-as-you-go, not subscription billing. → corrected.
+- LiveClient symbol map used `stype_in_symbol` (collapsed every contract to parent "SPXW.OPT") → fixed to `stype_out_symbol`; live probe caught it before any bad row landed.
+- fly_replay first run gave −$233 flies → parent symbology blends ALL expiries; added expiry filter (0DTE only). Then −$0.50 residual = async last-trade noise, floored at 0 in the batch.
+- Schwab refresh token was expired (invalid_grant); pre-flight reader caught it; Steve re-authed.
 
-**Files Changed**:
-mancini/codegen.py
-mancini/parser.py
-mancini/compositor.py
-mancini/gallery.py
-mancini/replay.py
-mancini/post_mortem.py
-mancini/archive/2026-05-18/forecast_2026-05-18.json
-mancini/archive/2026-05-18/forecast_2026-05-18.pine
-mancini/archive/2026-05-19/email_2026-05-19_raw.txt
-mancini/archive/2026-05-19/forecast_2026-05-19.json
-mancini/archive/2026-05-19/forecast_2026-05-19.pine
-mancini/archive/2026-05-19/forecast_tuesday.md
-mancini/archive/2026-05-19/post_mortem.md
-mancini/archive/2026-05-19/post_mortem_2026-05-19.md
-mancini/archive/2026-05-19/replay_2026-05-19.md
-tools/tv_capture/tv_capture.py
+**Files Changed** (committed 847e4be, 34e1c53, a31b5c6 — all pushed):
+scripts/corpus_stream_databento.py
+scripts/corpus_compact_databento.py
+scripts/probe_databento_access.py
+scripts/corpus_poll.py
+market/ingest/databento.py
+market/entities/trade.py
+market/corpus/paths.py
+market/measurement/__init__.py
+market/measurement/fly.py
+scripts/measurement/fly_replay.py
+scripts/measurement/fly_replay_batch.py
+tests/market/corpus/test_stream_databento.py
+tests/market/corpus/test_compact_databento.py
+tests/market/corpus/test_schwab_stream.py
+tests/market/test_ingest_databento.py
+tests/market/measurement/test_fly_replay.py
 
 ---
+
+## 10:06 - Tap In
+
+Session start. Daily housekeeping: archived stale 2026-06-01 DaysActivity (empty header), created fresh file for today.
+
+**[ALERT] Beads tracker down.** Dolt server running (PID 87409, :31611) but pointed at empty `.beads/dolt` (created today by my `bd dolt start`); local `embeddeddolt/st` clone has empty issues table; `issues.jsonl` deleted. Authoritative 55-issue dataset is on the GitHub remote (`refs/dolt/data`, reachable). Recovery: `bd bootstrap` (clone `st` from remote) — flagged for Steve, not run autonomously.
+
+**Carried-forward beads** (from 2026-06-01 briefing, unconfirmed): st-r2o (P1, blocked on COO greek framing), st-745 (P2, V-day measurement — active), st-u32/st-lks (P2, unblocked), st-cgb (P2, possibly unblocked now corpus is backfilled), st-u29 (P3).
+
+Full briefing in session-briefing.md.
