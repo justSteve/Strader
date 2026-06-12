@@ -1,7 +1,7 @@
 issue_prefix: st
 issue-prefix: st
-dolt.auto-start: false
-gc.endpoint_origin: inherited_city
-gc.endpoint_status: verified
+dolt.auto-start: true
 types.custom: molecule,convoy,message,event,gate,merge-request,agent,role,rig,session,spec,convergence,step
-export.auto: true
+export.auto: false
+
+sync.remote: "file:///mnt/c/Users/steve/dolt-remotes/strader"
