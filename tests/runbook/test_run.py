@@ -1,0 +1,99 @@
+"""CLI wiring tests for the Mancini Runbook. [co-7lyf / co-i10h]
+
+No live LLM call: the parse step is monkeypatched. These cover the gate, the
+halt/keep-last-good error paths, and the brief render.
+"""
+import json
+
+import pytest
+
+from runbook.mancini import run as run_mod
+from runbook.mancini import parse as parse_mod
+from runbook.mancini.schema import ParseResult, Level, Commentary, Trigger
+from runbook.mancini.validate import ValidationResult
+
+SOURCE = "ES Trade Plan. Supports are: 5800. Holding 5800 targets 5840.\n"
+
+
+def _good_outcome() -> parse_mod.ParseOutcome:
+    result = ParseResult(
+        date="2026-06-29", instrument="ES", session_bias="bullish above 5800",
+        levels=[Level(price=5800, kind="support", source_quote="5800")],
+        commentary=[Commentary(
+            text="Holding 5800 targets 5840.",
+            trigger=Trigger(type="price_zone", anchor_prices=[5800, 5840]),
+            source_quote="Holding 5800 targets 5840.")],
+    )
+    return parse_mod.ParseOutcome(result=result, validation=ValidationResult(ok=True))
+
+
+def test_happy_path(tmp_path, monkeypatch, capsys):
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
+    monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
+    monkeypatch.setattr(parse_mod, "parse", lambda *a, **k: _good_outcome())
+
+    rc = run_mod.main([
+        "--file", str(nl), "--no-gate",
+        "--store-root", str(tmp_path / "commentary"),
+    ])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "MANCINI MORNING BRIEF" in out
+    assert "5800" in out
+    # last-good written
+    assert (tmp_path / "parsed" / "2026-06-29.json").exists()
+    saved = json.loads((tmp_path / "parsed" / "2026-06-29.json").read_text())
+    assert saved["instrument"] == "ES"
+
+
+def test_gate_failure_halts(tmp_path, monkeypatch):
+    # A manifest with zero cycles fails the gate; parse must never run.
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({
+        "date": "2026-06-29",
+        "streams": {
+            "databento_glbx_es": {"cycles": 0, "errors": [], "last_pull_utc": ""},
+            "databento_opra": {"cycles": 0, "errors": [], "last_pull_utc": ""},
+        },
+    }))
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
+
+    def _boom(*a, **k):
+        raise AssertionError("parse must not run when the gate fails")
+
+    monkeypatch.setattr(parse_mod, "parse", _boom)
+    rc = run_mod.main(["--file", str(nl), "--manifest", str(manifest)])
+    assert rc == 2
+
+
+def test_validation_failure_keeps_last_good(tmp_path, monkeypatch):
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
+    bad = parse_mod.ParseOutcome(
+        result=_good_outcome().result,
+        validation=ValidationResult(ok=False, errors=["price 6100 not found"],
+                                    missing_prices=[6100]),
+    )
+    monkeypatch.setattr(parse_mod, "parse", lambda *a, **k: bad)
+    monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
+    rc = run_mod.main([
+        "--file", str(nl), "--no-gate", "--store-root", str(tmp_path / "c"),
+    ])
+    assert rc == 4
+    # nothing published
+    assert not (tmp_path / "parsed").exists()
+
+
+def test_extraction_error_is_graceful(tmp_path, monkeypatch):
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
+
+    def _raise(*a, **k):
+        raise RuntimeError("ANTHROPIC_API_KEY_DIRECT not set")
+
+    monkeypatch.setattr(parse_mod, "parse", _raise)
+    rc = run_mod.main(["--file", str(nl), "--no-gate",
+                       "--store-root", str(tmp_path / "c")])
+    assert rc == 3
