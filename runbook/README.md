@@ -19,9 +19,11 @@ runbook/
     validate.py    # anti-hallucination: every price must appear verbatim in source
     store.py       # append-only JSONL commentary store (commentary/<day>.jsonl)
     parse.py       # orchestrate extract -> validate
-    run.py         # CLI: gate -> parse -> validate -> store + brief
+    chart.py       # co-t1z9 — deterministic Pine overlay via existing pine_emitter
+    run.py         # CLI: gate -> parse -> validate -> store + chart + brief
     commentary/    # generated: per-day JSONL (git-tracked)
-    parsed/        # generated: per-day last-good ParseResult JSON
+    parsed/        # generated: per-day last-good ParseResult JSON (gitignored)
+    charts/        # generated: per-day Pine overlay (gitignored)
 ```
 
 ## Daily run
@@ -72,13 +74,25 @@ The live Anthropic call is injected, so the suite is deterministic and offline:
 golden + poisoned fixtures for the validator, store round-trip, gate criteria,
 parse assembly, and CLI gate/halt/keep-last-good paths.
 
+## #3 chart — what's built vs manual
+
+Per the feasibility verdict (spec addendum 2026-06-29), #3 splits:
+
+- **Deterministic daily chart — BUILT** (`chart.py`): validated levels → Pine
+  overlay via the existing `mancini/pine_emitter.py`, plus `apply_plan()` carrying
+  both tradingview-mcp delivery paths (`pine_set_source` and per-line
+  `draw_shape`). `run.py` writes `charts/<day>.pine` on success. The live apply
+  step needs TradingView Desktop + the `tradingview-mcp` server (not headless-testable).
+- **LuxAlgo Quant scaffold — MANUAL** (not automatable; no path to drive the Quant
+  chat). The per-strat Quant prompt stays a version-controlled asset + TV-reset
+  recovery recipe, surfaced by the Runbook for paste, not auto-delivered.
+
 ## Not yet built (follow-ons)
 
-- **#3 per-strat Quant chart** (`co-t1z9`): each strat's LuxAlgo Quant prompt +
-  deterministic level overlay; doubles as the TV-reset recovery recipe.
 - **#9 morning brief surface** (`co-ewba`): render to a live tmux/URL surface
   (`run.py` currently prints a text brief — the mini version).
 - **#10 intraday commentary highlighting** (`co-3qrw`): evaluate stored triggers
   against live price/time/regime.
 - A **live end-to-end run** against a real newsletter (needs `ANTHROPIC_API_KEY_DIRECT`;
   gated on `co-8gp`).
+- The **per-strat Quant scaffold prompt** asset (manual authoring path).
