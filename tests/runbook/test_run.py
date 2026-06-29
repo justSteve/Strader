@@ -31,6 +31,7 @@ def test_happy_path(tmp_path, monkeypatch, capsys):
     nl = tmp_path / "nl.txt"
     nl.write_text(SOURCE)
     monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
+    monkeypatch.setattr(run_mod, "CHARTS_ROOT", tmp_path / "charts")
     monkeypatch.setattr(parse_mod, "parse", lambda *a, **k: _good_outcome())
 
     rc = run_mod.main([
@@ -45,6 +46,10 @@ def test_happy_path(tmp_path, monkeypatch, capsys):
     assert (tmp_path / "parsed" / "2026-06-29.json").exists()
     saved = json.loads((tmp_path / "parsed" / "2026-06-29.json").read_text())
     assert saved["instrument"] == "ES"
+    # deterministic chart Pine written
+    pine_path = tmp_path / "charts" / "2026-06-29.pine"
+    assert pine_path.exists()
+    assert "//@version=6" in pine_path.read_text()
 
 
 def test_gate_failure_halts(tmp_path, monkeypatch):

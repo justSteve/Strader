@@ -35,6 +35,8 @@ logger = logging.getLogger("runbook.mancini")
 
 # Last-good full ParseResult lands here, for intraday re-emit and recovery.
 PARSED_ROOT = Path(__file__).resolve().parent / "parsed"
+# Generated daily Pine overlay (#3 deterministic chart).
+CHARTS_ROOT = Path(__file__).resolve().parent / "charts"
 
 
 def _read_newsletter(file_arg: str | None) -> str:
@@ -169,8 +171,27 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("commentary store: %s", store_path)
     logger.info("last-good parse: %s", parsed_path)
 
+    # 3b. Deterministic daily chart Pine (#3). Non-fatal: the levels/commentary
+    # are the critical output; a chart-emit failure must not sink the run.
+    chart_path = None
+    try:
+        from . import chart as chart_mod
+
+        CHARTS_ROOT.mkdir(parents=True, exist_ok=True)
+        chart_path = CHARTS_ROOT / f"{result.date or day}.pine"
+        chart_path.write_text(
+            chart_mod.emit_pine(result, generated_at=parsed_at), encoding="utf-8"
+        )
+        logger.info("chart Pine: %s", chart_path)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("chart emit failed (non-fatal): %s", e)
+        chart_path = None
+
     # 4. Brief (mini #9).
-    print(_render_brief(result))
+    brief = _render_brief(result)
+    if chart_path is not None:
+        brief += f"\nchart: {chart_path}  (apply via tradingview-mcp pine_set_source)"
+    print(brief)
     return 0
 
 

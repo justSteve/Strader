@@ -52,3 +52,7 @@ session-briefing.md
 
 # Beads / Dolt files (added by bd init)
 .beads/proxieddb/
+
+# Runbook generated caches (regenerable; commentary/ is intentionally tracked)
+runbook/mancini/parsed/
+runbook/mancini/charts/
