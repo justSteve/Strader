@@ -58,7 +58,14 @@ def _load_dotenv() -> None:
         key, _, val = line.partition("=")
         key = key.strip()
         val = val.split("#", 1)[0].strip()
-        if key and val and key not in os.environ:
+        # Make .env authoritative — OVERRIDE any pre-existing value. VS Code's
+        # envFile loader (and some shells) inject vars from .env using a parser
+        # that does NOT strip inline `# comments`, so SCHWAB_API_KEY arrives as
+        # "Tob52... # Schwab API key ..." and Schwab rejects the malformed
+        # client_id with `invalid_client`. The split() above strips the comment;
+        # dropping the `key not in os.environ` guard lets that clean value win.
+        # (diagnosed 2026-06-30 — invalid_client at the authorize step.)
+        if key and val:
             os.environ[key] = val
 
 
