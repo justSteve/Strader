@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "strader2"
+version = "0.1.0"
+description = "Strader2 — greenfield strategy layer over Strader's carried datafeed infrastructure"
+requires-python = ">=3.11"
+# The core package (config, feeds facade) is stdlib-only, so it installs with no
+# external deps. Runtime feed deps live under optional extras and are pinned
+# incrementally as strader2 modules adopt them — replacing the repo's historical
+# ad-hoc .venv + lib/schwab-py submodule arrangement (st-dp3).
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+# Feed extras: the carried infra's optional deps. Enumerated (unpinned) here as a
+# starting inventory; versions get pinned as each feed is exercised end-to-end.
+feeds = [
+  "databento",
+  "requests",
+]
+
+[tool.setuptools.packages.find]
+include = ["strader2*"]
+
+[tool.pytest.ini_options]
+# Repo root on sys.path so tests can import both `strader2.*` and the carried
+# infra packages (`market.*`, `broker_schwab.*`, `runbook.*`) that live at root.
+pythonpath = ["."]
+testpaths = ["strader2/tests"]
+addopts = "-q"
