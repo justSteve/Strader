@@ -15,6 +15,13 @@ daemon.*
 # Interactions log (runtime, not versioned)
 interactions.jsonl
 
+# GC molecule formulas — canonical copies live in COO factory/packs/strader/
+# formulas/; the deployed copy here is provisioned, not versioned. [co-o4la]
+formulas/
+
+# Local bead-event audit log (written by .beads/hooks/*, de-GC'd per co-zk7p)
+local-events.jsonl
+
 # Push state (runtime, per-machine)
 push-state.json
 

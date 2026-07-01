@@ -24,9 +24,10 @@ data/
 .dolt/
 *.db
 
-# Gas Town (added by gt)
+# Gas Town / Gas City (added by gt/gc)
 .runtime/
 .logs/
+.gc/
 __pycache__/
 tui/flytui
 
