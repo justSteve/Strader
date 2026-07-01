@@ -36,9 +36,15 @@ jobs:
           # The install is tiny (pytest + editable pkg), so caching buys nothing.
 
       - name: Install (editable + dev deps)
-        run: python -m pip install --upgrade pip && pip install -e ".[dev]"
+        # httpx is the runbook pilot's only heavy dep (runbook/mancini/llm.py
+        # calls the API over raw httpx). The feed/broker libs (databento,
+        # schwab-py) are intentionally NOT installed — their suites are excluded
+        # below until those deps are pinned.
+        run: python -m pip install --upgrade pip && pip install -e ".[dev]" httpx
 
       - name: Run tests
-        # Explicit suites: the strader2 package + the stdlib-only carried-infra
-        # tests. pythonpath=["."] (pyproject) makes market.*/runbook.* importable.
-        run: pytest strader2/tests tests/runbook tests/market/corpus tests/scripts
+        # strader2 package + the carried-infra suites that run without the live
+        # feed/broker libs. test_paths.py is named explicitly to skip the
+        # databento/schwab tests that share tests/market/corpus/.
+        # pythonpath=["."] (pyproject) makes market.*/runbook.* importable.
+        run: pytest strader2/tests tests/runbook tests/market/corpus/test_paths.py tests/scripts
