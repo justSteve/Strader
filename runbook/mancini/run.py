@@ -27,6 +27,7 @@ import sys
 from datetime import date as date_cls, datetime, timezone
 from pathlib import Path
 
+from . import clean
 from . import parse as parse_mod
 from . import store as store_mod
 from .schema import ParseResult
@@ -41,10 +42,14 @@ CHARTS_ROOT = Path(__file__).resolve().parent / "charts"
 
 def _read_newsletter(file_arg: str | None) -> str:
     if file_arg:
-        return Path(file_arg).read_text(encoding="utf-8")
-    if not sys.stdin.isatty():
-        return sys.stdin.read()
-    raise SystemExit("ERROR: provide newsletter text via --file or stdin")
+        raw = Path(file_arg).read_text(encoding="utf-8")
+    elif not sys.stdin.isatty():
+        raw = sys.stdin.read()
+    else:
+        raise SystemExit("ERROR: provide newsletter text via --file or stdin")
+    # Blobs arrive as raw HTML email; convert to the plain visible-text format
+    # the parser + prompt expect. Plain-text input passes through. (co-ylhf)
+    return clean.clean_newsletter(raw)
 
 
 def _resolve_day(date_arg: str | None) -> str:
