@@ -11,11 +11,11 @@ and shadowed the upstream package — every consumer had to do sys.path
 gymnastics to dodge the collision. After st-8cx renamed the local wrapper
 to broker_schwab/, the import is unambiguous.
 """
-import os
 from pathlib import Path
 
 from schwab import auth
-from dotenv import load_dotenv
+
+from strader2.settings import load_schwab
 
 GATE_KEY = Path.home() / '.schwab_gate_key'
 
@@ -35,18 +35,15 @@ def create_client():
             "touch ~/.schwab_gate_key"
         )
 
-    # Load .env from the project root, not cwd — so the client works whether
-    # a script is launched from Strader root, /, or anywhere else.
-    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    # Authoritative, validated config: the project-root .env wins over any
+    # polluted process env (the 2026-06-30 invalid_client incident, where a
+    # VS Code-injected inline comment poisoned the client_id), and a malformed
+    # key fails fast with a clear message instead of reaching Schwab.
+    cfg = load_schwab()
 
-    api_key = os.getenv('SCHWAB_API_KEY')
-    app_secret = os.getenv('SCHWAB_APP_SECRET')
-    token_path_raw = os.getenv('SCHWAB_TOKEN_PATH', './tokens/schwab_token.json')
-
-    if not api_key or not app_secret:
-        raise RuntimeError(
-            "Missing SCHWAB_API_KEY or SCHWAB_APP_SECRET in .env"
-        )
+    api_key = cfg['SCHWAB_API_KEY']
+    app_secret = cfg['SCHWAB_APP_SECRET']
+    token_path_raw = cfg.get('SCHWAB_TOKEN_PATH', './tokens/schwab_token.json')
 
     # Resolve token path against project root rather than cwd.
     project_root = Path(__file__).resolve().parent.parent

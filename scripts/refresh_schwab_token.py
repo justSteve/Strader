@@ -30,50 +30,23 @@ CADENCE: weekly. Schwab refresh tokens are deliberately short-lived.
 """
 from __future__ import annotations
 
-import os
 import shutil
 import sys
 from pathlib import Path
 
-# Add Strader root for `broker_schwab.*` imports. `schwab` resolves to the
-# upstream hobbled fork via site-packages — no sys.path tricks needed since
-# the local wrapper was renamed schwab/ → broker_schwab/ (st-8cx).
+# Add Strader root for `broker_schwab.*` / `strader2.*` imports. `schwab`
+# resolves to the upstream hobbled fork via site-packages — no sys.path tricks
+# needed since the local wrapper was renamed schwab/ → broker_schwab/ (st-8cx).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from schwab import auth as schwab_auth  # noqa: E402
 
+from strader2.config import ConfigError  # noqa: E402
+from strader2.settings import load_schwab_auth  # noqa: E402
+
 
 GATE_KEY = Path.home() / ".schwab_gate_key"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-
-def _load_dotenv() -> None:
-    env_path = PROJECT_ROOT / ".env"
-    if not env_path.exists():
-        return
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, val = line.partition("=")
-        key = key.strip()
-        val = val.split("#", 1)[0].strip()
-        # Make .env authoritative — OVERRIDE any pre-existing value. VS Code's
-        # envFile loader (and some shells) inject vars from .env using a parser
-        # that does NOT strip inline `# comments`, so SCHWAB_API_KEY arrives as
-        # "Tob52... # Schwab API key ..." and Schwab rejects the malformed
-        # client_id with `invalid_client`. The split() above strips the comment;
-        # dropping the `key not in os.environ` guard lets that clean value win.
-        # (diagnosed 2026-06-30 — invalid_client at the authorize step.)
-        if key and val:
-            os.environ[key] = val
-
-
-def _require_env(name: str) -> str:
-    val = os.environ.get(name)
-    if not val:
-        raise RuntimeError(f"Missing {name} in .env (or shell environment).")
-    return val
 
 
 def _backup(token_path: Path) -> Path | None:
@@ -115,16 +88,15 @@ def main() -> int:
               file=sys.stderr)
         return 1
 
-    _load_dotenv()
     try:
-        api_key = _require_env("SCHWAB_API_KEY")
-        app_secret = _require_env("SCHWAB_APP_SECRET")
-        callback_url = _require_env("SCHWAB_CALLBACK_URL")
-        token_path_str = os.environ.get(
-            "SCHWAB_TOKEN_PATH", "./tokens/schwab_token.json")
-    except RuntimeError as e:
+        cfg = load_schwab_auth()
+    except ConfigError as e:
         print(f"[ENV] {e}", file=sys.stderr)
         return 2
+    api_key = cfg["SCHWAB_API_KEY"]
+    app_secret = cfg["SCHWAB_APP_SECRET"]
+    callback_url = cfg["SCHWAB_CALLBACK_URL"]
+    token_path_str = cfg.get("SCHWAB_TOKEN_PATH", "./tokens/schwab_token.json")
 
     token_path = (PROJECT_ROOT / token_path_str).resolve() \
         if not Path(token_path_str).is_absolute() \
