@@ -31,7 +31,9 @@ ANTHROPIC_VERSION = "2023-06-01"
 MODEL = "claude-opus-4-8"
 TIMEOUT_S = 120.0
 LOCAL_ADDR_V4 = "0.0.0.0"  # WSL IPv6 is broken on this distro (see lux_vision_probe)
-MAX_TOKENS = 8000
+# A single Mancini letter can carry 50-60 explicit levels, each with a short
+# verbatim source_quote — 8000 truncated dense letters. (co-y2hg)
+MAX_TOKENS = 16000
 
 TOOL_NAME = "record_mancini_levels"
 
@@ -119,20 +121,35 @@ TOOL_SCHEMA: dict[str, Any] = {
 
 SYSTEM_PROMPT = (
     "You extract structured trading levels and forward-looking commentary from "
-    "Adam Mancini's nightly newsletter. This is financial data: accuracy is "
-    "paramount.\n\n"
-    "HARD RULES:\n"
-    "- Only record a numeric price that LITERALLY appears in the newsletter "
-    "text. Never infer, round, or invent a level. If you are unsure a number is "
-    "really a level, omit it.\n"
-    "- For every level and every commentary anchor price, copy the exact "
-    "surrounding text into source_quote. A downstream check rejects any price "
-    "not found verbatim in the source, so do not guess.\n"
-    "- 'commentary' is for forward-looking, conditional guidance about the "
-    "coming session ('if we hold X, target Y'; 'losing Z opens the door to W'). "
-    "Do NOT put past-session recap there.\n"
-    "- Classify each level kind precisely (support/resistance/pivot/target/"
-    "trigger) based on how Mancini frames it."
+    "Adam Mancini's nightly ES newsletter. Two things matter equally: accuracy "
+    "(every price must be real) AND completeness (these letters are DENSE with "
+    "explicit levels and you must capture them all).\n\n"
+    "WHERE THE LEVELS ARE — every letter contains these; extract from all of them:\n"
+    "- An explicit list like 'Supports are: 7383, 7377 (major), 7365 (major), "
+    "7355, ...' — record EVERY number as a support level. A '(major)' annotation "
+    "means set label to 'major'. These lists commonly hold 25-30 levels.\n"
+    "- An explicit 'Resistances are: 7391 (major), 7401, 7415 (major), ...' list "
+    "— record EVERY number as a resistance level, same rules.\n"
+    "- Inline levels in the 'Bull case', 'Bear case', and 'In summary' paragraphs "
+    "(breakout targets, range boundaries, pivots, short/long triggers) — capture "
+    "these too, classified by how Mancini frames them "
+    "(target/pivot/trigger/support/resistance).\n\n"
+    "COMMENTARY — the 'Bull case tomorrow', 'Bear case tomorrow', and 'In summary "
+    "for tomorrow' paragraphs are forward-looking conditional guidance ('defend "
+    "7435 then rip to 7458, 7472'; 'below 7377 opens breakdown shorts'). Capture "
+    "each distinct conditional idea as a commentary item with its trigger and "
+    "anchor prices. Do NOT record past-session recap as commentary.\n\n"
+    "ACCURACY RULES — these guarantee correctness; they are NOT a licence to omit "
+    "a level that is clearly stated:\n"
+    "- Every price you record MUST appear verbatim in the newsletter. Never "
+    "invent, round, or infer a price that is not written. For source_quote, copy "
+    "the minimal exact span that contains the price (e.g. '7377 (major)' from a "
+    "list, or the clause for an inline level) — it need not be the whole "
+    "paragraph.\n"
+    "- Classify each level's kind precisely based on Mancini's framing.\n"
+    "- Returning an empty or near-empty levels array for a normal Mancini letter "
+    "is a FAILURE — the explicit Supports/Resistances lists alone yield dozens of "
+    "levels. Extract all of them."
 )
 
 
