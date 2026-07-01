@@ -1,0 +1,42 @@
+name: CI
+
+# Runs the Strader2 package tests plus the carried-infra suites that are
+# stdlib+repo-only (no live feed / API keys), so CI is fast and deterministic.
+# The pilot's runbook + corpus tests are included explicitly because the
+# pytest config's default testpaths is just strader2/tests. The feed-touching
+# WIP suites (tests/market/pricing, tests/market/test_ingest_databento) are
+# intentionally omitted until their optional deps are pinned. [st-cir]
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Cancel an in-flight run when a newer commit lands on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install (editable + dev deps)
+        run: python -m pip install --upgrade pip && pip install -e ".[dev]"
+
+      - name: Run tests
+        # Explicit suites: the strader2 package + the stdlib-only carried-infra
+        # tests. pythonpath=["."] (pyproject) makes market.*/runbook.* importable.
+        run: pytest strader2/tests tests/runbook tests/market/corpus tests/scripts

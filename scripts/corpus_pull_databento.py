@@ -21,7 +21,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from datetime import date as _date, datetime, time as _time
 from pathlib import Path
@@ -37,12 +36,15 @@ UTC = ZoneInfo("UTC")
 
 
 def _load_env() -> None:
-    env_path = Path(__file__).resolve().parent.parent / ".env"
-    for line in env_path.read_text().splitlines():
-        s = line.strip()
-        if s and not s.startswith("#") and "=" in s and "DATABENTO" in s:
-            k, _, v = s.partition("=")
-            os.environ.setdefault(k.strip(), v.split("#", 1)[0].strip())
+    """Validate DATABENTO_API_KEY and publish the clean value to os.environ so
+    db.Historical() (which reads the key from the environment) sees the
+    authoritative token. Routes through the shared fail-fast loader instead of
+    an ad-hoc parse — the .env file wins over any polluted process env, and a
+    malformed key fails loudly here rather than as an opaque API error
+    (2026-06-30 invalid_client class of bug). [st-cir]"""
+    from strader2.settings import load_databento
+
+    load_databento()
 
 
 def _ct_to_utc(d: _date, hhmm: str) -> datetime:
