@@ -23,20 +23,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-
-def _load_dotenv_if_present() -> None:
-    env_path = Path(__file__).resolve().parent.parent / ".env"
-    if not env_path.exists():
-        return
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, val = line.partition("=")
-        key = key.strip()
-        val = val.split("#", 1)[0].strip()
-        if key and val and key not in os.environ:
-            os.environ[key] = val
+from strader2.config import ConfigError  # noqa: E402
+from strader2.settings import load_databento  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -55,10 +43,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    _load_dotenv_if_present()
-
-    if not os.environ.get("DATABENTO_API_KEY"):
-        print("[ALERT] DATABENTO_API_KEY not set in env or .env", file=sys.stderr)
+    try:
+        load_databento()  # validates + publishes DATABENTO_API_KEY to os.environ
+    except ConfigError as e:
+        print(f"[ALERT] {e}", file=sys.stderr)
         return 1
 
     args = parse_args()

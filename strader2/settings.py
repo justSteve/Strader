@@ -43,3 +43,17 @@ def load_schwab(env_path: str | os.PathLike[str] = DEFAULT_ENV_PATH) -> dict[str
 def load_schwab_auth(env_path: str | os.PathLike[str] = DEFAULT_ENV_PATH) -> dict[str, str]:
     """Validated config for the OAuth refresh flow (adds the callback URL)."""
     return load(SCHWAB_AUTH_FIELDS, env_path=env_path)
+
+
+# Databento market-data API key (single token, comment-immune).
+DATABENTO_FIELDS: tuple[Field, ...] = (
+    Field("DATABENTO_API_KEY", secret=True, validators=(non_empty, no_comment_residue, no_whitespace)),
+)
+
+
+def load_databento(env_path: str | os.PathLike[str] = DEFAULT_ENV_PATH) -> dict[str, str]:
+    """Validated config for Databento access. ``apply_to_environ`` (on by
+    default) republishes the clean key to ``os.environ`` so the ``databento``
+    library — which reads ``DATABENTO_API_KEY`` from the environment — also sees
+    the authoritative value."""
+    return load(DATABENTO_FIELDS, env_path=env_path)

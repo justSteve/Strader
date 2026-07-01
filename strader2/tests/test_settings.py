@@ -48,6 +48,20 @@ def test_callback_must_be_https(tmp_path):
     assert "https://" in str(ei.value)
 
 
+def test_databento_clean_from_env_overrides_pollution(tmp_path):
+    env = _env(tmp_path, "DATABENTO_API_KEY=db-abc123\n")
+    polluted = {"DATABENTO_API_KEY": "db-abc123  # metered — bounds the bill"}
+    cfg = load(settings.DATABENTO_FIELDS, env_path=env, environ=polluted)
+    assert cfg["DATABENTO_API_KEY"] == "db-abc123"
+
+
+def test_databento_missing_fails(tmp_path):
+    env = _env(tmp_path, "")
+    with pytest.raises(ConfigError) as ei:
+        load(settings.DATABENTO_FIELDS, env_path=env, environ={})
+    assert "DATABENTO_API_KEY" in str(ei.value)
+
+
 @pytest.mark.skipif(not DEFAULT_ENV_PATH.exists(), reason="no real .env in this environment")
 def test_real_env_passes_strict_loader():
     """Integration: the repo's actual .env must satisfy the strict auth spec.

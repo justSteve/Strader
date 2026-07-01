@@ -12,24 +12,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-
-def _load_dotenv() -> None:
-    env_path = Path(__file__).resolve().parent.parent / ".env"
-    if not env_path.exists():
-        return
-    for line in env_path.read_text().splitlines():
-        s = line.strip()
-        if s and not s.startswith("#") and "=" in s and "DATABENTO" in s:
-            k, _, v = s.partition("=")
-            os.environ.setdefault(k.strip(), v.split("#", 1)[0].strip())
+from strader2.config import ConfigError  # noqa: E402
+from strader2.settings import load_databento  # noqa: E402
 
 
 def main() -> int:
-    _load_dotenv()
-
-    key = os.environ.get("DATABENTO_API_KEY")
-    if not key:
-        print("[FAIL] DATABENTO_API_KEY not set", file=sys.stderr)
+    try:
+        key = load_databento()["DATABENTO_API_KEY"]
+    except ConfigError as e:
+        print(f"[FAIL] {e}", file=sys.stderr)
         return 1
 
     print(f"Key prefix: {key[:8]}...")
