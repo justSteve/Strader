@@ -77,3 +77,32 @@ def test_z_suffix_timestamp_parses():
     assert m["streams"]["databento_glbx_es"]["last_pull_utc"].endswith("Z")
     res = gate.evaluate(m, now=NOW)
     assert res.ok, res.reasons
+
+
+def test_check_reads_manifest_for_the_resolved_gate_day(tmp_path, monkeypatch):
+    """check(day=X) inspects the corpus manifest for exactly day X — the day
+    run.py resolves via most_recent_session_day. This ties the shared day
+    resolution to the file the gate actually reads: pointing it at the completed
+    session's manifest (not the empty plan-day dir) is the whole point of
+    Decision A. [co-i10h]
+    """
+    import json
+    from datetime import date
+
+    import market.corpus.paths as paths
+
+    gate_day = date(2026, 6, 29)  # most-recent-completed session as of NOW
+    monkeypatch.setattr(paths, "CORPUS_ROOT", tmp_path)
+
+    day_dir = tmp_path / gate_day.isoformat()
+    day_dir.mkdir()
+    (day_dir / "manifest.json").write_text(json.dumps(_manifest()))
+
+    # Reads tmp_path/2026-06-29/manifest.json via the corpus path convention.
+    res = gate.check(day=gate_day, now=NOW)
+    assert res.ok, res.reasons
+
+    # A different day has no manifest dir — the gate fails closed, not silently.
+    missing = gate.check(day=date(2026, 7, 1), now=NOW)
+    assert not missing.ok
+    assert any("not found" in r for r in missing.reasons)

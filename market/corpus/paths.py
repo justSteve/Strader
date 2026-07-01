@@ -16,7 +16,7 @@ it lines up with the cash session boundary at 15:00 CT.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -29,6 +29,26 @@ def central_date(now: datetime | None = None) -> date:
     """Return today's US/Central calendar date."""
     now = now or datetime.now(CENTRAL)
     return now.astimezone(CENTRAL).date() if now.tzinfo else now.date()
+
+
+def most_recent_session_day(now: datetime | None = None) -> date:
+    """Most-recent-completed trading session, US/Central.
+
+    Default: the previous weekday, walking back over Sat/Sun. Databento
+    historical is T+1, so *today* has no complete manifest before the cash
+    close — the corpus (and therefore the datastream gate) targets the last
+    session that actually finished. Holidays are NOT modeled: a holiday yields
+    an empty/0-tick day that the gate flags, which is the safe failure (an
+    alert, not silent stale data).
+
+    This is the single source of truth for "which day's data is current",
+    shared by scripts/corpus_daily.py (ingestion) and the datastream gate
+    (consumption) so the two cannot drift onto different days. [co-i10h]
+    """
+    d = central_date(now) - timedelta(days=1)
+    while d.weekday() >= 5:  # 5=Sat, 6=Sun
+        d -= timedelta(days=1)
+    return d
 
 
 def day_dir(d: date | None = None, *, create: bool = False) -> Path:

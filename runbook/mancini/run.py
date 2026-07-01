@@ -53,6 +53,11 @@ def _read_newsletter(file_arg: str | None) -> str:
 
 
 def _resolve_day(date_arg: str | None) -> str:
+    """The parse *plan-day*: the trading session the newsletter plans for.
+
+    This dates the emitted levels/commentary. It is deliberately NOT the day the
+    gate checks — see _resolve_gate_day. [co-i10h]
+    """
     if date_arg:
         return date_arg
     try:
@@ -63,25 +68,40 @@ def _resolve_day(date_arg: str | None) -> str:
         return date_cls.today().isoformat()
 
 
-def _run_gate(args, day: str) -> bool:
-    """Return True if the Runbook may proceed."""
+def _resolve_gate_day() -> date_cls:
+    """The gate *data-day*: the most-recent-completed session (prev weekday).
+
+    Decoupled from the parse plan-day by Decision A (Steve, 2026-07-01):
+    Databento is T+1, so the upcoming session the letter plans for has no
+    manifest yet — gating on it would spuriously halt every pre-close run.
+    The gate instead checks the last finished session, resolved identically to
+    scripts/corpus_daily.py's ingestion target via the shared helper so the two
+    cannot drift onto different days. [co-i10h]
+    """
+    from market.corpus.paths import most_recent_session_day
+
+    return most_recent_session_day()
+
+
+def _run_gate(args, gate_day: date_cls | None) -> bool:
+    """Return True if the Runbook may proceed.
+
+    ``gate_day`` is the most-recent-completed session (see _resolve_gate_day),
+    NOT the parse plan-day. An explicit --manifest short-circuits day
+    resolution (the path is used verbatim). [co-i10h]
+    """
     if args.no_gate:
         logger.warning("datastream gate SKIPPED (--no-gate)")
         return True
     from runbook.datastream import gate
 
-    manifest_path = args.manifest
-    day_obj = None
-    if manifest_path is None:
-        try:
-            day_obj = datetime.strptime(day, "%Y-%m-%d").date()
-        except ValueError:
-            day_obj = None
-    res = gate.check(manifest_path=manifest_path, day=day_obj)
+    res = gate.check(manifest_path=args.manifest, day=gate_day)
+    where = "explicit manifest" if args.manifest else f"data-day {gate_day}"
     if res.ok:
-        logger.info("datastream gate OK: %s", res.checked)
+        logger.info("datastream gate OK (%s): %s", where, res.checked)
         return True
-    logger.error("datastream gate FAILED — halting. reasons: %s", res.reasons)
+    logger.error("datastream gate FAILED (%s) — halting. reasons: %s",
+                 where, res.reasons)
     return False
 
 
@@ -125,11 +145,14 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    day = _resolve_day(args.date)
-    logger.info("Mancini Runbook run for %s", day)
+    day = _resolve_day(args.date)          # parse plan-day (the letter's session)
+    gate_day = _resolve_gate_day()         # gate data-day (last completed session)
+    logger.info("Mancini Runbook run — parse plan-day %s, gate data-day %s",
+                day, gate_day.isoformat())
 
-    # 1. Datastream gate.
-    if not _run_gate(args, day):
+    # 1. Datastream gate — checks the last completed session, decoupled from the
+    #    plan-day because Databento is T+1 (the plan-day has no data yet). [co-i10h]
+    if not _run_gate(args, gate_day):
         print("HALTED: datastream gate failed. Keeping last-good artifacts.",
               file=sys.stderr)
         return 2

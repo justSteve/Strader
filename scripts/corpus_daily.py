@@ -45,13 +45,17 @@ import json
 import logging
 import subprocess
 import sys
-from datetime import date as _date, datetime, timedelta, timezone
+from datetime import date as _date, datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from market.corpus.paths import CORPUS_ROOT, central_date, manifest_path  # noqa: E402
+from market.corpus.paths import (  # noqa: E402
+    CORPUS_ROOT,
+    manifest_path,
+    most_recent_session_day,
+)
 from runbook.datastream import gate  # noqa: E402
 
 logger = logging.getLogger("corpus_daily")
@@ -74,15 +78,14 @@ def _utc_now_iso() -> str:
 
 def resolve_target_day(explicit: str | None) -> _date:
     """Most recent completed session. Default: previous weekday (walks back over
-    Sat/Sun). Holidays are NOT modeled — a holiday yields a 0-tick pull that the
-    health check flags, which is the safe failure (an alert, not silent bad data).
+    Sat/Sun) via market.corpus.paths.most_recent_session_day — the shared helper
+    the datastream gate also uses, so ingestion and gate target the same day.
+    Holidays are NOT modeled — a holiday yields a 0-tick pull that the health
+    check flags, which is the safe failure (an alert, not silent bad data).
     """
     if explicit:
         return _date.fromisoformat(explicit)
-    d = central_date() - timedelta(days=1)
-    while d.weekday() >= 5:  # 5=Sat, 6=Sun
-        d -= timedelta(days=1)
-    return d
+    return most_recent_session_day()
 
 
 def stream_healthy_in_manifest(day: _date, stream: str) -> bool:
