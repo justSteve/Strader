@@ -1,6 +1,6 @@
-"""Strader2 strategy entities."""
+"""Strader strategy entities."""
 
-from strader2.entities.singleton import (
+from strader.entities.singleton import (
     Bias,
     CarmineSetup,
     Right,

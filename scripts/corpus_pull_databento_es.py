@@ -49,7 +49,7 @@ def _load_env() -> None:
     an ad-hoc parse — the .env file wins over any polluted process env, and a
     malformed key fails loudly here rather than as an opaque API error
     (2026-06-30 invalid_client class of bug). [st-cir]"""
-    from strader2.settings import load_databento
+    from strader.settings import load_databento
 
     load_databento()
 

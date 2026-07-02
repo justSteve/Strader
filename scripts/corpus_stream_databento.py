@@ -90,7 +90,7 @@ def _load_env() -> None:
     — the .env file wins over any polluted process env, and a malformed key
     fails loudly here rather than as an opaque gateway error (2026-06-30
     invalid_client class of bug). [st-cir]"""
-    from strader2.settings import load_databento
+    from strader.settings import load_databento
 
     load_databento()
 

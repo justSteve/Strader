@@ -1,11 +1,11 @@
-"""Tests for strader2.settings — the concrete Schwab field-specs."""
+"""Tests for strader.settings — the concrete Schwab field-specs."""
 
 from __future__ import annotations
 
 import pytest
 
-from strader2 import settings
-from strader2.config import DEFAULT_ENV_PATH, ConfigError, load
+from strader import settings
+from strader.config import DEFAULT_ENV_PATH, ConfigError, load
 
 
 def _env(tmp_path, text):

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 
-from strader2.config import (
+from strader.config import (
     DEFAULT_ENV_PATH,
     Field,
     is_https_url,

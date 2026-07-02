@@ -1,4 +1,4 @@
-"""Strict, fail-fast configuration loader for Strader2.
+"""Strict, fail-fast configuration loader for Strader.
 
 Supersedes the per-script ``_load_dotenv`` helpers scattered through the repo.
 Motivated directly by the 2026-06-30 ``.env`` → ``invalid_client`` incident: an
@@ -18,7 +18,7 @@ Two defenses live here:
 
 Usage::
 
-    from strader2.config import Field, load, non_empty, no_comment_residue, is_https_url
+    from strader.config import Field, load, non_empty, no_comment_residue, is_https_url
 
     SCHWAB = [
         Field("SCHWAB_API_KEY", secret=True, validators=[non_empty, no_comment_residue, no_whitespace]),
@@ -40,7 +40,7 @@ from typing import Callable, Iterable, Mapping, MutableMapping
 # A validator takes the resolved value and returns an error string, or None if OK.
 Validator = Callable[[str], "str | None"]
 
-# Repo root = parent of the strader2 package.
+# Repo root = parent of the strader package.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ENV_PATH = PROJECT_ROOT / ".env"
 
@@ -56,7 +56,7 @@ class ConfigError(Exception):
         self.problems = problems
         body = "\n".join(f"  - {p}" for p in problems)
         super().__init__(
-            f"Strader2 config invalid ({len(problems)} problem(s)):\n{body}"
+            f"Strader config invalid ({len(problems)} problem(s)):\n{body}"
         )
 
 

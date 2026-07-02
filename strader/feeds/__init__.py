@@ -1,13 +1,13 @@
-"""strader2.feeds — the single seam over the carried datafeed infrastructure.
+"""strader.feeds — the single seam over the carried datafeed infrastructure.
 
-Strader2 does NOT copy or move the proven datafeed code (`market.ingest`,
+Strader does NOT copy or move the proven datafeed code (`market.ingest`,
 `market.corpus`, `broker_schwab`, `runbook.mancini`). It imports it. This module
 is the one documented place that re-exports the carried entry points, so the
-rest of strader2 depends on ``strader2.feeds.<x>()`` rather than reaching into
+rest of strader depends on ``strader.feeds.<x>()`` rather than reaching into
 ``market.*`` directly. If the carried layout ever moves, only this file changes.
 
 Accessors are **lazy** — the heavy optional deps (databento, schwab) are imported
-only when a feed is actually requested, so ``import strader2.feeds`` stays cheap
+only when a feed is actually requested, so ``import strader.feeds`` stays cheap
 and side-effect free.
 """
 
@@ -17,7 +17,7 @@ from importlib import import_module
 from typing import Any
 
 # name -> dotted module path in the carried infra. The catalog doubles as
-# documentation of exactly what Strader2 carries.
+# documentation of exactly what Strader carries.
 CARRIED: dict[str, str] = {
     # market data ingest (raw API -> typed entities, US/Central normalized)
     "ingest_databento": "market.ingest.databento",

@@ -1,11 +1,11 @@
 """The live-feed corpus scripts must route DATABENTO_API_KEY through the shared
-fail-fast loader (strader2.settings.load_databento), not an ad-hoc .env parse.
+fail-fast loader (strader.settings.load_databento), not an ad-hoc .env parse.
 
 Regression guard for st-cir: the three corpus scripts used to hydrate the key
 with an inline `os.environ.setdefault(...)` parse — the polluted-env-wins
 pattern that produced the 2026-06-30 invalid_client incident (a stale/malformed
 process value silently beat the clean .env). The loader's override + fail-fast
-semantics are covered by strader2/tests/test_settings.py; here we prove each
+semantics are covered by strader/tests/test_settings.py; here we prove each
 script actually *delegates* to it, so nobody reintroduces a private parser.
 """
 import importlib.util
@@ -44,7 +44,7 @@ def _load_script(name: str):
 
 @pytest.mark.parametrize("script", CORPUS_SCRIPTS)
 def test_load_env_delegates_to_shared_loader(script, monkeypatch):
-    import strader2.settings as settings
+    import strader.settings as settings
 
     calls: list[tuple] = []
 
@@ -52,7 +52,7 @@ def test_load_env_delegates_to_shared_loader(script, monkeypatch):
         calls.append((args, kwargs))
         return {"DATABENTO_API_KEY": "db-test-key"}
 
-    # Each script does a lazy `from strader2.settings import load_databento`
+    # Each script does a lazy `from strader.settings import load_databento`
     # inside _load_env, so patching the module attribute is picked up at call time.
     monkeypatch.setattr(settings, "load_databento", _spy)
 

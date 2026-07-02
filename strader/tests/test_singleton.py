@@ -8,7 +8,7 @@ import pytest
 
 from market.entities.instrument import Contract
 from market.entities.level import Level
-from strader2.entities.singleton import SingletonPosition, SingletonSetup
+from strader.entities.singleton import SingletonPosition, SingletonSetup
 
 
 def _contract(right: str, delta: float) -> Contract:

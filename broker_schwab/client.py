@@ -15,7 +15,7 @@ from pathlib import Path
 
 from schwab import auth
 
-from strader2.settings import load_schwab
+from strader.settings import load_schwab
 
 GATE_KEY = Path.home() / '.schwab_gate_key'
 

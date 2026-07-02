@@ -23,8 +23,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from strader2.config import ConfigError  # noqa: E402
-from strader2.settings import load_databento  # noqa: E402
+from strader.config import ConfigError  # noqa: E402
+from strader.settings import load_databento  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:

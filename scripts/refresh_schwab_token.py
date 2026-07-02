@@ -34,15 +34,15 @@ import shutil
 import sys
 from pathlib import Path
 
-# Add Strader root for `broker_schwab.*` / `strader2.*` imports. `schwab`
+# Add Strader root for `broker_schwab.*` / `strader.*` imports. `schwab`
 # resolves to the upstream hobbled fork via site-packages — no sys.path tricks
 # needed since the local wrapper was renamed schwab/ → broker_schwab/ (st-8cx).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from schwab import auth as schwab_auth  # noqa: E402
 
-from strader2.config import ConfigError  # noqa: E402
-from strader2.settings import load_schwab_auth  # noqa: E402
+from strader.config import ConfigError  # noqa: E402
+from strader.settings import load_schwab_auth  # noqa: E402
 
 
 GATE_KEY = Path.home() / ".schwab_gate_key"

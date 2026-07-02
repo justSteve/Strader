@@ -3,7 +3,7 @@
 *"A single is a futures contract on its last day."* We go long a **call**
 (bullish) or a **put** (bearish) to capture a brief directional move — Carmine's
 8-15pt-in-<15min thesis — and we manage it on **delta, not theta**. This is
-Strader2's first strategy entity (plan co-r10h, scope st-nd5). It mirrors the
+Strader's first strategy entity (plan co-r10h, scope st-nd5). It mirrors the
 frozen-dataclass conventions in ``market/entities`` and reuses ``Contract`` and
 ``Level`` rather than redefining them.
 

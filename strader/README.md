@@ -1,12 +1,17 @@
-# Strader2
+# Strader
 
-The greenfield strategy layer for Strader. It carries the proven **datafeed
-infrastructure by import** (never by copy) and rebuilds only the strategy surface
-clean — leaving the ~80 files of factory/GC scaffolding in the parent tree
-untouched and out of scope.
+The strategy layer for Strader. It carries the proven **datafeed infrastructure
+by import** (never by copy) and holds only the strategy surface — config,
+entities, and the `feeds/` re-export seam over the carried infra.
 
-Design of record: `../docs/superpowers/specs/2026-06-29-strader2-greenfield-plan.md`
-(COO bead `co-r10h`). All 5 design decisions resolved 2026-06-30.
+Originally built as the quarantined `strader2` package while the parent tree
+was cleaned; folded in as the canonical `strader` package on 2026-07-02 once
+that cleanup landed (COO bead `co-wu3n`).
+
+Design of record: the greenfield plan `2026-06-29-strader2-greenfield-plan.md`
+and the fold-in plan `2026-07-02-strader2-fold-in-plan.md`, both under
+`docs/superpowers/specs/` **in the COO repo** (COO beads `co-r10h`, `co-wu3n`).
+All 5 greenfield design decisions resolved 2026-06-30.
 
 ## Focus strategy
 
@@ -20,7 +25,7 @@ manually) and no Carmine alert-ingestion (setups are recognized from the feed).
 ## Layout
 
 ```
-strader2/
+strader/
   config.py     # strict, fail-fast config loader + validator (see below)
   feeds/        # the single seam over carried infra — lazy re-exports of
                 #   market.ingest / market.corpus / broker_schwab / runbook.mancini
@@ -29,7 +34,7 @@ strader2/
 
 ## Config layer
 
-`strader2.config` supersedes the repo's per-script `_load_dotenv` helpers. It
+`strader.config` supersedes the repo's per-script `_load_dotenv` helpers. It
 exists because of the 2026-06-30 `.env` → `invalid_client` incident (an inline
 `# comment` bled into `SCHWAB_API_KEY`). Two defenses:
 
@@ -40,7 +45,7 @@ exists because of the 2026-06-30 `.env` → `invalid_client` incident (an inline
    API. `no_comment_residue` catches the exact original failure.
 
 ```python
-from strader2.config import Field, load, non_empty, no_comment_residue, no_whitespace, is_https_url
+from strader.config import Field, load, non_empty, no_comment_residue, no_whitespace, is_https_url
 
 cfg = load([
     Field("SCHWAB_API_KEY",     secret=True, validators=(non_empty, no_comment_residue, no_whitespace)),
@@ -53,5 +58,5 @@ cfg = load([
 ## Running tests
 
 ```bash
-.venv/bin/python -m pytest strader2/tests/
+.venv/bin/python -m pytest strader/tests/
 ```

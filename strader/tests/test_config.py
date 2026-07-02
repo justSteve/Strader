@@ -1,4 +1,4 @@
-"""Tests for strader2.config — the fail-fast configuration layer.
+"""Tests for strader.config — the fail-fast configuration layer.
 
 Includes the direct regression for the 2026-06-30 .env → invalid_client bug.
 """
@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from strader2.config import (
+from strader.config import (
     ConfigError,
     Field,
     is_https_url,
