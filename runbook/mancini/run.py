@@ -16,7 +16,7 @@ The newsletter text comes from --file or stdin. In production the COO
 email-ingress blob is fetched first (infra/azure/email-ingress/scripts/
 read-latest.sh) and piped in; wiring that fetch into this CLI is the v2 step.
 
-Requires ANTHROPIC_API_KEY_DIRECT for the live parse (see scripts/lux_vision_probe.py).
+Requires ANTHROPIC_API_KEY_DIRECT for the live parse.
 """
 from __future__ import annotations
 

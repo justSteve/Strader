@@ -46,7 +46,7 @@ Pipeline and exit codes:
 
 ## Configuration
 
-- **Claude credential:** `ANTHROPIC_API_KEY_DIRECT` (mirrors `scripts/lux_vision_probe.py`).
+- **Claude credential:** `ANTHROPIC_API_KEY_DIRECT`.
   Deliberately the *direct* key, not `ANTHROPIC_API_KEY` — see COO `co-8gp`
   (the standard key diverts subagents off the Max sub).
 - **Model:** `claude-opus-4-8` (override with `--model`).

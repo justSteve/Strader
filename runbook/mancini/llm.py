@@ -5,8 +5,7 @@ This is the one genuinely interpretive step in the Mancini pilot. It is an LLM
 tool call whose ``input_schema`` is the extraction contract. The model fills the
 tool input; we read it back as a dict. No tools loop, no autonomy, no session.
 
-Implementation mirrors the existing Strader Anthropic pattern
-(scripts/lux_vision_probe.py): raw httpx against the Messages API, key from
+Implementation uses the raw httpx-against-the-Messages-API pattern: key from
 ``ANTHROPIC_API_KEY_DIRECT``, IPv4 local-address binding for the WSL distro.
 Forced tool use (``tool_choice`` pinned to the tool) is more robust than
 "return only JSON" prompting — the API guarantees a tool_use block whose input
@@ -30,7 +29,7 @@ ANTHROPIC_VERSION = "2023-06-01"
 # current Opus-tier model with the same request surface.
 MODEL = "claude-opus-4-8"
 TIMEOUT_S = 120.0
-LOCAL_ADDR_V4 = "0.0.0.0"  # WSL IPv6 is broken on this distro (see lux_vision_probe)
+LOCAL_ADDR_V4 = "0.0.0.0"  # WSL IPv6 is broken on this distro
 # A single Mancini letter can carry 50-60 explicit levels, each with a short
 # verbatim source_quote — 8000 truncated dense letters. (co-y2hg)
 MAX_TOKENS = 16000
