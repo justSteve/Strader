@@ -112,10 +112,31 @@ def parse_review_steps(recap_text: str) -> list[ReviewStep]:
     return steps
 
 
+def _normalize_time(raw: str) -> str:
+    """Normalize informal time strings to H:MMAM/PM format.
+
+    Handles: '10am', '730am', '3:45PM', '815PM', '12:20PM'
+    """
+    raw = raw.strip().upper()
+    m = re.match(r'(\d{1,2}):(\d{2})\s*([AP]M)', raw)
+    if m:
+        return f"{m.group(1)}:{m.group(2)}{m.group(3)}"
+    m = re.match(r'(\d{3,4})\s*([AP]M)', raw)
+    if m:
+        digits = m.group(1)
+        mm = digits[-2:]
+        hh = digits[:-2]
+        return f"{hh}:{mm}{m.group(2)}"
+    m = re.match(r'(\d{1,2})\s*([AP]M)', raw)
+    if m:
+        return f"{m.group(1)}:00{m.group(2)}"
+    return raw
+
+
 def extract_time_anchor(text: str) -> str:
     """Find the most prominent time reference in a step's text."""
-    matches = re.findall(r'\d{1,2}:\d{2}\s*[AP]M', text, re.IGNORECASE)
-    return matches[0] if matches else ""
+    matches = re.findall(r'\d{1,2}:\d{2}\s*[AP]M|\d{3,4}\s*[AP]M|\d{1,2}\s*[AP]M', text, re.IGNORECASE)
+    return _normalize_time(matches[0]) if matches else ""
 
 
 def extract_prices(text: str) -> list[float]:
@@ -199,8 +220,11 @@ def parse_slides(recap_text: str) -> list[Slide]:
 
 
 def match_captures(slides: list[Slide], capture_dir: str,
-                   date: str = "") -> list[Slide]:
-    """Match each slide to the nearest 5-min screen capture by time.
+                   date: str = "", max_delta_min: int = 30) -> list[Slide]:
+    """Match each slide to the nearest screen capture by time.
+
+    Only pairs a slide with a capture if the time gap is within
+    max_delta_min minutes — prevents cross-session mismatches.
 
     Recognizes:
       ES_YYYYMMDD_HHMM.png  (capture tool output)
@@ -248,7 +272,8 @@ def match_captures(slides: list[Slide], capture_dir: str,
         target = h * 60 + m
 
         closest = min(cap_times, key=lambda ct: abs(ct - target))
-        slide.capture_file = captures[closest]
+        if abs(closest - target) <= max_delta_min:
+            slide.capture_file = captures[closest]
 
     return slides
 

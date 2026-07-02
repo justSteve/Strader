@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Mancini Review — 2026-05-21</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111; color: #eee; font-family: monospace;
+         display: flex; flex-direction: column; align-items: center;
+         height: 100vh; justify-content: center; }
+  .viewer { position: relative; max-width: 95vw; max-height: 85vh; }
+  .viewer img { max-width: 95vw; max-height: 85vh; object-fit: contain;
+                 border: 1px solid #333; border-radius: 4px; }
+  .controls { margin-top: 12px; display: flex; gap: 16px; align-items: center; }
+  button { background: #333; color: #eee; border: 1px solid #555;
+            padding: 8px 20px; font-size: 16px; cursor: pointer;
+            border-radius: 4px; font-family: monospace; }
+  button:hover { background: #555; }
+  .counter { font-size: 14px; color: #888; }
+  .hint { position: fixed; bottom: 12px; color: #555; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="viewer">
+  <img id="frame" src="slide_018.png" />
+</div>
+<div class="controls">
+  <button onclick="prev()">&larr; Prev</button>
+  <span class="counter" id="counter">1 / 17</span>
+  <button onclick="next()">Next &rarr;</button>
+</div>
+<div class="hint">Arrow keys or click to navigate</div>
+<script>
+const frames = ['slide_018.png', 'slide_019.png', 'slide_020.png', 'slide_021.png', 'slide_022.png', 'slide_023.png', 'slide_024.png', 'slide_025.png', 'slide_026.png', 'slide_027.png', 'slide_028.png', 'slide_029.png', 'slide_030.png', 'slide_031.png', 'slide_032.png', 'slide_033.png', 'slide_034.png'];
+let idx = 0;
+const img = document.getElementById('frame');
+const counter = document.getElementById('counter');
+
+function show() {
+  img.src = frames[idx];
+  counter.textContent = (idx + 1) + ' / ' + frames.length;
+}
+function next() { idx = Math.min(idx + 1, frames.length - 1); show(); }
+function prev() { idx = Math.max(idx - 1, 0); show(); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') next();
+  if (e.key === 'ArrowLeft') prev();
+});
+</script>
+</body>
+</html>
