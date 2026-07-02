@@ -133,6 +133,10 @@ def main() -> int:
                         help="Seconds to sleep after a successful pull")
     parser.add_argument("--sleep-backoff", type=int, default=120,
                         help="Seconds to sleep after a 429 rate-limit response")
+    parser.add_argument("--force", action="store_true",
+                        help="Bypass the already_pulled skip check. Use to re-pull "
+                             "or to extend an existing dataset over a new window "
+                             "(per-day pull script appends, so existing rows are preserved).")
     args = parser.parse_args()
 
     script_name, stream_key = PULL_SCRIPT_BY_DATASET[args.dataset]
@@ -152,7 +156,7 @@ def main() -> int:
         if not is_trading_day(current):
             current -= timedelta(days=1)
             continue
-        if already_pulled(current, repo_root, stream_key):
+        if not args.force and already_pulled(current, repo_root, stream_key):
             log(f"SKIP  {current}  ({args.dataset}: already pulled)", log_path)
             skipped += 1
             current -= timedelta(days=1)

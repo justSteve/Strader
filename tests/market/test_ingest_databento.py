@@ -160,3 +160,54 @@ def test_quote_from_databento_unknown_instrument_id_yields_empty_symbol():
     quote = quote_from_databento(record, {})
     assert quote.symbol == ""
     assert quote.instrument_id == 999
+
+
+def test_live_client_symbol_map_uses_stype_out(monkeypatch):
+    """LiveClient must resolve a parent/continuous input to the per-contract
+    instrument symbol via stype_out_symbol — NOT collapse every contract to
+    the parent (stype_in_symbol). Regression for a live-feed bug that tagged
+    every SPXW option trade as 'SPXW.OPT'.
+    """
+    import market.ingest.databento as ing
+
+    class FakeSymbolMapping:
+        def __init__(self, instrument_id, stype_in_symbol, stype_out_symbol):
+            self.instrument_id = instrument_id
+            self.stype_in_symbol = stype_in_symbol
+            self.stype_out_symbol = stype_out_symbol
+
+    class FakeTradeMsg2:
+        def __init__(self, instrument_id, ts, price, size, side):
+            self.instrument_id = instrument_id
+            self.pretty_ts_event = ts
+            self.pretty_price = price
+            self.size = size
+            self.side = side
+
+    class FakeLive:
+        def __init__(self, *a, **k):
+            self.records = []
+
+        def subscribe(self, **kwargs):
+            pass
+
+        def __iter__(self):
+            return iter(self.records)
+
+        def stop(self):
+            pass
+
+    fake = FakeLive()
+    fake.records = [
+        FakeSymbolMapping(7, "SPXW.OPT", "SPXW  260608C05500000"),
+        FakeTradeMsg2(7, datetime(2026, 6, 8, 18, 30, 0, tzinfo=timezone.utc),
+                      2.35, 4, "B"),
+    ]
+    monkeypatch.setattr(ing, "Live", lambda key=None: fake)
+    monkeypatch.setattr(ing, "SymbolMappingMsg", FakeSymbolMapping)
+    monkeypatch.setattr(ing, "TradeMsg", FakeTradeMsg2)
+
+    client = ing.LiveClient(key="dummy")
+    trades = list(client.trades())
+    assert len(trades) == 1
+    assert trades[0].symbol == "SPXW  260608C05500000"  # not "SPXW.OPT"
