@@ -1,0 +1,84 @@
+# conditions.yaml — controlled vocabulary for playbook day-context + entry tags.
+#
+# LIVING DOCUMENT (co-wh19 / st-c71): add / rename / retire tags here. Playbook
+# files and the evaluator both reference this file, and Playbook.load validates
+# every favored_/avoid_conditions tag against it, so typos and retired tags are
+# caught at load time rather than silently mis-scoring a strategy.
+#
+# Two tiers:
+#   day_context        — Tier 1, assessed to RANK playbooks for the day.
+#   entry_confirmation — Tier 2, checked at the moment of entry.
+#
+# `objective: true|partial|false` flags whether a tag is computable today or
+# depends on the deferred day-type classifier. `weight: high` lets the evaluator
+# privilege a promote condition (Mancini<->Carmine confluence is the one echo
+# Steve wants surfaced above all others).
+#
+# Authored in a block-YAML subset (no flow-style maps) so strader/_yaml.py loads
+# it with no external dependency; it is also valid standard YAML.
+tiers:
+  day_context:
+    trend-up:
+      def: "Price grinding higher; higher highs, holds above a rising average"
+      objective: partial
+    trend-down:
+      def: "Price grinding lower; lower lows, holds below a falling average"
+      objective: partial
+    range-chop:
+      def: "No net direction; oscillates in a band with repeated reversals"
+      objective: partial
+    vol-high:
+      def: "Market moving a lot — wide range versus its recent typical range"
+      objective: true
+    vol-low:
+      def: "Quiet, small-range tape"
+      objective: true
+    ivr-high:
+      def: "Options expensive versus their own past year (IV Rank high)"
+      objective: true
+    ivr-low:
+      def: "Options cheap versus their own past year (IV Rank low)"
+      objective: true
+    gex-neg:
+      def: "Negative GEX — dealer hedging amplifies moves; pushes run"
+      objective: true
+    gex-pos:
+      def: "Positive GEX — dealer hedging dampens moves; price pins / reverts"
+      objective: true
+    room-to-travel:
+      def: "Price far from the nearest magnet / wall; open space to move"
+      objective: true
+    near-magnet:
+      def: "Price at a wall / magnet where it tends to stall or pin"
+      objective: true
+    gap-up:
+      def: "Opened meaningfully above the prior close"
+      objective: true
+    gap-down:
+      def: "Opened meaningfully below the prior close"
+      objective: true
+    news-scheduled:
+      def: "Known calendar event due today (CPI, FOMC, jobs)"
+      objective: true
+    news-adhoc:
+      def: "Unscheduled headline-driven volatility"
+      objective: false
+    at-key-level:
+      def: "Price sitting on one of today's Mancini levels"
+      objective: true
+    level-to-level-room:
+      def: "Clear space to the next Mancini level (room to run)"
+      objective: true
+    mancini-carmine-confluence:
+      def: "A Mancini level and a Carmine zone coincide at one price — highest conviction"
+      objective: true
+      weight: high
+  entry_confirmation:
+    orderflow-confirm:
+      def: "Order-flow tools agree (cumulative delta / footprint show buyers or sellers stepping in)"
+    return-to-lvn:
+      def: "Price returned to a low-volume node it ripped through (Carmine core setup)"
+    luxalgo-zone-touch:
+      def: "Price reached a LuxAlgo supply / demand zone"
+    v-dump-complete:
+      def: "Sharp V-shaped drop bottomed and started its return (butterfly entry cue)"

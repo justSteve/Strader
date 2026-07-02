@@ -1,10 +1,20 @@
 # Playbook Entity — Design Spec
 
-**Status:** Approved design (2026-06-26). Living document — vocabulary and schema
-expected to be refined iteratively.
-**Bead:** co-wh19 (COO-driven; implemented in Strader)
+**Status:** Approved design (2026-06-26); **implemented 2026-07-02** under
+st-c71. Living document — vocabulary and schema expected to be refined iteratively.
+**Bead:** co-wh19 (COO-driven; implemented in Strader as st-c71)
 **Author flow:** brainstormed COO↔Steve 2026-06-25/26; supersedes the lost
 "playbook-as-entity" origin conversation (not recoverable from substrate).
+
+> **Revision (2026-07-02, st-c71).** The entity + evaluator were relocated from
+> `market/` to the **`strader` package** — strategy entities live beside
+> `singleton.py`. This spec predated the strader2 greenfield restructure (6-29)
+> and fold-in (7-2), which established the split: `market/entities/` holds carried
+> datafeed primitives, `strader/entities/` holds strategy entities. §3 below is
+> updated to the as-built layout. Also as-built: the six InvestiTrade playbooks
+> ship `status: worthy`, and YAML is loaded by a stdlib block-YAML subset loader
+> (`strader/_yaml.py`) so the core keeps no hard dependency (defers to PyYAML if
+> installed).
 
 ## 1. Purpose
 
@@ -44,18 +54,22 @@ It does **not** automate trades. It recommends and equips; Steve decides and act
 ## 3. Architecture
 
 ```
-strader/playbooks/
+strader/entities/playbook.py            # Playbook, PlaybookCatalog, Vocabulary (§6)
+strader/evaluate/playbook_evaluator.py  # PlaybookEvaluator, DayContext, PlaybookScore (§7)
+strader/_yaml.py                        # stdlib block-YAML subset loader (no hard dep)
+strader/playbooks/                       # the catalog data
   conditions.yaml                       # the living condition vocabulary (§5)
   momentum-breakout.md                  # one file per playbook (§4)
   mean-reversion-fade.md
-  …
-market/entities/playbook.py             # Playbook, PlaybookCatalog (§6)
-market/evaluate/playbook_evaluator.py   # PlaybookEvaluator, DayContext (§7)
+  trend-continuation-pullback.md
+  opening-range-breakout.md
+  options-premium-harvest.md
+  gap-fill.md
 ```
 
-Mirrors the existing `ButterflyTemplate`/`ButterflyInstance` pattern (frozen
-dataclasses in `market/entities/`). The evaluator sits beside the entities,
-not inside them.
+Mirrors the frozen-dataclass entity convention (as in `market/entities/`, and
+`strader/entities/singleton.py`). The evaluator sits beside the entities in the
+`strader` package, not inside them.
 
 ### Units and responsibilities
 

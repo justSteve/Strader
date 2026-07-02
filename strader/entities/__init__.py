@@ -1,5 +1,11 @@
 """Strader strategy entities."""
 
+from strader.entities.playbook import (
+    Playbook,
+    PlaybookCatalog,
+    PlaybookError,
+    Vocabulary,
+)
 from strader.entities.singleton import (
     Bias,
     CarmineSetup,
@@ -14,4 +20,8 @@ __all__ = [
     "Right",
     "SingletonSetup",
     "SingletonPosition",
+    "Playbook",
+    "PlaybookCatalog",
+    "PlaybookError",
+    "Vocabulary",
 ]
