@@ -10,5 +10,21 @@ from strader.evaluate.playbook_evaluator import (
     PlaybookEvaluator,
     PlaybookScore,
 )
+from strader.evaluate.day_classifier import (
+    Classification,
+    ClassifierConfig,
+    DayTypeClassifier,
+    MarketPrimitives,
+    SubjectiveRead,
+)
 
-__all__ = ["DayContext", "PlaybookEvaluator", "PlaybookScore"]
+__all__ = [
+    "DayContext",
+    "PlaybookEvaluator",
+    "PlaybookScore",
+    "Classification",
+    "ClassifierConfig",
+    "DayTypeClassifier",
+    "MarketPrimitives",
+    "SubjectiveRead",
+]
