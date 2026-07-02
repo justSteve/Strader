@@ -19,6 +19,8 @@ Greeks units:
     theta    — per 1 day (not per year)
     vega     — per 1.0 unit of sigma (divide by 100 for per-1%-vol)
     rho      — per 1.0 unit of rate (divide by 100 for per-1%-rate)
+    vanna    — d(delta)/d(sigma) = d(vega)/dS, per 1.0 unit of sigma per 1.0 unit of spot
+    charm    — d(delta)/dT, per 1 day of time-to-expiry (equivalently, -d(delta)/dt where t = clock time). Sign convention: positive charm = delta increases with more T (i.e. delta decays toward 0 as expiration nears, typical for OTM)
 
 References: Hull, Options, Futures, and Other Derivatives, Ch. 15.
 """
@@ -84,9 +86,9 @@ def price(spot: float, strike: float, T: float, r: float, sigma: float,
 
 def greeks(spot: float, strike: float, T: float, r: float, sigma: float,
            opt_type: OptType, q: float = 0.0) -> dict[str, float]:
-    """All five primary greeks for a European option.
+    """Primary greeks (delta/gamma/theta/vega/rho) + second-order (vanna/charm).
 
-    Returns: {'delta', 'gamma', 'theta', 'vega', 'rho'}.
+    Returns: {'delta', 'gamma', 'theta', 'vega', 'rho', 'vanna', 'charm'}.
     See module docstring for units.
     """
     phi = _phi(opt_type)
@@ -111,12 +113,28 @@ def greeks(spot: float, strike: float, T: float, r: float, sigma: float,
 
     rho = phi * strike * T * disc_r * _norm_cdf(phi * d2)
 
+    # Second-order. Vanna is sign-independent (same for call and put); charm
+    # has a sign flip via phi on the q-dividend term.
+    # Vanna = d(delta)/d(sigma) = -e^(-qT) · φ(d1) · d2 / σ.
+    vanna = -disc_q * pdf_d1 * d2 / sigma
+
+    # Charm = d(delta)/dT — per year, then per-day. For an OTM call charm > 0
+    # (longer T → larger delta, equivalently delta decays toward 0 as T → 0).
+    charm_annual = (
+        -phi * q * disc_q * _norm_cdf(phi * d1)
+        + disc_q * pdf_d1
+        * (2.0 * (r - q) * T - d2 * sigma * sqrt_T) / (2.0 * T * sigma * sqrt_T)
+    )
+    charm = charm_annual / DAYS_PER_YEAR
+
     return {
         "delta": delta,
         "gamma": gamma,
         "theta": theta,
         "vega": vega,
         "rho": rho,
+        "vanna": vanna,
+        "charm": charm,
     }
 
 

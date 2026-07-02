@@ -155,3 +155,69 @@ def test_atm_call_delta_near_half_at_zero_rate():
     g = greeks(100.0, 100.0, 0.25, 0.0, 0.20, "CALL", q=0.0)
     # d1 = (0 + 0·0.5·σ²·T)/(σ√T) = σ√T/2; N(σ√T/2) is slightly > 0.5
     assert 0.50 < g["delta"] < 0.55
+
+
+# ─── Second-order greeks: vanna, charm ──────────────────────────────────────
+
+def test_vanna_call_put_equality():
+    """Vanna = d(delta)/d(sigma) — sign-independent, calls and puts share it."""
+    args = dict(spot=100.0, strike=100.0, T=0.5, r=0.05, sigma=0.20)
+    g_call = greeks(**args, opt_type="CALL")
+    g_put = greeks(**args, opt_type="PUT")
+    assert g_call["vanna"] == pytest.approx(g_put["vanna"], abs=1e-12)
+
+
+def test_vanna_matches_finite_difference():
+    """Vanna closed-form ≈ central finite difference d(delta)/d(sigma)."""
+    args = dict(spot=100.0, strike=105.0, T=0.5, r=0.05, q=0.01)
+    sigma = 0.20
+    h = 1e-4
+    g = greeks(**args, sigma=sigma, opt_type="CALL")
+    g_up = greeks(**args, sigma=sigma + h, opt_type="CALL")
+    g_dn = greeks(**args, sigma=sigma - h, opt_type="CALL")
+    fd_vanna = (g_up["delta"] - g_dn["delta"]) / (2.0 * h)
+    assert g["vanna"] == pytest.approx(fd_vanna, abs=1e-4)
+
+
+def test_vanna_sign_otm_call_positive():
+    """OTM call: spot < strike → d1, d2 < 0 → vanna > 0
+    (vega rises as spot approaches strike from below)."""
+    g = greeks(spot=100.0, strike=120.0, T=0.5, r=0.05, sigma=0.20, opt_type="CALL")
+    assert g["vanna"] > 0
+
+
+def test_vanna_sign_otm_put_negative():
+    """OTM put: spot > strike → d1, d2 > 0 → vanna < 0."""
+    g = greeks(spot=100.0, strike=80.0, T=0.5, r=0.05, sigma=0.20, opt_type="PUT")
+    assert g["vanna"] < 0
+
+
+def test_charm_matches_finite_difference():
+    """Charm (per-day) closed-form ≈ central finite difference
+    d(delta)/dT / 365 (since charm in our convention = -d(delta)/dt and
+    dt = -dT, so charm = d(delta)/dT)."""
+    args = dict(spot=100.0, strike=105.0, r=0.05, sigma=0.20, q=0.01)
+    T = 0.5
+    h = 1e-6
+    g = greeks(**args, T=T, opt_type="CALL")
+    g_up = greeks(**args, T=T + h, opt_type="CALL")
+    g_dn = greeks(**args, T=T - h, opt_type="CALL")
+    fd_charm_per_day = ((g_up["delta"] - g_dn["delta"]) / (2.0 * h)) / 365.0
+    assert g["charm"] == pytest.approx(fd_charm_per_day, abs=1e-6)
+
+
+def test_charm_call_put_differ_by_dividend_yield():
+    """charm_call - charm_put = -q·e^(-qT) / 365 (independent of strike, sigma, r).
+
+    Derivation: with charm = d(delta)/dT, call delta = e^(-qT)·N(d1),
+    put delta = -e^(-qT)·N(-d1) = e^(-qT)·(N(d1) - 1). Differentiating the
+    constant -e^(-qT) (in the put expression) w.r.t. T gives +q·e^(-qT),
+    so charm_put picks up +q·e^(-qT) over charm_call.
+    Hence charm_call - charm_put = -q·e^(-qT)."""
+    q = 0.02
+    T = 0.5
+    args = dict(spot=100.0, strike=100.0, T=T, r=0.05, sigma=0.20, q=q)
+    g_call = greeks(**args, opt_type="CALL")
+    g_put = greeks(**args, opt_type="PUT")
+    expected = -q * exp(-q * T) / 365.0
+    assert (g_call["charm"] - g_put["charm"]) == pytest.approx(expected, abs=1e-10)
