@@ -1,6 +1,6 @@
 # Orderflow Signal Layer — Design of Record
 
-**Bead:** st-l5o · **Date:** 2026-07-03 · **Status:** DRAFT — pending Steve approval
+**Bead:** st-l5o · **Date:** 2026-07-03 · **Status:** APPROVED 2026-07-03 (Steve) — design of record
 **Companion research:** `docs/research/2026-07-03-orderflow-primitives-research.md` (Q1–Q3 deep dive with sources; also the learning document for the primitives and setup signatures)
 
 ---
@@ -174,23 +174,32 @@ class SetupRecognition(Signal):
 
 - The 13:00–15:00 CT window is **butterfly-specific**; orderflow needs the **full cash session 08:30–15:00 CT**.
 - **Trades, full RTH, daily:** ~3.25× the probed 2-hour cost ($0.09) ≈ **$0.29/day** — approved as acceptable. Re-verify with `metadata.get_cost` before widening (script already supports `--estimate-only`).
-- **MBP-1 quotes: never backfilled.** Round-the-clock ES live access arrives within weeks; quotes are captured **forward** from the live tee (`tee_raw` already archives lossless DBN). Absorption's `refill_events` evidence activates when quote capture starts; until then absorption scores run trades-only (volume + displacement, degraded and labeled as such).
-- **Overnight (Globex) — open question for Steve:** failed breakdowns often anchor to overnight lows/highs. Cheap middle ground: overnight *levels only* (high/low/settle), full tick data RTH-only. Decision deferred; round-the-clock live access may make it moot.
+- **MBP-1 quotes: never backfilled.** Quotes are captured **forward** from the live tee (`tee_raw` already archives lossless DBN) once live streaming lands (Phase B below). Absorption's `refill_events` evidence activates when quote capture starts; until then absorption scores run trades-only (volume + displacement, degraded and labeled as such).
+- **Overnight (Globex):** decision 2026-07-03 — skip for the interim; Phase B's round-the-clock capture makes it moot. Revisit only if the 8/1 upgrade slips.
+
+**Live vs. historical phasing (per co-s7zw, decided 2026-07-01):**
+
+| Phase | Window | Data reality | What runs |
+|---|---|---|---|
+| **A** | now → 8/1 | Historical batch T&S only (corpus pulls arrive next morning; Schwab has no futures time & sales; DataBento live streaming requires the CME Standard plan — blocked until the 8/1 subscription renewal, $179/mo + non-pro CME license ≈ $190 all-in) | Build + calibrate + golden-replay the whole layer on corpus data. **TradingView's built-in footprint (+ generated Pine overlays) is the live intraday surface.** |
+| **B** | 8/1 → | CME Standard live GLBX streaming: real-time trades + MBP-1, teed to corpus | The orderflow layer runs live in-session; our own live-capture footprint (co-s7zw Phase B) replaces TV's; quote capture begins, absorption gets full evidence. |
+
+Nothing in Phase A work is throwaway: live/replay parity (§5) means the engine built and proven on replay in Phase A is byte-for-byte the engine that goes live in Phase B.
 
 ---
 
-## 8. Implementation beads (created on approval; built there, not under st-l5o)
+## 8. Implementation beads (created 2026-07-03 on approval; built there, not under st-l5o)
 
-1. **orderflow-1:** `FootprintCell`/`FootprintBar` entities + deterministic volume-bar builder (straddle rule, tie-breaks) + golden replay test over one corpus day.
-2. **orderflow-2:** engine core — merged `events()` ingest iterator, CVD (+reset/None policy), large-lot, sweep, swing-pivot detector, `SweepPrint`/`DeltaDivergence` signals.
-3. **orderflow-3:** footprint imbalance + `ImbalanceStack` (diagonal test, thresholds from config).
-4. **orderflow-4:** LVN / volume-profile context on completed-session cadence; profile levels as `Level` signals.
-5. **orderflow-5:** four-beat `SetupRecognizer` + `SetupRecognition` lifecycle + consumer wiring (SingletonSetup construction, orderflow-confirm, classifier confluence). `failed_breakdown` + `range_trap` first.
-6. **orderflow-6:** corpus widening — full-RTH ES trades pull (cost re-estimate then flip the default window), `VOLUME_BAR_N` calibration from the widened corpus.
-7. **orderflow-7:** live quote capture + absorption `refill_events` activation (blocked on round-the-clock access landing).
-8. **orderflow-8:** live/replay parity harness in CI (golden fixture + regeneration protocol).
+1. **st-uqf:** `FootprintCell`/`FootprintBar` entities + deterministic volume-bar builder (straddle rule, tie-breaks) + golden replay test over one corpus day.
+2. **st-wnc:** engine core — merged `events()` ingest iterator, CVD (+reset/None policy), large-lot, sweep, swing-pivot detector, `SweepPrint`/`DeltaDivergence` signals.
+3. **st-su4:** footprint imbalance + `ImbalanceStack` (diagonal test, thresholds from config).
+4. **st-7d6:** LVN / volume-profile context on completed-session cadence; profile levels as `Level` signals.
+5. **st-2kf:** four-beat `SetupRecognizer` + `SetupRecognition` lifecycle + consumer wiring (SingletonSetup construction, orderflow-confirm, classifier confluence). `failed_breakdown` + `range_trap` first.
+6. **st-f05:** corpus widening — full-RTH ES trades pull (cost re-estimate then flip the default window), `VOLUME_BAR_N` calibration from the widened corpus.
+7. **st-d5f:** live quote capture + absorption `refill_events` activation (deferred to 2026-08-01 — Phase B, CME Standard upgrade).
+8. **st-bw9:** live/replay parity harness in CI (golden fixture + regeneration protocol).
 
-Suggested order: 1 → 2 → 3 → 6 in parallel with 4 → 5 → 8; 7 when access lands.
+Suggested order: st-uqf → st-wnc → st-su4 → st-f05, in parallel with st-7d6; then st-2kf → st-bw9; st-d5f when Phase B lands.
 
 ---
 
@@ -214,8 +223,8 @@ Initial values are starting points from practitioner literature, expected to be 
 
 ---
 
-## 10. Open items for Steve
+## 10. Resolution log
 
-1. **Approve this spec** (converts DRAFT → design of record; implementation beads get created).
-2. **Overnight scope** (§7): levels-only from Globex, or wait for round-the-clock access?
-3. **Q2 signatures as teaching material:** the companion research doc §Q2 is written to be read — the four-beat framing and per-setup walkthroughs are the "learn the mapping" deliverable. Worth a read-through session; the `return_to_lvn` two-branch read in particular is proposed, not established, and your tape experience is the validation.
+1. **Spec approved 2026-07-03 (Steve)** — design of record; implementation beads created under st-l5o's close.
+2. **Overnight scope:** skip interim Globex pulls; Phase B round-the-clock capture covers it (revisit only if 8/1 slips).
+3. **Q2 signatures as teaching material (standing):** the companion research doc §Q2 is the "learn the mapping" deliverable — the four-beat framing and per-setup walkthroughs are written to be read. The `return_to_lvn` two-branch read in particular is proposed, not established; Steve's tape experience is the validation.
