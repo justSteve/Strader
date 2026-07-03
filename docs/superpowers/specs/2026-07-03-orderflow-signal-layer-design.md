@@ -1,6 +1,6 @@
 # Orderflow Signal Layer — Design of Record
 
-**Bead:** st-l5o · **Date:** 2026-07-03 · **Status:** APPROVED 2026-07-03 (Steve) — design of record
+**Bead:** st-l5o · **Date:** 2026-07-03 · **Status:** Design of record — Steve's review ongoing; amendments expected (Phase A/B timing clarification approved 2026-07-03)
 **Companion research:** `docs/research/2026-07-03-orderflow-primitives-research.md` (Q1–Q3 deep dive with sources; also the learning document for the primitives and setup signatures)
 
 ---
