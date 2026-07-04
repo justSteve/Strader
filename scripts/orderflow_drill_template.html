@@ -158,14 +158,17 @@ const $ = id => document.getElementById(id);
 $("meta").textContent = `${DATA.meta.symbol} · ${DATA.meta.date} · N=${DATA.meta.bar_n} contracts/bar · ${DATA.meta.n_bars} bars · ${DATA.meta.contracts.toLocaleString()} contracts`;
 $("seek").max = bars.length - 1;
 
-// level chips
+// level chips: session-derived + optional externally supplied (e.g. Mancini
+// candidates from session_review.py — labeled M:, harvested not parsed)
 const chipDefs = [["open","Open"],["am_high","AM Hi"],["am_low","AM Lo"],["session_high","Day Hi"],["session_low","Day Lo"]];
-for (const [k, label] of chipDefs) {
+function addChip(label, price) {
   const b = document.createElement("button");
-  b.textContent = `${label} ${DATA.levels[k].toFixed(2)}`;
-  b.onclick = () => { $("lvlinput").value = DATA.levels[k].toFixed(2); armLevel(); };
+  b.textContent = `${label} ${price.toFixed(2)}`;
+  b.onclick = () => { $("lvlinput").value = price.toFixed(2); armLevel(); };
   $("chips").appendChild(b);
 }
+for (const [k, label] of chipDefs) addChip(label, DATA.levels[k]);
+for (const p of (DATA.mancini_candidates || [])) addChip("M:", p);
 
 // ── state ────────────────────────────────────────────────────────────────
 let idx = -1;                 // last played bar index
