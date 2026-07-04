@@ -126,6 +126,17 @@ Now the six candidate primitives. Each ends with a **"v1 verdict"** — the admi
 
 ---
 
+### The force-and-effect compass (added 2026-07-04, from Steve's read-through)
+
+Every primitive above is some combination of two observables: **force** (aggressive volume pressing a direction) and **effect** (price actually moving that way). The four combinations are the whole vocabulary:
+
+| | **Effect: price moves** | **Effect: price blocked** |
+|---|---|---|
+| **Force present** | Healthy move — aggression accepted. CVD and price agree; imbalances print in the move's direction. *Continuation.* | **Absorption** — aggression slams a level, a passive giant eats it, price stalls. Force without effect. *Someone big disagrees.* |
+| **Force absent** | **Divergence** — new price extreme on weakening aggression. Effect without force; the move is coasting. *Hollow, reversal candidate.* | Dead tape. Nothing to read. |
+
+Role clarity that trips people up: an **imbalance is an attacker's fingerprint** (one-sided aggression dominating at a price), while **absorption is a defender's fingerprint** (passive size soaking an attack). In a failed breakdown the same footprint shows both characters in sequence — sell imbalances on the flush (attackers), absorption at the low (the defender eats them), buy imbalances on the recovery (new attackers, now being rewarded). And the **sweep** is the attacker in a hurry: paying progressively worse prices across several levels because immediacy matters more than price.
+
 ### RECOMMENDATION — Q1
 
 **Ship all six, but in two tiers, because they are not the same kind of object.**
