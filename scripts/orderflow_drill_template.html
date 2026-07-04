@@ -96,6 +96,10 @@ td:first-child, th:first-child { text-align:left; }
   <label>Level <input type="text" id="lvlinput" size="7" placeholder="price"></label>
   <button id="arm">Arm level</button>
   <span id="chips"></span>
+  <label>Rows <select id="zoom">
+    <option value="9">Compact</option><option value="13" selected>Medium</option>
+    <option value="16">Large</option>
+  </select></label>
   <button id="tbl">Table view</button>
 </div>
 <div class="readouts">
@@ -140,7 +144,8 @@ const RESET_TICKS = 12;      // must first be ≥ 3 pts away to re-arm
 const JUDGE_BARS = 10;       // bars the tape gets to answer
 const JUDGE_TICKS = 16;      // 4 pts beyond/away decides accept/reject
 const KEEP_COLS = 48;        // DOM columns kept (virtualization)
-const CELL_H = 15, COL_W = 58, FOOT_H = 30;
+const COL_W = 58, FOOT_H = 30;
+let cellH = 13;              // zoom control; numbers hidden below 12px
 
 const bars = DATA.bars;
 const $ = id => document.getElementById(id);
@@ -172,18 +177,26 @@ stage.style.height = stageHeight() + "px";
 let viewHi = null, viewLo = null;
 function updateView() {
   const recent = bars.slice(Math.max(0, idx - 11), idx + 1);
-  if (!recent.length) return;
+  if (!recent.length) return false;
   let hi = Math.max(...recent.map(b => b.h)), lo = Math.min(...recent.map(b => b.l));
   if (level != null) { hi = Math.max(hi, level + 8 * TICK); lo = Math.min(lo, level - 8 * TICK); }
   hi += 2 * TICK; lo -= 2 * TICK;
+  const prevHi = viewHi, prevLo = viewLo;
   // gentle follow: expand instantly, contract slowly
   viewHi = viewHi == null ? hi : Math.max(hi, viewHi - 4 * TICK);
   viewLo = viewLo == null ? lo : Math.min(lo, viewLo + 4 * TICK);
   const span = (viewHi - viewLo) / TICK;
-  const maxRows = Math.floor((stage.clientHeight - FOOT_H) / CELL_H);
-  if (span > maxRows) { const mid = (viewHi + viewLo) / 2; viewHi = mid + (maxRows / 2) * TICK; viewLo = mid - (maxRows / 2) * TICK; }
+  const maxRows = Math.floor((stage.clientHeight - FOOT_H) / cellH);
+  if (span > maxRows) {
+    // keep the most recent price action in frame; sacrifice the far side
+    const lastC = recent[recent.length - 1].c;
+    const half = (maxRows / 2) * TICK;
+    let mid = Math.min(Math.max(lastC, viewLo + half), viewHi - half);
+    viewHi = mid + half; viewLo = mid - half;
+  }
+  return viewHi !== prevHi || viewLo !== prevLo;
 }
-const yFor = price => (viewHi - price) / TICK * CELL_H;
+const yFor = price => (viewHi - price) / TICK * cellH;
 
 function drawAxis() {
   yaxis.innerHTML = "";
@@ -210,14 +223,15 @@ function renderColumn(b, i) {
   const maxCell = Math.max(...b.cells.map(c => c[1] + c[2]), 1);
   for (const [price, bid, ask] of b.cells) {
     const y = yFor(price);
-    if (y < -CELL_H || y > stage.clientHeight - FOOT_H) continue;
+    // whole cells only — a half-clipped row misreads as small volume
+    if (y - cellH / 2 < 0 || y + cellH / 2 > stage.clientHeight - FOOT_H) continue;
     const cell = document.createElement("div");
     cell.className = "cell" + (price === b.poc ? " poc" : "");
-    cell.style.top = (y - CELL_H / 2) + "px"; cell.style.height = (CELL_H - 1) + "px";
+    cell.style.top = (y - cellH / 2) + "px"; cell.style.height = (cellH - 1) + "px";
     const total = bid + ask, buyDom = ask >= bid;
     const alpha = 0.15 + 0.6 * (total / maxCell);
     cell.style.background = `color-mix(in srgb, var(${buyDom ? "--buy" : "--sell"}) ${Math.round(alpha * 100)}%, var(--surface-1))`;
-    cell.textContent = `${bid}×${ask}`;
+    if (cellH >= 12) cell.textContent = `${bid}×${ask}`;
     cell.title = `${price.toFixed(2)}  sell-aggr ${bid} | buy-aggr ${ask}  (Δ ${ask - bid})`;
     col.appendChild(cell);
   }
@@ -284,11 +298,14 @@ function step() {
   idx++;
   const b = bars[idx];
   cvd += b.d;
-  updateView(); drawAxis();
-  strip.appendChild(renderColumn(b, idx));
-  while (strip.children.length > KEEP_COLS) strip.removeChild(strip.firstChild);
-  // repaint older columns against the (possibly) shifted view occasionally
-  if (idx % 6 === 0) repaintAll();
+  const shifted = updateView();
+  if (shifted) {
+    repaintAll();  // view moved: older columns must re-place against the new range
+  } else {
+    drawAxis();
+    strip.appendChild(renderColumn(b, idx));
+    while (strip.children.length > KEEP_COLS) strip.removeChild(strip.firstChild);
+  }
   repaintPace(); repaintReadouts(); appendBarRow(b, idx);
   judgePending();
   checkLevelApproach(b);
@@ -365,6 +382,7 @@ $("seek").oninput = e => seekTo(Number(e.target.value));
 $("arm").onclick = armLevel;
 $("lvlinput").addEventListener("keydown", e => { if (e.key === "Enter") armLevel(); });
 $("tbl").onclick = () => { const w = $("tblwrap"); w.style.display = w.style.display === "block" ? "none" : "block"; };
+$("zoom").onchange = e => { cellH = Number(e.target.value); repaintAll(); };
 $("export").onclick = () => {
   const blob = new Blob([JSON.stringify({ meta: DATA.meta, log: drillLog }, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
