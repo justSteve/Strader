@@ -21,3 +21,7 @@ class Trade:
     price: float
     size: int
     side: TradeSide = "N"
+    # Venue sequence number — the deterministic tie-break for equal-timestamp
+    # prints (orderflow spec §4). Optional: older corpus rows and non-Databento
+    # sources may not carry it.
+    sequence: int | None = None

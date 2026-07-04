@@ -51,6 +51,7 @@ def trade_from_databento(record: "TradeMsg", symbol_map: dict[int, str]) -> Trad
         price=float(record.pretty_price),
         size=int(record.size),
         side=side,  # type: ignore[arg-type]
+        sequence=int(seq) if (seq := getattr(record, "sequence", None)) is not None else None,
     )
 
 

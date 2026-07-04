@@ -47,4 +47,4 @@ jobs:
         # feed/broker libs. test_paths.py is named explicitly to skip the
         # databento/schwab tests that share tests/market/corpus/.
         # pythonpath=["."] (pyproject) makes market.*/runbook.* importable.
-        run: pytest strader/tests tests/runbook tests/market/corpus/test_paths.py tests/scripts
+        run: pytest strader/tests tests/runbook tests/market/corpus/test_paths.py tests/scripts tests/market/entities tests/market/orderflow
