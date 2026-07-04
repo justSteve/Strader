@@ -69,6 +69,15 @@ DATABENTO_PULLS = {
     "databento_glbx_es": "corpus_pull_databento_es.py",
     "databento_opra": "corpus_pull_databento.py",
 }
+
+# Per-stream CT pull windows. ES trades cover the full cash session for the
+# orderflow layer (st-f05; ~$0.60/day metered GLBX approved 2026-07-04). OPRA
+# stays late-day: flat-fee, but full-RTH option ticks would ~3x storage with
+# no consumer — the butterfly corpus only needs the final two hours.
+STREAM_WINDOWS = {
+    "databento_glbx_es": ("08:30", "15:00"),
+    "databento_opra": ("13:00", "15:00"),
+}
 SCHWAB_PULL = "corpus_pull_schwab.py"
 
 
@@ -157,8 +166,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="Re-pull even if a stream is already healthy (WARNING: append-only, double-counts)")
     ap.add_argument("--include-schwab", action="store_true",
                     help="Also attempt the Schwab pull (not gate-required; may need re-auth)")
-    ap.add_argument("--start-ct", default="13:00", help="Late-day window start CT (default 13:00)")
-    ap.add_argument("--end-ct", default="15:00", help="Late-day window end CT (default 15:00)")
+    ap.add_argument("--start-ct", default=None,
+                    help="Window start CT for ALL streams (default: per-stream STREAM_WINDOWS)")
+    ap.add_argument("--end-ct", default=None,
+                    help="Window end CT for ALL streams (default: per-stream STREAM_WINDOWS)")
     ap.add_argument("--max-age-hours", type=float, default=gate.DEFAULT_MAX_AGE_HOURS,
                     help=f"Staleness threshold for the health check (default {gate.DEFAULT_MAX_AGE_HOURS})")
     ap.add_argument("--dry-run", action="store_true", help="Resolve + plan only; no pulls, no spend")
@@ -170,19 +181,23 @@ def main(argv: list[str] | None = None) -> int:
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     day = resolve_target_day(args.date)
-    window = ["--start-ct", args.start_ct, "--end-ct", args.end_ct]
-    logger.info("corpus_daily target day = %s (window %s-%s CT)", day, args.start_ct, args.end_ct)
+    logger.info("corpus_daily target day = %s", day)
 
     pull_failed = False
 
     # --- Databento (gate-required) --------------------------------------------
     for stream, script in DATABENTO_PULLS.items():
+        default_start, default_end = STREAM_WINDOWS[stream]
+        window = ["--start-ct", args.start_ct or default_start,
+                  "--end-ct", args.end_ct or default_end]
         if not args.force and stream_healthy_in_manifest(day, stream):
             logger.info("skip %s: already healthy in manifest for %s", stream, day)
             continue
         if args.dry_run:
-            logger.info("[dry-run] would pull %s via %s", stream, script)
+            logger.info("[dry-run] would pull %s via %s (window %s-%s CT)",
+                        stream, script, window[1], window[3])
             continue
+        logger.info("%s window %s-%s CT", stream, window[1], window[3])
         rc, _ = run_pull(script, day, window)
         if rc != 0:
             pull_failed = True
