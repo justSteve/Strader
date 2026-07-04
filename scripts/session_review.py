@@ -94,11 +94,13 @@ def fetch_letter(name: str, key: str | None) -> str:
 
 def resolve_letters(day: _date, names: list[str]) -> tuple[str | None, str | None]:
     """(forecast, retro) blob names for a session date. Forecast = last letter
-    published before the 08:30 CT open; retro = first letter published after
-    the 15:00 CT close (Mancini's next letter recaps the session even when it
-    arrives days later, e.g. over a holiday weekend)."""
+    published before the 08:30 CT open. Retro = first letter published after
+    13:30 CT on the session day: Mancini writes the recap into the close
+    (observed ~14:30 CT publishes), so a 15:00 boundary would miss the same-day
+    letter; when he skips (holiday/weekend), the next letter still recaps the
+    session days later."""
     open_utc = datetime.combine(day, _time(8, 30), tzinfo=CENTRAL).astimezone(timezone.utc)
-    close_utc = datetime.combine(day, _time(15, 0), tzinfo=CENTRAL).astimezone(timezone.utc)
+    close_utc = datetime.combine(day, _time(13, 30), tzinfo=CENTRAL).astimezone(timezone.utc)
     forecast = None
     retro = None
     for n in names:
