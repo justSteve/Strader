@@ -100,6 +100,11 @@ td:first-child, th:first-child { text-align:left; }
     <option value="9">Compact</option><option value="13" selected>Medium</option>
     <option value="16">Large</option>
   </select></label>
+  <label>Cells <select id="cellmode">
+    <option value="delta" selected>Δ (signed)</option>
+    <option value="vol">Volume</option>
+    <option value="pair">bid×ask</option>
+  </select></label>
   <button id="tbl">Table view</button>
 </div>
 <div class="readouts">
@@ -146,6 +151,7 @@ const JUDGE_TICKS = 16;      // 4 pts beyond/away decides accept/reject
 const KEEP_COLS = 48;        // DOM columns kept (virtualization)
 const COL_W = 58, FOOT_H = 30;
 let cellH = 13;              // zoom control; numbers hidden below 12px
+let cellMode = "delta";      // delta | vol | pair — what the cell text shows
 
 const bars = DATA.bars;
 const $ = id => document.getElementById(id);
@@ -221,18 +227,37 @@ function renderColumn(b, i) {
   const col = document.createElement("div");
   col.className = "col"; col.style.width = COL_W + "px"; col.dataset.i = i;
   const maxCell = Math.max(...b.cells.map(c => c[1] + c[2]), 1);
-  for (const [price, bid, ask] of b.cells) {
+  const byTick = new Map(b.cells.map(c => [Math.round(c[0] / TICK), c]));
+  const tickLo = Math.round(b.cells[0][0] / TICK), tickHi = Math.round(b.cells[b.cells.length - 1][0] / TICK);
+  for (let tk = tickLo; tk <= tickHi; tk++) {
+    const price = tk * TICK;
     const y = yFor(price);
     // whole cells only — a half-clipped row misreads as small volume
     if (y - cellH / 2 < 0 || y + cellH / 2 > stage.clientHeight - FOOT_H) continue;
     const cell = document.createElement("div");
-    cell.className = "cell" + (price === b.poc ? " poc" : "");
     cell.style.top = (y - cellH / 2) + "px"; cell.style.height = (cellH - 1) + "px";
-    const total = bid + ask, buyDom = ask >= bid;
+    const c = byTick.get(tk);
+    if (!c) {
+      // real microstructure: zero contracts traded here inside the bar —
+      // show a deliberate void, not an accidental-looking hole
+      cell.className = "cell void";
+      cell.style.background = "transparent";
+      cell.style.border = "1px dashed var(--grid)";
+      cell.title = `${price.toFixed(2)}  no trades at this price in this bar (micro-LVN)`;
+      col.appendChild(cell);
+      continue;
+    }
+    const [, bid, ask] = c;
+    cell.className = "cell" + (price === b.poc ? " poc" : "");
+    const total = bid + ask, buyDom = ask >= bid, d = ask - bid;
     const alpha = 0.15 + 0.6 * (total / maxCell);
     cell.style.background = `color-mix(in srgb, var(${buyDom ? "--buy" : "--sell"}) ${Math.round(alpha * 100)}%, var(--surface-1))`;
-    if (cellH >= 12) cell.textContent = `${bid}×${ask}`;
-    cell.title = `${price.toFixed(2)}  sell-aggr ${bid} | buy-aggr ${ask}  (Δ ${ask - bid})`;
+    if (cellH >= 12) {
+      cell.textContent = cellMode === "pair" ? `${bid}×${ask}`
+                       : cellMode === "vol" ? `${total}`
+                       : (d >= 0 ? "+" : "") + d;
+    }
+    cell.title = `${price.toFixed(2)}  sell-aggr ${bid} | buy-aggr ${ask}  (Δ ${d >= 0 ? "+" : ""}${d}, vol ${total})`;
     col.appendChild(cell);
   }
   const foot = document.createElement("div"); foot.className = "foot";
@@ -383,6 +408,7 @@ $("arm").onclick = armLevel;
 $("lvlinput").addEventListener("keydown", e => { if (e.key === "Enter") armLevel(); });
 $("tbl").onclick = () => { const w = $("tblwrap"); w.style.display = w.style.display === "block" ? "none" : "block"; };
 $("zoom").onchange = e => { cellH = Number(e.target.value); repaintAll(); };
+$("cellmode").onchange = e => { cellMode = e.target.value; repaintAll(); };
 $("export").onclick = () => {
   const blob = new Blob([JSON.stringify({ meta: DATA.meta, log: drillLog }, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
