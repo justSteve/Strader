@@ -1,0 +1,385 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orderflow Drill</title>
+<style>
+/* Palette: dataviz reference instance. Diverging pair blue↔red carries buy/sell
+   aggression polarity (deliberately NOT green/red — CVD-safe). Text wears ink
+   tokens, never series color. */
+:root {
+  --surface-1:#fcfcfb; --page:#f9f9f7; --ink:#0b0b0b; --ink-2:#52514e;
+  --muted:#898781; --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --buy:#2a78d6; --sell:#e34948; --mid:#f0efec;
+  --good:#0ca30c; --critical:#d03b3b;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --surface-1:#1a1a19; --page:#0d0d0d; --ink:#ffffff; --ink-2:#c3c2b7;
+  --muted:#898781; --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --buy:#3987e5; --sell:#e66767; --mid:#383835;
+}}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--page); color:var(--ink);
+  font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; }
+header { padding:10px 16px 6px; display:flex; flex-wrap:wrap; gap:10px 18px; align-items:baseline; }
+header h1 { font-size:16px; margin:0; }
+header .meta { color:var(--ink-2); font-size:12px; }
+.legend { display:flex; gap:12px; font-size:12px; color:var(--ink-2); }
+.legend .chip { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:middle; }
+.controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:6px 16px; }
+button, select, input[type=text] { font:inherit; color:var(--ink); background:var(--surface-1);
+  border:1px solid var(--axis); border-radius:6px; padding:4px 10px; cursor:pointer; }
+button:hover { border-color:var(--ink-2); }
+button.primary { border-color:var(--buy); }
+input[type=range] { flex:1; min-width:140px; }
+.readouts { display:flex; gap:18px; padding:2px 16px 6px; font-size:12px; color:var(--ink-2);
+  font-variant-numeric: tabular-nums; flex-wrap:wrap; }
+.readouts b { color:var(--ink); font-size:14px; }
+.readouts .pos { color:var(--buy); } .readouts .neg { color:var(--sell); }
+#stage { position:relative; margin:0 16px; background:var(--surface-1);
+  border:1px solid var(--ring); border-radius:8px; overflow:hidden; }
+#cols { position:absolute; inset:0 56px 0 0; overflow:hidden; }
+#colstrip { position:absolute; right:0; top:0; bottom:0; display:flex; align-items:stretch; }
+.col { position:relative; border-right:1px solid var(--grid); }
+.col .cell { position:absolute; left:2px; right:2px; border-radius:2px;
+  font-size:9px; line-height:1; display:flex; align-items:center; justify-content:center;
+  color:var(--ink); white-space:nowrap; overflow:hidden;
+  font-variant-numeric: tabular-nums; }
+.col .cell.poc { outline:2px solid var(--ink-2); outline-offset:-2px; }
+.col .foot { position:absolute; left:0; right:0; bottom:0; height:30px; text-align:center;
+  font-size:9px; color:var(--muted); border-top:1px solid var(--grid); padding-top:2px;
+  font-variant-numeric: tabular-nums; }
+.col .foot .d { font-weight:600; }
+#yaxis { position:absolute; right:0; top:0; bottom:0; width:56px; border-left:1px solid var(--axis);
+  font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums; }
+#yaxis div { position:absolute; right:6px; transform:translateY(-50%); }
+.lvl-line { position:absolute; left:0; right:56px; border-top:2px dashed var(--critical); z-index:5; }
+.lvl-tag { position:absolute; right:60px; transform:translateY(-100%); font-size:10px;
+  color:var(--critical); background:var(--surface-1); padding:0 4px; z-index:6; }
+#pace { margin:8px 16px; height:52px; background:var(--surface-1); border:1px solid var(--ring);
+  border-radius:8px; position:relative; overflow:hidden; }
+#pace .lbl { position:absolute; top:2px; left:8px; font-size:10px; color:var(--muted); z-index:2; }
+#pacebars { position:absolute; inset:14px 8px 4px; display:flex; align-items:flex-end; gap:2px; }
+#pacebars div { flex:1; background:var(--buy); border-radius:2px 2px 0 0; min-height:2px; opacity:.85; }
+#panel { position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.45); z-index:50; }
+#panel .card { background:var(--surface-1); border:1px solid var(--ring); border-radius:10px;
+  padding:20px 24px; max-width:420px; }
+#panel h2 { margin:0 0 6px; font-size:15px; }
+#panel p { margin:4px 0 12px; color:var(--ink-2); font-size:13px; }
+#panel .btns { display:flex; gap:8px; }
+#log { margin:8px 16px 20px; }
+#log h3 { font-size:13px; margin:8px 0 4px; }
+table { border-collapse:collapse; width:100%; font-size:12px; font-variant-numeric:tabular-nums; }
+th, td { border:1px solid var(--grid); padding:3px 8px; text-align:right; }
+th { color:var(--ink-2); font-weight:600; background:var(--page); }
+td:first-child, th:first-child { text-align:left; }
+.ok { color:var(--good); font-weight:600; } .bad { color:var(--critical); font-weight:600; }
+#tblwrap { display:none; margin:8px 16px; max-height:300px; overflow:auto; }
+.hint { color:var(--muted); font-size:11px; padding:0 16px 8px; }
+</style></head><body>
+<header>
+  <h1>Orderflow Drill</h1>
+  <span class="meta" id="meta"></span>
+  <span class="legend">
+    <span><span class="chip" style="background:var(--buy)"></span>BUY aggression (lifted offers)</span>
+    <span><span class="chip" style="background:var(--sell)"></span>SELL aggression (hit bids)</span>
+    <span><span class="chip" style="outline:2px solid var(--ink-2);outline-offset:-2px"></span>POC</span>
+  </span>
+</header>
+<div class="controls">
+  <button id="play" class="primary">▶ Play</button>
+  <button id="back">⟨ Bar</button><button id="fwd">Bar ⟩</button>
+  <label>Speed <select id="speed">
+    <option value="1">1× real</option><option value="5">5×</option>
+    <option value="20" selected>20×</option><option value="60">60×</option>
+    <option value="240">240×</option>
+  </select></label>
+  <input type="range" id="seek" min="0" value="0">
+  <label>Level <input type="text" id="lvlinput" size="7" placeholder="price"></label>
+  <button id="arm">Arm level</button>
+  <span id="chips"></span>
+  <button id="tbl">Table view</button>
+</div>
+<div class="readouts">
+  <span>Bar <b id="ro-bar">0</b></span>
+  <span>Time <b id="ro-time">–</b></span>
+  <span>Last <b id="ro-price">–</b></span>
+  <span>Bar Δ <b id="ro-delta">–</b></span>
+  <span>Session Δ (sum of bars) <b id="ro-cvd">–</b></span>
+  <span>Bar took <b id="ro-dur">–</b></span>
+  <span>Score <b id="ro-score">0/0</b></span>
+</div>
+<div id="stage"><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div></div>
+<div id="pace"><span class="lbl">seconds per bar (last 60) — short bars = urgent tape</span><div id="pacebars"></div></div>
+<p class="hint">Space = play/pause · ←/→ = step · Arm a level to enter guess-then-reveal: playback pauses on approach, you call it, the tape answers. Calls are logged below (stored in this browser, exportable).</p>
+<div id="panel"><div class="card">
+  <h2 id="q-title">Price approaching level</h2>
+  <p id="q-body"></p>
+  <div class="btns">
+    <button data-call="reject" class="primary">Reject (fade it)</button>
+    <button data-call="accept" class="primary">Accept (goes through)</button>
+    <button data-call="skip">No call</button>
+  </div>
+</div></div>
+<div id="log">
+  <h3>Drill log <button id="export">Export JSON</button> <button id="clear">Clear</button></h3>
+  <table id="logtable"><thead><tr>
+    <th>When (bar time)</th><th>Level</th><th>From</th><th>Your call</th><th>Outcome</th><th>Verdict</th>
+  </tr></thead><tbody></tbody></table>
+</div>
+<div id="tblwrap"><table id="bartable"><thead><tr>
+  <th>#</th><th>Start</th><th>Dur s</th><th>O</th><th>H</th><th>L</th><th>C</th><th>Vol</th><th>Δ</th><th>NoneV</th><th>POC</th>
+</tr></thead><tbody></tbody></table></div>
+<script>
+"use strict";
+const DATA = /*__DRILL_DATA__*/null;
+if (!DATA) { document.body.textContent = "No drill data embedded — regenerate via scripts/orderflow_drill.py"; throw new Error("no data"); }
+
+// ── drill constants (mirror the score-don't-gate philosophy; heuristic v1) ──
+const TICK = DATA.meta.tick;
+const APPROACH_TICKS = 4;    // pause when within 1.0 pt of armed level
+const RESET_TICKS = 12;      // must first be ≥ 3 pts away to re-arm
+const JUDGE_BARS = 10;       // bars the tape gets to answer
+const JUDGE_TICKS = 16;      // 4 pts beyond/away decides accept/reject
+const KEEP_COLS = 48;        // DOM columns kept (virtualization)
+const CELL_H = 15, COL_W = 58, FOOT_H = 30;
+
+const bars = DATA.bars;
+const $ = id => document.getElementById(id);
+$("meta").textContent = `${DATA.meta.symbol} · ${DATA.meta.date} · N=${DATA.meta.bar_n} contracts/bar · ${DATA.meta.n_bars} bars · ${DATA.meta.contracts.toLocaleString()} contracts`;
+$("seek").max = bars.length - 1;
+
+// level chips
+const chipDefs = [["open","Open"],["am_high","AM Hi"],["am_low","AM Lo"],["session_high","Day Hi"],["session_low","Day Lo"]];
+for (const [k, label] of chipDefs) {
+  const b = document.createElement("button");
+  b.textContent = `${label} ${DATA.levels[k].toFixed(2)}`;
+  b.onclick = () => { $("lvlinput").value = DATA.levels[k].toFixed(2); armLevel(); };
+  $("chips").appendChild(b);
+}
+
+// ── state ────────────────────────────────────────────────────────────────
+let idx = -1;                 // last played bar index
+let playing = false, timer = null;
+let cvd = 0;
+let level = null, armedSide = null, awaitingCall = false;
+let pending = null;           // {barIdx, level, from, call}
+const LS_KEY = `oflow-drill-${DATA.meta.date}-${DATA.meta.bar_n}`;
+let drillLog = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
+
+// ── stage geometry: price window follows recent bars ────────────────────
+const stage = $("stage"), strip = $("colstrip"), yaxis = $("yaxis");
+function stageHeight() { return Math.max(320, Math.min(560, window.innerHeight - 330)); }
+stage.style.height = stageHeight() + "px";
+let viewHi = null, viewLo = null;
+function updateView() {
+  const recent = bars.slice(Math.max(0, idx - 11), idx + 1);
+  if (!recent.length) return;
+  let hi = Math.max(...recent.map(b => b.h)), lo = Math.min(...recent.map(b => b.l));
+  if (level != null) { hi = Math.max(hi, level + 8 * TICK); lo = Math.min(lo, level - 8 * TICK); }
+  hi += 2 * TICK; lo -= 2 * TICK;
+  // gentle follow: expand instantly, contract slowly
+  viewHi = viewHi == null ? hi : Math.max(hi, viewHi - 4 * TICK);
+  viewLo = viewLo == null ? lo : Math.min(lo, viewLo + 4 * TICK);
+  const span = (viewHi - viewLo) / TICK;
+  const maxRows = Math.floor((stage.clientHeight - FOOT_H) / CELL_H);
+  if (span > maxRows) { const mid = (viewHi + viewLo) / 2; viewHi = mid + (maxRows / 2) * TICK; viewLo = mid - (maxRows / 2) * TICK; }
+}
+const yFor = price => (viewHi - price) / TICK * CELL_H;
+
+function drawAxis() {
+  yaxis.innerHTML = "";
+  const step = Math.max(1, Math.round((viewHi - viewLo) / TICK / 14)) * TICK;
+  for (let p = Math.ceil(viewLo / step) * step; p <= viewHi; p += step) {
+    const d = document.createElement("div");
+    d.style.top = yFor(p) + "px"; d.textContent = p.toFixed(2);
+    yaxis.appendChild(d);
+  }
+  drawLevelLine();
+}
+function drawLevelLine() {
+  document.querySelectorAll(".lvl-line,.lvl-tag").forEach(e => e.remove());
+  if (level == null || viewHi == null || level > viewHi || level < viewLo) return;
+  const ln = document.createElement("div"); ln.className = "lvl-line"; ln.style.top = yFor(level) + "px";
+  const tag = document.createElement("div"); tag.className = "lvl-tag"; tag.style.top = yFor(level) + "px";
+  tag.textContent = level.toFixed(2);
+  stage.appendChild(ln); stage.appendChild(tag);
+}
+
+function renderColumn(b, i) {
+  const col = document.createElement("div");
+  col.className = "col"; col.style.width = COL_W + "px"; col.dataset.i = i;
+  const maxCell = Math.max(...b.cells.map(c => c[1] + c[2]), 1);
+  for (const [price, bid, ask] of b.cells) {
+    const y = yFor(price);
+    if (y < -CELL_H || y > stage.clientHeight - FOOT_H) continue;
+    const cell = document.createElement("div");
+    cell.className = "cell" + (price === b.poc ? " poc" : "");
+    cell.style.top = (y - CELL_H / 2) + "px"; cell.style.height = (CELL_H - 1) + "px";
+    const total = bid + ask, buyDom = ask >= bid;
+    const alpha = 0.15 + 0.6 * (total / maxCell);
+    cell.style.background = `color-mix(in srgb, var(${buyDom ? "--buy" : "--sell"}) ${Math.round(alpha * 100)}%, var(--surface-1))`;
+    cell.textContent = `${bid}×${ask}`;
+    cell.title = `${price.toFixed(2)}  sell-aggr ${bid} | buy-aggr ${ask}  (Δ ${ask - bid})`;
+    col.appendChild(cell);
+  }
+  const foot = document.createElement("div"); foot.className = "foot";
+  const dcls = b.d >= 0 ? "pos" : "neg";
+  foot.innerHTML = `<span class="d" style="color:var(${b.d >= 0 ? "--buy" : "--sell"})">${b.d >= 0 ? "+" : ""}${b.d}</span> ${fmtClock(b.t1)}`;
+  foot.title = `bar ${i}: vol ${b.v} (none ${b.nv}) · ${b.dur}s`;
+  col.appendChild(foot);
+  return col;
+}
+function repaintAll() {
+  updateView(); drawAxis(); strip.innerHTML = "";
+  for (let i = Math.max(0, idx - KEEP_COLS + 1); i <= idx; i++) strip.appendChild(renderColumn(bars[i], i));
+}
+const fmtClock = iso => iso.slice(11, 19);
+
+// ── pace strip ───────────────────────────────────────────────────────────
+function repaintPace() {
+  const wrap = $("pacebars"); wrap.innerHTML = "";
+  const window_ = bars.slice(Math.max(0, idx - 59), idx + 1);
+  const maxd = Math.max(...window_.map(b => b.dur), 1);
+  for (const b of window_) {
+    const d = document.createElement("div");
+    d.style.height = Math.max(4, (b.dur / maxd) * 100) + "%";
+    d.title = `${b.dur}s`;
+    wrap.appendChild(d);
+  }
+}
+
+// ── readouts, table, log ─────────────────────────────────────────────────
+function repaintReadouts() {
+  const b = bars[idx];
+  $("ro-bar").textContent = `${idx + 1}/${bars.length}`;
+  $("ro-time").textContent = b ? fmtClock(b.t1) + " CT" : "–";
+  $("ro-price").textContent = b ? b.c.toFixed(2) : "–";
+  const set = (id, v) => { const el = $(id); el.textContent = (v >= 0 ? "+" : "") + v; el.className = v >= 0 ? "pos" : "neg"; };
+  if (b) { set("ro-delta", b.d); set("ro-cvd", cvd); $("ro-dur").textContent = b.dur.toFixed(1) + "s"; }
+  const judged = drillLog.filter(e => e.verdict === "correct" || e.verdict === "wrong");
+  $("ro-score").textContent = `${judged.filter(e => e.verdict === "correct").length}/${judged.length}`;
+  $("seek").value = Math.max(idx, 0);
+}
+function appendBarRow(b, i) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${i + 1}</td><td>${fmtClock(b.t0)}</td><td>${b.dur.toFixed(1)}</td>` +
+    `<td>${b.o.toFixed(2)}</td><td>${b.h.toFixed(2)}</td><td>${b.l.toFixed(2)}</td><td>${b.c.toFixed(2)}</td>` +
+    `<td>${b.v}</td><td>${b.d}</td><td>${b.nv}</td><td>${b.poc.toFixed(2)}</td>`;
+  $("bartable").tBodies[0].appendChild(tr);
+}
+function repaintLog() {
+  const tb = $("logtable").tBodies[0]; tb.innerHTML = "";
+  for (const e of drillLog) {
+    const tr = document.createElement("tr");
+    const vcls = e.verdict === "correct" ? "ok" : e.verdict === "wrong" ? "bad" : "";
+    tr.innerHTML = `<td>${e.when}</td><td>${e.level.toFixed(2)}</td><td>${e.from}</td>` +
+      `<td>${e.call}</td><td>${e.outcome ?? "…"}</td><td class="${vcls}">${e.verdict ?? ""}</td>`;
+    tb.appendChild(tr);
+  }
+  localStorage.setItem(LS_KEY, JSON.stringify(drillLog));
+}
+
+// ── playback engine ──────────────────────────────────────────────────────
+function step() {
+  if (idx >= bars.length - 1) { pause(); return; }
+  idx++;
+  const b = bars[idx];
+  cvd += b.d;
+  updateView(); drawAxis();
+  strip.appendChild(renderColumn(b, idx));
+  while (strip.children.length > KEEP_COLS) strip.removeChild(strip.firstChild);
+  // repaint older columns against the (possibly) shifted view occasionally
+  if (idx % 6 === 0) repaintAll();
+  repaintPace(); repaintReadouts(); appendBarRow(b, idx);
+  judgePending();
+  checkLevelApproach(b);
+}
+function scheduleNext() {
+  if (!playing) return;
+  const next = bars[idx + 1];
+  if (!next) { pause(); return; }
+  const ms = Math.max(30, next.dur * 1000 / Number($("speed").value));
+  timer = setTimeout(() => { step(); scheduleNext(); }, ms);
+}
+function play() { if (playing || awaitingCall) return; playing = true; $("play").textContent = "❚❚ Pause"; scheduleNext(); }
+function pause() { playing = false; clearTimeout(timer); $("play").textContent = "▶ Play"; }
+function seekTo(target) {
+  pause(); strip.innerHTML = ""; $("bartable").tBodies[0].innerHTML = "";
+  cvd = 0; idx = -1; viewHi = viewLo = null; pending = null;
+  const t = Math.max(0, Math.min(target, bars.length - 1));
+  for (let i = 0; i <= t; i++) { idx = i; cvd += bars[i].d; appendBarRow(bars[i], i); }
+  repaintAll(); repaintPace(); repaintReadouts();
+}
+
+// ── guess-then-reveal ────────────────────────────────────────────────────
+function armLevel() {
+  const v = parseFloat($("lvlinput").value);
+  if (!isFinite(v)) return;
+  level = Math.round(v / TICK) * TICK;
+  armedSide = null; // set once price is far enough away
+  $("arm").textContent = `Armed @ ${level.toFixed(2)}`;
+  drawAxis();
+}
+function checkLevelApproach(b) {
+  if (level == null || awaitingCall || pending) return;
+  const dist = (b.c - level) / TICK;
+  if (armedSide == null) { if (Math.abs(dist) >= RESET_TICKS) armedSide = dist > 0 ? "above" : "below"; return; }
+  if (Math.abs(dist) <= APPROACH_TICKS) {
+    awaitingCall = true; pause();
+    $("q-title").textContent = `Approaching ${level.toFixed(2)} from ${armedSide}`;
+    $("q-body").textContent = `Last ${b.c.toFixed(2)} · bar Δ ${b.d >= 0 ? "+" : ""}${b.d} · session Δ ${cvd >= 0 ? "+" : ""}${cvd} · bar took ${b.dur.toFixed(1)}s. Reject (price fades away) or accept (price goes through)?`;
+    $("panel").style.display = "grid";
+  }
+}
+document.querySelectorAll("#panel button").forEach(btn => btn.onclick = () => {
+  $("panel").style.display = "none"; awaitingCall = false;
+  const call = btn.dataset.call;
+  const entry = { when: fmtClock(bars[idx].t1), barIdx: idx, level, from: armedSide,
+                  call, outcome: null, verdict: call === "skip" ? "-" : null };
+  drillLog.push(entry); repaintLog();
+  if (call !== "skip") pending = entry;
+  armedSide = null; // must travel away before the next prompt
+  play();
+});
+function judgePending() {
+  if (!pending || idx < pending.barIdx + 1) return;
+  const b = bars[idx];
+  const from = pending.from, L = pending.level;
+  const through = from === "above" ? (L - b.l) / TICK : (b.h - L) / TICK;  // penetration beyond level
+  const away = from === "above" ? (b.h - L) / TICK : (L - b.l) / TICK;     // rejection distance back
+  let outcome = null;
+  if (through >= JUDGE_TICKS) outcome = "accept";
+  else if (away >= JUDGE_TICKS) outcome = "reject";
+  else if (idx - pending.barIdx >= JUDGE_BARS) outcome = "chop";
+  if (outcome) {
+    pending.outcome = outcome;
+    pending.verdict = outcome === "chop" ? "chop (no credit)" : (outcome === pending.call ? "correct" : "wrong");
+    pending = null; repaintLog(); repaintReadouts();
+  }
+}
+
+// ── wiring ───────────────────────────────────────────────────────────────
+$("play").onclick = () => playing ? pause() : play();
+$("fwd").onclick = () => { pause(); step(); };
+$("back").onclick = () => seekTo(idx - 1);
+$("seek").oninput = e => seekTo(Number(e.target.value));
+$("arm").onclick = armLevel;
+$("lvlinput").addEventListener("keydown", e => { if (e.key === "Enter") armLevel(); });
+$("tbl").onclick = () => { const w = $("tblwrap"); w.style.display = w.style.display === "block" ? "none" : "block"; };
+$("export").onclick = () => {
+  const blob = new Blob([JSON.stringify({ meta: DATA.meta, log: drillLog }, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `drill-log-${DATA.meta.date}.json`; a.click();
+};
+$("clear").onclick = () => { drillLog = []; repaintLog(); repaintReadouts(); };
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
+  if (e.code === "ArrowRight") { pause(); step(); }
+  if (e.code === "ArrowLeft") seekTo(idx - 1);
+});
+window.addEventListener("resize", () => { stage.style.height = stageHeight() + "px"; repaintAll(); });
+
+// boot: show the first bar, paused
+seekTo(0); repaintLog();
+</script></body></html>
