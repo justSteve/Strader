@@ -53,6 +53,8 @@ All four Carmine setups decompose into the same rhythm:
 > **Beat 3 — delta flips or diverges** (CVD turns; price extreme unconfirmed by delta)
 > **Beat 4 — reversal confirmed** (opposite-side stacked imbalances as price re-takes the level)
 
+Altitude note: the beats consume primitive *events*, not raw footprint cells. "Stacked imbalance" in beat 4 is the finished output of the diagonal cell test (§2; research doc Q1.3) — the diagonal arithmetic happens one layer down, inside the bar builder; by the time a signature sees it, it is just an event ("stacked buy imbalance at 7541–7542, bar #412"). Same for "absorption" (a score) and "delta flip" (a CVD read). The recognizer reads the lab report; the microscope work is already done.
+
 What varies per setup is the **level type**, **direction**, and **intensity profile**:
 
 | Setup | Level | Break | Resolution | Confidence in signature |
