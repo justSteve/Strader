@@ -65,6 +65,21 @@ input[type=range] { flex:1; min-width:140px; }
 #panel h2 { margin:0 0 6px; font-size:15px; }
 #panel p { margin:4px 0 12px; color:var(--ink-2); font-size:13px; }
 #panel .btns { display:flex; gap:8px; }
+#caption { position:absolute; top:8px; left:8px; right:70px; z-index:7; display:none;
+  background:color-mix(in srgb, var(--surface-1) 92%, transparent); border:1px solid var(--ring);
+  border-left:4px solid var(--buy); border-radius:8px; padding:8px 30px 8px 12px;
+  font-size:13px; color:var(--ink); }
+#caption .x { position:absolute; top:4px; right:8px; cursor:pointer; color:var(--muted); }
+#visits { padding:0 16px 4px; font-size:12px; color:var(--ink-2); display:none; }
+#visits button { padding:2px 8px; font-size:12px; margin:2px; }
+#help { position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.5); z-index:60; }
+#help .card { background:var(--surface-1); border:1px solid var(--ring); border-radius:12px;
+  padding:22px 26px; max-width:640px; max-height:85vh; overflow:auto; font-size:14px; line-height:1.55; }
+#help h2 { font-size:16px; margin:0 0 8px; }
+#help h4 { margin:14px 0 4px; font-size:13px; }
+#help p, #help li { color:var(--ink-2); margin:4px 0; }
+#help b { color:var(--ink); }
+#help .swatch { display:inline-block; width:11px; height:11px; border-radius:2px; vertical-align:-1px; }
 #log { margin:8px 16px 20px; }
 #log h3 { font-size:13px; margin:8px 0 4px; }
 table { border-collapse:collapse; width:100%; font-size:12px; font-variant-numeric:tabular-nums; }
@@ -106,6 +121,7 @@ td:first-child, th:first-child { text-align:left; }
     <option value="pair">bid×ask</option>
   </select></label>
   <button id="tbl">Table view</button>
+  <button id="helpbtn" title="What am I looking at?">?</button>
 </div>
 <div class="readouts">
   <span>Bar <b id="ro-bar">0</b></span>
@@ -116,9 +132,40 @@ td:first-child, th:first-child { text-align:left; }
   <span>Bar took <b id="ro-dur">–</b></span>
   <span>Score <b id="ro-score">0/0</b></span>
 </div>
-<div id="stage"><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div></div>
+<div id="visits"></div>
+<div id="stage"><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
+  <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
+</div>
 <div id="pace"><span class="lbl">seconds per bar (last 60) — short bars = urgent tape</span><div id="pacebars"></div></div>
-<p class="hint">Space = play/pause · ←/→ = step · Arm a level to enter guess-then-reveal: playback pauses on approach, you call it, the tape answers. Calls are logged below (stored in this browser, exportable).</p>
+<p class="hint">Space = play/pause · ←/→ = step · Click a level chip to arm it AND jump to its first visit · <b>?</b> explains the screen ·
+Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button></p>
+<div id="help"><div class="card">
+  <h2>What am I looking at?</h2>
+  <p>This is one full trading day replayed as <b>volume bars</b>: every column is exactly the same number of contracts changing hands (shown in the header), <b>not</b> the same amount of time. When columns arrive fast, the market is busy; when they crawl, it's quiet. The strip below the chart shows each bar's real duration.</p>
+  <h4>Reading one cell (a price inside a bar)</h4>
+  <ul>
+    <li><span class="swatch" style="background:var(--buy)"></span> <b>Blue = buyers were the aggressors</b> at that price (they crossed the spread to lift sellers' offers). <span class="swatch" style="background:var(--sell)"></span> <b>Red = sellers were the aggressors</b> (they hit buyers' bids).</li>
+    <li><b>Stronger color = more contracts</b> traded at that price in this bar.</li>
+    <li>The number is the cell's <b>net delta</b> (buy-aggressor minus sell-aggressor volume). Hover any cell for the full breakdown. Switch the Cells menu to see totals or the raw bid×ask pair.</li>
+    <li>The <b>outlined cell</b> is the bar's POC — the price where the most volume traded.</li>
+    <li>A <b>dashed empty cell</b> is real: price jumped across that level without a single trade (a micro low-volume node).</li>
+  </ul>
+  <h4>What to look FOR (the force-and-effect compass)</h4>
+  <ul>
+    <li><b>Force with effect</b> — heavy one-sided color and price moving that way: a healthy move, expect continuation.</li>
+    <li><b>Force without effect</b> — heavy aggressive volume but price stops: someone big is absorbing. Watch for reversal.</li>
+    <li><b>Effect without force</b> — price makes a new high/low but the session Δ readout doesn't follow: a hollow move.</li>
+    <li>Footer of each column = the bar's total delta. The <b>Session Δ</b> readout is the running sum — its <i>trend</i> matters, not its level.</li>
+  </ul>
+  <h4>How to run a rep</h4>
+  <ol>
+    <li>Click a level chip (session levels, or M: chips from Mancini's letter). You'll be dropped ~10 bars before price first visited it.</li>
+    <li>Press <b>Space</b> and watch the approach: is the aggression toward the level being rewarded (bars keep moving) or eaten (heavy color, no progress)?</li>
+    <li>When price gets within a point, the replay pauses and asks: reject or accept. Answer, watch the tape decide, and your running score builds below.</li>
+    <li>Use the visit buttons above the chart to replay other approaches to the same level.</li>
+  </ol>
+  <p style="text-align:right"><button onclick="document.getElementById('help').style.display='none'">Got it</button></p>
+</div></div>
 <div id="panel"><div class="card">
   <h2 id="q-title">Price approaching level</h2>
   <p id="q-body"></p>
@@ -164,7 +211,8 @@ const chipDefs = [["open","Open"],["am_high","AM Hi"],["am_low","AM Lo"],["sessi
 function addChip(label, price) {
   const b = document.createElement("button");
   b.textContent = `${label} ${price.toFixed(2)}`;
-  b.onclick = () => { $("lvlinput").value = price.toFixed(2); armLevel(); };
+  b.title = "Arm this level and jump to its first visit";
+  b.onclick = () => { $("lvlinput").value = price.toFixed(2); armLevel(true); };
   $("chips").appendChild(b);
 }
 for (const [k, label] of chipDefs) addChip(label, DATA.levels[k]);
@@ -355,14 +403,53 @@ function seekTo(target) {
   repaintAll(); repaintPace(); repaintReadouts();
 }
 
+// ── level visits: find every episode where price approached the level ────
+function findEpisodes(L) {
+  const eps = []; let side = null;
+  for (let i = 0; i < bars.length; i++) {
+    const dist = (bars[i].c - L) / TICK;
+    if (side == null) { if (Math.abs(dist) >= RESET_TICKS) side = dist > 0 ? "above" : "below"; continue; }
+    if (Math.abs(dist) <= APPROACH_TICKS) { eps.push({ i, from: side }); side = null; }
+  }
+  return eps;
+}
+function showCaption(text) {
+  $("caption-text").textContent = text;
+  $("caption").style.display = "block";
+}
+function jumpToEpisode(ep, k, total) {
+  seekTo(Math.max(0, ep.i - 10));
+  armedSide = null;
+  showCaption(`Visit ${k + 1}/${total} of ${level.toFixed(2)} — price approaches from ${ep.from}, `
+    + `first touch ≈ ${fmtClock(bars[ep.i].t1)} CT. You are 10 bars early. Press Space and watch the approach: `
+    + `is the aggression toward the level being rewarded (price keeps moving) or eaten (heavy color, no progress)?`);
+}
+function renderVisits(eps) {
+  const v = $("visits");
+  v.innerHTML = "";
+  if (!eps.length) { v.style.display = "none"; return; }
+  v.append(`Visits to ${level.toFixed(2)}: `);
+  eps.forEach((ep, k) => {
+    const b = document.createElement("button");
+    b.textContent = `${k + 1} · ${fmtClock(bars[ep.i].t1).slice(0, 5)}`;
+    b.onclick = () => jumpToEpisode(ep, k, eps.length);
+    v.appendChild(b);
+  });
+  v.style.display = "block";
+}
+
 // ── guess-then-reveal ────────────────────────────────────────────────────
-function armLevel() {
+function armLevel(jump) {
   const v = parseFloat($("lvlinput").value);
   if (!isFinite(v)) return;
   level = Math.round(v / TICK) * TICK;
   armedSide = null; // set once price is far enough away
   $("arm").textContent = `Armed @ ${level.toFixed(2)}`;
   drawAxis();
+  const eps = findEpisodes(level);
+  renderVisits(eps);
+  if (jump && eps.length) jumpToEpisode(eps[0], 0, eps.length);
+  else if (jump) showCaption(`Price never came within ${APPROACH_TICKS / 4} pts of ${level.toFixed(2)} this session — pick another level or another day.`);
 }
 function checkLevelApproach(b) {
   if (level == null || awaitingCall || pending) return;
@@ -407,8 +494,34 @@ $("play").onclick = () => playing ? pause() : play();
 $("fwd").onclick = () => { pause(); step(); };
 $("back").onclick = () => seekTo(idx - 1);
 $("seek").oninput = e => seekTo(Number(e.target.value));
-$("arm").onclick = armLevel;
-$("lvlinput").addEventListener("keydown", e => { if (e.key === "Enter") armLevel(); });
+$("arm").onclick = () => armLevel(true);
+$("lvlinput").addEventListener("keydown", e => { if (e.key === "Enter") armLevel(true); });
+$("helpbtn").onclick = () => { $("help").style.display = "grid"; };
+if (!localStorage.getItem("oflow-help-seen")) {
+  $("help").style.display = "grid";
+  localStorage.setItem("oflow-help-seen", "1");
+}
+// session highlights: computed moments worth studying, one click away
+function jumpHighlight(i, text) { seekTo(Math.max(0, i - 8)); showCaption(text); }
+$("hl-fast").onclick = () => {
+  let best = 1; for (let i = 1; i < bars.length; i++) if (bars[i].dur < bars[best].dur) best = i;
+  jumpHighlight(best, `Fastest bar of the session: ${bars[best].dur.toFixed(1)}s for ${bars[best].v} contracts at ${fmtClock(bars[best].t1)} CT. `
+    + `Urgency like this usually means stops are being run or a big player wants in NOW. Watch what price does once the burst exhausts.`);
+};
+$("hl-delta").onclick = () => {
+  let best = 0; for (let i = 1; i < bars.length; i++) if (Math.abs(bars[i].d) > Math.abs(bars[best].d)) best = i;
+  jumpHighlight(best, `Most one-sided bar: Δ ${bars[best].d >= 0 ? "+" : ""}${bars[best].d} at ${fmtClock(bars[best].t1)} CT — `
+    + `${bars[best].d >= 0 ? "buyers" : "sellers"} threw maximum aggression here. The question the compass asks: did price actually GO that way afterward (force with effect), or was it absorbed?`);
+};
+$("hl-flip").onclick = () => {
+  let best = 1, sw = 0;
+  for (let i = 1; i < bars.length; i++) {
+    const s = Math.abs(bars[i].d - bars[i - 1].d);
+    if (Math.sign(bars[i].d) !== Math.sign(bars[i - 1].d) && s > sw) { sw = s; best = i; }
+  }
+  jumpHighlight(best, `Sharpest delta flip: ${bars[best - 1].d} → ${bars[best].d >= 0 ? "+" : ""}${bars[best].d} at ${fmtClock(bars[best].t1)} CT. `
+    + `One side was in charge, then the other seized it within ${DATA.meta.bar_n * 2} contracts. Flips at a meaningful level are beat 3 of the reversal signatures.`);
+};
 $("tbl").onclick = () => { const w = $("tblwrap"); w.style.display = w.style.display === "block" ? "none" : "block"; };
 $("zoom").onchange = e => { cellH = Number(e.target.value); repaintAll(); };
 $("cellmode").onchange = e => { cellMode = e.target.value; repaintAll(); };
