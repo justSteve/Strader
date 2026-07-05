@@ -73,3 +73,36 @@ def test_straddle_overshoot_bounded(trades):
 def test_missing_day_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         read_corpus_day(tmp_path / "nope.jsonl")
+
+
+# ── engine golden (st-wnc) ───────────────────────────────────────────────────
+def test_engine_golden_default_config(trades):
+    """Production thresholds on the small fixture: no signals fire (the 100-
+    contract floors demand institutional size), but engine state is pinned."""
+    import market.orderflow.engine as eng
+    e = eng.OrderflowEngine()
+    sigs = e.run(trades)
+    assert sigs == []
+    assert (e.cvd, e.none_vol, e.large_lot_count) == (93, 0, 0)
+
+
+def test_engine_golden_sensitized(trades, monkeypatch):
+    """Thresholds lowered to fixture scale so the signal paths execute and the
+    full output is hash-pinned. Regenerate deliberately on intentional engine
+    changes (same protocol as the bar golden)."""
+    import hashlib
+    import market.orderflow.engine as eng
+    from market.signals.orderflow import SweepPrint
+    monkeypatch.setattr(eng, "SWEEP_MIN_SIZE", 30)
+    monkeypatch.setattr(eng, "LARGE_LOT_MIN_SIZE", 20)
+    e = eng.OrderflowEngine()
+    sigs = e.run(trades)
+    assert len(sigs) == 5
+    assert sum(isinstance(s, SweepPrint) for s in sigs) == 5
+    assert e.large_lot_count == 3
+    first = next(s for s in sigs if isinstance(s, SweepPrint))
+    assert (first.direction, first.ticks_swept, first.total_size) == ("buy", 3, 49)
+    h = hashlib.sha256()
+    for s in sigs:
+        h.update(repr(s).encode())
+    assert h.hexdigest() == "9ed02f366306614c5a73ea31f87e97f0f63c4d3761c9c5c2d0d13fc91ef19ac2"

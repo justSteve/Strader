@@ -35,10 +35,16 @@ IMBALANCE_RATIO = 3.0           # diagonal dominance multiple
 IMBALANCE_FLOOR = 100           # contracts on the dominant side, ES scale
 STACK_MIN = 3                   # consecutive same-direction imbalances = stacked
 
-# ── large-lot / sweep (spec §2) [literature seeds; calibrate st-wnc] ────────
+# ── large-lot / sweep (spec §2) [calibrated st-wnc 2026-07-05 on 7/2 RTH] ───
+# Relative-only thresholds were hopelessly chatty on ES (10x median ≈ 10-20
+# contracts -> 15,467 "large lots"/day; 3-level runs -> 3,658 "sweeps"/day).
+# A 100-contract floor yields ~33 large lots and ~39 sweeps per session —
+# rare enough to mean urgency. Both tests are AND-ed with the floor.
 LARGE_LOT_K = 10.0              # multiple of rolling median print size
+LARGE_LOT_MIN_SIZE = 100        # absolute contract floor (AND with the above)
 LARGE_LOT_MEDIAN_WINDOW = 500   # prints in the rolling-median warm-up window
 SWEEP_MIN_TICKS = 3             # distinct price levels walked by one aggressor
+SWEEP_MIN_SIZE = 100            # total contracts in the run (AND with above)
 SWEEP_WINDOW_MS = 250           # event-time window; never wall-clock
 
 # ── divergence pivots (spec §2) [literature seed; calibrate st-wnc] ─────────

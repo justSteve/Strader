@@ -142,6 +142,20 @@ class LiveClient:
             if isinstance(record, TradeMsg):
                 yield trade_from_databento(record, self._symbol_map)
 
+    def events(self) -> Iterator[Trade | Quote]:
+        """Yield typed Trade AND Quote entities interleaved in stream order —
+        the single canonical input the orderflow engine consumes (spec §5).
+        Subscribe to both 'trades' and 'mbp-1' schemas before iterating;
+        symbol-mapping and other records are absorbed silently."""
+        for record in self._client:
+            if isinstance(record, SymbolMappingMsg):
+                self._symbol_map[int(record.instrument_id)] = record.stype_out_symbol
+                continue
+            if isinstance(record, TradeMsg):
+                yield trade_from_databento(record, self._symbol_map)
+            elif isinstance(record, MBP1Msg):
+                yield quote_from_databento(record, self._symbol_map)
+
     def quotes(self) -> Iterator[Quote]:
         """Yield typed Quote entities (top-of-book snapshots) from MBP-1/TBBO.
 
