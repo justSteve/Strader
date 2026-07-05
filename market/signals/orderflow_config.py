@@ -52,3 +52,10 @@ PIVOT_FILTER_TICKS = 8          # swing high/low confirmation filter (2.0 pts)
 
 # ── consumer wiring (spec §6) ───────────────────────────────────────────────
 CONFLUENCE_TOLERANCE_PTS = 2.0  # Mancini level ∩ anchor proximity
+
+# Calibration note (st-su4, 2026-07-05, 7/2 full RTH): at VOLUME_BAR_N=2000
+# the FLOOR=100 diagonal test flags ~333 levels/session (≈1 per 2 bars — sane
+# recognizer evidence), but 3-consecutive STACKS are structurally rare at this
+# bar size (0-6/session across floors 30-100): cells average ~130 contracts.
+# Do NOT lower the floor to manufacture stacks; if the recognizer needs
+# stacked confirmation it should aggregate coarser (st-2kf design decision).

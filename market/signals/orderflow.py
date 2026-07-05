@@ -38,3 +38,14 @@ class DeltaDivergence(Signal):
     prior_extreme: float = 0.0
     cvd_at_extreme: int = 0
     cvd_at_prior: int = 0
+
+
+@dataclass(frozen=True)
+class ImbalanceStack(Signal):
+    """STACK_MIN+ consecutive prices in one bar where one aggressor side
+    diagonally dominated (research doc Q1.3) — an institutional footprint,
+    often defended on retests. Emitted per stack when the bar completes."""
+
+    direction: Literal["buy", "sell"] = "buy"
+    prices: tuple[float, ...] = ()   # ascending, one per stacked level
+    ratios: tuple[float, ...] = ()   # dominant/opposite per level (opposite floored at 1)

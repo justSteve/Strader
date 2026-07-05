@@ -106,3 +106,12 @@ def test_engine_golden_sensitized(trades, monkeypatch):
     for s in sigs:
         h.update(repr(s).encode())
     assert h.hexdigest() == "9ed02f366306614c5a73ea31f87e97f0f63c4d3761c9c5c2d0d13fc91ef19ac2"
+
+
+# ── imbalance golden (st-su4) ────────────────────────────────────────────────
+def test_imbalance_golden(trades):
+    from market.orderflow.imbalance import find_imbalances, find_stacks
+    bars = list(build_bars(trades, n=500, include_partial=True))
+    singles = [(round(p, 2), d, round(r, 2)) for b in bars for p, d, r in find_imbalances(b)]
+    assert singles == [(7482.75, "buy", 3.88)]
+    assert [s for b in bars for s in find_stacks(b)] == []
