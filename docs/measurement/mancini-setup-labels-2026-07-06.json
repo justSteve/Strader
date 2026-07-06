@@ -1,0 +1,1603 @@
+[
+ {
+  "session_date": "2025-06-22",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "6:00PM",
+  "rth": false,
+  "es_levels": [],
+  "quote": "This setup a textbook Failed Breakdown right off the 6pm futures open Sunday.",
+  "source_blob": "2025-06-25-202712.txt"
+ },
+ {
+  "session_date": "2025-06-23",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": "6:00PM",
+  "rth": false,
+  "es_levels": [],
+  "quote": "This setup a textbook Failed Breakdown right off the 6pm futures open.",
+  "source_blob": "2025-06-24-202425.txt"
+ },
+ {
+  "session_date": "2025-06-25",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6208
+  ],
+  "quote": "This was so textbook it should be routine by now: Shelf of lows at 6208, bearish headline hits, we flush down fast, trap shorts, recover, squeeze.",
+  "source_blob": "2025-06-30-202526.txt"
+ },
+ {
+  "session_date": "2025-06-26",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "1:50PM",
+  "rth": true,
+  "es_levels": [],
+  "quote": "We recovered this shelf by 1:50PM, and I tweeted the long as well at 1:40PM: This was a classic, shallow Failed Breakdown not of a singular low, but a shelf.",
+  "source_blob": "2025-06-26-202052.txt"
+ },
+ {
+  "session_date": "2025-06-27",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This was a classic, shallow Failed Breakdown not of a singular low, but a shelf.",
+  "source_blob": "2025-06-27-202737.txt"
+ },
+ {
+  "session_date": "2025-07-10",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "30:00PM",
+  "rth": false,
+  "es_levels": [
+   6330,
+   6283
+  ],
+  "quote": "I will also recap a quality and very textbook Failed Breakdown we had at 830PM on Thursday evening, when Tariff Headlines collapsed the market from 6330s down to 6283.",
+  "source_blob": "2025-07-14-202719.txt"
+ },
+ {
+  "session_date": "2025-07-11",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "30:00AM",
+  "rth": false,
+  "es_levels": [
+   6277,
+   6282
+  ],
+  "quote": "Fortunately, we had a very classic Failed Breakdown re-test of 6277 from above at 730AM (we recovered 6277, back-tested it precisely from above, bounced).",
+  "source_blob": "2025-07-14-202719.txt"
+ },
+ {
+  "session_date": "2025-07-14",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "3:30AM",
+  "rth": false,
+  "es_levels": [
+   6263
+  ],
+  "quote": "I will start by quickly recapping that 3:30AM Monday Failed Breakdown of the 6263 Sunday 6pm low, as this one was very classic.",
+  "source_blob": "2025-07-17-202648.txt"
+ },
+ {
+  "session_date": "2025-07-16",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "Here, it was just a simple, classic Failed Breakdown.",
+  "source_blob": "2025-07-16-202644.txt"
+ },
+ {
+  "session_date": "2025-07-17",
+  "setup": "failed_breakdown",
+  "explicitness": "mention",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "8:00AM",
+  "rth": false,
+  "es_levels": [
+   6301
+  ],
+  "quote": "The 8am-830AM Thursday Failed Breakdown/Reclaim of 6301, I gave this out on Wednesday at 4pm when we were a few points above 6301.",
+  "source_blob": "2025-07-22-202646.txt"
+ },
+ {
+  "session_date": "2025-07-17",
+  "setup": "level_reclaim",
+  "explicitness": "mention",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6301
+  ],
+  "quote": "This is somewhat complex, but its a great example of a hybrid Reclaim (of the 6301 S/R shelf from Monday-Wednesday) and a low quality Failed Breakdown (of the cluster of lows at 63",
+  "source_blob": "2025-07-20-140556.txt"
+ },
+ {
+  "session_date": "2025-07-17",
+  "setup": "other",
+  "explicitness": "strong",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6301
+  ],
+  "quote": "This is somewhat complex, but its a great example of a hybrid Reclaim (of the 6301 S/R shelf from Monday-Wednesday) and a low quality Failed Breakdown (of the cluster of lows at 63",
+  "source_blob": "2025-07-18-202559.txt"
+ },
+ {
+  "session_date": "2025-07-22",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": "10:05AM",
+  "rth": true,
+  "es_levels": [
+   6323
+  ],
+  "quote": "I am still holding my 10% long runner from the 6323 (Friday's low) Failed Breakdown at 10:05AM today and this was a textbook Failed Breakdown.",
+  "source_blob": "2025-07-22-202646.txt"
+ },
+ {
+  "session_date": "2025-07-22",
+  "setup": "level_reclaim",
+  "explicitness": "classic",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6323
+  ],
+  "quote": "This was a classic Level Reclaim which is a complex variant of the Failed Breakdown.",
+  "source_blob": "2025-07-28-202541.txt"
+ },
+ {
+  "session_date": "2025-07-24",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6395
+  ],
+  "quote": "I'll do a deep dive into a textbook Failed Breakdown we had last Thursday morning where ES lost and recovered a significant low at 6395, giving us the squeeze to this weeks highs.",
+  "source_blob": "2025-07-29-202849.txt"
+ },
+ {
+  "session_date": "2025-07-24",
+  "setup": "level_reclaim",
+  "explicitness": "classic",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This was a classic Level Reclaim which is a complex variant of the Failed Breakdown.",
+  "source_blob": "2025-07-29-202849.txt"
+ },
+ {
+  "session_date": "2025-07-28",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This setup a more classical Failed Breakdown late in the day Monday.",
+  "source_blob": "2025-07-30-203910.txt"
+ },
+ {
+  "session_date": "2025-07-30",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 4,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "We got a textbook, planned Failed Breakdown here of yesterdays lows.",
+  "source_blob": "2025-07-31-191728.txt"
+ },
+ {
+  "session_date": "2025-07-31",
+  "setup": "other",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "11:30PM",
+  "rth": false,
+  "es_levels": [
+   6374
+  ],
+  "quote": "a very classic Back-Test Short of 6374 around 11:30PM Thursday.",
+  "source_blob": "2025-08-04-202744.txt"
+ },
+ {
+  "session_date": "2025-08-01",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "2:30PM",
+  "rth": true,
+  "es_levels": [
+   6298,
+   6240
+  ],
+  "quote": "Last Friday at 2:30PM, ES saw an absolutely textbook Failed Breakdown: Around noon Friday ES went \u201celevator down\u201d from 6298 to 6240.",
+  "source_blob": "2025-08-08-202208.txt"
+ },
+ {
+  "session_date": "2025-08-01",
+  "setup": "level_reclaim",
+  "explicitness": "mention",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "10:15AM",
+  "rth": true,
+  "es_levels": [
+   6257,
+   6244
+  ],
+  "quote": "The 10:15AM Friday Reclaim of 6257 Squeeze. On Friday morning ES sold violently down to 6244 by 10am.",
+  "source_blob": "2025-08-05-202557.txt"
+ },
+ {
+  "session_date": "2025-08-07",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "The obvious setup here is the Failed Breakdown of today's daily low. We saw exactly this, and this is the classic Failed Breakdown.",
+  "source_blob": "2025-08-07-202842.txt"
+ },
+ {
+  "session_date": "2025-08-08",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "2:30PM",
+  "rth": true,
+  "es_levels": [
+   6298,
+   6240
+  ],
+  "quote": "Last Friday at 2:30PM, ES saw an absolutely textbook Failed Breakdown: Around noon Friday ES went elevator down from 6298 to 6240.",
+  "source_blob": "2025-08-10-142335.txt"
+ },
+ {
+  "session_date": "2025-08-11",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "low",
+  "agreement": 2,
+  "time_et": "4:30AM",
+  "rth": false,
+  "es_levels": [
+   6413
+  ],
+  "quote": "We got a great Failed Breakdown between 4:30AM and 5:00AM Monday, this was then followed up with a classic double-dip Failed Breakdown.",
+  "source_blob": "2025-08-12-202704.txt"
+ },
+ {
+  "session_date": "2025-08-12",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6461,
+   6507
+  ],
+  "quote": "textbook Failed Breakdown where ES recovered a major low from last Tuesday at 6461, then squeezed to 6507 by Friday morning.",
+  "source_blob": "2025-08-19-202330.txt"
+ },
+ {
+  "session_date": "2025-08-15",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6461,
+   6507
+  ],
+  "quote": "This in turn setup a textbook Failed Breakdown where ES recovered a major low from last Tuesday at 6461, then squeezed to 6507 by Friday morning.",
+  "source_blob": "2025-08-20-202133.txt"
+ },
+ {
+  "session_date": "2025-08-21",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 4,
+  "time_et": "9:45AM",
+  "rth": true,
+  "es_levels": [
+   6375,
+   6410
+  ],
+  "quote": "On Thursday we had the most classic and simple Failed Breakdown type: At 9:45AM Thursday ES set the morning low at 6375 from which we rallied to 6410+.",
+  "source_blob": "2025-08-26-201706.txt"
+ },
+ {
+  "session_date": "2025-08-22",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "10:00AM",
+  "rth": true,
+  "es_levels": [],
+  "quote": "prior to the Jackson Hole meeting at 10am Friday and this was one of the most aesthetic, textbook Failed Breakdowns we have seen this year.",
+  "source_blob": "2025-08-27-223531.txt"
+ },
+ {
+  "session_date": "2025-08-25",
+  "setup": "other",
+  "explicitness": "textbook",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "For those interested in reading the technical setup that caused this flush, it was a textbook example of my rarest setup type (the Breakdown Short).",
+  "source_blob": "2025-08-25-202512.txt"
+ },
+ {
+  "session_date": "2025-08-27",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": "9:30AM",
+  "rth": true,
+  "es_levels": [
+   6478
+  ],
+  "quote": "Firstly, we got a textbook Failed Breakdown Wednesday morning at 9:30AM of 6478.",
+  "source_blob": "2025-08-29-202707.txt"
+ },
+ {
+  "session_date": "2025-08-28",
+  "setup": "failed_breakdown",
+  "explicitness": "mention",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This was not a textbook Failed Breakdown.",
+  "source_blob": "2025-08-28-203035.txt"
+ },
+ {
+  "session_date": "2025-08-29",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "11:05AM",
+  "rth": true,
+  "es_levels": [
+   6460
+  ],
+  "quote": "At 11:05AM Friday ES put in a textbook Failed Breakdown of last Wednesday's daily 6460 low which was set after Nvidia earnings.",
+  "source_blob": "2025-09-02-202543.txt"
+ },
+ {
+  "session_date": "2025-09-02",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6384,
+   6371
+  ],
+  "quote": "This was a very classic Failed Breakdown: Set a big low at 6384, flush it to 6371, recover it, squeeze.",
+  "source_blob": "2025-09-07-145440.txt"
+ },
+ {
+  "session_date": "2025-09-03",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6484
+  ],
+  "quote": "This was a classic Failed Breakdown: ES set a big low at 6484, goes elevator down, loses the low, flushes it, traps shorts, recovers, squeezes.",
+  "source_blob": "2025-09-03-202741.txt"
+ },
+ {
+  "session_date": "2025-09-05",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "11:13AM",
+  "rth": true,
+  "es_levels": [],
+  "quote": "Last Friday at 11:13AM ES saw an absolutely textbook Failed Breakdown and I would strongly recommend readers read the Education section of my last newsletter for the full run down ",
+  "source_blob": "2025-09-11-202809.txt"
+ },
+ {
+  "session_date": "2025-09-08",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "low",
+  "agreement": 3,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6450,
+   6456
+  ],
+  "quote": "A much more attractive setup is if we flush it down to 6450, then put in a Failed Breakdown of today's 6456 low. This Failed Breakdown was textbook because of the context.",
+  "source_blob": "2025-09-11-202809.txt"
+ },
+ {
+  "session_date": "2025-09-09",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "10:52AM",
+  "rth": true,
+  "es_levels": [
+   6490
+  ],
+  "quote": "The 10:52AM Tuesday Failed Breakdown of the 6490 Monday Daily Low. This was a straight-forward, classic Failed Breakdown.",
+  "source_blob": "2025-09-11-202809.txt"
+ },
+ {
+  "session_date": "2025-09-10",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 4,
+  "time_et": "3:40PM",
+  "rth": true,
+  "es_levels": [
+   6518,
+   6506,
+   6508,
+   6552,
+   6565,
+   6578
+  ],
+  "quote": "We had an absolutely classic Failed Breakdown of this at 3:40PM today which was discussed above and live tweeted.",
+  "source_blob": "2025-09-11-202809.txt"
+ },
+ {
+  "session_date": "2025-09-12",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6490
+  ],
+  "quote": "Obvious setup of interest here is the Failed Breakdown of today's daily low at 6490. Why was this textbook?",
+  "source_blob": "2025-09-12-202534.txt"
+ },
+ {
+  "session_date": "2025-09-16",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "4:00PM",
+  "rth": false,
+  "es_levels": [
+   6660
+  ],
+  "quote": "I wrote on Tuesday at 4pm: \u201cOne option would be the Failed Breakdown of today's low at 6660.\u201d In this case, we had a fairly classical Failed Breakdown whereby we had the Tuesday da",
+  "source_blob": "2025-09-18-202135.txt"
+ },
+ {
+  "session_date": "2025-09-23",
+  "setup": "failed_breakdown",
+  "explicitness": "mention",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "8:00AM",
+  "rth": false,
+  "es_levels": [
+   6745
+  ],
+  "quote": "The Tuesday 8am Micro Failed Breakdown of the 6745 Shelf.",
+  "source_blob": "2025-09-24-202729.txt"
+ },
+ {
+  "session_date": "2025-09-23",
+  "setup": "level_reclaim",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "30:00AM",
+  "rth": false,
+  "es_levels": [
+   6698,
+   6702,
+   6704,
+   6730
+  ],
+  "quote": "At 930AM, we got a classic level reclaim long where ES held 6698-702, recovered 6704, then squeezed to ~6730.",
+  "source_blob": "2025-09-23-202931.txt"
+ },
+ {
+  "session_date": "2025-09-24",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "We essentially set the high here from which we commenced a monster flush This then setup a more classical Failed Breakdown.",
+  "source_blob": "2025-09-26-202955.txt"
+ },
+ {
+  "session_date": "2025-09-24",
+  "setup": "level_reclaim",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "30:00AM",
+  "rth": false,
+  "es_levels": [
+   6698,
+   6702,
+   6704,
+   6730
+  ],
+  "quote": "At 930AM, we got a classic 'level reclaim' long where ES held 6698-702 as mentioned above, recovered 6704, then squeezed to ~6730.",
+  "source_blob": "2025-09-24-202729.txt"
+ },
+ {
+  "session_date": "2025-09-25",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": "2:10PM",
+  "rth": true,
+  "es_levels": [
+   6631
+  ],
+  "quote": "The 2:10PM Thursday Failed Breakdown of 6631. We had an extremely textbook Failed Breakdown a little after 2pm on Thursday.",
+  "source_blob": "2025-09-29-202510.txt"
+ },
+ {
+  "session_date": "2025-09-25",
+  "setup": "other",
+  "explicitness": "strong",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "a monster Back-Test Short we had Thursday which took us down to yesterdays low.",
+  "source_blob": "2025-09-28-141216.txt"
+ },
+ {
+  "session_date": "2025-09-28",
+  "setup": "level_reclaim",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "6:00PM",
+  "rth": false,
+  "es_levels": [],
+  "quote": "I will also run down some quality setups we had to start this week afterwards, including a textbook \u201cLevel Reclaim\u201d long off the Sunday 6pm open, and a Failed Breakdown we had yest",
+  "source_blob": "2025-10-01-201728.txt"
+ },
+ {
+  "session_date": "2025-09-29",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6696
+  ],
+  "quote": "It was the classic Failed Breakdown: We swept Monday's 6696 daily low by a couple points, recovered, longs triggered.",
+  "source_blob": "2025-10-05-144742.txt"
+ },
+ {
+  "session_date": "2025-09-30",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "4:30AM",
+  "rth": false,
+  "es_levels": [
+   6693
+  ],
+  "quote": "This was about as textbook as a Failed Breakdown gets: By 4:30AM, ES had recovered 6693.",
+  "source_blob": "2025-10-01-201728.txt"
+ },
+ {
+  "session_date": "2025-10-01",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6699
+  ],
+  "quote": "This Failed Breakdown was interesting for two reasons: 1) Its just textbook in structure.",
+  "source_blob": "2025-10-06-202412.txt"
+ },
+ {
+  "session_date": "2025-10-02",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This was the textbook Failed Breakdown: Price flushes the prior days low, traps, squeezes.",
+  "source_blob": "2025-10-02-202335.txt"
+ },
+ {
+  "session_date": "2025-10-03",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": "2:15PM",
+  "rth": true,
+  "es_levels": [
+   6766
+  ],
+  "quote": "A fairly textbook Failed Breakdown we had at around 2:15PM where ES flushed a multi-hour, 30 point low set Friday morning at ~6766 by about 12 points, recovered it, and rallied 14 ",
+  "source_blob": "2025-10-08-202426.txt"
+ },
+ {
+  "session_date": "2025-10-06",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": "10:12AM",
+  "rth": true,
+  "es_levels": [
+   6772
+  ],
+  "quote": "The Monday 10:12AM Textbook Failed Breakdown of 6772",
+  "source_blob": "2025-10-09-203031.txt"
+ },
+ {
+  "session_date": "2025-10-14",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "9:52AM",
+  "rth": true,
+  "es_levels": [
+   6605,
+   6766
+  ],
+  "quote": "absolutely textbook Failed Breakdown at 9:52AM Tuesday: flushed 6605 by 12 points, recovered, squeezed 150+ points.",
+  "source_blob": "2025-10-16-203307.txt"
+ },
+ {
+  "session_date": "2025-10-17",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": "4:35AM",
+  "rth": false,
+  "es_levels": [
+   6593,
+   6573
+  ],
+  "quote": "On Friday at 4:35AM ES had a straight out of the textbook, A+, full-powered Failed Breakdown when ES sold 90 points, undercut the Tuesday October 14th 6593 low, and recovered.",
+  "source_blob": "2025-10-24-203043.txt"
+ },
+ {
+  "session_date": "2025-10-19",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "8:35PM",
+  "rth": false,
+  "es_levels": [],
+  "quote": "very textbook Failed Breakdown shortly after the Sunday open (at 8:35PM).",
+  "source_blob": "2025-10-22-202641.txt"
+ },
+ {
+  "session_date": "2025-10-20",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This was a classic Failed Breakdown, we see them every day nearly, and this was a great example to learn from.",
+  "source_blob": "2025-10-20-202404.txt"
+ },
+ {
+  "session_date": "2025-10-22",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "2:00PM",
+  "rth": true,
+  "es_levels": [
+   6694
+  ],
+  "quote": "In the most classic form, it will be a Failed Breakdown of the prior days low and this is exactly what we had Wednesday at 2pm when we lost the Tuesday 6694 daily low by 4 points, ",
+  "source_blob": "2025-10-27-202816.txt"
+ },
+ {
+  "session_date": "2025-10-24",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "4:35AM",
+  "rth": false,
+  "es_levels": [
+   6593
+  ],
+  "quote": "On Friday at 4:35AM ES had a straight out of the textbook, A+, full-powered Failed Breakdown when ES sold 90 points, undercut the Tuesday October 14th 6593 low, and recovered.",
+  "source_blob": "2025-10-26-142636.txt"
+ },
+ {
+  "session_date": "2025-10-28",
+  "setup": "level_reclaim",
+  "explicitness": "strong",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "great example of the Level Reclaim long, the complex variant of the Failed Breakdown.",
+  "source_blob": "2025-10-28-202319.txt"
+ },
+ {
+  "session_date": "2025-10-29",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": "2:30PM",
+  "rth": true,
+  "es_levels": [
+   6942,
+   6881,
+   6882,
+   6869
+  ],
+  "quote": "A very textbook Failed Breakdown we had right after FOMC Wednesday where ES sold from 6942 at 2:30PM Wednesday down to 6881.",
+  "source_blob": "2025-11-03-212818.txt"
+ },
+ {
+  "session_date": "2025-10-29",
+  "setup": "level_reclaim",
+  "explicitness": "classic",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "Instead of there being a low that sweeps, traps, and recovers as in the traditional Failed Breakdown, here we have a clear classical horizontal trendline that flushes and reclaims.",
+  "source_blob": "2025-10-29-203503.txt"
+ },
+ {
+  "session_date": "2025-10-30",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6882,
+   6869
+  ],
+  "quote": "Today we saw a very classic Failed Breakdown where we swept yesterday's 6882 daily low down to 6869 support, trapped shorts, then popped.",
+  "source_blob": "2025-10-30-183058.txt"
+ },
+ {
+  "session_date": "2025-10-31",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "1:30PM",
+  "rth": true,
+  "es_levels": [
+   6851
+  ],
+  "quote": "Shortly after around 1:30PM ES recovered 6851, putting in the most classic Failed Breakdown: The Failed Breakdown of the prior days low.",
+  "source_blob": "2025-11-05-213059.txt"
+ },
+ {
+  "session_date": "2025-10-31",
+  "setup": "flush_recover",
+  "explicitness": "strong",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6851
+  ],
+  "quote": "Friday afternoons flush and recovery of the 6851 Thursday daily low was a perfect example of this.",
+  "source_blob": "2025-11-03-212818.txt"
+ },
+ {
+  "session_date": "2025-11-03",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "3:10AM",
+  "rth": false,
+  "es_levels": [
+   6877
+  ],
+  "quote": "The 3:10AM Monday Failed Breakdown of the 6877 Sunday Low. This was a textbook Failed Breakdown.",
+  "source_blob": "2025-11-04-212926.txt"
+ },
+ {
+  "session_date": "2025-11-04",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This setup a Failed Breakdown of the more classic variety.",
+  "source_blob": "2025-11-05-213059.txt"
+ },
+ {
+  "session_date": "2025-11-04",
+  "setup": "level_reclaim",
+  "explicitness": "strong",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6818
+  ],
+  "quote": "Level Reclaims are more advanced and more subtle to spot but we had a perfect example of one at 6818.",
+  "source_blob": "2025-11-05-213059.txt"
+ },
+ {
+  "session_date": "2025-11-06",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "Before getting into today's action I'd like to just rewind a little to Thursday afternoon to discuss in a little more detail a very textbook Failed Breakdown we had.",
+  "source_blob": "2025-11-11-212714.txt"
+ },
+ {
+  "session_date": "2025-11-07",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "1:20PM",
+  "rth": true,
+  "es_levels": [],
+  "quote": "Friday's 1:20PM was a textbook example of how Failed Breakdowns work.",
+  "source_blob": "2025-11-12-213023.txt"
+ },
+ {
+  "session_date": "2025-11-18",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6670
+  ],
+  "quote": "another very classic Failed Breakdown of the Friday 6670 Daily Low.",
+  "source_blob": "2025-11-18-212841.txt"
+ },
+ {
+  "session_date": "2025-11-19",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6670
+  ],
+  "quote": "This in turn setup another - very classic - Failed Breakdown of the Friday 6670 Daily Low.",
+  "source_blob": "2025-11-19-193820.txt"
+ },
+ {
+  "session_date": "2025-11-21",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "5:30AM",
+  "rth": false,
+  "es_levels": [
+   6540,
+   6542
+  ],
+  "quote": "We set a nice low at 6540-42 Thursday evening, we flushed it and recovered by 5:30AM Friday morning, giving us a classic Failed Breakdown and ripping.",
+  "source_blob": "2025-11-24-212841.txt"
+ },
+ {
+  "session_date": "2025-11-24",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "4:00PM",
+  "rth": false,
+  "es_levels": [],
+  "quote": "This was a classic, powerful Failed Breakdown which generated a 160 point leg up, and it was provided to readers last Monday at 4pm when I wrote: \u201cThanksgiving week underway.",
+  "source_blob": "2025-12-03-212540.txt"
+ },
+ {
+  "session_date": "2025-11-25",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6701
+  ],
+  "quote": "high powered, classic Failed Breakdown; deep dive into last Tuesday's 6701 Failed Breakdown.",
+  "source_blob": "2025-12-04-212933.txt"
+ },
+ {
+  "session_date": "2025-11-28",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "picture perfect example of a Failed Breakdown in its fullest, most perfect iteration.",
+  "source_blob": "2025-11-28-183300.txt"
+ },
+ {
+  "session_date": "2025-12-01",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This was a very textbook Failed Breakdown.",
+  "source_blob": "2025-12-01-212836.txt"
+ },
+ {
+  "session_date": "2025-12-10",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "10:22PM",
+  "rth": false,
+  "es_levels": [],
+  "quote": "last Wednesday evening at 10:22PM ES triggered an absolutely textbook Failed Breakdown -> ~100 point rally.",
+  "source_blob": "2025-12-16-212115.txt"
+ },
+ {
+  "session_date": "2025-12-12",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "low",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This one was absolutely textbook - as textbook as a Failed Breakdown gets.",
+  "source_blob": "2025-12-12-212857.txt"
+ },
+ {
+  "session_date": "2025-12-15",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This one was absolutely textbook - as textbook as a Failed Breakdown gets.",
+  "source_blob": "2025-12-15-213116.txt"
+ },
+ {
+  "session_date": "2025-12-17",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "In today's newsletter I'll talk this, I'll discuss the setups that produced the squeeze since last Wednesday in detail (its a classic Failed Breakdown).",
+  "source_blob": "2025-12-24-193730.txt"
+ },
+ {
+  "session_date": "2025-12-29",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "12:25PM",
+  "rth": true,
+  "es_levels": [
+   6935,
+   6938
+  ],
+  "quote": "About an hour after the 12:25PM 6935-38 backtest on December 29th, ES put in a very textbook Failed Breakdown at the same spot.",
+  "source_blob": "2026-01-05-211934.txt"
+ },
+ {
+  "session_date": "2026-01-02",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "10:30AM",
+  "rth": true,
+  "es_levels": [
+   6890,
+   6896
+  ],
+  "quote": "The 10:30AM Failed Breakdown of 6890/96: as clear and textbook as a Failed Breakdown gets.",
+  "source_blob": "2026-01-02-213032.txt"
+ },
+ {
+  "session_date": "2026-01-09",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "10:05AM",
+  "rth": true,
+  "es_levels": [
+   6964
+  ],
+  "quote": "The 10:05AM Classic Failed Breakdown of 6964: At 10:05AM, ES got a classic Failed Breakdown.",
+  "source_blob": "2026-01-09-193945.txt"
+ },
+ {
+  "session_date": "2026-01-12",
+  "setup": "other",
+  "explicitness": "classic",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This was a classic elevator down sell where ES lost every support with ease in a single flush.",
+  "source_blob": "2026-01-12-211304.txt"
+ },
+ {
+  "session_date": "2026-01-13",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6986,
+   7002
+  ],
+  "quote": "Tuesday Evening: As stated above and discussed extensively in yesterday's newsletter (this setup was provided in advance), late day yesterday we got a quality and classic Failed Br",
+  "source_blob": "2026-01-14-210934.txt"
+ },
+ {
+  "session_date": "2026-01-13",
+  "setup": "other",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This was a classic elevator down sell where ES lost every support with ease in a single flush.",
+  "source_blob": "2026-01-13-212409.txt"
+ },
+ {
+  "session_date": "2026-01-21",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 4,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6822
+  ],
+  "quote": "This rally was caused by the textbook Failed Breakdown of 6822 we saw yesterday morning, which I discussed in yesterday's trade recap section.",
+  "source_blob": "2026-01-22-210928.txt"
+ },
+ {
+  "session_date": "2026-01-29",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "11:22AM",
+  "rth": true,
+  "es_levels": [
+   6923
+  ],
+  "quote": "Beginners should stick with classic Failed Breakdowns like the one we saw at 11:22AM yesterday when we recovered 6923 and this is what ultimately started the rip higher into last e",
+  "source_blob": "2026-01-30-211607.txt"
+ },
+ {
+  "session_date": "2026-01-30",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "11:22AM",
+  "rth": true,
+  "es_levels": [
+   6923
+  ],
+  "quote": "Beginners should stick with classic Failed Breakdowns like the one we saw at 11:22AM yesterday when we recovered 6923 and this is what ultimately started the rip higher into last e",
+  "source_blob": "2026-02-01-160352.txt"
+ },
+ {
+  "session_date": "2026-02-02",
+  "setup": "level_reclaim",
+  "explicitness": "strong",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   7005
+  ],
+  "quote": "would be a Level Reclaim long, not a classic Failed breakdown (7005 resistance shelf).",
+  "source_blob": "2026-02-02-210818.txt"
+ },
+ {
+  "session_date": "2026-02-03",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This was a classic Failed Breakdown given to readers in advance and you can read about it in the trade recap section of yesterday's newsletter.",
+  "source_blob": "2026-02-04-204226.txt"
+ },
+ {
+  "session_date": "2026-02-03",
+  "setup": "level_reclaim",
+  "explicitness": "mention",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "4:00PM",
+  "rth": false,
+  "es_levels": [
+   7005,
+   6999
+  ],
+  "quote": "This would be a Level Reclaim long, not a classic Failed breakdown. At 4pm we dipped to 6999 or so, then popped back to 7005.",
+  "source_blob": "2026-02-03-211853.txt"
+ },
+ {
+  "session_date": "2026-02-06",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6860
+  ],
+  "quote": "This was an absolutely classic Failed Breakdown, and we saw a monster amount of follow through to 6860's by this morning.",
+  "source_blob": "2026-02-06-210536.txt"
+ },
+ {
+  "session_date": "2026-02-13",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": "9:45AM",
+  "rth": true,
+  "es_levels": [
+   6822,
+   6824,
+   6808,
+   6893
+  ],
+  "quote": "A textbook Failed Breakdown where at 9:45AM ES swept a big overnight shelf of lows at 6822-24, sold down to 6808, recovered, that shelf and ran to 6893 target.",
+  "source_blob": "2026-02-13-211136.txt"
+ },
+ {
+  "session_date": "2026-02-24",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "10:40PM",
+  "rth": false,
+  "es_levels": [
+   6893
+  ],
+  "quote": "Tuesday Evening and the 10:40PM 6893 Failed Breakdown Yesterday we closed up at the high of day after ES put in an absolutely textbook Failed Breakdown yesterday morning at 9:35AM.",
+  "source_blob": "2026-02-25-201856.txt"
+ },
+ {
+  "session_date": "2026-02-27",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6838,
+   6841
+  ],
+  "quote": "prospective: recover today's daily low of 6841 for a classic Failed Breakdown.",
+  "source_blob": "2026-02-27-210120.txt"
+ },
+ {
+  "session_date": "2026-03-02",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6768,
+   6759
+  ],
+  "quote": "Nothing under there until 6759 but instead of buying it wait for it to hold and recover today's 6768 daily low for a huge Failed Breakdown. This was an absolutely textbook Failed B",
+  "source_blob": "2026-03-03-210204.txt"
+ },
+ {
+  "session_date": "2026-03-09",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "We had a massive squeeze Monday into Tuesday, driven by a classic Failed Breakdown Monday a little after midnight.",
+  "source_blob": "2026-03-11-200235.txt"
+ },
+ {
+  "session_date": "2026-03-16",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "6:30AM",
+  "rth": false,
+  "es_levels": [
+   6612
+  ],
+  "quote": "Around 6:30AM, ES got an absolutely classic, bread-and-butter Failed Breakdown of yesterday's 6612 daily low.",
+  "source_blob": "2026-03-22-151404.txt"
+ },
+ {
+  "session_date": "2026-03-20",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": "3:44PM",
+  "rth": true,
+  "es_levels": [
+   6535
+  ],
+  "quote": "The Friday Afternoon 3:44PM Failed Breakdown of the September 2025 6535 Low. Late day Friday, ES got an absolutely textbook Failed Breakdown.",
+  "source_blob": "2026-03-23-200744.txt"
+ },
+ {
+  "session_date": "2026-03-26",
+  "setup": "level_reclaim",
+  "explicitness": "mention",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "4:00PM",
+  "rth": false,
+  "es_levels": [
+   6524
+  ],
+  "quote": "I wrote yesterday at 4pm: \u201cYou can also trade and flushes of 6524 and recoveries.\u201d Note that this would be a level reclaim long NOT a classic Failed Breakdown.",
+  "source_blob": "2026-03-27-201139.txt"
+ },
+ {
+  "session_date": "2026-03-27",
+  "setup": "level_reclaim",
+  "explicitness": "mention",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   6524
+  ],
+  "quote": "flushes of 6524 and recoveries: level reclaim long NOT a classic Failed Breakdown.",
+  "source_blob": "2026-03-29-144626.txt"
+ },
+ {
+  "session_date": "2026-03-30",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "30:00PM",
+  "rth": false,
+  "es_levels": [
+   6360,
+   6360.25
+  ],
+  "quote": "I am still holding my 10% long runner from the classic 6360 Failed Breakdown we saw at 830PM last night, and this was an absolutely textbook example of a Failed Breakdown.",
+  "source_blob": "2026-03-31-202505.txt"
+ },
+ {
+  "session_date": "2026-04-06",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This was a very classic Failed Breakdown.",
+  "source_blob": "2026-04-06-200856.txt"
+ },
+ {
+  "session_date": "2026-04-23",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 4,
+  "time_et": "1:50PM",
+  "rth": true,
+  "es_levels": [
+   7085
+  ],
+  "quote": "We had an extremely nice rally from yesterday's 1:50PM Failed Breakdown of 7085 and this was textbook and had all the components you want to see.",
+  "source_blob": "2026-04-24-195432.txt"
+ },
+ {
+  "session_date": "2026-04-29",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   7137
+  ],
+  "quote": "Yesterday after earnings very textbook: Failed Breakdown of yesterday's 7137 daily low.",
+  "source_blob": "2026-04-30-191324.txt"
+ },
+ {
+  "session_date": "2026-06-04",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 3,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   7580,
+   7527
+  ],
+  "quote": "Today was a very classic Failed Breakdown example with all the typical building blocks: A sharp, fast elevator down sell last evening from 7580+ down to 7527.",
+  "source_blob": "2026-06-04-194556.txt"
+ },
+ {
+  "session_date": "2026-06-05",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   7580,
+   7527
+  ],
+  "quote": "Today was a very classic Failed Breakdown example with all the typical building blocks: A sharp, fast elevator down sell last evening from 7580+ down to 7527.",
+  "source_blob": "2026-06-05-200652.txt"
+ },
+ {
+  "session_date": "2026-06-08",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "This is a classic Failed Breakdown.",
+  "source_blob": "2026-06-08-191145.txt"
+ },
+ {
+  "session_date": "2026-06-09",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": "12:57PM",
+  "rth": true,
+  "es_levels": [
+   7275
+  ],
+  "quote": "By 12:57PM, we recovered 7275 here for a very classic Failed Breakdown.",
+  "source_blob": "2026-06-09-195739.txt"
+ },
+ {
+  "session_date": "2026-06-10",
+  "setup": "failed_breakdown",
+  "explicitness": "textbook",
+  "date_confidence": "high",
+  "agreement": 4,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   7300,
+   7232
+  ],
+  "quote": "What we saw last night was an absolutely textbook Failed Breakdown: 1) Elevator down sell from 7300+ to 7232 2) We then lost Tuesday's massive low 3) We recovered and long.",
+  "source_blob": "2026-06-11-192726.txt"
+ },
+ {
+  "session_date": "2026-06-11",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "Thursday Evening Yesterday saw ES put in an absolutely classic Failed Breakdown.",
+  "source_blob": "2026-06-12-195207.txt"
+ },
+ {
+  "session_date": "2026-06-17",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [],
+  "quote": "Last Wednesday after FOMC saw ES put in an absolutely classic Failed Breakdown.",
+  "source_blob": "2026-06-23-192244.txt"
+ },
+ {
+  "session_date": "2026-06-21",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": "6:00PM",
+  "rth": false,
+  "es_levels": [
+   7521
+  ],
+  "quote": "Sunday after the 6pm futures open we got a highly classic Failed Breakdown of Friday's daily low of 7521 and ripped.",
+  "source_blob": "2026-06-23-192244.txt"
+ },
+ {
+  "session_date": "2026-06-25",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "high",
+  "agreement": 2,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   7490
+  ],
+  "quote": "We ripped heavily after this to 7490+ and this was a classic Failed Breakdown.",
+  "source_blob": "2026-06-25-194351.txt"
+ },
+ {
+  "session_date": "2026-06-26",
+  "setup": "failed_breakdown",
+  "explicitness": "classic",
+  "date_confidence": "low",
+  "agreement": 1,
+  "time_et": null,
+  "rth": null,
+  "es_levels": [
+   7470
+  ],
+  "quote": "We ripped heavily after this to 7470+ yesterday and this was a classic Failed Breakdown.",
+  "source_blob": "2026-06-28-141207.txt"
+ }
+]
