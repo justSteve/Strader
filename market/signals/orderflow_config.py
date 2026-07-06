@@ -59,6 +59,18 @@ PROFILE_BUCKET_TICKS = 4        # 1.0-pt buckets — 0.25 is too noisy for nodes
 LVN_MAX_FRACTION = 0.30         # local minimum below 30% of POC volume = LVN
 HVN_MIN_FRACTION = 0.70         # local maximum above 70% of POC volume = HVN
 
+# ── four-beat recognizer (spec §3; st-2kf) ─────────────────────────────────
+# Delta thresholds seeded from the 7/2 RTH |bar-delta| distribution
+# (p50=111 p75=210 p90=312): flush ≈ p90, quiet ≈ p50, confirm ≈ p75.
+ENGAGE_PENETRATION_TICKS = 2    # bar must trade ≥ this beyond the level (beat 1)
+FLUSH_DELTA_MIN = 300           # |bar Δ| for a VIOLENT break -> failed_breakdown
+QUIET_DELTA_MAX = 110           # |bar Δ| below this = quiet loss -> level_reclaim
+STALL_EXTENSION_TICKS = 1       # beat 2: extreme extends ≤ this while aggression continues
+FLIP_DELTA_MIN = 150            # beat 3: opposite-direction bar Δ
+CONFIRM_DELTA_MIN = 200         # beat 4 fallback when no opposite ImbalanceStack printed
+ENGAGEMENT_WINDOW_BARS = 12     # beats must complete within this many bars of beat 1
+INVALIDATE_TICKS = 16           # 4.0 pts beyond the level without reclaim kills the setup
+
 # ── consumer wiring (spec §6) ───────────────────────────────────────────────
 CONFLUENCE_TOLERANCE_PTS = 2.0  # Mancini level ∩ anchor proximity
 

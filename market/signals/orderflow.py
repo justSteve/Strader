@@ -49,3 +49,20 @@ class ImbalanceStack(Signal):
     direction: Literal["buy", "sell"] = "buy"
     prices: tuple[float, ...] = ()   # ascending, one per stacked level
     ratios: tuple[float, ...] = ()   # dominant/opposite per level (opposite floored at 1)
+
+
+@dataclass(frozen=True)
+class SetupRecognition(Signal):
+    """A Carmine setup forming / confirmed / invalidated at a level (spec §3,
+    §6). Score-don't-gate: partial recognitions surface as ``forming`` with
+    the beats that fired; ``confirmed`` carries everything SingletonSetup
+    needs. The four beats: flush (aggression past the level), stall (failed
+    acceptance), flip (delta turns), confirm (reversal re-takes the level)."""
+
+    setup: str = "failed_breakdown"            # CarmineSetup literal
+    bias: Literal["bullish", "bearish"] = "bullish"
+    anchor_price: float = 0.0
+    anchor_kind: str = "support"               # support|resistance|range_high|range_low|lvn
+    state: Literal["forming", "confirmed", "invalidated"] = "forming"
+    beats: tuple[str, ...] = ()                # subset of (flush, stall, flip, confirm)
+    mancini_confluence: bool = False
