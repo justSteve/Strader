@@ -1,6 +1,6 @@
 # Orderflow Drill & Session Review — Operator's Guide
 
-*st-yfn / st-6b0 · updated 2026-07-06. The one-page answer to "how does this apparatus work?"*
+*st-yfn / st-6b0 · updated 2026-07-06 (post st-2kf/st-bw9). The one-page answer to "how does this apparatus work?"*
 
 ## What this is
 
@@ -40,7 +40,11 @@ One page per day: the **forecast letter** (last one published before the open �
 
 ## Under the hood, already running
 
-The engine computes more than the drill yet displays: session-anchored **CVD** (untagged prints bucketed separately, never faked into delta), **sweeps** (one aggressor walking ≥3 levels, ≥100 contracts, sub-¼-second — ~39/session), **large lots** (≥100 contracts and ≥10× the rolling median print — ~33/session), **delta divergences** at confirmed swing pivots (~97/session), per-bar **diagonal imbalances** (~333 levels/session), and the **prior-session volume profile** (POC/HVN/LVN as levels — on 7/2 the math's POC 7510 and LVNs 7491/7541 landed on Mancini's 7511/7492/7541). These become visible in the drill when the four-beat **setup recognizer** (st-2kf) lands and starts saying "failed breakdown forming at your level" with its evidence attached.
+The engine computes more than the drill yet displays: session-anchored **CVD** (untagged prints bucketed separately, never faked into delta), **sweeps** (one aggressor walking ≥3 levels, ≥100 contracts, sub-¼-second — ~39/session), **large lots** (≥100 contracts and ≥10× the rolling median print — ~33/session), **delta divergences** at confirmed swing pivots (~97/session), per-bar **diagonal imbalances** (~333 levels/session), and the **prior-session volume profile** (POC/HVN/LVN as levels — on 7/2 the math's POC 7510 and LVNs 7491/7541 landed on Mancini's 7511/7492/7541).
+
+**The four-beat setup recognizer is built (st-2kf).** One parameterized state machine watches any anchor level — Mancini number, profile LVN, range edge — for the rhythm: **flush** (aggression breaks the level) → **stall** (aggression continues, stops being rewarded) → **flip** (delta turns) → **confirm** (price re-takes the level with opposite evidence). Every beat emits a `forming` recognition with its evidence (score-don't-gate: partial setups surface, never suppressed); lifecycles end `confirmed` or `invalidated`. Flush violence separates `failed_breakdown` from `level_reclaim`; the LVN two-branch read ships labeled *proposed*. A confirmed recognition constructs a `SingletonSetup` directly and drives the `orderflow-confirm` tag and the classifier's confluence input. First real-day read (7/2 vs Mancini's plan levels): nine breakdown engagements correctly invalidated as price fell through support after support, then `level_reclaim` **confirmed** at 7506 (13:59) and 7511 (14:50) into the late recovery — the machine's narrative matched the tape's. Recognitions are not yet drawn inside the drill; that display layer is the next drill upgrade (st-yfn anatomy mode).
+
+**Determinism is enforced by a parity harness in CI (st-bw9).** Every commit replays a real (deliberately messy) 7/2 fixture through the full stack — reader → bars → engine → imbalances → recognizer → profile — and diffs every field of every emitted event against a committed snapshot. An unintended behavior change fails the build naming the first divergent event; an intended one ships as a single reviewable commit via `regen_parity_snapshot.py --reason "..."` plus a CHANGES-log entry. When Phase B live capture starts (8/1), a captured live hour replays through the same pipeline and must reproduce the live signals — the end-to-end live==replay proof.
 
 ## Commands
 
@@ -49,4 +53,9 @@ The engine computes more than the drill yet displays: session-anchored **CVD** (
 | Drill for a day | `.venv/bin/python scripts/orderflow_drill.py --date <YYYY-MM-DD>` |
 | Full review (letters + drill) | `.venv/bin/python scripts/session_review.py --date <YYYY-MM-DD>` |
 | Finer/coarser bars | add `--bar-n 1000` (etc.) |
-| All engine tests | `.venv/bin/python -m pytest tests/market/orderflow -q` |
+| All engine tests (incl. parity) | `.venv/bin/python -m pytest tests/market/orderflow -q` |
+| Regenerate parity snapshot (intentional engine change only) | `.venv/bin/python scripts/regen_parity_snapshot.py --reason "<why>"` |
+
+## Build status (2026-07-06)
+
+Seven of the eight design-spec implementation beads are closed: entities/bars (st-uqf), engine core (st-wnc), imbalance (st-su4), profile (st-7d6), recognizer (st-2kf), parity harness (st-bw9), plus the session review (st-6b0). Open: **st-f05** (volume-bar N=2,000 stays provisional until ~5 full-RTH days accumulate from the daily pull) and **st-d5f** (live quote capture + full absorption evidence — deferred to the 8/1 CME Standard upgrade, Phase B). Drill backlog: show recognizer output in-replay (anatomy mode), plus the parked ideas — commentary whiteboard (st-4qo) and the interactive drill companion (st-ago).
