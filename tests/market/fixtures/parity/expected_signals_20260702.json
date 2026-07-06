@@ -1,0 +1,191 @@
+[
+ {
+  "type": "SweepPrint",
+  "timestamp": "2026-07-02T08:30:00.015586-05:00",
+  "source": "orderflow.sweep",
+  "confidence": 0.5,
+  "reason": "buy sweep 7555.00->7555.50 (3 levels, 49 contracts)",
+  "direction": "buy",
+  "start_price": 7555.0,
+  "end_price": 7555.5,
+  "ticks_swept": 3,
+  "total_size": 49
+ },
+ {
+  "type": "SweepPrint",
+  "timestamp": "2026-07-02T08:30:00.036533-05:00",
+  "source": "orderflow.sweep",
+  "confidence": 0.6667,
+  "reason": "sell sweep 7555.75->7555.00 (4 levels, 66 contracts)",
+  "direction": "sell",
+  "start_price": 7555.75,
+  "end_price": 7555.0,
+  "ticks_swept": 4,
+  "total_size": 66
+ },
+ {
+  "type": "SetupRecognition",
+  "timestamp": "2026-07-02T08:30:01.279499-05:00",
+  "source": "orderflow.recognizer",
+  "confidence": 0.35,
+  "reason": "failed_breakdown forming @ 7555.00 (resistance): beats so far: flush",
+  "setup": "failed_breakdown",
+  "bias": "bearish",
+  "anchor_price": 7555.0,
+  "anchor_kind": "resistance",
+  "state": "forming",
+  "beats": [
+   "flush"
+  ],
+  "mancini_confluence": false
+ },
+ {
+  "type": "SweepPrint",
+  "timestamp": "2026-07-02T08:30:01.441960-05:00",
+  "source": "orderflow.sweep",
+  "confidence": 0.6667,
+  "reason": "buy sweep 7557.00->7557.75 (4 levels, 33 contracts)",
+  "direction": "buy",
+  "start_price": 7557.0,
+  "end_price": 7557.75,
+  "ticks_swept": 4,
+  "total_size": 33
+ },
+ {
+  "type": "SweepPrint",
+  "timestamp": "2026-07-02T13:00:00.734093-05:00",
+  "source": "orderflow.sweep",
+  "confidence": 0.5,
+  "reason": "sell sweep 7482.50->7482.00 (3 levels, 41 contracts)",
+  "direction": "sell",
+  "start_price": 7482.5,
+  "end_price": 7482.0,
+  "ticks_swept": 3,
+  "total_size": 41
+ },
+ {
+  "type": "SetupRecognition",
+  "timestamp": "2026-07-02T13:00:02.316710-05:00",
+  "source": "orderflow.recognizer",
+  "confidence": 0.35,
+  "reason": "failed_breakdown forming @ 7482.00 (support \u2229 mancini): beats so far: flush",
+  "setup": "failed_breakdown",
+  "bias": "bullish",
+  "anchor_price": 7482.0,
+  "anchor_kind": "support",
+  "state": "forming",
+  "beats": [
+   "flush"
+  ],
+  "mancini_confluence": true
+ },
+ {
+  "type": "SetupRecognition",
+  "timestamp": "2026-07-02T13:00:02.316710-05:00",
+  "source": "orderflow.recognizer",
+  "confidence": 0.5,
+  "reason": "failed_breakdown forming @ 7555.00 (resistance): beats so far: flush+flip",
+  "setup": "failed_breakdown",
+  "bias": "bearish",
+  "anchor_price": 7555.0,
+  "anchor_kind": "resistance",
+  "state": "forming",
+  "beats": [
+   "flush",
+   "flip"
+  ],
+  "mancini_confluence": false
+ },
+ {
+  "type": "SetupRecognition",
+  "timestamp": "2026-07-02T13:00:02.316710-05:00",
+  "source": "orderflow.recognizer",
+  "confidence": 0.8,
+  "reason": "failed_breakdown confirmed @ 7555.00 (resistance): confirmed on opposite delta",
+  "setup": "failed_breakdown",
+  "bias": "bearish",
+  "anchor_price": 7555.0,
+  "anchor_kind": "resistance",
+  "state": "confirmed",
+  "beats": [
+   "flush",
+   "flip",
+   "confirm"
+  ],
+  "mancini_confluence": false
+ },
+ {
+  "type": "SweepPrint",
+  "timestamp": "2026-07-02T13:00:03.013479-05:00",
+  "source": "orderflow.sweep",
+  "confidence": 0.5,
+  "reason": "buy sweep 7481.25->7481.75 (3 levels, 39 contracts)",
+  "direction": "buy",
+  "start_price": 7481.25,
+  "end_price": 7481.75,
+  "ticks_swept": 3,
+  "total_size": 39
+ },
+ {
+  "type": "SetupRecognition",
+  "timestamp": "2026-07-02T13:00:24.543765-05:00",
+  "source": "orderflow.recognizer",
+  "confidence": 0.5,
+  "reason": "failed_breakdown forming @ 7482.00 (support \u2229 mancini): beats so far: flush+flip",
+  "setup": "failed_breakdown",
+  "bias": "bullish",
+  "anchor_price": 7482.0,
+  "anchor_kind": "support",
+  "state": "forming",
+  "beats": [
+   "flush",
+   "flip"
+  ],
+  "mancini_confluence": true
+ },
+ {
+  "type": "SetupRecognition",
+  "timestamp": "2026-07-02T13:00:45.976479-05:00",
+  "source": "orderflow.recognizer",
+  "confidence": 0.8,
+  "reason": "failed_breakdown confirmed @ 7482.00 (support \u2229 mancini): confirmed on opposite delta",
+  "setup": "failed_breakdown",
+  "bias": "bullish",
+  "anchor_price": 7482.0,
+  "anchor_kind": "support",
+  "state": "confirmed",
+  "beats": [
+   "flush",
+   "flip",
+   "confirm"
+  ],
+  "mancini_confluence": true
+ },
+ {
+  "type": "Level",
+  "timestamp": "2026-07-02T13:00:45.976479-05:00",
+  "source": "orderflow.profile",
+  "confidence": 0.9,
+  "reason": "POC @ 7482.00 (1019 contracts, prior-rth-session window 2026-07-02)",
+  "price": 7482.0,
+  "level_type": "support"
+ },
+ {
+  "type": "Level",
+  "timestamp": "2026-07-02T13:00:45.976479-05:00",
+  "source": "orderflow.profile",
+  "confidence": 0.6,
+  "reason": "HVN @ 7555.00 (728 contracts, prior-rth-session window 2026-07-02)",
+  "price": 7555.0,
+  "level_type": "resistance"
+ },
+ {
+  "type": "Level",
+  "timestamp": "2026-07-02T13:00:45.976479-05:00",
+  "source": "orderflow.profile",
+  "confidence": 0.6,
+  "reason": "LVN @ 7556.00 (63 contracts, prior-rth-session window 2026-07-02)",
+  "price": 7556.0,
+  "level_type": "resistance"
+ }
+]
