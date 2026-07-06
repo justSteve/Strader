@@ -138,7 +138,8 @@ td:first-child, th:first-child { text-align:left; }
 </div>
 <div id="pace"><span class="lbl">seconds per bar (last 60) — short bars = urgent tape</span><div id="pacebars"></div></div>
 <p class="hint">Space = play/pause · ←/→ = step · Click a level chip to arm it AND jump to its first visit · <b>?</b> explains the screen ·
-Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button></p>
+Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button>
+· coach: <span id="bridge-dot">—</span></p>
 <div id="help"><div class="card">
   <h2>What am I looking at?</h2>
   <p>This is one full trading day replayed as <b>volume bars</b>: every column is exactly the same number of contracts changing hands (shown in the header), <b>not</b> the same amount of time. When columns arrive fast, the market is busy; when they crawl, it's quiet. The strip below the chart shows each bar's real duration.</p>
@@ -539,6 +540,76 @@ document.addEventListener("keydown", e => {
   if (e.code === "ArrowLeft") seekTo(idx - 1);
 });
 window.addEventListener("resize", () => { stage.style.height = stageHeight() + "px"; repaintAll(); });
+
+// ── coach bridge (st-ago): silent when absent, two-way when present ──────
+// POST bodies go as text/plain so a file:// page makes "simple" CORS
+// requests (no preflight). All bridge failures are swallowed — the drill
+// must work fully offline.
+const BRIDGE = "http://127.0.0.1:7788";
+let bridgeUp = false, lastCmdId = 0, lastStateSent = 0;
+
+function snapshot(kind, extra) {
+  const b = bars[idx] || bars[0];
+  return Object.assign({
+    kind, date: DATA.meta.date, bar: idx, clock: b ? fmtClock(b.t1) : null,
+    price: b ? b.c : null, bar_delta: b ? b.d : null, session_delta: cvd,
+    level, playing, speed: Number($("speed").value),
+  }, extra || {});
+}
+function sendState(kind, extra) {
+  if (!bridgeUp) return;
+  const discrete = kind !== "bar";
+  const now = performance.now();
+  if (!discrete && now - lastStateSent < 500) return;  // throttle bar flood
+  lastStateSent = now;
+  fetch(BRIDGE + "/state", { method: "POST", body: JSON.stringify(snapshot(kind, extra)),
+                             headers: { "Content-Type": "text/plain" } }).catch(() => {});
+}
+function applyCoach(cmd) {
+  if (cmd.type === "say") showCaption("COACH: " + (cmd.text || ""));
+  else if (cmd.type === "arm" && isFinite(cmd.price)) { $("lvlinput").value = cmd.price; armLevel(true); }
+  else if (cmd.type === "jump" && isFinite(cmd.bar)) { seekTo(Number(cmd.bar)); showCaption(cmd.text ? "COACH: " + cmd.text : "Coach moved you to bar " + cmd.bar); }
+  else if (cmd.type === "pause") pause();
+  else if (cmd.type === "play") play();
+}
+async function pollCoach() {
+  if (!bridgeUp) return;
+  try {
+    const r = await fetch(`${BRIDGE}/commands?since=${lastCmdId}`);
+    const d = await r.json();
+    for (const c of d.commands || []) applyCoach(c);
+    lastCmdId = d.last ?? lastCmdId;
+  } catch { bridgeUp = false; $("bridge-dot").textContent = "—"; setTimeout(connectBridge, 10000); return; }
+  setTimeout(pollCoach, 2000);
+}
+function connectBridge() {
+  fetch(BRIDGE + "/health").then(r => r.json()).then(() => {
+    bridgeUp = true;
+    $("bridge-dot").textContent = "connected";
+    sendState("session_open", { n_bars: bars.length, bar_n: DATA.meta.bar_n });
+    pollCoach();
+  }).catch(() => { $("bridge-dot").textContent = "—"; });
+}
+connectBridge();
+
+// instrument the interesting moments (wrappers keep core logic untouched)
+const _step = step;
+step = function () { _step(); sendState("bar"); };
+const _armLevel = armLevel;
+armLevel = function (jump) { _armLevel(jump); sendState("level_armed", { level }); };
+const _jumpToEpisode = jumpToEpisode;
+jumpToEpisode = function (ep, k, total) { _jumpToEpisode(ep, k, total); sendState("visit_jump", { visit: k + 1, of: total, from: ep.from }); };
+const _judgePending = judgePending;
+judgePending = function () {
+  const before = drillLog.length && drillLog[drillLog.length - 1].outcome;
+  _judgePending();
+  const last = drillLog[drillLog.length - 1];
+  if (last && last.outcome && last.outcome !== before) sendState("judged", { call: last.call, outcome: last.outcome, verdict: last.verdict });
+};
+document.querySelectorAll("#panel button").forEach(btn => {
+  const prev = btn.onclick;
+  btn.onclick = () => { sendState("call", { call: btn.dataset.call, level }); prev(); };
+});
 
 // boot: show the first bar, paused
 seekTo(0); repaintLog();
