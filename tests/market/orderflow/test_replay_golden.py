@@ -115,3 +115,15 @@ def test_imbalance_golden(trades):
     singles = [(round(p, 2), d, round(r, 2)) for b in bars for p, d, r in find_imbalances(b)]
     assert singles == [(7482.75, "buy", 3.88)]
     assert [s for b in bars for s in find_stacks(b)] == []
+
+
+# ── profile golden (st-7d6) ──────────────────────────────────────────────────
+def test_profile_golden(trades):
+    from market.orderflow.profile import build_profile, profile_levels
+    prof = build_profile(trades)
+    assert (len(prof.prices), prof.total, prof.poc_price) == (78, 3995, 7482.0)
+    levels = [(l.reason.split(" @ ")[0], l.price, l.level_type)
+              for l in profile_levels(prof, reference_price=7500.0)]
+    assert levels == [("POC", 7482.0, "support"),
+                      ("HVN", 7555.0, "resistance"),
+                      ("LVN", 7556.0, "resistance")]

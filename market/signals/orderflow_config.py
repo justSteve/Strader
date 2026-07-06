@@ -50,6 +50,15 @@ SWEEP_WINDOW_MS = 250           # event-time window; never wall-clock
 # ── divergence pivots (spec §2) [literature seed; calibrate st-wnc] ─────────
 PIVOT_FILTER_TICKS = 8          # swing high/low confirmation filter (2.0 pts)
 
+# ── volume profile / LVN context (spec §2 Tier B; st-7d6) ──────────────────
+# Window convention: the v1 profile window is the PRIOR RTH session — callers
+# feed yesterday's trades and consume the levels today. Recomputed on
+# completed-session cadence, never per-tick (research doc Q1.6).
+PROFILE_WINDOW = "prior-rth-session"
+PROFILE_BUCKET_TICKS = 4        # 1.0-pt buckets — 0.25 is too noisy for nodes
+LVN_MAX_FRACTION = 0.30         # local minimum below 30% of POC volume = LVN
+HVN_MIN_FRACTION = 0.70         # local maximum above 70% of POC volume = HVN
+
 # ── consumer wiring (spec §6) ───────────────────────────────────────────────
 CONFLUENCE_TOLERANCE_PTS = 2.0  # Mancini level ∩ anchor proximity
 
