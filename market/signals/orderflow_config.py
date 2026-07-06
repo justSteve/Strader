@@ -68,8 +68,14 @@ QUIET_DELTA_MAX = 110           # |bar Δ| below this = quiet loss -> level_recl
 STALL_EXTENSION_TICKS = 1       # beat 2: extreme extends ≤ this while aggression continues
 FLIP_DELTA_MIN = 150            # beat 3: opposite-direction bar Δ
 CONFIRM_DELTA_MIN = 200         # beat 4 fallback when no opposite ImbalanceStack printed
-ENGAGEMENT_WINDOW_BARS = 12     # beats must complete within this many bars of beat 1
-INVALIDATE_TICKS = 16           # 4.0 pts beyond the level without reclaim kills the setup
+# [calibrated] st-3vu 2026-07-06 against 12 Mancini-labeled textbook days:
+# the original seeds (12 bars / 16 ticks = 4 pts) invalidated exactly his best
+# setups — textbook flushes run 10-15 pts below the level before reclaiming
+# (that depth IS the trap). Loosening to 40 bars / 60 ticks flipped 4 labeled
+# misses (2025-10-03, 2025-10-06, 2026-02-13, 2026-04-23) into confirmations
+# within 0-3 minutes of Mancini's own timestamps while losing zero prior hits.
+ENGAGEMENT_WINDOW_BARS = 40     # beats must complete within this many bars of beat 1
+INVALIDATE_TICKS = 60           # 15 pts beyond the level without reclaim kills the setup
 
 # ── consumer wiring (spec §6) ───────────────────────────────────────────────
 CONFLUENCE_TOLERANCE_PTS = 2.0  # Mancini level ∩ anchor proximity
