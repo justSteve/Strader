@@ -32,14 +32,64 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from market.orderflow.bars import build_bars          # noqa: E402
 from market.orderflow.replay import read_corpus_day   # noqa: E402
+from market.orderflow.recognizer import Anchor, SetupRecognizer  # noqa: E402
+from market.orderflow.anatomy import anatomy_payload, build_instances  # noqa: E402
 from market.signals.orderflow_config import TICK, VOLUME_BAR_N  # noqa: E402
 
 logger = logging.getLogger("orderflow_drill")
 
 TEMPLATE = Path(__file__).parent / "orderflow_drill_template.html"
+LABELS = Path(__file__).resolve().parent.parent / "docs/measurement/mancini-setup-labels-2026-07-06.json"
+FAMILY = {"failed_breakdown", "level_reclaim"}
 
 
-def bars_payload(day: _date, bar_n: int) -> dict:
+def mancini_levels_for(day: _date) -> list[float]:
+    """The day's Mancini support/resistance levels from the labeled corpus —
+    the same anchor source score_recognizer.py validated against. Empty for
+    unlabeled days (anatomy then falls back to session range edges)."""
+    if not LABELS.exists():
+        return []
+    try:
+        entries = json.loads(LABELS.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        logger.warning("could not read Mancini labels (%s); anatomy uses range edges only", e)
+        return []
+    lv = {round(float(x), 2)
+          for e in entries
+          if e.get("session_date") == day.isoformat() and e.get("setup") in FAMILY
+          for x in e.get("es_levels", []) if 5000 < float(x) < 9000}
+    return sorted(lv)
+
+
+def build_anatomy(bars: list, suggested: dict, mancini_levels: list[float]) -> list[dict]:
+    """Run the validated recognizer over the day and fold its emissions into
+    four-beat walkthrough instances (st-yfn anatomy mode). Anchors: the day's
+    Mancini levels (validated `support` source) plus session range edges so
+    unlabeled days still surface `range_trap` walkthroughs."""
+    anchors: list[Anchor] = []
+    seen: set[tuple[float, str]] = set()
+
+    def add(price: float, kind: str, label: str, mancini: bool = False) -> None:
+        key = (round(price, 2), kind)
+        if key in seen:
+            return
+        seen.add(key)
+        anchors.append(Anchor(price, kind, label, mancini=mancini))
+
+    for lv in mancini_levels:
+        add(lv, "support", f"mancini {lv:g}", mancini=True)
+    add(suggested["session_high"], "range_high", "day high")
+    add(suggested["session_low"], "range_low", "day low")
+    if not anchors:
+        return []
+    recs = SetupRecognizer(anchors, mancini_prices=mancini_levels).run(bars)
+    instances = build_instances(recs, bars)
+    logger.info("anatomy: %d anchors -> %d recs -> %d instances",
+                len(anchors), len(recs), len(instances))
+    return anatomy_payload(instances)
+
+
+def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = None) -> dict:
     trades = read_corpus_day(day)
     if not trades:
         raise SystemExit(f"corpus day {day} parsed to zero trades")
@@ -67,6 +117,8 @@ def bars_payload(day: _date, bar_n: int) -> dict:
         "session_high": max(b.high for b in bars),
         "session_low": min(b.low for b in bars),
     }
+    mancini = mancini_levels if mancini_levels is not None else mancini_levels_for(day)
+    anatomy = build_anatomy(bars, suggested, mancini)
     return {
         "meta": {
             "symbol": bars[0].symbol or "ES.c.0",
@@ -78,6 +130,8 @@ def bars_payload(day: _date, bar_n: int) -> dict:
         },
         "levels": suggested,
         "bars": out_bars,
+        "mancini_candidates": mancini,
+        "anatomy": anatomy,
     }
 
 
@@ -107,6 +161,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--bar-n", type=int, default=VOLUME_BAR_N,
                     help=f"Contracts per bar (default {VOLUME_BAR_N})")
     ap.add_argument("--out", help="Output HTML path (default /tmp/desk-orderflow-drill-<date>.html)")
+    ap.add_argument("--mancini-levels", help="Comma-separated ES levels to anchor anatomy "
+                    "(overrides the labeled-corpus lookup; e.g. 7491,7510,7541)")
     ap.add_argument("--no-open", action="store_true", help="Skip auto-opening the browser")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
@@ -117,7 +173,9 @@ def main(argv: list[str] | None = None) -> int:
     day = _date.fromisoformat(args.date)
     out = Path(args.out) if args.out else Path(f"/tmp/desk-orderflow-drill-{day.isoformat()}.html")
 
-    payload = bars_payload(day, args.bar_n)
+    mancini = ([float(x) for x in args.mancini_levels.split(",") if x.strip()]
+               if args.mancini_levels else None)
+    payload = bars_payload(day, args.bar_n, mancini_levels=mancini)
     render(payload, out)
     if not args.no_open:
         open_in_browser(out)

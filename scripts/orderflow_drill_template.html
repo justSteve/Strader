@@ -89,6 +89,23 @@ td:first-child, th:first-child { text-align:left; }
 .ok { color:var(--good); font-weight:600; } .bad { color:var(--critical); font-weight:600; }
 #tblwrap { display:none; margin:8px 16px; max-height:300px; overflow:auto; }
 .hint { color:var(--muted); font-size:11px; padding:0 16px 8px; }
+/* anatomy mode (st-yfn phase 3) */
+#anatomy { padding:2px 16px 6px; font-size:12px; color:var(--ink-2); display:none; flex-wrap:wrap; gap:6px; align-items:center; }
+#anatomy .a-lbl { color:var(--muted); margin-right:2px; }
+#anatomy button { padding:3px 9px; font-size:12px; border-radius:14px; }
+#anatomy button.confirmed { border-color:var(--good); }
+#anatomy button.invalidated { border-color:var(--muted); color:var(--muted); }
+#beatrail { display:none; gap:6px; padding:4px 16px 2px; flex-wrap:wrap; align-items:center; font-size:12px; }
+#beatrail .a-lbl { color:var(--ink-2); font-weight:600; margin-right:4px; }
+#beatrail .arrow { color:var(--muted); }
+#beatrail .exit { margin-left:auto; cursor:pointer; color:var(--muted); border:1px solid var(--axis);
+  border-radius:6px; padding:2px 8px; }
+.beat-pill { display:inline-flex; gap:6px; align-items:center; padding:3px 10px; border:1px solid var(--axis);
+  border-radius:14px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.beat-pill .bn { text-transform:uppercase; letter-spacing:.04em; font-size:10px; font-weight:600; }
+.beat-pill.done { color:var(--ink); border-color:var(--buy); }
+.beat-pill.current { color:var(--ink); border-color:var(--buy);
+  background:color-mix(in srgb, var(--buy) 14%, var(--surface-1)); }
 </style></head><body>
 <header>
   <h1>Orderflow Drill</h1>
@@ -121,6 +138,7 @@ td:first-child, th:first-child { text-align:left; }
     <option value="pair">bid×ask</option>
   </select></label>
   <button id="tbl">Table view</button>
+  <button id="anat" title="Walk the recognizer's four-beat setups on this day">Anatomy</button>
   <button id="helpbtn" title="What am I looking at?">?</button>
 </div>
 <div class="readouts">
@@ -133,6 +151,8 @@ td:first-child, th:first-child { text-align:left; }
   <span>Score <b id="ro-score">0/0</b></span>
 </div>
 <div id="visits"></div>
+<div id="anatomy"></div>
+<div id="beatrail"></div>
 <div id="stage"><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
   <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
 </div>
@@ -385,6 +405,7 @@ function step() {
   }
   repaintPace(); repaintReadouts(); appendBarRow(b, idx);
   judgePending();
+  checkAnatomyBeat(idx);
   checkLevelApproach(b);
 }
 function scheduleNext() {
@@ -439,8 +460,96 @@ function renderVisits(eps) {
   v.style.display = "block";
 }
 
+// ── anatomy mode (st-yfn phase 3): walk the recognizer's four-beat reads ──
+// Each instance is one engagement the SetupRecognizer produced on THIS tape;
+// every beat carries the bar it fired on, so the replay narrates the rhythm
+// live (flush → stall → flip → confirm). Guessing is suppressed here — this
+// is the reveal. Deterministic: the walkthroughs are baked into DATA.
+const ANATOMY = DATA.anatomy || [];
+let anatomyActive = null;   // the instance being walked, or null
+let anatomyPtr = 0;         // beats narrated so far
+const SETUP_LABEL = { failed_breakdown:"Failed Breakdown", level_reclaim:"Level Reclaim",
+                      range_trap:"Range Trap", return_to_lvn:"Return to LVN" };
+const setupName = s => SETUP_LABEL[s] || s;
+
+function renderAnatomyList() {
+  const wrap = $("anatomy"); wrap.innerHTML = "";
+  if (!ANATOMY.length) { $("anat").disabled = true; $("anat").title = "No recognized setups for this day"; return; }
+  const lbl = document.createElement("span"); lbl.className = "a-lbl";
+  lbl.textContent = "Setups the recognizer found on this day — click to walk the four beats:";
+  wrap.appendChild(lbl);
+  ANATOMY.forEach(inst => {
+    const b = document.createElement("button");
+    b.className = inst.state;
+    const icon = inst.state === "confirmed" ? "✓" : inst.state === "invalidated" ? "✕" : "…";
+    const last = inst.beats[inst.beats.length - 1];
+    const mc = inst.mancini ? " ∩M" : "";
+    b.textContent = `${icon} ${setupName(inst.setup)} @ ${inst.anchor_price.toFixed(2)}${mc} · ${last ? last.clock.slice(0,5) : "?"} · ${inst.beats.length} beat${inst.beats.length>1?"s":""}`;
+    b.title = inst.headline;
+    b.onclick = () => startAnatomy(inst);
+    wrap.appendChild(b);
+  });
+}
+function renderBeatRail() {
+  const rail = $("beatrail");
+  if (!anatomyActive) { rail.style.display = "none"; rail.innerHTML = ""; return; }
+  rail.innerHTML = "";
+  const title = document.createElement("span"); title.className = "a-lbl";
+  title.textContent = `${setupName(anatomyActive.setup)} @ ${anatomyActive.anchor_price.toFixed(2)} — ${anatomyActive.state}`;
+  rail.appendChild(title);
+  anatomyActive.beats.forEach((bt, i) => {
+    if (i) { const ar = document.createElement("span"); ar.className = "arrow"; ar.textContent = "→"; rail.appendChild(ar); }
+    const pill = document.createElement("span");
+    pill.className = "beat-pill" + (i < anatomyPtr ? " done" : "") + (i === anatomyPtr - 1 ? " current" : "");
+    pill.innerHTML = `<span class="bn"></span><span class="bt-clk"></span>`;
+    pill.children[0].textContent = bt.beat;
+    pill.children[1].textContent = bt.clock.slice(0, 5);
+    pill.title = bt.gloss;
+    rail.appendChild(pill);
+  });
+  const exit = document.createElement("span"); exit.className = "exit"; exit.textContent = "× exit anatomy";
+  exit.onclick = exitAnatomy; rail.appendChild(exit);
+  rail.style.display = "flex";
+}
+function startAnatomy(inst) {
+  anatomyActive = inst; anatomyPtr = 0;
+  level = inst.anchor_price; armedSide = null;
+  $("lvlinput").value = level.toFixed(2);
+  $("arm").textContent = `Armed @ ${level.toFixed(2)}`;
+  $("visits").style.display = "none";
+  seekTo(Math.max(0, inst.start_bar - 8));
+  drawAxis(); renderBeatRail();
+  showCaption(`SIGNATURE ANATOMY — ${setupName(inst.setup)} at ${inst.anchor_price.toFixed(2)} `
+    + `(${inst.bias}, ${inst.state}). The rhythm is flush → stall → flip → confirm; you're 8 bars before the flush. `
+    + `Press Space — each beat is called as price reaches it. Guessing is off in this mode; this is the reveal.`);
+  sendState("anatomy_start", { setup: inst.setup, anchor: inst.anchor_price, state: inst.state, beats: inst.beats.length });
+}
+function checkAnatomyBeat(i) {
+  if (!anatomyActive) return;
+  const beats = anatomyActive.beats;
+  while (anatomyPtr < beats.length && beats[anatomyPtr].bar <= i) {
+    const bt = beats[anatomyPtr]; anatomyPtr++;
+    showCaption(`BEAT ${anatomyPtr}/${beats.length} · ${bt.beat.toUpperCase()} (${bt.clock} CT) — ${bt.gloss}  ·  recognizer: ${bt.reason}`);
+    renderBeatRail();
+    sendState("anatomy_beat", { beat: bt.beat, n: anatomyPtr, of: beats.length, setup: anatomyActive.setup });
+    if (anatomyPtr === beats.length) {
+      const st = anatomyActive.state, price = anatomyActive.anchor_price.toFixed(2), head = anatomyActive.headline;
+      setTimeout(() => { if (anatomyActive) showCaption(
+        st === "confirmed"   ? `✓ CONFIRMED — the reversal took hold at ${price}. That's the whole setup · ${head}`
+      : st === "invalidated" ? `✕ INVALIDATED — the break was real; price accepted beyond ${price} · ${head}`
+      :                        `… engagement still open at session end · ${head}`); }, 0);
+    }
+  }
+}
+function exitAnatomy() {
+  if (!anatomyActive) return;
+  anatomyActive = null; anatomyPtr = 0;
+  renderBeatRail(); $("caption").style.display = "none";
+}
+
 // ── guess-then-reveal ────────────────────────────────────────────────────
 function armLevel(jump) {
+  exitAnatomy();  // a manual arm leaves anatomy mode
   const v = parseFloat($("lvlinput").value);
   if (!isFinite(v)) return;
   level = Math.round(v / TICK) * TICK;
@@ -453,7 +562,7 @@ function armLevel(jump) {
   else if (jump) showCaption(`Price never came within ${APPROACH_TICKS / 4} pts of ${level.toFixed(2)} this session — pick another level or another day.`);
 }
 function checkLevelApproach(b) {
-  if (level == null || awaitingCall || pending) return;
+  if (anatomyActive || level == null || awaitingCall || pending) return;
   const dist = (b.c - level) / TICK;
   if (armedSide == null) { if (Math.abs(dist) >= RESET_TICKS) armedSide = dist > 0 ? "above" : "below"; return; }
   if (Math.abs(dist) <= APPROACH_TICKS) {
@@ -612,5 +721,7 @@ document.querySelectorAll("#panel button").forEach(btn => {
 });
 
 // boot: show the first bar, paused
+$("anat").onclick = () => { const w = $("anatomy"); w.style.display = w.style.display === "flex" ? "none" : "flex"; };
+renderAnatomyList();
 seekTo(0); repaintLog();
 </script></body></html>
