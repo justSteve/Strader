@@ -338,6 +338,9 @@ function renderColumn(b, i) {
     const total = bid + ask, buyDom = ask >= bid, d = ask - bid;
     const alpha = 0.15 + 0.6 * (total / maxCell);
     cell.style.background = `color-mix(in srgb, var(${buyDom ? "--buy" : "--sell"}) ${Math.round(alpha * 100)}%, var(--surface-1))`;
+    // Deep-blue cells swallow dark text; flip to white on the darkest blues.
+    // (Reds stay readable at full intensity — no flip needed.)
+    if (buyDom && alpha > 0.5) cell.style.color = "#fff";
     if (cellH >= 12) {
       // Δ mode shows magnitude only — the cell color already carries the sign
       cell.textContent = cellMode === "pair" ? `${bid}×${ask}`
