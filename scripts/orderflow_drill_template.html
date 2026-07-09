@@ -35,7 +35,8 @@ input[type=range] { flex:1; min-width:140px; }
 .readouts b { color:var(--ink); font-size:14px; }
 .readouts .pos { color:var(--buy); } .readouts .neg { color:var(--sell); }
 #stage { position:relative; margin:0 16px; background:var(--surface-1);
-  border:1px solid var(--ring); border-radius:8px; overflow:hidden; }
+  border:1px solid var(--ring); border-radius:8px; overflow:hidden;
+  resize:vertical; min-height:320px; }
 #cols { position:absolute; inset:0 56px 0 0; overflow:hidden; }
 #colstrip { position:absolute; right:0; top:0; bottom:0; display:flex; align-items:stretch; }
 .col { position:relative; border-right:1px solid var(--grid); }
@@ -250,8 +251,21 @@ let drillLog = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
 
 // ── stage geometry: price window follows recent bars ────────────────────
 const stage = $("stage"), strip = $("colstrip"), yaxis = $("yaxis");
-function stageHeight() { return Math.max(320, Math.min(560, window.innerHeight - 330)); }
-stage.style.height = stageHeight() + "px";
+// Fill the viewport below the controls, reserving room for the pace strip +
+// hints; no fixed cap — a portrait monitor gets all its vertical real estate.
+// The stage is also user-resizable (CSS resize:vertical drag grip, bottom-right
+// corner); a manual drag wins over auto-fill until the page reloads.
+function stageHeight() {
+  const top = stage.getBoundingClientRect().top;
+  return Math.max(320, window.innerHeight - top - 130);
+}
+let autoH = stageHeight();
+stage.style.height = autoH + "px";
+let userSized = false;
+new ResizeObserver(() => {
+  if (Math.abs(stage.clientHeight - autoH) > 2) userSized = true;
+  repaintAll();
+}).observe(stage);
 let viewHi = null, viewLo = null;
 function updateView() {
   const recent = bars.slice(Math.max(0, idx - 11), idx + 1);
@@ -648,7 +662,10 @@ document.addEventListener("keydown", e => {
   if (e.code === "ArrowRight") { pause(); step(); }
   if (e.code === "ArrowLeft") seekTo(idx - 1);
 });
-window.addEventListener("resize", () => { stage.style.height = stageHeight() + "px"; repaintAll(); });
+window.addEventListener("resize", () => {
+  if (!userSized) { autoH = stageHeight(); stage.style.height = autoH + "px"; }
+  repaintAll();
+});
 
 // ── coach bridge (st-ago): silent when absent, two-way when present ──────
 // POST bodies go as text/plain so a file:// page makes "simple" CORS
