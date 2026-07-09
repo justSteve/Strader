@@ -338,9 +338,10 @@ function renderColumn(b, i) {
     const total = bid + ask, buyDom = ask >= bid, d = ask - bid;
     const alpha = 0.15 + 0.6 * (total / maxCell);
     cell.style.background = `color-mix(in srgb, var(${buyDom ? "--buy" : "--sell"}) ${Math.round(alpha * 100)}%, var(--surface-1))`;
-    // Deep-blue cells swallow dark text; flip to white on the darkest shade
-    // only (alpha tops out at 0.75). Reds stay readable at full intensity.
-    if (buyDom && alpha > 0.65) cell.style.color = "#fff";
+    // Text reverses to white on the POC cell only — it is always the bar's
+    // darkest cell (total == maxCell), and the rule stays semantic: the one
+    // outlined cell reads white, every other cell keeps theme ink.
+    if (price === b.poc) cell.style.color = "#fff";
     if (cellH >= 12) {
       // Δ mode shows magnitude only — the cell color already carries the sign
       cell.textContent = cellMode === "pair" ? `${bid}×${ask}`
