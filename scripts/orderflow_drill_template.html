@@ -339,16 +339,17 @@ function renderColumn(b, i) {
     const alpha = 0.15 + 0.6 * (total / maxCell);
     cell.style.background = `color-mix(in srgb, var(${buyDom ? "--buy" : "--sell"}) ${Math.round(alpha * 100)}%, var(--surface-1))`;
     if (cellH >= 12) {
+      // Δ mode shows magnitude only — the cell color already carries the sign
       cell.textContent = cellMode === "pair" ? `${bid}×${ask}`
                        : cellMode === "vol" ? `${total}`
-                       : (d >= 0 ? "+" : "") + d;
+                       : String(Math.abs(d));
     }
     cell.title = `${price.toFixed(2)}  sell-aggr ${bid} | buy-aggr ${ask}  (Δ ${d >= 0 ? "+" : ""}${d}, vol ${total})`;
     col.appendChild(cell);
   }
   const foot = document.createElement("div"); foot.className = "foot";
   const dcls = b.d >= 0 ? "pos" : "neg";
-  foot.innerHTML = `<span class="d" style="color:var(${b.d >= 0 ? "--buy" : "--sell"})">${b.d >= 0 ? "+" : ""}${b.d}</span> ${fmtClock(b.t1)}`;
+  foot.innerHTML = `<span class="d" style="color:var(${b.d >= 0 ? "--buy" : "--sell"})">${Math.abs(b.d)}</span> ${fmtClock(b.t1)}`;
   foot.title = `bar ${i}: vol ${b.v} (none ${b.nv}) · ${b.dur}s`;
   col.appendChild(foot);
   return col;
