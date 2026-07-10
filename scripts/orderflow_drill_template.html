@@ -111,11 +111,6 @@ td:first-child, th:first-child { text-align:left; }
 <header>
   <h1>Orderflow Drill</h1>
   <span class="meta" id="meta"></span>
-  <span class="legend">
-    <span><span class="chip" style="background:var(--buy)"></span>BUY aggression (lifted offers)</span>
-    <span><span class="chip" style="background:var(--sell)"></span>SELL aggression (hit bids)</span>
-    <span><span class="chip" style="outline:2px solid var(--ink-2);outline-offset:-2px"></span>POC</span>
-  </span>
 </header>
 <div class="controls">
   <button id="play" class="primary">▶ Play</button>
@@ -157,7 +152,7 @@ td:first-child, th:first-child { text-align:left; }
 <div id="stage"><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
   <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
 </div>
-<div id="pace"><span class="lbl">seconds per bar (last 60) — short bars = urgent tape</span><div id="pacebars"></div></div>
+<div id="pace"><span class="lbl">seconds per bar — one per column above · short = urgent tape</span><div id="pacebars"></div></div>
 <p class="hint">Space = play/pause · ←/→ = step · Click a level chip to arm it AND jump to its first visit · <b>?</b> explains the screen ·
 Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button>
 · coach: <span id="bridge-dot">—</span></p>
@@ -218,6 +213,8 @@ const RESET_TICKS = 12;      // must first be ≥ 3 pts away to re-arm
 const JUDGE_BARS = 10;       // bars the tape gets to answer
 const JUDGE_TICKS = 16;      // 4 pts beyond/away decides accept/reject
 const KEEP_COLS = 48;        // DOM columns kept (virtualization)
+// prices print without trailing zeros: 7511, 7511.5, 7511.25
+const fmtPrice = p => (+p.toFixed(2)).toString();
 const COL_W = 58, FOOT_H = 30;
 let cellH = 13;              // zoom control; numbers hidden below 12px
 let cellMode = "delta";      // delta | vol | pair — what the cell text shows
@@ -232,13 +229,22 @@ $("seek").max = bars.length - 1;
 const chipDefs = [["open","Open"],["am_high","AM Hi"],["am_low","AM Lo"],["session_high","Day Hi"],["session_low","Day Lo"]];
 function addChip(label, price) {
   const b = document.createElement("button");
-  b.textContent = `${label} ${price.toFixed(2)}`;
+  b.textContent = `${label} ${fmtPrice(price)}`;
   b.title = "Arm this level and jump to its first visit";
-  b.onclick = () => { $("lvlinput").value = price.toFixed(2); armLevel(true); };
+  b.onclick = () => { $("lvlinput").value = fmtPrice(price); armLevel(true); };
   $("chips").appendChild(b);
 }
 for (const [k, label] of chipDefs) addChip(label, DATA.levels[k]);
-for (const p of (DATA.mancini_candidates || [])) addChip("M:", p);
+const mLvls = DATA.mancini_candidates || [];
+if (mLvls.length) {
+  const sel = document.createElement("select");
+  sel.title = "Levels harvested from Mancini's letter — pick one to arm it";
+  sel.innerHTML = `<option value="">Mancini ▾</option>` +
+    mLvls.map(p => `<option value="${p}">M: ${fmtPrice(p)}</option>`).join("");
+  sel.onchange = () => { if (!sel.value) return;
+    $("lvlinput").value = sel.value; armLevel(true); };
+  $("chips").appendChild(sel);
+}
 
 // ── state ────────────────────────────────────────────────────────────────
 let idx = -1;                 // last played bar index
@@ -268,7 +274,8 @@ new ResizeObserver(() => {
 }).observe(stage);
 let viewHi = null, viewLo = null;
 function updateView() {
-  const recent = bars.slice(Math.max(0, idx - 11), idx + 1);
+  // scale to every displayed column — no cell of any visible bar truncates
+  const recent = bars.slice(Math.max(0, idx - KEEP_COLS + 1), idx + 1);
   if (!recent.length) return false;
   let hi = Math.max(...recent.map(b => b.h)), lo = Math.min(...recent.map(b => b.l));
   if (level != null) { hi = Math.max(hi, level + 8 * TICK); lo = Math.min(lo, level - 8 * TICK); }
@@ -295,7 +302,7 @@ function drawAxis() {
   const step = Math.max(1, Math.round((viewHi - viewLo) / TICK / 14)) * TICK;
   for (let p = Math.ceil(viewLo / step) * step; p <= viewHi; p += step) {
     const d = document.createElement("div");
-    d.style.top = yFor(p) + "px"; d.textContent = p.toFixed(2);
+    d.style.top = yFor(p) + "px"; d.textContent = fmtPrice(p);
     yaxis.appendChild(d);
   }
   drawLevelLine();
@@ -305,7 +312,7 @@ function drawLevelLine() {
   if (level == null || viewHi == null || level > viewHi || level < viewLo) return;
   const ln = document.createElement("div"); ln.className = "lvl-line"; ln.style.top = yFor(level) + "px";
   const tag = document.createElement("div"); tag.className = "lvl-tag"; tag.style.top = yFor(level) + "px";
-  tag.textContent = level.toFixed(2);
+  tag.textContent = fmtPrice(level);
   stage.appendChild(ln); stage.appendChild(tag);
 }
 
@@ -329,7 +336,7 @@ function renderColumn(b, i) {
       cell.className = "cell void";
       cell.style.background = "transparent";
       cell.style.border = "1px dashed var(--grid)";
-      cell.title = `${price.toFixed(2)}  no trades at this price in this bar (micro-LVN)`;
+      cell.title = `${fmtPrice(price)}  no trades at this price in this bar (micro-LVN)`;
       col.appendChild(cell);
       continue;
     }
@@ -348,12 +355,12 @@ function renderColumn(b, i) {
                        : cellMode === "vol" ? `${total}`
                        : String(Math.abs(d));
     }
-    cell.title = `${price.toFixed(2)}  sell-aggr ${bid} | buy-aggr ${ask}  (Δ ${d >= 0 ? "+" : ""}${d}, vol ${total})`;
+    cell.title = `${fmtPrice(price)}  sell-aggr ${bid} | buy-aggr ${ask}  (Δ ${d >= 0 ? "+" : ""}${d}, vol ${total})`;
     col.appendChild(cell);
   }
   const foot = document.createElement("div"); foot.className = "foot";
   const dcls = b.d >= 0 ? "pos" : "neg";
-  foot.innerHTML = `<span class="d" style="color:var(${b.d >= 0 ? "--buy" : "--sell"})">${Math.abs(b.d)}</span> ${fmtClock(b.t1)}`;
+  foot.innerHTML = `<span class="d" style="color:var(${b.d >= 0 ? "--buy" : "--sell"})">${Math.abs(b.d)}</span> ${fmtClock(b.t1)}<div style="color:var(--muted)">${i}</div>`;
   foot.title = `bar ${i}: vol ${b.v} (none ${b.nv}) · ${b.dur}s`;
   col.appendChild(foot);
   return col;
@@ -367,7 +374,7 @@ const fmtClock = iso => iso.slice(11, 19);
 // ── pace strip ───────────────────────────────────────────────────────────
 function repaintPace() {
   const wrap = $("pacebars"); wrap.innerHTML = "";
-  const window_ = bars.slice(Math.max(0, idx - 59), idx + 1);
+  const window_ = bars.slice(Math.max(0, idx - KEEP_COLS + 1), idx + 1);  // 1:1 with columns above
   const maxd = Math.max(...window_.map(b => b.dur), 1);
   for (const b of window_) {
     const d = document.createElement("div");
@@ -382,7 +389,7 @@ function repaintReadouts() {
   const b = bars[idx];
   $("ro-bar").textContent = `${idx + 1}/${bars.length}`;
   $("ro-time").textContent = b ? fmtClock(b.t1) + " CT" : "–";
-  $("ro-price").textContent = b ? b.c.toFixed(2) : "–";
+  $("ro-price").textContent = b ? fmtPrice(b.c) : "–";
   const set = (id, v) => { const el = $(id); el.textContent = (v >= 0 ? "+" : "") + v; el.className = v >= 0 ? "pos" : "neg"; };
   if (b) { set("ro-delta", b.d); set("ro-cvd", cvd); $("ro-dur").textContent = b.dur.toFixed(1) + "s"; }
   const judged = drillLog.filter(e => e.verdict === "correct" || e.verdict === "wrong");
@@ -392,8 +399,8 @@ function repaintReadouts() {
 function appendBarRow(b, i) {
   const tr = document.createElement("tr");
   tr.innerHTML = `<td>${i + 1}</td><td>${fmtClock(b.t0)}</td><td>${b.dur.toFixed(1)}</td>` +
-    `<td>${b.o.toFixed(2)}</td><td>${b.h.toFixed(2)}</td><td>${b.l.toFixed(2)}</td><td>${b.c.toFixed(2)}</td>` +
-    `<td>${b.v}</td><td>${b.d}</td><td>${b.nv}</td><td>${b.poc.toFixed(2)}</td>`;
+    `<td>${fmtPrice(b.o)}</td><td>${fmtPrice(b.h)}</td><td>${fmtPrice(b.l)}</td><td>${fmtPrice(b.c)}</td>` +
+    `<td>${b.v}</td><td>${b.d}</td><td>${b.nv}</td><td>${fmtPrice(b.poc)}</td>`;
   $("bartable").tBodies[0].appendChild(tr);
 }
 function repaintLog() {
@@ -401,7 +408,7 @@ function repaintLog() {
   for (const e of drillLog) {
     const tr = document.createElement("tr");
     const vcls = e.verdict === "correct" ? "ok" : e.verdict === "wrong" ? "bad" : "";
-    tr.innerHTML = `<td>${e.when}</td><td>${e.level.toFixed(2)}</td><td>${e.from}</td>` +
+    tr.innerHTML = `<td>${e.when}</td><td>${fmtPrice(e.level)}</td><td>${e.from}</td>` +
       `<td>${e.call}</td><td>${e.outcome ?? "…"}</td><td class="${vcls}">${e.verdict ?? ""}</td>`;
     tb.appendChild(tr);
   }
@@ -461,7 +468,7 @@ function showCaption(text) {
 function jumpToEpisode(ep, k, total) {
   seekTo(Math.max(0, ep.i - 10));
   armedSide = null;
-  showCaption(`Visit ${k + 1}/${total} of ${level.toFixed(2)} — price approaches from ${ep.from}, `
+  showCaption(`Visit ${k + 1}/${total} of ${fmtPrice(level)} — price approaches from ${ep.from}, `
     + `first touch ≈ ${fmtClock(bars[ep.i].t1)} CT. You are 10 bars early. Press Space and watch the approach: `
     + `is the aggression toward the level being rewarded (price keeps moving) or eaten (heavy color, no progress)?`);
 }
@@ -469,7 +476,7 @@ function renderVisits(eps) {
   const v = $("visits");
   v.innerHTML = "";
   if (!eps.length) { v.style.display = "none"; return; }
-  v.append(`Visits to ${level.toFixed(2)}: `);
+  v.append(`Visits to ${fmtPrice(level)}: `);
   eps.forEach((ep, k) => {
     const b = document.createElement("button");
     b.textContent = `${k + 1} · ${fmtClock(bars[ep.i].t1).slice(0, 5)}`;
@@ -503,7 +510,7 @@ function renderAnatomyList() {
     const icon = inst.state === "confirmed" ? "✓" : inst.state === "invalidated" ? "✕" : "…";
     const last = inst.beats[inst.beats.length - 1];
     const mc = inst.mancini ? " ∩M" : "";
-    b.textContent = `${icon} ${setupName(inst.setup)} @ ${inst.anchor_price.toFixed(2)}${mc} · ${last ? last.clock.slice(0,5) : "?"} · ${inst.beats.length} stage${inst.beats.length>1?"s":""}`;
+    b.textContent = `${icon} ${setupName(inst.setup)} @ ${fmtPrice(inst.anchor_price)}${mc} · ${last ? last.clock.slice(0,5) : "?"} · ${inst.beats.length} stage${inst.beats.length>1?"s":""}`;
     b.title = inst.headline;
     b.onclick = () => startAnatomy(inst);
     wrap.appendChild(b);
@@ -514,7 +521,7 @@ function renderBeatRail() {
   if (!anatomyActive) { rail.style.display = "none"; rail.innerHTML = ""; return; }
   rail.innerHTML = "";
   const title = document.createElement("span"); title.className = "a-lbl";
-  title.textContent = `${setupName(anatomyActive.setup)} @ ${anatomyActive.anchor_price.toFixed(2)} — ${anatomyActive.state}`;
+  title.textContent = `${setupName(anatomyActive.setup)} @ ${fmtPrice(anatomyActive.anchor_price)} — ${anatomyActive.state}`;
   rail.appendChild(title);
   anatomyActive.beats.forEach((bt, i) => {
     if (i) { const ar = document.createElement("span"); ar.className = "arrow"; ar.textContent = "→"; rail.appendChild(ar); }
