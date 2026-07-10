@@ -139,7 +139,7 @@ td:first-child, th:first-child { text-align:left; }
     <option value="pair">bid×ask</option>
   </select></label>
   <button id="tbl">Table view</button>
-  <button id="anat" title="Walk the recognizer's four-beat setups on this day">Anatomy</button>
+  <button id="anat" title="Walk the recognizer's four-stage setups on this day">Anatomy</button>
   <button id="helpbtn" title="What am I looking at?">?</button>
 </div>
 <div class="readouts">
@@ -479,9 +479,9 @@ function renderVisits(eps) {
   v.style.display = "block";
 }
 
-// ── anatomy mode (st-yfn phase 3): walk the recognizer's four-beat reads ──
+// ── anatomy mode (st-yfn phase 3): walk the recognizer's four-stage reads ──
 // Each instance is one engagement the SetupRecognizer produced on THIS tape;
-// every beat carries the bar it fired on, so the replay narrates the rhythm
+// every stage carries the bar it fired on, so the replay narrates the rhythm
 // live (flush → stall → flip → confirm). Guessing is suppressed here — this
 // is the reveal. Deterministic: the walkthroughs are baked into DATA.
 const ANATOMY = DATA.anatomy || [];
@@ -495,7 +495,7 @@ function renderAnatomyList() {
   const wrap = $("anatomy"); wrap.innerHTML = "";
   if (!ANATOMY.length) { $("anat").disabled = true; $("anat").title = "No recognized setups for this day"; return; }
   const lbl = document.createElement("span"); lbl.className = "a-lbl";
-  lbl.textContent = "Setups the recognizer found on this day — click to walk the four beats:";
+  lbl.textContent = "Setups the recognizer found on this day — click to walk the four stages:";
   wrap.appendChild(lbl);
   ANATOMY.forEach(inst => {
     const b = document.createElement("button");
@@ -503,7 +503,7 @@ function renderAnatomyList() {
     const icon = inst.state === "confirmed" ? "✓" : inst.state === "invalidated" ? "✕" : "…";
     const last = inst.beats[inst.beats.length - 1];
     const mc = inst.mancini ? " ∩M" : "";
-    b.textContent = `${icon} ${setupName(inst.setup)} @ ${inst.anchor_price.toFixed(2)}${mc} · ${last ? last.clock.slice(0,5) : "?"} · ${inst.beats.length} beat${inst.beats.length>1?"s":""}`;
+    b.textContent = `${icon} ${setupName(inst.setup)} @ ${inst.anchor_price.toFixed(2)}${mc} · ${last ? last.clock.slice(0,5) : "?"} · ${inst.beats.length} stage${inst.beats.length>1?"s":""}`;
     b.title = inst.headline;
     b.onclick = () => startAnatomy(inst);
     wrap.appendChild(b);
@@ -540,7 +540,7 @@ function startAnatomy(inst) {
   drawAxis(); renderBeatRail();
   showCaption(`SIGNATURE ANATOMY — ${setupName(inst.setup)} at ${inst.anchor_price.toFixed(2)} `
     + `(${inst.bias}, ${inst.state}). The rhythm is flush → stall → flip → confirm; you're 8 bars before the flush. `
-    + `Press Space — each beat is called as price reaches it. Guessing is off in this mode; this is the reveal.`);
+    + `Press Space — each stage is called as price reaches it. Guessing is off in this mode; this is the reveal.`);
   sendState("anatomy_start", { setup: inst.setup, anchor: inst.anchor_price, state: inst.state, beats: inst.beats.length });
 }
 function checkAnatomyBeat(i) {
@@ -548,7 +548,7 @@ function checkAnatomyBeat(i) {
   const beats = anatomyActive.beats;
   while (anatomyPtr < beats.length && beats[anatomyPtr].bar <= i) {
     const bt = beats[anatomyPtr]; anatomyPtr++;
-    showCaption(`BEAT ${anatomyPtr}/${beats.length} · ${bt.beat.toUpperCase()} (${bt.clock} CT) — ${bt.gloss}  ·  recognizer: ${bt.reason}`);
+    showCaption(`STAGE ${anatomyPtr}/${beats.length} · ${bt.beat.toUpperCase()} (${bt.clock} CT) — ${bt.gloss}  ·  recognizer: ${bt.reason}`);
     renderBeatRail();
     sendState("anatomy_beat", { beat: bt.beat, n: anatomyPtr, of: beats.length, setup: anatomyActive.setup });
     if (anatomyPtr === beats.length) {
@@ -649,7 +649,7 @@ $("hl-flip").onclick = () => {
     if (Math.sign(bars[i].d) !== Math.sign(bars[i - 1].d) && s > sw) { sw = s; best = i; }
   }
   jumpHighlight(best, `Sharpest delta flip: ${bars[best - 1].d} → ${bars[best].d >= 0 ? "+" : ""}${bars[best].d} at ${fmtClock(bars[best].t1)} CT. `
-    + `One side was in charge, then the other seized it within ${DATA.meta.bar_n * 2} contracts. Flips at a meaningful level are beat 3 of the reversal signatures.`);
+    + `One side was in charge, then the other seized it within ${DATA.meta.bar_n * 2} contracts. Flips at a meaningful level are stage 3 of the reversal signatures.`);
 };
 $("tbl").onclick = () => { const w = $("tblwrap"); w.style.display = w.style.display === "block" ? "none" : "block"; };
 $("zoom").onchange = e => { cellH = Number(e.target.value); repaintAll(); };
