@@ -136,7 +136,9 @@ looking at it.
 
 ## How lessons consume this catalog
 
-A lesson spec names: **scenarios drawn** (e.g. S2 vs S4 discrimination) · **scaffold
+Concentration order lives in [skill-ladder.md](skill-ladder.md); the machine-readable
+deck (ladder order + fixed instances, consumed by the drill's Ladder dropdown) is
+[scenario-deck.json](scenario-deck.json). A lesson spec names: **scenarios drawn** (e.g. S2 vs S4 discrimination) · **scaffold
 level** (narrated / prompted / cold) · **deck** (which fixed instances, in what mix and
 order — losing hands at honest ratios: 7/2's truth is 9 invalidations to 4 confirms) ·
 **pass bar**. The generator builds the drill from the spec; the same deck repeats until

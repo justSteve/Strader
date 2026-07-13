@@ -40,7 +40,40 @@ logger = logging.getLogger("orderflow_drill")
 
 TEMPLATE = Path(__file__).parent / "orderflow_drill_template.html"
 LABELS = Path(__file__).resolve().parent.parent / "docs/measurement/mancini-setup-labels-2026-07-06.json"
+DECK = Path(__file__).resolve().parent.parent / "docs/drills/scenario-deck.json"
 FAMILY = {"failed_breakdown", "level_reclaim"}
+
+
+def scenario_deck_for(day: _date, bar_n: int) -> list[dict]:
+    """The pro forma scenario deck (st-5ov), ladder-ordered, with reference
+    instances filtered to this drill's day. Bar indices in the deck are only
+    valid at the deck's bar_n; on mismatch the refs keep their level (the UI
+    arms it) but lose their bar jump."""
+    if not DECK.exists():
+        return []
+    try:
+        deck = json.loads(DECK.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        logger.warning("could not read scenario deck (%s); dropdown will be empty", e)
+        return []
+    bars_valid = deck.get("bar_n") == bar_n
+    out = []
+    for sc in deck.get("scenarios", []):
+        refs = []
+        for r in sc.get("refs", []):
+            if r.get("date") != day.isoformat():
+                continue
+            r = dict(r)
+            if not bars_valid:
+                r["start"] = r["end"] = None
+            refs.append(r)
+        out.append({k: sc[k] for k in ("id", "unit", "name", "what", "tell", "call")}
+                   | {"refs": refs,
+                      "deck_days": sorted({r["date"] for r in sc.get("refs", [])})})
+    if not bars_valid:
+        logger.info("scenario deck bar_n=%s != drill bar_n=%d — refs fall back to level-arming",
+                    deck.get("bar_n"), bar_n)
+    return out
 
 
 def mancini_levels_for(day: _date) -> list[float]:
@@ -132,6 +165,7 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
         "bars": out_bars,
         "mancini_candidates": mancini,
         "anatomy": anatomy,
+        "scenarios": scenario_deck_for(day, bar_n),
     }
 
 

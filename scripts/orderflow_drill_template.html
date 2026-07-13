@@ -71,8 +71,8 @@ input[type=range] { flex:1; min-width:140px; }
   border-left:4px solid var(--buy); border-radius:8px; padding:8px 30px 8px 12px;
   font-size:13px; color:var(--ink); }
 #caption .x { position:absolute; top:4px; right:8px; cursor:pointer; color:var(--muted); }
-#visits { padding:0 16px 4px; font-size:12px; color:var(--ink-2); display:none; }
-#visits button { padding:2px 8px; font-size:12px; margin:2px; }
+#visits, #scendeck { padding:0 16px 4px; font-size:12px; color:var(--ink-2); display:none; }
+#visits button, #scendeck button { padding:2px 8px; font-size:12px; margin:2px; }
 #help { position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.5); z-index:60; }
 #help .card { background:var(--surface-1); border:1px solid var(--ring); border-radius:12px;
   padding:22px 26px; max-width:640px; max-height:85vh; overflow:auto; font-size:14px; line-height:1.55; }
@@ -124,6 +124,8 @@ td:first-child, th:first-child { text-align:left; }
   <label>Level <input type="text" id="lvlinput" size="7" placeholder="price"></label>
   <button id="arm">Arm level</button>
   <span id="chips"></span>
+  <label title="The skill ladder — scenarios in concentration order (docs/drills/skill-ladder.md)">Ladder
+    <select id="scenario"><option value="">scenario ▾</option></select></label>
   <label>Rows <select id="zoom">
     <option value="9">Compact</option><option value="13" selected>Medium</option>
     <option value="16">Large</option>
@@ -147,6 +149,7 @@ td:first-child, th:first-child { text-align:left; }
   <span>Score <b id="ro-score">0/0</b></span>
 </div>
 <div id="visits"></div>
+<div id="scendeck"></div>
 <div id="anatomy"></div>
 <div id="beatrail"></div>
 <div id="stage"><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
@@ -176,6 +179,7 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
   </ul>
   <h4>How to run a rep</h4>
   <ol>
+    <li>Or start from the <b>Ladder</b> dropdown: scenarios in concentration order (U0 tempo → U1 frames → S2 → S4 → S5 → S3 → S1/S6). Picking one arms its level and drops you on its fixed reference instance.</li>
     <li>Click a level chip (session levels, or M: chips from Mancini's letter). You'll be dropped ~10 bars before price first visited it.</li>
     <li>Press <b>Space</b> and watch the approach: is the aggression toward the level being rewarded (bars keep moving) or eaten (heavy color, no progress)?</li>
     <li>When price gets within a point, the replay pauses and asks: reject or accept. Answer, watch the tape decide, and your running score builds below.</li>
@@ -573,6 +577,83 @@ function exitAnatomy() {
   renderBeatRail(); $("caption").style.display = "none";
 }
 
+// ── scenario ladder (st-5ov): the pro forma deck, in concentration order ──
+// DATA.scenarios arrives ladder-ordered (docs/drills/skill-ladder.md); the
+// dropdown mirrors that order exactly — top-to-bottom IS the curriculum.
+// Refs are the catalog's FIXED instances for this day; [to tag] scenarios
+// say so rather than guessing an example.
+const SCENARIOS = DATA.scenarios || [];
+function scenarioSuffix(sc) {
+  if (sc.refs.length) return ` · ${sc.refs.length} ref${sc.refs.length > 1 ? "s" : ""}`;
+  if (sc.deck_days.length) return ` · refs on ${sc.deck_days.join(", ")}`;
+  return sc.id === "ANCHORS" ? " · via Anatomy" : " · [to tag]";
+}
+function buildScenarioSelect() {
+  const sel = $("scenario");
+  if (!SCENARIOS.length) { sel.parentElement.style.display = "none"; return; }
+  for (const sc of SCENARIOS) {
+    const o = document.createElement("option");
+    o.value = sc.id;
+    o.textContent = `U${sc.unit} · ${sc.id} — ${sc.name}${scenarioSuffix(sc)}`;
+    sel.appendChild(o);
+  }
+  sel.onchange = () => {
+    const sc = SCENARIOS.find(s => s.id === sel.value);
+    if (sc) selectScenario(sc);
+  };
+}
+function armRefLevel(ref) {
+  if (ref.level == null) return;
+  level = Math.round(ref.level / TICK) * TICK;
+  armedSide = null;
+  $("lvlinput").value = fmtPrice(level);
+  $("arm").textContent = `Armed @ ${level.toFixed(2)}`;
+}
+function jumpToRef(sc, ref, k) {
+  armRefLevel(ref);
+  if (ref.start != null) {
+    seekTo(Math.max(0, ref.start - 8));
+    showCaption(`${sc.id} ref ${k + 1}/${sc.refs.length} — ${ref.label}. You are 8 bars early; press Space. CALL: ${sc.call}`);
+  } else if (ref.level != null) {
+    armLevel(true);  // bar indices invalid at this bar_n — fall back to first level visit
+  }
+  sendState("scenario_ref", { id: sc.id, ref: k + 1, level: ref.level, start: ref.start });
+}
+function renderScenarioRefs(sc) {
+  const row = $("scendeck");
+  row.innerHTML = "";
+  if (sc.refs.length) {
+    row.append(`${sc.id} deck (fixed instances): `);
+    sc.refs.forEach((ref, k) => {
+      const b = document.createElement("button");
+      b.textContent = `${k + 1}${ref.level != null ? " @ " + fmtPrice(ref.level) : ""}`;
+      b.title = ref.label;
+      b.onclick = () => jumpToRef(sc, ref, k);
+      row.appendChild(b);
+    });
+  } else if (sc.deck_days.length) {
+    row.append(`Deck references for ${sc.id} live on ${sc.deck_days.join(", ")} — generate that day's drill to walk them.`);
+  } else if (sc.id === "ANCHORS") {
+    row.append("No fixed refs — open the Anatomy list and walk its range_trap / return_to_lvn instances.");
+  } else {
+    row.append("[to tag] — standing reference not yet pinned to exact bars; never guess one.");
+  }
+  row.style.display = "block";
+}
+function selectScenario(sc) {
+  exitAnatomy();
+  $("visits").style.display = "none";
+  renderScenarioRefs(sc);
+  if (sc.refs.length) {           // position on ref 1 silently; the description caption below wins
+    const ref = sc.refs[0];
+    armRefLevel(ref);
+    if (ref.start != null) seekTo(Math.max(0, ref.start - 8));
+    else if (ref.level != null) armLevel(true);
+  }
+  showCaption(`UNIT ${sc.unit} · ${sc.id} ${sc.name.toUpperCase()} — ${sc.what}  ·  TELL: ${sc.tell}  ·  CALL: ${sc.call}`);
+  sendState("scenario_select", { id: sc.id, unit: sc.unit, refs: sc.refs.length });
+}
+
 // ── guess-then-reveal ────────────────────────────────────────────────────
 function armLevel(jump) {
   exitAnatomy();  // a manual arm leaves anatomy mode
@@ -751,6 +832,7 @@ document.querySelectorAll("#panel button").forEach(btn => {
 
 // boot: show the first bar, paused
 $("anat").onclick = () => { const w = $("anatomy"); w.style.display = w.style.display === "flex" ? "none" : "flex"; };
+buildScenarioSelect();
 renderAnatomyList();
 seekTo(0); repaintLog();
 </script></body></html>
