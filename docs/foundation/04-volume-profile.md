@@ -74,7 +74,28 @@ departure creates a thin zone; the schools differ in how they draw the box and t
 folklore they attach. We treat LVN as the honest, mechanical name (it's literally
 countable from trades) and translate the others onto it.
 
-## The reference levels this lens gives you
+## Sidebar: why gaps "fill" — old folklore, explained by this document
+
+You've heard for decades that gaps act as magnets and tend to get filled, and the
+claim never came with a mechanism. It's this document's logic at grand scale. An
+overnight gap is movement by withdrawal (document 01): the orders left, price
+relocated, and **almost no business was done anywhere in the gapped span** — making
+the entire gap one giant low-volume zone. Two consequences follow. First, *no
+defenders*: nobody's position or break-even lives inside untraded ground, so a move
+back through it meets almost no resistance — the slice-through rule, stretched
+across 40 points instead of two. Second, *unfinished audit*: the auction never
+tested whether business belonged at those prices, and the market habitually returns
+to test untested ground (the same instinct as single-print repair and the naked-POC
+revisit). "Magnet" is folklore for **no brakes plus a standing reason to make the
+trip**.
+
+And the honest, condition-attached version that folklore omits: **a gap fills
+easily when the market REJECTS the new price; it stays open when the market ACCEPTS
+it.** If real value builds at the gapped-to price — heavy two-sided business,
+acceptance — the audit came back "the repricing was right," and that gap can stay
+open for months. Watch the first hour: acceptance below says the gap is the new
+landscape; rejection below says the empty corridor overhead is the path of least
+resistance.
 
 Like Market Profile, Volume Profile produces levels that persist:
 
