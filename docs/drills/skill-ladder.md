@@ -4,6 +4,11 @@
 Companion to [scenario-catalog.md](scenario-catalog.md); machine-readable deck in
 [scenario-deck.json](scenario-deck.json).*
 
+> **Prerequisite (st-8j8):** this ladder assumes the background built in
+> [`docs/foundation/`](../foundation/00-READ-ME-FIRST.md) — auction mechanics,
+> volume, the two profiles, order flow, the footprint, and trap mechanics. Read
+> that series first; it defines every term this page uses in shorthand.
+
 ---
 
 ## Why an order exists at all — three structural facts

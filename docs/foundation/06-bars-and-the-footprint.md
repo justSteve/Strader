@@ -1,0 +1,117 @@
+# 06 · Bars and the Footprint — Reading the Drill Screen
+
+*Foundation series, document 6 of 8. Rests on: [02 · Volume](02-volume.md) (effort
+vs effect) and [05 · Order Flow](05-order-flow.md) (delta, absorption).*
+
+---
+
+## The one idea
+
+A footprint chart is nothing new — it is documents 01–05 drawn as a picture. Each
+bar is opened up so you can see, at every price inside it, who was pressing and how
+hard. Once the underlying ideas exist, the footprint stops being a wall of colored
+numbers and becomes the fastest way to watch the auction argue. This document walks
+every element of the drill screen and names the concept behind it.
+
+## First: why the bars aren't clock bars
+
+Your chart habits were built on **clock bars** — every candle is one minute (or
+five, or thirty). Clock bars have a hidden flaw for order-flow work: *the amount of
+evidence per bar swings wildly*. A 1-minute bar at lunch might hold 300 contracts;
+a 1-minute bar during a violent flush might hold 30,000. Same-sized candle, hundred‑
+fold difference in how much actually happened. Patterns learned on clock bars are
+partly patterns of the clock, not the market.
+
+**Volume bars** fix this by inverting it: every bar closes when the same number of
+contracts has traded — in our drills, **2,000 contracts per bar**. Consequences:
+
+- **Every bar carries equal evidence.** A bar is a fixed 2,000-contract sample of
+  the auction, always comparable to its neighbors.
+- **Time becomes an output.** The one thing that now varies is *how long the bar
+  took*. An 11-second bar means 2,000 contracts changed hands in 11 seconds —
+  the tape is on fire. A 9-minute bar means the market is asleep. Bar duration is
+  a pure **urgency meter**, and the drill's *pace strip* (the little bar-graph
+  strip under the chart) displays exactly that: one duration bar per column.
+
+This is a genuine habit change from clock-bar reading, which is why the drill
+curriculum's very first unit is nothing but pace: replaying days at various speeds
+until "fast bars = urgent tape" is felt rather than computed.
+
+## The footprint: a bar, opened up
+
+Take one 2,000-contract bar. Instead of drawing it as a candle, list every price it
+touched (one row per tick — 0.25 points), and at each price show the business done,
+split by aggressor side (document 01's tag):
+
+```
+one bar, opened up:                        how to read a cell:
+price     sell-aggr × buy-aggr
+6251.00        12  ×  85          ← buyers pressing here, lightly
+6250.75        96  ×  310         ← heavy business, buyers forcing 3:1
+6250.50       410  ×  388         ← the bar's biggest fight (its POC)
+6250.25       205  ×  71          ← sellers forcing ~3:1
+6250.00        44  ×   9          ← light selling
+              ───────────
+              bar delta = (sum of buy-aggr) − (sum of sell-aggr)
+```
+
+On the drill screen each such row is a **cell**, and the rendering encodes three
+things at once:
+
+| Visual | Encodes | Concept behind it |
+|--------|---------|-------------------|
+| **Cell color** (blue vs red) | Which side's aggression won that price — blue = buy-aggressor dominant, red = sell-aggressor | Document 01: the aggressor tag |
+| **Cell brightness** | Total contracts at that price — brighter = more business | Document 02: effort |
+| **The number** | The net margin (buy-aggr minus sell-aggr at that price) | Document 05: delta, per price |
+| **Outlined cell** | The bar's own POC — the price with the most volume inside this bar | Document 03's POC idea, at bar scale |
+| **Dashed empty cell** | A price the bar jumped over with zero trades | Document 04's LVN, at micro scale — real, deliberate emptiness |
+| **Footer number** | The whole bar's delta, colored by sign | Document 05: the pressure gauge |
+
+Hover any cell in the drill and it spells out its raw sell-aggressor / buy-aggressor
+pair — nothing on the screen is more than one hover away from its definition.
+
+## The four single-cell reads
+
+Document 02's effort-vs-effect table becomes, cell by cell, the drill curriculum's
+"frame" vocabulary. Same table, now in footprint terms — brightness is effort, the
+net number is the score:
+
+| Read | Looks like | Means |
+|------|-----------|-------|
+| **Conviction** | Bright cell, big net number | Hard fight, clear winner — trust the winner |
+| **Absorption** | Bright cell, *small* net number | Huge two-sided strain, no winner — someone strong is hiding at this price; reversal fuel |
+| **Hollow** | Dim cell, big net number | A "win" with almost no business behind it — evaporates on contact with a real opponent |
+| **Dead** | Dim cell, small number | Nothing happened here |
+
+A real example you found yourself, on the July 2 reference day, first bar of the
+session: a cell with net −1 that was *brighter* than a neighboring cell with net
+−16. The −16 cell looks scarier by number; the −1 cell is the story — far more
+total business, dead-even outcome. That's absorption's signature in the wild.
+
+## From cells to columns to sequences
+
+Reading builds in three steps, and the drill units follow the same three:
+
+1. **One cell** — the four reads above.
+2. **One column** (a whole bar) — where inside the bar did the business
+   concentrate (the bar's POC)? What's the footer delta? Did the bar's shape climb
+   or sag? A column is one 2,000-contract *round* of the fight.
+3. **A sequence of columns** — now the compass runs: is the pressing side's effort
+   producing effect bar over bar? Are footers staying one color (one side in
+   charge) or flipping? Are bars speeding up (urgency arriving) or slowing? This
+   is where the level-engagement stories of document 07 play out.
+
+## The rest of the drill screen, quickly
+
+So every control has a concept attached: the **level chips** arm a price from the
+day's map (session open/highs/lows, or levels harvested from Mancini's letter —
+document 07 covers why those levels); the **Ladder dropdown** loads the drill
+curriculum's scenarios in learning order; **Anatomy** walks recognized four-stage
+setups with each stage narrated (the stages themselves are document 07's subject);
+and the **Session Δ** readout is cumulative delta from document 05 — watch its
+slope, ignore its level.
+
+---
+
+**Next: [07 · Levels and Traps](07-levels-and-traps.md) — where the fights happen,
+who gets trapped, and the four-stage reversal the drills are built around.**
