@@ -120,5 +120,18 @@ Carmine Rosato trades comes from.
 
 ---
 
+## Check yourself
+
+*Questions only — bring your answers to the open Strader session.*
+
+1. How is a Market Profile physically built, and what does one TPO mark mean?
+2. What are the Point of Control, the Value Area, and the Initial Balance — and
+   why do *yesterday's* versions still matter today?
+3. What's "naked" about a naked POC, and what does the market tend to do about it?
+4. A D-shaped day and a trend day: describe each in balance/imbalance terms, and
+   say which one the late-day butterfly wants and why.
+5. What do single prints record, and why does the market tend to come back and
+   repair them?
+
 **Next: [04 · Volume Profile](04-volume-profile.md) — where the business was done,
 and the gaps where it wasn't.**

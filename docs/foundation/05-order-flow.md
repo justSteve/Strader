@@ -126,5 +126,19 @@ Kept explicit, because over-trusting the tape is how order-flow traders die:
 
 ---
 
+## Check yourself
+
+*Questions only — bring your answers to the open Strader session.*
+
+1. Define delta in one sentence. Why does cumulative delta's slope matter while
+   its absolute level means nothing?
+2. Price makes a new low of the day, but cumulative delta sits higher than at the
+   previous low. What is that called, and what does it say about the sellers?
+3. Exhaustion and absorption both stop a move. Who stops it in each case, what
+   does the delta look like in each, and who is in control afterward?
+4. What is a sweep, and what does it mean when even a sweep fails to move price?
+5. Why is order flow only meaningful at mapped levels — and which tools supply
+   the map?
+
 **Next: [06 · Bars and the Footprint](06-bars-and-the-footprint.md) — the display
 that shows all of this at once, and how to read every element of the drill screen.**

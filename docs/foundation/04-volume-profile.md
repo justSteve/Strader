@@ -107,5 +107,18 @@ trade-by-trade view.
 
 ---
 
+## Check yourself
+
+*Questions only — bring your answers to the open Strader session.*
+
+1. What does a Volume Profile count, and when it disagrees with the Market
+   Profile, which do you trust and why?
+2. Describe a high-volume node and a low-volume node in auction terms — and how
+   price tends to behave when it returns to each.
+3. Why does a low-volume node force a decision rather than host rotation? Walk
+   Carmine Rosato's entry model through that fact, step by step.
+4. "Supply zone," "order block," "fair-value gap," "low-volume node" — what's the
+   relationship among these terms?
+
 **Next: [05 · Order Flow](05-order-flow.md) — the trade-by-trade view: delta,
 divergence, and absorption.**

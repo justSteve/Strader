@@ -77,7 +77,7 @@ sitting with:
 | | **Big effect** (price moved) | **Small effect** (price stuck) |
 |---|---|---|
 | **Big effort** (heavy volume) | **Conviction.** A real fight with a clear winner. Healthy move; expect follow-through. | **Absorption.** Massive force spent, price didn't budge — someone enormous is quietly taking the other side of every trade. The strongest reversal tell there is. |
-| **Small effort** (light volume) | **Hollow move.** Price traveled but nobody did business — a thin-book drift. It evaporates on contact with a real opponent. | **Dead.** Nothing happened. Rest. |
+| **Small effort** (light volume) | **Hollow move.** Price traveled but nobody did business — usually document 01's movement-by-withdrawal: the other side wasn't beaten, it stepped aside. Evaporates on contact with a real opponent. | **Dead.** Nothing happened. Rest. |
 
 The arm-wrestling picture, since it will come back: effort is the strain in the
 arms, effect is whether the arm actually moves. A huge strain with no movement
@@ -114,6 +114,20 @@ Numbers only mean something against a baseline. For the day session on /ES:
   its full treatment in document 06.
 
 ---
+
+## Check yourself
+
+*Questions only — bring your answers to the open Strader session.*
+
+1. Price is called an advertisement and volume the business actually done. What
+   kind of lie does that distinction let you catch?
+2. The same stream of trades can be totaled three different ways. What are the
+   three, and which tool does each become?
+3. What do acceptance and rejection mean in auction terms — and what does a
+   rejected price leave behind in the volume record?
+4. Name the four effort-vs-effect situations. Which one is the strongest reversal
+   tell, and what does it say is happening behind the scenes?
+5. What is VWAP, and why do its bands work as a "how stretched is price" meter?
 
 **Next: [03 · Market Profile](03-market-profile.md) — reading where price spends
 its time.**

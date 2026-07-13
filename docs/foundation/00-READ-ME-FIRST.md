@@ -44,13 +44,13 @@ Each layer rests on the one below it. Read in order.
 
 ## How to know you're ready to move on
 
-When you finish a document, open whatever Strader session is active and tell it,
-in your own words, what the document gave you — Strader judges the understanding
-and probes the gaps before you move on. (Just name the document and start talking;
-the checks live in Strader's head, not on these pages, so you can't grade your own
-homework by glancing ahead.) If the retelling doesn't come in your own words, the
-next document will feel like compressed claims you weren't party to — go back
-instead; the series is short enough to re-read.
+Each document ends with a short **Check yourself** list — questions only; there
+are no answers anywhere in this series. When you finish a document, type your
+answers into whatever Strader session is open, in your own words. Strader judges
+them against the document, probes the gaps, and gives a plain ready-or-re-read
+verdict before you move on. If the answers won't come in your own words, the next
+document will feel like compressed claims you weren't party to — go back instead;
+the series is short enough to re-read.
 
 ## Where this sits relative to the drills
 

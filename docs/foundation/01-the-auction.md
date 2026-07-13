@@ -32,6 +32,11 @@ Aggressive = time certainty, no price certainty.** Every trade that ever prints 
 one aggressive order meeting one resting order. Both sides are always present in
 every single trade.
 
+Keep that sentence narrow: it describes every **trade**. It says nothing yet about
+price **movement** — most trades move nothing at all, and movement turns out to
+have more than one source (below). Conflating trades with movement is the most
+common confusion at this stage, and worth stamping out early.
+
 ## The book
 
 The exchange keeps a live ledger of every resting order, organized by price. It's
@@ -89,25 +94,36 @@ bucket rather than letting them pollute the count.)
 
 ## Why price moves
 
-Price does not drift, float, or get pushed by sentiment rays. Price moves for
-exactly one mechanical reason:
+Price does not drift, float, or get pushed by sentiment rays. Price ticks up when
+**the best offer empties** — with nothing left for sale at 6250.50, the next
+resting offers, at 6250.75, become the best offer. That's the entire event we call
+"price went up a tick." Downward moves are the mirror image.
 
-> **Price ticks up when aggressive buyers consume ALL the resting offers at the
-> best offer price.** With nothing left to buy at 6250.50, the next resting offers —
-> at 6250.75 — become the best offer. That's the entire event we call "price went
-> up a tick." Downward moves are the mirror image.
+Notice what that implies: **a trade and a price change are different events.**
+Most trades just chip at the best level without emptying it — thousands of trades
+produce only hundreds of ticks of movement. A trade is two parties doing business;
+movement is a level *running out*.
 
-Two very different situations produce the same upward tick:
+And a level can run out in two different ways:
 
-1. **Heavy aggression** — a flood of impatient buyers chews through a thick wall
-   of offers. Lots of contracts trade. This is a move with *fuel*.
-2. **Thin liquidity** — hardly anyone is offering, so even mild buying steps price
-   up through near-empty levels. Very few contracts trade. This is a move with
-   *no resistance* — which also means no proof anyone believed in it.
+1. **It gets eaten.** Aggressive buyers consume every resting offer at the level.
+   Movement by **aggression** — and it's loud: every contract consumed prints on
+   the public record as a trade you can see and count.
+2. **It gets abandoned.** The sellers *cancel* their resting offers and step away —
+   news hits, or they lose their nerve. Not one contract trades, nothing prints,
+   and yet the best offer is suddenly higher. Movement by **withdrawal** — silent,
+   because a cancelled order leaves no trade behind.
 
-Same green candle on a price chart. Completely different meaning. **Distinguishing
-these two is, in one sentence, what all of order-flow reading is for** — and it's
-why price alone (document 01) always needs volume (document 02) next to it.
+Real moves are a blend of the two, but the mix is readable. A move the market
+**paid for** — heavy aggression eating thick levels, lots of contracts printing —
+is a move with fuel and proof behind it. A move the market was **given** — price
+stepping through near-empty or fleeing levels on almost no trades — proves nothing
+about anyone's conviction. Opening gaps and news spikes are the extreme case:
+whole ladders of orders get pulled and price relocates almost without trading.
+
+Same green candle either way. **Telling paid-for movement from given movement is,
+in one sentence, what all of order-flow reading is for** — and it's why price
+alone always needs volume (document 02) next to it.
 
 ## What the auction is trying to do
 
@@ -144,5 +160,21 @@ tool in your toolkit is a way of asking "balance or imbalance, and where?"
 | Typical day volume | On the order of 1–2 million contracts | Our reference day (July 2) traded 1.34M in the day session |
 
 ---
+
+## Check yourself
+
+*Questions only — no answers anywhere in this series. Bring yours to the open
+Strader session, in your own words, and it will probe from there.*
+
+1. A resting order and an aggressive order each give something up and get
+   something in return. What, for each?
+2. Every trade has exactly one buyer and one seller — so what can "buying volume"
+   possibly measure?
+3. Most trades don't move price at all. Why not? What exactly has to happen for
+   price to tick up?
+4. A price level can empty in two different ways. What are they, and which one
+   leaves a trace on the tape?
+5. Two identical-looking green candles: one heavily traded, one barely traded.
+   What might each mean, and which would you trust?
 
 **Next: [02 · Volume](02-volume.md) — the auction's honesty meter.**

@@ -118,5 +118,21 @@ deck — the deck exists because this sequence *is* the strategy.
 
 ---
 
+## Check yourself
+
+*Questions only — bring your answers to the open Strader session.*
+
+1. What are the five sources of levels — and what physically makes a level
+   "live" when price touches it?
+2. Tell the six stories that can unfold when price meets a level, in your own
+   words, without using the deck codes.
+3. Walk the trap's four stages: who is selling in the flush, why that fuel
+   self-exhausts, who is trapped after the flip, and whose stops power the
+   confirm.
+4. Why can no read — however skilled — reliably separate a real trap from a
+   failing one before stage four? What does that mean for entries?
+5. Restate the late-day butterfly thesis as this document's trap sequence at
+   session scale.
+
 **Next: [08 · The /ES → SPX Bridge](08-es-spx-bridge.md) — why we read futures to
 trade index options, plus the map from this series into the drill units.**

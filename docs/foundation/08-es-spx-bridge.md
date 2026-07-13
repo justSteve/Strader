@@ -104,4 +104,18 @@ flag it and it gets fixed.
 
 ---
 
+## Check yourself
+
+*Questions only — bring your answers to the open Strader session.*
+
+1. Why does SPX itself have no tape — and where is the S&P auction actually
+   legible?
+2. What is the basis, roughly why does it exist, and why is an /ES read an SPX
+   read for intraday purposes?
+3. An /ES level from Mancini's letter needs what adjustment before it becomes an
+   SPX option strike decision — and how often does that adjustment change?
+4. What changes when a futures-tape read is expressed through an option, and
+   which two doctrine lines keep that translation simple?
+5. Pick any drill unit and name the foundation documents it rests on.
+
 **Done. Back to the map: [00 · READ ME FIRST](00-READ-ME-FIRST.md).**

@@ -113,5 +113,20 @@ slope, ignore its level.
 
 ---
 
+## Check yourself
+
+*Questions only — bring your answers to the open Strader session.*
+
+1. What's the hidden flaw in clock bars for order-flow work, and what does a
+   volume bar hold constant instead?
+2. On volume bars, what does a bar's *duration* tell you — and where does the
+   drill screen display it?
+3. A footprint cell has a color, a brightness, and a number. What does each
+   encode, and which foundation concept does each trace back to?
+4. Name the four single-cell reads. Which one was your own July 2 first-bar find,
+   and what made that cell the story?
+5. What is a dashed empty cell on the drill screen, and why is it drawn
+   deliberately rather than left blank?
+
 **Next: [07 · Levels and Traps](07-levels-and-traps.md) — where the fights happen,
 who gets trapped, and the four-stage reversal the drills are built around.**
