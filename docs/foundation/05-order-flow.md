@@ -77,6 +77,20 @@ runs out — and it always runs out — the wall's owner is sitting on a massive
 position acquired at one price, and the path of least resistance flips hard the
 other way.
 
+Why would anyone trade this way? Because for genuine size, it's the ONLY way in.
+A player who wants thousands of contracts has a problem small traders never face:
+their own order is big enough to wreck their own price. Buy aggressively at that
+scale and every fill pushes price higher — they end up chasing their own demand.
+So size must sit still at a chosen price, passive, and let the market deliver.
+Seen from that chair, a panic flush is a *fire sale*: a crowd of forced sellers
+dumping inventory at one price, into the one buyer built to take it all. The
+absorber isn't nobly defending a level at a loss — they're **shopping**, and the
+"dampening" of the move is a side effect of how size has to shop. (Carmine's word
+for the fingerprint is the **re-load**: the resting orders getting eaten and
+reappearing at the same price, again and again.) They can still be wrong — the
+level can fail and they eat the loss — but risk of loss and intent to lose are
+different things.
+
 Distinguish the two ways a move stalls, because they look similar and mean
 different things about *who* is in control:
 
