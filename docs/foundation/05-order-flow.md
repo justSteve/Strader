@@ -125,6 +125,15 @@ different things about *who* is in control:
 Both are reversal conditions; absorption is the stronger and more precise one,
 because someone *proved* their intent with size.
 
+A note on the table's "delta looks like" column: those are **bar** deltas — the
+per-bar footer numbers — and the comparison baseline is **the move's own earlier
+bars**, so neither read requires price to be revisiting old ground. A first touch
+of a brand-new low can show exhaustion (each push printing less than the last) or
+absorption (loud prints, no progress) just fine. The *cumulative*-delta
+comparison — divergence, above — is the separate, stronger instrument that does
+require two comparable extremes to exist. And the classifier at a level is never
+attempt-count; it is always "does the aggression keep getting paid?"
+
 ## Sweeps and urgency
 
 One more pattern worth naming: a **sweep** — a single aggressive order so large it
