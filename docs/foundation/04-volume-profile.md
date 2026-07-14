@@ -76,8 +76,9 @@ countable from trades) and translate the others onto it.
 
 ## Sidebar: why gaps "fill" — old folklore, explained by this document
 
-You've heard for decades that gaps act as magnets and tend to get filled, and the
-claim never came with a mechanism. It's this document's logic at grand scale. An
+"Gaps act as magnets and tend to get filled" is decades-old trading folklore —
+you've run into it yourself, skeptically, and it never came with a mechanism
+attached. It's this document's logic at grand scale. An
 overnight gap is movement by withdrawal (document 01): the orders left, price
 relocated, and **almost no business was done anywhere in the gapped span** — making
 the entire gap one giant low-volume zone. Two consequences follow. First, *no
