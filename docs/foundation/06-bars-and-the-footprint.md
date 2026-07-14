@@ -113,6 +113,58 @@ slope, ignore its level.
 
 ---
 
+## Known snags — a field guide from your own crossing
+
+This section exists at your request: an honest record of where the comprehension
+checks on documents 01–05 went astray, restated in this document's terms, so the
+next pass over this ground unwinds the confusion instead of repeating it. Six
+snags; each with the trap and the rule that springs it.
+
+**Snag 1 — the flipped anchor.** Your flagged failure mode: once the initial
+direction flips, everything downstream stays internally coherent, so the error
+can't be felt from inside. The screen gives you a mechanical guard: the flush IS
+a color. Bright red cells punching down through a level = flush down; if the trap
+springs, it pays UP. Rule: **say the flush direction out loud before analyzing
+anything.** Anchor first; the confirm's direction is then automatic.
+
+**Snag 2 — crediting the wrong party.** Twice you assigned the absorber's role to
+"the aggressor." The screen guards this one too: **cell colors count aggression
+only** — blue is buy-aggressors, red is sell-aggressors; the passive side never
+prints a color. A resting wall is invisible in the cells; you see it only as
+*effect* — loud one-sided color with price refusing to move. If you catch
+yourself saying "the aggressor met all challengers," stop: whoever meets
+challengers from a standing position is passive by definition.
+
+**Snag 3 — time versus contracts.** In Market Profile territory you counted
+volume where the tool counts half-hours (the POC, single prints). The lenses
+usually agree, which is exactly why they blur. On this screen the roles are
+explicit: volume is the constant (every bar the same contracts), time is the
+*output* (the pace strip). Rule: before saying "transactions," ask which unit the
+tool in your hand actually counts.
+
+**Snag 4 — counter versus signed sum.** "Anything that accumulates can only be
+higher on revisits" — true for volume, false for delta. Footer numbers are
+signed; the Session Δ readout wanders up and down all day, like price. Only
+volume is a true counter.
+
+**Snag 5 — earlier-in-time versus old-ground-in-price.** "The move's own earlier
+bars" read to you as revisiting old ground. *Earlier* is a time word — look left;
+every move has earlier bars. *Old ground* is a price word — it exists only when
+price returns to somewhere it traded and left. Exhaustion and absorption read
+first-touch, against the move's own earlier bars; divergence is the one read that
+needs two visits.
+
+**Snag 6 — attempt-count as classifier.** "Fails on the first attempt = plain
+continuation" — no. The classifier at a level is never how many attempts; it is
+always **"does the aggression keep getting paid?"** The trap itself is a
+first-attempt story — if first attempts defaulted to continuation, there would be
+nothing to drill.
+
+None of these are personal defects; they are the standard potholes of this
+material — our own recognizer code carries explicit direction constants because
+sign errors are exactly that easy. The difference between a snag and a leak is
+whether it's written down. It is now.
+
 ## Check yourself
 
 *Questions only — bring your answers to the open Strader session.*
