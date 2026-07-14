@@ -125,14 +125,18 @@ different things about *who* is in control:
 Both are reversal conditions; absorption is the stronger and more precise one,
 because someone *proved* their intent with size.
 
-A note on the table's "delta looks like" column: those are **bar** deltas — the
-per-bar footer numbers — and the comparison baseline is **the move's own earlier
-bars**, so neither read requires price to be revisiting old ground. A first touch
-of a brand-new low can show exhaustion (each push printing less than the last) or
-absorption (loud prints, no progress) just fine. The *cumulative*-delta
-comparison — divergence, above — is the separate, stronger instrument that does
-require two comparable extremes to exist. And the classifier at a level is never
-attempt-count; it is always "does the aggression keep getting paid?"
+A note on the table's "delta looks like" row: those are **bar** deltas — the
+per-bar footer numbers — compared against **the move's own earlier bars**. Keep
+two words apart here: "earlier" is a TIME word; "old ground" is a PRICE word. A
+flush pressing to new lows always has earlier bars (behind it on the chart) while
+standing on brand-new ground the whole way — if its pushes print −900, −600,
+−350, −150 while price still edges lower, that fading is read entirely inside one
+advance, nothing revisited. Revisiting old ground is the *price* event — price
+returning to somewhere it traded and left — and that's what the
+*cumulative*-delta comparison (divergence, above) requires: two separate visits
+to comparable extremes, two snapshots to compare. So exhaustion and absorption
+are first-touch readable; divergence needs history. And the classifier at a level
+is never attempt-count; it is always "does the aggression keep getting paid?"
 
 ## Sweeps and urgency
 
