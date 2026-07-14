@@ -39,8 +39,11 @@ That's the whole definition. A bar with delta +420 means impatient buyers forced
 420 more contracts than impatient sellers did during that bar. Delta is the auction
 answering *"who was pressing, and how hard?"* — one number per bar.
 
-The running total from the session open is **cumulative delta** (also "session
-delta" — on the drill screen it's the `Session Δ` readout). Guard against a
+The running total from the session open is **cumulative delta** — one quantity
+that travels under several names: **CVD** ("Cumulative Volume Delta") in the
+research companion and most practitioner writing, "session delta" in
+conversation, and the `Session Δ` readout on the drill screen. All the same
+thing. Guard against a
 natural misreading: cumulative delta is a **signed** sum, not a volume-like
 counter that only grows. It *falls* during every bar the sellers dominate and
 rises when the buyers do — it wanders up and down all day, like price does. Two
@@ -86,6 +89,15 @@ The aggressive side is spending its ammunition into a wall. When the ammunition
 runs out — and it always runs out — the wall's owner is sitting on a massive
 position acquired at one price, and the path of least resistance flips hard the
 other way.
+
+"Path of least resistance" is literal here, not chart folklore. From document 01,
+moving price means chewing through the resting orders in the way — "resistance"
+is that pile of opposing business, and the path of least resistance is the
+direction where the pile is thinnest. After the fight at a hammered low, the two
+directions are wildly asymmetric: **down** needs fresh aggressive sellers (just
+spent) to eat a bid wall that has proven it re-loads; **up** needs only modest
+buying to eat offers thinned out by everyone who already sold into the panic.
+One door is barred, the other is unlocked — price takes the unlocked one.
 
 Why would anyone trade this way? Because for genuine size, it's the ONLY way in.
 A player who wants thousands of contracts has a problem small traders never face:
