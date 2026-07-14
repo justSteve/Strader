@@ -9,9 +9,15 @@ Depth companion with sources: `docs/research/2026-07-03-orderflow-primitives-res
 ## The one idea
 
 The profiles (documents 03–04) gave you the map — what kind of day, and where the
-decision prices sit. Order flow is the **live camera at the decision price**: as
-price arrives at a level that matters, it shows you which side is pressing, whether
-the pressing is working, and whether someone big is quietly standing in the way.
+**decision prices** sit. A decision price is document 04's "decision point"
+generalized: any price the market can't just drift through — a low-volume node, a
+prior value edge, a range extreme, a naked POC, a widely watched level — because a
+stored pile of commitments (stops, waiting entries, defenders) must resolve when
+price arrives. Contrast the middle of a value area, where price can rotate all
+afternoon with nothing at stake. Order flow is the **live camera at the decision
+price**: as price arrives, it shows you which side is pressing, whether the
+pressing is working, and whether someone big is quietly standing in the way —
+which answer is winning, while the question is still being asked.
 Every order-flow tool is arithmetic on one fact you already own from document 01:
 every trade is tagged by who forced it — the aggressive buyer or the aggressive
 seller.
