@@ -34,7 +34,11 @@ That's the whole definition. A bar with delta +420 means impatient buyers forced
 answering *"who was pressing, and how hard?"* — one number per bar.
 
 The running total from the session open is **cumulative delta** (also "session
-delta" — on the drill screen it's the `Session Δ` readout). Two rules for using it:
+delta" — on the drill screen it's the `Session Δ` readout). Guard against a
+natural misreading: cumulative delta is a **signed** sum, not a volume-like
+counter that only grows. It *falls* during every bar the sellers dominate and
+rises when the buyers do — it wanders up and down all day, like price does. Two
+rules for using it:
 
 - **The level means nothing; the trend means everything.** Cumulative delta's
   absolute value depends on where the count started. Read its *slope* and its
@@ -107,9 +111,14 @@ because someone *proved* their intent with size.
 
 One more pattern worth naming: a **sweep** — a single aggressive order so large it
 consumes several price levels of the book at once. Sweeps are the loudest form of
-impatience: someone wanted in/out NOW, at any price. A sweep *into* a key level
-often starts the violent flush you'll study in document 07; a sweep that fails to
-move price (absorption eating even that) is as strong as tells get.
+impatience: someone wanted in/out NOW, at any price. By construction a sweep moves
+price *at the moment it executes* — it walks through several rungs of resting
+orders. The information is in what happens next: if fresh orders instantly re-load
+the eaten rungs and price snaps back, the sweep failed to make the move *stick* —
+the most motivated order type in existence was fully digested, which means someone
+even bigger is on the other side. A sweep *into* a key level often starts the
+violent flush you'll study in document 07; a sweep that can't make price stick is
+as strong as tells get.
 
 ## The compass, assembled
 
