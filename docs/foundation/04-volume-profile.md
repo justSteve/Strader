@@ -67,6 +67,17 @@ nothing but this structure. His method, restated with the concepts of documents
 4. He positions with the answer, with a stop just beyond the zone, because the
    zone's whole nature is "decides quickly."
 
+A provenance note, because precision matters: that four-step walk is a
+*reconstruction* of his approach in this series' vocabulary, not a transcription
+of his course. And the instrument differs — his example charts rarely show a
+Volume Profile histogram. His screen of choice is **Bookmap**, a live picture of
+the RESTING side of the book: orders stacking, re-loading, and pulling — document
+01's *silent half*, where big-money intent shows before it prints. The division of
+labor: the volume profile is OUR instrument for finding the thin zones his method
+keys on; the book display is HIS instrument for judging the return. (In our data
+stack, the profile comes from recorded trades; the book-side view is the
+depth-of-book layer behind the absorption work.)
+
 One more naming note, so other people's material doesn't confuse you: **supply and
 demand zones, order blocks, fair-value gaps, "smart money concepts"** — these are
 four schools' names for substantially the same scar the same event leaves. A fast
@@ -102,7 +113,9 @@ Like Market Profile, Volume Profile produces levels that persist:
 
 - **Volume POC** — the highest-volume price of the session (the profile's biggest
   shelf). Usually close to the TPO POC of document 03; when they differ, trust
-  the volume version.
+  the volume version. "Trust" means two operational things: anchor your reference
+  levels to the volume shelf, and set revisit expectations by it — a time-heavy
+  but volume-light zone will NOT be sticky, letters notwithstanding.
 - **Naked volume POC** — same "unfinished business" magnet idea as document 03's
   naked POC, measured in volume.
 - **Composite profiles** — stack several days (or weeks) of volume into one
