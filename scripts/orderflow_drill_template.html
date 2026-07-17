@@ -378,8 +378,7 @@ function renderColumn(b, i) {
   txt.children[1].textContent = (b.dur < 10 ? b.dur.toFixed(1) : Math.round(b.dur)) + "s";
   txt.children[2].textContent = i;
   foot.appendChild(fill); foot.appendChild(txt);
-  foot.title = `bar ${i} · closed ${fmtClock(b.t1)} CT: Δ ${b.d >= 0 ? "+" : ""}${b.d} · vol ${b.v} (none ${b.nv}) · ${b.dur}s — `
-             + `fill height = duration vs the last ${KEEP_COLS} bars (tall = slow tape, short = urgent)`;
+  foot.title = `bar ${i} · closed ${fmtClock(b.t1)} CT: Δ ${b.d >= 0 ? "+" : ""}${b.d} · vol ${b.v} (none ${b.nv}) · ${b.dur}s`;
   col.appendChild(foot);
   return col;
 }
