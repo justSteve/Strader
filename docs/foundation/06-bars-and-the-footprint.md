@@ -50,13 +50,35 @@ price     sell-aggr × buy-aggr
 6250.75        96  ×  310         ← heavy business, buyers forcing 3:1
 6250.50       410  ×  388         ← the bar's biggest fight (its POC)
 6250.25       205  ×  71          ← sellers forcing ~3:1
-6250.00        44  ×   9          ← light selling
+6250.00      (no trades — price jumped straight across this tick)
+6249.75        44  ×   9          ← light selling at the low
               ───────────
               bar delta = (sum of buy-aggr) − (sum of sell-aggr)
+                        = 863 − 767 = +96 for this bar
 ```
 
-On the drill screen each such row is a **cell**, and the rendering encodes three
-things at once:
+That table is the raw data. Here is how the SAME bar renders as one column on the
+drill screen (default view; the Cells menu can switch the number shown, and
+hovering any cell pops the full sell × buy pair):
+
+```
+          one column = one 2,000-contract bar
+        ┌───────────┐
+6251.00 │    73     │  ← pale blue, small number: light business, buyers edged it
+6250.75 │    214    │  ← STRONG blue: heavy business, buyers dominated (310 v 96)
+6250.50 │ ┏━━━━━━━┓ │
+        │ ┃  22   ┃ │  ← the OUTLINED cell = this bar's POC (most volume traded
+        │ ┗━━━━━━━┛ │    here: 410+388). Note: brightest cell, tiniest number —
+6250.25 │    134    │    a dead-even war. That's the absorption signature.
+6250.00 │ ╌╌╌╌╌╌╌╌╌ │  ← dashed VOID: zero trades at this price inside this bar
+6249.75 │    35     │    (a micro low-volume node — drawn deliberately)
+        ╞═══════════╡
+        │ 96 · 13:46│  ← the FOOTER: the bar's total delta (number = magnitude,
+        │    389    │    COLOR = winner: blue buyers / red sellers), the bar's
+        └───────────┘    closing clock, and the bar's index number
+```
+
+Each price row is a **cell**, and the rendering encodes three things at once:
 
 | Visual | Encodes | Concept behind it |
 |--------|---------|-------------------|
@@ -97,11 +119,55 @@ Reading builds in three steps, and the drill units follow the same three:
    concentrate (the bar's POC)? What's the footer delta? Did the bar's shape climb
    or sag? A column is one 2,000-contract *round* of the fight.
 3. **A sequence of columns** — now the compass runs: is the pressing side's effort
-   producing effect bar over bar? Are footers staying one color (one side in
-   charge) or flipping? Are bars speeding up (urgency arriving) or slowing? This
-   is where the level-engagement stories of document 07 play out.
+   producing effect bar over bar? Run your eye along the **footer row** — the
+   strip of bar-delta numbers across the bottom of the columns. Their colors are
+   a scoreboard, one entry per round:
 
-## The rest of the drill screen, quickly
+```
+   footer row across nine consecutive bars   (r) = red number, (b) = blue number
+                                              — on screen it's color, not letters
+
+    512(r) 447(r) 610(r) │ 388(r) 402(r) │  55(b) 210(b) 340(b) 415(b)
+    ───────────────────────────────────────────────────────────────────
+    "staying one color":        still red        "flipping": footers turn
+    sellers winning round       but price has    blue — buyers now win the
+    after round — the flush     stopped falling  rounds. This color change
+                                — the stall      IS the flip, stage three
+```
+
+   Footers staying one color = one side in charge, bar after bar. Footers
+   changing color = control changed hands. Add the pace strip underneath (are
+   bars speeding up — urgency arriving — or slowing?) and this is where the
+   level-engagement stories of document 07 play out.
+
+## The whole screen, mapped
+
+Every region of the drill page, top to bottom, with the concept each one carries:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Orderflow Drill   ES.c.0 · 2026-07-02 · N=2000 contracts/bar · 667 bars  │ header: which day,
+│                                                                          │ contracts per bar
+│ ▶Play ⟨Bar Bar⟩ Speed[20×] ══seek══ Level[____][Arm] chips Ladder▾ ? ... │ controls: playback,
+│                                                                          │ arm a level, scenarios
+│ Bar 390/667 · Time 13:46 CT · Last 7509.25 · Bar Δ −447 ·               │ readouts: Session Δ =
+│ Session Δ −1,882 · Bar took 12.3s · Score 3/4                            │ cumulative delta (slope!)
+├───────────────────────────────────────────────────────────────┬─────────┤
+│                                                                │  7514   │
+│   ▒▒   ▒▒   ░░   ▓▓   ▓▓   ▒▒   ░░   ▒▒   ▓▓   one column     │  7512   │ chart: columns
+│   ▒▒   ░░   ▓▓   ▓▓   ▒▒   ▒▒   ▓▓   ▓▓   ▒▒   per bar,       │  7511¼◄─┼─price axis;
+│  ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ 7511.25 ╌╌╌          │  7510   │ dashed line =
+│   ░░   ▒▒   ▒▒   ░░   ▓▓   ▓▓   ▒▒   ░░   ░░   cells stacked  │  7509   │ your ARMED level
+│  ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐  by price       │  7508   │
+│  │512│ │447│ │610│ │388│ │402│ │ 55│ │210│ │340│ ◄── the FOOTER row:     │
+│  └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘  bar delta + clock + index │
+├──────────────────────────────────────────────────────────────────────────┤
+│ seconds per bar   ▂▂▁▂▃▂▁▁▂▇█▇▃▁▁▂▁▂▃▂▁▂                                 │ pace strip: one
+│                            └── tall = SLOW bar, short = fast/urgent      │ duration bar per column
+├──────────────────────────────────────────────────────────────────────────┤
+│ Drill log: your calls, outcomes, verdicts (the append-only score record) │
+└──────────────────────────────────────────────────────────────────────────┘
+```
 
 So every control has a concept attached: the **level chips** arm a price from the
 day's map (session open/highs/lows, or levels harvested from Mancini's letter —
