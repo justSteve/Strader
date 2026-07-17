@@ -45,21 +45,23 @@ input[type=range] { flex:1; min-width:140px; }
   color:var(--ink); white-space:nowrap; overflow:hidden;
   font-variant-numeric: tabular-nums; }
 .col .cell.poc { outline:2px solid var(--ink-2); outline-offset:-2px; }
-.col .foot { position:absolute; left:0; right:0; bottom:0; height:30px; text-align:center;
-  font-size:9px; color:var(--muted); border-top:1px solid var(--grid); padding-top:2px;
+/* footer (st-qen): full cell tinted with the bar-winner's color; an inner fill
+   rises with bar duration (tall = slow tape) — the pace strip lives here now.
+   Text is 3 centered lines, bold reverse-white, bottom-aligned so the jagged
+   fill tops stay out of the reading line. */
+.col .foot { position:absolute; left:0; right:0; bottom:0; height:72px; text-align:center;
+  font-size:9px; border-top:1px solid var(--grid); overflow:hidden;
   font-variant-numeric: tabular-nums; }
-.col .foot .d { font-weight:600; }
+.col .foot .fill { position:absolute; left:0; right:0; bottom:0; }
+.col .foot .txt { position:absolute; left:0; right:0; bottom:2px; color:#fff;
+  font-weight:700; line-height:1.15; }
+.col .foot .txt .d { font-size:11px; }
 #yaxis { position:absolute; right:0; top:0; bottom:0; width:56px; border-left:1px solid var(--axis);
   font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums; }
 #yaxis div { position:absolute; right:6px; transform:translateY(-50%); }
 .lvl-line { position:absolute; left:0; right:56px; border-top:2px dashed var(--critical); z-index:5; }
 .lvl-tag { position:absolute; right:60px; transform:translateY(-100%); font-size:10px;
   color:var(--critical); background:var(--surface-1); padding:0 4px; z-index:6; }
-#pace { margin:8px 16px; height:52px; background:var(--surface-1); border:1px solid var(--ring);
-  border-radius:8px; position:relative; overflow:hidden; }
-#pace .lbl { position:absolute; top:2px; left:8px; font-size:10px; color:var(--muted); z-index:2; }
-#pacebars { position:absolute; inset:14px 8px 4px; display:flex; align-items:flex-end; gap:2px; }
-#pacebars div { flex:1; background:var(--buy); border-radius:2px 2px 0 0; min-height:2px; opacity:.85; }
 #panel { position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.45); z-index:50; }
 #panel .card { background:var(--surface-1); border:1px solid var(--ring); border-radius:10px;
   padding:20px 24px; max-width:420px; }
@@ -155,13 +157,12 @@ td:first-child, th:first-child { text-align:left; }
 <div id="stage"><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
   <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
 </div>
-<div id="pace"><span class="lbl">seconds per bar — one per column above · short = urgent tape</span><div id="pacebars"></div></div>
 <p class="hint">Space = play/pause · ←/→ = step · Click a level chip to arm it AND jump to its first visit · <b>?</b> explains the screen ·
 Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button>
 · coach: <span id="bridge-dot">—</span></p>
 <div id="help"><div class="card">
   <h2>What am I looking at?</h2>
-  <p>This is one full trading day replayed as <b>volume bars</b>: every column is exactly the same number of contracts changing hands (shown in the header), <b>not</b> the same amount of time. When columns arrive fast, the market is busy; when they crawl, it's quiet. The strip below the chart shows each bar's real duration.</p>
+  <p>This is one full trading day replayed as <b>volume bars</b>: every column is exactly the same number of contracts changing hands (shown in the header), <b>not</b> the same amount of time. When columns arrive fast, the market is busy; when they crawl, it's quiet. Each column's <b>footer</b> carries the bar's real duration as its colored fill height — tall fill = slow bar, short fill = urgent tape.</p>
   <h4>Reading one cell (a price inside a bar)</h4>
   <ul>
     <li><span class="swatch" style="background:var(--buy)"></span> <b>Blue = buyers were the aggressors</b> at that price (they crossed the spread to lift sellers' offers). <span class="swatch" style="background:var(--sell)"></span> <b>Red = sellers were the aggressors</b> (they hit buyers' bids).</li>
@@ -175,7 +176,7 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
     <li><b>Force with effect</b> — heavy one-sided color and price moving that way: a healthy move, expect continuation.</li>
     <li><b>Force without effect</b> — heavy aggressive volume but price stops: someone big is absorbing. Watch for reversal.</li>
     <li><b>Effect without force</b> — price makes a new high/low but the session Δ readout doesn't follow: a hollow move.</li>
-    <li>Footer of each column = the bar's total delta. The <b>Session Δ</b> readout is the running sum — its <i>trend</i> matters, not its level.</li>
+    <li>Footer of each column = the bar's scoreboard: the cell is shaded in the <b>winner's color</b> (blue buyers / red sellers), the bold number is the bar's total delta (magnitude), and the fill height is the bar's duration. The <b>Session Δ</b> readout is the running sum — its <i>trend</i> matters, not its level.</li>
   </ul>
   <h4>How to run a rep</h4>
   <ol>
@@ -219,7 +220,8 @@ const JUDGE_TICKS = 16;      // 4 pts beyond/away decides accept/reject
 const KEEP_COLS = 48;        // DOM columns kept (virtualization)
 // prices print without trailing zeros: 7511, 7511.5, 7511.25
 const fmtPrice = p => (+p.toFixed(2)).toString();
-const COL_W = 58, FOOT_H = 30;
+const COL_W = 58, FOOT_H = 72;
+const FILL_MIN = 34;         // fill always covers the 3 text lines (white stays on color)
 let cellH = 13;              // zoom control; numbers hidden below 12px
 let cellMode = "delta";      // delta | vol | pair — what the cell text shows
 
@@ -261,13 +263,14 @@ let drillLog = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
 
 // ── stage geometry: price window follows recent bars ────────────────────
 const stage = $("stage"), strip = $("colstrip"), yaxis = $("yaxis");
-// Fill the viewport below the controls, reserving room for the pace strip +
-// hints; no fixed cap — a portrait monitor gets all its vertical real estate.
-// The stage is also user-resizable (CSS resize:vertical drag grip, bottom-right
-// corner); a manual drag wins over auto-fill until the page reloads.
+// Fill the viewport below the controls, reserving room for the hint line only
+// (the pace strip now lives inside the footers); no fixed cap — a portrait
+// monitor gets all its vertical real estate. The stage is also user-resizable
+// (CSS resize:vertical drag grip, bottom-right corner); a manual drag wins
+// over auto-fill until the page reloads.
 function stageHeight() {
   const top = stage.getBoundingClientRect().top;
-  return Math.max(320, window.innerHeight - top - 130);
+  return Math.max(320, window.innerHeight - top - 70);
 }
 let autoH = stageHeight();
 stage.style.height = autoH + "px";
@@ -362,10 +365,21 @@ function renderColumn(b, i) {
     cell.title = `${fmtPrice(price)}  sell-aggr ${bid} | buy-aggr ${ask}  (Δ ${d >= 0 ? "+" : ""}${d}, vol ${total})`;
     col.appendChild(cell);
   }
+  // footer (st-qen): winner-tinted cell, duration fill, 3 bold-white lines
   const foot = document.createElement("div"); foot.className = "foot";
-  const dcls = b.d >= 0 ? "pos" : "neg";
-  foot.innerHTML = `<span class="d" style="color:var(${b.d >= 0 ? "--buy" : "--sell"})">${Math.abs(b.d)}</span> ${fmtClock(b.t1)}<div style="color:var(--muted)">${i}</div>`;
-  foot.title = `bar ${i}: vol ${b.v} (none ${b.nv}) · ${b.dur}s`;
+  const side = b.d >= 0 ? "--buy" : "--sell";
+  foot.style.background = `color-mix(in srgb, var(${side}) 22%, var(--surface-1))`;
+  const fill = document.createElement("div"); fill.className = "fill";
+  fill.style.height = Math.round(FILL_MIN + (FOOT_H - 2 - FILL_MIN) * (b.dur / trailingMaxDur(i))) + "px";
+  fill.style.background = `color-mix(in srgb, var(${side}) 88%, var(--surface-1))`;
+  const txt = document.createElement("div"); txt.className = "txt";
+  txt.innerHTML = `<div class="d"></div><div></div><div></div>`;
+  txt.children[0].textContent = Math.abs(b.d);
+  txt.children[1].textContent = fmtClock(b.t1);
+  txt.children[2].textContent = i;
+  foot.appendChild(fill); foot.appendChild(txt);
+  foot.title = `bar ${i}: Δ ${b.d >= 0 ? "+" : ""}${b.d} · vol ${b.v} (none ${b.nv}) · ${b.dur}s — `
+             + `fill height = duration vs the last ${KEEP_COLS} bars (tall = slow tape, short = urgent)`;
   col.appendChild(foot);
   return col;
 }
@@ -375,17 +389,13 @@ function repaintAll() {
 }
 const fmtClock = iso => iso.slice(11, 19);
 
-// ── pace strip ───────────────────────────────────────────────────────────
-function repaintPace() {
-  const wrap = $("pacebars"); wrap.innerHTML = "";
-  const window_ = bars.slice(Math.max(0, idx - KEEP_COLS + 1), idx + 1);  // 1:1 with columns above
-  const maxd = Math.max(...window_.map(b => b.dur), 1);
-  for (const b of window_) {
-    const d = document.createElement("div");
-    d.style.height = Math.max(4, (b.dur / maxd) * 100) + "%";
-    d.title = `${b.dur}s`;
-    wrap.appendChild(d);
-  }
+// ── pace (st-qen: lives inside each footer now) ─────────────────────────
+// Normalize a bar's duration against its own trailing window — deterministic
+// per bar index, so appended columns never need their neighbors repainted.
+function trailingMaxDur(i) {
+  let m = 1e-9;
+  for (let k = Math.max(0, i - KEEP_COLS + 1); k <= i; k++) m = Math.max(m, bars[k].dur);
+  return m;
 }
 
 // ── readouts, table, log ─────────────────────────────────────────────────
@@ -433,7 +443,7 @@ function step() {
     strip.appendChild(renderColumn(b, idx));
     while (strip.children.length > KEEP_COLS) strip.removeChild(strip.firstChild);
   }
-  repaintPace(); repaintReadouts(); appendBarRow(b, idx);
+  repaintReadouts(); appendBarRow(b, idx);
   judgePending();
   checkAnatomyBeat(idx);
   checkLevelApproach(b);
@@ -452,7 +462,7 @@ function seekTo(target) {
   cvd = 0; idx = -1; viewHi = viewLo = null; pending = null;
   const t = Math.max(0, Math.min(target, bars.length - 1));
   for (let i = 0; i <= t; i++) { idx = i; cvd += bars[i].d; appendBarRow(bars[i], i); }
-  repaintAll(); repaintPace(); repaintReadouts();
+  repaintAll(); repaintReadouts();
 }
 
 // ── level visits: find every episode where price approached the level ────

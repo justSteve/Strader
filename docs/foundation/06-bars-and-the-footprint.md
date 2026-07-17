@@ -30,8 +30,9 @@ contracts has traded — in our drills, **2,000 contracts per bar**. Consequence
 - **Time becomes an output.** The one thing that now varies is *how long the bar
   took*. An 11-second bar means 2,000 contracts changed hands in 11 seconds —
   the tape is on fire. A 9-minute bar means the market is asleep. Bar duration is
-  a pure **urgency meter**, and the drill's *pace strip* (the little bar-graph
-  strip under the chart) displays exactly that: one duration bar per column.
+  a pure **urgency meter**, and each column's *footer* displays exactly that: its
+  shaded fill rises with the bar's duration (tall fill = slow bar, short =
+  urgent), so the row of jagged fill tops reads as the tape's pace at a glance.
 
 This is a genuine habit change from clock-bar reading, which is why the drill
 curriculum's very first unit is nothing but pace: replaying days at various speeds
@@ -73,9 +74,13 @@ hovering any cell pops the full sell × buy pair):
 6250.00 │ ╌╌╌╌╌╌╌╌╌ │  ← dashed VOID: zero trades at this price inside this bar
 6249.75 │    35     │    (a micro low-volume node — drawn deliberately)
         ╞═══════════╡
-        │ 96 · 13:46│  ← the FOOTER: the bar's total delta (number = magnitude,
-        │    389    │    COLOR = winner: blue buyers / red sellers), the bar's
-        └───────────┘    closing clock, and the bar's index number
+        │           │  ← the FOOTER: the whole cell shaded in the WINNER's
+        │███  96 ███│    color (blue = buyers won the bar, red = sellers).
+        │███13:46███│    Three centered lines in bold white: total delta
+        │███ 389 ███│    (magnitude), closing clock, bar index. The shade's
+        └───────────┘    FILL HEIGHT is the bar's duration vs recent bars —
+                         tall fill = slow bar, short = urgent. Jagged fill
+                         tops across columns = the tape's pace at a glance
 ```
 
 Each price row is a **cell**, and the rendering encodes three things at once:
@@ -87,7 +92,8 @@ Each price row is a **cell**, and the rendering encodes three things at once:
 | **The number** | The net margin (buy-aggr minus sell-aggr at that price) | Document 05: delta, per price |
 | **Outlined cell** | The bar's own POC — the price with the most volume inside this bar | Document 03's POC idea, at bar scale |
 | **Dashed empty cell** | A price the bar jumped over with zero trades | Document 04's LVN, at micro scale — real, deliberate emptiness |
-| **Footer number** | The whole bar's delta, colored by sign | Document 05: the pressure gauge |
+| **Footer shading** | The cell's color = the bar's winner; the bold white number = the bar's total delta (magnitude) | Document 05: the pressure gauge |
+| **Footer fill height** | The bar's duration vs recent bars (tall = slow, short = urgent) | Time as an output — the urgency meter |
 
 Hover any cell in the drill and it spells out its raw sell-aggressor / buy-aggressor
 pair — nothing on the screen is more than one hover away from its definition.
@@ -136,9 +142,9 @@ Reading builds in three steps, and the drill units follow the same three:
 ```
 
    Footers staying one color = one side in charge, bar after bar. Footers
-   changing color = control changed hands. Add the pace strip underneath (are
-   bars speeding up — urgency arriving — or slowing?) and this is where the
-   level-engagement stories of document 07 play out.
+   changing color = control changed hands. Add the fill heights of those same
+   footers (are bars speeding up — urgency arriving — or slowing?) and this is
+   where the level-engagement stories of document 07 play out.
 
 ## The whole screen, mapped
 
@@ -159,11 +165,10 @@ Every region of the drill page, top to bottom, with the concept each one carries
 │  ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ 7511.25 ╌╌╌          │  7510   │ dashed line =
 │   ░░   ▒▒   ▒▒   ░░   ▓▓   ▓▓   ▒▒   ░░   ░░   cells stacked  │  7509   │ your ARMED level
 │  ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐  by price       │  7508   │
-│  │512│ │447│ │610│ │388│ │402│ │ 55│ │210│ │340│ ◄── the FOOTER row:     │
-│  └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘  bar delta + clock + index │
-├──────────────────────────────────────────────────────────────────────────┤
-│ seconds per bar   ▂▂▁▂▃▂▁▁▂▇█▇▃▁▁▂▁▂▃▂▁▂                                 │ pace strip: one
-│                            └── tall = SLOW bar, short = fast/urgent      │ duration bar per column
+│  │▆▆│ │▃▃│ │██│ │▅▅│ │▂▂│ │▇▇│ │▃▃│ │▄▄│ │▂▂│ ◄── the FOOTER row: cells  │
+│  │512│ │447│ │610│ │388│ │402│ │ 55│ │210│ │340│  shaded in the winner's  │
+│  └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘  color; white text = delta │
+│         fill height = bar duration (tall = SLOW, short = urgent) + clock + index │
 ├──────────────────────────────────────────────────────────────────────────┤
 │ Drill log: your calls, outcomes, verdicts (the append-only score record) │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -205,8 +210,8 @@ challengers from a standing position is passive by definition.
 volume where the tool counts half-hours (the POC, single prints). The lenses
 usually agree, which is exactly why they blur. On this screen the roles are
 explicit: volume is the constant (every bar the same contracts), time is the
-*output* (the pace strip). Rule: before saying "transactions," ask which unit the
-tool in your hand actually counts.
+*output* (the footer fill heights). Rule: before saying "transactions," ask which
+unit the tool in your hand actually counts.
 
 **Snag 4 — counter versus signed sum.** "Anything that accumulates can only be
 higher on revisits" — true for volume, false for delta. Footer numbers are
