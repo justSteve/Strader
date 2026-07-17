@@ -35,8 +35,6 @@
   "permissions": {
     "allow": [
       "Edit(*)",
-      "Write(*)",
-      "MultiEdit(*)",
       "Bash(cd *)",
       "Bash(pwd *)",
       "Bash(which *)",
@@ -85,9 +83,9 @@
       "Bash(grep *)",
       "Bash(wc *)",
       "Bash(date *)",
-      "Write(/tmp/*)",
+      "Edit(/tmp/*)",
       "Read(/tmp/*)",
-      "Write(.claude/state/**)"
+      "Edit(.claude/state/**)"
     ],
     "deny": [
       "Read(.env)",
