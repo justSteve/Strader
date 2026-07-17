@@ -76,11 +76,12 @@ hovering any cell pops the full sell × buy pair):
         ╞═══════════╡
         │           │  ← the FOOTER: the whole cell shaded in the WINNER's
         │███  96 ███│    color (blue = buyers won the bar, red = sellers).
-        │███13:46███│    Three centered lines in bold white: total delta
-        │███ 389 ███│    (magnitude), closing clock, bar index. The shade's
-        └───────────┘    FILL HEIGHT is the bar's duration vs recent bars —
-                         tall fill = slow bar, short = urgent. Jagged fill
-                         tops across columns = the tape's pace at a glance
+        │███12.3s███│    Three centered lines in bold white: total delta
+        │███ 389 ███│    (magnitude), the bar's duration in seconds, bar
+        └───────────┘    index (hover for the closing clock). The shade's
+                         FILL HEIGHT draws that same duration — tall fill =
+                         slow bar, short = urgent. Jagged fill tops across
+                         columns = the tape's pace at a glance
 ```
 
 Each price row is a **cell**, and the rendering encodes three things at once:
@@ -168,7 +169,7 @@ Every region of the drill page, top to bottom, with the concept each one carries
 │  │▆▆│ │▃▃│ │██│ │▅▅│ │▂▂│ │▇▇│ │▃▃│ │▄▄│ │▂▂│ ◄── the FOOTER row: cells  │
 │  │512│ │447│ │610│ │388│ │402│ │ 55│ │210│ │340│  shaded in the winner's  │
 │  └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘  color; white text = delta │
-│         fill height = bar duration (tall = SLOW, short = urgent) + clock + index │
+│     fill height = bar duration (tall = SLOW, short = urgent) + seconds + index  │
 ├──────────────────────────────────────────────────────────────────────────┤
 │ Drill log: your calls, outcomes, verdicts (the append-only score record) │
 └──────────────────────────────────────────────────────────────────────────┘
