@@ -29,12 +29,16 @@ from market.entities.level import Level
 Bias = Literal["bullish", "bearish"]
 Right = Literal["CALL", "PUT"]
 
-# Carmine's setup taxonomy — the trigger that justifies taking the direction.
-# These are *recognized from the datafeed* (volume profile / order flow), not
-# ingested as posted alerts (plan co-r10h §6.2).
+# Setup taxonomy — the trigger that justifies taking the direction. These are
+# *recognized from the datafeed* (volume profile / order flow), not ingested as
+# posted alerts (plan co-r10h §6.2).
+# PROVENANCE NOTE (st-1s1, Steve's ruling 2026-07-18): failed_breakdown and
+# level_reclaim are MANCINI's signature setups (~90% of his trades; doctrine in
+# 316/330 letters — see the FBD playbook record); the type name `CarmineSetup`
+# predates that finding and its rename is tracked under st-1s1.
 CarmineSetup = Literal[
-    "failed_breakdown",  # big low flush, trap, recover — Carmine's core edge
-    "level_reclaim",     # sweep then reclaim of a lost level
+    "failed_breakdown",  # big low flush, trap, recover — Mancini's signature setup
+    "level_reclaim",     # slower reclaim of a lost S/R shelf — FBD's gentle sibling
     "return_to_lvn",     # price returns to a ripped-through low-volume node
     "range_trap",        # trap at a range boundary, then reverse
 ]

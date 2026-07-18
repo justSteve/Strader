@@ -124,7 +124,7 @@ def test_catalog_loads_and_filters():
     assert mb in catalog.worthy()
     assert set(catalog.worthy()) == {pb for pb in catalog if pb.status in ("worthy", "active")}
     assert len(catalog.worthy()) >= 6  # the six InvestiTrade records stay eligible
-    assert {"SGL", "LDF"} <= {pb.code for pb in catalog}
+    assert {"SGL", "LDF", "FBD"} <= {pb.code for pb in catalog}
 
 
 def test_catalog_integrity_all_tags_known():
