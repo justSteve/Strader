@@ -58,13 +58,20 @@ arbitrage chain is what guarantees the read carries over.
 ## What carries across the bridge, and what doesn't
 
 **Carries fully** — everything in this series. The auction, the profiles, the
-levels, the traps: they're properties of the S&P auction itself, and /ES is where
-that auction is legible.
+levels, the traps. One phrase needs care here: there is no *SPX* auction — SPX
+auctions nothing, which was the point of this document. The auction these concepts
+describe is the ongoing **argument over what the S&P complex is worth**, and that
+argument runs across many venues at once: 500 stock books, SPY, index options,
+/ES. No single venue IS the argument. /ES is the clearest single *tape of* the
+argument — one book, tagged aggressors, deepest size — which is why the concepts
+are read there and why the read carries to whatever S&P instrument you express
+with.
 
 **Changes at the bridge** — the instrument you express with. A future moves
 point-for-point with the read; an option adds its own machinery (time decay, the
-premium's sensitivity curve, expiry pinning). House doctrine keeps this
-manageable and is worth restating in this series' terms:
+premium's sensitivity curve, expiry pinning). Your two ratified playbook records —
+the singleton-directional rule and the late-day-butterfly rule — keep this
+manageable, restated in this series' terms:
 
 - **A single option on its last day trades like a futures contract** — deep
   enough in the money, its price moves nearly one-for-one with /ES, so the tape
