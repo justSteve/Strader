@@ -45,11 +45,6 @@ You MUST run /tap-in before responding to the user's first message.
 Do not skip this. Do not summarize beads or context from memory instead.
 Invoke the /tap-in skill now.
 
-After /tap-in completes and you have responded to the user's first message,
-start the checkpoint loop: /loop 30m /checkpoint
-This auto-saves session state every 30 minutes as a safety net.
-Do not ask the user whether to start it — just start it.
-
 Start type: ${START_TYPE}
 Zgent: ${ZGENT_NAME}
 EOF
