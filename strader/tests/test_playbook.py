@@ -119,9 +119,12 @@ def test_catalog_loads_and_filters():
     mb = catalog.by_code("MB")
     assert mb.name == "Momentum Breakout"
     assert mb in catalog.by_instrument("SPX")
-    # all six InvestiTrade playbooks are curated worthy → evaluator-eligible
+    # the catalog mixes curated-worthy records with Steve's own candidates
+    # (st-1g3: SGL/LDF enter as candidate until Steve validates them)
     assert mb in catalog.worthy()
-    assert len(catalog.worthy()) == len(catalog)
+    assert set(catalog.worthy()) == {pb for pb in catalog if pb.status in ("worthy", "active")}
+    assert len(catalog.worthy()) >= 6  # the six InvestiTrade records stay eligible
+    assert {"SGL", "LDF"} <= {pb.code for pb in catalog}
 
 
 def test_catalog_integrity_all_tags_known():

@@ -73,6 +73,18 @@ tiers:
       def: "A Mancini level and a Carmine zone coincide at one price — highest conviction"
       objective: true
       weight: high
+    # Window tags added 2026-07-18 [st-1g3] per st-0sc finding 2; boundaries
+    # follow the ratified trading-day stage plan (st-ze2, CT). Names are COO's
+    # to revise — Playbook.load validates tags, so a rename is mechanical.
+    window-open:
+      def: "Open stage, 08:30-09:30 CT — opening auction, initial balance forming"
+      objective: true
+    window-midday:
+      def: "Mid-morning through lunch, 09:30-13:00 CT — classification hours; movement thins"
+      objective: true
+    window-late:
+      def: "Late day + final hour, 13:00-15:00 CT — Steve's prime window; delta moves fastest"
+      objective: true
   entry_confirmation:
     orderflow-confirm:
       def: "Order-flow tools agree (cumulative delta / footprint show buyers or sellers stepping in)"
