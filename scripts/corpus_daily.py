@@ -79,6 +79,12 @@ STREAM_WINDOWS = {
     "databento_opra": ("13:00", "15:00"),
 }
 SCHWAB_PULL = "corpus_pull_schwab.py"
+# Proactive Schwab token-age heartbeat (st-e2f). Runs every day regardless of
+# --include-schwab: the whole point is to warn BEFORE the 7-day refresh wall even
+# on days we don't pull Schwab. It owns its own alert/heartbeat/bead surfaces and
+# is deliberately isolated from the datastream gate — Schwab is not gate-required,
+# so an aging token must NOT mark the (Databento) corpus unhealthy.
+SCHWAB_TOKEN_HEALTH = "schwab_token_health.py"
 
 
 def _utc_now_iso() -> str:
@@ -125,6 +131,23 @@ def run_pull(script: str, day: _date, extra: list[str] | None = None) -> tuple[i
     if proc.returncode != 0:
         logger.error("pull FAILED (%s exit=%s):\n%s", script, proc.returncode, out.strip())
     return proc.returncode, out
+
+
+def run_token_health() -> int:
+    """Fire the proactive Schwab token-age heartbeat (st-e2f) as a subprocess,
+    matching the run_pull convention. Date-independent and free (local file read),
+    so it runs on every corpus_daily invocation — including --dry-run. Returns the
+    checker's rc (0 ok, 1 action-needed, 2 internal) for logging only; the caller
+    does NOT fold it into the datastream gate exit code."""
+    cmd = [sys.executable, str(REPO_ROOT / "scripts" / SCHWAB_TOKEN_HEALTH)]
+    logger.info("token-health: %s", " ".join(cmd))
+    proc = subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
+    out = (proc.stdout or "") + (proc.stderr or "")
+    if proc.returncode == 0:
+        logger.info("schwab token healthy")
+    else:
+        logger.warning("schwab token heartbeat rc=%s:\n%s", proc.returncode, out.strip())
+    return proc.returncode
 
 
 def _is_schwab_auth_failure(manifest_day: _date) -> bool:
@@ -182,6 +205,10 @@ def main(argv: list[str] | None = None) -> int:
 
     day = resolve_target_day(args.date)
     logger.info("corpus_daily target day = %s", day)
+
+    # Proactive Schwab token-age heartbeat (st-e2f) — runs unconditionally, owns
+    # its own alerting, and never affects the datastream gate exit code below.
+    run_token_health()
 
     pull_failed = False
 
