@@ -1,0 +1,30 @@
+{
+  "comment": "MP drill deck (st-3zh). Fixed archetypal days — repetition is a feature. Labels: heuristic nominates (scripts/measurement/mp_day_scan.py), hand-review ratifies. provisional=true means the label overrides the heuristic and awaits Watch-phase confirmation by Steve. Generate: .venv/bin/python scripts/market_profile_drill.py --date <date> --day-type <label>. NOTE: only full-RTH corpus days qualify (historical backfill is 4-bracket, 13:00-15:00 only); scan of 2026-07-19 found 24 eligible days.",
+  "scan": "2026-07-19",
+  "days": [
+    {"date": "2025-07-22", "label": "D", "provisional": false,
+     "scan": "IBx 1.1, POC@49%, longest 8/13, range 36p",
+     "note": "textbook balance — bell around one value area"},
+    {"date": "2026-07-15", "label": "D", "provisional": false,
+     "scan": "IBx 2.2, POC@58%, longest 9/13, range 56p",
+     "note": "recent; Mancini commentary on file for cross-reference"},
+    {"date": "2025-10-06", "label": "P", "provisional": false,
+     "scan": "IBx 1.4, POC@71%, longest 7/13, range 32p",
+     "note": "clean P — acceptance on top of an early push"},
+    {"date": "2026-07-08", "label": "P", "provisional": false,
+     "scan": "IBx 2.8, POC@78%, longest 9/13, range 68p",
+     "note": "recent, with real upside range extension"},
+    {"date": "2026-07-02", "label": "b", "provisional": false,
+     "scan": "IBx 2.7, POC@18%, longest 6/13, range 115p",
+     "note": "the calibrated reference day — same tape as the orderflow drills"},
+    {"date": "2026-07-13", "label": "b", "provisional": false,
+     "scan": "IBx 1.6, POC@34%, longest 7/13, range 60p",
+     "note": "recent, mild b — subtler read than 7/2"},
+    {"date": "2025-09-23", "label": "trend", "provisional": true,
+     "scan": "IBx 5.1, POC@16%, longest 5/13, range 56p (heuristic: b)",
+     "note": "trend-DOWN candidate — thin profile + huge IB extension; confirm elongation in Watch phase"},
+    {"date": "2026-04-23", "label": "trend", "provisional": true,
+     "scan": "IBx 4.5, POC@83%, longest 7/13, range 103p (heuristic: P)",
+     "note": "trend-UP candidate — confirm no dominant bulge in Watch phase"}
+  ]
+}
