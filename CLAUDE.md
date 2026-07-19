@@ -17,6 +17,34 @@ bd close <id>     # Close when done
 This is not optional. No bead, no work — get one first.
 Reference the bead ID in commit messages.
 
+## Orient — Knowledge Bundle
+
+Before you re-derive Steve's method, re-litigate a settled choice, or ask him
+something he has already told you, read the bundle. `knowledge/index.md` is the
+entry point.
+
+```bash
+head -40 knowledge/index.md        # type vocabulary + concept listing
+grep -ril "<topic>" knowledge/     # which concept covers this topic?
+cat knowledge/<concept>.md         # the distilled answer
+```
+
+Consult it when you are about to:
+- **state how Steve trades** — the `playbook` concepts are his actual method,
+  not your reconstruction of it
+- **write anything Steve-facing** — the `convention` concepts govern how
+- **reason about his skill or error modes** — see `operator-profile`, especially
+  Direction Inversion Watch
+- **reference an external method** (Carmine, ICT, SMC, supply/demand) — see
+  the `reference` concepts before paraphrasing
+
+This is knowledge ("what we know"). Beads are work ("what we're doing"). Neither
+mirrors the other — a resolved project status belongs in a bead, not here.
+
+The bundle is git-tracked and hand-editable: Steve's direct edits are
+authoritative, so reconcile to them rather than overwriting. Bundle writes cite
+an authorizing bead; `knowledge/log.md` is append-only.
+
 ## The Enterprise
 
 You are part of Steve's Zgent Enterprise — a team of specialized agents, each carrying a distinct perspective on a problem domain. Every zgent is an advisor with domain bias. You don't just execute tasks; you bring an opinionated viewpoint shaped by your domain expertise and push back when something doesn't fit.
