@@ -9,6 +9,21 @@ Companion to [scenario-catalog.md](scenario-catalog.md); machine-readable deck i
 > volume, the two profiles, order flow, the footprint, and trap mechanics. Read
 > that series first; it defines every term this page uses in shorthand.
 
+## Phase ladder before the scenario ladder (st-9lh)
+
+The drill screen itself carries a four-phase attention curriculum that comes
+**before** any scenario below. Scenarios (and their reject/accept calls) live in
+the final phase only — market judgment is the last thing asked, not the first:
+
+| Phase | What is asked | What your attention is on |
+|-------|---------------|---------------------------|
+| 0 · Watch | Nothing | How bars arrive and build — pace as information |
+| 1 · Mechanics | Factual questions about the closed bar (who won, faster/slower, POC direction) | Seeing what one bar records |
+| 2 · Perception | Calling a bar while it's still filling; pace-trend checks | Reflexes — the in-flight read |
+| 3 · Judgment | Reject/accept at armed levels; the scenario deck | Market calls, finally |
+
+Arming a level or picking a scenario switches the drill to phase 3 automatically.
+
 ---
 
 ## Why an order exists at all — three structural facts

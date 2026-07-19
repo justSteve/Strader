@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Candles</title>
+<style>
+:root { --bg:#11151c; --surface:#171c25; --ink:#dbe2ee; --muted:#7c8698;
+  --grid:#232a37; --buy:#3f8cff; --sell:#e5484d; --hl:#f5c518; }
+* { box-sizing:border-box; margin:0; }
+body { background:var(--bg); color:var(--ink);
+  font:13px/1.45 system-ui, "Segoe UI", sans-serif; height:100vh; display:flex; flex-direction:column; }
+header { display:flex; align-items:baseline; gap:12px; padding:8px 14px; background:var(--surface); }
+h1 { font-size:15px; }
+.meta { color:var(--muted); font-size:12px; }
+#wrap { flex:1; overflow-x:auto; overflow-y:hidden; position:relative; }
+canvas { display:block; }
+#hint { padding:6px 14px; color:var(--muted); font-size:12px; background:var(--surface); }
+</style></head><body>
+<header><h1>1-minute candles</h1><span class="meta" id="meta"></span></header>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<p id="hint">Same tape as the footprint drill, in the familiar shape. The gold band is the minute the drill
+sent you to — jumps from the drill's <b>Candles ↗</b> button land here. Scroll freely; a new jump re-centers.</p>
+<script>
+const DATA = /*__CANDLE_DATA__*/null;
+const C = DATA.candles;                       // [minuteISO, o, h, l, c, v]
+const CW = 7, GAP = 3, PAD_T = 14, VOL_H = 46, AXIS_W = 0;
+$ = id => document.getElementById(id);
+$("meta").textContent = `${DATA.meta.symbol} · ${DATA.meta.date} · ${C.length} minutes · times CT`;
+
+const wrap = $("wrap"), cv = $("cv"), ctx = cv.getContext("2d");
+let hi = -Infinity, lo = Infinity, vmax = 1;
+for (const k of C) { hi = Math.max(hi, k[2]); lo = Math.min(lo, k[3]); vmax = Math.max(vmax, k[5]); }
+
+function targetMinute() {
+  const m = location.hash.match(/t=(\d{2}:\d{2})/);
+  if (!m) return -1;
+  return C.findIndex(k => k[0].slice(11, 16) === m[1]);
+}
+function draw() {
+  const H = wrap.clientHeight, W = C.length * (CW + GAP) + 40;
+  cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio;
+  cv.style.width = W + "px"; cv.style.height = H + "px";
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  const priceH = H - PAD_T - VOL_H - 18;
+  const y = p => PAD_T + (hi - p) / (hi - lo) * priceH;
+  ctx.clearRect(0, 0, W, H);
+  // horizontal gridlines at round prices
+  const step = Math.max(5, Math.round((hi - lo) / 8 / 5) * 5);
+  ctx.strokeStyle = "#232a37"; ctx.fillStyle = "#7c8698"; ctx.font = "10px system-ui";
+  for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) {
+    ctx.beginPath(); ctx.moveTo(0, y(p)); ctx.lineTo(W, y(p)); ctx.stroke();
+    ctx.fillText(p.toFixed(0), 4, y(p) - 2);
+  }
+  const tgt = targetMinute();
+  C.forEach((k, i) => {
+    const x = 20 + i * (CW + GAP);
+    const [iso, o, h, l, c, v] = k;
+    if (i === tgt) {                                   // highlight band
+      ctx.fillStyle = "rgba(245,197,24,.16)";
+      ctx.fillRect(x - GAP / 2 - 1, 0, CW + GAP + 2, H);
+    }
+    const up = c >= o;
+    ctx.strokeStyle = ctx.fillStyle = up ? "#3f8cff" : "#e5484d";
+    ctx.beginPath(); ctx.moveTo(x + CW / 2, y(h)); ctx.lineTo(x + CW / 2, y(l)); ctx.stroke();
+    const top = y(Math.max(o, c)), bh = Math.max(1, Math.abs(y(o) - y(c)));
+    ctx.fillRect(x, top, CW, bh);
+    ctx.globalAlpha = .45;                             // volume strip
+    ctx.fillRect(x, H - 16 - v / vmax * VOL_H, CW, v / vmax * VOL_H);
+    ctx.globalAlpha = 1;
+    if (iso.slice(14, 16) === "00") {                  // hour ticks
+      ctx.fillStyle = "#7c8698";
+      ctx.fillText(iso.slice(11, 16), x - 8, H - 4);
+    }
+    if (i === tgt) {
+      ctx.fillStyle = "#f5c518";
+      ctx.fillText("▼ " + iso.slice(11, 16), x - 10, 11);
+    }
+  });
+  if (tgt >= 0) wrap.scrollLeft = Math.max(0, 20 + tgt * (CW + GAP) - wrap.clientWidth / 2);
+}
+window.addEventListener("hashchange", draw);
+window.addEventListener("resize", draw);
+draw();
+</script></body></html>

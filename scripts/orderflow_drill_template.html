@@ -63,6 +63,12 @@ input[type=range] { flex:1; min-width:140px; }
 .lvl-tag { position:absolute; right:60px; transform:translateY(-100%); font-size:10px;
   color:var(--critical); background:var(--surface-1); padding:0 4px; z-index:6; }
 #panel { position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.45); z-index:50; }
+#quiz { position:fixed; right:18px; bottom:64px; display:none; z-index:49; }
+#quiz .card { background:var(--surface-1); border:1px solid var(--ring); border-radius:10px;
+  padding:14px 18px; max-width:360px; box-shadow:0 6px 24px rgba(0,0,0,.4); }
+#quiz h2 { margin:0 0 4px; font-size:14px; }
+#quiz p { margin:2px 0 10px; color:var(--ink-2); font-size:12px; }
+#quiz .btns { display:flex; gap:8px; }
 #panel .card { background:var(--surface-1); border:1px solid var(--ring); border-radius:10px;
   padding:20px 24px; max-width:420px; }
 #panel h2 { margin:0 0 6px; font-size:15px; }
@@ -118,9 +124,14 @@ td:first-child, th:first-child { text-align:left; }
   <button id="play" class="primary">▶ Play</button>
   <button id="back">⟨ Bar</button><button id="fwd">Bar ⟩</button>
   <label>Speed <select id="speed">
-    <option value="1">1× real</option><option value="5">5×</option>
-    <option value="20" selected>20×</option><option value="60">60×</option>
-    <option value="240">240×</option>
+    <option value="0.5">½× slow</option><option value="1" selected>1× real</option>
+    <option value="2">2×</option><option value="5">5×</option>
+  </select></label>
+  <label title="The learning ladder — each phase directs your attention at one thing">Phase <select id="phase">
+    <option value="watch" selected>0 · Watch</option>
+    <option value="mechanics">1 · Mechanics</option>
+    <option value="perception">2 · Perception</option>
+    <option value="judgment">3 · Judgment</option>
   </select></label>
   <input type="range" id="seek" min="0" value="0">
   <label>Level <input type="text" id="lvlinput" size="7" placeholder="price"></label>
@@ -157,8 +168,9 @@ td:first-child, th:first-child { text-align:left; }
 <div id="stage"><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
   <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
 </div>
-<p class="hint">Space = play/pause · ←/→ = step · Click a level chip to arm it AND jump to its first visit · <b>?</b> explains the screen ·
+<p class="hint">Space = play/pause · ←/→ = step · Ctrl+←/→ = speed down/up · Click a level chip to arm it AND jump to its first visit · <b>?</b> explains the screen ·
 Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button>
+· <button id="candles" title="Open the same tape as 1-minute candles in a second window, synced to this minute">Candles ↗</button>
 · coach: <span id="bridge-dot">—</span></p>
 <div id="help"><div class="card">
   <h2>What am I looking at?</h2>
@@ -171,7 +183,14 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
     <li>The <b>outlined cell</b> is the bar's POC — the price where the most volume traded.</li>
     <li>A <b>dashed empty cell</b> is real: price jumped across that level without a single trade (a micro low-volume node).</li>
   </ul>
-  <h4>What to look FOR (the force-and-effect compass)</h4>
+  <h4>The Phase ladder (start at 0, earn your way up)</h4>
+  <ul>
+    <li><b>0 · Watch</b> — nothing asked. Learn the tape's rhythm: bars now build in front of you as their trades land, and how fast they build IS the information.</li>
+    <li><b>1 · Mechanics</b> — factual questions about the bar that just closed (who won it, faster or slower, where the POC moved). Seeing before judging.</li>
+    <li><b>2 · Perception</b> — call the bar while it's still filling. Reflexes, graded.</li>
+    <li><b>3 · Judgment</b> — armed levels, reject/accept calls. The compass below only matters from here on.</li>
+  </ul>
+  <h4>What to look FOR (the force-and-effect compass — phase 3 material)</h4>
   <ul>
     <li><b>Force with effect</b> — heavy one-sided color and price moving that way: a healthy move, expect continuation.</li>
     <li><b>Force without effect</b> — heavy aggressive volume but price stops: someone big is absorbing. Watch for reversal.</li>
@@ -196,6 +215,11 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
     <button data-call="accept" class="primary">Accept (goes through)</button>
     <button data-call="skip">No call</button>
   </div>
+</div></div>
+<div id="quiz"><div class="card">
+  <h2 id="quiz-title"></h2>
+  <p id="quiz-body"></p>
+  <div class="btns" id="quiz-btns"></div>
 </div></div>
 <div id="log">
   <h3>Drill log <button id="export">Export JSON</button> <button id="clear">Clear</button></h3>
@@ -421,7 +445,7 @@ function repaintLog() {
   for (const e of drillLog) {
     const tr = document.createElement("tr");
     const vcls = e.verdict === "correct" ? "ok" : e.verdict === "wrong" ? "bad" : "";
-    tr.innerHTML = `<td>${e.when}</td><td>${fmtPrice(e.level)}</td><td>${e.from}</td>` +
+    tr.innerHTML = `<td>${e.when}</td><td>${e.level == null ? (e.qtype || "—") : fmtPrice(e.level)}</td><td>${e.from}</td>` +
       `<td>${e.call}</td><td>${e.outcome ?? "…"}</td><td class="${vcls}">${e.verdict ?? ""}</td>`;
     tb.appendChild(tr);
   }
@@ -429,33 +453,94 @@ function repaintLog() {
 }
 
 // ── playback engine ──────────────────────────────────────────────────────
+function finishBar(i) {
+  // everything that happens the moment a bar COMPLETES — shared by instant
+  // step and progressive playback
+  const b = bars[i];
+  setCol(i, renderColumn(b, i));
+  cvd += b.d;
+  repaintReadouts(); appendBarRow(b, i);
+  gradeMidFlight(b);
+  judgePending();
+  checkAnatomyBeat(i);
+  checkLevelApproach(b);
+  maybeQuiz(i);
+}
 function step() {
   if (idx >= bars.length - 1) { pause(); return; }
   idx++;
   const b = bars[idx];
-  cvd += b.d;
   const shifted = updateView();
-  if (shifted) {
-    repaintAll();  // view moved: older columns must re-place against the new range
-  } else {
-    drawAxis();
-    strip.appendChild(renderColumn(b, idx));
+  if (shifted) repaintAll(); else drawAxis();
+  finishBar(idx);
+}
+function setCol(i, node) {
+  const old = strip.querySelector(`.col[data-i="${i}"]`);
+  if (old) strip.replaceChild(node, old);
+  else {
+    strip.appendChild(node);
     while (strip.children.length > KEEP_COLS) strip.removeChild(strip.firstChild);
   }
-  repaintReadouts(); appendBarRow(b, idx);
-  judgePending();
-  checkAnatomyBeat(idx);
-  checkLevelApproach(b);
+}
+// progressive build (st-9lh): the bar FILLS across its duration from real
+// tape chunks (DATA bars[].steps) instead of popping in fully formed —
+// watching it build IS the pace read.
+let fillTimers = [], pendingFinalize = null;
+function clearFill() { fillTimers.forEach(clearTimeout); fillTimers = []; }
+function partialBar(b, upto) {
+  const map = new Map();
+  let d = 0, v = 0, close = b.o, elapsed = 0;
+  for (let s = 0; s <= upto && s < b.steps.length; s++) {
+    const [px, el, adds] = b.steps[s];
+    close = px; elapsed = el;
+    for (const [p, sa, ba] of adds) {
+      const cur = map.get(p) || [p, 0, 0];
+      cur[1] += sa; cur[2] += ba; map.set(p, cur);
+      d += ba - sa; v += ba + sa;
+    }
+  }
+  const cells = [...map.values()].sort((a, x) => a[0] - x[0]);
+  if (!cells.length) cells.push([close, 0, 0]);
+  let poc = cells[0][0], best = -1;
+  for (const [p, sa, ba] of cells) if (sa + ba > best) { best = sa + ba; poc = p; }
+  return Object.assign({}, b, { c: close, d, v, dur: elapsed, poc, cells, nv: 0 });
+}
+function animateBar(i, ms) {
+  idx = i;
+  const b = bars[i];
+  const shifted = updateView();
+  if (shifted) repaintAll(); else drawAxis();
+  clearFill();
+  const S = (b.steps || []).length;
+  const finalize = () => {
+    pendingFinalize = null; clearFill();
+    finishBar(i);
+    if (playing) scheduleNext();
+  };
+  pendingFinalize = finalize;
+  if (!S || ms < 150) { timer = setTimeout(finalize, ms); return; }
+  setCol(i, renderColumn(partialBar(b, -1), i));           // empty shell appears now
+  for (let s = 0; s < S; s++) {
+    fillTimers.push(setTimeout(() => {
+      setCol(i, renderColumn(partialBar(b, s), i));
+      if (s === Math.floor(S * 0.6)) maybeMidFlight(b, i); // perception: call it in flight
+    }, ms * (s + 1) / (S + 1)));
+  }
+  timer = setTimeout(finalize, ms);
 }
 function scheduleNext() {
   if (!playing) return;
   const next = bars[idx + 1];
   if (!next) { pause(); return; }
   const ms = Math.max(30, next.dur * 1000 / Number($("speed").value));
-  timer = setTimeout(() => { step(); scheduleNext(); }, ms);
+  animateBar(idx + 1, ms);
 }
 function play() { if (playing || awaitingCall) return; playing = true; $("play").textContent = "❚❚ Pause"; scheduleNext(); }
-function pause() { playing = false; clearTimeout(timer); $("play").textContent = "▶ Play"; }
+function pause() {
+  playing = false; clearTimeout(timer); clearFill();
+  if (pendingFinalize) { const f = pendingFinalize; pendingFinalize = null; f(); }
+  $("play").textContent = "▶ Play";
+}
 function seekTo(target) {
   pause(); strip.innerHTML = ""; $("bartable").tBodies[0].innerHTML = "";
   cvd = 0; idx = -1; viewHi = viewLo = null; pending = null;
@@ -613,6 +698,7 @@ function buildScenarioSelect() {
 }
 function armRefLevel(ref) {
   if (ref.level == null) return;
+  $("phase").value = "judgment";   // scenario refs are judgment practice
   level = Math.round(ref.level / TICK) * TICK;
   armedSide = null;
   $("lvlinput").value = fmtPrice(level);
@@ -668,6 +754,7 @@ function armLevel(jump) {
   exitAnatomy();  // a manual arm leaves anatomy mode
   const v = parseFloat($("lvlinput").value);
   if (!isFinite(v)) return;
+  $("phase").value = "judgment";   // arming a level IS judgment practice
   level = Math.round(v / TICK) * TICK;
   armedSide = null; // set once price is far enough away
   $("arm").textContent = `Armed @ ${level.toFixed(2)}`;
@@ -678,7 +765,7 @@ function armLevel(jump) {
   else if (jump) showCaption(`Price never came within ${APPROACH_TICKS / 4} pts of ${level.toFixed(2)} this session — pick another level or another day.`);
 }
 function checkLevelApproach(b) {
-  if (anatomyActive || level == null || awaitingCall || pending) return;
+  if (anatomyActive || level == null || awaitingCall || pending || phase() !== "judgment") return;
   const dist = (b.c - level) / TICK;
   if (armedSide == null) { if (Math.abs(dist) >= RESET_TICKS) armedSide = dist > 0 ? "above" : "below"; return; }
   if (Math.abs(dist) <= APPROACH_TICKS) {
@@ -715,6 +802,118 @@ function judgePending() {
   }
 }
 
+// ── phase ladder (st-9lh): watch → mechanics → perception → judgment ──────
+// The attention curriculum. Each phase points the learner at ONE thing;
+// market judgment (continuation/reversal) is the LAST phase, not the first.
+const phase = () => $("phase").value;
+const MECH_EVERY = 15, PERC_EVERY = 12;   // bars between prompts
+let lastQuizBar = -999, midFlight = null, mechRotor = 0, candleJumps = 0;
+
+const PHASE_GUIDE = {
+  watch: "WATCH — nothing will be asked. Leave speed at 1×. Attend to one thing only: how bars ARRIVE. Fast arrivals = busy tape; a crawl = quiet. When you can feel a busy stretch coming before it lands, move to Mechanics.",
+  mechanics: "MECHANICS — every ~15 bars the replay pauses with one factual question about the bar that just closed. No market opinions yet — this phase is learning to SEE what a bar records.",
+  perception: "PERCEPTION — you'll be asked to call a bar while it is still filling (no pause — answer in flight, like calling the catch before the ball lands), plus occasional pace-trend checks. Reflex training.",
+  judgment: "JUDGMENT — arm a level or pick a ladder scenario. When price approaches, the replay pauses: reject or accept. Market calls start here, and only here.",
+};
+$("phase").onchange = () => { lastQuizBar = idx; showCaption(PHASE_GUIDE[phase()]); };
+
+function askQuiz(title, body, options, modal, onAnswer) {
+  $("quiz-title").textContent = title;
+  $("quiz-body").textContent = body;
+  const btns = $("quiz-btns"); btns.innerHTML = "";
+  for (const o of options) {
+    const b = document.createElement("button");
+    b.className = "primary"; b.textContent = o;
+    b.onclick = () => { $("quiz").style.display = "none"; onAnswer(o); };
+    btns.appendChild(b);
+  }
+  $("quiz").style.display = "block";
+  if (modal) { awaitingCall = true; pause(); }
+}
+function logQuiz(qtype, call, answerKey, explain) {
+  const ok = call === answerKey;
+  drillLog.push({ when: fmtClock(bars[idx].t1), barIdx: idx, level: null, from: phase(),
+                  qtype, call, outcome: answerKey, verdict: ok ? "correct" : "wrong" });
+  repaintLog(); repaintReadouts();
+  showCaption((ok ? "✓ " : "✕ ") + explain);
+}
+
+// mechanics questions — each returns null when the bar is too degenerate to grade
+function qWhoWon(b) {
+  if (Math.abs(b.d) < 25) return null;
+  return { qtype: "who_won", title: "Who won that bar?",
+    body: "The bar that just closed — which side was the net aggressor?",
+    options: ["Buyers", "Sellers"], key: b.d > 0 ? "Buyers" : "Sellers",
+    explain: `Δ ${b.d > 0 ? "+" : ""}${b.d} — ${b.d > 0 ? "buyers lifted offers harder" : "sellers hit bids harder"}.` };
+}
+function qPace(b, prev) {
+  if (!prev || Math.abs(b.dur - prev.dur) < Math.max(2, prev.dur * 0.15)) return null;
+  return { qtype: "pace", title: "Faster or slower?",
+    body: "Did that bar complete faster or slower than the one before it?",
+    options: ["Faster", "Slower"], key: b.dur < prev.dur ? "Faster" : "Slower",
+    explain: `${b.dur.toFixed(1)}s vs ${prev.dur.toFixed(1)}s before — ${b.dur < prev.dur ? "urgency picked up" : "the tape cooled"}.` };
+}
+function qPocDir(b, prev) {
+  if (!prev || b.poc === prev.poc) return null;
+  return { qtype: "poc_dir", title: "Where did the volume move?",
+    body: "This bar's POC (most-traded price) vs the previous bar's — higher or lower?",
+    options: ["Higher", "Lower"], key: b.poc > prev.poc ? "Higher" : "Lower",
+    explain: `POC ${fmtPrice(prev.poc)} → ${fmtPrice(b.poc)} — the auction's center of gravity moved ${b.poc > prev.poc ? "up" : "down"}.` };
+}
+function qPaceTrend(i) {
+  if (i < 10) return null;
+  const mean = a => a.reduce((x, y) => x + y.dur, 0) / a.length;
+  const now = mean(bars.slice(i - 4, i + 1)), before = mean(bars.slice(i - 9, i - 4));
+  if (Math.abs(now - before) < before * 0.15) return null;
+  return { qtype: "pace_trend", title: "Tape trend?",
+    body: "Over the last ~10 bars, is the tape speeding up or slowing down?",
+    options: ["Speeding up", "Slowing down"], key: now < before ? "Speeding up" : "Slowing down",
+    explain: `Last 5 bars averaged ${now.toFixed(1)}s vs ${before.toFixed(1)}s for the 5 before — ${now < before ? "accelerating" : "decelerating"}.` };
+}
+function maybeQuiz(i) {
+  const need = phase() === "mechanics" ? MECH_EVERY
+             : phase() === "perception" ? PERC_EVERY * 2 : Infinity;
+  if (awaitingCall || anatomyActive || i - lastQuizBar < need) return;
+  const b = bars[i], prev = bars[i - 1];
+  let q = null;
+  if (phase() === "mechanics") {
+    const gens = [qWhoWon(b), qPace(b, prev), qPocDir(b, prev)].filter(Boolean);
+    if (gens.length) q = gens[mechRotor++ % gens.length];
+  } else if (phase() === "perception") {
+    q = qPaceTrend(i);
+  }
+  if (!q) return;
+  lastQuizBar = i;
+  askQuiz(q.title, q.body, q.options, true, ans => {
+    awaitingCall = false;
+    logQuiz(q.qtype, ans, q.key, q.explain);
+    play();
+  });
+}
+// perception mid-flight call: asked while the bar is STILL FILLING, graded at
+// its close — playback does not pause; a late answer is itself the datum.
+function maybeMidFlight(b, i) {
+  if (phase() !== "perception" || midFlight || awaitingCall || anatomyActive) return;
+  if (i - lastQuizBar < PERC_EVERY) return;
+  lastQuizBar = i;
+  midFlight = { barIdx: i, call: null };
+  askQuiz("Call it — in flight", "This bar is still filling. Will it CLOSE above or below its open? No pause — answer before it completes.",
+    ["Above", "Below"], false, ans => { if (midFlight && midFlight.barIdx === i) midFlight.call = ans; });
+}
+function gradeMidFlight(b) {
+  if (!midFlight || midFlight.barIdx !== idx) return;
+  const mf = midFlight; midFlight = null;
+  $("quiz").style.display = "none";
+  if (Math.abs(b.c - b.o) < TICK * 2) { showCaption("Bar closed flat — no grade on that in-flight call."); return; }
+  if (!mf.call) {
+    drillLog.push({ when: fmtClock(b.t1), barIdx: idx, level: null, from: "perception",
+                    qtype: "close_call", call: "(too late)", outcome: b.c > b.o ? "Above" : "Below", verdict: "-" });
+    repaintLog(); return;
+  }
+  logQuiz("close_call", mf.call, b.c > b.o ? "Above" : "Below",
+    `closed ${fmtPrice(b.c)} vs open ${fmtPrice(b.o)} — ${b.c > b.o ? "above" : "below"}. The in-flight read is the reflex being trained.`);
+}
+
 // ── wiring ───────────────────────────────────────────────────────────────
 $("play").onclick = () => playing ? pause() : play();
 $("fwd").onclick = () => { pause(); step(); };
@@ -727,6 +926,7 @@ if (!localStorage.getItem("oflow-help-seen")) {
   $("help").style.display = "grid";
   localStorage.setItem("oflow-help-seen", "1");
 }
+showCaption(PHASE_GUIDE[phase()]);   // opening instruction for the current phase
 // session highlights: computed moments worth studying, one click away
 function jumpHighlight(i, text) { seekTo(Math.max(0, i - 8)); showCaption(text); }
 $("hl-fast").onclick = () => {
@@ -748,6 +948,10 @@ $("hl-flip").onclick = () => {
   jumpHighlight(best, `Sharpest delta flip: ${bars[best - 1].d} → ${bars[best].d >= 0 ? "+" : ""}${bars[best].d} at ${fmtClock(bars[best].t1)} CT. `
     + `One side was in charge, then the other seized it within ${DATA.meta.bar_n * 2} contracts. Flips at a meaningful level are stage 3 of the reversal signatures.`);
 };
+$("candles").onclick = () => {
+  const b = bars[Math.max(idx, 0)];
+  window.open(`${DATA.meta.candles_file || ""}#t=${fmtClock(b.t1).slice(0, 5)}&n=${++candleJumps}`, "candleview");
+};
 $("tbl").onclick = () => { const w = $("tblwrap"); w.style.display = w.style.display === "block" ? "none" : "block"; };
 $("zoom").onchange = e => { cellH = Number(e.target.value); repaintAll(); };
 $("cellmode").onchange = e => { cellMode = e.target.value; repaintAll(); };
@@ -760,6 +964,14 @@ $("export").onclick = () => {
 $("clear").onclick = () => { drillLog = []; repaintLog(); repaintReadouts(); };
 document.addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT") return;
+  if (e.ctrlKey && (e.code === "ArrowRight" || e.code === "ArrowLeft")) {
+    e.preventDefault();
+    const sel = $("speed");
+    sel.selectedIndex = Math.min(sel.options.length - 1,
+      Math.max(0, sel.selectedIndex + (e.code === "ArrowRight" ? 1 : -1)));
+    showCaption(`Speed ${sel.options[sel.selectedIndex].text}`);
+    return;
+  }
   if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
   if (e.code === "ArrowRight") { pause(); step(); }
   if (e.code === "ArrowLeft") seekTo(idx - 1);

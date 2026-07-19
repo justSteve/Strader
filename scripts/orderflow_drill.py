@@ -122,6 +122,66 @@ def build_anatomy(bars: list, suggested: dict, mancini_levels: list[float]) -> l
     return anatomy_payload(instances)
 
 
+FILL_STEPS = 8  # progressive-build chunks per bar (st-9lh) — real tape slices
+CANDLE_TEMPLATE = Path(__file__).parent / "candles_template.html"
+
+
+def minute_candles(trades) -> list[list]:
+    """1-minute OHLCV from the tape — the companion 'familiar view' (st-9lh).
+    ``[minuteISO, o, h, l, c, v]`` per traded minute; empty minutes omitted."""
+    out: list[list] = []
+    cur_key = None
+    for t in trades:
+        key = t.ts.replace(second=0, microsecond=0)
+        if key != cur_key:
+            out.append([key.isoformat(), t.price, t.price, t.price, t.price, 0])
+            cur_key = key
+        k = out[-1]
+        k[2] = max(k[2], t.price)
+        k[3] = min(k[3], t.price)
+        k[4] = t.price
+        k[5] += t.size
+    return out
+
+
+def bar_fill_steps(trades, bars, n_steps: int = FILL_STEPS) -> list[list]:
+    """Per bar: equal-volume cumulative fill chunks for progressive rendering.
+
+    Honest sub-bar data, not animation guesswork: the bar's own trades are
+    split into ``n_steps`` equal-volume chunks (whole trade lands in the chunk
+    it completes, mirroring the bar straddle rule). Each chunk is
+    ``[close_price, elapsed_seconds, [[price, sellAggrAdd, buyAggrAdd], ...]]``
+    — additive deltas the template accumulates into partial cells. Side "N"
+    trades advance volume/close/clock only, matching the cells convention.
+    """
+    out: list[list] = []
+    ti = 0
+    for b in bars:
+        vol = 0
+        bar_trades = []
+        while ti < len(trades) and vol < b.volume:
+            t = trades[ti]
+            ti += 1
+            vol += t.size
+            bar_trades.append(t)
+        steps, adds = [], {}
+        done_vol, k = 0, 1
+        for t in bar_trades:
+            done_vol += t.size
+            if t.side != "N":
+                a = adds.setdefault(t.price, [0, 0])
+                a[0 if t.side == "A" else 1] += t.size
+            if done_vol >= b.volume * k / n_steps and k <= n_steps:
+                elapsed = (t.ts - b.start_ts).total_seconds()
+                steps.append([t.price, round(elapsed, 1),
+                              [[p, sa, ba] for p, (sa, ba) in sorted(adds.items())]])
+                adds = {}
+                while done_vol >= b.volume * k / n_steps and k <= n_steps:
+                    k += 1
+        out.append(steps)
+    return out
+
+
 def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = None) -> dict:
     trades = read_corpus_day(day)
     if not trades:
@@ -129,8 +189,9 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
     bars = list(build_bars(trades, n=bar_n, include_partial=True))
     logger.info("%s: %d trades -> %d bars (N=%d)", day, len(trades), len(bars), bar_n)
 
+    fill = bar_fill_steps(trades, bars)
     out_bars = []
-    for b in bars:
+    for b, steps in zip(bars, fill):
         out_bars.append({
             "t0": b.start_ts.isoformat(), "t1": b.end_ts.isoformat(),
             "o": b.open, "h": b.high, "l": b.low, "c": b.close,
@@ -138,6 +199,7 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
             "dur": round(b.duration_seconds, 3),
             "poc": b.poc_price,
             "cells": [[c.price, c.bid_vol, c.ask_vol] for c in b.cells],
+            "steps": steps,
         })
 
     # level chips the drill offers out of the box (session-derived; the UI
@@ -160,7 +222,9 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
             "tick": TICK,
             "n_bars": len(bars),
             "contracts": sum(b.volume for b in bars),
+            "candles_file": f"desk-candles-{day.isoformat()}.html",
         },
+        "_candles": minute_candles(trades),
         "levels": suggested,
         "bars": out_bars,
         "mancini_candidates": mancini,
@@ -170,6 +234,7 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
 
 
 def render(payload: dict, out_path: Path) -> None:
+    candles = payload.pop("_candles", None)
     template = TEMPLATE.read_text(encoding="utf-8")
     marker = "/*__DRILL_DATA__*/null"
     if marker not in template:
@@ -177,6 +242,18 @@ def render(payload: dict, out_path: Path) -> None:
     html = template.replace(marker, json.dumps(payload, separators=(",", ":")))
     out_path.write_text(html, encoding="utf-8")
     logger.info("wrote %s (%.1f KB)", out_path, out_path.stat().st_size / 1024)
+    if candles is not None:
+        cpath = out_path.parent / payload["meta"]["candles_file"]
+        ctpl = CANDLE_TEMPLATE.read_text(encoding="utf-8")
+        cmark = "/*__CANDLE_DATA__*/null"
+        if cmark not in ctpl:
+            raise SystemExit(f"template {CANDLE_TEMPLATE} missing data marker")
+        cpayload = {"meta": {"symbol": payload["meta"]["symbol"],
+                             "date": payload["meta"]["date"]},
+                    "candles": candles}
+        cpath.write_text(ctpl.replace(cmark, json.dumps(cpayload, separators=(",", ":"))),
+                         encoding="utf-8")
+        logger.info("wrote companion %s (%.1f KB)", cpath, cpath.stat().st_size / 1024)
 
 
 def open_in_browser(path: Path) -> None:
