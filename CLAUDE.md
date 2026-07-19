@@ -323,7 +323,32 @@ bd close <id>         # Complete work
 
 - Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
 - Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+
+### Memory — four stores, four jobs
+
+These are **not** interchangeable. Putting a fact in the wrong one is how it goes
+stale, gets duplicated, or never gets read.
+
+| Store | Holds | Reach for it when |
+|-------|-------|-------------------|
+| **beads** (`bd`) | work and decisions — "what we're doing" | the thing has a state and eventually gets closed |
+| **`bd remember`** | short operational gotchas, auto-injected at `bd prime` | the fact must be in **every** session's context — a recovery procedure, a standing authorization. Keep it small; it is a context tax on every session. |
+| **auto-memory** (`~/.claude/projects/-root-projects-Strader/memory/`) | raw session capture, agent-written | capturing something mid-session before it has been curated. A staging area, not the durable tier. |
+| **knowledge bundle** (`knowledge/index.md`) | curated, typed, git-tracked knowledge — "what we know" | the fact is durable, worth Steve reading, and worth keeping |
+
+The flow is **capture → curate**: facts land in auto-memory, and the durable ones
+graduate into `knowledge/` (COO runs `tools/okf/graduate-memory.py`). A resolved
+project status is a bead, not a concept.
+
+Steve's direct edits to `knowledge/` are **authoritative** — reconcile to them,
+never overwrite. Check for drift at session start with
+`git log --oneline -5 -- knowledge/`.
+
+> This section supersedes the `bd init` boilerplate line *"Use `bd remember` for
+> persistent knowledge — do NOT use MEMORY.md files"* [co-czvg]. That line ships
+> from beads' own template, predates the knowledge bundle, and its blanket ban
+> never matched practice — 23 bundle concepts and 26 auto-memory files are in
+> active use here.
 
 **Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
 
