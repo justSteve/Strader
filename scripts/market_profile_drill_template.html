@@ -1,0 +1,736 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market Profile Drill</title>
+<style>
+/* Palette: same dataviz reference instance as the orderflow sibling — dark
+   desk aesthetic, ink tokens carry text, never series color. TPO-specific
+   accents added: --poc (time-POC, amber) and --vpoc (volume-POC, violet)
+   are deliberately NOT the buy/sell blue/red pair — this drill has no
+   aggression polarity, it has a TIME read vs a VOLUME read, so the two
+   markers must look like different instruments, not opposing sides.
+   --ib (teal) marks the Initial Balance, which is auto-drawn, never guessed.
+   [st-3zh] */
+:root {
+  --surface-1:#fcfcfb; --page:#f9f9f7; --ink:#0b0b0b; --ink-2:#52514e;
+  --muted:#898781; --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --buy:#2a78d6; --sell:#e34948; --mid:#f0efec;
+  --good:#0ca30c; --critical:#d03b3b;
+  --poc:#b8862c; --vpoc:#7a52c4; --ib:#1f8f81;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --surface-1:#1a1a19; --page:#0d0d0d; --ink:#ffffff; --ink-2:#c3c2b7;
+  --muted:#898781; --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --buy:#3987e5; --sell:#e66767; --mid:#383835;
+  --good:#3fca3f; --critical:#e66767;
+  --poc:#e0b356; --vpoc:#a983e0; --ib:#3fc9bb;
+}}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--page); color:var(--ink);
+  font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; }
+header { padding:10px 16px 6px; display:flex; flex-wrap:wrap; gap:10px 18px; align-items:baseline; }
+header h1 { font-size:16px; margin:0; }
+header .meta { color:var(--ink-2); font-size:12px; }
+.controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:6px 16px; }
+button, select, input[type=text] { font:inherit; color:var(--ink); background:var(--surface-1);
+  border:1px solid var(--axis); border-radius:6px; padding:4px 10px; cursor:pointer; }
+button:hover { border-color:var(--ink-2); }
+button.primary { border-color:var(--buy); }
+button:disabled { opacity:.4; cursor:default; }
+.readouts { display:flex; gap:18px; padding:2px 16px 6px; font-size:12px; color:var(--ink-2);
+  font-variant-numeric: tabular-nums; flex-wrap:wrap; }
+.readouts b { color:var(--ink); font-size:14px; }
+/* bracket rail (st-3zh): one pill per letter, so "which bracket are we on" is
+   always visible even while the eye is down in the grid reading rows. */
+#bracketrail { display:flex; gap:4px; padding:2px 16px 6px; flex-wrap:wrap; }
+.b-pill { display:inline-flex; align-items:center; padding:2px 7px; border:1px solid var(--axis);
+  border-radius:12px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.b-pill.done { color:var(--ink); border-color:var(--ink-2); }
+.b-pill.current { color:var(--ink); border-color:var(--buy);
+  background:color-mix(in srgb, var(--buy) 16%, var(--surface-1)); }
+.b-pill.checkpoint { border-style:dashed; }
+#stage { position:relative; margin:0 16px; }
+/* the TPO grid itself: monospace letter rows, highest price at top. This is
+   the authentic Market Profile rendering — letters stacked at price, not
+   bars. [st-3zh] */
+#tpogrid { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size:13px;
+  max-height: calc(100vh - 300px); min-height:280px; overflow-y:auto;
+  border:1px solid var(--ring); border-radius:8px; background:var(--surface-1); }
+.tpo-row { position:relative; display:flex; align-items:center; height:20px;
+  border-bottom:1px solid var(--grid); padding:0 8px; }
+.tpo-row .axis { width:62px; flex:none; text-align:right; color:var(--muted);
+  font-variant-numeric:tabular-nums; margin-right:10px; }
+.tpo-row .volbar { position:absolute; left:80px; top:1px; bottom:1px;
+  background:color-mix(in srgb, var(--vpoc) 30%, transparent); z-index:0; }
+.tpo-row .letters { position:relative; z-index:1; letter-spacing:2px; white-space:nowrap; overflow:hidden; }
+.tpo-row .letters .pending { opacity:.45; font-style:italic; }
+.tpo-row .tag { position:relative; z-index:1; margin-left:auto; font-size:9px; padding:0 4px;
+  border-radius:4px; white-space:nowrap; }
+.tpo-row .tag.ib { color:var(--ib); border:1px solid var(--ib); }
+.tpo-row .tag.vpoc { color:var(--vpoc); border:1px solid var(--vpoc); }
+.tpo-row .tag.tpoc { color:var(--poc); border:1px solid var(--poc); }
+.tpo-row.poc { outline:2px solid var(--poc); outline-offset:-2px; }
+.tpo-row.poc .letters { font-weight:700; }
+.tpo-row.va { background:color-mix(in srgb, var(--poc) 12%, transparent); }
+.tpo-row.single .letters { box-shadow: inset 3px 0 0 var(--critical); padding-left:4px; }
+.tpo-row.ib-hi { border-top:2px dashed var(--ib); }
+.tpo-row.ib-lo { border-bottom:2px dashed var(--ib); }
+.tpo-row.row-clickable { cursor:pointer; }
+.tpo-row.row-clickable:hover { background:var(--ring); }
+.tpo-row.selected { background:color-mix(in srgb, var(--buy) 22%, transparent); }
+#caption { margin:8px 16px 0; display:none; background:var(--surface-1); border:1px solid var(--ring);
+  border-left:4px solid var(--buy); border-radius:8px; padding:8px 30px 8px 12px; font-size:13px;
+  color:var(--ink); position:relative; }
+#caption .x { position:absolute; top:4px; right:8px; cursor:pointer; color:var(--muted); }
+/* quiz + close-of-day modals share the sibling's fixed-overlay convention */
+#quizcard, #closepanel { position:fixed; inset:0; display:none; place-items:center;
+  background:rgba(0,0,0,.45); z-index:50; }
+#quizcard .card, #closepanel .card { background:var(--surface-1); border:1px solid var(--ring);
+  border-radius:10px; padding:20px 24px; max-width:460px; max-height:82vh; overflow:auto;
+  box-shadow:0 6px 24px rgba(0,0,0,.4); }
+#quizcard h2, #closepanel h2 { margin:0 0 6px; font-size:15px; }
+#quizcard p, #closepanel p { margin:4px 0 10px; color:var(--ink-2); font-size:13px; }
+#qc-choices, #closepanel .btns { display:flex; flex-wrap:wrap; gap:8px; }
+#qc-clickhint { color:var(--ink-2); font-size:12px; margin-bottom:8px; }
+#qc-submitrow { margin-bottom:8px; }
+#qc-reveal { font-size:13px; padding:8px 0; border-top:1px solid var(--grid); margin-top:6px; display:none; }
+#qc-reveal .callhist { margin-top:6px; color:var(--ink-2); font-size:12px; }
+#qc-next { text-align:right; display:none; }
+#closepanel .card { position:relative; max-width:520px; }
+#closepanel .x { position:absolute; top:10px; right:14px; cursor:pointer; color:var(--muted); }
+#close-summary { font-size:13px; line-height:1.6; }
+#close-summary b { color:var(--ink); }
+#help { position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.5); z-index:60; }
+#help .card { background:var(--surface-1); border:1px solid var(--ring); border-radius:12px;
+  padding:22px 26px; max-width:600px; max-height:82vh; overflow:auto; font-size:13px; line-height:1.55; }
+#help h2 { font-size:16px; margin:0 0 8px; }
+#help p, #help li { color:var(--ink-2); margin:4px 0; }
+#help b { color:var(--ink); }
+#log { margin:8px 16px 20px; }
+#log h3 { font-size:13px; margin:8px 0 4px; }
+table { border-collapse:collapse; width:100%; font-size:12px; font-variant-numeric:tabular-nums; }
+th, td { border:1px solid var(--grid); padding:3px 8px; text-align:right; }
+th { color:var(--ink-2); font-weight:600; background:var(--page); }
+td:first-child, th:first-child { text-align:left; }
+.ok { color:var(--good); font-weight:600; } .bad { color:var(--critical); font-weight:600; }
+.hint { color:var(--muted); font-size:11px; padding:6px 16px 8px; }
+</style></head><body>
+<header>
+  <h1>Market Profile Drill</h1>
+  <span class="meta" id="meta"></span>
+</header>
+<div class="controls">
+  <button id="play" class="primary">▶ Play</button>
+  <button id="fwd">Step ⟩</button>
+  <button id="restart">⟲ Restart</button>
+  <label>Speed <select id="speed">
+    <option value="3">3s / bracket</option>
+    <option value="6" selected>6s / bracket</option>
+    <option value="10">10s / bracket</option>
+    <option value="20">20s / bracket</option>
+  </select></label>
+  <label title="watch = overlays live, no quiz · calls = overlays hidden, quizzed at checkpoints">Phase <select id="phase">
+    <option value="watch">Watch</option>
+    <option value="calls" selected>Calls</option>
+  </select></label>
+  <button id="helpbtn" title="What am I looking at?">?</button>
+</div>
+<div class="readouts">
+  <span>Bracket <b id="ro-bracket">–</b></span>
+  <span>Clock <b id="ro-clock">–</b></span>
+  <span>Phase <b id="ro-phase">–</b></span>
+  <span>Score <b id="ro-score">0/0</b></span>
+</div>
+<div id="bracketrail"></div>
+<div id="stage">
+  <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
+  <div id="tpogrid"></div>
+</div>
+<p class="hint">Space = play/pause · → = step one bracket · R = restart · 1–4 = quiz choice · Enter = submit/next ·
+coach: <span id="bridge-dot">—</span></p>
+
+<div id="help"><div class="card">
+  <h2>What am I looking at?</h2>
+  <p>A <b>Market Profile (TPO)</b> for one session, building half-hour bracket by half-hour: A (8:30–9:00 CT), B, C, and
+  so on. Each bracket's letter is stamped on every price row it traded — the row with the most letters is the
+  <b>Point of Control (POC)</b>, the fairest price of the day. The band holding ~70% of the letters around the POC is
+  the <b>Value Area</b> (VAH high edge, VAL low edge). The high/low of brackets A+B is the <b>Initial Balance (IB)</b> —
+  drawn automatically once bracket B closes, teal dashed lines. A row touched by exactly one letter, away from the
+  day's extremes, is a <b>single print</b> — a fast, rejected move the market tends to come back and repair.</p>
+  <h4>Phases</h4>
+  <ul>
+    <li><b>Watch</b> — no quiz. Developing POC / Value Area / singles render live after every bracket so you can see
+    the read evolve. Run this first on a new day.</li>
+    <li><b>Calls</b> — overlays hidden. Playback pauses at each checkpoint bracket and runs its quiz: a day-type call,
+    a click-the-POC call, and (from bracket F on) a single-print flag pass. The first checkpoint also asks about the
+    Initial Balance. Day-type calls before the close are logged as early reads and judged only at the final
+    checkpoint — that's where you see your own call history and find out when you locked onto the right shape.</li>
+  </ul>
+  <h4>Day types (doc 03)</h4>
+  <ul>
+    <li><b>D-shape</b> — balance / rotation. Two-sided trade, a bell around one value area. The friendly day for the
+    late-day butterfly.</li>
+    <li><b>P-shape / b-shape</b> — one-sided. A thin stem (fast, early move) under or over a bulge where the day
+    built acceptance. P = stem low, bulge high (short-covering rally). b = stem high, bulge low (long liquidation).</li>
+    <li><b>Trend day</b> — elongated, no bulge. The auction never finds two-sided business. No rotation, no pin — the
+    day that hurts the fly.</li>
+  </ul>
+  <h4>Close of day</h4>
+  <p>After the last bracket: the truth day-type + why, your call history, the full overlay, and a <b>volume twin</b>
+  toggle — per-row session volume as faint bars behind the letters, with the time-POC and volume-POC marked
+  separately. Time is not volume; sometimes they agree, sometimes they don't.</p>
+  <p style="text-align:right"><button onclick="document.getElementById('help').style.display='none'">Got it</button></p>
+</div></div>
+
+<div id="quizcard"><div class="card">
+  <h2 id="qc-title"></h2>
+  <p id="qc-body"></p>
+  <div id="qc-choices"></div>
+  <div id="qc-clickhint"></div>
+  <div id="qc-submitrow"><button id="qc-submit" disabled>Submit</button></div>
+  <div id="qc-reveal"></div>
+  <div id="qc-next"><button id="qc-nextbtn" class="primary">Next ▸</button></div>
+</div></div>
+
+<div id="closepanel"><div class="card">
+  <span class="x" onclick="document.getElementById('closepanel').style.display='none'">×</span>
+  <h2>Close of day</h2>
+  <div id="close-summary"></div>
+  <p style="margin-top:12px"><button id="volumetwin">Show volume twin</button></p>
+</div></div>
+
+<div id="log">
+  <h3>Drill log <button id="export">Export JSON</button> <button id="clear">Clear</button></h3>
+  <table id="logtable"><thead><tr>
+    <th>When</th><th>Bracket</th><th>Kind</th><th>Your call</th><th>Truth</th><th>Verdict</th>
+  </tr></thead><tbody></tbody></table>
+</div>
+
+<script>
+"use strict";
+// [st-3zh] Market Profile (TPO) reading drill — sibling of orderflow_drill_template.html.
+// Same conventions: dark-desk palette, phase ladder, localStorage log, JSON
+// export, coach-bridge POSTs. See docs/mp-drill-operation.md and
+// docs/foundation/03-market-profile.md for the vocabulary this quizzes.
+const DATA = /*__MP_DRILL_DATA__*/null;
+if (!DATA) { document.body.textContent = "no data injected"; throw new Error("no data"); }
+
+// ── constants + small helpers ────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmtPrice = p => (+p.toFixed(2)).toString();
+const hhmm = iso => iso.slice(11, 16);
+const clock = iso => iso.slice(11, 19);
+const letterRank = l => l.charCodeAt(0) - 65;
+
+const rows = DATA.rows;
+const brackets = DATA.brackets;
+const maxVolume = Math.max(1, ...(DATA.volume || [1]));
+const letterIdxMap = new Map(brackets.map((b, i) => [b.letter, i]));
+// Short-day guard: checkpoints named in DATA but not present in this day's
+// brackets are dropped. The generator (market_profile_drill.py) always
+// appends the actual last bracket's letter as the final checkpoint, so this
+// filter is defensive, not load-bearing on the happy path.
+const presentCheckpoints = (DATA.checkpoints || []).filter(l => letterIdxMap.has(l));
+const finalCheckpointLetter = presentCheckpoints.length ? presentCheckpoints[presentCheckpoints.length - 1] : null;
+const firstCheckpointIdx = presentCheckpoints.length ? letterIdxMap.get(presentCheckpoints[0]) : null;
+// ib.high/ib.low arrive as PRICES (row floors); resolve to row indices once.
+function rowIndexOfPrice(p) {
+  let best = 0, bestd = Infinity;
+  for (let i = 0; i < rows.length; i++) { const d = Math.abs(rows[i] - p); if (d < bestd) { bestd = d; best = i; } }
+  return best;
+}
+const ibHiRow = DATA.ib ? rowIndexOfPrice(DATA.ib.high) : null;
+const ibLoRow = DATA.ib ? rowIndexOfPrice(DATA.ib.low) : null;
+
+function dayTypeLabel(code) {
+  return { D: "D-shape (balance / rotation)", P: "P-shape", b: "b-shape", trend: "Trend day" }[code] || code;
+}
+// Codes come straight from market/orderflow/tpo.py::classify_day_type:
+// "D" | "P" | "b" | "trend" (note: lowercase word, not "T").
+const DAY_TYPE_CHOICES = [["D", "D-shape (balance/rotation)"], ["P", "P-shape"], ["b", "b-shape"], ["trend", "Trend day"]];
+
+$("meta").textContent = `${DATA.meta.symbol} · ${DATA.meta.date} · ${brackets.length} brackets · ${rows.length} rows · ${DATA.meta.row_pts}pt`;
+
+// ── state ────────────────────────────────────────────────────────────────
+let idx = -1;                       // last COMMITTED bracket index (-1 = nothing revealed)
+let playing = false, timer = null, awaitingCall = false;
+let rowLetters = rows.map(() => []);        // committed letters per row
+let revealingRows = new Set(), revealingLetter = null;   // in-flight progressive reveal
+let chunkTimers = [], pendingFinalize = null;
+let overlayVisible = false, overlaySnapshot = null;      // POC/VA/singles overlay
+let ibShown = false;
+let volumeTwinOn = false, dayClosed = false;
+let quizModeState = null;           // {type:'choices'|'click', ...} while a quiz question is open
+let sessionCallHistory = [];        // this run's day-type calls, for the close-of-day trace
+
+const LS_KEY = `mp-drill-${DATA.meta.date}`;
+let drillLog = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
+
+// ── bracket rail: one pill per letter, marks done/current/checkpoint ─────
+function renderBracketRail() {
+  const rail = $("bracketrail"); rail.innerHTML = "";
+  brackets.forEach((b, i) => {
+    const p = document.createElement("span");
+    p.className = "b-pill" + (i <= idx ? " done" : "") + (i === idx ? " current" : "")
+      + (presentCheckpoints.includes(b.letter) ? " checkpoint" : "");
+    p.textContent = b.letter;
+    p.title = `${hhmm(b.t0)}–${hhmm(b.t1)} CT${presentCheckpoints.includes(b.letter) ? " · checkpoint" : ""}`;
+    rail.appendChild(p);
+  });
+}
+
+// ── grid rendering ───────────────────────────────────────────────────────
+function shouldLabel(i) {
+  const n = rows.length;
+  const every = n > 60 ? Math.ceil(n / 50) : 1;
+  return i % every === 0 || i === 0 || i === n - 1;
+}
+function rowEl(i) {
+  const el = document.createElement("div");
+  el.className = "tpo-row";
+  if (overlayVisible && overlaySnapshot) {
+    if (i === overlaySnapshot.poc) el.className += " poc";
+    if (i >= overlaySnapshot.val && i <= overlaySnapshot.vah) el.className += " va";
+    if (overlaySnapshot.singles && overlaySnapshot.singles.includes(i)) el.className += " single";
+  }
+  if (ibShown) {
+    if (i === ibHiRow) el.className += " ib-hi";
+    if (i === ibLoRow) el.className += " ib-lo";
+  }
+  if (quizModeState && quizModeState.type === "click") {
+    el.className += " row-clickable";
+    if (quizModeState.selected.has(i)) el.className += " selected";
+    el.onclick = () => onRowClick(i);
+  }
+  const axis = document.createElement("span"); axis.className = "axis";
+  axis.textContent = shouldLabel(i) ? fmtPrice(rows[i]) : "";
+  el.appendChild(axis);
+  if (volumeTwinOn) {
+    const vb = document.createElement("span"); vb.className = "volbar";
+    vb.style.width = ((DATA.volume[i] / maxVolume) * 60) + "%";
+    el.appendChild(vb);
+  }
+  const letters = document.createElement("span"); letters.className = "letters";
+  letters.textContent = rowLetters[i].join("");
+  if (revealingRows.has(i) && revealingLetter) {
+    const pend = document.createElement("span"); pend.className = "pending"; pend.textContent = revealingLetter;
+    letters.appendChild(pend);
+  }
+  el.appendChild(letters);
+  if (ibShown && i === ibHiRow) { const t = document.createElement("span"); t.className = "tag ib"; t.textContent = "IB hi"; el.appendChild(t); }
+  if (ibShown && i === ibLoRow) { const t = document.createElement("span"); t.className = "tag ib"; t.textContent = "IB lo"; el.appendChild(t); }
+  if (volumeTwinOn && i === DATA.vpoc) { const t = document.createElement("span"); t.className = "tag vpoc"; t.textContent = "◆ vPOC"; el.appendChild(t); }
+  if (volumeTwinOn && overlaySnapshot && i === overlaySnapshot.poc) { const t = document.createElement("span"); t.className = "tag tpoc"; t.textContent = "● tPOC"; el.appendChild(t); }
+  return el;
+}
+function renderGrid() {
+  const grid = $("tpogrid"); grid.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  for (let i = rows.length - 1; i >= 0; i--) frag.appendChild(rowEl(i));   // highest price top
+  grid.appendChild(frag);
+}
+function onRowClick(i) {
+  if (!quizModeState || quizModeState.type !== "click") return;
+  if (quizModeState.mode === "single") quizModeState.selected = new Set([i]);
+  else { if (quizModeState.selected.has(i)) quizModeState.selected.delete(i); else quizModeState.selected.add(i); }
+  $("qc-submit").disabled = quizModeState.selected.size === 0;
+  renderGrid();
+}
+
+function updateReadouts() {
+  const cur = idx >= 0 ? brackets[idx] : null;
+  $("ro-bracket").textContent = cur ? `${cur.letter} (${idx + 1}/${brackets.length})` : `–/${brackets.length}`;
+  $("ro-clock").textContent = cur ? `${hhmm(cur.t0)}–${hhmm(cur.t1)} CT` : "–";
+  $("ro-phase").textContent = phase() === "watch" ? "Watch" : "Calls";
+  updateScore();
+  renderBracketRail();
+}
+function updateScore() {
+  const graded = drillLog.filter(e => e.correct === true || e.correct === false);
+  const right = drillLog.filter(e => e.correct === true).length;
+  $("ro-score").textContent = `${right}/${graded.length}`;
+}
+
+// ── log + localStorage + export (mirrors the orderflow sibling exactly) ──
+function repaintLogTable() {
+  const tb = $("logtable").tBodies[0]; tb.innerHTML = "";
+  for (const e of drillLog) {
+    const tr = document.createElement("tr");
+    const vcls = e.correct === true ? "ok" : e.correct === false ? "bad" : "";
+    const fmt1 = v => Array.isArray(v) ? v.map(r => fmtPrice(rows[r])).join(",")
+                    : typeof v === "number" ? fmtPrice(rows[v])
+                    : (v == null ? "—" : v);
+    tr.innerHTML = `<td>${(e.ts || "").slice(11, 19)}</td><td>${e.bracket}</td><td>${e.kind}</td>` +
+      `<td>${fmt1(e.call)}</td><td>${fmt1(e.truth)}</td>` +
+      `<td class="${vcls}">${e.correct === true ? "correct" : e.correct === false ? "wrong" : "logged"}</td>`;
+    tb.appendChild(tr);
+  }
+  localStorage.setItem(LS_KEY, JSON.stringify(drillLog));
+}
+function logAnswer(e) {
+  const entry = Object.assign({ ts: new Date().toISOString() }, e);
+  drillLog.push(entry);
+  repaintLogTable(); updateScore();
+  sendState("answer", { lastAnswer: entry });
+}
+$("export").onclick = () => {
+  const blob = new Blob([JSON.stringify({ meta: DATA.meta, log: drillLog }, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `mp-drill-${DATA.meta.date}.json`; a.click();
+};
+$("clear").onclick = () => { drillLog = []; localStorage.setItem(LS_KEY, "[]"); repaintLogTable(); updateScore(); };
+
+// ── caption banner (transient guidance / phase notes) ────────────────────
+function showCaption(text) { $("caption-text").textContent = text; $("caption").style.display = "block"; }
+const PHASE_GUIDE = {
+  watch: "WATCH — no quiz. Developing POC / Value Area / singles render live after each bracket, so you can see the read evolve.",
+  calls: "CALLS — overlays hidden. Playback pauses at each checkpoint bracket and runs its quiz. Answer, then Continue.",
+};
+$("phase").onchange = () => {
+  if (phase() === "watch") { overlaySnapshot = idx >= 0 ? DATA.snapshots[idx] : null; overlayVisible = idx >= 0; }
+  else if (!dayClosed) overlayVisible = false;
+  renderGrid();
+  showCaption(PHASE_GUIDE[phase()]);
+};
+
+// ── chunked bracket reveal (st-3zh): a bracket's touched rows print in a few
+// chunks across its interval so the eye tracks WHERE price spent time as it
+// happens, rather than the whole letter popping in at once. Mirrors the
+// orderflow sibling's progressive bar fill (animateBar/partialBar). ────────
+function chunk(arr, n) {
+  if (!arr.length) return [[]];
+  const size = Math.max(1, Math.ceil(arr.length / n));
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+function commitBracket(i) {
+  const br = brackets[i];
+  for (const r of br.touched) if (!rowLetters[r].includes(br.letter)) rowLetters[r].push(br.letter);
+  revealingRows = new Set(); revealingLetter = null;
+}
+function animatedReveal(i, ms) {
+  clearChunks();
+  const br = brackets[i];
+  const chunks = chunk(br.touched, Math.min(4, Math.max(1, br.touched.length)));
+  let acc = [];
+  const finalize = () => { pendingFinalize = null; clearChunks(); commitBracket(i); idx = i; postCommit(i); };
+  pendingFinalize = finalize;
+  const n = chunks.length;
+  for (let c = 0; c < n; c++) {
+    chunkTimers.push(setTimeout(() => {
+      acc = acc.concat(chunks[c]); revealingRows = new Set(acc); revealingLetter = br.letter;
+      renderGrid();
+    }, ms * (c + 1) / (n + 1)));
+  }
+  timer = setTimeout(finalize, ms);
+}
+function clearChunks() { chunkTimers.forEach(clearTimeout); chunkTimers = []; }
+
+function postCommit(i) {
+  if (i === 1 && DATA.ib) ibShown = true;                    // IB fixed after bracket B
+  if (phase() === "watch") { overlaySnapshot = DATA.snapshots[i]; overlayVisible = true; }
+  renderGrid(); updateReadouts();
+  const letter = brackets[i].letter;
+  const isCP = phase() === "calls" && presentCheckpoints.includes(letter);
+  const isLast = i === brackets.length - 1;
+  const resumeAfter = playing;
+  if (isCP) {
+    pause();
+    showCaption(`Checkpoint ${letter} — quiz time.`);
+    runCheckpointQuiz(i, letter === finalCheckpointLetter, () => {
+      if (isLast) closeOfDay(); else if (resumeAfter) play();
+    });
+  } else if (isLast) {
+    closeOfDay();
+  } else if (playing) {
+    scheduleNext();
+  }
+}
+function scheduleNext() {
+  if (!playing) return;
+  const next = idx + 1;
+  if (next >= brackets.length) { pause(); return; }
+  if (phase() === "calls") overlayVisible = false;   // hidden again once autoplay resumes
+  renderGrid();
+  animatedReveal(next, Number($("speed").value) * 1000);
+}
+function play() {
+  if (playing || awaitingCall) return;
+  if (idx >= brackets.length - 1) return;
+  playing = true; $("play").textContent = "❚❚ Pause";
+  scheduleNext();
+}
+function pause() {
+  playing = false; clearTimeout(timer); clearChunks();
+  if (pendingFinalize) { const f = pendingFinalize; pendingFinalize = null; f(); }
+  $("play").textContent = "▶ Play";
+}
+function stepForward() {
+  if (idx >= brackets.length - 1) return;
+  pause();
+  const i = idx + 1;
+  commitBracket(i); idx = i;
+  postCommit(i);
+}
+function restart() {
+  pause();
+  idx = -1; rowLetters = rows.map(() => []); revealingRows = new Set(); revealingLetter = null;
+  overlayVisible = false; overlaySnapshot = null; ibShown = false; volumeTwinOn = false; dayClosed = false;
+  quizModeState = null; sessionCallHistory = [];
+  $("quizcard").style.display = "none"; $("closepanel").style.display = "none";
+  $("caption").style.display = "none";
+  renderGrid(); updateReadouts();
+}
+function jumpToBracket(n) {
+  // coach "jump" command: instantly resolve to bracket n (0-based), no quiz replay
+  pause();
+  idx = -1; rowLetters = rows.map(() => []); revealingRows = new Set(); revealingLetter = null;
+  overlayVisible = false; overlaySnapshot = null; ibShown = false;
+  const t = Math.max(0, Math.min(n, brackets.length - 1));
+  for (let i = 0; i <= t; i++) {
+    commitBracket(i); idx = i;
+    if (i === 1 && DATA.ib) ibShown = true;
+    if (phase() === "watch") { overlaySnapshot = DATA.snapshots[i]; overlayVisible = true; }
+  }
+  renderGrid(); updateReadouts();
+}
+
+// ── checkpoint quiz engine (st-3zh) ───────────────────────────────────────
+// Runs day-type -> POC -> (singles from bracket F on) -> (IB, first checkpoint
+// only) as a queue, one question at a time. `done` is the queue's own
+// advance function; the final `done()` call is what resumes playback (or
+// triggers the close-of-day reveal on the last bracket).
+const phase = () => $("phase").value;
+
+function runCheckpointQuiz(bracketIdx, isFinal, onComplete) {
+  const letter = brackets[bracketIdx].letter;
+  const queue = [{ type: "day_type" }, { type: "poc" }];
+  if (letterRank(letter) >= letterRank("F")) queue.push({ type: "singles" });
+  if (DATA.ib && bracketIdx === firstCheckpointIdx) queue.push({ type: "ib" });
+  let qi = 0;
+  function next() {
+    if (qi >= queue.length) { $("quizcard").style.display = "none"; awaitingCall = false; onComplete(); return; }
+    const q = queue[qi++];
+    if (q.type === "day_type") askDayType(bracketIdx, isFinal, next);
+    else if (q.type === "poc") askPOC(bracketIdx, next);
+    else if (q.type === "singles") askSingles(bracketIdx, next);
+    else if (q.type === "ib") askIB(bracketIdx, next);
+  }
+  next();
+}
+
+function resetQuizCard() {
+  $("qc-choices").innerHTML = ""; $("qc-clickhint").style.display = "none";
+  $("qc-submitrow").style.display = "none"; $("qc-submit").disabled = true;
+  $("qc-reveal").style.display = "none"; $("qc-reveal").innerHTML = "";
+  $("qc-next").style.display = "none";
+  $("quizcard").style.display = "grid";
+  awaitingCall = true;
+}
+function showQuizChoices(title, body, choices, onPick) {
+  resetQuizCard();
+  $("qc-title").textContent = title; $("qc-body").textContent = body;
+  quizModeState = { type: "choices", choices };
+  choices.forEach((c, i) => {
+    const b = document.createElement("button"); b.className = "primary"; b.textContent = `${i + 1}. ${c}`;
+    b.onclick = () => { [...$("qc-choices").children].forEach(x => x.disabled = true); quizModeState = null; onPick(i); };
+    $("qc-choices").appendChild(b);
+  });
+}
+function showQuizClickPrompt(title, body, mode, onSubmit) {
+  resetQuizCard();
+  $("qc-title").textContent = title; $("qc-body").textContent = body;
+  quizModeState = { type: "click", mode, selected: new Set() };
+  $("qc-clickhint").style.display = "block";
+  $("qc-clickhint").textContent = mode === "single" ? "Click one row on the chart, then Submit."
+    : "Click every row you want to flag (click again to unflag), then Submit.";
+  $("qc-submitrow").style.display = "block";
+  $("qc-submit").onclick = () => {
+    const sel = [...quizModeState.selected]; quizModeState = null;
+    $("qc-submitrow").style.display = "none"; $("qc-clickhint").style.display = "none";
+    renderGrid(); onSubmit(sel);
+  };
+  renderGrid();
+}
+function showReveal(text, showHistory, done) {
+  $("qc-reveal").style.display = "block";
+  $("qc-reveal").textContent = text;
+  if (showHistory) {
+    const hist = document.createElement("div"); hist.className = "callhist";
+    hist.innerHTML = "<b>Your day-type calls:</b> " +
+      (sessionCallHistory.length ? sessionCallHistory.map(h => `${h.bracket}:${h.call}`).join(" → ") : "(none logged)");
+    $("qc-reveal").appendChild(hist);
+  }
+  $("qc-next").style.display = "block";
+  $("qc-nextbtn").textContent = "Next ▸";
+  $("qc-nextbtn").onclick = () => { $("qc-next").style.display = "none"; $("qc-reveal").style.display = "none"; done(); };
+}
+
+// a) day-type call — every checkpoint; scored vs truth ONLY at the final one
+function askDayType(bracketIdx, isFinal, done) {
+  const letter = brackets[bracketIdx].letter;
+  showQuizChoices("Reading the developing shape",
+    `What kind of day is this so far, after bracket ${letter}?`,
+    DAY_TYPE_CHOICES.map(c => c[1]),
+    (i) => {
+      const code = DAY_TYPE_CHOICES[i][0];
+      sessionCallHistory.push({ bracket: letter, call: code });
+      if (isFinal) {
+        const correct = code === DATA.truth.day_type;
+        logAnswer({ bracket: letter, kind: "day_type", call: code, truth: DATA.truth.day_type, correct });
+        showReveal(`${correct ? "✓ Correct." : "✕ Not quite."} Truth: ${dayTypeLabel(DATA.truth.day_type)}. ${DATA.truth.why}`, true, done);
+      } else {
+        logAnswer({ bracket: letter, kind: "day_type", call: code, truth: null, correct: null });
+        showReveal("Early call — logged, judged at close.", false, done);
+      }
+    });
+}
+// b) POC call — click the row; correct within 1 row of the developing POC
+function askPOC(bracketIdx, done) {
+  const letter = brackets[bracketIdx].letter;
+  const snap = DATA.snapshots[bracketIdx];
+  showQuizClickPrompt("Point of Control", `Click the row you read as the current POC (after bracket ${letter}).`, "single",
+    (sel) => {
+      const r = sel[0];
+      const correct = r != null && Math.abs(r - snap.poc) <= 1;
+      logAnswer({ bracket: letter, kind: "poc", call: r, truth: snap.poc, correct });
+      overlaySnapshot = snap; overlayVisible = true; renderGrid();
+      const readTxt = r != null ? fmtPrice(rows[r]) : "(no pick)";
+      showReveal(`${correct ? "✓" : "✕"} You read ${readTxt} — developing POC is ${fmtPrice(rows[snap.poc])} ` +
+        `(Value Area ${fmtPrice(rows[snap.val])}–${fmtPrice(rows[snap.vah])}).`, false, done);
+    });
+}
+// c) single prints — checkpoints >= F; multi-click, exact-set score w/ partial credit report
+function askSingles(bracketIdx, done) {
+  const letter = brackets[bracketIdx].letter;
+  const snap = DATA.snapshots[bracketIdx];
+  showQuizClickPrompt("Single prints", `Flag every single-print row after bracket ${letter}, then Submit.`, "multi",
+    (sel) => {
+      const truth = new Set(snap.singles || []); const chosen = new Set(sel);
+      const hits = [...chosen].filter(x => truth.has(x)).length;
+      const falses = [...chosen].filter(x => !truth.has(x)).length;
+      const misses = [...truth].filter(x => !chosen.has(x)).length;
+      const correct = falses === 0 && misses === 0;
+      logAnswer({ bracket: letter, kind: "singles", call: sel, truth: snap.singles || [], correct });
+      overlaySnapshot = snap; overlayVisible = true; renderGrid();
+      showReveal(`${correct ? "✓ Exact match." : "✕ Not exact."} Hits ${hits}/${truth.size} · misses ${misses} · false flags ${falses}.`, false, done);
+    });
+}
+// d) Initial Balance — first checkpoint only; IB auto-marked, judged from the current snapshot
+function askIB(bracketIdx, done) {
+  const letter = brackets[bracketIdx].letter;
+  const snap = DATA.snapshots[bracketIdx];
+  ibShown = true; renderGrid();
+  const above = snap.hi > ibHiRow, below = snap.lo < ibLoRow;
+  let key = "Still inside";
+  if (above && below) key = (snap.hi - ibHiRow) >= (ibLoRow - snap.lo) ? "Above" : "Below";
+  else if (above) key = "Above"; else if (below) key = "Below";
+  showQuizChoices("Initial Balance", "IB is now marked (brackets A–B, teal dashed). Has price extended beyond it yet?",
+    ["Above", "Below", "Still inside"],
+    (i) => {
+      const call = ["Above", "Below", "Still inside"][i];
+      const correct = call === key;
+      logAnswer({ bracket: letter, kind: "ib", call, truth: key, correct });
+      showReveal(`${correct ? "✓" : "✕"} Truth: ${key} — IB ${fmtPrice(DATA.ib.low)}–${fmtPrice(DATA.ib.high)}; ` +
+        `range so far ${fmtPrice(rows[snap.lo])}–${fmtPrice(rows[snap.hi])}.`, false, done);
+    });
+}
+
+// ── close-of-day reveal (st-3zh) ──────────────────────────────────────────
+function closeOfDay() {
+  playing = false; $("play").textContent = "▶ Play"; awaitingCall = false;
+  dayClosed = true;
+  overlayVisible = true; overlaySnapshot = DATA.snapshots[brackets.length - 1]; ibShown = !!DATA.ib;
+  renderGrid(); updateReadouts();
+  const tPOCrow = overlaySnapshot.poc, tPOCprice = rows[tPOCrow], vPOCprice = rows[DATA.vpoc];
+  const diff = Math.round(Math.abs(tPOCprice - vPOCprice) * 100) / 100;
+  $("close-summary").innerHTML =
+    `<p><b>Truth:</b> ${dayTypeLabel(DATA.truth.day_type)} — ${DATA.truth.why}</p>` +
+    `<p><b>Your day-type calls:</b> ${sessionCallHistory.length ? sessionCallHistory.map(h => `${h.bracket}:${h.call}`).join(" → ") : "(none logged)"}</p>` +
+    `<p>Time POC ${fmtPrice(tPOCprice)} vs Volume POC ${fmtPrice(vPOCprice)} — ${diff === 0 ? "same" : "differ by " + diff + " pts"}</p>`;
+  $("closepanel").style.display = "grid";
+  sendState("close_of_day", { day_type_calls: sessionCallHistory });
+}
+$("volumetwin").onclick = () => {
+  volumeTwinOn = !volumeTwinOn; renderGrid();
+  $("volumetwin").textContent = volumeTwinOn ? "Hide volume twin" : "Show volume twin";
+};
+
+// ── wiring + keyboard ──────────────────────────────────────────────────────
+$("play").onclick = () => playing ? pause() : play();
+$("fwd").onclick = () => stepForward();
+$("restart").onclick = () => restart();
+$("helpbtn").onclick = () => { $("help").style.display = "grid"; };
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (quizModeState && quizModeState.type === "choices" && /^[1-4]$/.test(e.key)) {
+    const btns = $("qc-choices").children; const b = btns[Number(e.key) - 1];
+    if (b && !b.disabled) b.click();
+    return;
+  }
+  if (e.key === "Enter") {
+    if ($("qc-next").style.display === "block") { $("qc-nextbtn").click(); return; }
+    if ($("qc-submitrow").style.display === "block" && !$("qc-submit").disabled) { $("qc-submit").click(); return; }
+  }
+  if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
+  if (e.code === "ArrowRight") stepForward();
+  if (e.key === "r" || e.key === "R") restart();
+});
+if (!localStorage.getItem("mp-help-seen")) { $("help").style.display = "grid"; localStorage.setItem("mp-help-seen", "1"); }
+
+// ── coach bridge (st-ago pattern): silent when absent, two-way when present.
+// POST bodies go as text/plain so a file:// page makes "simple" CORS
+// requests (no preflight). All bridge failures are swallowed — the drill
+// must work fully offline. Short timeout on every POST so a dead bridge
+// never stalls the UI. ─────────────────────────────────────────────────────
+const BRIDGE = "http://127.0.0.1:7788";
+let bridgeUp = false, lastCmdId = 0;
+function postState(payload) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 800);
+  fetch(BRIDGE + "/state", { method: "POST", body: JSON.stringify(payload), headers: { "Content-Type": "text/plain" }, signal: ctrl.signal })
+    .catch(() => {}).finally(() => clearTimeout(t));
+}
+function sendState(kind, extra) {
+  if (!bridgeUp) return;
+  const cur = idx >= 0 ? brackets[idx] : null;
+  postState(Object.assign({ kind, drill: "market-profile", date: DATA.meta.date,
+    bracket: cur ? cur.letter : null, phase: phase(), lastAnswer: drillLog[drillLog.length - 1] || null }, extra || {}));
+}
+function applyCoach(cmd) {
+  if (cmd.type === "say") showCaption("COACH: " + (cmd.text || ""));
+  else if (cmd.type === "jump" && isFinite(cmd.bracket)) { jumpToBracket(Number(cmd.bracket)); showCaption(cmd.text ? "COACH: " + cmd.text : `Coach moved you to bracket ${cmd.bracket}`); }
+  else if (cmd.type === "pause") pause();
+  else if (cmd.type === "play") play();
+  // "arm" is part of the shared bridge contract (orderflow's armed-level
+  // concept) but has no analogue here — ignored, not an error.
+}
+async function pollCoach() {
+  if (!bridgeUp) return;
+  try {
+    const r = await fetch(`${BRIDGE}/commands?since=${lastCmdId}`);
+    const d = await r.json();
+    for (const c of d.commands || []) applyCoach(c);
+    lastCmdId = d.last ?? lastCmdId;
+  } catch { bridgeUp = false; $("bridge-dot").textContent = "—"; setTimeout(connectBridge, 10000); return; }
+  setTimeout(pollCoach, 2000);
+}
+function connectBridge() {
+  fetch(BRIDGE + "/health").then(r => r.json()).then(() => {
+    bridgeUp = true; $("bridge-dot").textContent = "connected";
+    sendState("session_open", { n_brackets: brackets.length });
+    pollCoach();
+  }).catch(() => { $("bridge-dot").textContent = "—"; });
+}
+connectBridge();
+
+// ── boot: reveal bracket A immediately (paused), like the orderflow sibling
+// booting on bar 0 — an empty grid is a worse first impression than one
+// bracket already on the tape. ─────────────────────────────────────────────
+renderBracketRail();
+if (brackets.length) { commitBracket(0); idx = 0; postCommit(0); }
+else { renderGrid(); updateReadouts(); }
+repaintLogTable(); updateScore();
+showCaption(PHASE_GUIDE[phase()]);
+</script></body></html>
