@@ -174,7 +174,7 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
 · coach: <span id="bridge-dot">—</span></p>
 <div id="help"><div class="card">
   <h2>What am I looking at?</h2>
-  <p>This is one full trading day replayed as <b>volume bars</b>: every column is exactly the same number of contracts changing hands (shown in the header), <b>not</b> the same amount of time. When columns arrive fast, the market is busy; when they crawl, it's quiet. Each column's <b>footer</b> carries the bar's real duration as its colored fill height — tall fill = slow bar, short fill = urgent tape.</p>
+  <p>This is one full trading day replayed as <b>volume bars</b>: every column is exactly the same number of contracts changing hands (shown in the header), <b>not</b> the same amount of time. When columns arrive fast, the market is busy; when they crawl, it's quiet. Each column's <b>footer</b> carries the bar's real duration as its colored fill height — tall fill = slow bar, short fill = urgent tape. That height is on a <b>fixed absolute scale — full = 120s</b>, the same on every day you drill, so heights are comparable across days and you can learn what a given pace looks like.</p>
   <h4>Reading one cell (a price inside a bar)</h4>
   <ul>
     <li><span class="swatch" style="background:var(--buy)"></span> <b>Blue = buyers were the aggressors</b> at that price (they crossed the spread to lift sellers' offers). <span class="swatch" style="background:var(--sell)"></span> <b>Red = sellers were the aggressors</b> (they hit buyers' bids).</li>
@@ -195,7 +195,7 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
     <li><b>Force with effect</b> — heavy one-sided color and price moving that way: a healthy move, expect continuation.</li>
     <li><b>Force without effect</b> — heavy aggressive volume but price stops: someone big is absorbing. Watch for reversal.</li>
     <li><b>Effect without force</b> — price makes a new high/low but the session Δ readout doesn't follow: a hollow move.</li>
-    <li>Footer of each column = the bar's scoreboard: the cell is shaded in the <b>winner's color</b> (blue buyers / red sellers); the three lines are the bar's total delta (magnitude), its duration in seconds, and its index; the fill height draws that same duration (hover for the closing clock time). The <b>Session Δ</b> readout is the running sum — its <i>trend</i> matters, not its level.</li>
+    <li>Footer of each column = the bar's scoreboard: the cell is shaded in the <b>winner's color</b> (blue buyers / red sellers); the three lines are the bar's total delta (magnitude), its duration in seconds, and its index; the fill height draws that same duration on a fixed scale (full = 120s, constant across days; hover for the closing clock time). The <b>Session Δ</b> readout is the running sum — its <i>trend</i> matters, not its level.</li>
   </ul>
   <h4>How to run a rep</h4>
   <ol>
@@ -246,6 +246,12 @@ const KEEP_COLS = 48;        // DOM columns kept (virtualization)
 const fmtPrice = p => (+p.toFixed(2)).toString();
 const COL_W = 58, FOOT_H = 72;
 const FILL_MIN = 34;         // fill always covers the 3 text lines (white stays on color)
+// Duration fill scale (st-4wh). ABSOLUTE and constant across every day, so a
+// fast day renders visibly shorter than a slow one and "full height" is a
+// learnable anchor: 120s for one bar-N block of contracts. Square-root because
+// the distribution is right-skewed (2026-07-02: p25 20.5s, median 30.8s,
+// p90 66.1s, max 109.6s) — linear buries the whole common band at the bottom.
+const DUR_CEIL = 120;        // seconds; at or above this the fill is full
 let cellH = 13;              // zoom control; numbers hidden below 12px
 let cellMode = "delta";      // delta | vol | pair — what the cell text shows
 
@@ -394,7 +400,7 @@ function renderColumn(b, i) {
   const side = b.d >= 0 ? "--buy" : "--sell";
   foot.style.background = `color-mix(in srgb, var(${side}) 22%, var(--surface-1))`;
   const fill = document.createElement("div"); fill.className = "fill";
-  fill.style.height = Math.round(FILL_MIN + (FOOT_H - 2 - FILL_MIN) * (b.dur / trailingMaxDur(i))) + "px";
+  fill.style.height = Math.round(FILL_MIN + (FOOT_H - 2 - FILL_MIN) * durFrac(b.dur)) + "px";
   fill.style.background = `color-mix(in srgb, var(${side}) 88%, var(--surface-1))`;
   const txt = document.createElement("div"); txt.className = "txt";
   txt.innerHTML = `<div class="d"></div><div></div><div></div>`;
@@ -413,12 +419,18 @@ function repaintAll() {
 const fmtClock = iso => iso.slice(11, 19);
 
 // ── pace (st-qen: lives inside each footer now) ─────────────────────────
-// Normalize a bar's duration against its own trailing window — deterministic
-// per bar index, so appended columns never need their neighbors repainted.
-function trailingMaxDur(i) {
-  let m = 1e-9;
-  for (let k = Math.max(0, i - KEEP_COLS + 1); k <= i; k++) m = Math.max(m, bars[k].dur);
-  return m;
+// A bar's fill fraction depends ONLY on its own duration and DUR_CEIL — no
+// window, no neighbors, so appended columns never repaint their predecessors.
+//
+// This replaced a trailing-max normalization (st-4wh) that divided each bar by
+// the slowest bar in its trailing window. That made every running-max bar draw
+// at 100%, and bar 0 — whose window is just itself — full height always: on
+// 2026-07-02 the opening 2.0s bar, the fastest tape of the session, rendered as
+// maximally slow. It also rebased the scale every column, so equal heights meant
+// different durations at different points of the day, which is precisely what
+// absolute pace calibration cannot tolerate.
+function durFrac(dur) {
+  return Math.sqrt(Math.min(Math.max(dur, 0), DUR_CEIL) / DUR_CEIL);
 }
 
 // ── readouts, table, log ─────────────────────────────────────────────────
