@@ -85,7 +85,17 @@
       "Bash(date *)",
       "Edit(/tmp/*)",
       "Read(/tmp/*)",
-      "Edit(.claude/state/**)"
+      "Edit(.claude/state/**)",
+      "Bash(cut *)",
+      "Bash(tr *)",
+      "Bash(uniq *)",
+      "Bash(echo *)",
+      "Bash(printf *)",
+      "Bash(basename *)",
+      "Bash(dirname *)",
+      "Bash(bash *)",
+      "Bash(true)",
+      "Bash(false)"
     ],
     "deny": [
       "Read(.env)",
