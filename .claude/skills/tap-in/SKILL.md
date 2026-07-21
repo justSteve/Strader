@@ -57,11 +57,23 @@ Note open work items, recent state, continuity threads.
 cat "${CLAUDE_PROJECT_DIR}/CurrentStatus.md" 2>/dev/null
 ```
 
-### 5. Check Open Beads
+### 5. Check the Ready Queue (name-first)
+
+The store is Dolt-backed (`.beads/embeddeddolt`). Read it through `bd`, and use
+the ProperName view so items read by their human handle:
 
 ```bash
-tail -30 "${CLAUDE_PROJECT_DIR}/.beads/issues.jsonl" | jq -r 'select(.status == "open" or .status == "in_progress") | [.id, .status, .type, .title] | @tsv' | column -t
+bd propername --ready 2>/dev/null | head -30
 ```
+
+Each line is `PROPERNAME · st-id · P# · title` — carry the name, not just the id.
+
+> Until 2026-07-21 this step read `tail -30 .beads/issues.jsonl`. That file is a
+> **stale export**, last written 2026-06-12, not the live store — so every
+> session from that date on oriented on a 5.5-week-old snapshot and had no signal
+> anything was wrong. The export returned plausible, well-formed, wrong data,
+> which is worse than returning nothing. Do not reintroduce a read of it
+> (co-vf9q).
 
 ### 6. Output Session Briefing
 

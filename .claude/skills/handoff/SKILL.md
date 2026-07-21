@@ -32,10 +32,13 @@ NEVER generate DaysActivity entries freeform. Only this skill writes to DaysActi
    - Review recent conversation for session summary
    - Note any discoveries or issues encountered
 
-4. **Check open beads**
+4. **Check the ready queue (name-first)**
+   The store is Dolt-backed (`.beads/embeddeddolt`). Read it through `bd`:
    ```bash
-   tail -30 "${CLAUDE_PROJECT_DIR}/.beads/issues.jsonl" | jq -r 'select(.status == "open" or .status == "in_progress") | [.id, .type, .title] | @tsv' | column -t
+   bd propername --ready 2>/dev/null | head -30
    ```
+   > Until 2026-07-21 this read `tail -30 .beads/issues.jsonl` — a stale export
+   > last written 2026-06-12, not the live store. Do not reintroduce it (co-vf9q).
 
 5. **Create handoff entry**
 
