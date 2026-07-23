@@ -1,34 +1,61 @@
-# DaysActivity - 2026-07-21
+# DaysActivity - 2026-07-23
 
-## 07:01 - Session Handoff [Mancini Parses + 7/20 Deck Freeze]
+## 09:52 - Session Handoff [Absorption + MI Gauge + Mancini v2 + Token]
 
-**Summary**: One session spanning Sun 7/20 → Tue 7/21 morning. Traced COO's ingress rebuild via CM (Gmail OAuth consent was in Testing → 7-day token death; published-to-production fix 7/18 is durable — blobs now land unattended), parsed the July 20 and July 21 Mancini plans in-session (st-7h9, st-57c; 69 + 67 levels, all anti-hallucination-validated), pulled Monday's Databento fill (660k ES + 512k OPRA, gate green), read Monday's 51-pt morning drop off the real tape, and froze 7/20 into the drill scenario deck with recognizer-verified refs (st-sfb). Filed st-ze6: the automation ledger — every pipeline link is now pure code except commentary extraction, which is coded but credit-blocked (co-8gp).
+**Summary**: One session spanning Wed 7/22 → Thu 7/23. Bought the approved MBP-1 day ($1.21 for 7/2 full RTH, 9.06M book events) and built AbsorptionTracker end-to-end — band-tolerant level episodes, refill counting, floors calibrated on the real day, parity harness extended (st-9vl closed). Designed and built the MI composite gauge (st-3fr): $TICK percentile scale calibrated from a 31-session backfill (folklore ±1000 is a 1-in-10-session event; real climax ±450–600 by bucket), MIGauge engine with named drivers, replay + live CLI; replay of 7/22 showed breadth diverging at the 9:05 high and pegged −92 during the 9:30 flush — the sell-into-climax bell for Steve's +118% 7520 put. Found and fixed the Schwab same-day clamp (negatives floored to 0 in intraday minute history; just-settled day arrives duplicated; T+1 heals; live gauge rebuilt on quote sampling). Mancini pipeline v2 completed and st-ze6 closed: --from-blob fetch, plan-day from title, deterministic list extractor (69/69 on the real 7/23 letter, parity gate), hybrid mode with no-clobber guard, morning chain riding corpus_daily's cron. July 22 + 23 plans processed via in-session extraction (68 + 71 levels, validated). Token re-minted by Steve (one code-expiry retry; next wall ~7/30; st-z6p closed). Deck freeze committed (st-sfb closed), stray st-aeg closed, GEXBot pause memorized. Two subs drove the 7/23 Mancini import and Databento fill in parallel. All work committed and pushed (85ad2e5..cb0c5c9, 9 commits, 345 tests green).
 
 **Open Work**:
-- Uncommitted, awaiting Steve's nod: `git add docs/drills/ tests/scripts/test_scenario_deck.py runbook/mancini/commentary/2026-07-2*.jsonl && git commit -m "feat(drills): freeze 2026-07-20 into the scenario deck — 7505 FBD marquee + cascade refs [st-sfb, st-7h9, st-57c]"` (also loose: archive/DaysActivity-2026-07-19.md, session-review-2026-07-19.md — Steve's keep/delete call from 7/20 still open)
-- st-ze6 (ready) — Mancini pipeline v2: fetch wiring, plan-day from title, deterministic list extractor, pre-open cron
-- Drill reps: /tmp/desk-orderflow-drill-2026-07-20.html built and waiting (484 bars; Ladder dropdown jumps to the new 7/20 refs)
-- co-8gp (COO) — ANTHROPIC_API_KEY_DIRECT credits: funding it makes the letter chain hands-free end to end
-- July 8 plan still the only blob-coverage gap (needs Steve re-forward, post-mortem completeness only)
-- st-aeg — stray bead from 7/18 titled "task", no description; Steve to identify or close
-- Schwab token expires ~7/24 — refresh due this week
+- st-3fr (in progress) — MI gauge remaining: drill-deck TICK overlay, live breadth unavailable (ADD/VOLD quotes dead intraday, T+1 only), regime-weight calibration as forward capture accumulates
+- Steve to post the schwab-py Discord draft (same-day clamp forensics) — drafted in-session, his call
+- co-8gp (COO) — API credits still block interpretive commentary; hybrid mode publishes deterministic levels meanwhile; auto-restores when funded
+- st-096 — remaining AC: daily Schwab pull cron wiring, stage-boundary quote poll, May snapshot-stop root cause
+- Tomorrow pre-open: `tmux -L moocity new-window -n gauge '.venv/bin/python scripts/mi_gauge.py --live'` before 8:30 for full-session spine semantics
+- Next token wall ~2026-07-30 (heartbeat warns Tue/Wed AM); consider the warm-up-login trick before the real paste
 
 **Tried**:
-- `bd create task "title"` → positional "task" becomes the TITLE (st-57c born nameless, retitled; st-aeg is an older casualty of the same trap). Correct form: `bd create --type task --title "..." --description "..."`
-- `python3 -m pytest tests/` (system python) → 7 collection errors (no schwab/databento modules). Full suite needs `.venv/bin/python -m pytest` — 308 pass
-- CM conversations table for COO → stale (stops 2026-05-07); CM `file_changes` runs to the minute and carried the weekend evidence instead
-- Recognizer at 7505/7483/7490 with the parsed plan levels → 12 instances incl. the marquee (flush 159 → confirm 168) matching the tick-level read exactly; also surfaced the @7522 confirmed-trap-overrun at 09:03 — the fast-cut teaching case
+- Strict single-price absorption episodes → only ever completed refill cycles in closing-auction churn (all 14 hits 14:58–15:00); 2-tick band tolerance is what surfaced mid-session defenses
+- Schwab minute history for live $TICK → same-day candles clamp negatives to 0 (quote endpoint correct at the same moment); live gauge must sample quotes, not candles
+- `--days 3` internals re-pull of the just-settled day → every minute duplicated (healed segment first, stale clamped second); first-wins dedup + implausibility guard added
+- Mancini LLM leg 400 with bare status → error body revealed credit exhaustion; llm.py now surfaces the API's own message
+- Web survey of the same-day clamp → undocumented anywhere public (schwab-py docs/issues, TDA-era trackers, useThinkScript); our forensics are the first account
+- OAuth paste attempt #1 → dead code (~30s expiry); warm login made attempt #2 trivial
 
 **Files Changed**:
-docs/drills/scenario-deck.json
+market/entities/book.py
+market/orderflow/absorption.py
+market/orderflow/quotes.py
+market/orderflow/parity.py
+market/signals/orderflow.py
+market/signals/orderflow_config.py
+market/signals/internals.py
+market/signals/internals_config.py
+market/internals/gauge.py
+market/internals/feed.py
+market/corpus/paths.py
+broker_schwab/readers/history.py
+runbook/mancini/run.py
+runbook/mancini/llm.py
+runbook/mancini/fetch.py
+runbook/mancini/listlevels.py
+runbook/mancini/tests/test_listlevels.py
+runbook/mancini/commentary/2026-07-22.jsonl
+runbook/mancini/commentary/2026-07-23.jsonl
+scripts/corpus_pull_databento_es_mbp1.py
+scripts/corpus_pull_internals.py
+scripts/corpus_daily.py
+scripts/mi_gauge.py
+scripts/regen_parity_snapshot.py
+scripts/measurement/absorption_calibrate.py
+scripts/measurement/internals_calibrate.py
 docs/drills/scenario-catalog.md
+docs/drills/scenario-deck.json
+docs/measurement/internals-tick-seed-2026-07-22.md
+tests/market/orderflow/test_absorption.py
+tests/market/orderflow/test_parity_harness.py
+tests/market/internals/test_gauge.py
+tests/market/fixtures/es_mbp1_golden_20260702.jsonl.gz
+tests/market/fixtures/parity/expected_absorption_20260702.json
+tests/runbook/test_run.py
 tests/scripts/test_scenario_deck.py
-runbook/mancini/commentary/2026-07-20.jsonl
-runbook/mancini/commentary/2026-07-21.jsonl
-runbook/mancini/parsed/2026-07-20.json (gitignored artifact)
-runbook/mancini/parsed/2026-07-21.json (gitignored artifact)
-runbook/mancini/charts/2026-07-20.pine (gitignored artifact)
-runbook/mancini/charts/2026-07-21.pine (gitignored artifact)
-data/corpus/2026-07-20/ (Databento ES + OPRA pulls)
 
 ---
