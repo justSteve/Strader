@@ -133,6 +133,9 @@ def _render_brief(result: ParseResult) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Mancini Runbook pilot")
+    ap.add_argument("--show", metavar="YYYY-MM-DD", nargs="?", const="today",
+                    help="re-emit the stored brief for a plan-day (default "
+                         "today) — no gate, no fetch, no parse")
     ap.add_argument("--file", help="newsletter text file (default: stdin)")
     ap.add_argument("--from-blob", action="store_true",
                     help="fetch the newest letter from the email-ingress blob "
@@ -154,6 +157,16 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+    if args.show:
+        show_day = _resolve_day(None if args.show == "today" else args.show)
+        path = PARSED_ROOT / f"{show_day}.json"
+        if not path.exists():
+            print(f"no stored parse for {show_day} ({path})", file=sys.stderr)
+            return 1
+        result = ParseResult.from_dict(json.loads(path.read_text(encoding="utf-8")))
+        print(_render_brief(result))
+        return 0
 
     gate_day = _resolve_gate_day()         # gate data-day (last completed session)
 
