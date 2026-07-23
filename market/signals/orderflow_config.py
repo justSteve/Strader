@@ -77,6 +77,28 @@ CONFIRM_DELTA_MIN = 200         # beat 4 fallback when no opposite ImbalanceStac
 ENGAGEMENT_WINDOW_BARS = 40     # beats must complete within this many bars of beat 1
 INVALIDATE_TICKS = 60           # 15 pts beyond the level without reclaim kills the setup
 
+# ── absorption (spec §2 demoted tier; research doc Q4; st-9vl) ──────────────
+# A level episode = the span where a side's defended price P stays alive at
+# top-of-book: open while best bid ∈ [P, P + BAND ticks] (better bids stacking
+# in front keep P's defense alive), closed the moment it trades through
+# (bid < P = broke) or price leaves the band (defense won). Ask-side mirror.
+# Within it, a REFILL = resting size at P depleted by ≥ REFILL_DEPLETION_MIN
+# then recovered by ≥ REFILL_RECOVERY_MIN (observable only while P is at top —
+# MBP-1 sees one level). An AbsorptionRead emits at episode end when
+# aggressive volume into P and refill count both clear their floors.
+# [calibrated] st-9vl 2026-07-22 on the purchased 2026-07-02 MBP-1 day (9.06M
+# book events): strict single-price episodes only ever completed refill cycles
+# in the closing-auction churn (all 14 hits inside 14:58-15:00) — the band is
+# what makes mid-session defense visible. Floors chosen from the emission
+# grid for the ~10-40/session rarity band (the st-wnc large-lot/sweep lesson).
+ABSORPTION_BAND_TICKS = 2       # defended price survives ≤ this far behind top
+ABSORPTION_VOL_MIN = 100        # aggressive contracts into the level, ES scale
+ABSORPTION_REFILL_MIN = 2       # distinct refill events to call it defended
+REFILL_DEPLETION_MIN = 25       # contracts consumed before a recovery counts
+REFILL_RECOVERY_MIN = 25        # contracts replenished to count one refill
+ABSORPTION_VOL_SCALE = 500      # volume at which the vol component saturates
+ABSORPTION_REFILL_SCALE = 4     # refills at which the refill component saturates
+
 # ── consumer wiring (spec §6) ───────────────────────────────────────────────
 CONFLUENCE_TOLERANCE_PTS = 2.0  # Mancini level ∩ anchor proximity
 

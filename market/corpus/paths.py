@@ -77,5 +77,15 @@ def databento_glbx_es_path(d: date | None = None) -> Path:
     return day_dir(d) / "databento_glbx_es.jsonl"
 
 
+def databento_glbx_es_mbp1_path(d: date | None = None) -> Path:
+    """Per-day Databento GLBX.MDP3 ES.c.0 MBP-1 (top-of-book) stream. [st-9vl]"""
+    return day_dir(d) / "databento_glbx_es_mbp1.jsonl"
+
+
+def internals_path(d: date | None = None) -> Path:
+    """Per-day NYSE internals minute candles ($TICK/$TRIN/$ADD/$VOLD). [st-3fr]"""
+    return day_dir(d) / "internals.jsonl"
+
+
 def manifest_path(d: date | None = None) -> Path:
     return day_dir(d) / "manifest.json"

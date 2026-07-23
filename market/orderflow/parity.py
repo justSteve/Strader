@@ -35,7 +35,9 @@ from typing import Iterable
 
 import market.orderflow.engine as _engine_mod
 import market.orderflow.recognizer as _recognizer_mod
+from market.entities.book import BookEvent
 from market.entities.trade import Trade
+from market.orderflow.absorption import AbsorptionTracker
 from market.orderflow.bars import build_bars
 from market.orderflow.engine import OrderflowEngine
 from market.orderflow.imbalance import find_stacks
@@ -132,4 +134,23 @@ def parity_run(trades: Iterable[Trade]) -> list[dict]:
             events.append(serialize(lv))
 
     logger.info("parity_run: %d trades -> %d events", len(trades), len(events))
+    return events
+
+
+def absorption_parity_run(book_events: Iterable[BookEvent]) -> list[dict]:
+    """The MBP-1 absorption replay (st-9vl). Runs at PRODUCTION floors — the
+    committed fixture (a 65s slice of the purchased 2026-07-02 MBP-1 day,
+    around the 10:11:28 CT defended-ask read) was chosen to contain a
+    production-scale emission, so no override scaling is needed. Deterministic:
+    same events, same list."""
+    tracker = AbsorptionTracker()
+    events: list[dict] = []
+    n = 0
+    for e in book_events:
+        n += 1
+        for s in tracker.process(e):
+            events.append(serialize(s))
+    for s in tracker.flush():
+        events.append(serialize(s))
+    logger.info("absorption_parity_run: %d book events -> %d reads", n, len(events))
     return events

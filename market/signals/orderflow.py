@@ -4,8 +4,7 @@ Design spec §6 (docs/superpowers/specs/2026-07-03-orderflow-signal-layer-design
 These extend the frozen ``Signal`` hierarchy in ``market/signals/types.py`` —
 data artifacts (FootprintBar) live in ``market/entities``; interpretations
 live here. Arrives bead-by-bead: SweepPrint + DeltaDivergence (st-wnc);
-ImbalanceStack (st-su4), AbsorptionRead + SetupRecognition (st-2kf) follow
-under their own beads.
+ImbalanceStack (st-su4); SetupRecognition (st-2kf); AbsorptionRead (st-9vl).
 """
 from __future__ import annotations
 
@@ -49,6 +48,27 @@ class ImbalanceStack(Signal):
     direction: Literal["buy", "sell"] = "buy"
     prices: tuple[float, ...] = ()   # ascending, one per stacked level
     ratios: tuple[float, ...] = ()   # dominant/opposite per level (opposite floored at 1)
+
+
+@dataclass(frozen=True)
+class AbsorptionRead(Signal):
+    """A passive defender soaked one-sided aggression at a top-of-book level:
+    heavy aggressive volume hit the level while resting size repeatedly
+    refilled and price refused to move (research doc Q4 — force without
+    effect). Scored evidence, never a boolean gate: ``confidence`` carries the
+    score, components stay exposed. Emitted when the level episode ends.
+
+    ``displacement_ticks`` is signed from the defender's perspective: where
+    top-of-book went when the episode closed. For a bid defense, negative =
+    the level finally broke; positive = price lifted away (defense won).
+    ``refill_events`` requires MBP-1 quotes; 0 when running trades-only
+    (degraded, and labeled so in ``reason``)."""
+
+    side: Literal["bid", "ask"] = "bid"
+    price: float = 0.0
+    aggressive_vol: int = 0
+    displacement_ticks: int = 0
+    refill_events: int = 0
 
 
 @dataclass(frozen=True)

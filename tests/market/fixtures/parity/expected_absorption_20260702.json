@@ -1,0 +1,14 @@
+[
+ {
+  "type": "AbsorptionRead",
+  "timestamp": "2026-07-02T10:11:28.885327-05:00",
+  "source": "orderflow.absorption",
+  "confidence": 0.353,
+  "reason": "buyers threw 103 contracts at 7538.25 ask; size refilled 2x over 2.1s \u2014 absorbed, level fell away",
+  "side": "ask",
+  "price": 7538.25,
+  "aggressive_vol": 103,
+  "displacement_ticks": 3,
+  "refill_events": 2
+ }
+]
