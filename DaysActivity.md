@@ -1,35 +1,34 @@
-# DaysActivity - 2026-07-19
+# DaysActivity - 2026-07-21
 
-## 12:55 - Session Handoff [MP Drill Build + COO Profile Memo]
+## 07:01 - Session Handoff [Mancini Parses + 7/20 Deck Freeze]
 
-**Summary**: Built the full Market Profile TPO reading drill (st-3zh) end-to-end — TPO entity/builder with 23 tests, corpus-day generator, self-contained drill template (delegated to a Sonnet-tier agent against a frozen payload schema), first real drill generated from 7/2 tape, corpus day-type scan, and an 8-day archetypal deck. Also routed Steve's capability-profile initiative to COO via A2A memo (st-gsh), confirmed Schwab auth is green post-refresh (/ES rolled to U26), and discarded a stale doc-08 working-tree reversion that would have undone the st-8j8 fix.
+**Summary**: One session spanning Sun 7/20 → Tue 7/21 morning. Traced COO's ingress rebuild via CM (Gmail OAuth consent was in Testing → 7-day token death; published-to-production fix 7/18 is durable — blobs now land unattended), parsed the July 20 and July 21 Mancini plans in-session (st-7h9, st-57c; 69 + 67 levels, all anti-hallucination-validated), pulled Monday's Databento fill (660k ES + 512k OPRA, gate green), read Monday's 51-pt morning drop off the real tape, and froze 7/20 into the drill scenario deck with recognizer-verified refs (st-sfb). Filed st-ze6: the automation ledger — every pipeline link is now pure code except commentary extraction, which is coded but credit-blocked (co-8gp).
 
 **Open Work**:
-- st-3zh (in_progress) — build complete; awaiting Steve's first rep verdict on the 7/2 drill UI before close. Two deck days carry provisional trend labels (2025-09-23 down, 2026-04-23 up) pending Watch-phase confirmation.
-- st-gsh (open) — A2A memo to COO (`docs/a2a/2026-07-19-strader-to-coo-steve-profile.md`) awaiting COO ack; closes on acknowledgment.
-- st-9vl — still awaiting Steve's ~$4 spend yes/no.
-- `.beads/issues.jsonl` export still diverges from live Dolt DB (confirmed again at handoff: JSONL shows neither st-3zh in_progress nor st-gsh) — export sync check needed.
-- `session-review-2026-07-19.md` (untracked, repo root) — Steve's offline review copy of this session; delete or commit at his discretion.
+- Uncommitted, awaiting Steve's nod: `git add docs/drills/ tests/scripts/test_scenario_deck.py runbook/mancini/commentary/2026-07-2*.jsonl && git commit -m "feat(drills): freeze 2026-07-20 into the scenario deck — 7505 FBD marquee + cascade refs [st-sfb, st-7h9, st-57c]"` (also loose: archive/DaysActivity-2026-07-19.md, session-review-2026-07-19.md — Steve's keep/delete call from 7/20 still open)
+- st-ze6 (ready) — Mancini pipeline v2: fetch wiring, plan-day from title, deterministic list extractor, pre-open cron
+- Drill reps: /tmp/desk-orderflow-drill-2026-07-20.html built and waiting (484 bars; Ladder dropdown jumps to the new 7/20 refs)
+- co-8gp (COO) — ANTHROPIC_API_KEY_DIRECT credits: funding it makes the letter chain hands-free end to end
+- July 8 plan still the only blob-coverage gap (needs Steve re-forward, post-mortem completeness only)
+- st-aeg — stray bead from 7/18 titled "task", no description; Steve to identify or close
+- Schwab token expires ~7/24 — refresh due this week
 
-**Discoveries**:
-- Only 24/268 corpus days are full-RTH — historical backfill is 4-bracket (13:00–15:00) tape and cannot produce a Market Profile. Forward collection adds one eligible day per session.
-- Day-type heuristic v1 never fires "trend" (census D:5 P:14 b:5 trend:0) — the range≥2×IB + thin-profile + close-pinned gates rarely co-fire; IBx≥4 days land in P/b instead. Tuning candidate.
-- Time-POC convention decision: Dalton mid-range tie-break, deliberately different from volume-POC's lower-wins (documented in `market/orderflow/tpo.py`).
+**Tried**:
+- `bd create task "title"` → positional "task" becomes the TITLE (st-57c born nameless, retitled; st-aeg is an older casualty of the same trap). Correct form: `bd create --type task --title "..." --description "..."`
+- `python3 -m pytest tests/` (system python) → 7 collection errors (no schwab/databento modules). Full suite needs `.venv/bin/python -m pytest` — 308 pass
+- CM conversations table for COO → stale (stops 2026-05-07); CM `file_changes` runs to the minute and carried the weekend evidence instead
+- Recognizer at 7505/7483/7490 with the parsed plan levels → 12 instances incl. the marquee (flush 159 → confirm 168) matching the tick-level read exactly; also surfaced the @7522 confirmed-trap-overrun at 09:03 — the fast-cut teaching case
 
 **Files Changed**:
-docs/a2a/2026-07-19-strader-to-coo-steve-profile.md
-market/entities/tpo_profile.py
-market/orderflow/tpo.py
-scripts/market_profile_drill.py
-scripts/market_profile_drill_template.html
-scripts/measurement/mp_day_scan.py
-docs/mp-drill-operation.md
-docs/drills/mp-deck.json
-docs/measurement/mp-day-scan-2026-07-19.txt
-tests/test_tpo.py
-tests/scripts/test_mp_drill_payload.py
-tests/scripts/test_mp_deck.py
-runbook/mancini/commentary/2026-07-15.jsonl
-archive/DaysActivity-2026-07-18.md
+docs/drills/scenario-deck.json
+docs/drills/scenario-catalog.md
+tests/scripts/test_scenario_deck.py
+runbook/mancini/commentary/2026-07-20.jsonl
+runbook/mancini/commentary/2026-07-21.jsonl
+runbook/mancini/parsed/2026-07-20.json (gitignored artifact)
+runbook/mancini/parsed/2026-07-21.json (gitignored artifact)
+runbook/mancini/charts/2026-07-20.pine (gitignored artifact)
+runbook/mancini/charts/2026-07-21.pine (gitignored artifact)
+data/corpus/2026-07-20/ (Databento ES + OPRA pulls)
 
 ---
