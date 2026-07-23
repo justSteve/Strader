@@ -137,6 +137,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--manifest", help="explicit manifest.json path for the gate")
     ap.add_argument("--store-root", help="override commentary store root (testing)")
     ap.add_argument("--model", default=None, help="override model id")
+    ap.add_argument("--extraction-json",
+                    help="pre-built tool-input dict (JSON file) — bypasses the "
+                         "live LLM call but NOT validation/persistence. The "
+                         "in-session parse path while ANTHROPIC_API_KEY_DIRECT "
+                         "is credit-blocked (co-8gp, st-ze6 hybrid mode)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
 
@@ -167,6 +172,10 @@ def main(argv: list[str] | None = None) -> int:
     kwargs = {"parsed_at": parsed_at}
     if args.model:
         kwargs["model"] = args.model
+    if args.extraction_json:
+        prebuilt = json.loads(Path(args.extraction_json).read_text(encoding="utf-8"))
+        kwargs["extractor"] = lambda _text: prebuilt
+        kwargs["model"] = f"in-session:{args.model or 'claude-fable-5'}"
     try:
         outcome = parse_mod.parse(raw, **kwargs)
     except Exception as e:  # network, refusal, missing tool block

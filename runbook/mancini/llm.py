@@ -219,7 +219,12 @@ def extract(
     transport = httpx.HTTPTransport(local_address=LOCAL_ADDR_V4)
     with httpx.Client(transport=transport, timeout=timeout_s) as client:
         resp = client.post(API_URL, headers=headers, json=payload)
-    resp.raise_for_status()
+    if resp.status_code >= 400:
+        # surface the API's own error message — a bare status code has already
+        # cost one diagnosis round-trip (2026-07-22)
+        raise RuntimeError(
+            f"Messages API {resp.status_code}: {resp.text[:500]}"
+        )
     return _extract_tool_input(resp.json())
 
 
