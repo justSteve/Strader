@@ -5,8 +5,9 @@ Replay (deterministic, from the internals corpus):
     .venv/bin/python scripts/mi_gauge.py --date 2026-07-22
     .venv/bin/python scripts/mi_gauge.py --date 2026-07-22 --all   # every minute
 
-Live (polls Schwab $TICK minute history every --poll seconds; designed to sit
-in a tmux pane):
+Live (samples the Schwab $TICK QUOTE endpoint — same-day minute-history
+candles clamp negatives to zero, quotes are correct — and aggregates samples
+into synthetic minutes; designed to sit in a tmux pane):
     .venv/bin/python scripts/mi_gauge.py --live
     tmux -L moocity new-window -n gauge \\
         '.venv/bin/python scripts/mi_gauge.py --live'
@@ -19,7 +20,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time as time_mod
-from datetime import date as _date, datetime, timedelta, timezone
+from datetime import date as _date, datetime, time as _time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -66,34 +67,50 @@ def replay(day: _date, show_all: bool) -> int:
 
 
 def live(poll_s: int) -> int:
-    # Live path constructs TickMinute rows from the Schwab minute-history
-    # endpoint — same data the corpus stores, same gauge, live==replay.
+    """Live path samples the QUOTE endpoint, not minute history: same-day
+    minute candles clamp negatives to zero (see internals-tick-seed doc), but
+    quotes return correct signed values. Samples aggregate into synthetic
+    minutes fed to the same gauge.
+
+    Honest caveat, printed at startup: a sampled minute's high/low only sees
+    the prints we happened to catch, so wick extremes are understated versus
+    true minute candles — live climax calls fire slightly late/less often
+    than replay. Sample fast (default 5s ≈ 12/min, well inside rate limits)
+    to shrink the gap."""
     from broker_schwab.client import create_client
     c = create_client()
     g = MIGauge()
-    seen: set[datetime] = set()
-    print("# MI gauge live — polling $TICK minute history "
-          f"every {poll_s}s (Ctrl-C to stop)")
+    cur_min: datetime | None = None
+    hi = lo = last = None
+    print(f"# MI gauge live — sampling $TICK quotes every {poll_s}s; "
+          "synthetic minutes (sampled wicks understate true extremes)")
+    now_ct = datetime.now(tz=CENTRAL)
+    if now_ct.time() > _time(8, 35):
+        print("# NOTE: launched mid-session — the cum-TICK spine measures "
+              "since LAUNCH, not since the 08:30 open (same-day history is "
+              "clamped and cannot backfill it). Start the pane pre-open for "
+              "full-session spine semantics; early cum reads run hot.")
     while True:
-        end = datetime.now(tz=timezone.utc)
-        r = c.get_price_history_every_minute(
-            "$TICK", start_datetime=end - timedelta(hours=8),
-            end_datetime=end, need_extended_hours_data=False,
-        )
-        if r.status_code == 200 and not r.json().get("empty"):
-            for cd in r.json().get("candles", []):
-                ts = datetime.fromtimestamp(
-                    cd["datetime"] / 1000, tz=timezone.utc).astimezone(CENTRAL)
-                if ts in seen:
-                    continue
-                seen.add(ts)
-                read = g.process(TickMinute(
-                    ts=ts, high=int(cd["high"]), low=int(cd["low"]),
-                    close=int(cd["close"])))
+        try:
+            r = c.get_quotes(["$TICK"])
+            q = r.json().get("$TICK", {}).get("quote", {}) if r.status_code == 200 else {}
+            px = q.get("lastPrice")
+        except Exception as e:  # noqa: BLE001 — keep the pane alive
+            print(f"  poll error: {e}", file=sys.stderr)
+            px = None
+        if px is not None:
+            now = datetime.now(tz=CENTRAL)
+            minute = now.replace(second=0, microsecond=0)
+            if cur_min is None:
+                cur_min, hi, lo, last = minute, px, px, px
+            elif minute > cur_min:
+                read = g.process(TickMinute(ts=cur_min, high=int(hi),
+                                            low=int(lo), close=int(last)))
                 if read is not None:
                     print(render(read), flush=True)
-        else:
-            print(f"  poll error HTTP {r.status_code}", file=sys.stderr)
+                cur_min, hi, lo, last = minute, px, px, px
+            else:
+                hi, lo, last = max(hi, px), min(lo, px), px
         time_mod.sleep(poll_s)
 
 
@@ -104,8 +121,8 @@ def main() -> int:
                     help="replay: print every minute, not just non-neutral")
     ap.add_argument("--live", action="store_true",
                     help="poll Schwab live and stream reads")
-    ap.add_argument("--poll", type=int, default=60,
-                    help="live poll interval seconds (default 60)")
+    ap.add_argument("--poll", type=int, default=5,
+                    help="live quote-sample interval seconds (default 5)")
     args = ap.parse_args()
     if args.live:
         return live(args.poll)

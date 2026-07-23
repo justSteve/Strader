@@ -229,6 +229,25 @@ def main(argv: list[str] | None = None) -> int:
         if rc != 0:
             pull_failed = True
 
+    # --- Internals snapshot (not gate-required) [st-3fr] ----------------------
+    # Schwab minute history for $TICK/$TRIN/$ADD/$VOLD is a rolling ~47-day
+    # window; a daily full-range refresh (4 API calls total, no metering)
+    # makes the history permanent AND heals the same-day clamped segments
+    # (negatives floored at 0 until T+1 — see internals-tick-seed doc).
+    # --force on the last 3 days rewrites the healed data over stale copies.
+    # (range-shaped script — no --date, so it bypasses run_pull's injection)
+    if not args.dry_run:
+        cmd = [sys.executable, str(REPO_ROOT / "scripts" / "corpus_pull_internals.py"),
+               "--days", "45", "--force"]
+        logger.info("pull: %s", " ".join(cmd))
+        proc = subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
+        if proc.returncode != 0:
+            logger.warning("internals snapshot failed rc=%s (not gate-blocking):\n%s",
+                           proc.returncode,
+                           ((proc.stdout or "") + (proc.stderr or "")).strip())
+    else:
+        logger.info("[dry-run] would refresh internals snapshot (45d, force)")
+
     # --- Schwab (optional, not gate-required) ---------------------------------
     if args.include_schwab and not args.dry_run:
         rc, out = run_pull(SCHWAB_PULL, day)
