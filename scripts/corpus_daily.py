@@ -248,6 +248,26 @@ def main(argv: list[str] | None = None) -> int:
     else:
         logger.info("[dry-run] would refresh internals snapshot (45d, force)")
 
+    # --- Mancini morning parse (not gate-required) [st-ze6] -------------------
+    # Pre-open chain: fetch newest letter blob -> parse (hybrid deterministic
+    # levels if the interpretive leg is credit-blocked) -> validate -> persist
+    # + brief. Runs its own datastream gate internally. Failure alerts but
+    # never blocks the corpus fill.
+    if not args.dry_run:
+        cmd = [sys.executable, "-m", "runbook.mancini.run", "--from-blob"]
+        logger.info("mancini: %s", " ".join(cmd))
+        proc = subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
+        if proc.returncode != 0:
+            emit_alert(
+                "mancini_parse",
+                f"Morning Mancini parse failed (rc={proc.returncode}) — "
+                "last-good artifacts still stand; run manually or in-session.",
+                {"returncode": proc.returncode,
+                 "tail": ((proc.stdout or "") + (proc.stderr or ""))[-500:]},
+            )
+    else:
+        logger.info("[dry-run] would run Mancini morning parse (--from-blob)")
+
     # --- Schwab (optional, not gate-required) ---------------------------------
     if args.include_schwab and not args.dry_run:
         rc, out = run_pull(SCHWAB_PULL, day)

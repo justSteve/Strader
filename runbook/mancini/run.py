@@ -28,8 +28,10 @@ from datetime import date as date_cls, datetime, timezone
 from pathlib import Path
 
 from . import clean
+from . import listlevels
 from . import parse as parse_mod
 from . import store as store_mod
+from . import validate as validate_mod
 from .schema import ParseResult
 
 logger = logging.getLogger("runbook.mancini")
@@ -132,6 +134,9 @@ def _render_brief(result: ParseResult) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Mancini Runbook pilot")
     ap.add_argument("--file", help="newsletter text file (default: stdin)")
+    ap.add_argument("--from-blob", action="store_true",
+                    help="fetch the newest letter from the email-ingress blob "
+                         "container instead of --file/stdin [st-ze6]")
     ap.add_argument("--date", help="trading day YYYY-MM-DD (default: today US/Central)")
     ap.add_argument("--no-gate", action="store_true", help="skip the datastream gate")
     ap.add_argument("--manifest", help="explicit manifest.json path for the gate")
@@ -150,10 +155,7 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    day = _resolve_day(args.date)          # parse plan-day (the letter's session)
     gate_day = _resolve_gate_day()         # gate data-day (last completed session)
-    logger.info("Mancini Runbook run — parse plan-day %s, gate data-day %s",
-                day, gate_day.isoformat())
 
     # 1. Datastream gate — checks the last completed session, decoupled from the
     #    plan-day because Databento is T+1 (the plan-day has no data yet). [co-i10h]
@@ -162,10 +164,41 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 2
 
-    raw = _read_newsletter(args.file)
+    if args.from_blob:
+        from . import fetch as fetch_mod
+        try:
+            blob_name, blob_raw = fetch_mod.fetch_latest()
+        except RuntimeError as e:
+            logger.error("blob fetch failed: %s", e)
+            print(f"FAILED: blob fetch ({e}). Keeping last-good.", file=sys.stderr)
+            return 2
+        logger.info("letter source: blob %s", blob_name)
+        raw = clean.clean_newsletter(blob_raw)
+    else:
+        raw = _read_newsletter(args.file)
     if not raw.strip():
         logger.error("empty newsletter input")
         return 2
+
+    # Plan-day: explicit --date wins; else the letter's own title ("July 23
+    # Plan") is authoritative; today is the last resort. [st-ze6]
+    if args.date:
+        day = _resolve_day(args.date)
+    else:
+        title_day = listlevels.resolve_plan_day(raw, _resolve_gate_day())
+        day = title_day.isoformat() if title_day else _resolve_day(None)
+        logger.info("plan-day from %s: %s",
+                    "letter title" if title_day else "fallback (today)", day)
+    logger.info("Mancini Runbook run — parse plan-day %s, gate data-day %s",
+                day, gate_day.isoformat())
+
+    # Deterministic list extraction runs on EVERY pass — cross-check when the
+    # interpretive leg runs, sole level source in hybrid mode. [st-ze6]
+    det_levels = listlevels.extract_list_levels(raw)
+    logger.info("deterministic lists: %d levels (%d supports, %d resistances)",
+                len(det_levels),
+                sum(1 for l in det_levels if l.kind == "support"),
+                sum(1 for l in det_levels if l.kind == "resistance"))
 
     # 2 + validate. Live LLM call.
     parsed_at = datetime.now(timezone.utc).isoformat()
@@ -176,12 +209,44 @@ def main(argv: list[str] | None = None) -> int:
         prebuilt = json.loads(Path(args.extraction_json).read_text(encoding="utf-8"))
         kwargs["extractor"] = lambda _text: prebuilt
         kwargs["model"] = f"in-session:{args.model or 'claude-fable-5'}"
+    hybrid = False
     try:
         outcome = parse_mod.parse(raw, **kwargs)
     except Exception as e:  # network, refusal, missing tool block
         logger.exception("extraction failed: %s", e)
-        print(f"FAILED: extraction error ({e}). Keeping last-good.", file=sys.stderr)
-        return 3
+        if args.extraction_json or not det_levels:
+            print(f"FAILED: extraction error ({e}). Keeping last-good.", file=sys.stderr)
+            return 3
+        # Hybrid mode [st-ze6]: interpretive leg unavailable (credit block
+        # co-8gp / network) — publish the deterministic list levels alone,
+        # commentary flagged pending. Still validated, still gated.
+        # Never clobber a richer parse already published for this plan-day
+        # (e.g. cron firing after an in-session parse).
+        existing = PARSED_ROOT / f"{day}.json"
+        if existing.exists():
+            try:
+                prev_model = json.loads(existing.read_text(encoding="utf-8")).get("model", "")
+            except (OSError, ValueError):
+                prev_model = ""
+            if prev_model and prev_model != "deterministic-lists":
+                logger.info("hybrid skip: %s already parsed by %r — keeping it",
+                            day, prev_model)
+                print(f"OK (no-op): {day} already has a richer parse ({prev_model}).")
+                return 0
+        hybrid = True
+        logger.warning("HYBRID MODE: publishing %d deterministic list levels; "
+                       "commentary pending (interpretive leg unavailable)",
+                       len(det_levels))
+        result = ParseResult(
+            date=day, instrument="ES",
+            session_bias="(commentary pending — interpretive leg unavailable; "
+                         "deterministic list levels only)",
+            levels=det_levels, commentary=[],
+            raw_excerpt=raw[:2000], model="deterministic-lists",
+            parsed_at=parsed_at,
+        )
+        outcome = parse_mod.ParseOutcome(
+            result=result, validation=validate_mod.check(raw, result))
 
     if not outcome.ok:
         logger.error("validation FAILED — not publishing. errors: %s",
@@ -194,6 +259,19 @@ def main(argv: list[str] | None = None) -> int:
     result = outcome.result
     if not result.date:
         result.date = day
+
+    # Count-parity cross-check [st-ze6]: when the interpretive leg ran, every
+    # deterministically-listed level must appear in its output — a missing one
+    # is an omission (the quiet failure mode validation can't otherwise see).
+    if not hybrid and det_levels:
+        missing = listlevels.parity_check(
+            det_levels, {lv.price for lv in result.levels})
+        if missing:
+            miss_str = ", ".join(f"{lv.price:.0f} ({lv.kind})" for lv in missing)
+            logger.error("list-parity FAILED — interpretive parse omitted: %s", miss_str)
+            print(f"FAILED: interpretive parse omitted {len(missing)} listed "
+                  f"level(s): {miss_str}. Keeping last-good.", file=sys.stderr)
+            return 4
 
     # 3. Persist: commentary store + last-good full result.
     store_path = store_mod.append(
