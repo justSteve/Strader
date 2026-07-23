@@ -138,14 +138,50 @@ def test_validation_failure_keeps_last_good(tmp_path, monkeypatch):
     assert not (tmp_path / "parsed").exists()
 
 
-def test_extraction_error_is_graceful(tmp_path, monkeypatch):
+def _raise(*a, **k):
+    raise RuntimeError("ANTHROPIC_API_KEY_DIRECT not set")
+
+
+def test_extraction_error_without_lists_is_graceful(tmp_path, monkeypatch):
+    # No Supports/Resistances list sentences -> hybrid impossible -> rc 3.
     nl = tmp_path / "nl.txt"
-    nl.write_text(SOURCE)
-
-    def _raise(*a, **k):
-        raise RuntimeError("ANTHROPIC_API_KEY_DIRECT not set")
-
+    nl.write_text("ES Trade Plan. Holding above the pivot targets more.\n")
     monkeypatch.setattr(parse_mod, "parse", _raise)
+    monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
     rc = run_mod.main(["--file", str(nl), "--no-gate",
                        "--store-root", str(tmp_path / "c")])
     assert rc == 3
+
+
+def test_extraction_error_with_lists_publishes_hybrid(tmp_path, monkeypatch, capsys):
+    # Interpretive leg down + lists present -> deterministic levels publish,
+    # commentary flagged pending. [st-ze6 hybrid mode]
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
+    monkeypatch.setattr(parse_mod, "parse", _raise)
+    monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
+    monkeypatch.setattr(run_mod, "CHARTS_ROOT", tmp_path / "charts")
+    rc = run_mod.main(["--file", str(nl), "--no-gate", "--date", "2026-06-29",
+                       "--store-root", str(tmp_path / "c")])
+    assert rc == 0
+    saved = json.loads((tmp_path / "parsed" / "2026-06-29.json").read_text())
+    assert saved["model"] == "deterministic-lists"
+    assert [lv["price"] for lv in saved["levels"]] == [5800.0]
+    assert saved["commentary"] == []
+    assert "pending" in saved["session_bias"]
+
+
+def test_hybrid_never_clobbers_richer_parse(tmp_path, monkeypatch):
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
+    parsed_root = tmp_path / "parsed"
+    parsed_root.mkdir()
+    richer = {"model": "in-session:claude-fable-5", "levels": [1, 2, 3]}
+    (parsed_root / "2026-06-29.json").write_text(json.dumps(richer))
+    monkeypatch.setattr(parse_mod, "parse", _raise)
+    monkeypatch.setattr(run_mod, "PARSED_ROOT", parsed_root)
+    rc = run_mod.main(["--file", str(nl), "--no-gate", "--date", "2026-06-29",
+                       "--store-root", str(tmp_path / "c")])
+    assert rc == 0
+    # untouched
+    assert json.loads((parsed_root / "2026-06-29.json").read_text()) == richer
