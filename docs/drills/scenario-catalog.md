@@ -46,6 +46,13 @@ These are the units of the trading decision. Units 2–5 of the curriculum drill
   - **Marquee:** @7511, flush bar 389 → stall 390 → flip 399 → confirm 413.
   - @7492, flush 471 → flip 476 → stall 482 → confirm 502.
   - @7506, flush 558 → stall 559 → flip 566 → confirm 594.
+- **Reference [verified], 2026-07-20:**
+  - **Marquee:** @7505, flush 159 (09:56 CT) → stall 160 → flip+confirm 168 (10:02) —
+    the mapped FBD off the 51-pt morning drop; the letter said *don't bid direct, FBD
+    actionable*, and the tape delivered it to spec (shallow flush to 7500.75, delta
+    exhaustion on the final push, +23 pts to the 7534-39 shelf after confirm).
+  - @7483, flush 398 (14:14) → flip 400 → stall 402 → confirm 408 — late-day range-support defense.
+  - @7483, flush 461 → stall 463 → flip 464 → confirm 467 — all four stages in 31 seconds at 14:59.
 
 ### S3 · Level reclaim (the gentle sibling)
 
@@ -59,6 +66,9 @@ These are the units of the trading decision. Units 2–5 of the curriculum drill
 - **Call:** Accept the reclaim on confirm; slightly lower conviction than a true trap.
 - **Reference [verified], 2026-07-02:** @7511, bars 605→609 (the 14:50 late-recovery
   reclaim); @7506, bars 554→556 (the 13:59 reclaim).
+- **Reference [verified], 2026-07-20:** @7505, bars 173→176 (the 10:06 follow-on reclaim
+  right after the marquee FBD confirmed); @7490, bars 426→430 (the 14:36 reclaim in the
+  late-day defense).
 
 ### S4 · Clean break (continuation — the anti-trap)
 
@@ -72,6 +82,8 @@ These are the units of the trading decision. Units 2–5 of the curriculum drill
 - **Reference [verified], 2026-07-02 (the morning cascade — recognizer engaged, then
   correctly invalidated as support after support gave way):** @7541 bars 239–246;
   @7541 bars 266–276; @7541 bars 321–333.
+- **Reference [verified], 2026-07-20:** @7534 bars 53–72 — engaged at the 7534-39 shelf
+  at 08:52, flip fired but support gave way; the 33-pt opening leg of the 51-pt drop.
 
 ### S5 · Sprung trap fails (stall without retake)
 
@@ -86,6 +98,10 @@ These are the units of the trading decision. Units 2–5 of the curriculum drill
 - **Reference [verified], 2026-07-02:** @7506 bars 422–434 (flush+flip+stall, no
   reclaim); @7511 bars 535–563 (stall+flip, no retake — resolved only later as the
   separate S3 at bar 605).
+- **Reference [verified], 2026-07-20:** @7505 bars 354–369 (13:31 — 7505 lost for good
+  on the afternoon leg); @7490 bars 369–409 (13:44 — cascade continues to 7483);
+  @7522 bars 85–114 (reclaim overrun mid-cascade at 09:05 — its own FBD at bars 71–81
+  HAD confirmed at 09:03; confirm is not immunity, this is the fast-cut case).
 
 ### S6 · Chop straddle
 
@@ -130,7 +146,8 @@ looking at it.
 - **T2 Dead tape** — long bars, dim columns (the market resting; 10:00–13:00 CT default).
 - **T3 Burst** — a cluster of seconds-long bars (an event on the tape; often stage 1
   of an S2 somewhere).
-- **Reference [verified]:** T3 — 2026-07-02 early-afternoon flush sequence into bar 389+.
+- **Reference [verified]:** T3 — 2026-07-02 early-afternoon flush sequence into bar 389+;
+  T3 — 2026-07-20 bars 461–467, six bars in 31 seconds at 14:59 (the final 7483 defense).
 
 ---
 

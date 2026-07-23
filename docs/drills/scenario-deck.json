@@ -10,7 +10,8 @@
       "tell": "Time is an output, not an input: same contracts per bar, wildly different clock. T3 bursts are often stage 1 of an S2 somewhere.",
       "call": "No call — this unit calibrates urgency perception.",
       "refs": [
-        {"date": "2026-07-02", "level": null, "start": 389, "end": 413, "label": "T3 burst — the early-afternoon flush sequence into bar 389+"}
+        {"date": "2026-07-02", "level": null, "start": 389, "end": 413, "label": "T3 burst — the early-afternoon flush sequence into bar 389+"},
+        {"date": "2026-07-20", "level": null, "start": 461, "end": 467, "label": "T3 burst — six bars in 31 seconds at 14:59, the final 7483 defense"}
       ]
     },
     {
@@ -34,7 +35,10 @@
       "refs": [
         {"date": "2026-07-02", "level": 7511, "start": 389, "end": 413, "label": "marquee · flush 389 → stall 390 → flip 399 → confirm 413"},
         {"date": "2026-07-02", "level": 7492, "start": 471, "end": 502, "label": "flush 471 → flip 476 → stall 482 → confirm 502"},
-        {"date": "2026-07-02", "level": 7506, "start": 558, "end": 594, "label": "flush 558 → stall 559 → flip 566 → confirm 594"}
+        {"date": "2026-07-02", "level": 7506, "start": 558, "end": 594, "label": "flush 558 → stall 559 → flip 566 → confirm 594"},
+        {"date": "2026-07-20", "level": 7505, "start": 159, "end": 168, "label": "marquee · the mapped 7505 FBD off the 51-pt morning drop — flush 159 (09:56) → stall 160 → flip+confirm 168 (10:02); letter said don't bid direct, FBD actionable"},
+        {"date": "2026-07-20", "level": 7483, "start": 398, "end": 408, "label": "late-day range-support defense · flush 398 (14:14) → flip 400 → stall 402 → confirm 408"},
+        {"date": "2026-07-20", "level": 7483, "start": 461, "end": 467, "label": "the 31-second burst FBD at 14:59 — all four stages inside the T3 tempo ref"}
       ]
     },
     {
@@ -47,7 +51,8 @@
       "refs": [
         {"date": "2026-07-02", "level": 7541, "start": 239, "end": 246, "label": "morning cascade 1/3 — engaged, then correctly invalidated as support gave way"},
         {"date": "2026-07-02", "level": 7541, "start": 266, "end": 276, "label": "morning cascade 2/3"},
-        {"date": "2026-07-02", "level": 7541, "start": 321, "end": 333, "label": "morning cascade 3/3"}
+        {"date": "2026-07-02", "level": 7541, "start": 321, "end": 333, "label": "morning cascade 3/3"},
+        {"date": "2026-07-20", "level": 7534, "start": 53, "end": 72, "label": "morning cascade — engaged at the 7534-39 shelf (08:52), flip fired but support gave way; the 33-pt opening leg"}
       ]
     },
     {
@@ -59,7 +64,10 @@
       "call": "No trade. If positioned early (against doctrine), the fast cut.",
       "refs": [
         {"date": "2026-07-02", "level": 7506, "start": 422, "end": 434, "label": "flush + flip + stall, no reclaim"},
-        {"date": "2026-07-02", "level": 7511, "start": 535, "end": 563, "label": "stall + flip, no retake — resolves only later as the separate S3 at bar 605"}
+        {"date": "2026-07-02", "level": 7511, "start": 535, "end": 563, "label": "stall + flip, no retake — resolves only later as the separate S3 at bar 605"},
+        {"date": "2026-07-20", "level": 7505, "start": 354, "end": 369, "label": "13:31 flush + flip + stall, no reclaim — 7505 lost for good on the afternoon leg"},
+        {"date": "2026-07-20", "level": 7490, "start": 369, "end": 409, "label": "13:44 flush + stall + flip, no reclaim — the cascade continues to 7483"},
+        {"date": "2026-07-20", "level": 7522, "start": 85, "end": 114, "label": "reclaim attempt overrun mid-cascade (its FBD at 71-81 HAD confirmed at 09:03) — the fast-cut case: confirm is not immunity"}
       ]
     },
     {
@@ -71,7 +79,9 @@
       "call": "Accept the reclaim on confirm; slightly lower conviction than a true trap.",
       "refs": [
         {"date": "2026-07-02", "level": 7511, "start": 605, "end": 609, "label": "the 14:50 late-recovery reclaim"},
-        {"date": "2026-07-02", "level": 7506, "start": 554, "end": 556, "label": "the 13:59 reclaim"}
+        {"date": "2026-07-02", "level": 7506, "start": 554, "end": 556, "label": "the 13:59 reclaim"},
+        {"date": "2026-07-20", "level": 7505, "start": 173, "end": 176, "label": "the 10:06 follow-on reclaim right after the marquee FBD confirmed"},
+        {"date": "2026-07-20", "level": 7490, "start": 426, "end": 430, "label": "the 14:36 reclaim during the late-day 7483/7490 defense"}
       ]
     },
     {
