@@ -38,6 +38,8 @@ def main():
     ap.add_argument("--days", type=int, default=1,
                     help="how far back to request (default 1)")
     ap.add_argument("--json", action="store_true", help="dump raw response")
+    ap.add_argument("--out", metavar="PATH",
+                    help="append each symbol's full response JSON to PATH (one line per symbol)")
     args = ap.parse_args()
 
     c = create_client()
@@ -68,6 +70,12 @@ def main():
                   f"l={c_['low']} c={c_['close']} v={c_['volume']}")
         if args.json:
             print(json.dumps(data, indent=2)[:2000])
+        if args.out:
+            out = Path(args.out)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            with out.open("a") as fh:
+                fh.write(json.dumps(data) + "\n")
+            print(f"  wrote full response -> {out}")
 
 
 if __name__ == "__main__":
