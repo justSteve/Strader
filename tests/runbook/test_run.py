@@ -15,6 +15,15 @@ from runbook.mancini.validate import ValidationResult
 SOURCE = "ES Trade Plan. Supports are: 5800. Holding 5800 targets 5840.\n"
 
 
+@pytest.fixture(autouse=True)
+def _isolate_desk(tmp_path_factory, monkeypatch):
+    """Keep every test off the real steves-desk publication paths. [st-eo0]"""
+    root = tmp_path_factory.mktemp("desk")
+    monkeypatch.setattr(run_mod, "DESK_REPORTS", root / "reports" / "mancini")
+    monkeypatch.setattr(run_mod, "DESK_REFRESH", root / "absent-refresh.sh")
+    return root
+
+
 def _good_outcome() -> parse_mod.ParseOutcome:
     result = ParseResult(
         date="2026-06-29", instrument="ES", session_bias="bullish above 5800",
@@ -185,3 +194,49 @@ def test_hybrid_never_clobbers_richer_parse(tmp_path, monkeypatch):
     assert rc == 0
     # untouched
     assert json.loads((parsed_root / "2026-06-29.json").read_text()) == richer
+
+
+def test_desk_plan_renders_bias_notes_and_bolded_majors():
+    result = ParseResult(
+        date="2026-07-24", instrument="ES", session_bias="bears control below 7474",
+        levels=[Level(price=7474, kind="resistance", label="major"),
+                Level(price=7459, kind="resistance"),
+                Level(price=7412, kind="support", label="major")],
+        commentary=[Commentary(
+            text="Flush and recovery of 7412 is actionable.",
+            trigger=Trigger(type="price_zone", anchor_prices=[7412]))],
+        model="in-session:test", parsed_at="2026-07-24T12:00:00+00:00")
+    doc = run_mod._render_desk_plan(result)
+    assert "# Mancini — ES — 2026-07-24 (Friday) plan" in doc
+    assert "bears control below 7474" in doc
+    assert "Flush and recovery of 7412 is actionable." in doc
+    assert "**7474** · 7459" in doc      # major bolded, minor not
+    assert "**7412**" in doc
+
+
+def test_desk_doc_written_on_publish(tmp_path, monkeypatch, _isolate_desk):
+    # Hybrid publish path also lands the desk doc; missing refresh script is
+    # non-fatal (logged, doc still written).
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
+    monkeypatch.setattr(parse_mod, "parse", _raise)
+    monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
+    monkeypatch.setattr(run_mod, "CHARTS_ROOT", tmp_path / "charts")
+    rc = run_mod.main(["--file", str(nl), "--no-gate", "--date", "2026-06-29",
+                       "--store-root", str(tmp_path / "c")])
+    assert rc == 0
+    doc = run_mod.DESK_REPORTS / "mancini-es-2026-06-29.md"
+    assert doc.exists()
+    assert "commentary pending" in doc.read_text()
+
+
+def test_no_desk_flag_suppresses_publication(tmp_path, monkeypatch, _isolate_desk):
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
+    monkeypatch.setattr(parse_mod, "parse", lambda raw, **kw: _good_outcome())
+    monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
+    monkeypatch.setattr(run_mod, "CHARTS_ROOT", tmp_path / "charts")
+    rc = run_mod.main(["--file", str(nl), "--no-gate", "--date", "2026-06-29",
+                       "--store-root", str(tmp_path / "c"), "--no-desk"])
+    assert rc == 0
+    assert not (run_mod.DESK_REPORTS / "mancini-es-2026-06-29.md").exists()

@@ -40,6 +40,12 @@ logger = logging.getLogger("runbook.mancini")
 PARSED_ROOT = Path(__file__).resolve().parent / "parsed"
 # Generated daily Pine overlay (#3 deterministic chart).
 CHARTS_ROOT = Path(__file__).resolve().parent / "charts"
+# steves-desk Trading window publication [st-eo0]: the plan-day doc lands in
+# COO's mancini reports dir, and COO's refresh script copies the newest one to
+# the stable Trading-window address (myDesk/trading/mancini-latest-es-plan.md).
+# Cross-repo write sanctioned by the shared-executable-space convention.
+DESK_REPORTS = Path("/root/projects/COO/myDesk/reports/mancini")
+DESK_REFRESH = Path("/root/projects/COO/myDesk/trading/trading-desk-refresh.sh")
 
 
 def _read_newsletter(file_arg: str | None) -> str:
@@ -131,6 +137,88 @@ def _render_brief(result: ParseResult) -> str:
     return "\n".join(lines)
 
 
+def _render_desk_plan(result: ParseResult) -> str:
+    """The prose plan-day doc for the steves-desk Trading window. [st-eo0]
+
+    Same content contract as the hand-written myDesk/reports/mancini docs:
+    bias, actionable forward notes, then the two ladders with majors bolded.
+    Renders whatever the ParseResult holds — a hybrid (deterministic-lists)
+    parse yields ladders with commentary marked pending."""
+    try:
+        weekday = datetime.strptime(result.date, "%Y-%m-%d").strftime("%A")
+    except (ValueError, TypeError):
+        weekday = "?"
+    lines = [
+        f"# Mancini — {result.instrument or 'ES'} — {result.date} ({weekday}) plan",
+        "",
+        f"> {len(result.levels)} levels · {len(result.commentary)} forward notes · "
+        f"model `{result.model}` · parsed {result.parsed_at[:16]}Z · "
+        "prices verbatim from the letter.",
+        "",
+        "## Bias",
+        "",
+        result.session_bias or "(none)",
+        "",
+        "## Actionable — forward-looking notes",
+        "",
+    ]
+    for c in result.commentary:
+        anchors = ", ".join(str(p) for p in c.trigger.anchor_prices)
+        suffix = f"  _[{c.trigger.type}: {anchors}]_" if anchors else f"  _[{c.trigger.type}]_"
+        lines.append(f"- {c.text}{suffix}")
+    if not result.commentary:
+        lines.append("_(commentary pending — interpretive leg unavailable; "
+                     "ladders below are the deterministic list levels)_")
+    for kind, title in (("resistance", "Resistance ladder (high→low)"),
+                        ("support", "Support ladder (high→low)")):
+        lvls = sorted((l for l in result.levels if l.kind == kind),
+                      key=lambda l: l.price, reverse=True)
+        if not lvls:
+            continue
+        lines += ["", f"## {title}  ·  **bold = major**", ""]
+        lines.append(" · ".join(
+            f"**{l.price:g}**" if "major" in l.label.lower() else f"{l.price:g}"
+            for l in lvls))
+    extras = [l for l in result.levels if l.kind not in ("resistance", "support")]
+    if extras:
+        lines += ["", "## Other named levels", ""]
+        for l in sorted(extras, key=lambda l: l.price, reverse=True):
+            label = f" — {l.label}" if l.label else ""
+            lines.append(f"- {l.price:g} ({l.kind}){label}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _emit_desk_plan(result: ParseResult) -> Path | None:
+    """Write the plan-day doc and refresh the Trading window's stable title.
+
+    Non-fatal by contract (mirrors the chart emit): the parse artifacts are the
+    critical output; a desk failure logs and moves on."""
+    import subprocess
+
+    desk_root = DESK_REPORTS.parent.parent  # COO/myDesk — absent => no desk here
+    if not desk_root.exists():
+        logger.warning("desk publish skipped: %s not present", desk_root)
+        return None
+    DESK_REPORTS.mkdir(parents=True, exist_ok=True)
+    doc = DESK_REPORTS / f"mancini-es-{result.date}.md"
+    doc.write_text(_render_desk_plan(result), encoding="utf-8")
+    logger.info("desk plan doc: %s", doc)
+    if DESK_REFRESH.exists():
+        proc = subprocess.run(["bash", str(DESK_REFRESH)],
+                              capture_output=True, text=True)
+        if proc.returncode != 0:
+            logger.warning("trading-desk-refresh failed (rc=%d): %s",
+                           proc.returncode, proc.stderr.strip()[:300])
+        else:
+            logger.info("Trading window refreshed — stable title "
+                        "mancini-latest-es-plan.md now serves %s", doc.name)
+    else:
+        logger.warning("refresh script missing (%s) — doc written but the "
+                       "stable title was not updated", DESK_REFRESH)
+    return doc
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Mancini Runbook pilot")
     ap.add_argument("--show", metavar="YYYY-MM-DD", nargs="?", const="today",
@@ -150,6 +238,9 @@ def main(argv: list[str] | None = None) -> int:
                          "live LLM call but NOT validation/persistence. The "
                          "in-session parse path while ANTHROPIC_API_KEY_DIRECT "
                          "is credit-blocked (co-8gp, st-ze6 hybrid mode)")
+    ap.add_argument("--no-desk", action="store_true",
+                    help="skip publishing the plan doc to the steves-desk "
+                         "Trading window")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
 
@@ -166,6 +257,8 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         result = ParseResult.from_dict(json.loads(path.read_text(encoding="utf-8")))
         print(_render_brief(result))
+        if not args.no_desk:
+            _emit_desk_plan(result)
         return 0
 
     gate_day = _resolve_gate_day()         # gate data-day (last completed session)
@@ -315,10 +408,22 @@ def main(argv: list[str] | None = None) -> int:
         logger.warning("chart emit failed (non-fatal): %s", e)
         chart_path = None
 
+    # 3c. steves-desk Trading window: plan-day doc under the stable title
+    # mancini-latest-es-plan.md. Non-fatal, same contract as the chart. [st-eo0]
+    desk_path = None
+    if not args.no_desk:
+        try:
+            desk_path = _emit_desk_plan(result)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("desk publish failed (non-fatal): %s", e)
+
     # 4. Brief (mini #9).
     brief = _render_brief(result)
     if chart_path is not None:
         brief += f"\nchart: {chart_path}  (apply via tradingview-mcp pine_set_source)"
+    if desk_path is not None:
+        brief += ("\ndesk: Trading window title mancini-latest-es-plan.md "
+                  f"<- {desk_path.name}")
     print(brief)
     return 0
 
