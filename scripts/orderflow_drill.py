@@ -34,14 +34,13 @@ from market.orderflow.bars import build_bars          # noqa: E402
 from market.orderflow.replay import read_corpus_day   # noqa: E402
 from market.orderflow.recognizer import Anchor, SetupRecognizer  # noqa: E402
 from market.orderflow.anatomy import anatomy_payload, build_instances  # noqa: E402
+from market.orderflow.anchors import day_anchors, mancini_levels_for  # noqa: E402
 from market.signals.orderflow_config import TICK, VOLUME_BAR_N  # noqa: E402
 
 logger = logging.getLogger("orderflow_drill")
 
 TEMPLATE = Path(__file__).parent / "orderflow_drill_template.html"
-LABELS = Path(__file__).resolve().parent.parent / "docs/measurement/mancini-setup-labels-2026-07-06.json"
 DECK = Path(__file__).resolve().parent.parent / "docs/drills/scenario-deck.json"
-FAMILY = {"failed_breakdown", "level_reclaim"}
 
 
 def scenario_deck_for(day: _date, bar_n: int) -> list[dict]:
@@ -76,43 +75,13 @@ def scenario_deck_for(day: _date, bar_n: int) -> list[dict]:
     return out
 
 
-def mancini_levels_for(day: _date) -> list[float]:
-    """The day's Mancini support/resistance levels from the labeled corpus —
-    the same anchor source score_recognizer.py validated against. Empty for
-    unlabeled days (anatomy then falls back to session range edges)."""
-    if not LABELS.exists():
-        return []
-    try:
-        entries = json.loads(LABELS.read_text())
-    except (OSError, json.JSONDecodeError) as e:
-        logger.warning("could not read Mancini labels (%s); anatomy uses range edges only", e)
-        return []
-    lv = {round(float(x), 2)
-          for e in entries
-          if e.get("session_date") == day.isoformat() and e.get("setup") in FAMILY
-          for x in e.get("es_levels", []) if 5000 < float(x) < 9000}
-    return sorted(lv)
-
-
 def build_anatomy(bars: list, suggested: dict, mancini_levels: list[float]) -> list[dict]:
     """Run the validated recognizer over the day and fold its emissions into
-    four-beat walkthrough instances (st-yfn anatomy mode). Anchors: the day's
-    Mancini levels (validated `support` source) plus session range edges so
-    unlabeled days still surface `range_trap` walkthroughs."""
-    anchors: list[Anchor] = []
-    seen: set[tuple[float, str]] = set()
-
-    def add(price: float, kind: str, label: str, mancini: bool = False) -> None:
-        key = (round(price, 2), kind)
-        if key in seen:
-            return
-        seen.add(key)
-        anchors.append(Anchor(price, kind, label, mancini=mancini))
-
-    for lv in mancini_levels:
-        add(lv, "support", f"mancini {lv:g}", mancini=True)
-    add(suggested["session_high"], "range_high", "day high")
-    add(suggested["session_low"], "range_low", "day low")
+    four-stage walkthrough instances (st-yfn anatomy mode). Anchors come from
+    market.orderflow.anchors.day_anchors — the same rule the replay recorder
+    uses (st-055), so drill anatomy and the measured record cannot diverge."""
+    anchors = day_anchors(mancini_levels,
+                          suggested["session_high"], suggested["session_low"])
     if not anchors:
         return []
     recs = SetupRecognizer(anchors, mancini_prices=mancini_levels).run(bars)
