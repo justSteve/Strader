@@ -78,6 +78,24 @@ STREAM_WINDOWS = {
     "databento_glbx_es": ("08:30", "15:00"),
     "databento_opra": ("13:00", "15:00"),
 }
+# Pre-approved MBP-1 sessions (st-ve6): Steve approved daily T+1 MBP-1 pulls
+# for exactly these dates (replay-drill fidelity incl. absorption, st-055).
+# Bounded by design — a day outside this set is never pulled and no spend
+# occurs. Extend ONLY with explicit Steve approval; ~$1/day metered, ~4GB/day.
+# Not gate-required: a failed MBP-1 pull warns but never fails the datastream gate.
+MBP1_STREAM = "databento_glbx_es_mbp1"
+MBP1_SCRIPT = "corpus_pull_databento_es_mbp1.py"
+MBP1_APPROVED_DAYS = frozenset({
+    _date(2026, 7, 27), _date(2026, 7, 28), _date(2026, 7, 29),
+    _date(2026, 7, 30), _date(2026, 7, 31),
+})
+
+
+def mbp1_approved(day: _date) -> bool:
+    """True only for sessions Steve explicitly pre-approved for MBP-1 spend."""
+    return day in MBP1_APPROVED_DAYS
+
+
 SCHWAB_PULL = "corpus_pull_schwab.py"
 # Proactive Schwab token-age heartbeat (st-e2f). Runs every day regardless of
 # --include-schwab: the whole point is to warn BEFORE the 7-day refresh wall even
@@ -228,6 +246,22 @@ def main(argv: list[str] | None = None) -> int:
         rc, _ = run_pull(script, day, window)
         if rc != 0:
             pull_failed = True
+
+    # --- MBP-1 (pre-approved sessions only, not gate-required) [st-ve6] -------
+    if mbp1_approved(day):
+        if not args.force and stream_healthy_in_manifest(day, MBP1_STREAM):
+            logger.info("skip %s: already healthy in manifest for %s", MBP1_STREAM, day)
+        elif args.dry_run:
+            logger.info("[dry-run] would pull %s (pre-approved session %s)",
+                        MBP1_STREAM, day)
+        else:
+            rc, _ = run_pull(MBP1_SCRIPT, day,
+                             ["--start-ct", "08:30", "--end-ct", "15:00"])
+            if rc != 0:
+                logger.warning("MBP-1 pull failed rc=%s (pre-approved day %s; "
+                               "not gate-blocking — re-run manually: "
+                               ".venv/bin/python scripts/%s --date %s)",
+                               rc, day, MBP1_SCRIPT, day.isoformat())
 
     # --- Internals snapshot (not gate-required) [st-3fr] ----------------------
     # Schwab minute history for $TICK/$TRIN/$ADD/$VOLD is a rolling ~47-day
