@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from market.orderflow.bars import build_bars          # noqa: E402
 from market.orderflow.replay import read_corpus_day   # noqa: E402
-from market.orderflow.recognizer import Anchor, SetupRecognizer  # noqa: E402
+from market.orderflow.recognizer import SetupRecognizer  # noqa: E402
 from market.orderflow.anatomy import anatomy_payload, build_instances  # noqa: E402
 from market.orderflow.anchors import day_anchors, mancini_levels_for  # noqa: E402
 from market.signals.orderflow_config import TICK, VOLUME_BAR_N  # noqa: E402
