@@ -12,6 +12,9 @@ into synthetic minutes; designed to sit in a tmux pane):
     tmux -L moocity new-window -n gauge \\
         '.venv/bin/python scripts/mi_gauge.py --live'
 
+Live exits at 15:15 CT and on a day rollover (--session-end HH:MM | none) —
+it is a session daemon, not a service.
+
 Replay default prints only non-neutral reads plus every band transition —
 the pattern-learning view. --all prints every minute.
 """
@@ -19,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time as time_mod
 from datetime import date as _date, datetime, time as _time
@@ -32,6 +36,15 @@ from market.internals.gauge import MIGauge, TickMinute   # noqa: E402
 
 CENTRAL = ZoneInfo("America/Chicago")
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# Live gauge stops here (CT). 15:15 = cash close 15:00 plus a settle-print tail;
+# past it the tape is closed and every further "minute" is a flat repeat of the
+# last print. Before st-5n8 the loop had NO stop condition at all: the 7/24
+# launch ran 26h, wrote 1269 dead rows past the close, and spilled Saturday's
+# rows into Friday's capture file. Overridable per-run (--session-end) or by
+# environment (STRADER_GAUGE_SESSION_END), which is how the cron wrapper keeps
+# its own no-respawn window and the gauge's self-exit on the same number.
+SESSION_END_DEFAULT = "15:15"
 
 BAR = {"climax": "█", "lean": "▒", "neutral": "·"}
 
@@ -64,12 +77,48 @@ def default_capture_path(day: _date) -> Path:
     return REPO_ROOT / "data" / "corpus" / day.isoformat() / "mi_gauge_live.jsonl"
 
 
-def append_capture(path: Path, m: TickMinute) -> None:
-    """Append one processed minute. Flushed + fsync-free line write; a kill
-    mid-write can only truncate the FINAL line, which restore tolerates."""
+def parse_session_end(raw: str | None) -> _time | None:
+    """'15:15' → time(15,15); 'none'/'off'/'' → None (run until killed)."""
+    if raw is None:
+        return None
+    s = raw.strip().lower()
+    if s in ("", "none", "off", "never"):
+        return None
+    hh, _, mm = s.partition(":")
+    return _time(int(hh), int(mm or 0))
+
+
+def stop_reason(now: datetime, capture_day: _date,
+                session_end: _time | None) -> str | None:
+    """Why the live loop must stop, or None to keep running. [st-5n8]
+
+    'rollover' is checked first and is the harder stop: the capture day is
+    fixed at launch, so a process that outlives midnight would keep appending
+    to the PREVIOUS day's file. A fresh launch owns the new day.
+    """
+    if now.date() != capture_day:
+        return "rollover"
+    if session_end is not None and now.time() >= session_end:
+        return "session-end"
+    return None
+
+
+def append_capture(path: Path, m: TickMinute, day: _date | None = None) -> bool:
+    """Append one processed minute; returns True if written. Flushed +
+    fsync-free line write; a kill mid-write can only truncate the FINAL line,
+    which restore tolerates.
+
+    When `day` is given the write is REFUSED for a minute from any other day
+    [st-5n8] — the last line of defence against a long-lived process folding
+    tomorrow's rows into today's capture. restore_state() already filters on
+    read; this stops the bad row from being written at all.
+    """
+    if day is not None and m.ts.date() != day:
+        return False
     rec = {"ts": m.ts.isoformat(), "high": m.high, "low": m.low, "close": m.close}
     with path.open("a") as fh:
         fh.write(json.dumps(rec) + "\n")
+    return True
 
 
 def restore_state(path: Path, gauge: MIGauge, day: _date,
@@ -133,7 +182,9 @@ def replay(day: _date, show_all: bool) -> int:
     return 0
 
 
-def live(poll_s: int, capture: Path | None) -> int:
+def live(poll_s: int, capture: Path | None,
+         session_end: _time | None = None,
+         capture_day: _date | None = None) -> int:
     """Live path samples the QUOTE endpoint, not minute history: same-day
     minute candles clamp negatives to zero (see internals-tick-seed doc), but
     quotes return correct signed values. Samples aggregate into synthetic
@@ -150,7 +201,24 @@ def live(poll_s: int, capture: Path | None) -> int:
     to restore the spine — so a mid-session respawn continues rather than
     resetting to cum=0. Minutes elapsed while the process was DOWN are lost
     (same-day $TICK history is clamped and cannot backfill), so the restore
-    banner names the gap when one is detected."""
+    banner names the gap when one is detected.
+
+    Lifetime [st-5n8]: the loop stops at `session_end` (CT) and on a day
+    rollover. Both are evaluated BEFORE the broker client is built, so a launch
+    outside the window costs nothing and touches no API — which is what lets the
+    cron wrapper stay a dumb heartbeat."""
+    if capture_day is None:
+        capture_day = datetime.now(tz=CENTRAL).date()
+
+    reason = stop_reason(datetime.now(tz=CENTRAL), capture_day, session_end)
+    if reason == "session-end":
+        print(f"# past session end {session_end.strftime('%H:%M')} CT — "
+              "not starting a live gauge (nothing to measure on a closed tape).")
+        return 0
+    if reason == "rollover":
+        print(f"# capture day {capture_day} is not today — not starting a live gauge.")
+        return 0
+
     from broker_schwab.client import create_client
     c = create_client()
     g = MIGauge()
@@ -162,7 +230,7 @@ def live(poll_s: int, capture: Path | None) -> int:
     restored_ts: datetime | None = None
     if capture is not None:
         capture.parent.mkdir(parents=True, exist_ok=True)
-        restored_ts = restore_state(capture, g, datetime.now(tz=CENTRAL).date())
+        restored_ts = restore_state(capture, g, capture_day)
         print(f"# capturing to {capture}", flush=True)
 
     now_ct = datetime.now(tz=CENTRAL)
@@ -180,6 +248,10 @@ def live(poll_s: int, capture: Path | None) -> int:
               "pane pre-open for full-session spine semantics; early cum reads "
               "run hot.")
 
+    if session_end is not None:
+        print(f"# exits at {session_end.strftime('%H:%M')} CT "
+              "(--session-end none to run until killed)", flush=True)
+
     def commit_minute(ts, h, l, c_):
         """Process one completed synthetic minute, unless it duplicates a
         restored one (fast crash+respawn inside the same minute)."""
@@ -187,12 +259,35 @@ def live(poll_s: int, capture: Path | None) -> int:
             return
         read = g.process(TickMinute(ts=ts, high=int(h), low=int(l), close=int(c_)))
         if capture is not None:
-            append_capture(capture, TickMinute(ts=ts, high=int(h),
-                                               low=int(l), close=int(c_)))
+            m = TickMinute(ts=ts, high=int(h), low=int(l), close=int(c_))
+            if not append_capture(capture, m, day=capture_day):
+                print(f"  [guard] refused to write a {ts.date()} minute into "
+                      f"the {capture_day} capture file", file=sys.stderr,
+                      flush=True)
         if read is not None:
             print(render(read), flush=True)
 
     while True:
+        now = datetime.now(tz=CENTRAL)
+
+        # --- stop conditions, checked every tick of the loop ---------------
+        reason = stop_reason(now, capture_day, session_end)
+        if reason is not None:
+            # Flush the minute in progress only if it belongs to the window we
+            # are closing out; anything past the boundary is not ours to write.
+            if cur_min is not None and cur_min.date() == capture_day and (
+                    session_end is None or cur_min.time() < session_end):
+                commit_minute(cur_min, hi, lo, last)
+            if reason == "rollover":
+                print(f"# day rolled over ({capture_day} → {now.date()}) — "
+                      "exiting; a fresh launch owns the new day's capture.",
+                      flush=True)
+            else:
+                print(f"# session end {session_end.strftime('%H:%M')} CT — "
+                      f"exiting cleanly ({g.minutes}m captured, "
+                      f"cum {g.cum_tick:+d}).", flush=True)
+            return 0
+
         try:
             r = c.get_quotes(["$TICK"])
             q = r.json().get("$TICK", {}).get("quote", {}) if r.status_code == 200 else {}
@@ -201,7 +296,6 @@ def live(poll_s: int, capture: Path | None) -> int:
             print(f"  poll error: {e}", file=sys.stderr)
             px = None
         if px is not None:
-            now = datetime.now(tz=CENTRAL)
             minute = now.replace(second=0, microsecond=0)
             if cur_min is None:
                 cur_min, hi, lo, last = minute, px, px, px
@@ -227,15 +321,25 @@ def main() -> int:
                          "data/corpus/<today>/mi_gauge_live.jsonl)")
     ap.add_argument("--no-capture", action="store_true",
                     help="live: disable durable capture + restore")
+    ap.add_argument("--session-end", metavar="HH:MM",
+                    default=os.environ.get("STRADER_GAUGE_SESSION_END",
+                                           SESSION_END_DEFAULT),
+                    help="live: exit at this CT time (default "
+                         f"{SESSION_END_DEFAULT}; 'none' runs until killed)")
     args = ap.parse_args()
     if args.live:
+        today = datetime.now(tz=CENTRAL).date()
         if args.no_capture:
             capture = None
         elif args.capture:
             capture = Path(args.capture)
         else:
-            capture = default_capture_path(datetime.now(tz=CENTRAL).date())
-        return live(args.poll, capture)
+            capture = default_capture_path(today)
+        try:
+            session_end = parse_session_end(args.session_end)
+        except ValueError:
+            ap.error(f"--session-end: expected HH:MM or 'none', got {args.session_end!r}")
+        return live(args.poll, capture, session_end=session_end, capture_day=today)
     if not args.date:
         ap.error("--date required unless --live")
     return replay(_date.fromisoformat(args.date), args.all)

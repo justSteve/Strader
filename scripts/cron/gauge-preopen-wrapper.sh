@@ -27,10 +27,24 @@
 # filtered pgrep; when no live process exists, every stale `gauge` window is
 # reaped before a fresh launch.
 #
-# BOOTSTRAP (Steve-authorized 2026-07-23). If the tmux session is down this
-# wrapper creates a MINIMAL session to host the gauge — it does NOT rebuild
-# COO's full desk. If COO later re-bootstraps the desk the two may need
-# reconciling; that tradeoff is accepted for gauge reliability.
+# SESSION WINDOW [st-5n8]. The gauge is a SESSION daemon, not a service. It
+# self-exits at STRADER_GAUGE_SESSION_END (default 15:15 CT) and on a day
+# rollover; this wrapper exports that same value so both agree on one number.
+# Outside 08:00–15:15 CT Mon–Fri, "no gauge running" is the CORRECT state and
+# this script exits 0 without launching. Before st-5n8 neither side had a stop
+# condition, so the 7/24 launch ran 26h into Saturday and wrote 1269 dead rows.
+# A gauge still alive outside the window is logged as a WARN — it is not killed
+# from cron; that stays a human call.
+#
+# BOOTSTRAP (Steve-authorized 2026-07-23; upgraded under st-r3f). If the tmux
+# session is down, bring up the REAL desk by invoking COO's own idempotent
+# bootstrap (/root/projects/COO/tmuxMOO/bin/steves-desk-session.sh, honours
+# TMUX_SOCKET, no-ops when the session exists) — cross-repo READ+invoke by
+# absolute path is what COO's shared-executable-space convention prescribes. The
+# gauge then lands in the actual working surface and nothing needs reconciling
+# later. Only when that script is unavailable (or the session name is not
+# steves-desk, the sole name it creates) do we fall back to the 7/23 behaviour:
+# a MINIMAL session hosting just the gauge.
 #
 # Placement: a dedicated full-width window (the ~102-col render does not fit
 # COO's 62/94 NAV/CONTENT split), inserted right after the Trading window when
@@ -43,6 +57,8 @@
 # exercising every path WITHOUT the moocity desk or the gated live Schwab API):
 #   STRADER_TMUX_SOCKET  STRADER_TMUX_SESSION  STRADER_GAUGE_WIN
 #   STRADER_ANCHOR_WIN   STRADER_GAUGE_MATCH   STRADER_GAUGE_LAUNCH
+#   STRADER_DESK_BOOTSTRAP  STRADER_GAUGE_SESSION_START/_END
+#   STRADER_GAUGE_NOW   (pretend it is 'YYYY-MM-DDTHH:MM' CT)
 
 set -uo pipefail
 
@@ -59,6 +75,16 @@ ANCHOR_WIN="${STRADER_ANCHOR_WIN:-Trading}"
 GAUGE_MATCH="${STRADER_GAUGE_MATCH:-mi_gauge.py --live}"
 GAUGE_LAUNCH_CMD="${STRADER_GAUGE_LAUNCH:-exec $PY $STRADER_REPO/$GAUGE_SCRIPT --live}"
 
+# Session window (CT). Exported so the launched gauge self-exits on the same
+# number this wrapper stops respawning on — one source of truth, no drift.
+SESSION_START="${STRADER_GAUGE_SESSION_START:-08:00}"
+SESSION_END="${STRADER_GAUGE_SESSION_END:-15:15}"
+export STRADER_GAUGE_SESSION_END="$SESSION_END"
+
+# COO's real desk bootstrap [st-r3f]; idempotent, honours TMUX_SOCKET.
+DESK_BOOTSTRAP="${STRADER_DESK_BOOTSTRAP:-/root/projects/COO/tmuxMOO/bin/steves-desk-session.sh}"
+DESK_SESSION_NAME="steves-desk"   # the only session name that script creates
+
 TMUX=(tmux -L "$SOCKET")
 
 : "${HOME:=/root}"
@@ -70,6 +96,26 @@ DATE="$(date +%Y-%m-%d)"
 LOG="$LOG_DIR/$DATE.log"
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
+
+hm_to_min() { local h=${1%%:*} m=${1##*:}; echo $(( 10#$h * 60 + 10#$m )); }
+
+# Session clock. Cron runs local America/Chicago, but the zone is forced so the
+# guard is still right when invoked from a differently-zoned shell. Tests set
+# STRADER_GAUGE_NOW='YYYY-MM-DDTHH:MM' to pin a moment (weekend, post-close…).
+if [[ -n "${STRADER_GAUGE_NOW:-}" ]]; then
+    NOW_HM="$(TZ=America/Chicago date -d "$STRADER_GAUGE_NOW" +%H:%M 2>/dev/null)"
+    NOW_DOW="$(TZ=America/Chicago date -d "$STRADER_GAUGE_NOW" +%u 2>/dev/null)"
+    [[ -z "$NOW_HM" ]] && { echo "FATAL: unparseable STRADER_GAUGE_NOW='$STRADER_GAUGE_NOW'" >&2; exit 2; }
+else
+    NOW_HM="$(TZ=America/Chicago date +%H:%M)"
+    NOW_DOW="$(TZ=America/Chicago date +%u)"
+fi
+IN_SESSION=0
+if (( NOW_DOW <= 5 )) \
+   && (( $(hm_to_min "$NOW_HM") >= $(hm_to_min "$SESSION_START") )) \
+   && (( $(hm_to_min "$NOW_HM") <  $(hm_to_min "$SESSION_END") )); then
+    IN_SESSION=1
+fi
 
 # Live-gauge PIDs, restricted to actual python processes. A bare `pgrep -f
 # 'mi_gauge.py --live'` also matches any shell/grep/editor whose command line
@@ -99,7 +145,21 @@ live_gauge_pids() {
     # --- idempotency guard: PROCESS, not window --------------------------
     LIVE_PIDS="$(live_gauge_pids | tr '\n' ' ')"
     if [[ -n "${LIVE_PIDS// }" ]]; then
-        log "OK: live gauge already running (pid ${LIVE_PIDS%% })— nothing to do."
+        if (( IN_SESSION )); then
+            log "OK: live gauge already running (pid ${LIVE_PIDS%% })— nothing to do."
+        else
+            log "WARN: gauge still running (pid ${LIVE_PIDS%% }) at $NOW_HM CT (dow $NOW_DOW), OUTSIDE the $SESSION_START–$SESSION_END window — it should have self-exited at $SESSION_END. Not killing from cron; that is Steve's call. A pre-st-5n8 process has no stop condition and will run until killed."
+        fi
+        exit 0
+    fi
+
+    # --- outside the session window, NOT running is CORRECT [st-5n8] -----
+    # The cron line fires on a dumb heartbeat; the judgement lives here. No
+    # gauge outside 08:00–15:15 CT Mon–Fri is the desired state, not a fault to
+    # respawn away — there is nothing to measure on a closed tape, and a launch
+    # here is what produced the 26-hour 7/24 run.
+    if (( ! IN_SESSION )); then
+        log "OK: $NOW_HM CT (dow $NOW_DOW) is outside the session window $SESSION_START–$SESSION_END Mon–Fri — no gauge expected, not launching."
         exit 0
     fi
 
@@ -115,9 +175,30 @@ live_gauge_pids() {
         log "token health: ${STATUS:-unknown}"
     fi
 
+    # --- desk down → bring up the REAL desk first [st-r3f] ---------------
+    # Steve's ask: the code that starts the gauge should detect a down desk and
+    # start it. COO's script is the authority on what the desk IS, and it is
+    # idempotent (clean exit 0 when the session exists), so calling it here can
+    # only ever help. Only its failure or absence falls through to the minimal
+    # bootstrap below.
+    if ! "${TMUX[@]}" has-session -t "$SESSION" 2>/dev/null; then
+        if [[ "$SESSION" == "$DESK_SESSION_NAME" && -x "$DESK_BOOTSTRAP" ]]; then
+            log "session '$SESSION' is DOWN — invoking COO desk bootstrap: $DESK_BOOTSTRAP"
+            TMUX_SOCKET="$SOCKET" timeout 60 bash "$DESK_BOOTSTRAP"
+            DESK_RC=$?
+            if "${TMUX[@]}" has-session -t "$SESSION" 2>/dev/null; then
+                log "real desk is up (bootstrap rc=$DESK_RC) — placing the gauge window in it."
+            else
+                log "WARN: desk bootstrap produced no session '$SESSION' (rc=$DESK_RC) — falling back to the minimal bootstrap."
+            fi
+        else
+            log "note: real desk bootstrap not usable (session='$SESSION' script='$DESK_BOOTSTRAP') — minimal bootstrap."
+        fi
+    fi
+
     WID=""
     if ! "${TMUX[@]}" has-session -t "$SESSION" 2>/dev/null; then
-        # --- BOOTSTRAP: session down → create a minimal one (Steve-authorized) ---
+        # --- FALLBACK BOOTSTRAP: still down → create a minimal session -----
         log "session '$SESSION' on socket '$SOCKET' is DOWN — bootstrapping a minimal session (Steve-authorized 2026-07-23). NOTE: not COO's full desk; reconcile if COO rebuilds."
         WID="$("${TMUX[@]}" new-session -d -s "$SESSION" -n "$WIN_NAME" \
                  -c "$STRADER_REPO" -P -F '#{window_id}' "$GAUGE_LAUNCH_CMD" 2>/dev/null)"
@@ -156,10 +237,16 @@ live_gauge_pids() {
         done
     fi
 
-    # remain-on-exit: a CLEAN exit closes the window (the gauge loops forever,
-    # so it only exits on crash); a CRASH instead freezes the error in-pane
-    # until the next heartbeat reaps it — crashes stay diagnosable, not silent.
-    "${TMUX[@]}" set-option -t "$WID" remain-on-exit on 2>/dev/null || true
+    # remain-on-exit=failed: freeze the pane on a CRASH (traceback stays legible
+    # until the next launch reaps it), close it on a clean exit. Steve's call
+    # 2026-07-25 — before st-5n8 the gauge never exited cleanly, so `on` and
+    # `failed` behaved identically; now that 15:15 is a clean exit, `on` would
+    # park a dead pane on the desk every evening until the next morning's first
+    # in-window fire. The day's final read is already durable in
+    # data/corpus/<date>/mi_gauge_live.jsonl, so closing the window loses
+    # nothing. (The pre-st-5n8 comment here claimed `on` closed the window on a
+    # clean exit; it does not — that was never exercised.)
+    "${TMUX[@]}" set-option -t "$WID" remain-on-exit failed 2>/dev/null || true
 
     sleep 1
     NEWPID="$(live_gauge_pids | tr '\n' ' ')"
@@ -167,7 +254,7 @@ live_gauge_pids() {
         log "OK: launched live gauge (pid ${NEWPID%% }) in $SESSION window '$WIN_NAME' ($WID)."
         exit 0
     fi
-    log "ERROR: window $WID created but no live gauge process after 1s — the gauge likely crashed on startup; check pane $WID (remain-on-exit is on, so the error is frozen there)."
+    log "ERROR: window $WID created but no live gauge process after 1s — the gauge likely crashed on startup; check pane $WID (remain-on-exit is 'failed', so a crash stays frozen there)."
     exit 4
 
 } >> "$LOG" 2>&1
