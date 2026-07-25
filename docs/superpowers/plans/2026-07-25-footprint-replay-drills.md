@@ -1125,4 +1125,3 @@ git pull --rebase && git push
 - **Spec coverage:** pacing model → header + Task 7 doc (decision: drill 1× + zero-wall-clock evidence); session setup/teardown → Tasks 4 & 7; capture format/storage → Task 3; hindsight annotations → Task 5; drill workflow from the seat → Task 7; constraints (no contamination, append-only) → invariants section + tests in Tasks 3 & 5.
 - **Placeholder scan:** no TBDs, no "add error handling later", no "similar to Task N" — every code step carries its full code; every Run step names its command and expected outcome.
 - **Type consistency:** `record_day` returns `meta | {"n_events", "day_type", "path"}` and Task 4 consumes exactly those keys; `full_stack_events(trades, *, bar_n, anchors, mancini_prices)` is called with the same signature in Tasks 2, 3; `annotations_path`/`signals_path` defined in Task 3, consumed in Tasks 5, 6; `beats` field name (code) vs "stages" (prose/UI) follows knowledge/stages-not-beats.
-```
