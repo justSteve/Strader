@@ -1,0 +1,120 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Corpus Day Browser</title>
+<style>
+:root { --bg:#11151c; --surface:#171c25; --ink:#dbe2ee; --muted:#7c8698;
+  --grid:#232a37; --buy:#3f8cff; --sell:#e5484d; --hl:#f5c518; --ok:#4cc38a; }
+* { box-sizing:border-box; margin:0; }
+body { background:var(--bg); color:var(--ink);
+  font:13px/1.45 system-ui, "Segoe UI", sans-serif; height:100vh; display:flex; flex-direction:column; }
+header { display:flex; align-items:center; gap:10px; padding:8px 14px; background:var(--surface); flex-wrap:wrap; }
+h1 { font-size:15px; margin-right:4px; }
+button { background:#232a37; color:var(--ink); border:1px solid #2e3644; border-radius:5px;
+  padding:4px 12px; font-size:14px; cursor:pointer; }
+button:hover { background:#2e3644; }
+select { background:#232a37; color:var(--ink); border:1px solid #2e3644; border-radius:5px; padding:4px 8px; }
+.chip { font-size:11.5px; padding:2px 9px; border-radius:10px; background:#232a37; color:var(--muted); }
+.chip.full { background:#173226; color:var(--ok); }
+.chip.part { background:#332a17; color:#d0b45a; }
+.chip.mbp  { background:#1a2a3d; color:#6aa8e8; }
+.chip.type { background:#2a2130; color:#d8a0e0; }
+.pos { color:var(--muted); font-size:12px; margin-left:auto; }
+#wrap { flex:1; overflow-x:auto; overflow-y:hidden; position:relative; }
+canvas { display:block; }
+#hint { padding:6px 14px; color:var(--muted); font-size:12px; background:var(--surface); }
+#hint code { color:#9db4d0; }
+</style></head><body>
+<header>
+  <h1>Day browser</h1>
+  <button id="prev">◀</button>
+  <select id="pick"></select>
+  <button id="next">▶</button>
+  <span id="chips"></span>
+  <span class="pos" id="pos"></span>
+</header>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<p id="hint">← → cycle days · Home/End jump to first/latest · same canonical tape the replay drills use ·
+replay the shown day: <code id="cmd"></code></p>
+<script>
+const DATA = /*__BROWSER_DATA__*/null;
+const DAYS = DATA.days;
+const CW = 7, GAP = 3, PAD_T = 14, VOL_H = 46;
+const $ = id => document.getElementById(id);
+let idx = DAYS.length - 1;
+
+const pick = $("pick");
+DAYS.forEach((d, i) => {
+  const o = document.createElement("option");
+  o.value = i;
+  o.textContent = d.date + (d.full_rth ? "" : " (partial)") + (d.mbp1 ? " ●" : "");
+  pick.appendChild(o);
+});
+
+const wrap = $("wrap"), cv = $("cv"), ctx = cv.getContext("2d");
+
+function chips(d) {
+  const cov = d.full_rth ? '<span class="chip full">FULL RTH</span>'
+                         : `<span class="chip part">${d.window}</span>`;
+  const mbp = d.mbp1 ? '<span class="chip mbp">MBP-1 ✓ full-precision replay</span>' : "";
+  const rng = (d.h - d.l).toFixed(2);
+  return `${cov} <span class="chip type" title="${d.why}">${d.day_type}</span>
+    <span class="chip">O ${d.o} · H ${d.h} · L ${d.l} · C ${d.c}</span>
+    <span class="chip">range ${rng}</span>
+    <span class="chip">${d.contracts.toLocaleString()} contracts</span> ${mbp}`;
+}
+
+function draw() {
+  const d = DAYS[idx], C = d.candles;
+  pick.value = idx;
+  $("chips").innerHTML = chips(d);
+  $("pos").textContent = `${idx + 1} / ${DAYS.length}`;
+  $("cmd").textContent = `.venv/bin/python scripts/replay_day.py --date ${d.date}`;
+  document.title = `${d.date} · Day browser`;
+
+  let hi = -Infinity, lo = Infinity, vmax = 1;
+  for (const k of C) { hi = Math.max(hi, k[2]); lo = Math.min(lo, k[3]); vmax = Math.max(vmax, k[5]); }
+  const H = wrap.clientHeight, W = C.length * (CW + GAP) + 60;
+  cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio;
+  cv.style.width = W + "px"; cv.style.height = H + "px";
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  const priceH = H - PAD_T - VOL_H - 18;
+  const y = p => PAD_T + (hi - p) / (hi - lo || 1) * priceH;
+  ctx.clearRect(0, 0, W, H);
+
+  const step = Math.max(5, Math.round((hi - lo) / 8 / 5) * 5);
+  ctx.strokeStyle = "#232a37"; ctx.fillStyle = "#7c8698"; ctx.font = "10px system-ui";
+  for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) {
+    ctx.beginPath(); ctx.moveTo(0, y(p)); ctx.lineTo(W, y(p)); ctx.stroke();
+    ctx.fillText(p.toFixed(0), 4, y(p) - 2);
+  }
+  C.forEach((k, i) => {
+    const x = 40 + i * (CW + GAP);
+    const [iso, o, h, l, c, v] = k;
+    const up = c >= o;
+    ctx.strokeStyle = ctx.fillStyle = up ? "#3f8cff" : "#e5484d";
+    ctx.beginPath(); ctx.moveTo(x + CW / 2, y(h)); ctx.lineTo(x + CW / 2, y(l)); ctx.stroke();
+    const top = y(Math.max(o, c)), bh = Math.max(1, Math.abs(y(o) - y(c)));
+    ctx.fillRect(x, top, CW, bh);
+    ctx.globalAlpha = .45;
+    ctx.fillRect(x, H - 16 - v / vmax * VOL_H, CW, v / vmax * VOL_H);
+    ctx.globalAlpha = 1;
+    if (iso.slice(14, 16) === "00") {
+      ctx.fillStyle = "#7c8698";
+      ctx.fillText(iso.slice(11, 16), x - 8, H - 4);
+    }
+  });
+  wrap.scrollLeft = 0;
+}
+
+function go(i) { idx = Math.min(DAYS.length - 1, Math.max(0, i)); draw(); }
+$("prev").onclick = () => go(idx - 1);
+$("next").onclick = () => go(idx + 1);
+pick.onchange = () => go(Number(pick.value));
+window.addEventListener("keydown", e => {
+  if (e.key === "ArrowLeft") go(idx - 1);
+  else if (e.key === "ArrowRight") go(idx + 1);
+  else if (e.key === "Home") go(0);
+  else if (e.key === "End") go(DAYS.length - 1);
+});
+window.addEventListener("resize", draw);
+draw();
+</script></body></html>
