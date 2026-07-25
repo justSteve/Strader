@@ -14,7 +14,7 @@
 
 **Explicitly out of scope (deferred, do not build):**
 - `DayTypeClassifier` (playbook) binding — it takes declared `MarketPrimitives`, not feeds; binding is deferred per co-wh19 §10. Per-day classification here uses the computable TPO classifier (`market/orderflow/tpo.py:classify_day_type`).
-- Absorption (`AbsorptionTracker`) — needs MBP-1, which exists only for 2026-07-02. The replay week runs trades-only.
+- ~~Absorption — needs MBP-1, which exists only for 2026-07-02~~ **AMENDED 2026-07-25 (st-ve6 backfill): MBP-1 now exists for 07-02, 07-13→17, 07-20→22. Absorption IS in scope**: the recorder auto-detects the day's MBP-1 file and appends `absorption_parity_run` emissions (production floors, no overrides) to the same record. Days without MBP-1 (07-23, 07-24 pending billing; the 07-06 week) record trades-only, flagged in RunMeta.
 - Live GLBX feed / live footprint renderer — Phase B (2026-08-01, orderflow-signal-layer-design §Phase B).
 
 **Invariants (bead constraints):**
@@ -370,6 +370,22 @@ def test_read_latest_run_selects_last_block(tmp_path):
     latest = read_latest_run(out)
     assert latest and all(r["run"] == m2["run"] for r in latest)
     assert latest[0]["type"] == "RunMeta"
+
+
+MBP1_FIXTURE = Path(__file__).resolve().parent.parent.parent \
+    / "market/fixtures/es_mbp1_golden_20260702.jsonl.gz"
+
+
+def test_record_includes_absorption_when_book_present(tmp_path):
+    without = tmp_path / "without.jsonl"
+    with_book = tmp_path / "with.jsonl"
+    m0 = record_day(FIXTURE, anchors=list(ANCHORS), out_path=without)
+    m1 = record_day(FIXTURE, anchors=list(ANCHORS), out_path=with_book,
+                    book_path=MBP1_FIXTURE)
+    assert m0["mbp1"] is False and m1["mbp1"] is True
+    assert m1["n_events"] > m0["n_events"]  # absorption reads appended
+    rows = [json.loads(l) for l in with_book.open()]
+    assert all("bar_i" in r for r in rows[2:])  # absorption rows carry bar_i=None
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -413,7 +429,8 @@ from typing import Iterable
 import market.signals.orderflow_config as _config
 from market.orderflow.anchors import day_anchors, mancini_levels_for
 from market.orderflow.bars import build_bars
-from market.orderflow.parity import full_stack_events
+from market.orderflow.parity import absorption_parity_run, full_stack_events
+from market.orderflow.quotes import mbp1_day_path, read_mbp1_day
 from market.orderflow.recognizer import Anchor
 from market.orderflow.replay import read_corpus_day
 from market.orderflow.tpo import build_tpo, classify_day_type
@@ -452,13 +469,17 @@ def _config_snapshot() -> dict:
 def record_day(day: _date | Path, *, bar_n: int = _config.VOLUME_BAR_N,
                anchors: list[Anchor] | None = None,
                mancini_prices: Iterable[float] | None = None,
+               book_path: Path | None = None,
                out_path: Path | None = None) -> dict:
     """Run the production stack over one day and append the record.
 
     ``day`` may be a fixture Path (tests). When ``anchors`` is None they are
     derived by the shared rule: the day's Mancini levels (or the explicit
-    ``mancini_prices`` override) plus session range edges. Returns the RunMeta
-    dict with ``n_events``, ``day_type`` and ``path`` added.
+    ``mancini_prices`` override) plus session range edges. Absorption: for a
+    real date the day's MBP-1 file is auto-detected (``mbp1_day_path``); for a
+    fixture Path pass ``book_path`` explicitly. Days without book data record
+    trades-only, flagged ``mbp1: false`` in RunMeta. Returns the RunMeta dict
+    with ``n_events``, ``day_type`` and ``path`` added.
     """
     trades = read_corpus_day(day)
     if not trades:
@@ -478,6 +499,14 @@ def record_day(day: _date | Path, *, bar_n: int = _config.VOLUME_BAR_N,
 
     events = full_stack_events(trades, bar_n=bar_n, anchors=anchors,
                                mancini_prices=mancini)
+
+    book = book_path if book_path is not None else (
+        mbp1_day_path(day_d) if not isinstance(day, Path) else None)
+    has_book = book is not None and Path(book).exists()
+    if has_book:
+        events += [e | {"bar_i": None}
+                   for e in absorption_parity_run(read_mbp1_day(Path(book)))]
+
     try:
         day_type, why = classify_day_type(build_tpo(trades))
     except Exception as exc:  # classification must not sink the record
@@ -489,7 +518,7 @@ def record_day(day: _date | Path, *, bar_n: int = _config.VOLUME_BAR_N,
             "date": day_d.isoformat(), "bar_n": bar_n,
             "n_trades": len(trades), "n_bars": len(bars),
             "anchors": [[a.price, a.kind, a.label, a.mancini] for a in anchors],
-            "mancini": mancini, "git": _git_head(),
+            "mancini": mancini, "mbp1": has_book, "git": _git_head(),
             "config": _config_snapshot(),
             "logged_utc": now.isoformat(timespec="seconds")}
 
@@ -521,7 +550,7 @@ def read_latest_run(path: Path) -> list[dict]:
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest tests/market/orderflow/test_session_record.py -v`
-Expected: 3 PASS
+Expected: 4 PASS
 
 - [ ] **Step 5: Commit**
 
@@ -1080,8 +1109,11 @@ full-RTH week). The 07-06 → 07-10 week is equally replayable.
 
 ## Troubleshooting
 
-- `FileNotFoundError: no ES corpus file` — that date has no tape
-  (2026-07-24 is known-missing; cron defect st-i68). Pick another day.
+- `FileNotFoundError: no ES corpus file` — that date has no tape. Pick
+  another day.
+- No absorption rows in the record — the day has no MBP-1 file (07-23/24
+  pending billing; the 07-06 week is trades-only). RunMeta says `mbp1: false`;
+  everything else records normally. The target week 07-13..17 has full MBP-1.
 - Empty recognitions — an unlabeled day anchors on range edges only;
   supply `--mancini-levels` to anchor the levels you traded.
 - Out-of-order/duplicated tape (e.g. 2026-07-02) is safe: the reader
