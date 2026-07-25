@@ -43,6 +43,7 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from runbook.mancini.clean import clean_newsletter as clean_letter          # noqa: E402
+from runbook.mancini.fetch import resolve_az                                # noqa: E402
 from market.orderflow.replay import read_corpus_day, es_day_path  # noqa: E402
 import orderflow_drill                                            # noqa: E402
 
@@ -57,7 +58,9 @@ MORNING_BACKFILL_COST = 0.51  # $ estimate for 08:30-13:00 trades (st-f05 probe 
 
 # ── blob layer ──────────────────────────────────────────────────────────────
 def _az(*args: str) -> str:
-    proc = subprocess.run(["az", *args], capture_output=True, text=True)
+    # Shared resolver: env override -> PATH -> known install paths, with a
+    # named error instead of a bare FileNotFoundError. [st-i68]
+    proc = subprocess.run([resolve_az(), *args], capture_output=True, text=True)
     if proc.returncode != 0:
         raise RuntimeError(f"az {' '.join(args[:3])}… failed: {proc.stderr.strip()[:300]}")
     return proc.stdout.replace("\r", "")
