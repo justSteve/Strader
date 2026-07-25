@@ -95,44 +95,59 @@ def serialize(sig: Signal) -> dict:
     return out
 
 
+def full_stack_events(trades: list[Trade], *, bar_n: int,
+                      anchors: Iterable[Anchor],
+                      mancini_prices: Iterable[float] = ()) -> list[dict]:
+    """One deterministic pass of the full stack at CURRENT module thresholds.
+
+    The canonical drive loop (ordering rules in the module docstring), shared
+    by the parity harness (fixture floors via ``_overridden``) and the replay
+    recorder (production floors, st-055). Every event dict carries ``bar_i``
+    — the index of the completed bar it was emitted under, ``None`` for
+    end-of-stream flush signals and profile levels.
+    """
+    events: list[dict] = []
+    engine = OrderflowEngine()
+    recognizer = SetupRecognizer(list(anchors), mancini_prices=list(mancini_prices))
+
+    idx = 0
+    # Drive engine per-trade and bar-consumers per-bar in one pass: bars close
+    # on known trade boundaries, so process trades until each bar's volume is
+    # covered — same faithful drive as the live adapter would produce.
+    for bar_i, bar in enumerate(build_bars(iter(trades), n=bar_n, include_partial=True)):
+        vol = 0
+        while idx < len(trades) and vol < bar.volume:
+            t = trades[idx]
+            for s in engine.process(t):
+                events.append(serialize(s) | {"bar_i": bar_i})
+            vol += t.size
+            idx += 1
+        for stack in find_stacks(bar):
+            events.append(serialize(stack) | {"bar_i": bar_i})
+        for rec in recognizer.on_bar(bar):
+            events.append(serialize(rec) | {"bar_i": bar_i})
+    while idx < len(trades):
+        for s in engine.process(trades[idx]):
+            events.append(serialize(s) | {"bar_i": None})
+        idx += 1
+    for s in engine.flush():
+        events.append(serialize(s) | {"bar_i": None})
+
+    prof = build_profile(trades)
+    for lv in profile_levels(prof, reference_price=trades[-1].price):
+        events.append(serialize(lv) | {"bar_i": None})
+    return events
+
+
 def parity_run(trades: Iterable[Trade]) -> list[dict]:
     """The canonical full-stack replay. Deterministic: same trades, same list."""
     trades = list(trades)
-    events: list[dict] = []
     with _overridden():
-        engine = OrderflowEngine()
-        recognizer = SetupRecognizer(list(PARITY_ANCHORS), mancini_prices=PARITY_MANCINI)
-
-        pending: list[Trade] = []
-        bar_iter = build_bars(iter(trades), n=PARITY_BAR_N, include_partial=True)
-        # Drive engine per-trade and bar-consumers per-bar in one pass:
-        # bars close on known trade boundaries, so process trades until each
-        # bar's end_ts/volume is covered. Simplest faithful drive: rebuild the
-        # engine stream alongside the bar stream on the same trade list.
-        idx = 0
-        for bar in bar_iter:
-            vol = 0
-            while idx < len(trades) and vol < bar.volume:
-                t = trades[idx]
-                for s in engine.process(t):
-                    events.append(serialize(s))
-                vol += t.size
-                idx += 1
-            for stack in find_stacks(bar):
-                events.append(serialize(stack))
-            for rec in recognizer.on_bar(bar):
-                events.append(serialize(rec))
-        while idx < len(trades):
-            for s in engine.process(trades[idx]):
-                events.append(serialize(s))
-            idx += 1
-        for s in engine.flush():
-            events.append(serialize(s))
-
-        prof = build_profile(trades)
-        for lv in profile_levels(prof, reference_price=trades[-1].price):
-            events.append(serialize(lv))
-
+        events = full_stack_events(trades, bar_n=PARITY_BAR_N,
+                                   anchors=PARITY_ANCHORS,
+                                   mancini_prices=PARITY_MANCINI)
+    for e in events:
+        e.pop("bar_i", None)  # snapshot format predates bar_i; keep it stable
     logger.info("parity_run: %d trades -> %d events", len(trades), len(events))
     return events
 
