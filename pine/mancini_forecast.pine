@@ -28,6 +28,7 @@ showNotes   = input.bool(true,  "Notes always visible (else tooltip)", group="Di
 extendRight = input.int(10,     "Extend right (bars)", group="Display", minval=0, maxval=500)
 historyBack = input.int(300,    "History back (bars)", group="Display", minval=50, maxval=2000)
 labelMargin = input.int(3, "Label margin (bars from left screen edge)", group="Display", minval=0, maxval=50)
+labelSizeIn = input.string("normal", "Label size", group="Display", options=["small", "normal", "large"])
 hudPos      = input.string("top_left", "HUD position", group="Display",
      options=["top_left", "top_right", "bottom_left", "bottom_right", "off"])
 
@@ -151,6 +152,7 @@ _stateWord(int st) =>
     st == 0 ? "untouched" : st == 1 ? "held" : st == 2 ? "BROKEN" : "RECLAIMED"
 
 // === Draw (delete-and-redraw on last bar) ===
+var int lblXCache = na
 var array<line>  _lines  = array.new<line>()
 var array<label> _labels = array.new<label>()
 var array<box>   _boxes  = array.new<box>()
@@ -171,8 +173,15 @@ if barstate.islast
     x1 = bar_index - historyBack
     x2 = bar_index + extendRight
     // Labels anchor to the LEFT EDGE OF THE VISIBLE SCREEN plus a small
-    // margin — chart.left_visible_bar_time recalculates on scroll/zoom.
-    int lblX = chart.left_visible_bar_time + labelMargin * timeframe.in_seconds() * 1000
+    // margin. chart.left_visible_bar_time refreshes on scroll/zoom but can
+    // return na on realtime-tick recalcs - an na anchor throws the label to
+    // the far left. Cache the last known-good value; fall back to history
+    // depth before the first scroll event ever fires.
+    int leftVis = chart.left_visible_bar_time
+    if not na(leftVis)
+        lblXCache := leftVis + labelMargin * timeframe.in_seconds() * 1000
+    int lblX = na(lblXCache) ? time[historyBack] : lblXCache
+    labelSz = labelSizeIn == "large" ? size.large : labelSizeIn == "small" ? size.small : size.normal
 
     if array.size(lvPrice) > 0
         for i = 0 to array.size(lvPrice) - 1
@@ -209,7 +218,7 @@ if barstate.islast
                      + (array.get(lvDefenses, i) > 0 ? " +" + str.tostring(array.get(lvDefenses, i)) : "")
                 txt = showNotes and str.length(note) > 0 ? tag + " - " + note : tag
                 array.push(_labels, label.new(lblX, p, txt, xloc.bar_time, yloc.price,
-                     color.new(color.black, 100), label.style_label_right, baseCol, size.small,
+                     color.new(color.black, 100), label.style_label_right, baseCol, labelSz,
                      tooltip=str.length(note) > 0 ? note : na))
 
     if array.size(profPrice) > 0
@@ -220,7 +229,7 @@ if barstate.islast
             if showLabels
                 array.push(_labels, label.new(lblX, pp, str.upper(array.get(profKind, i)) + " " + str.tostring(pp, "#.##"),
                      xloc.bar_time, yloc.price, color.new(color.black, 100),
-                     label.style_label_right, cProf, size.tiny))
+                     label.style_label_right, cProf, size.small))
 
     // === Proximity HUD ===
     if hudPos != "off"
