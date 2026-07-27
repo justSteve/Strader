@@ -13,6 +13,7 @@ extras remain commentary-side. Prices render trailing-zero-free (7458, 7461.5).
 """
 from __future__ import annotations
 
+import subprocess
 from typing import Sequence
 
 from .chart import key_prices
@@ -97,3 +98,29 @@ def _level_line(lv: Level, prefix: str, p1: str, p2: str, keys: set[float],
         if note:
             parts.append(f'"{note}"')
     return " ".join(parts)
+
+
+def _default_run(cmd: list[str], text: str) -> int:
+    proc = subprocess.run(cmd, input=text.encode("utf-16-le"), timeout=15)
+    return proc.returncode
+
+
+def push_clipboard(payload: str, *, run=_default_run) -> int:
+    """Push the payload to the Windows clipboard via clip.exe (WSL interop).
+
+    clip.exe expects UTF-16LE from a pipe; plain UTF-8 arrives mojibake'd
+    (same class of bug as the WSL backup scripts, spec Known hazards)."""
+    return run(["clip.exe"], payload)
+
+
+def ceiling_probe(kb: int) -> str:
+    """Synthetic payload of ~kb KB for the input.text_area ceiling test.
+
+    Valid v1 format with an obviously-fake date so a leftover probe paste
+    trips the STALE banner instead of masquerading as a real day."""
+    lines = [f"v1 2099-01-01 ES"]
+    price = 1000.0
+    while len("\n".join(lines).encode()) < kb * 1024 - 24:
+        lines.append(f"S {price:g} . minor")
+        price += 0.25
+    return "\n".join(lines)

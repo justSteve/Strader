@@ -100,3 +100,21 @@ def test_real_day_payload_shape_and_size():
     assert lines[0] == f"v1 {d['date']} ES"
     assert 40 < len(lines) < 100
     assert len(payload.encode()) < 4096  # spec: ~2 KB for a 60-level day
+
+
+def test_push_clipboard_uses_injected_runner():
+    sent = {}
+    def fake_run(cmd, text):
+        sent["cmd"], sent["text"] = cmd, text
+        return 0
+    from runbook.mancini.payload_emitter import push_clipboard
+    rc = push_clipboard("v1 2026-07-27 ES", run=fake_run)
+    assert rc == 0 and sent["cmd"] == ["clip.exe"] and sent["text"].startswith("v1 ")
+
+
+def test_ceiling_probe_sizes():
+    from runbook.mancini.payload_emitter import ceiling_probe
+    for kb in (2, 4, 8, 16):
+        p = ceiling_probe(kb)
+        assert p.startswith("v1 2099-01-01 ES")
+        assert abs(len(p.encode()) - kb * 1024) < 64
