@@ -37,6 +37,9 @@ def _note_for(price: float, result: ParseResult) -> str | None:
         anchors = getattr(c.trigger, "anchor_prices", None) or []
         if any(abs(a - price) < 1e-9 for a in anchors):
             sentence = c.text.split(". ")[0].strip().rstrip(".")
+            # ASCII-fold: TV label fonts drop em/en dashes and curly quotes
+            for bad, good in (("\u2014", "-"), ("\u2013", "-"), ("\u2018", "'"), ("\u2019", "'"), ("\u201c", "'"), ("\u201d", "'")):
+                sentence = sentence.replace(bad, good)
             return (sentence[:57] + "...") if len(sentence) > 60 else sentence
     return None
 
