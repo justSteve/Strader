@@ -1,0 +1,260 @@
+//@version=6
+// Mancini Forecast — STABLE renderer [st-5rc]
+// Installed once; never edited daily. The day's levels arrive via the
+// "Daily payload" text area (v1 format, emitted by runbook/mancini/payload_emitter.py).
+// Spec: docs/superpowers/specs/2026-07-25-mancini-stable-renderer-design.md
+indicator("Mancini Forecast", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=100)
+
+// === Payload ===
+payload = input.text_area("", "Daily payload (v1)", group="Payload",
+     tooltip="Paste the morning payload here (Ctrl+A, Ctrl+V). First line: v1 <date> <symbol>")
+
+// === Activation (carried over from per-day script) ===
+useRadius        = input.bool(true,  "A. Radius from price", group="Activation")
+radius           = input.float(60,   "Radius (points)", group="Activation", minval=1, maxval=500, step=5)
+radiusSmooth     = input.int(5,      "Centerpoint SMA (bars)", group="Activation", minval=1, maxval=50)
+useVisible       = input.bool(false, "B. Visible-range only", group="Activation")
+visibleLookback  = input.int(150,    "Visible lookback (bars)", group="Activation", minval=10, maxval=2000)
+useSessionFilter = input.bool(false, "C. Hide touched-today levels", group="Activation")
+touchTolerance   = input.float(2,    "Touch tolerance (points)", group="Activation", minval=0, step=0.25)
+alwaysShowKey    = input.bool(true,  "Always show key levels", group="Activation")
+nonKeyAlpha      = input.int(50,     "Non-key transparency (%)", group="Activation", minval=0, maxval=100)
+
+// === Display ===
+showMajor   = input.bool(true,  "Show major levels", group="Display")
+showMinor   = input.bool(true,  "Show minor levels", group="Display")
+showLabels  = input.bool(true,  "Show price labels", group="Display")
+showNotes   = input.bool(false, "Notes always visible (else tooltip)", group="Display")
+extendRight = input.int(10,     "Extend right (bars)", group="Display", minval=0, maxval=500)
+historyBack = input.int(300,    "History back (bars)", group="Display", minval=50, maxval=2000)
+hudPos      = input.string("top_left", "HUD position", group="Display",
+     options=["top_left", "top_right", "bottom_left", "bottom_right", "off"])
+
+// === Colors ===
+cSup   = input.color(#26a69a, "Support",    group="Colors")
+cRes   = input.color(#ef5350, "Resistance", group="Colors")
+cProf  = input.color(#b39ddb, "Profile (P) levels", group="Colors")
+cStale = input.color(#d50000, "Stale banner", group="Colors")
+
+// === Parsed payload state (filled once on first bar; inputs are constant per run) ===
+var string  pDate    = ""
+var string  pSymbol  = ""
+var array<float>  lvPrice  = array.new<float>()
+var array<float>  lvPrice2 = array.new<float>()   // na = single line
+var array<bool>   lvIsSup  = array.new<bool>()
+var array<bool>   lvMajor  = array.new<bool>()
+var array<bool>   lvKey    = array.new<bool>()
+var array<bool>   lvConf   = array.new<bool>()
+var array<string> lvNote   = array.new<string>()
+var array<string> profKind = array.new<string>()
+var array<float>  profPrice = array.new<float>()
+// state: 0 untouched · 1 tested/held · 2 broken · 3 reclaimed
+var array<int>    lvState  = array.new<int>()
+var array<int>    lvDefenses = array.new<int>()   // held-close count (tick marks)
+
+_parseNote(string line) =>
+    i1 = str.pos(line, "\"")
+    string note = ""
+    if not na(i1)
+        rest = str.substring(line, i1 + 1)
+        i2 = str.pos(rest, "\"")
+        note := na(i2) ? rest : str.substring(rest, 0, i2)
+    note
+
+if barstate.isfirst and str.length(payload) > 0
+    lines = str.split(payload, "\n")
+    for li = 0 to array.size(lines) - 1
+        line = str.trim(array.get(lines, li))
+        if str.length(line) == 0
+            continue
+        toks = str.split(line, " ")
+        head = array.get(toks, 0)
+        if head == "v1" and array.size(toks) >= 3
+            pDate   := array.get(toks, 1)
+            pSymbol := array.get(toks, 2)
+        else if (head == "S" or head == "R") and array.size(toks) >= 4
+            price  = str.tonumber(array.get(toks, 1))
+            p2tok  = array.get(toks, 2)
+            price2 = p2tok == "." ? na : str.tonumber(p2tok)
+            array.push(lvPrice,  price)
+            array.push(lvPrice2, price2)
+            array.push(lvIsSup,  head == "S")
+            array.push(lvMajor,  array.get(toks, 3) == "major")
+            hasKey  = false
+            hasConf = false
+            for ti = 4 to array.size(toks) - 1
+                t = array.get(toks, ti)
+                if t == "key"
+                    hasKey := true
+                if t == "conf"
+                    hasConf := true
+            array.push(lvKey,  hasKey)
+            array.push(lvConf, hasConf)
+            array.push(lvNote, _parseNote(line))
+            array.push(lvState, 0)
+            array.push(lvDefenses, 0)
+        else if head == "P" and array.size(toks) >= 3
+            array.push(profKind,  array.get(toks, 1))
+            array.push(profPrice, str.tonumber(array.get(toks, 2)))
+
+// === Per-bar state machine (confirmed bars only; close-based, wicks are flush noise) ===
+if barstate.isconfirmed and array.size(lvPrice) > 0
+    for i = 0 to array.size(lvPrice) - 1
+        p    = array.get(lvPrice, i)
+        p2   = array.get(lvPrice2, i)
+        isSup = array.get(lvIsSup, i)
+        nearEdge = na(p2) ? p : (isSup ? math.max(p, p2) : math.min(p, p2))
+        farEdge  = na(p2) ? p : (isSup ? math.min(p, p2) : math.max(p, p2))
+        st = array.get(lvState, i)
+        touched = low <= nearEdge + touchTolerance and high >= nearEdge - touchTolerance
+        heldClose   = isSup ? close > nearEdge : close < nearEdge
+        brokenClose = isSup ? close < farEdge - touchTolerance : close > farEdge + touchTolerance
+        if st == 0 and touched
+            st := 1
+        if (st == 1 or st == 0) and brokenClose
+            st := 2
+        if st == 2 and heldClose
+            st := 3
+        if (st == 1 or st == 3) and touched and heldClose
+            array.set(lvDefenses, i, array.get(lvDefenses, i) + 1)
+        array.set(lvState, i, st)
+
+// === Helpers ===
+centerPrice = ta.sma(close, radiusSmooth)
+visHigh = ta.highest(high, visibleLookback)
+visLow  = ta.lowest(low,  visibleLookback)
+
+_shouldShow(float price, bool isKey, int st, bool isMajor) =>
+    pass = true
+    if not showMajor and isMajor
+        pass := false
+    if not showMinor and not isMajor
+        pass := false
+    if useRadius and math.abs(price - centerPrice) > radius
+        pass := false
+    if useVisible and (price > visHigh or price < visLow)
+        pass := false
+    if useSessionFilter and st >= 1
+        pass := false
+    if alwaysShowKey and isKey
+        pass := true
+    pass
+
+_stateWord(int st) =>
+    st == 0 ? "untouched" : st == 1 ? "held" : st == 2 ? "BROKEN" : "RECLAIMED"
+
+// === Draw (delete-and-redraw on last bar) ===
+var array<line>  _lines  = array.new<line>()
+var array<label> _labels = array.new<label>()
+var array<box>   _boxes  = array.new<box>()
+var table hud   = na
+var table stale = na
+
+if barstate.islast
+    for ln in _lines
+        line.delete(ln)
+    array.clear(_lines)
+    for lb in _labels
+        label.delete(lb)
+    array.clear(_labels)
+    for bx in _boxes
+        box.delete(bx)
+    array.clear(_boxes)
+
+    x1 = bar_index - historyBack
+    x2 = bar_index + extendRight
+
+    if array.size(lvPrice) > 0
+        for i = 0 to array.size(lvPrice) - 1
+            p     = array.get(lvPrice, i)
+            p2    = array.get(lvPrice2, i)
+            isSup = array.get(lvIsSup, i)
+            isMaj = array.get(lvMajor, i)
+            isKey = array.get(lvKey, i)
+            isCnf = array.get(lvConf, i)
+            note  = array.get(lvNote, i)
+            st    = array.get(lvState, i)
+            if not _shouldShow(p, isKey, st, isMaj)
+                continue
+            // broken support restyles as resistance (and vice versa)
+            effSup = st == 2 ? not isSup : isSup
+            baseCol = effSup ? cSup : cRes
+            alpha = isKey ? 0 : nonKeyAlpha
+            style = st == 2 ? line.style_dashed : (isMaj ? line.style_solid : line.style_dashed)
+            width = isMaj ? 2 : 1
+            if isCnf
+                width := width + 1
+            lineCol = color.new(baseCol, alpha)
+            if not na(p2)
+                array.push(_boxes, box.new(x1, math.max(p, p2), x2, math.min(p, p2),
+                     border_color=lineCol, border_width=1, bgcolor=color.new(baseCol, 88)))
+            array.push(_lines, line.new(x1, p, x2, p, xloc.bar_index, extend.none, lineCol, style, width))
+            if showLabels
+                tag = (isKey ? "K " : "") + (isCnf ? "◆ " : "") + str.tostring(p, "#.##")
+                     + (isSup ? " S" : " R") + (isMaj ? "*" : "")
+                     + (st == 3 ? " ↺" : st == 2 ? " ✕" : "")
+                     + (array.get(lvDefenses, i) > 0 ? " +" + str.tostring(array.get(lvDefenses, i)) : "")
+                txt = showNotes and str.length(note) > 0 ? tag + " — " + note : tag
+                // chart-left: labels sit at the left end; price axis owns the right edge
+                array.push(_labels, label.new(x1, p, txt, xloc.bar_index, yloc.price,
+                     color.new(color.black, 100), label.style_label_right, baseCol, size.small,
+                     tooltip=str.length(note) > 0 ? note : na))
+
+    if array.size(profPrice) > 0
+        for i = 0 to array.size(profPrice) - 1
+            pp = array.get(profPrice, i)
+            array.push(_lines, line.new(x1, pp, x2, pp, xloc.bar_index, extend.none,
+                 color.new(cProf, 30), line.style_dotted, 1))
+            if showLabels
+                array.push(_labels, label.new(x1, pp, str.upper(array.get(profKind, i)) + " " + str.tostring(pp, "#.##"),
+                     xloc.bar_index, yloc.price, color.new(color.black, 100),
+                     label.style_label_right, cProf, size.tiny))
+
+    // === Proximity HUD ===
+    if hudPos != "off"
+        pos = hudPos == "top_left" ? position.top_left : hudPos == "top_right" ? position.top_right :
+             hudPos == "bottom_left" ? position.bottom_left : position.bottom_right
+        if na(hud)
+            hud := table.new(pos, 4, 3, bgcolor=color.new(color.black, 80), border_width=1)
+        float bestAbove = na
+        float bestBelow = na
+        int   idxAbove  = na
+        int   idxBelow  = na
+        if array.size(lvPrice) > 0
+            for i = 0 to array.size(lvPrice) - 1
+                p = array.get(lvPrice, i)
+                if p > close and (na(bestAbove) or p < bestAbove)
+                    bestAbove := p
+                    idxAbove  := i
+                if p < close and (na(bestBelow) or p > bestBelow)
+                    bestBelow := p
+                    idxBelow  := i
+        table.cell(hud, 0, 0, "Mancini", text_color=color.white, text_size=size.small)
+        table.cell(hud, 1, 0, pDate, text_color=color.gray, text_size=size.small)
+        table.cell(hud, 2, 0, "", text_size=size.small)
+        table.cell(hud, 3, 0, "", text_size=size.small)
+        if not na(idxAbove)
+            table.cell(hud, 0, 1, "▲ " + str.tostring(bestAbove, "#.##"), text_color=cRes, text_size=size.small)
+            table.cell(hud, 1, 1, str.tostring(bestAbove - close, "#.#") + " pts", text_color=color.white, text_size=size.small)
+            table.cell(hud, 2, 1, array.get(lvMajor, idxAbove) ? "major" : "minor", text_color=color.gray, text_size=size.small)
+            table.cell(hud, 3, 1, _stateWord(array.get(lvState, idxAbove)), text_color=color.gray, text_size=size.small)
+        if not na(idxBelow)
+            table.cell(hud, 0, 2, "▼ " + str.tostring(bestBelow, "#.##"), text_color=cSup, text_size=size.small)
+            table.cell(hud, 1, 2, str.tostring(close - bestBelow, "#.#") + " pts", text_color=color.white, text_size=size.small)
+            table.cell(hud, 2, 2, array.get(lvMajor, idxBelow) ? "major" : "minor", text_color=color.gray, text_size=size.small)
+            table.cell(hud, 3, 2, _stateWord(array.get(lvState, idxBelow)), text_color=color.gray, text_size=size.small)
+
+    // === Staleness guard ===
+    chartDay = str.format_time(timenow, "yyyy-MM-dd", syminfo.timezone)
+    if str.length(payload) == 0
+        if na(stale)
+            stale := table.new(position.top_center, 1, 1, bgcolor=color.new(cStale, 10))
+        table.cell(stale, 0, 0, "NO PAYLOAD — paste the morning payload into settings",
+             text_color=color.white, text_size=size.large)
+    else if pDate != chartDay
+        if na(stale)
+            stale := table.new(position.top_center, 1, 1, bgcolor=color.new(cStale, 10))
+        table.cell(stale, 0, 0, "LEVELS FROM " + pDate + " — STALE", text_color=color.white, text_size=size.large)
+    else if not na(stale)
+        table.delete(stale)
+        stale := na
