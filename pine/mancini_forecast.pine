@@ -61,8 +61,11 @@ _parseNote(string line) =>
         note := na(i2) ? rest : str.substring(rest, 0, i2)
     note
 
+var int rawLineCount = 0
 if barstate.isfirst and str.length(payload) > 0
-    lines = str.split(payload, "\n")
+    // Windows clipboard/text-area round-trip can inject \r; strip defensively.
+    lines = str.split(str.replace_all(payload, "\r", ""), "\n")
+    rawLineCount := array.size(lines)
     for li = 0 to array.size(lines) - 1
         line = str.trim(array.get(lines, li))
         if str.length(line) == 0
@@ -231,8 +234,8 @@ if barstate.islast
                     idxBelow  := i
         table.cell(hud, 0, 0, "Mancini", text_color=color.white, text_size=size.small)
         table.cell(hud, 1, 0, pDate, text_color=color.gray, text_size=size.small)
-        table.cell(hud, 2, 0, "", text_size=size.small)
-        table.cell(hud, 3, 0, "", text_size=size.small)
+        table.cell(hud, 2, 0, str.tostring(array.size(lvPrice)) + " lvls", text_color=color.gray, text_size=size.small)
+        table.cell(hud, 3, 0, "ctr " + str.tostring(centerPrice, "#.#"), text_color=color.gray, text_size=size.small)
         if not na(idxAbove)
             table.cell(hud, 0, 1, "▲ " + str.tostring(bestAbove, "#.##"), text_color=cRes, text_size=size.small)
             table.cell(hud, 1, 1, str.tostring(bestAbove - close, "#.#") + " pts", text_color=color.white, text_size=size.small)
@@ -250,6 +253,11 @@ if barstate.islast
         if na(stale)
             stale := table.new(position.top_center, 1, 1, bgcolor=color.new(cStale, 10))
         table.cell(stale, 0, 0, "NO PAYLOAD — paste the morning payload into settings",
+             text_color=color.white, text_size=size.large)
+    else if array.size(lvPrice) == 0
+        if na(stale)
+            stale := table.new(position.top_center, 1, 1, bgcolor=color.new(cStale, 10))
+        table.cell(stale, 0, 0, "PAYLOAD PARSED (" + str.tostring(rawLineCount) + " lines) BUT 0 LEVELS — check format",
              text_color=color.white, text_size=size.large)
     else if pDate != chartDay
         if na(stale)
