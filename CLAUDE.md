@@ -10,7 +10,9 @@ You are a beads-first entity. Substantive work requires bead authorization.
 
 ```bash
 bd ready          # Check for open beads
-bd create task "Strader: <description>"  # Create a bead
+bd create "Strader: <title>" --type task -d "<description>"  # Create a bead
+# NEVER `bd create task "..."` — bd takes ONE positional (the title); a leading
+# 'task' word becomes the title and the real title is silently dropped [st-kq8]
 bd close <id>     # Close when done
 ```
 
