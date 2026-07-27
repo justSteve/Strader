@@ -85,12 +85,15 @@ if barstate.isfirst and str.length(payload) > 0
             array.push(lvMajor,  array.get(toks, 3) == "major")
             hasKey  = false
             hasConf = false
-            for ti = 4 to array.size(toks) - 1
-                t = array.get(toks, ti)
-                if t == "key"
-                    hasKey := true
-                if t == "conf"
-                    hasConf := true
+            // Pine for-loops iterate BACKWARD when start > end, so a 4-token
+            // line would read index 4 of a size-4 array. Guard the range.
+            if array.size(toks) >= 5
+                for ti = 4 to array.size(toks) - 1
+                    t = array.get(toks, ti)
+                    if t == "key"
+                        hasKey := true
+                    if t == "conf"
+                        hasConf := true
             array.push(lvKey,  hasKey)
             array.push(lvConf, hasConf)
             array.push(lvNote, _parseNote(line))
