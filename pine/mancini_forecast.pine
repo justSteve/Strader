@@ -220,7 +220,7 @@ if barstate.islast
                      + (array.get(lvDefenses, i) > 0 ? " +" + str.tostring(array.get(lvDefenses, i)) : "")
                 txt = showNotes and str.length(note) > 0 ? tag + " - " + note : tag
                 array.push(_labels, label.new(lblX, p, txt, xloc.bar_time, yloc.price,
-                     color.new(color.black, 100), label.style_label_right, baseCol, labelSz,
+                     color.new(color.black, 100), label.style_label_left, baseCol, labelSz,
                      tooltip=str.length(note) > 0 ? note : na))
 
     if array.size(profPrice) > 0
@@ -231,7 +231,7 @@ if barstate.islast
             if showLabels
                 array.push(_labels, label.new(lblX, pp, str.upper(array.get(profKind, i)) + " " + str.tostring(pp, "#.##"),
                      xloc.bar_time, yloc.price, color.new(color.black, 100),
-                     label.style_label_right, cProf, size.small))
+                     label.style_label_left, cProf, size.small))
 
     // === Proximity HUD ===
     if hudPos != "off"
