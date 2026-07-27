@@ -172,13 +172,15 @@ if barstate.islast
 
     x1 = bar_index - historyBack
     x2 = bar_index + extendRight
-    // Labels anchor to the LEFT EDGE OF THE VISIBLE SCREEN plus a small
-    // margin. chart.left_visible_bar_time refreshes on scroll/zoom but can
-    // return na on realtime-tick recalcs - an na anchor throws the label to
-    // the far left. Cache the last known-good value; fall back to history
-    // depth before the first scroll event ever fires.
+    // Labels anchor to the LEFT EDGE OF THE VISIBLE SCREEN plus a margin.
+    // Capture the anchor exactly ONCE per full recalc: `var lblXCache`
+    // re-initializes to na on every full recalc, and scroll/zoom/reset/
+    // settings changes all trigger full recalcs (where the visible-range
+    // built-in is correct). Realtime ticks re-execute only the last bar and
+    // find the cache already set - they must never move the anchor, because
+    // chart.left_visible_bar_time is not trustworthy mid-stream.
     int leftVis = chart.left_visible_bar_time
-    if not na(leftVis)
+    if na(lblXCache) and not na(leftVis)
         lblXCache := leftVis + labelMargin * timeframe.in_seconds() * 1000
     int lblX = na(lblXCache) ? time[historyBack] : lblXCache
     labelSz = labelSizeIn == "large" ? size.large : labelSizeIn == "small" ? size.small : size.normal
