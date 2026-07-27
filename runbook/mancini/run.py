@@ -408,6 +408,21 @@ def main(argv: list[str] | None = None) -> int:
         logger.warning("chart emit failed (non-fatal): %s", e)
         chart_path = None
 
+    # 3b2. Stable-renderer payload → Windows clipboard (#st-5rc). Non-fatal.
+    # Parallel-run: 3b keeps emitting the per-day script during migration week.
+    payload_path = None
+    try:
+        from . import payload_emitter
+
+        payload = payload_emitter.build_payload(result)
+        payload_path = CHARTS_ROOT / f"{result.date or day}.payload.txt"
+        payload_path.write_text(payload, encoding="utf-8")
+        rc = payload_emitter.push_clipboard(payload)
+        logger.info("stable-renderer payload: %s (%d bytes, clip rc=%d)",
+                    payload_path, len(payload.encode()), rc)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("payload emit failed (non-fatal): %s", e)
+
     # 3c. steves-desk Trading window: plan-day doc under the stable title
     # mancini-latest-es-plan.md. Non-fatal, same contract as the chart. [st-eo0]
     desk_path = None
