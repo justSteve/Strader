@@ -198,6 +198,22 @@ terms:
     on_the_chart: A thrust, a parry that fails, the thrust resumes (Steve's fencing frame, 2026-07-28). Bright / pinned / bright again, leg unbroken.
 
   # ── Leg tier (the archetypes) ────────────────────────────────────────────
+  - term: zigzag decomposition
+    tier: leg
+    status: ratified
+    live: hindsight
+    definition: >
+      The drawing rule that produces legs: redraw the day with the fewest
+      alternating strokes that capture every swing bigger than the reversal
+      threshold (20% of the day's final high-low range, floor 1.5 pts). A
+      stroke extends while price makes new extremes its way; a
+      beyond-threshold retracement ends it at its furthest point and starts
+      the opposite stroke. Sub-threshold wiggle is absorbed into the stroke
+      it happened during. Doubly hindsight: the threshold needs the final
+      range, and a stroke's end is knowable only after the retracement.
+      (Charting platforms ship the same idea as the ZigZag indicator,
+      usually fixed-percent; ours is day-relative.)
+    on_the_chart: The day traced with the fewest pen strokes — on 7/22 the threshold was 7.65 pts and the day compressed to four strokes.
   - term: leg
     tier: leg
     status: ratified
