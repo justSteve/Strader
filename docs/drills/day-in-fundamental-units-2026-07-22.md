@@ -102,7 +102,9 @@ words, which is what a **D-day** looks like from the inside.
 
 ## Epilogue — creatures not seen today
 
-Four archetypes sat this day out. Each gets its best real sighting:
+Four archetypes never appear on 7/22. So that you still meet them, here is
+each one's best sighting from *other* days in the 263-day corpus — real
+dates, real numbers, nothing staged:
 
 - **counterforce-leg** — price moving *through* opposing force. The corpus
   specimen is 2026-07-27, 08:30: **−81.75 points on net BUYING (+3,033)** —
