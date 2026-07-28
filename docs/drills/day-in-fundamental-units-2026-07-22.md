@@ -42,8 +42,8 @@ morning is thick with **probe-atoms** (high-effort round-trip minutes):
 By 09:06 the whole run is one **leg** — the zigzag's unit — and here the
 vocabulary earns its honesty clause. The leg: +28.25 points in 36 minutes,
 **pace** 0.792 against the flush-leg **cutpoint** of 0.75, **giveback** 0.009 — it kept
-essentially everything it took. Is it a **flush-leg**? By the cut, yes — but at
-pace 0.792 vs 0.75 the **archetype-grade** is ~0.01: a **coin-flip grade-band**
+essentially everything it took. Is it a **flush-leg**? By the cutpoint, yes — but at
+pace 0.792 the **archetype-grade** is ~0.01: a **coin-flip grade-band**
 call, honestly reported as the *flush-leg/steady-leg pair*. The label is not
 embarrassed; it is telling you exactly how much to lean on it. Its **force**
 (+4,183, signed delta — never confuse with unsigned effort) agrees with its
