@@ -137,7 +137,7 @@ def _render_brief(result: ParseResult) -> str:
     return "\n".join(lines)
 
 
-def _render_desk_plan(result: ParseResult) -> str:
+def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = None) -> str:
     """The prose plan-day doc for the steves-desk Trading window. [st-eo0]
 
     Same content contract as the hand-written myDesk/reports/mancini docs:
@@ -185,11 +185,13 @@ def _render_desk_plan(result: ParseResult) -> str:
         for l in sorted(extras, key=lambda l: l.price, reverse=True):
             label = f" — {l.label}" if l.label else ""
             lines.append(f"- {l.price:g} ({l.kind}){label}")
+    for section in (extra_sections or []):
+        lines += ["", section]
     lines.append("")
     return "\n".join(lines)
 
 
-def _emit_desk_plan(result: ParseResult) -> Path | None:
+def _emit_desk_plan(result: ParseResult, extra_sections: list[str] | None = None) -> Path | None:
     """Write the plan-day doc and refresh the Trading window's stable title.
 
     Non-fatal by contract (mirrors the chart emit): the parse artifacts are the
@@ -202,7 +204,7 @@ def _emit_desk_plan(result: ParseResult) -> Path | None:
         return None
     DESK_REPORTS.mkdir(parents=True, exist_ok=True)
     doc = DESK_REPORTS / f"mancini-es-{result.date}.md"
-    doc.write_text(_render_desk_plan(result), encoding="utf-8")
+    doc.write_text(_render_desk_plan(result, extra_sections), encoding="utf-8")
     logger.info("desk plan doc: %s", doc)
     if DESK_REFRESH.exists():
         proc = subprocess.run(["bash", str(DESK_REFRESH)],
@@ -428,7 +430,13 @@ def main(argv: list[str] | None = None) -> int:
     desk_path = None
     if not args.no_desk:
         try:
-            desk_path = _emit_desk_plan(result)
+            # Overnight interaction supplement (st-doz): what price has already
+            # done to the letter's levels since it was written. Never blocks —
+            # build_overnight_section degrades to a one-line note internally.
+            from . import overnight
+
+            desk_path = _emit_desk_plan(
+                result, extra_sections=[overnight.build_overnight_section(result)])
         except Exception as e:  # noqa: BLE001
             logger.warning("desk publish failed (non-fatal): %s", e)
 
