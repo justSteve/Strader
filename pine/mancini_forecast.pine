@@ -17,7 +17,7 @@ useVisible       = input.bool(false, "B. Visible-range only", group="Activation"
 visibleLookback  = input.int(150,    "Visible lookback (bars)", group="Activation", minval=10, maxval=2000)
 useSessionFilter = input.bool(false, "C. Hide touched-today levels", group="Activation")
 touchTolerance   = input.float(2,    "Touch tolerance (points)", group="Activation", minval=0, step=0.25)
-alwaysShowKey    = input.bool(true,  "Always show key levels", group="Activation")
+alwaysShowKey    = input.bool(false, "Always show key levels (ignores radius - stretches the scale)", group="Activation")
 nonKeyAlpha      = input.int(50,     "Non-key transparency (%)", group="Activation", minval=0, maxval=100)
 
 // === Display ===
