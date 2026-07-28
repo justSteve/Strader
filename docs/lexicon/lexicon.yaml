@@ -42,6 +42,8 @@ banned_bare:
   - {word: beat,     compounds: []}   # retired outright — "stages" ruling 2026-07-09
   - {word: move,     compounds: [leg]}  # unit sense; moves.jsonl keeps its filename
   - {word: level,    compounds: [plan-level, price-level, tick-level]}  # when ambiguity is possible
+  - {word: band,     compounds: [grade-band, VWAP-band]}  # certainty stripe vs price envelope — Steve catch 2026-07-28
+  - {word: terminal, compounds: [command-token, console-terminal]}  # grammar jargon retired — Steve catch 2026-07-28
 
 terms:
   # ── Axes (the measuring sticks) ──────────────────────────────────────────
@@ -100,13 +102,13 @@ terms:
     definition: >
       Grade <= 0.1 — within a whisker of the cell-boundary. 20.4% of atoms,
       19.3% of legs. Unreportable as a cell claim; report the straddled
-      pair ("F3/F4 coin-flip"). Banned as a bare CLI terminal.
+      pair ("F3/F4 coin-flip"). Banned as a bare command token in the CLI grammar.
     on_the_chart: A column you could argue either way about — the honest label admits it.
   - term: lean band
     tier: band
     status: provisional   # collides with directional "lean" — ruling-round flag
     live: hindsight
-    definition: Grade 0.1-0.3 (32.5% atoms / 28.7% legs). Reportable with band attached.
+    definition: Grade 0.1-0.3 (32.5% atoms / 28.7% legs). Reportable with the grade-band attached.
     on_the_chart: Readable but not shout-it-across-the-room.
   - term: solid band
     tier: band
