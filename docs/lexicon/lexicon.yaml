@@ -44,6 +44,7 @@ banned_bare:
   - {word: level,    compounds: [plan-level, price-level, tick-level]}  # when ambiguity is possible
   - {word: band,     compounds: [grade-band, VWAP-band]}  # certainty stripe vs price envelope — Steve catch 2026-07-28
   - {word: terminal, compounds: [command-token, console-terminal]}  # grammar jargon retired — Steve catch 2026-07-28
+  - {word: cut,      compounds: [cutpoint]}  # classification line vs cutting a position — Steve catch 2026-07-28
 
 terms:
   # ── Axes (the measuring sticks) ──────────────────────────────────────────
@@ -82,7 +83,7 @@ terms:
     tier: axis
     status: ratified
     live: hindsight
-    definition: Leg extreme-points per minute; corpus tercile cuts 0.38 / 0.75.
+    definition: Leg extreme-points per minute; corpus tercile cutpoints 0.38 / 0.75.
     on_the_chart: How steep the leg looks on the candle companion chart.
   - term: giveback
     tier: axis
@@ -95,6 +96,18 @@ terms:
     on_the_chart: The pullback from the leg's furthest point before the next leg starts.
 
   # ── Grade bands (how sure a label is) ────────────────────────────────────
+  - term: cutpoint
+    tier: band
+    status: ratified
+    live: n/a (a property of definitions, not of tape)
+    definition: >
+      A dividing line in a classification — pace 0.75 is the flush-leg
+      cutpoint; the archetype-grade measures distance from it. Distinct
+      from a threshold, which TRIGGERS an event when crossed (the reversal
+      threshold ends a leg; the 150-contract delta threshold fires the
+      flip-stage). Cutpoints sort; thresholds act. Bare "cut" is banned in
+      definitions — in speech it keeps its trading sense: cutting a position.
+    on_the_chart: Nothing — cutpoints live in the grading, not on the tape.
   - term: coin-flip band
     tier: band
     status: ratified

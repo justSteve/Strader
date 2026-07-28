@@ -41,7 +41,7 @@ morning is thick with **probe-atoms** (high-effort round-trip minutes):
 
 By 09:06 the whole run is one **leg** — the zigzag's unit — and here the
 vocabulary earns its honesty clause. The leg: +28.25 points in 36 minutes,
-**pace** 0.792 against the flush-leg cut of 0.75, **giveback** 0.009 — it kept
+**pace** 0.792 against the flush-leg **cutpoint** of 0.75, **giveback** 0.009 — it kept
 essentially everything it took. Is it a **flush-leg**? By the cut, yes — but at
 pace 0.792 vs 0.75 the **archetype-grade** is ~0.01: a **coin-flip grade-band**
 call, honestly reported as the *flush-leg/steady-leg pair*. The label is not
@@ -62,7 +62,7 @@ it took.
 ## Act III — the escalator (09:44 → 11:20)
 
 The recovery is the slowest big leg of the day: +31.50 points across 96
-minutes at pace 0.336 — under the 0.38 cut, effect in the 76th percentile —
+minutes at pace 0.336 — under the 0.38 cutpoint, effect in the 76th percentile —
 a **leg-grind**, the trend-day crawl that never offers a clean entry. Its
 force is enormous and aligned (+9,757): patient, paid-for buying. The 09:46
 confirmation-event at 7533 (the recognizer's fourth and final of the day)
