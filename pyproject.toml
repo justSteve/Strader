@@ -14,7 +14,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4"]
+dev = ["pytest>=7.4", "pyyaml>=6"]  # pyyaml: lexicon-as-code linting [st-g9y]
 # Feed extras: the carried infra's optional deps. Enumerated (unpinned) here as a
 # starting inventory; versions get pinned as each feed is exercised end-to-end.
 feeds = [

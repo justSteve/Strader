@@ -1,0 +1,394 @@
+# PA Lexicon v1 — the controlled vocabulary for price-action description. [st-g9y]
+#
+# Source of truth for how Strader's surfaces (code enums, record fields, drill
+# labels, coach speech, CLI grammar terminals) name price action. Derived from
+# the measured taxonomy (docs/measurement/orderflow-fundamental-units.md,
+# corpus run 20260728T123632Z) and the conflict inventory
+# (docs/research/2026-07-28-pa-vocabulary-consistency-review.md).
+#
+# Reading guide for Steve: `on_the_chart` is what the term looks like on the
+# FootPrint drill surface (or candlesticks where noted). `live` says whether
+# the thing is knowable in the moment (live) or only after the fact
+# (hindsight) — your yea/nay decisions can only ever be asked about live
+# terms; hindsight terms are how the tape gets graded afterward.
+
+meta:
+  version: 1
+  date: 2026-07-28
+  bead: st-g9y
+  conventions:
+    compound_term: >
+      A word that crosses domain boundaries never appears bare in a
+      definition or emission — it carries a disambiguating partner word
+      (delta-flip vs GEX-flip; flush-leg vs flush-stage). Bare use in
+      conversation is tolerated only when context is unambiguous.
+    grades_not_gates: >
+      Cell, band, and archetype membership are graded coordinates, never
+      identities. Say "graded F1 at 0.62", never "is F1". A coin-flip-band
+      label is unreportable bare — report the straddled pair.
+
+# Words that must NEVER appear bare in definitions, emissions, or CLI
+# terminals. Each names its compounds.
+banned_bare:
+  - {word: flush,    compounds: [flush-stage, flush-leg]}
+  - {word: stall,    compounds: [stall-stage, absorption-stall, micro-stall]}
+  - {word: flip,     compounds: [flip-stage, delta-flip, GEX-flip]}
+  - {word: confirm,  compounds: [confirm-stage, confirmation-event]}
+  - {word: trap,     compounds: [leg-boundary-trap, trapped-trader-level]}
+  - {word: pivot,    compounds: [pivot-atom, pivot-level]}
+  - {word: grind,    compounds: [leg-grind]}
+  - {word: probe,    compounds: [probe-atom, probe-fade, auction-probe]}
+  - {word: boundary, compounds: [cell-boundary, leg-boundary-trap]}
+  - {word: beat,     compounds: []}   # retired outright — "stages" ruling 2026-07-09
+  - {word: move,     compounds: [leg]}  # unit sense; moves.jsonl keeps its filename
+  - {word: level,    compounds: [plan-level, price-level, tick-level]}  # when ambiguity is possible
+
+terms:
+  # ── Axes (the measuring sticks) ──────────────────────────────────────────
+  - term: effort
+    tier: axis
+    status: ratified
+    live: live
+    definition: Unsigned volume traded in a unit — how much fuel was spent.
+    on_the_chart: Cell brightness and the size of the footer volume number.
+  - term: effect
+    tier: axis
+    status: ratified
+    live: live
+    definition: >
+      Price movement produced. Two faces: displacement (close minus open,
+      signed) and travel (high minus low). A unit can travel far and
+      displace nothing — that is a fight, not stillness.
+    on_the_chart: How far the column's cells span (travel) vs where it closes relative to where it opened (displacement).
+  - term: force
+    tier: axis
+    status: ratified
+    live: live
+    definition: >
+      Signed delta — buy-aggression minus sell-aggression. NOT the same as
+      effort (unsigned). The two axes are never interchangeable.
+    on_the_chart: The footer delta number and its color.
+  - term: travel-ratio
+    tier: axis
+    status: ratified
+    live: live
+    definition: >
+      Displacement divided by travel, 0-1. 1 = one-way traffic; near 0 =
+      full round trip inside the unit. Marks structure the unit's net hides.
+    on_the_chart: A tall column that closes where it opened has travel-ratio near 0 — the wick-heavy silhouette.
+  - term: pace
+    tier: axis
+    status: ratified
+    live: hindsight
+    definition: Leg extreme-points per minute; corpus tercile cuts 0.38 / 0.75.
+    on_the_chart: How steep the leg looks on the candle companion chart.
+  - term: giveback
+    tier: axis
+    status: ratified
+    live: hindsight
+    definition: >
+      Fraction of a leg's extreme surrendered by its end. Measured fact:
+      big legs keep what they take (flush-leg median giveback 0.05);
+      giveback concentrates in small legs.
+    on_the_chart: The pullback from the leg's furthest point before the next leg starts.
+
+  # ── Grade bands (how sure a label is) ────────────────────────────────────
+  - term: coin-flip band
+    tier: band
+    status: ratified
+    live: hindsight
+    definition: >
+      Grade <= 0.1 — within a whisker of the cell-boundary. 20.4% of atoms,
+      19.3% of legs. Unreportable as a cell claim; report the straddled
+      pair ("F3/F4 coin-flip"). Banned as a bare CLI terminal.
+    on_the_chart: A column you could argue either way about — the honest label admits it.
+  - term: lean band
+    tier: band
+    status: provisional   # collides with directional "lean" — ruling-round flag
+    live: hindsight
+    definition: Grade 0.1-0.3 (32.5% atoms / 28.7% legs). Reportable with band attached.
+    on_the_chart: Readable but not shout-it-across-the-room.
+  - term: solid band
+    tier: band
+    status: ratified
+    live: hindsight
+    definition: Grade 0.3-0.6 (31.3% / 29.0%). Reliable.
+    on_the_chart: You would call it the same way twice.
+  - term: strong band
+    tier: band
+    status: ratified
+    live: hindsight
+    definition: Grade > 0.6 (15.8% / 23.0%). Survives any reasonable reclassification.
+    on_the_chart: Unmistakable — the textbook example you would screenshot.
+
+  # ── Atom tier (1 minute) ─────────────────────────────────────────────────
+  - term: atom
+    tier: atom
+    status: ratified
+    live: live (raw) / hindsight (graded)
+    definition: >
+      One clock minute of tape: net, range, travel-ratio, effort, force —
+      live at minute close. Its percentile grades and F-cell are
+      day-relative, hence hindsight.
+    on_the_chart: Roughly 2-4 footprint columns' worth of tape at typical pace (columns are volume-bars, not minutes).
+  - term: F1 conviction
+    tier: atom
+    status: ratified
+    live: hindsight
+    definition: High effort AND high effect — the movement is being paid for. 34.7% of atoms.
+    on_the_chart: Bright cells, wide span, big footer delta agreeing with direction.
+  - term: F2 absorption
+    tier: atom
+    status: ratified
+    live: hindsight
+    definition: >
+      High effort, low effect — someone is standing there. 16.0% of atoms.
+      82.5% of all range-travel the 1-minute lens discards hides inside F2
+      cells: absorption minutes are internally violent.
+    on_the_chart: Bright cells piled at the same prices, column going nowhere — the pile-up without the march.
+  - term: F3 hollow
+    tier: atom
+    status: ratified
+    live: hindsight
+    definition: Effect without effort — price drifting on air. 22.4% of atoms.
+    on_the_chart: Dim cells but the column spans far; nobody paid for the trip.
+  - term: F4 dead
+    tier: atom
+    status: ratified
+    live: hindsight
+    definition: Neither effort nor effect. 26.9% of atoms.
+    on_the_chart: Dim, short, forgettable.
+  - term: doji-atom
+    tier: atom
+    status: ratified
+    live: live
+    definition: Travel-ratio exactly 0 (open = close). 8.0% of atoms — the pure-rotation marker.
+    on_the_chart: The column that ends where it began.
+  - term: probe-atom
+    tier: atom
+    status: ratified
+    live: hindsight
+    definition: >
+      High-effort round-trip minute (effort_pct > 80, travel < 0.3).
+      ~6.7/day, 75.3% graded F2. Confirmation events co-locate with them
+      at 37.1% vs a 16.2% base — but no better than high-effort one-way
+      minutes: effort is the signal, the round trip is texture.
+    on_the_chart: A violent column that slams back to where it started — the sub-minute fight compressed.
+  - term: pivot-atom
+    tier: atom
+    status: ratified
+    live: hindsight
+    definition: >
+      The shared border minute between consecutive legs (leg k's last =
+      leg k+1's first). 63% graded F1 — legs die hot, by opposition, not
+      exhaustion.
+    on_the_chart: The loud column at the turn — NOT a quiet fade.
+  - term: micro-stall
+    tier: atom
+    status: ratified
+    live: hindsight
+    definition: >
+      The interior "1-2-1" cell motif — conviction, absorption, conviction
+      resuming — a sub-leg pause. Partner word micro- distinguishes it from
+      stall-stage (episode tier).
+    on_the_chart: Bright / pinned / bright again, without the leg turning.
+
+  # ── Leg tier (the archetypes) ────────────────────────────────────────────
+  - term: leg
+    tier: leg
+    status: ratified
+    live: hindsight
+    definition: >
+      One element of the day's zigzag (reversal threshold 20% of final day
+      range, floor 1.5 pts). Median 15 min, 7.25 pts. The unit the
+      archetypes name. ("Move" is retired as a unit word; option-structure
+      legs must compound as option-leg / spread-leg.)
+    on_the_chart: One directional swing on the candle companion — the thing you'd draw with one pen stroke.
+  - term: flush-leg
+    tier: leg
+    status: ratified
+    live: hindsight
+    definition: >
+      Fast and big — pace >= 0.75, effect >= 70. 13.7% of legs; median
+      16.75 pts in 16 min, giveback 0.05. 76% occur on D-days. The
+      tradeable V-dump leg.
+    on_the_chart: The steep cliff. On candlesticks — the elevator-down (or up) you already recognize.
+  - term: steady-leg
+    tier: leg
+    status: ratified
+    live: hindsight
+    definition: >
+      Mid-pace pure-conviction residual; the most force-confirmed class
+      (alignment 0.95). ~18% of legs. The "trust the tape" reference.
+    on_the_chart: A clean staircase — direction, pace, and delta all agreeing.
+  - term: leg-grind
+    tier: leg
+    status: ratified
+    live: hindsight
+    definition: >
+      Slow but big — pace < 0.38, effect >= 70. 6.0% of legs, median 66
+      min. Over-indexes P-days (trend-day crawl).
+    on_the_chart: The all-afternoon escalator that never gives an entry.
+  - term: counterforce-leg
+    tier: leg
+    status: ratified
+    live: hindsight
+    definition: >
+      Big leg whose delta disagrees with its direction (effect >= 60,
+      force misaligned). 4.2%; skews DOWN 41/28 — price falling through
+      net buying: trapped-buyer drops. (Renamed from "squeeze-leg" — squeeze
+      is an up-cloud word; the bare name would have baked in a direction
+      inversion.)
+    on_the_chart: Falling prices with blue (buy) footers — the tape arguing with itself. Direction Inversion Watch territory.
+  - term: absorption-stall
+    tier: leg
+    status: ratified
+    live: hindsight
+    definition: Leg-scale F2 — heavy effort, little net progress. 9.6% of legs.
+    on_the_chart: A fat sideways smear of bright columns.
+  - term: hollow-glide
+    tier: leg
+    status: ratified
+    live: hindsight
+    definition: Leg-scale F3 — distance covered on thin participation. ~8% of legs.
+    on_the_chart: A drift you could wave your hand through.
+  - term: probe-fade
+    tier: leg
+    status: ratified
+    live: hindsight
+    definition: >
+      Small leg that pokes out and surrenders it — giveback >= 0.30 with
+      effect < 50. 7.8% of legs.
+    on_the_chart: The failed little excursion — out, nothing there, back.
+  - term: dead-drift
+    tier: leg
+    status: ratified
+    live: hindsight
+    definition: The residual majority — 32.4% of legs. Nothing happening, honestly labeled.
+    on_the_chart: The chop between the stories.
+
+  # ── Day tier ─────────────────────────────────────────────────────────────
+  - term: day-sequence
+    tier: day
+    status: ratified
+    live: hindsight
+    definition: >
+      The session's ordered archetype string — a day-type read from the
+      inside. 2026-07-22 reads flush-leg, steady-leg, leg-grind, steady-leg.
+    on_the_chart: The day's story told in four to eight words.
+
+  # ── Episode tier (the recognizer's live world — your existing words live here) ──
+  - term: episode
+    tier: episode
+    status: deferred   # container word unresolved: engagement / instance / recognition / episode
+    live: live
+    definition: >
+      The recognizer's unit of work at 2,000-trade bar resolution — one
+      engagement of one anchor through the four stages. LIVE — this is the
+      tier that emits in real time and the tier your yea/nay rides on.
+    on_the_chart: The Anatomy row in the drill; the thing the coach arms and walks.
+  - term: flush-stage
+    tier: stage
+    status: ratified
+    live: live
+    definition: >
+      Stage 1 — aggressive break through a price-level. Sub-minute;
+      invisible to atoms. Leg-scale correlate: the flush-leg.
+    on_the_chart: The spike through the armed plan-level — often inside a single column.
+  - term: stall-stage
+    tier: stage
+    status: ratified
+    live: live
+    definition: >
+      Stage 2 — aggression continues, extreme stops extending. Atom-scale
+      correlate: F2-in-tail (absorption-death), which lifts the
+      confirm-conditional from 0.46 to 0.60.
+    on_the_chart: Sellers still hitting, lows shrinking — the pile-up (7/22 footers 1-3).
+  - term: flip-stage
+    tier: stage
+    status: ratified
+    live: live
+    definition: >
+      Stage 3 — delta turns against the break (threshold 150 contracts,
+      ~7% of bar volume: machine-legible, not eye-legible). Its 1-minute
+      shadow is the pivot-atom.
+    on_the_chart: You will NOT see it in cells; the coach calls it. Footer sign change is the after-the-fact trace.
+  - term: confirm-stage
+    tier: stage
+    status: ratified
+    live: live
+    definition: >
+      Stage 4 — a close back across the price-level with opposite evidence. The
+      recognizer emission is a confirmation-event. Atom correlate: the
+      conviction head ("11"/"111" leg openings).
+    on_the_chart: The retake candle/column closing back through the price-level.
+  - term: sweep-print
+    tier: primitive
+    status: ratified
+    live: live
+    definition: >
+      One aggressive order eating multiple book price-levels (>= 3 ticks).
+      Your candlestick-hindsight "sweep" — it kept its name, compounded.
+    on_the_chart: The long single-print tail; on candles, the wick you already spot.
+  - term: absorption-read
+    tier: primitive
+    status: ratified
+    live: live
+    definition: >
+      Book-level verdict — aggressor threw size, passive side refilled
+      (from MBP-1 quotes). Outcome word (held/broke/lifted-away) is
+      currently prose-only; enum field is queued code work.
+    on_the_chart: Price pinned while the footer volume climbs; needs book data to grade.
+  - term: delta-divergence
+    tier: primitive
+    status: ratified
+    live: live
+    definition: New price extreme on weaker aggression than the prior extreme — the exhaustion tell.
+    on_the_chart: New low, smaller red footer than the last low made.
+  - term: imbalance-stack
+    tier: primitive
+    status: ratified
+    live: live
+    definition: ">= 3 consecutive diagonal bid/ask dominances (3:1) — one side owning a price ladder."
+    on_the_chart: A diagonal run of lopsided cells.
+
+  # ── Level-state tier (the Pine renderer's close-based words) ─────────────
+  - term: level-state
+    tier: level-state
+    status: ratified
+    live: live
+    definition: >
+      The renderer's per-plan-level state machine, close-based:
+      untouched -> tested/held -> broken -> reclaimed. RECLAIMED is the
+      failed-breakdown pattern rendered in place — the same market event
+      the episode tier confirms from orderflow, on a slower clock.
+    on_the_chart: The plan-level line's color/style and state word in the HUD on the /ES chart.
+
+  # ── Cross-tier signatures (the trading discoveries) ──────────────────────
+  - term: V-signature
+    tier: signature
+    status: ratified
+    live: hindsight   # live trigger (provisional-pivot) is unbuilt future work
+    definition: >
+      Prior down flush-leg <= -8 pts, confirmation-event within 3 min of
+      the new up-leg. 77.5% wins vs 46.9% base (31/40, hindsight
+      attribution). The measured V-dump fly entry.
+    on_the_chart: The cliff, the turn, the immediate retake — your butterfly setup in taxonomy words.
+  - term: host-leg
+    tier: signature
+    status: ratified
+    live: hindsight
+    definition: >
+      The leg containing a confirmation-event. Direction agreement splits
+      win rate 66% vs 19% — the strongest single hindsight separator.
+      Stays a diagnostic until a live proxy exists.
+    on_the_chart: Is the setup swimming with or against the swing it lives inside.
+  - term: leg-boundary-trap
+    tier: signature
+    status: ratified
+    live: hindsight
+    definition: >
+      Down-leg dying by absorption (F2 tail) then an up-leg opening on
+      conviction — the four-stage sequence at leg scale. 27.6% of down-up
+      pairs; stall-conditional 0.60 vs 0.46.
+    on_the_chart: Pile-up at the low, loud turn, bright staircase out.
