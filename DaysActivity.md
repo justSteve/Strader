@@ -1,46 +1,56 @@
-# DaysActivity - 2026-07-25
+# DaysActivity - 2026-07-28
 
-## 17:28 - Session Handoff [Runaway Gauge + Cron PATH + Desk Autostart]
+## 18:45 - Session Handoff [Taxonomy + Lexicon + Training Package — the Vocabulary Front]
 
-**Summary**: Saturday maintenance session. Tap-in surfaced two P1 defects that had gone unread since Friday; both were fixed, tested, committed and pushed, and the cross-repo half was handed to COO as an A2A memo. The MI gauge daemon (PID 177811) had run 27 hours from Friday 09:12 CT into Saturday afternoon with no stop condition, writing dead-market rows into Friday's capture file at one row per minute; the morning Mancini cron had died Friday on `FileNotFoundError: 'az'` because the Azure CLI resolves only through WSL interop and cron's PATH omits it. Two subagents ran the fixes in parallel. Steve killed the daemon and authorized the `remain-on-exit` change, the commits, the push, and the memo.
+**Summary**: One continuous session spanning Sat 07-25 evening → Mon 07-28 evening. The arc: took over the replay-drill stack from COO's concurrent work, ran the first drills, then — driven by Steve's directives — built the entire vocabulary front end-to-end: corpus-wide recognizer precision measurement (acuity run 2 LEG B), the fundamental-units taxonomy (ultracode, 11 agents, adversarially verified), lexicon.yaml v1 with a CI linter, a measured day-narrative teaching surface, and the generalized five-channel training package (essays/checks/deck/audio). Steve made two standing rulings recorded to memory: he is risk authority, not PA-correctness arbiter (hindsight holds confirmation authority; LEG A retired), and teaching surfaces must embed chart figures (st-flu, parked deliberately). Six of Steve's live catches became lexicon law. Also: DataBento backfill completed after his billing fix (10/10 days + forward cron verified), the 7/22 Mancini pre/tape/post package with a $0.08 pre-market verification proving his "flushed 7506" exact (7504.0 at 07:56:53 CT), a bd-create silent-title-drop defect memo to COO, and a live EOD fly call + rescind graded correct by the close.
 
 **Open Work**:
-- st-i68 ("Morning Mancini cron fails on cron PATH — Azure CLI not resolvable", P1, in_progress) — the in-repo half is shipped and Monday 07-27 06:30 CT is safe on it alone; closes when COO applies or explicitly skips the wrapper patch proposed in the memo
-- st-66u ("Runbook #11 implementation — heartbeat: did pull/parse/gate run before the open", P1, open) — to be widened from "did it run" to also cover *unread alerts*; the 7/24 health alert fired correctly and sat ~19h until the next tap-in read it
-- st-3fr ("Strader: MI composite gauge — internals-driven entry/exit scale", P2) — forward-capture sample is now trimmed and trustworthy; calibration work itself untouched this session
-- COO owes three answers (memo section "Requested from COO"): apply/adapt the wrapper patch; rule on hoisting PATH composition into `factory/factory.env`; state whether the corpus-cron handover to Strader is near enough (live date 08-01) that the structural fix should land with the migration instead
+- **st-ndc (P1)** — Schwab refresh token expires ~Thu 07-30 05:49 CT; re-auth needed before then. **8/1 live date is Saturday**; P1 readiness lane: st-096 (Schwab online), st-958 (risk-state reset), st-66u (heartbeat + unread alerts)
+- **st-055** — replay-drill stack complete; closes when Steve sits a full day. 07-15 drill armed (levels 7573/7566/7553/7547/7533); 7/22 reversed-drill partially walked; bridge stopped at session end
+- **Evaluation session** (checks-09) — Steve's call after he cycles narrative → audio → essays → cards; passing unlocks drills per his recognition-before-reflex ruling. Deck import needs COO's bridge (`tools/anki/deck-import.sh`) or Steve
+- **st-g9y** — lexicon v1 shipped; remaining: extend the bare-word linter to code emissions + drill surfaces; container-word (episode/engagement/instance) and lean-band rulings deferred
+- **st-vqa** — x-ray harness design (deterministic watcher 90%, agent at pivotal moments); v1 slice for live week = alerts-to-desk + standing coach session 13:00–15:00
+- **st-98z** — recognizer refinement backlog (developing-day-type gate, re-fire damping ≥4th fire 33%, stacked-confirm branch 0/353 dead-path inspection, proximity gate)
+- **st-btu** — Phase B capture-window ruling: pre-market extension (the 7/22 7506 trap printed 07:56, invisible to RTH corpus)
+- **st-d5g** — bar indexing 1-based everywhere (drill footer is 0-based, progress readout 1-based — internally inconsistent today); **st-mmy** glanceable delta footers; **st-flu** figures infrastructure (palette validated both modes, build parked at Steve's direction)
+- **st-i68** — in-repo half shipped 07-25; still awaiting COO on the wrapper patch. **st-kq8** — bd-create defect memo delivered; awaiting COO ack. **st-3c4/st-5rc** — renderer implemented by concurrent session; Steve reports labels still jumping left + wants font +2 (logged on st-5rc, unverified which surface)
+- 7/28 annotations file carries Steve's live EOD call (fly 7455/7470/7485 @ .05, rescinded) + settlement grade — feed into the day's hindsight review when 7/28 tape lands (cron 07-29 06:30)
 
 **Tried**:
-- Asserted the tap-in `ps` snapshot was "~50 minutes stale" → wrong; derived the interval from an `11:45Z` log timestamp without reading the clock, on a box running Central. It was seven minutes. Steve called it out. Read the clock, never subtract timestamps by eye — recorded as a corollary in the liveness auto-memory
-- First-draft COO wrapper patch used a wholesale `export PATH="…"` replacement → wrong idiom; COO's own `pulse-zepos-wrapper.sh` (lines 23–32) solves the identical cron-PATH problem additively with `export PATH="${GO_BIN}:${PATH}"`. Rewritten append-style (`"${PATH}:${AZ_WBIN}"`), re-verified under `env -i HOME=/root PATH=/usr/bin:/bin` → resolves az 2.83.0. Caught only because the wrapper was read directly rather than trusting the subagent's report
-- Subagent reported "mirrored copies" of COO's wrapper at `/mnt/wslg/distro/root/projects/COO/…` that might drift → false. `stat` shows inode 56293 on device 2096 for both paths: one file through a bind mount. Retracted explicitly in the memo before COO could spend time on it. No second copy exists in the distro tree
-- Trim of the 7/24 capture had to be run twice → the first trim (435 rows) was re-polluted to 470 because the runaway daemon was still appending during the fix. Kill first, then trim. Re-trim needed no date arithmetic: every polluted row carries a `2026-07-25` timestamp, so a `grep '"ts": "2026-07-24'` filter is sufficient and exact
-- tap-in filed st-i68 with the literal title `task` → uncitable in a memo and invisible in `bd propername`. Retitled before writing. Worth watching whether bead-filing from tap-in drops titles generally
-- `pytest -q` from `pyproject.toml` addopts plus an explicit `-q` becomes `-qq` and suppresses the pass/fail summary line entirely → use the exit code, or drop the extra `-q`. Cost several confused runs before the count appeared
-
-**Decisions**:
-- `remain-on-exit` switched `on` → `failed` (Steve). Before st-5n8 the gauge never exited cleanly so the two settings behaved identically; now that 15:15 CT is a clean exit, `on` would park a dead pane on the desk nightly. The final read is already durable in the capture file
-- The caller-side "verify steves-desk is up before presenting" step is **retired** (Steve). The gauge start path now brings the desk up on demand, so callers stop checking. The adjacent rule — never *assert* something is running from a stale check — stands, scoped in memory to assertions only: check before you claim, not before you act
-- A gauge found alive outside the session window is logged as a WARN and never killed from cron; that stays a human call
-- The COO wrapper patch was written as a proposal, not applied — cross-repo writes need separate authorization, and PATH composition is COO's structural call, not Strader's
+- Asserted "settlement 7433.99, fly expired worthless" **12 minutes before the close** → Steve caught it ("we are still 7 minutes from close"). Cause: read an index's absent bid/ask as market-closed. Liveness memory now carries corollary 2: no settlement/expiry claims before the bell; market outcomes pre-close are probabilities with "as of <time>"
+- Told Steve "screen bars = my table +1" without verifying the drill surface's numbering → wrong; the column footers print 0-based record indices (and disagree with the page's own 1-based progress readout). His "10 ticks" observation exposed it. Never send a bar pointer without checking the payload
+- `bd create task "title"` → bd binds "task" as the title and **silently drops the real title** (one positional). Seven corruptions in four days across three callers, all following CLAUDE.md's own stale syntax. CLAUDE.md fixed; memo to COO (docs/a2a/2026-07-27-strader-to-coo-bd-create-silent-title-drop.md); never pre-name bead IDs in prose either — twice guessed wrong before create returned
+- DataBento estimate succeeding proves nothing about billing — estimates are free; the 402 fires only on purchase. First backfill retry 402'd after the "fix"; second attempt (Steve found the real portal setting) went clean
+- Custom-window corpus pulls **append into the RTH corpus day-file** (`databento_glbx_es_path`) — a pre-market pull via the stock script would contaminate replay. Used a scratchpad-only variant for the 07:56 verification
+- Adversarial verification earns its cost: Draft 1's 1.9× enrichment mixed two definitions (real: 1.47×); the "absorption-before-wins 35.6%" claim was irreproducible and likely sign-inverted (withdrawn); the whole grading substrate was unlabeled hindsight until the gates-attack forced the rider. The counterexample verifier reproduced every surviving number exactly
+- Python heredoc string replacements silently miss when text wraps across lines — two lexicon/narrative sweeps "succeeded" while leaving bare words; grep-verify after every prose sweep
 
 **Files Changed**:
-scripts/mi_gauge.py
-scripts/cron/gauge-preopen-wrapper.sh
-runbook/mancini/fetch.py
-scripts/session_review.py
-tests/scripts/test_mi_gauge_session_stop.py
-tests/scripts/test_gauge_preopen_wrapper.py
-tests/runbook/test_fetch.py
-docs/a2a/2026-07-25-strader-to-coo-cron-path-az.md
-archive/DaysActivity-2026-07-23.md
-data/corpus/2026-07-24/mi_gauge_live.jsonl
-data/corpus/2026-07-24/mi_gauge_live.raw.jsonl
+market/orderflow/moves.py
+market/orderflow/anchors.py (review only)
+scripts/acuity_run2.py
+scripts/moves_sweep.py
+scripts/lexicon_render.py
+docs/lexicon/lexicon.yaml
+tests/docs/test_lexicon.py
+tests/market/orderflow/test_moves.py
+docs/measurement/recognizer-acuity-run2.md
+docs/measurement/orderflow-fundamental-units.md
+docs/research/2026-07-28-pa-vocabulary-consistency-review.md
+docs/drills/day-in-fundamental-units-2026-07-22.md
+docs/foundation/09-fundamental-units.md
+docs/training/training-package-pipeline.md
+docs/training/checks-09-fundamental-units.md
+docs/training/decks/foundation-09-fundamental-units.tsv
+docs/training/notebooklm/fundamental-units-source.md
+docs/a2a/2026-07-25-strader-to-coo-personal-projects-roster.md
+docs/a2a/2026-07-27-strader-to-coo-bd-create-silent-title-drop.md
+CLAUDE.md
+pyproject.toml
+data/measurement/replay/signals_2026-07-{15,22}.jsonl (runs appended)
+data/measurement/replay/annotations_2026-07-28.jsonl
+data/corpus/2026-07-{23,24}/databento_glbx_es_mbp1.jsonl (backfilled)
 
-**Commits**: 5cee846 (gauge, st-5n8 + st-r3f) · 5e1f267 (mancini az, st-i68) · 1e6cf81 (log housekeeping) · a2bf571 (A2A memo, st-i68) — pushed, tree clean. Suite green at this session's HEAD (461) and re-verified at repo HEAD after the concurrent work below: **464 passed / 0 failed** across `tests/`, `strader/tests`, `runbook/mancini/tests`.
-
-**Concurrent session**: this was not the only session in the repo today. Between 15:18 and 17:28 CT another session committed under the same git identity — 20ee4e2 (Mancini stable renderer design spec, st-3c4), dceed36 (replay-drill plan update, st-ve6 + st-055), and three st-055 refactors extracting the shared day-anchor rule into `anchors.py` and the `full_stack_events` drive loop out of `parity_run`. None of that is described by this entry and it should get its own handoff. Flagged because the two sessions' work interleaves in the same history and the orderflow/parity refactors were not reviewed here.
-
-**Beads Closed**: st-5n8 (MI gauge daemon never stops) · st-r3f (gauge start path auto-starts the real steves-desk)
+**Beads**: Closed — st-e56, st-27y (orphan), st-ve6, st-n62, st-kaf, st-zq0. Created — st-e56, st-btu, st-kq8, st-98z, st-vqa, st-d5g, st-mmy, st-g9y, st-kaf, st-flu, st-zq0, plus retitles (st-3c4/st-ve6/st-gip). Memory — two new: steve-risk-authority-not-pa-arbiter; liveness corollary 2 (no pre-close settlement claims).
 
 ---
