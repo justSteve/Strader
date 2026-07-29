@@ -45,19 +45,67 @@ def test_zone_pairing_by_shared_source_quote():
     assert len(lines) == 2  # one zone line, not two singles
 
 
-def test_key_flag_and_note_from_commentary():
-    c = Commentary(text="Bear case Monday: begins below 7434 — breakdown trade.",
-                   trigger=Trigger(type="price_cross", anchor_prices=[7434.0],
+def _with_commentary(price, text, tags):
+    c = Commentary(text=text,
+                   trigger=Trigger(type="price_cross", anchor_prices=[price],
                                    condition_text=""),
-                   tags=[], source_quote="Bear case Monday: Begins below 7434.")
-    r = ParseResult(date="2026-07-27", instrument="ES", session_bias="",
-                    levels=[Level(price=7434.0, kind="support", label="major",
-                                  source_quote="7434 (major)")],
-                    commentary=[c], raw_excerpt="", model="t",
-                    parsed_at="2026-07-27T13:00:00+00:00")
+                   tags=tags, source_quote=text)
+    return ParseResult(date="2026-07-27", instrument="ES", session_bias="",
+                       levels=[Level(price=price, kind="support", label="major",
+                                     source_quote=f"{price:g} (major)")],
+                       commentary=[c], raw_excerpt="", model="t",
+                       parsed_at="2026-07-27T13:00:00+00:00")
+
+
+def test_key_flag_and_level_quality_descriptor():
+    # A level-narrow phrase becomes a short descriptor, not a spliced sentence.
+    r = _with_commentary(7434.0,
+                         "7434 is en route but so well tested it is difficult to engage.",
+                         ["failed-breakdown", "entry"])
     line = build_payload(r).splitlines()[1]
     assert line.startswith("S 7434 . major key")
-    assert '"Bear case Monday: begins below 7434' in line
+    assert line.endswith('"well tested"')
+
+
+def test_letter_summary_commentary_never_reaches_a_label():
+    # st-ybd: bull/bear case, positioning and regime prose belong in the letter
+    # summary. Steve: "I never care what M. is holding."
+    for tags in (["bull-case", "breakout", "targets"], ["positioning", "runner"],
+                 ["mode2", "range"], ["bear-case", "breakdown"], ["summary", "lean"]):
+        r = _with_commentary(7533.0,
+                             "Bull case: ES spends more time in the 7418-7506 range "
+                             "engaging the zones above, then breaks out.", tags)
+        line = build_payload(r).splitlines()[1]
+        assert '"' not in line, f"{tags} leaked prose onto the label: {line}"
+
+
+def test_no_matching_descriptor_yields_no_note():
+    # Most levels have nothing particular said about them. Silence is correct.
+    r = _with_commentary(7398.0,
+                         "7398 is below there. One could bid it, but Mancini never "
+                         "does when bears control - no knife catching.",
+                         ["support", "entry"])
+    assert build_payload(r).splitlines()[1] == "S 7398 . major key"
+
+
+def test_descriptor_text_keeps_its_lowercase_r():
+    # Guards the renderer bug from the emitter side: the payload on disk must
+    # carry intact spelling, so any future r-dropping is provably renderer-side.
+    r = _with_commentary(7458.0, "7458 is first support down.",
+                         ["failed-breakdown", "optional"])
+    line = build_payload(r).splitlines()[1]
+    assert '"first support"' in line
+    assert "fist" not in line
+
+
+def test_range_boundary_outranks_shelf():
+    # 7418 is both "an obvious shelf" and the bottom of the range; the range
+    # placement is the more actionable of the two.
+    r = _with_commentary(7418.0,
+                         "Range support is now 7418 - last Thursday's low plus big "
+                         "lows Monday and Tuesday, an obvious shelf.",
+                         ["support", "range-boundary"])
+    assert build_payload(r).splitlines()[1].endswith('"range edge"')
 
 
 def test_conf_flag_within_tolerance_and_profile_lines():
@@ -118,3 +166,23 @@ def test_ceiling_probe_sizes():
         p = ceiling_probe(kb)
         assert p.startswith("v1 2099-01-01 ES")
         assert abs(len(p.encode()) - kb * 1024) < 64
+
+
+def test_descriptor_attaches_to_nearest_preceding_price():
+    # "Safer: wait for 7398 to hold, then recover the 7418 shelf" is anchored on
+    # 7398, but the shelf belongs to 7418. Whole-text scanning hung it on 7398.
+    r = _with_commentary(7398.0,
+                         "7398 is below there. One could bid it, but Mancini never does "
+                         "when bears control - no knife catching. Safer: wait for 7398 "
+                         "to hold, then recover the 7418 shelf.",
+                         ["support", "entry"])
+    assert build_payload(r).splitlines()[1] == "S 7398 . major key"
+
+
+def test_descriptor_after_its_price_in_a_two_price_sentence():
+    # Same rule, opposite outcome: "very strong" follows 7311, so 7311 owns it
+    # even though 7358 is named earlier in the sentence.
+    r = _with_commentary(7311.0,
+                         "Nothing below 7358 until 7311, which is a very strong support.",
+                         ["support"])
+    assert build_payload(r).splitlines()[1].endswith('"very strong"')

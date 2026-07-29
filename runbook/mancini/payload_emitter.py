@@ -13,6 +13,7 @@ extras remain commentary-side. Prices render trailing-zero-free (7458, 7461.5).
 """
 from __future__ import annotations
 
+import re
 import subprocess
 from typing import Sequence
 
@@ -31,16 +32,78 @@ def _tier(level: Level) -> str:
     return "major" if "major" in (level.label or "").lower() else "minor"
 
 
+# Commentary categories that belong in the letter summary and never on a chart
+# label. Steve 2026-07-29: "I never care what M. is holding. today's 7533 gives
+# me Bull Case: that info is for the letter summary, not labels."
+_LETTER_SUMMARY_TAGS = frozenset({
+    "positioning", "runner", "bull-case", "bear-case", "summary", "lean",
+    "catalyst", "fomc", "mode2", "targets", "breakout", "breakdown",
+    "advanced", "shorts",
+})
+
+# Ordered most-useful-first. A label earns text only when the letter says
+# something narrow about THAT level's quality \u2014 how well it has held, how it was
+# built, where it sits in the range. Everything is drawn from a fixed vocabulary
+# so labels stay short and comparable across days; the old behaviour spliced 57
+# characters of narrative and left mid-word stubs like "runner f...".
+_DESCRIPTORS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (re.compile(pattern), descriptor) for pattern, descriptor in (
+        (r"\brange (?:support|resistance)\b",                 "range edge"),
+        (r"\b(?:so )?well tested\b",                          "well tested"),
+        (r"\bvery strong\b",                                  "very strong"),
+        (r"\b(?:major )?support cluster\b",                   "major cluster"),
+        (r"\bbig (?:support|resistance)\b",                   "big level"),
+        (r"\bstrong (?:support|resistance)\b",                "strong"),
+        (r"\bobvious shelf\b|\bbuilt the shelf\b|\bshelf\b",  "shelf"),
+        (r"\bfirst support down\b",                           "first support"),
+        (r"\bfirst resistance\b",                             "first resistance"),
+    )
+)
+
+
+_PRICE_MENTION = re.compile(r"\b(\d{4}(?:\.\d+)?)\b")
+
+
+def _owns(text: str, at: int, price: float) -> bool:
+    """True if the phrase at offset ``at`` describes ``price``.
+
+    A descriptor belongs to the nearest price mentioned BEFORE it. One
+    commentary routinely names several levels \u2014 "Safer: wait for 7398 to hold,
+    then recover the 7418 shelf" anchors on 7398, but the shelf is 7418's.
+    Reading the whole sentence would hang that shelf on the wrong level.
+    A phrase with no price before it (e.g. a sentence opening "Range support
+    is now 7418") describes the level the commentary is anchored on.
+    """
+    owner = None
+    for m in _PRICE_MENTION.finditer(text):
+        if m.start() >= at:
+            break
+        owner = float(m.group(1))
+    return owner is None or abs(owner - price) < 1e-9
+
+
 def _note_for(price: float, result: ParseResult) -> str | None:
-    """First sentence (<=60 chars) of the first commentary anchored on price."""
+    """A short descriptor of this level's own quality, or None.
+
+    Deliberately NOT a summary of the day's plan. Commentary tagged as
+    positioning, bull/bear case, regime or catalyst is rejected outright \u2014 it is
+    about the session, not about the level, and Steve reads that in the letter
+    summary rather than off the chart. What survives is scanned for a
+    level-quality phrase from ``_DESCRIPTORS``, attributed by ``_owns``, so a
+    label reads "well tested" instead of a truncated sentence. No match means no
+    note, which is the common and correct outcome: most levels have nothing
+    particular said about them.
+    """
     for c in result.commentary:
+        if _LETTER_SUMMARY_TAGS.intersection(t.lower() for t in c.tags):
+            continue
         anchors = getattr(c.trigger, "anchor_prices", None) or []
-        if any(abs(a - price) < 1e-9 for a in anchors):
-            sentence = c.text.split(". ")[0].strip().rstrip(".")
-            # ASCII-fold: TV label fonts drop em/en dashes and curly quotes
-            for bad, good in (("\u2014", "-"), ("\u2013", "-"), ("\u2018", "'"), ("\u2019", "'"), ("\u201c", "'"), ("\u201d", "'")):
-                sentence = sentence.replace(bad, good)
-            return (sentence[:57] + "...") if len(sentence) > 60 else sentence
+        if not any(abs(a - price) < 1e-9 for a in anchors):
+            continue
+        text = c.text.lower()
+        for pattern, descriptor in _DESCRIPTORS:
+            if any(_owns(text, m.start(), price) for m in pattern.finditer(text)):
+                return descriptor
     return None
 
 
