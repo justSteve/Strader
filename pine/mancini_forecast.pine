@@ -29,6 +29,13 @@ extendRight = input.int(10,     "Extend right (bars)", group="Display", minval=0
 historyBack = input.int(300,    "History back (bars)", group="Display", minval=50, maxval=2000)
 labelMargin = input.int(3, "Label margin (bars from left screen edge)", group="Display", minval=0, maxval=50)
 labelSizeIn = input.string("normal", "Label size", group="Display", options=["small", "normal", "large"])
+// "chart" matches the chart background exactly, so a label blanks whatever it
+// covers instead of letting candles show through it. Steve 2026-07-29: candle
+// detail on the label side of the chart is not needed (st-ybd).
+labelBgIn    = input.string("chart", "Label background", group="Display",
+     options=["chart", "black", "transparent"])
+labelBgAlpha = input.int(0, "Label background transparency (%)", group="Display",
+     minval=0, maxval=100, tooltip="0 = fully opaque (blanks the chart underneath), 100 = invisible")
 hudPos      = input.string("top_left", "HUD position", group="Display",
      options=["top_left", "top_right", "bottom_left", "bottom_right", "off"])
 
@@ -205,6 +212,12 @@ if barstate.islast
         lblXCache := leftVis + labelMargin * timeframe.in_seconds() * 1000
     int lblX = na(lblXCache) ? time[historyBack] : lblXCache
     labelSz = labelSizeIn == "large" ? size.large : labelSizeIn == "small" ? size.small : size.normal
+    // chart.bg_color tracks the active theme, so "chart" blanks cleanly in both
+    // light and dark without hard-coding a hex. "transparent" is the old
+    // behaviour, kept so the change is reversible from the settings panel.
+    lblBgBase = labelBgIn == "black" ? color.black : chart.bg_color
+    lblBg     = labelBgIn == "transparent" ? color.new(color.black, 100)
+                 : color.new(lblBgBase, labelBgAlpha)
 
     if array.size(lvPrice) > 0
         for i = 0 to array.size(lvPrice) - 1
@@ -243,7 +256,7 @@ if barstate.islast
                      + (array.get(lvDefenses, i) > 0 ? " +" + str.tostring(array.get(lvDefenses, i)) : "")
                 txt = showNotes and str.length(note) > 0 ? tag + " - " + note : tag
                 array.push(_labels, label.new(lblX, p, txt, xloc.bar_time, yloc.price,
-                     color.new(color.black, 100), label.style_label_lower_left, baseCol, labelSz,
+                     lblBg, label.style_label_lower_left, baseCol, labelSz,
                      tooltip=str.length(note) > 0 ? note : na))
 
     if array.size(profPrice) > 0
@@ -253,7 +266,7 @@ if barstate.islast
                  color.new(cProf, 30), line.style_dotted, 1))
             if showLabels
                 array.push(_labels, label.new(lblX, pp, str.upper(array.get(profKind, i)) + " " + str.tostring(pp, "#.##"),
-                     xloc.bar_time, yloc.price, color.new(color.black, 100),
+                     xloc.bar_time, yloc.price, lblBg,
                      label.style_label_lower_left, cProf, size.small))
 
     // === Proximity HUD ===
