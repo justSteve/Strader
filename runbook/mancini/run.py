@@ -46,6 +46,11 @@ CHARTS_ROOT = Path(__file__).resolve().parent / "charts"
 # Cross-repo write sanctioned by the shared-executable-space convention.
 DESK_REPORTS = Path("/root/projects/COO/myDesk/reports/mancini")
 DESK_REFRESH = Path("/root/projects/COO/myDesk/trading/trading-desk-refresh.sh")
+# Browser view of the same plan [st-lo2]. desk-viewer.sh's open_in_browser()
+# wraps a doc through `marked` into /tmp/desk-<slug>.html, so the stable title
+# always lands at this address. Steve keeps that tab open — re-rendering it here
+# means a plain browser refresh shows today's plan without touching the desk.
+DESK_HTML = Path("/tmp/desk-mancini-latest-es-plan.html")
 
 
 def _read_newsletter(file_arg: str | None) -> str:
@@ -191,6 +196,60 @@ def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = No
     return "\n".join(lines)
 
 
+# Mirrors the shell inside desk-viewer.sh open_in_browser() so the browser page
+# looks the same however it was produced. If COO extracts a shared renderer,
+# drop this and call it instead. [st-lo2]
+_DESK_HTML_HEAD = """<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         font-size: 22px; max-width: 92%; margin: 48px auto; padding: 0 48px;
+         line-height: 1.75; color: #222; background: #fafafa; }
+  code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: .9em; }
+  pre  { background: #f0f0f0; padding: 20px; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  h1,h2,h3 { border-bottom: 1px solid #ddd; padding-bottom: .3em; }
+  blockquote { border-left: 4px solid #ccc; margin: 0; padding-left: 1em; color: #555; }
+  a { color: #0066cc; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ddd; padding: 10px 14px; }
+  th { background: #f0f0f0; }
+</style></head><body>
+"""
+
+
+def _render_desk_html(doc: Path) -> Path | None:
+    """Re-render the plan doc as the desk browser page at DESK_HTML. [st-lo2]
+
+    Renders the doc this run just wrote rather than the stable-title copy: same
+    content on the normal path (ours is the newest), but the page still lands on
+    today's plan if COO's refresh script is missing or fails.
+
+    Deliberately does not launch a browser — the tab is already open, and a new
+    window every parse is the opposite of what this is for. Non-fatal: `marked`
+    lives on the Windows npm PATH and may be absent under cron.
+    """
+    import shutil
+    import subprocess
+
+    if shutil.which("marked") is None:
+        logger.warning("desk html skipped: marked not on PATH")
+        return None
+    try:
+        proc = subprocess.run(["marked", "--gfm", "-i", str(doc)],
+                              capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as e:
+        logger.warning("desk html skipped: marked failed to run (%s)", e)
+        return None
+    if proc.returncode != 0:
+        logger.warning("marked failed (rc=%d): %s",
+                       proc.returncode, proc.stderr.strip()[:300])
+        return None
+    DESK_HTML.write_text(_DESK_HTML_HEAD + proc.stdout + "</body></html>",
+                         encoding="utf-8")
+    logger.info("desk html: %s — refresh the open tab to see it", DESK_HTML)
+    return DESK_HTML
+
+
 def _emit_desk_plan(result: ParseResult, extra_sections: list[str] | None = None) -> Path | None:
     """Write the plan-day doc and refresh the Trading window's stable title.
 
@@ -218,6 +277,7 @@ def _emit_desk_plan(result: ParseResult, extra_sections: list[str] | None = None
     else:
         logger.warning("refresh script missing (%s) — doc written but the "
                        "stable title was not updated", DESK_REFRESH)
+    _render_desk_html(doc)
     return doc
 
 
