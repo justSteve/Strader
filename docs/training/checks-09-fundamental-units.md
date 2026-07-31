@@ -63,9 +63,26 @@ Rules:
 12. State your seat in one sentence each: what you are the authority on,
     what hindsight is the authority on, and what the machine watches.
 
+## Section B — the measurement layer (formative only, added 2026-07-31, st-v95)
+
+Three questions on the vocabulary the accuracy numbers are spoken in
+(`docs/training/plain-words-glossary.md` Part 1 is the answer key). Graded
+owned/borrowed/missing like the rest, but **outside the mastery bar** — these
+exist because this vocabulary reached Steve undefined on 2026-07-31, not
+because they gate anything.
+
+B1. A briefing says "423 signals across 182 days, 45% wins." Say in your own
+    words where each of those three numbers comes from, and why "45% wins"
+    is not a statement about profit.
+B2. Fire #1 versus fire #4 at the same level — what changes, what is the
+    measured size of the change, and what is the trader's move at each?
+B3. What does the recognition engine actually see when it makes a call — and
+    name two things you might assume it sees that it does not.
+
 ## After the session
 
 - Owned answers on Q1–Q3, Q5–Q6, Q8–Q9, Q11–Q12 and the discrimination trio →
   check retired; drills unlock (the 07-28 ruling: recognition before reflex).
+  Section B does not affect the bar.
 - Any missing answer → its topic returns as a snag card in the deck, written
   from the *actual wrong answer given*, not the abstract topic.

@@ -8,9 +8,12 @@ effect), [05 · Order Flow](05-order-flow.md) (aggression, delta, absorption),
 *This document is five short essays, read in order. Ground truth for every term
 is `docs/lexicon/lexicon.yaml`; every number is a measurement from 263 trading
 days (39,482 minutes, 1,649 price swings), adversarially verified. First
-contact with this vocabulary should be the companion narrative,*
-The Day in Fundamental Units — 2026-07-22*; these essays explain the machinery
-the narrative showed in motion.*
+contact with this vocabulary should be the companion narratives,*
+The Day in Fundamental Units *(2026-07-22 and 2026-07-24)*; these essays
+explain the machinery the narratives showed in motion. For the measurement
+vocabulary the accuracy numbers are spoken in — anchor, fire, the scoring
+rule — read `docs/training/plain-words-glossary.md` first; no essay assumes
+it.*
 
 ---
 
