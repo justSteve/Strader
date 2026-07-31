@@ -62,7 +62,10 @@ earns is a separate question, and sizing is your seat.
 **Effect** — how far price moved (what the business bought).
 **Force** — which side was pressing (signed; can disagree with direction).
 **Cells F1–F4** — the four combinations of high/low effort × effect:
-conviction / absorption / hollow / dead.
+conviction / absorption / hollow / dead. The **F is for "frame"** — the codes
+come from the drill catalog's single-bar *frame scenarios* (its siblings are
+S1–S6 level-engagement scenarios and T1–T3 tempo scenarios), and the taxonomy
+inherited those ratified names rather than minting new ones.
 **Grade, grade-band** — how far a label sits from the dividing line: coin-flip
 (too close to call — always spoken as a pair, "F3/F4"), lean, solid, strong.
 **Leg** — one stroke of the day's zigzag; the unit swings are measured in.
