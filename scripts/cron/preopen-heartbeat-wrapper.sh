@@ -36,6 +36,12 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 
     cd "$STRADER_REPO" || { log "FATAL: repo dir missing: $STRADER_REPO"; exit 2; }
 
+    # Day-start risk reset first [st-958] — idempotent, so a re-fire never
+    # clobbers a day that already carries recorded trades. Its failure does not
+    # stop the heartbeat below; the heartbeat's risk check is what reports it.
+    PYTHONPATH="$STRADER_REPO" "$PY" -m runbook.risk_state reset \
+        || log "WARN: risk-state reset failed (heartbeat will flag it)"
+
     PYTHONPATH="$STRADER_REPO" "$PY" -m runbook.heartbeat
     rc=$?
     log "=== preopen-heartbeat end (rc=$rc) ==="

@@ -85,8 +85,21 @@ def check_schwab() -> dict:
             "day": today.isoformat(), "reasons": reasons}
 
 
+def check_risk() -> dict:
+    """Today's risk state exists — the day-start reset ran [st-958]. Hard:
+    live trading without the day's budgets on disk is the exact failure this
+    heartbeat exists to catch."""
+    today = central_date()
+    from runbook.risk_state import state_path
+    path = state_path(today.isoformat())
+    ok = path.exists()
+    reasons = [] if ok else ["no risk state — run: python -m runbook.risk_state reset"]
+    return {"name": "risk", "hard": True, "ok": ok,
+            "day": today.isoformat(), "reasons": reasons}
+
+
 def run_checks() -> list[dict]:
-    return [check_corpus(), check_mancini(), check_schwab()]
+    return [check_corpus(), check_mancini(), check_risk(), check_schwab()]
 
 
 def main(argv: list[str] | None = None) -> int:

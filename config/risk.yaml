@@ -1,0 +1,40 @@
+# Risk limits — the Playbook hard limits as config. [st-958, co-59ky]
+#
+# Steve owns every number here; edit and commit. The morning reset
+# (runbook/risk_state.py, fired by the 08:25 pre-open cron) snapshots these
+# into data/risk/<day>.json — the day trades against the SNAPSHOT, so a
+# mid-session edit here changes tomorrow, never today.
+#
+# Defaults are graduated week-1 sizing per the grow-into-the-system ruling
+# (2026-07-06): minimal size first, growth is earned. They are deliberately
+# small; raising them is a Steve edit, not an agent decision.
+
+# Set to the actual account balance to activate the 2%-per-trade cap from the
+# Playbook. null = dollar limits below stand alone (a warning is printed).
+account_balance_usd: null
+
+# Hard stop for the day: realized losses reach this and the state flips to
+# HALTED — no further entries, per the fast-cuts edge.
+max_daily_loss_usd: 300
+
+# Positions open at once, across all strategies.
+max_open_positions: 2
+
+# Playbook hard boundary (CLAUDE.md): max risk per trade as % of balance.
+pct_max_per_trade: 2.0
+
+# Escalation boundary (CLAUDE.md hard rule — do not raise): any position
+# above this notional requires explicit Steve sign-off.
+escalation_notional_usd: 5000
+
+# Per-strategy daily budgets: how many entries, and max risk per entry.
+strategies:
+  butterflies:
+    max_trades: 3
+    max_risk_per_trade_usd: 150
+  orb:
+    max_trades: 1
+    max_risk_per_trade_usd: 100
+  scalps:
+    max_trades: 3
+    max_risk_per_trade_usd: 100
