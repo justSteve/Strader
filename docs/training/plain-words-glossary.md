@@ -70,8 +70,8 @@ conviction / absorption / hollow / dead.
 steady-leg, leg-grind, counterforce-leg, absorption-stall, hollow-glide,
 probe-fade, dead-drift).
 **Pivot-atom** — the shared minute where one leg dies and the next is born.
-**Stages** — the recognizer's four beats at a level: flush-stage → stall-stage
-→ flip-stage → confirm-stage.
+**Stages** — the recognizer's four-part sequence at a level: flush-stage →
+stall-stage → flip-stage → confirm-stage.
 **Episode** — one whole engagement of price with a level, start to resolution.
 **LIVE / HINDSIGHT** — the stamp on every quantity: knowable in the minute, or
 only computable after the day completes. Percentiles, cells, legs, and
