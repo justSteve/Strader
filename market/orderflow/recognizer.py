@@ -109,6 +109,12 @@ class SetupRecognizer:
         # while price still sits beyond the level (value = break direction)
         self._blocked: dict[int, int] = {}
         self._prev_close: float | None = None
+        # per-anchor confirmed-fire counter [st-98z item 2] — keyed like
+        # _active/_blocked on id(anchor). Deliberately NEVER cleared: the
+        # count survives block/re-engage cycles, because the evidence is
+        # about the anchor's session-long fire history (fire #4+ on the
+        # same level ran 33% vs ~50% for fires 1-3), not the engagement's.
+        self._fires: dict[int, int] = {}
 
     # ── per-bar drive ───────────────────────────────────────────────────────
     def on_bar(self, bar: FootprintBar) -> list[SetupRecognition]:
@@ -153,6 +159,18 @@ class SetupRecognizer:
         beyond = (a.price - bar.low) if direction < 0 else (bar.high - a.price)
         if beyond < pen:
             return None
+        # proximity gate [st-98z item 4]: an engagement born at/beyond
+        # invalidation depth is provably unconfirmable — _advance checks
+        # invalidation first, from an extreme already ≥ INVALIDATE_TICKS, so
+        # the engagement dies before the confirm branch can ever run. This is
+        # noise elimination (a far-off anchor engaging on the first with-break
+        # bar of the session), not scoring suppression: genuine flushes engage
+        # within a few ticks of the level.
+        if beyond >= INVALIDATE_TICKS * TICK:
+            logger.debug("no engage @ %.2f: first bar already %.1f ticks beyond "
+                         "(>= INVALIDATE_TICKS=%d)", a.price, beyond / TICK,
+                         INVALIDATE_TICKS)
+            return None
         # aggression must point with the break; a drift-through is no beat 1
         if direction * bar.delta < 0:
             return None
@@ -183,6 +201,8 @@ class SetupRecognizer:
             if eng.setup == "return_to_lvn" and d * bar.delta >= FLIP_DELTA_MIN:
                 eng.beats.append("extend")
                 eng.done = True
+                key = id(eng.anchor)
+                self._fires[key] = self._fires.get(key, 0) + 1
                 out.append(self._emit(eng, bar, "confirmed", accept_branch=True))
                 return out
             eng.done = True
@@ -208,6 +228,8 @@ class SetupRecognizer:
                 if stacked or -d * bar.delta >= CONFIRM_DELTA_MIN:
                     eng.beats.append("confirm")
                     eng.done = True
+                    key = id(eng.anchor)
+                    self._fires[key] = self._fires.get(key, 0) + 1
                     out.append(self._emit(eng, bar, "confirmed", stacked=stacked))
 
         eng.extreme = new_extreme
@@ -222,8 +244,20 @@ class SetupRecognizer:
         bias = "bullish" if eng.direction < 0 else "bearish"
         if accept_branch:  # node accepted the move: bias follows the break
             bias = "bearish" if eng.direction < 0 else "bullish"
+        # fire_index: which confirmed fire this engagement is (1-based) for its
+        # anchor. On a confirmed emission the counter was just incremented, so
+        # it IS this fire's number; on forming/invalidated the counter holds
+        # prior confirms, so this engagement would be fire prior+1.
+        fired = self._fires.get(id(eng.anchor), 0)
+        fire_index = fired if state == "confirmed" else fired + 1
+        # confirmed confidence [st-98z item 2]: base 0.8 (0.9 with stacked
+        # imbalance), STEP-damped to 0.6 (0.7 stacked) at fire_index >= 4 —
+        # baseline evidence is a cliff, not a slope: fires 1-3 ran 51/49/49%
+        # first-touch, fire 4+ ran 33%. Emission still happens either way
+        # (score-don't-gate); consumers weigh the damped score.
         conf = {"forming": min(0.75, 0.2 + 0.15 * len(eng.beats)),
-                "confirmed": 0.9 if stacked else 0.8,
+                "confirmed": ((0.9 if stacked else 0.8) if fire_index < 4
+                              else (0.7 if stacked else 0.6)),
                 "invalidated": 0.0}[state]
         words = {
             "forming": f"beats so far: {'+'.join(eng.beats)}",
@@ -234,7 +268,7 @@ class SetupRecognizer:
         proposed = " [proposed two-branch LVN read — validate empirically]" \
             if eng.setup == "return_to_lvn" else ""
         if accept_branch:
-            words = "ACCEPT branch: delta extended through the node, no stall"
+            words = "ACCEPT branch: delta extended through the node, no stall-stage"
         return SetupRecognition(
             timestamp=bar.end_ts, source="orderflow.recognizer",
             confidence=conf,
@@ -245,6 +279,7 @@ class SetupRecognizer:
             anchor_price=eng.anchor.price, anchor_kind=eng.anchor.kind,
             state=state, beats=tuple(eng.beats),
             mancini_confluence=self._confluent[id(eng.anchor)],
+            fire_index=fire_index,
         )
 
 

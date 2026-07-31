@@ -86,3 +86,7 @@ class SetupRecognition(Signal):
     state: Literal["forming", "confirmed", "invalidated"] = "forming"
     beats: tuple[str, ...] = ()                # subset of (flush, stall, flip, confirm)
     mancini_confluence: bool = False
+    # 1-based per-anchor confirmed-fire sequence [st-98z]: which confirm this
+    # is (or, on forming/invalidated, would be) for its anchor within the
+    # recognizer's lifetime. Confirmed confidence is step-damped at >= 4.
+    fire_index: int = 1

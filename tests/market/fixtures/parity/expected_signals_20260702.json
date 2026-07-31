@@ -37,7 +37,8 @@
   "beats": [
    "flush"
   ],
-  "mancini_confluence": false
+  "mancini_confluence": false,
+  "fire_index": 1
  },
  {
   "type": "SweepPrint",
@@ -77,7 +78,8 @@
   "beats": [
    "flush"
   ],
-  "mancini_confluence": true
+  "mancini_confluence": true,
+  "fire_index": 1
  },
  {
   "type": "SetupRecognition",
@@ -94,7 +96,8 @@
    "flush",
    "flip"
   ],
-  "mancini_confluence": false
+  "mancini_confluence": false,
+  "fire_index": 1
  },
  {
   "type": "SetupRecognition",
@@ -112,7 +115,8 @@
    "flip",
    "confirm"
   ],
-  "mancini_confluence": false
+  "mancini_confluence": false,
+  "fire_index": 1
  },
  {
   "type": "SweepPrint",
@@ -141,7 +145,8 @@
    "flush",
    "flip"
   ],
-  "mancini_confluence": true
+  "mancini_confluence": true,
+  "fire_index": 1
  },
  {
   "type": "SetupRecognition",
@@ -159,7 +164,8 @@
    "flip",
    "confirm"
   ],
-  "mancini_confluence": true
+  "mancini_confluence": true,
+  "fire_index": 1
  },
  {
   "type": "Level",

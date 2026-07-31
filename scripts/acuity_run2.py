@@ -39,7 +39,8 @@ from market.orderflow.bars import build_bars                       # noqa: E402
 from market.orderflow.profile import build_profile, profile_levels  # noqa: E402
 from market.orderflow.recognizer import Anchor, SetupRecognizer    # noqa: E402
 from market.orderflow.replay import es_day_path, read_corpus_day   # noqa: E402
-from market.orderflow.tpo import build_tpo, classify_day_type      # noqa: E402
+from market.orderflow.tpo import (                                 # noqa: E402
+    build_tpo, classify_day_type, developing_upto)
 
 logger = logging.getLogger("acuity_run2")
 
@@ -136,26 +137,52 @@ def run_day(day: _date) -> dict:
     invalidated = [r for r in recs if r.state == "invalidated"]
 
     try:
-        day_type, _why = classify_day_type(build_tpo(trades))
+        tpo = build_tpo(trades)
+        day_type, _why = classify_day_type(tpo)
     except Exception:
+        tpo = None
         day_type = "unknown"
 
     ts_index = [t.ts for t in trades]
     conf_rows = []
+    # cross-check derivation of the recognizer's own fire_index [st-98z]:
+    # per-(day,anchor) confirm sequence, counted in chronological confirm
+    # order. The recognizer's field is authoritative; a mismatch means the
+    # two sequences diverged (e.g. anchor-identity vs price keying) — log it.
+    fire_counts: dict[float, int] = {}
     for r in confirmed:
         import bisect
+        fire_counts[r.anchor_price] = fire_counts.get(r.anchor_price, 0) + 1
+        if r.fire_index != fire_counts[r.anchor_price]:
+            logger.warning(
+                "fire_index mismatch %s @ %.2f %s: recognizer=%d derived=%d",
+                day.isoformat(), r.anchor_price, r.timestamp.strftime("%H:%M"),
+                r.fire_index, fire_counts[r.anchor_price])
         i = bisect.bisect_left(ts_index, r.timestamp)
         if i >= len(trades):
             continue
         entry = trades[i].price
         sign = 1 if r.bias == "bullish" else -1
+        # Non-lookahead day-type call at confirm time [st-98z]: classify from
+        # the brackets fully completed BEFORE the confirm bar's half-hour
+        # bracket (the in-progress bracket would leak future trades — the
+        # profile is built from the whole day's tape). Late-day tapes
+        # (coverage == "late_day") have only a sliver of profile; record what
+        # the developing classifier actually sees, upto included.
+        if tpo is not None:
+            dev_upto = developing_upto(tpo, r.timestamp)
+            dev_type, _ = classify_day_type(tpo, upto=dev_upto)
+        else:
+            dev_upto, dev_type = -1, "unknown"
         row = {"day": day.isoformat(), "setup": r.setup, "bias": r.bias,
                "anchor": r.anchor_price,
                "anchor_src": ("mancini" if any(a.price == r.anchor_price and a.mancini
                                                for a in anchors) else "lvn"),
                "ct": r.timestamp.strftime("%H:%M"), "hour": r.timestamp.hour,
                "entry": entry, "confidence": r.confidence,
-               "day_type": day_type, "coverage": coverage}
+               "fire_index": r.fire_index,
+               "day_type": day_type, "developing_day_type": dev_type,
+               "dev_upto": dev_upto, "coverage": coverage}
         for w in WINDOWS_MIN:
             mfe, mae, verdict = _excursion(
                 trades, i, entry, sign, r.timestamp + timedelta(minutes=w))
@@ -186,6 +213,10 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Acuity run 2 LEG B sweep [st-n62]")
     ap.add_argument("--days", nargs="*", help="Specific days (default: all with ES tape)")
     ap.add_argument("--workers", type=int, default=6)
+    ap.add_argument("--since", metavar="YYYY-MM-DD",
+                    help="Only days >= this ISO date (string compare)")
+    ap.add_argument("--until", metavar="YYYY-MM-DD",
+                    help="Only days < this ISO date (string compare)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
@@ -195,6 +226,10 @@ def main() -> int:
     else:
         days = sorted(p.parent.name for p in
                       (REPO_ROOT / "data" / "corpus").glob("*/databento_glbx_es.jsonl"))
+    if args.since:
+        days = [d for d in days if d >= args.since]
+    if args.until:
+        days = [d for d in days if d < args.until]
     print(f"acuity run 2: {len(days)} days, {args.workers} workers")
 
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")

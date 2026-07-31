@@ -164,41 +164,82 @@ def single_print_rows(profile: TPOProfile, upto: int | None = None) -> list[int]
     return out
 
 
-def initial_balance(profile: TPOProfile) -> tuple[float, float] | None:
+def initial_balance(profile: TPOProfile,
+                    upto: int | None = None) -> tuple[float, float] | None:
     """(ib_low, ib_high) row-floor prices from brackets A+B; None until the
-    session has both. Row floors, consistent with every other read here."""
-    ib = [b for b in profile.brackets if b.letter in LETTERS[:IB_BRACKETS]]
+    session has both. Row floors, consistent with every other read here.
+
+    ``upto`` restricts to brackets[:upto] (the developing state) so a
+    mid-flight caller never sees an IB before both A and B have printed.
+    A and B occupy the first two positions whenever they exist at all, so
+    for ``upto >= 2`` this matches the full-session read; for a session
+    whose tape starts after 09:30 (no A/B brackets) it stays None.
+    """
+    ib = [b for b in profile.brackets[:upto] if b.letter in LETTERS[:IB_BRACKETS]]
     if len(ib) < IB_BRACKETS:
         return None
     idxs = [i for b in ib for i in b.row_indices]
     return profile.prices[min(idxs)], profile.prices[max(idxs)]
 
 
-def classify_day_type(profile: TPOProfile) -> tuple[str, str]:
+def developing_upto(profile: TPOProfile, ts) -> int:
+    """Positional ``upto`` for the developing reads at wall-clock ``ts``.
+
+    Counts the profile brackets whose half-hour period ENDS strictly before
+    the bracket containing ``ts`` — the bracket in progress is excluded,
+    because the profile is built from the full day's tape and including it
+    would leak up to 30 minutes of future trades into a "live" read.
+
+    Maps time to position via bracket letters, so a late-start tape (first
+    trade 13:00 → letters J..M) yields the count of its own completed
+    brackets, not the wall-clock bracket number.
+    """
+    open_ts = ts.replace(hour=RTH_START.hour, minute=RTH_START.minute,
+                         second=0, microsecond=0)
+    idx = int((ts - open_ts) // timedelta(minutes=BRACKET_MIN))
+    idx = max(0, min(idx, len(LETTERS)))
+    return sum(1 for b in profile.brackets if LETTERS.index(b.letter) < idx)
+
+
+def classify_day_type(profile: TPOProfile,
+                      upto: int | None = None) -> tuple[str, str]:
     """Heuristic v1 day-type call: ('D'|'P'|'b'|'trend', one-line why).
 
     Seeds deck labels — hand-review before a day enters the drill deck.
+
+    ``upto=None`` (default) is the full-session, lookahead read — unchanged
+    behavior for all existing callers. ``upto=k`` is the DEVELOPING call
+    after the k-th bracket (positional, matching ``TPOProfile.counts``):
+    counts, POC, range, and close all come from brackets[:k] only, so the
+    call is valid mid-session. Returns ("unknown", "IB incomplete") while
+    fewer than IB_BRACKETS brackets have completed [st-98z].
     """
-    counts = profile.counts()
+    if upto is not None:
+        upto = min(upto, len(profile.brackets))
+        if upto < IB_BRACKETS:
+            return "unknown", "IB incomplete"
+    counts = profile.counts(upto)
     printed = [i for i, c in enumerate(counts) if c > 0]
     lo, hi = printed[0], printed[-1]
     rng = hi - lo + 1
-    poc = poc_row(profile)
+    poc = poc_row(profile, upto)
     poc_pos = (poc - lo) / max(1, rng - 1)       # 0 = at low, 1 = at high
-    close_row = int(profile.brackets[-1].close // profile.row_pts
+    last_bracket = profile.brackets[-1 if upto is None else upto - 1]
+    close_row = int(last_bracket.close // profile.row_pts
                     ) - int(profile.prices[0] // profile.row_pts)
     close_pos = (close_row - lo) / max(1, rng - 1)
-    ib = initial_balance(profile)
+    ib = initial_balance(profile, upto)
     if ib:
         ib_rows = max(1, round((ib[1] - ib[0]) / profile.row_pts) + 1)
         ext = rng / ib_rows
     else:
         ext = 1.0
-    max_frac = max(counts) / max(1, len(profile.brackets))
+    n_letters = len(profile.brackets) if upto is None else upto
+    max_frac = max(counts) / max(1, n_letters)
 
     if ext >= 2.0 and max_frac <= 0.45 and (close_pos >= 0.75 or close_pos <= 0.25):
         return "trend", (f"range {ext:.1f}× the IB, thin profile "
-                         f"(longest row {max(counts)} of {len(profile.brackets)} letters), "
+                         f"(longest row {max(counts)} of {n_letters} letters), "
                          f"close pinned at the {'high' if close_pos >= 0.75 else 'low'}")
     if poc_pos >= 0.62:
         return "P", (f"bulge sits in the upper range (POC at {poc_pos:.0%} of range) "

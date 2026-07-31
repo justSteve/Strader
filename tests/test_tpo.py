@@ -9,6 +9,7 @@ from market.entities.trade import Trade
 from market.orderflow.tpo import (
     build_tpo,
     classify_day_type,
+    developing_upto,
     initial_balance,
     poc_row,
     single_print_rows,
@@ -120,3 +121,52 @@ def test_day_type_b_shape():
 def test_day_type_d_shape():
     p = from_rows([[1, 2, 3], [0, 2, 4], [1, 2, 3], [1, 3, 4], [0, 1, 2]])
     assert classify_day_type(p)[0] == "D"
+
+
+# ── developing day type (non-lookahead, st-98z) ──────────────────────────────
+
+def test_developing_day_type_progressive_b():
+    # Push up + acceptance on top (P-ish early), then sell-off and acceptance
+    # below: the developing call moves unknown → P → b as brackets complete.
+    p = from_rows([[0, 1, 2, 3, 4, 5], [4, 5],
+                   [0, 1], [0, 1], [0, 1], [0, 1]])
+    assert classify_day_type(p, upto=0) == ("unknown", "IB incomplete")
+    assert classify_day_type(p, upto=1) == ("unknown", "IB incomplete")
+    assert classify_day_type(p, upto=2)[0] == "P"     # POC pinned high so far
+    assert classify_day_type(p, upto=3)[0] == "b"     # sell-off flips the read
+    assert classify_day_type(p, upto=6)[0] == "b"
+    assert classify_day_type(p)[0] == "b"             # full-session agrees
+
+
+def test_developing_upto_none_equivalence():
+    # upto=len(brackets) must reproduce the full-session call exactly.
+    for rows in (
+        [[0, 1, 2], [1, 2, 3], [3, 4, 5], [5, 6, 7], [7, 8, 9], [9, 10, 11]],
+        [[0, 1, 2, 3, 4, 5], [6, 7, 8], [6, 7, 8], [6, 7, 8], [6, 7, 8]],
+        [[3, 4, 5, 6, 7, 8], [0, 1, 2], [0, 1, 2], [0, 1, 2], [0, 1, 2]],
+        [[1, 2, 3], [0, 2, 4], [1, 2, 3], [1, 3, 4], [0, 1, 2]],
+    ):
+        p = from_rows(rows)
+        assert classify_day_type(p, upto=len(p.brackets)) == classify_day_type(p)
+
+
+def test_developing_initial_balance_upto():
+    p = from_rows([[0, 1, 2], [1, 3], [2, 4]])
+    assert initial_balance(p, upto=1) is None          # B not complete yet
+    assert initial_balance(p, upto=2) == initial_balance(p) == (7400.0, 7403.0)
+
+
+def test_developing_upto_excludes_bracket_in_progress():
+    p = from_rows([[0, 1], [1, 2], [2, 3]])            # A, B, C from 08:30
+    assert developing_upto(p, datetime(2026, 7, 2, 8, 45)) == 0   # inside A
+    assert developing_upto(p, datetime(2026, 7, 2, 9, 31)) == 2   # inside C
+    assert developing_upto(p, datetime(2026, 7, 2, 15, 10)) == 3  # all done
+
+
+def test_developing_upto_late_start_tape_maps_by_letter():
+    # Tape starts 13:00 (letters J, K): at 13:40 only J has completed —
+    # positional upto is 1, not the wall-clock bracket number 10.
+    p = build_tpo([mk(13, 5, 7400.0), mk(13, 35, 7401.0)])
+    assert [b.letter for b in p.brackets] == ["J", "K"]
+    assert developing_upto(p, datetime(2026, 7, 2, 13, 40)) == 1
+    assert classify_day_type(p, upto=1) == ("unknown", "IB incomplete")

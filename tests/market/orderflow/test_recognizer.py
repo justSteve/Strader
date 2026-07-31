@@ -154,7 +154,132 @@ def test_drift_through_without_aggression_is_no_engagement():
     assert _drive(Anchor(L, "support"), bars) == []
 
 
+# ── proximity gate: born-dead engagements rejected (st-98z item 4) ──────────
+def test_far_anchor_beyond_invalidation_depth_never_engages():
+    """Anchor sitting past invalidation depth above the whole tape (the 7/22
+    support-anchor-7575 pattern): first with-break-delta bar must NOT engage —
+    such an engagement can only invalidate, never confirm."""
+    gate = INVALIDATE_TICKS * TICK  # 15 pts
+    bars = [_bar(0, L - gate - 2, L - gate, L - gate - 3, L - gate - 1,
+                 -(FLUSH_DELTA_MIN + 100))]
+    assert _drive(Anchor(L, "support"), bars) == []
+
+
+def test_flush_just_inside_invalidation_depth_still_engages():
+    """Boundary: a first bar whose beyond is one point inside the gate engages
+    normally (the gate is >= INVALIDATE_TICKS, not looser)."""
+    depth = INVALIDATE_TICKS * TICK - 1.0  # 14 pts beyond
+    bars = [_bar(0, L + 1, L + 1, L - depth, L - depth + 0.5,
+                 -(FLUSH_DELTA_MIN + 10))]
+    recs = _drive(Anchor(L, "support"), bars)
+    assert [r.state for r in recs] == ["forming"]
+    assert recs[0].beats == ("flush",)
+
+
+# ── beat-4 stacked-imbalance branch: 0.9-confidence path (st-98z item 3) ────
+def _stacked_reclose_bar(i):
+    """Reclose bar closing back above L whose cells carry a 3-level adjacent
+    buy imbalance stack (each ask cell ≥ IMBALANCE_FLOOR with an empty/quiet
+    diagonal below), while bar delta (+100) stays below CONFIRM_DELTA_MIN —
+    so only the ImbalanceStack evidence can confirm."""
+    cells = (
+        FootprintCell(price=L - 1.0, bid_vol=260, ask_vol=0),    # lone sell imb., gap-isolated
+        FootprintCell(price=L, bid_vol=0, ask_vol=120),
+        FootprintCell(price=L + 0.25, bid_vol=0, ask_vol=120),
+        FootprintCell(price=L + 0.5, bid_vol=0, ask_vol=120),
+    )
+    return FootprintBar(symbol="ES.c.0", start_ts=T0 + timedelta(minutes=i),
+                        end_ts=T0 + timedelta(minutes=i, seconds=40),
+                        open=L - 0.75, high=L + 0.75, low=L - 1.0, close=L + 0.5,
+                        volume=620, delta=+100, none_vol=0, cells=cells)
+
+
+STACKED_BARS = [
+    _bar(0, L + 2, L + 2, L - 2, L - 1.5, -FLUSH_DELTA_MIN),   # flush: violent break of support
+    _bar(1, L - 1.5, L - 0.5, L - 1.75, L - 1, FLIP_DELTA_MIN),  # flip: delta turns up
+    _stacked_reclose_bar(2),                                   # reclose w/ buy stack, Δ+100 < CONFIRM_DELTA_MIN
+]
+
+
+def test_stacked_imbalance_confirms_at_higher_confidence():
+    recs = _drive(Anchor(L, "support"), STACKED_BARS)
+    final = recs[-1]
+    assert final.state == "confirmed" and final.setup == "failed_breakdown"
+    assert final.bias == "bullish"
+    assert final.beats == ("flush", "flip", "confirm")
+    assert final.confidence == 0.9
+    assert "confirmed with stacked imbalance" in final.reason
+
+
+def test_delta_only_confirm_stays_at_base_confidence():
+    final = _drive(Anchor(L, "support"), FBD_BARS)[-1]
+    assert final.state == "confirmed"
+    assert final.confidence == 0.8
+    assert "confirmed on opposite delta" in final.reason
+
+
 def test_determinism_double_run():
     a = _drive(Anchor(L, "support"), FBD_BARS)
     b = _drive(Anchor(L, "support"), FBD_BARS)
     assert a == b
+
+
+# ── per-anchor re-fire damping (st-98z item 2) ──────────────────────────────
+def _fbd_cycle(base, start_i):
+    """One full flush→stall→flip→confirm cycle at ``base``. The leading
+    above-level bar clears any re-engagement block from a prior cycle."""
+    return [
+        _bar(start_i + 0, base + 3, base + 3.5, base + 2.5, base + 2.8, +50),
+        _bar(start_i + 1, base + 2, base + 2, base - 2, base - 1.5, -(FLUSH_DELTA_MIN + 50)),
+        _bar(start_i + 2, base - 1.5, base - 1, base - 2.25, base - 1.75, -(FLIP_DELTA_MIN + 10)),
+        _bar(start_i + 3, base - 1.75, base - 0.5, base - 2, base - 0.75, FLIP_DELTA_MIN + 20),
+        _bar(start_i + 4, base - 0.75, base + 1.5, base - 1, base + 1, CONFIRM_DELTA_MIN + 30),
+    ]
+
+
+def test_fourth_confirm_carries_fire_index_4_and_damped_confidence():
+    """Fires 1-3 confirm at 0.8; fire 4 on the same anchor still EMITS
+    (score-don't-gate) but carries fire_index=4 and step-damped 0.6."""
+    bars = [b for cyc in range(4) for b in _fbd_cycle(L, cyc * 5)]
+    recs = _drive(Anchor(L, "support"), bars)
+    confirms = [r for r in recs if r.state == "confirmed"]
+    assert [c.fire_index for c in confirms] == [1, 2, 3, 4]
+    assert [c.confidence for c in confirms] == [0.8, 0.8, 0.8, 0.6]
+    # forming emissions of the 4th engagement already carry its fire number
+    assert all(r.fire_index == 4 for r in recs if r.state == "forming"
+               and r.timestamp >= confirms[2].timestamp)
+
+
+def test_independent_anchors_do_not_share_fire_counters():
+    """After 4 confirms at L, a first confirm at a different anchor is fire 1
+    at full confidence. The second anchor sits 20 pts up — past the proximity
+    gate — so the L-cycle bars never engage it."""
+    B = L + 20.0
+    bars = [b for cyc in range(4) for b in _fbd_cycle(L, cyc * 5)]
+    bars += _fbd_cycle(B, 20)
+    recs = SetupRecognizer([Anchor(L, "support"), Anchor(B, "support")]).run(bars)
+    confirms_b = [r for r in recs if r.state == "confirmed" and r.anchor_price == B]
+    assert [c.fire_index for c in confirms_b] == [1]
+    assert confirms_b[0].confidence == 0.8
+    confirms_l = [r for r in recs if r.state == "confirmed" and r.anchor_price == L]
+    assert [c.fire_index for c in confirms_l] == [1, 2, 3, 4]
+
+
+def test_fire_counter_survives_block_and_invalidation_cycles():
+    """The counter counts CONFIRMS per anchor across the recognizer's whole
+    lifetime: an invalidated engagement in between neither increments it nor
+    resets it — that persistence is the point of the damping."""
+    deep = INVALIDATE_TICKS * TICK + 1
+    bars = list(_fbd_cycle(L, 0))                                # confirm: fire 1
+    bars += [
+        _bar(5, L + 3, L + 3.5, L + 0.5, L + 2, +50),            # clears the block
+        _bar(6, L + 2, L + 2, L - 2, L - 1.5, -(FLUSH_DELTA_MIN + 10)),   # re-engage
+        _bar(7, L - 1.5, L - 1.5, L - deep, L - deep + 0.5, -(FLUSH_DELTA_MIN + 10)),  # invalidate
+    ]
+    bars += _fbd_cycle(L, 8)                                     # confirm: fire 2
+    recs = _drive(Anchor(L, "support"), bars)
+    confirms = [r for r in recs if r.state == "confirmed"]
+    invalidated = [r for r in recs if r.state == "invalidated"]
+    assert [c.fire_index for c in confirms] == [1, 2]
+    assert [c.confidence for c in confirms] == [0.8, 0.8]
+    assert len(invalidated) == 1 and invalidated[0].fire_index == 2  # would-be fire 2, didn't count
