@@ -84,8 +84,11 @@ themselves sort into eight recurring characters.
 The **zigzag decomposition** is the drawing rule: trace the day with
 alternating strokes, ending a stroke only when price retraces more than a
 threshold (20% of the day's range) from the stroke's furthest point. Each
-stroke is a **leg** — median 15 minutes, 7.25 points. Everything smaller than
-the threshold is absorbed into the leg as texture.
+stroke is a **leg** — median 15 minutes, 7.25 points. A backtrack smaller than
+the threshold does not turn the pen: its minutes stay on the tape, fully
+graded, inside the leg — the leg's *texture*, the reason travel exceeds
+displacement and giveback exists. (Not "absorbed" — that word stays reserved
+for the F2 cell.)
 
 Across 1,649 legs, four measured axes — pace, effect, giveback, force
 alignment — sort the population into eight **archetypes**: **flush-leg**
