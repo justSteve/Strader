@@ -137,10 +137,19 @@ def stream_healthy_in_manifest(day: _date, stream: str) -> bool:
     return (st.get("cycles", 0) or 0) > 0 and not (st.get("errors") or [])
 
 
-def run_pull(script: str, day: _date, extra: list[str] | None = None) -> tuple[int, str]:
+def run_pull(script: str, day: _date, extra: list[str] | None = None,
+             pass_date: bool = True) -> tuple[int, str]:
     """Invoke a per-stream pull script in this interpreter's venv. Returns
-    (returncode, combined_output). Never raises on non-zero — the caller decides."""
-    cmd = [sys.executable, str(REPO_ROOT / "scripts" / script), "--date", day.isoformat()]
+    (returncode, combined_output). Never raises on non-zero — the caller decides.
+
+    pass_date=False is for snapshot scripts (corpus_pull_schwab.py) that write
+    to TODAY's day-dir and take no --date; injecting one made the pull die on
+    argparse before it ever reached the API, which is why --include-schwab
+    could never have restored the stream [st-096].
+    """
+    cmd = [sys.executable, str(REPO_ROOT / "scripts" / script)]
+    if pass_date:
+        cmd += ["--date", day.isoformat()]
     if extra:
         cmd += extra
     logger.info("pull: %s", " ".join(cmd))
@@ -296,9 +305,14 @@ def main(argv: list[str] | None = None) -> int:
     # later than 08:15, the parse starts failing its gate — move the parse too.
 
     # --- Schwab (optional, not gate-required) ---------------------------------
+    # Snapshot lands in TODAY's day-dir, not the T+1 target day: a live quote
+    # pulled this morning is this morning's data. The daily stage cadence is
+    # owned by scripts/cron/schwab-stages-wrapper.sh [st-096]; this flag is the
+    # batch-run escape hatch.
     if args.include_schwab and not args.dry_run:
-        rc, out = run_pull(SCHWAB_PULL, day)
-        if rc != 0 or _is_schwab_auth_failure(day):
+        rc, out = run_pull(SCHWAB_PULL, day, ["--stage", "daily-batch"],
+                           pass_date=False)
+        if rc != 0 or _is_schwab_auth_failure(_date.today()):
             emit_alert(
                 "schwab_reauth",
                 "Schwab pull failed — refresh token expired/revoked. "

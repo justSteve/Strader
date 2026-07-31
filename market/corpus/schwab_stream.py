@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from datetime import date as _date
 
-from broker_schwab.client import create_client
-
 from .writer import utc_now_iso
 
 
@@ -83,6 +81,11 @@ def _strikes_window(chain: dict, n: int = 10) -> list[dict]:
 
 def pull_cycle(symbol: str = "$SPX") -> dict:
     """Run one Schwab corpus pull. Returns the JSONL-ready record."""
+    # Imported here, not at module top: the schwab package lives only in the
+    # venv, and importing this module must stay possible for tests running on
+    # the system interpreter [st-096].
+    from broker_schwab.client import create_client
+
     ts_pull = utc_now_iso()
     client = create_client()
     errors: list[str] = []
