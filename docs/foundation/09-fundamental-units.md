@@ -69,9 +69,12 @@ pace 0.792 against a 0.75 cutpoint, the vocabulary reported
 "flush-leg/steady-leg, coin-flip" — telling you *exactly* how much weight the
 label can bear. A vocabulary that admits its coin flips earns trust for its
 strong calls. (A **cutpoint**, while we are here, is a dividing line that
-*sorts*; a **threshold** is a value that *triggers* — the reversal threshold
-ends a swing, the 150-contract delta threshold fires the flip-stage. Bare
-"cut" stays reserved for what you do to a losing position.)
+*sorts*; a **threshold** is a value that *triggers*. The 0.75 pace cutpoint
+above sorts flush-leg from steady-leg, and the 50/50 percentile boundary
+sorts atoms into cells — nothing happens at either, a label just changes.
+The reversal threshold ends a swing, the 150-contract delta threshold fires
+the flip-stage — something *happens*. Bare "cut" stays reserved for what you
+do to a losing position.)
 
 ## Essay III — The zigzag and the eight archetypes
 
