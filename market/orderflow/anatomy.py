@@ -28,10 +28,10 @@ from market.signals.orderflow import SetupRecognition
 # beat is reached. Kept here (not the template) so the vocabulary has one home.
 BEAT_ORDER = ("flush", "stall", "flip", "confirm", "extend")
 BEAT_GLOSS = {
-    "flush":   "Aggression breaks past the level — the trap is set.",
+    "flush":   "Aggression breaks past the price-level — the trap is set.",
     "stall":   "The break stops being rewarded: force without effect (absorption).",
     "flip":    "Delta turns against the break — the other side seizes control.",
-    "confirm": "Price re-takes the level with opposite evidence — reversal confirmed.",
+    "confirm": "Price re-takes the price-level with opposite evidence — reversal confirmed.",
     "extend":  "Delta extended through the node instead of stalling — acceptance (proposed read).",
 }
 
