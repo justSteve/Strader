@@ -95,7 +95,19 @@
       "Bash(dirname *)",
       "Bash(bash *)",
       "Bash(true)",
-      "Bash(false)"
+      "Bash(false)",
+      "Write(*)",
+      "Bash(python3 *)",
+      "Bash(.venv/bin/python *)",
+      "Bash(.venv/bin/python3 *)",
+      "Bash(./.venv/bin/python *)",
+      "Bash(./.venv/bin/python3 *)",
+      "Bash(/root/projects/COO/tmuxMOO/bin/desk-html.sh *)",
+      "Bash(/root/projects/COO/tmuxMOO/bin/desk-register.sh *)",
+      "Bash(tmux -L moocity capture-pane *)",
+      "Bash(tmux -L moocity list-sessions*)",
+      "Bash(tmux -L moocity list-windows *)",
+      "Bash(tmux -L moocity has-session *)"
     ],
     "deny": [
       "Read(.env)",
