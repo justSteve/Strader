@@ -302,3 +302,38 @@ def test_no_desk_flag_suppresses_publication(tmp_path, monkeypatch, _isolate_des
                        "--store-root", str(tmp_path / "c"), "--no-desk"])
     assert rc == 0
     assert not (run_mod.DESK_REPORTS / "mancini-es-2026-06-29.md").exists()
+
+
+# --- clipboard is opt-in [st-0x9] -------------------------------------------
+# Regression pair for 2026-07-30, when three pytest runs during unrelated work
+# replaced the day's 60-level payload in Steve's clipboard with the two-line
+# _good_outcome fixture. Two independent things have to hold: the suite can
+# never reach clip.exe (tests/conftest.py, which is what `_no_clipboard` is),
+# and a parse without --clip must not even attempt the push.
+
+def _run_for_payload(tmp_path, monkeypatch, extra_args):
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
+    monkeypatch.setattr(parse_mod, "parse", lambda raw, **kw: _good_outcome())
+    monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
+    monkeypatch.setattr(run_mod, "CHARTS_ROOT", tmp_path / "charts")
+    rc = run_mod.main(["--file", str(nl), "--no-gate", "--date", "2026-06-29",
+                       "--store-root", str(tmp_path / "c"), "--no-desk",
+                       *extra_args])
+    assert rc == 0
+    return tmp_path / "charts" / "2026-06-29.payload.txt"
+
+
+def test_payload_file_written_but_clipboard_untouched_by_default(
+        tmp_path, monkeypatch, _no_clipboard):
+    payload_path = _run_for_payload(tmp_path, monkeypatch, [])
+    # The file is the durable artifact and is always produced...
+    assert payload_path.exists()
+    assert "5800" in payload_path.read_text()
+    # ...but nothing was pushed. This is the assertion that matters.
+    assert _no_clipboard == []
+
+
+def test_clip_flag_pushes_the_payload(tmp_path, monkeypatch, _no_clipboard):
+    payload_path = _run_for_payload(tmp_path, monkeypatch, ["--clip"])
+    assert _no_clipboard == [payload_path.read_text()]

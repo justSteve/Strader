@@ -282,25 +282,18 @@ def main(argv: list[str] | None = None) -> int:
     else:
         logger.info("[dry-run] would refresh internals snapshot (45d, force)")
 
-    # --- Mancini morning parse (not gate-required) [st-ze6] -------------------
-    # Pre-open chain: fetch newest letter blob -> parse (hybrid deterministic
-    # levels if the interpretive leg is credit-blocked) -> validate -> persist
-    # + brief. Runs its own datastream gate internally. Failure alerts but
-    # never blocks the corpus fill.
-    if not args.dry_run:
-        cmd = [sys.executable, "-m", "runbook.mancini.run", "--from-blob"]
-        logger.info("mancini: %s", " ".join(cmd))
-        proc = subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
-        if proc.returncode != 0:
-            emit_alert(
-                "mancini_parse",
-                f"Morning Mancini parse failed (rc={proc.returncode}) — "
-                "last-good artifacts still stand; run manually or in-session.",
-                {"returncode": proc.returncode,
-                 "tail": ((proc.stdout or "") + (proc.stderr or ""))[-500:]},
-            )
-    else:
-        logger.info("[dry-run] would run Mancini morning parse (--from-blob)")
+    # --- Mancini morning parse — MOVED OUT of this chain [st-q1n] -------------
+    # Until 2026-07-30 the parse ran here, inline, which tied it to this batch's
+    # 06:30 CT slot. The two jobs want opposite clocks: the Databento T+1 pull
+    # runs as early as the vendor has data, while the Mancini plan wants to run
+    # as LATE as possible so its overnight interaction brief (st-doz) measures
+    # the most ETH price action against the day's levels. It now has its own
+    # cron at 08:15 CT — scripts/cron/mancini-preopen-wrapper.sh.
+    #
+    # The ordering this batch provided is preserved, not lost: corpus_daily
+    # still fills data/corpus/<day>/ at 06:30, so run.py's datastream gate
+    # passes when the parse fires two hours later. If this batch is ever moved
+    # later than 08:15, the parse starts failing its gate — move the parse too.
 
     # --- Schwab (optional, not gate-required) ---------------------------------
     if args.include_schwab and not args.dry_run:

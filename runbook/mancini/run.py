@@ -294,6 +294,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-desk", action="store_true",
                     help="skip publishing the plan doc to the steves-desk "
                          "Trading window")
+    ap.add_argument("--clip", action="store_true",
+                    help="ALSO push the stable-renderer payload to the Windows "
+                         "clipboard. Off by default [st-0x9]: the payload file "
+                         "is always written, but the clipboard is Steve's live "
+                         "desktop and a diagnostic or backfill parse must not "
+                         "seize it. The 08:15 CT pre-open wrapper sets this — "
+                         "it is the only thing that should.")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
 
@@ -461,8 +468,15 @@ def main(argv: list[str] | None = None) -> int:
         logger.warning("chart emit failed (non-fatal): %s", e)
         chart_path = None
 
-    # 3b2. Stable-renderer payload → Windows clipboard (#st-5rc). Non-fatal.
+    # 3b2. Stable-renderer payload (#st-5rc). Non-fatal.
     # Parallel-run: 3b keeps emitting the per-day script during migration week.
+    #
+    # The FILE is always written; the CLIPBOARD is opt-in behind --clip [st-0x9].
+    # Steve's clipboard is a live desktop surface, not an output directory: the
+    # morning routine is double-click the indicator, Ctrl+A, Ctrl+V, and whatever
+    # sits there at 08:29 is what lands on the chart. A parse run to READ the
+    # letter, to backfill an old day, or to check a renderer change must not
+    # overwrite it. Only the 08:15 pre-open wrapper passes --clip.
     payload_path = None
     try:
         from . import payload_emitter
@@ -470,9 +484,14 @@ def main(argv: list[str] | None = None) -> int:
         payload = payload_emitter.build_payload(result)
         payload_path = CHARTS_ROOT / f"{result.date or day}.payload.txt"
         payload_path.write_text(payload, encoding="utf-8")
-        rc = payload_emitter.push_clipboard(payload)
-        logger.info("stable-renderer payload: %s (%d bytes, clip rc=%d)",
-                    payload_path, len(payload.encode()), rc)
+        if args.clip:
+            rc = payload_emitter.push_clipboard(payload)
+            logger.info("stable-renderer payload: %s (%d bytes, clip rc=%d)",
+                        payload_path, len(payload.encode()), rc)
+        else:
+            logger.info("stable-renderer payload: %s (%d bytes, clipboard "
+                        "untouched — pass --clip to load it)",
+                        payload_path, len(payload.encode()))
     except Exception as e:  # noqa: BLE001
         logger.warning("payload emit failed (non-fatal): %s", e)
 
