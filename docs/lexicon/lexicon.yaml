@@ -316,7 +316,7 @@ terms:
     status: deferred   # container word unresolved: engagement / instance / recognition / episode
     live: live
     definition: >
-      The recognizer's unit of work at 2,000-trade bar resolution — one
+      The recognizer's unit of work at 2,000-contract bar resolution — one
       engagement of one anchor through the four stages. LIVE — this is the
       tier that emits in real time and the tier your yea/nay rides on.
     on_the_chart: The Anatomy row in the drill; the thing the coach arms and walks.

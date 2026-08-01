@@ -114,14 +114,34 @@ that number.
 **The one idea:** every vocabulary you already have keeps working; each word
 now has an address.
 
-The units nest: **axes** score → **atoms** (minutes) → **legs** (swings) →
-the **day-sequence** (the session's archetype string — a D-day *reads* as
-rotation from the inside). Beside that stack sits the tier you already knew:
-the **episode** tier, where the recognizer runs the four **stages**
-(flush-stage → stall-stage → flip-stage → confirm-stage) on 2,000-contract
-bars, and where the **primitives** live — **sweep-print**, **absorption-read**,
-**delta-divergence**, **imbalance-stack**. Nothing you learned in documents
-01–08 was replaced; it was given a floor in the building.
+Start at the smallest unit and build upward. An **atom** is one minute of
+tape. A **leg** contains atoms — one stroke of the zigzag, median fifteen
+minutes of them. The trading day contains the legs: write down each leg's
+archetype in the order they happened — 7/22 reads roughly "steady-leg,
+flush-leg, absorption-stall, leg-grind…" — and that ordered list is the
+**day-sequence**, the whole day's character in one line. (A Market Profile
+rotation day, the D-shape, shows itself here as short legs alternating
+direction — the rotation is readable from the inside.) So the nesting is:
+minutes, inside swings, inside the day. Three tiers, each built from the one
+below it.
+
+The **axes** — effort, effect, force — are not a fourth tier in that stack.
+They are the rulers, and the same rulers measure more than one tier: a single
+minute gets an effort score, and so does an entire leg.
+
+One more tier exists, and it deliberately does *not* sit inside the nesting —
+it sits beside it. An **episode** is one whole fight at one price level, from
+first contact to resolution. The nested tiers slice the day by *time* — the
+clock, then the zigzag. An episode slices it by *place*: one level's fight
+can stretch across pieces of several legs. This is the recognizer's home
+ground. It watches episodes on **2,000-contract bars**, calls the four
+**stages** (flush-stage → stall-stage → flip-stage → confirm-stage) as they
+happen, and every **primitive** from your footprint reading — **sweep-print**,
+**absorption-read**, **delta-divergence**, **imbalance-stack** — lives here.
+It is also the tier with a different clock: episodes and stages are **LIVE**,
+called in the moment, while legs and the day-sequence are **HINDSIGHT** maps
+drawn after the close (Essay V). Nothing you learned in documents 01–08 was
+replaced; it was given a floor in the building.
 
 The tiers also resolve an apparent paradox worth meeting head-on: 7/22's
 afternoon leg is wall-to-wall F4-dead *atoms*, yet grades F1 at *leg* scale —

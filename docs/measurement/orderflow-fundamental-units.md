@@ -47,7 +47,7 @@ Three measured tiers plus one cross-referenced tier. Each unit's definition is o
 | Atom — graded | `effort_pct`, `effect_pct`, cell F1–F4, `grade` | **HINDSIGHT** (day-relative, session close — §0.1) |
 | Leg | boundaries, `pace`, `giveback_frac`, archetype, `cells` | **HINDSIGHT** (final-range threshold + pivot-confirmation lag — §0.1) |
 | Day-sequence | ordered archetype string | **HINDSIGHT** (end of session) |
-| Episode | recognizer four-stage unit | **LIVE** (2,000-trade bars, emitted in real time) |
+| Episode | recognizer four-stage unit | **LIVE** (2,000-contract bars, emitted in real time) |
 
 ### 1.1 Atom (measured; n = 39,482)
 
@@ -80,7 +80,7 @@ The ordered archetype string of a session (a hindsight object: it requires compl
 
 ### 1.4 Episode (cross-referenced, NOT measured by this corpus)
 
-The recognizer's unit of work at 2,000-trade bar resolution. **Container-word caveat:** code says `_Engagement`, drills say "instances," records say "recognitions," the coach improvised "episodes" (conflict item 7). This document uses *episode* provisionally and the choice is explicitly deferred to the lexicon ruling round — nothing below depends on which word wins.
+The recognizer's unit of work at 2,000-contract bar resolution. **Container-word caveat:** code says `_Engagement`, drills say "instances," records say "recognitions," the coach improvised "episodes" (conflict item 7). This document uses *episode* provisionally and the choice is explicitly deferred to the lexicon ruling round — nothing below depends on which word wins.
 
 **Resolution boundary (taxonomy axiom):** recognizer flush-stages and flip-stages are sub-minute and structurally invisible to atoms. The atom-visible signature of a four-stage episode is **stall-stage(F2) → conviction head** only; never require flush-stage representation in an atom cell string when cross-referencing (7533 validation: the 08:32/08:37/08:41 confirmation events all sit *inside* one 36-min up-leg; their flush-stage excursions to 7531.75/7532.75 appear only as single negative-net atoms).
 
@@ -223,7 +223,7 @@ Plus the corpus-wide `doji-atom` flag (travel = 0 exactly, 8.0%).
 
 | Stage | Empirical status at atom/leg scale |
 |---|---|
-| **flush-stage** | **Below atom resolution as a stage** (2,000-trade bars); its *leg-scale* correlate is the flush-leg archetype (13.7%), and its depth is now a measured graded field (V-signature flush-stage depth, pts + percentile). Sub-minute flush-stages inside a leg are invisible to cells (7533 08:32–08:41) |
+| **flush-stage** | **Below atom resolution as a stage** (2,000-contract bars); its *leg-scale* correlate is the flush-leg archetype (13.7%), and its depth is now a measured graded field (V-signature flush-stage depth, pts + percentile). Sub-minute flush-stages inside a leg are invisible to cells (7533 08:32–08:41) |
 | **stall-stage** | **Atom-scale correlate measured** (mirroring flush-stage's phrasing — the sub-minute stall-stage itself is not measured here): the F2-in-tail3 absorption-death signature with its graded score (§2.2), any-F2 slice 49.8% of legs, carrying the 0.46 → 0.60 conditional (final-shape attribution D 1.35×/b 1.85×; attenuates to ~1.0× on P) |
 | **flip-stage** | **Partially measured**: the pivot-atom is its 1-minute shadow (63% F1 — "pivot-atoms are loud"); the delta-flip itself is sub-minute. Note the recognizer ACCEPT-branch `bias` inversion (conflict item 4) remains a code fix, out of taxonomy scope |
 | **confirm-stage** | **Measured**: the conviction head (`11`/`111` opens, 37.4%/22.1% of leg starts — binary string motifs, coin-flip-band caveat per §2.3); confirmation-event quality banded by atom@0 effect_pct and travel (§2.3) |
