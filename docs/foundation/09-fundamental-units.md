@@ -683,8 +683,11 @@ grade-bands, all leg boundaries (a pivot exists only after the retracement
 proves it), all archetypes, the day-sequence.
 
 The system's two strongest discoveries are both hindsight, and honestly
-labeled: confirmations *with* their host-leg win 66% versus 19% against it,
-and the **V-signature** — a deep flush-leg answered by a confirmation-event
+labeled. First: every confirmation lands inside some stroke of the zigzag —
+its **host-leg**. A buy call fired inside a rising host-leg wins its scoring
+race (±5 first-touch, 30 minutes) 66% of the time; fired inside a falling
+one — a bottom-call made mid-drop — it wins 19%. Second, the
+**V-signature** — a deep flush-leg answered by a confirmation-event
 within minutes — wins 77.5% versus a 46.9% base. Neither is a live entry
 rule yet; turning them live (developing percentiles, provisional pivots) is
 open engineering, and until it ships, they are how the tape gets *graded*,
