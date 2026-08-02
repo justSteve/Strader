@@ -1,5 +1,37 @@
 # DaysActivity - 2026-08-02
 
+## 02:09 - Session Handoff [Stale-Surface Correction + Zigzag Blocked on Missing Tape]
+
+**Summary**: Short correction session that turned into two root-cause finds. `CurrentStatus.md` was three months stale (still claimed TradingView MCP configured, five nonexistent domain skills, and the discontinued checkpoint loop) — rewrote it as a standing operational snapshot and fixed the structural cause: tap-in and handoff both READ it and nothing WROTE it, so it was guaranteed to rot; handoff gained a conditional step 7 (st-0ji). Then purged the stale `tv_capture.py` references (st-ysj7) — the tool itself was already deleted 2026-07-02 in `5496175` as a dead-end Vision experiment, but the knowledge bundle had spent six weeks naming that deleted tool as "the sole interface to chart state." The promised 07-31 zigzag decomposition could NOT run: `data/corpus/2026-07-31/` holds no Databento streams at all, and the cause is structural rather than a one-off failure (st-u56 blocked, st-n42a filed).
+
+**Open Work**:
+- **st-u56 (blocked, needs Steve's call)** — 07-31 zigzag vs the eyeball read. The ES tape is absent. Monday 08-03 06:30 CT recovers it automatically (verified: `most_recent_session_day()` walks back over the weekend and resolves to 2026-07-31 from both Sun and Mon). Either wait for that, free and automatic, or authorize a manual Databento pull now — **it costs money, so it was not done on agent initiative**. Runner is written and waiting at `scratchpad/decompose_day.py` (read-only, writes nothing to `data/measurement/moves/`); one command once the tape lands.
+- **st-n42a (new)** — Friday's tape is unavailable all weekend. Corpus cron is `30 6 * * 1-5`, Friday's T+1 data comes due Saturday, so it first lands Monday — three days late. No data loss, but weekend review of a Friday session is impossible, which is exactly what this session tried to do. Prior Fridays 07-17 and 07-24 were papered over by ad-hoc Saturday runs at 16:37/18:10 UTC, not by the cron. Fix is a Saturday run or widening to `1-6`.
+- **st-08p** — unchanged, still externally blocked on Steve's NotebookLM upload and COO's deck import.
+- **Steve before Monday 08-03** — unchanged and still unarmed: `config/risk.yaml` numbers are Strader's guesses and `account_balance_usd` is still `null`, so the 2% per-trade cap does not fire.
+- **st-ndc (P1, ready)** — Schwab token wall 2026-08-05 15:17Z.
+- **Master moved underneath this session** — `486bfbb` (Steve + Fable 5, 02:05) landed the FD0 flush-down design under st-apzt. Not this session's work; noted so the next one does not attribute it here.
+
+**Tried**:
+- Trusted the prior handoff's "07-31 tape landed with the 08-01 pull" → **wrong, and worth not re-deriving**. That was st-5a9's *scratchpad* OPRA pull, explicitly "corpus untouched" — options prices at one moment, never the ES bars a zigzag needs.
+- `mi_gauge_live.jsonl` as a price fallback for 07-31 → no: it is the 0–100 market-internals gauge (`{"high":61,"low":61,"close":61}`), not price.
+- `schwab.jsonl` for 07-31 → only 3 stage snapshots with session OHLC, nowhere near enough for a leg decomposition. No substitute for the ES tape exists on disk.
+- Rehearsed the detector on 07-30 to separate "detector broken" from "data missing" → detector is sound: 390 atoms, 79.50-pt range, 15.90-pt threshold, 3 legs; pivot-atom sharing (leg 1 ends 09:42, leg 2 starts 09:41) and the 270-min rth mega-leg both match `docs/measurement/orderflow-fundamental-units.md`.
+- Threshold arithmetic confirms the eyeball read independently of the tape: `REVERSAL_FRAC` is 0.20, and 20% × 107 = 21.4 against Steve's called ~21. Leg count and the leg-3-by-6-points call remain unscored.
+- Renamed rather than deleted the TV concept — deleting outright would have dropped still-true rulings (never attempt TV MCP; Pine is hand-pasted). Left `archive/`, the stale beads `.bak`, and the 2026-05-17 design spec untouched per the precedent in `5496175`: historical logs and design specs keep their references as record.
+- Also corrected out-of-repo auto-memory (`project_tv_screenshot_pipeline.md`) and collapsed a duplicate `MEMORY.md` entry that pointed twice at the same file.
+
+**Files Changed**:
+CurrentStatus.md
+.claude/skills/handoff/SKILL.md
+knowledge/tradingview-chart-interface.md
+knowledge/index.md
+knowledge/log.md
+docs/measurement/v_day_definition.md
+DaysActivity.md
+
+---
+
 ## 00:53 - Session Handoff [Readiness Lane Shipped + Training Steps 0–2]
 
 **Summary**: One continuous session spanning Thu 07-30 night → Sat 08-02 00:53. Two arcs. First, the entire P1 readiness lane shipped and closed before the 8/1 line: st-096 Schwab online (stage-boundary snapshot cron 07:00/08:30/13:00/14:45 CT, live-verified; May snapshot-stop root-caused — no scheduler ever existed; fixed the latent `--date` injection that made `--include-schwab` dead on arrival), st-66u pre-open heartbeat (gate + Mancini artifact + risk state hard checks, schwab soft check, 08:25 CT cron), st-958 risk-state reset (config/risk.yaml → data/risk/<day>.json, HALTED on daily-loss breach, [ALERT] violations — **defaults are Strader's guesses; Steve must review and set account_balance_usd before Monday**). Second, the training package went live: A2A from COO set the adapted sequence, steps 0–2 ran end-to-end — glossary confirmed, essays read (producing five real doc fixes: cutpoint/threshold parallel, zigzag texture line + reserved-word collision, essay IV recomposed after a jargon-despair stop, host-leg gloss, F-is-for-frame origin, and a three-doc factual fix: 2,000-CONTRACT bars, not 2,000-trade), then the formative checks-09 pass: 4 owned / 5 borrowed / 3 missing, trio Q4+Q7 owned Q10 borrowed, Section B all borrowed; weakest Q2 (5-collision) and Q8 (zigzag rule unbound + invented story — anchor-first coaching given). Deck 29→39 cards, ten minted from Steve's own catches/misses. Audio bundle rebuilt current with st-ndw SVG figures stripped to captions. Also: .30/.60 delta pricing of Steve's 07-31 8:38 short from OPRA tape (st-5a9 closed — 7455P $8.60/−.32 vs 7485P $19.20/−.62, +83% vs +57% two minutes in); desk pages relocated to /var/moo/desk with dated archives (st-3tp); eyeball zigzag decomposition of 07-31's 107-pt day taught live; gc mail double-defect diagnosed.

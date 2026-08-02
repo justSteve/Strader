@@ -3,7 +3,7 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
-**Last refreshed**: 2026-08-02 [st-0ji]
+**Last refreshed**: 2026-08-02 [st-0ji, st-ysj7, st-n42a]
 
 > Standing operational snapshot — what is wired up, live, or paused right now.
 > Session history lives in `DaysActivity.md`; work lives in beads; durable
@@ -32,7 +32,7 @@ summative pass.
 
 | Time | Job |
 |------|-----|
-| 06:30 | Corpus daily (COO-side wrapper) |
+| 06:30 | Corpus daily (COO-side wrapper) — weekdays only, so **Friday's tape first lands Monday**, not Saturday (`st-n42a`) |
 | 07:00 / 08:30 / 13:00 / 14:45 | Schwab stage-boundary snapshots |
 | 08:15 | Mancini pre-open — **`st-i68` open** |
 | 08:25 | Pre-open heartbeat + risk-state reset |
