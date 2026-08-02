@@ -76,5 +76,6 @@ missing its `leases` table). The working channel is file-convention A2A under
    resolvable). Fires every weekday at 08:15 until fixed.
 3. **`st-08p` blocked externally** — training steps 3–5 need Steve's NotebookLM
    upload and COO's deck import.
-4. **Stale path in the bundle** — `knowledge/tradingview-screenshot-pipeline.md`
-   cites `tools/tv_capture/tv_capture.py`, which no longer exists.
+4. **07-31 tape absent** — `data/corpus/2026-07-31/` has no Databento streams;
+   Friday's T+1 pull was due Saturday and the corpus cron is weekdays-only. The
+   08-03 06:30 run targets 07-31 and recovers it. Blocks `st-u56`.

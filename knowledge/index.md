@@ -45,7 +45,7 @@ in it covered external domain knowledge or facts about the operator.
 - [Checkpoint Loop Discontinued](checkpoint-loop-discontinued.md) — The 30-min /checkpoint auto-save loop is discontinued (2026-07-13) — do not start it at session start
 - [Databento Live Collection](databento-live-collection.md) — Databento forward-collection mode is LIVE tick stream (chosen over T+1 batch), via scripts/corpus_stream_databento.py
 - [Grow Into Live Trading](grow-into-live-trading.md) — 8/1/2026 go-live is a hard start date but NOT full-size — graduated entry, permission to grow into the system
-- [TradingView Screenshot Pipeline](tradingview-screenshot-pipeline.md) — TradingView MCP is dead — screenshots via tv_capture.py are the sole chart interface. No MCP, no CDP.
+- [TradingView Chart Interface](tradingview-chart-interface.md) — There is no automated TradingView interface — MCP and the screenshot/Vision pipeline are both dead. Chart state comes from our own corpus; Pine is hand-pasted.
 
 ### operator-profile
 

@@ -129,7 +129,7 @@ Per-rule diagnostic flags let us debug parameter sensitivity without re-running 
 
 1. Run detector on the full 250-day corpus → label set
 2. Sample 5 V-labeled days and 5 non-V days at random
-3. Generate ES chart screenshots for each (`tools/tv_capture/tv_capture.py`, 5-min bars, 13:00–15:00 CT)
+3. Render an ES chart for each from our own corpus (`tools/local_chart.py`, 5-min bars, 13:00–15:00 CT) and open the HTML over `file://`
 4. Eyeball-check: does the detector's verdict agree with what we see?
 5. If agreement < 80%, identify which knob is mis-tuned, adjust, re-run
 6. Freeze parameters once agreement ≥ 80%; record final values + validation evidence at the bottom of this doc
