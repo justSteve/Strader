@@ -3,13 +3,78 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
+**Last refreshed**: 2026-08-02 [st-0ji]
 
-## Operational State
+> Standing operational snapshot — what is wired up, live, or paused right now.
+> Session history lives in `DaysActivity.md`; work lives in beads; durable
+> knowledge lives in `knowledge/index.md`. This file holds none of those.
+> The `/handoff` skill refreshes it.
 
-- Trading tools: TradingView MCP server configured
-- Domain skills: daily-pnl-summary, entry-signal-evaluation, greeks-analysis, position-sizing, risk-limit-enforcement
-- Session lifecycle: tap-in, handoff, checkpoint deployed 2026-05-04
+## Phase
+
+Live trading opened **2026-08-01** on graduated sizing — a hard start, not a
+full-size one. Growth is earned (`knowledge/` grow-into-the-system ruling).
+The fundamental-units training sequence is mid-flight; drills unlock only on a
+summative pass.
+
+## Data and Instruments
+
+| Surface | State |
+|---------|-------|
+| TradingView MCP | **Removed.** No `.mcp.json`. Chart state comes from screenshots; Pine scripts are pasted by Steve by hand. |
+| GEXBot | **Paused** since 2026-07-22. No live GEX feed — never cite current GEX levels. |
+| Schwab API | `lib/schwab-py` on the `hobbled-readonly` fork — account/order/transaction methods physically removed. Only `broker_schwab/readers/{quote,chain}.py` are auto-allowed. |
+| Databento | Live tick-stream collection, forward corpus. Historical corpus is tape-only — no GEX history. |
+| Mancini | Pre-open cron wired; `st-i68` PATH bug open against it. |
+| Market internals | `scripts/mi_gauge.py`, captured on the 5-minute session cron. |
+
+## Crons (weekdays, CT)
+
+| Time | Job |
+|------|-----|
+| 06:30 | Corpus daily (COO-side wrapper) |
+| 07:00 / 08:30 / 13:00 / 14:45 | Schwab stage-boundary snapshots |
+| 08:15 | Mancini pre-open — **`st-i68` open** |
+| 08:25 | Pre-open heartbeat + risk-state reset |
+| every 5 min, 08:00–15:55 | Market-internals gauge |
+
+First full Monday-morning fire: **2026-08-03**.
+
+## Risk Posture
+
+`config/risk.yaml` snapshots into `data/risk/<day>.json` at the 08:25 reset;
+the day trades against the snapshot, so edits take effect tomorrow. State flips
+to **HALTED** on a daily-loss breach.
+
+- Daily stop −$300 · max 2 open positions · escalation above $5,000 notional
+- Per-strategy: flies 3×$150 · ORB 1×$100 · scalps 3×$100
+- **`account_balance_usd` is `null`** — the 2%-per-trade cap is **unarmed**.
+  Every number above is Strader's graduated-sizing default, not Steve's ruling.
+
+## Execution Gate
+
+Strader authors trade code. Steve alone executes, via `./scripts/run.sh`.
+No autonomous orders, ever.
+
+## Session Lifecycle
+
+`/tap-in` at start, `/handoff` at end. The checkpoint loop was discontinued
+2026-07-13 and should not be reintroduced.
+
+## Comms
+
+`gc mail` is dead from Strader in both directions — two COO-side defects (city
+resolution walks up from cwd and Strader is out-of-tree; the moocity store is
+missing its `leases` table). The working channel is file-convention A2A under
+`docs/a2a/`.
 
 ## Attention Items
 
-- First session with full lifecycle artifacts — validate tap-in/handoff flow
+1. **Risk cap unarmed** — `account_balance_usd: null`. Steve's ruling on the
+   whole risk table is outstanding.
+2. **`st-i68`** — Mancini pre-open cron fails on cron PATH (Azure CLI not
+   resolvable). Fires every weekday at 08:15 until fixed.
+3. **`st-08p` blocked externally** — training steps 3–5 need Steve's NotebookLM
+   upload and COO's deck import.
+4. **Stale path in the bundle** — `knowledge/tradingview-screenshot-pipeline.md`
+   cites `tools/tv_capture/tv_capture.py`, which no longer exists.

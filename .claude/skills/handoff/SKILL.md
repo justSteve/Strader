@@ -67,6 +67,24 @@ path/to/file2.ts
    - Write: header + new entry + blank line + existing entries
    - Preserve the `# DaysActivity - YYYY-MM-DD` header at top
 
+7. **Refresh CurrentStatus.md** *(only when standing state actually moved)*
+
+   `CurrentStatus.md` is a standing operational snapshot, not a session log —
+   what is wired up, live, or paused right now. Most sessions change nothing in
+   it and it should be left alone. Update it when this session:
+
+   - turned a data surface, cron, or instrument on, off, or broken
+   - changed the risk posture, the execution gate, or a hard boundary
+   - moved the phase (training → drills, sizing tier, live-date milestone)
+   - resolved or added an item under **Attention Items**
+
+   Rules: replace the stale line in place, never append a changelog. Bump
+   **Last refreshed** to today with the authorizing bead. Do not restate
+   session narrative — that is what the DaysActivity entry above is for.
+
+   > This step exists because the file sat unmaintained from 2026-05-04 to
+   > 2026-08-02: tap-in and handoff both read it, nothing wrote it [st-0ji].
+
 ## Entry Format Rules
 
 - **Timestamp**: 24-hour format (HH:MM)
