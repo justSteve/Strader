@@ -147,9 +147,6 @@ fact, which is exactly the authority hindsight holds in this system. The
 narrative you just read is the hindsight layer teaching the live layer's
 vocabulary; your seat only ever gets asked about the live half.
 
-
----
-
 # 09 · Fundamental Units — Naming What the Tape Does
 
 *Foundation series, document 9. Rests on: [02 · Volume](02-volume.md) (effort vs
@@ -160,9 +157,12 @@ effect), [05 · Order Flow](05-order-flow.md) (aggression, delta, absorption),
 *This document is five short essays, read in order. Ground truth for every term
 is `docs/lexicon/lexicon.yaml`; every number is a measurement from 263 trading
 days (39,482 minutes, 1,649 price swings), adversarially verified. First
-contact with this vocabulary should be the companion narrative,*
-The Day in Fundamental Units — 2026-07-22*; these essays explain the machinery
-the narrative showed in motion.*
+contact with this vocabulary should be the companion narratives,*
+The Day in Fundamental Units *(2026-07-22 and 2026-07-24)*; these essays
+explain the machinery the narratives showed in motion. For the measurement
+vocabulary the accuracy numbers are spoken in — anchor, fire, the scoring
+rule — read `docs/training/plain-words-glossary.md` first; no essay assumes
+it.*
 
 ---
 
@@ -218,9 +218,12 @@ pace 0.792 against a 0.75 cutpoint, the vocabulary reported
 "flush-leg/steady-leg, coin-flip" — telling you *exactly* how much weight the
 label can bear. A vocabulary that admits its coin flips earns trust for its
 strong calls. (A **cutpoint**, while we are here, is a dividing line that
-*sorts*; a **threshold** is a value that *triggers* — the reversal threshold
-ends a swing, the 150-contract delta threshold fires the flip-stage. Bare
-"cut" stays reserved for what you do to a losing position.)
+*sorts*; a **threshold** is a value that *triggers*. The 0.75 pace cutpoint
+above sorts flush-leg from steady-leg, and the 50/50 percentile boundary
+sorts atoms into cells — nothing happens at either, a label just changes.
+The reversal threshold ends a swing, the 150-contract delta threshold fires
+the flip-stage — something *happens*. Bare "cut" stays reserved for what you
+do to a losing position.)
 
 ## Essay III — The zigzag and the eight archetypes
 
@@ -230,8 +233,11 @@ themselves sort into eight recurring characters.
 The **zigzag decomposition** is the drawing rule: trace the day with
 alternating strokes, ending a stroke only when price retraces more than a
 threshold (20% of the day's range) from the stroke's furthest point. Each
-stroke is a **leg** — median 15 minutes, 7.25 points. Everything smaller than
-the threshold is absorbed into the leg as texture.
+stroke is a **leg** — median 15 minutes, 7.25 points. A backtrack smaller than
+the threshold does not turn the pen: its minutes stay on the tape, fully
+graded, inside the leg — the leg's *texture*, the reason travel exceeds
+displacement and giveback exists. (Not "absorbed" — that word stays reserved
+for the F2 cell.)
 
 Across 1,649 legs, four measured axes — pace, effect, giveback, force
 alignment — sort the population into eight **archetypes**: **flush-leg**
@@ -257,20 +263,43 @@ that number.
 **The one idea:** every vocabulary you already have keeps working; each word
 now has an address.
 
-The units nest: **axes** score → **atoms** (minutes) → **legs** (swings) →
-the **day-sequence** (the session's archetype string — a D-day *reads* as
-rotation from the inside). Beside that stack sits the tier you already knew:
-the **episode** tier, where the recognizer runs the four **stages**
-(flush-stage → stall-stage → flip-stage → confirm-stage) on 2,000-contract
-bars, and where the **primitives** live — **sweep-print**, **absorption-read**,
-**delta-divergence**, **imbalance-stack**. Nothing you learned in documents
-01–08 was replaced; it was given a floor in the building.
+Start at the smallest unit and build upward. An **atom** is one minute of
+tape. A **leg** contains atoms — one stroke of the zigzag, median fifteen
+minutes of them. The trading day contains the legs: write down each leg's
+archetype in the order they happened — 7/22 reads roughly "steady-leg,
+flush-leg, absorption-stall, leg-grind…" — and that ordered list is the
+**day-sequence**, the whole day's character in one line. (A Market Profile
+rotation day, the D-shape, shows itself here as short legs alternating
+direction — the rotation is readable from the inside.) So the nesting is:
+minutes, inside swings, inside the day. Three tiers, each built from the one
+below it.
+
+The **axes** — effort, effect, force — are not a fourth tier in that stack.
+They are the rulers, and the same rulers measure more than one tier: a single
+minute gets an effort score, and so does an entire leg.
+
+One more tier exists, and it deliberately does *not* sit inside the nesting —
+it sits beside it. An **episode** is one whole fight at one price level, from
+first contact to resolution. The nested tiers slice the day by *time* — the
+clock, then the zigzag. An episode slices it by *place*: one level's fight
+can stretch across pieces of several legs. This is the recognizer's home
+ground. It watches episodes on **2,000-contract bars**, calls the four
+**stages** (flush-stage → stall-stage → flip-stage → confirm-stage) as they
+happen, and every **primitive** from your footprint reading — **sweep-print**,
+**absorption-read**, **delta-divergence**, **imbalance-stack** — lives here.
+It is also the tier with a different clock: episodes and stages are **LIVE**,
+called in the moment, while legs and the day-sequence are **HINDSIGHT** maps
+drawn after the close (Essay V). Nothing you learned in documents 01–08 was
+replaced; it was given a floor in the building.
 
 The tiers also resolve an apparent paradox worth meeting head-on: 7/22's
 afternoon leg is wall-to-wall F4-dead *atoms*, yet grades F1 at *leg* scale —
 because 221 minutes of small efforts sum to a large one. Atom grades are the
 day's texture; leg grades are corpus-scale mass. Both true. When you speak a
 grade, say which tier you mean.
+
+*Figure 1 — every minute of the fade, graded. Full-height ticks are atoms with something happening; the short gray ticks are F4 dead — the leg is mostly absence. (run `20260728T123632Z`, hover any tick for its atom.)*
+*Figure 2 — the paradox resolved: no single minute is loud, but the sum passes the whole morning leg-grind and lands in the corpus&#8217;s top decile of full-RTH legs. Leg percentiles rank against coverage-matched legs only (window truncation biases leg statistics).*
 
 One discrimination from this stack matters more than any other, and it has a
 fencing name: at a contested price, a thrust meets a parry. If the **parry
@@ -293,8 +322,11 @@ grade-bands, all leg boundaries (a pivot exists only after the retracement
 proves it), all archetypes, the day-sequence.
 
 The system's two strongest discoveries are both hindsight, and honestly
-labeled: confirmations *with* their host-leg win 66% versus 19% against it,
-and the **V-signature** — a deep flush-leg answered by a confirmation-event
+labeled. First: every confirmation lands inside some stroke of the zigzag —
+its **host-leg**. A buy call fired inside a rising host-leg wins its scoring
+race (±5 first-touch, 30 minutes) 66% of the time; fired inside a falling
+one — a bottom-call made mid-drop — it wins 19%. Second, the
+**V-signature** — a deep flush-leg answered by a confirmation-event
 within minutes — wins 77.5% versus a 46.9% base. Neither is a live entry
 rule yet; turning them live (developing percentiles, provisional pivots) is
 open engineering, and until it ships, they are how the tape gets *graded*,
@@ -305,131 +337,6 @@ minute; an agent switches on where it counts; **hindsight is the authority on
 what was correct; you are the authority on risk** — the final call on every
 trade and every size. This vocabulary's whole purpose is to make what the
 watchers tell you *unambiguous* at the moment that call is yours.
-
-
----
-
-## The Vocabulary, term by term
-
-
-### Axes
-
-**effort** (live): Unsigned volume traded in a unit — how much fuel was spent. On the chart: Cell brightness and the size of the footer volume number.
-
-**effect** (live): Price movement produced. Two faces: displacement (close minus open, signed) and travel (high minus low). A unit can travel far and displace nothing — that is a fight, not stillness. On the chart: How far the column's cells span (travel) vs where it closes relative to where it opened (displacement).
-
-**force** (live): Signed delta — buy-aggression minus sell-aggression. NOT the same as effort (unsigned). The two axes are never interchangeable. On the chart: The footer delta number and its color.
-
-**travel-ratio** (live): Displacement divided by travel, 0-1. 1 = one-way traffic; near 0 = full round trip inside the unit. Marks structure the unit's net hides. On the chart: A tall column that closes where it opened has travel-ratio near 0 — the wick-heavy silhouette.
-
-**pace** (hindsight): Leg extreme-points per minute; corpus tercile cutpoints 0.38 / 0.75. On the chart: How steep the leg looks on the candle companion chart.
-
-**giveback** (hindsight): Fraction of a leg's extreme surrendered by its end. Measured fact: big legs keep what they take (flush-leg median giveback 0.05); giveback concentrates in small legs. On the chart: The pullback from the leg's furthest point before the next leg starts.
-
-
-### Grade bands
-
-**cutpoint** (n/a (a property of definitions, not of tape)): A dividing line in a classification — pace 0.75 is the flush-leg cutpoint; the archetype-grade measures distance from it. Distinct from a threshold, which TRIGGERS an event when crossed (the reversal threshold ends a leg; the 150-contract delta threshold fires the flip-stage). Cutpoints sort; thresholds act. Bare "cut" is banned in definitions — in speech it keeps its trading sense: cutting a position. On the chart: Nothing — cutpoints live in the grading, not on the tape.
-
-**coin-flip band** (hindsight): Grade <= 0.1 — within a whisker of the cell-boundary. 20.4% of atoms, 19.3% of legs. Unreportable as a cell claim; report the straddled pair ("F3/F4 coin-flip"). Banned as a bare command token in the CLI grammar. On the chart: A column you could argue either way about — the honest label admits it.
-
-**lean band** (hindsight): Grade 0.1-0.3 (32.5% atoms / 28.7% legs). Reportable with the grade-band attached. On the chart: Readable but not shout-it-across-the-room.
-
-**solid band** (hindsight): Grade 0.3-0.6 (31.3% / 29.0%). Reliable. On the chart: You would call it the same way twice.
-
-**strong band** (hindsight): Grade > 0.6 (15.8% / 23.0%). Survives any reasonable reclassification. On the chart: Unmistakable — the textbook example you would screenshot.
-
-
-### Atom tier
-
-**atom** (live (raw) / hindsight (graded)): One clock minute of tape: net, range, travel-ratio, effort, force — live at minute close. Its percentile grades and F-cell are day-relative, hence hindsight. On the chart: Roughly 2-4 footprint columns' worth of tape at typical pace (columns are volume-bars, not minutes).
-
-**F1 conviction** (hindsight): High effort AND high effect — the movement is being paid for. 34.7% of atoms. On the chart: Bright cells, wide span, big footer delta agreeing with direction.
-
-**F2 absorption** (hindsight): High effort, low effect — someone is standing there. 16.0% of atoms. 82.5% of all range-travel the 1-minute lens discards hides inside F2 cells: absorption minutes are internally violent. On the chart: Bright cells piled at the same prices, column going nowhere — the pile-up without the march.
-
-**F3 hollow** (hindsight): Effect without effort — price drifting on air. 22.4% of atoms. On the chart: Dim cells but the column spans far; nobody paid for the trip.
-
-**F4 dead** (hindsight): Neither effort nor effect. 26.9% of atoms. On the chart: Dim, short, forgettable.
-
-**doji-atom** (live): Travel-ratio exactly 0 (open = close). 8.0% of atoms — the pure-rotation marker. On the chart: The column that ends where it began.
-
-**probe-atom** (hindsight): High-effort round-trip minute (effort_pct > 80, travel < 0.3). ~6.7/day, 75.3% graded F2. Confirmation events co-locate with them at 37.1% vs a 16.2% base — but no better than high-effort one-way minutes: effort is the signal, the round trip is texture. On the chart: A violent column that slams back to where it started — the sub-minute fight compressed.
-
-**pivot-atom** (hindsight): The shared border minute between consecutive legs (leg k's last = leg k+1's first). 63% graded F1 — legs die hot, by opposition, not exhaustion. On the chart: The loud column at the turn — NOT a quiet fade.
-
-**micro-stall** (hindsight): The interior "1-2-1" cell motif — conviction, absorption, conviction resuming — a sub-leg pause. Partner word micro- distinguishes it from stall-stage (episode tier). The parry FAILS here: the leg continues. If the parry holds and force turns, you were watching a stall-stage instead — indistinguishable in the moment, named only in hindsight. On the chart: A thrust, a parry that fails, the thrust resumes (Steve's fencing frame, 2026-07-28). Bright / pinned / bright again, leg unbroken.
-
-
-### Leg tier
-
-**zigzag decomposition** (hindsight): The drawing rule that produces legs: redraw the day with the fewest alternating strokes that capture every swing bigger than the reversal threshold (20% of the day's final high-low range, floor 1.5 pts). A stroke extends while price makes new extremes its way; a beyond-threshold retracement ends it at its furthest point and starts the opposite stroke. Sub-threshold wiggle is absorbed into the stroke it happened during. Doubly hindsight: the threshold needs the final range, and a stroke's end is knowable only after the retracement. (Charting platforms ship the same idea as the ZigZag indicator, usually fixed-percent; ours is day-relative.) On the chart: The day traced with the fewest pen strokes — on 7/22 the threshold was 7.65 pts and the day compressed to four strokes.
-
-**leg** (hindsight): One element of the day's zigzag (reversal threshold 20% of final day range, floor 1.5 pts). Median 15 min, 7.25 pts. The unit the archetypes name. ("Move" is retired as a unit word; option-structure legs must compound as option-leg / spread-leg.) On the chart: One directional swing on the candle companion — the thing you'd draw with one pen stroke.
-
-**flush-leg** (hindsight): Fast and big — pace >= 0.75, effect >= 70. 13.7% of legs; median 16.75 pts in 16 min, giveback 0.05. 76% occur on D-days. The tradeable V-dump leg. On the chart: The steep cliff. On candlesticks — the elevator-down (or up) you already recognize.
-
-**steady-leg** (hindsight): Mid-pace pure-conviction residual; the most force-confirmed class (alignment 0.95). ~18% of legs. The "trust the tape" reference. On the chart: A clean staircase — direction, pace, and delta all agreeing.
-
-**leg-grind** (hindsight): Slow but big — pace < 0.38, effect >= 70. 6.0% of legs, median 66 min. Over-indexes P-days (trend-day crawl). On the chart: The all-afternoon escalator that never gives an entry.
-
-**counterforce-leg** (hindsight): Big leg whose delta disagrees with its direction (effect >= 60, force misaligned). 4.2%; skews DOWN 41/28 — price falling through net buying: trapped-buyer drops. (Renamed from "squeeze-leg" — squeeze is an up-cloud word; the bare name would have baked in a direction inversion.) On the chart: Falling prices with blue (buy) footers — the tape arguing with itself. Direction Inversion Watch territory.
-
-**absorption-stall** (hindsight): Leg-scale F2 — heavy effort, little net progress. 9.6% of legs. On the chart: A fat sideways smear of bright columns.
-
-**hollow-glide** (hindsight): Leg-scale F3 — distance covered on thin participation. ~8% of legs. On the chart: A drift you could wave your hand through.
-
-**probe-fade** (hindsight): Small leg that pokes out and surrenders it — giveback >= 0.30 with effect < 50. 7.8% of legs. On the chart: The failed little excursion — out, nothing there, back.
-
-**dead-drift** (hindsight): The residual majority — 32.4% of legs. Nothing happening, honestly labeled. On the chart: The chop between the stories.
-
-
-### Day tier
-
-**day-sequence** (hindsight): The session's ordered archetype string — a day-type read from the inside. 2026-07-22 reads flush-leg, steady-leg, leg-grind, steady-leg. On the chart: The day's story told in four to eight words.
-
-
-### Episode tier
-
-**episode** (live): The recognizer's unit of work at 2,000-trade bar resolution — one engagement of one anchor through the four stages. LIVE — this is the tier that emits in real time and the tier your yea/nay rides on. On the chart: The Anatomy row in the drill; the thing the coach arms and walks.
-
-
-### The four stages
-
-**flush-stage** (live): Stage 1 — aggressive break through a price-level. Sub-minute; invisible to atoms. Leg-scale correlate: the flush-leg. On the chart: The spike through the armed plan-level — often inside a single column.
-
-**stall-stage** (live): Stage 2 — aggression continues, extreme stops extending. Atom-scale correlate: F2-in-tail (absorption-death), which lifts the confirm-conditional from 0.46 to 0.60. On the chart: The parry that HOLDS — sellers still thrusting, lows shrinking, nothing given (7/22 footers 1-3).
-
-**flip-stage** (live): Stage 3 — delta turns against the break (threshold 150 contracts, ~7% of bar volume: machine-legible, not eye-legible). Its 1-minute shadow is the pivot-atom. On the chart: You will NOT see it in cells; the coach calls it. Footer sign change is the after-the-fact trace.
-
-**confirm-stage** (live): Stage 4 — a close back across the price-level with opposite evidence. The recognizer emission is a confirmation-event. Atom correlate: the conviction head ("11"/"111" leg openings). On the chart: The retake candle/column closing back through the price-level.
-
-
-### Orderflow primitives
-
-**sweep-print** (live): One aggressive order eating multiple book price-levels (>= 3 ticks). Your candlestick-hindsight "sweep" — it kept its name, compounded. On the chart: The long single-print tail; on candles, the wick you already spot.
-
-**absorption-read** (live): Book-level verdict — aggressor threw size, passive side refilled (from MBP-1 quotes). Outcome word (held/broke/lifted-away) is currently prose-only; enum field is queued code work. On the chart: Price pinned while the footer volume climbs; needs book data to grade.
-
-**delta-divergence** (live): New price extreme on weaker aggression than the prior extreme — the exhaustion tell. On the chart: New low, smaller red footer than the last low made.
-
-**imbalance-stack** (live): >= 3 consecutive diagonal bid/ask dominances (3:1) — one side owning a price ladder. On the chart: A diagonal run of lopsided cells.
-
-
-### Level states
-
-**level-state** (live): The renderer's per-plan-level state machine, close-based: untouched -> tested/held -> broken -> reclaimed. RECLAIMED is the failed-breakdown pattern rendered in place — the same market event the episode tier confirms from orderflow, on a slower clock. On the chart: The plan-level line's color/style and state word in the HUD on the /ES chart.
-
-
-### Cross-tier signatures
-
-**V-signature** (hindsight): Prior down flush-leg <= -8 pts, confirmation-event within 3 min of the new up-leg. 77.5% wins vs 46.9% base (31/40, hindsight attribution). The measured V-dump fly entry. On the chart: The cliff, the turn, the immediate retake — your butterfly setup in taxonomy words.
-
-**host-leg** (hindsight): The leg containing a confirmation-event. Direction agreement splits win rate 66% vs 19% — the strongest single hindsight separator. Stays a diagnostic until a live proxy exists. On the chart: Is the setup swimming with or against the swing it lives inside.
-
-**leg-boundary-trap** (hindsight): Down-leg dying by absorption (F2 tail) then an up-leg opening on conviction — the four-stage sequence at leg scale. 27.6% of down-up pairs; stall-conditional 0.60 vs 0.46. On the chart: Pile-up at the low, loud turn, bright staircase out.
-
----
 
 # The Day in Fundamental Units — Friday 2026-07-24
 
@@ -784,8 +691,6 @@ verdicts describe overlapping but non-identical setups — neither is the other'
 scorecard. The narrative you just read is the hindsight layer teaching the live
 layer's vocabulary; your seat only ever gets asked about the live half.
 
----
-
 # Plain-Words Glossary — Read This Before Any Numbers Conversation
 
 **Bead:** st-v95 · **Date:** 2026-07-31 · **Why this exists:** on 2026-07-31 an
@@ -850,7 +755,10 @@ earns is a separate question, and sizing is your seat.
 **Effect** — how far price moved (what the business bought).
 **Force** — which side was pressing (signed; can disagree with direction).
 **Cells F1–F4** — the four combinations of high/low effort × effect:
-conviction / absorption / hollow / dead.
+conviction / absorption / hollow / dead. The **F is for "frame"** — the codes
+come from the drill catalog's single-bar *frame scenarios* (its siblings are
+S1–S6 level-engagement scenarios and T1–T3 tempo scenarios), and the taxonomy
+inherited those ratified names rather than minting new ones.
 **Grade, grade-band** — how far a label sits from the dividing line: coin-flip
 (too close to call — always spoken as a pair, "F3/F4"), lean, solid, strong.
 **Leg** — one stroke of the day's zigzag; the unit swings are measured in.
@@ -858,8 +766,8 @@ conviction / absorption / hollow / dead.
 steady-leg, leg-grind, counterforce-leg, absorption-stall, hollow-glide,
 probe-fade, dead-drift).
 **Pivot-atom** — the shared minute where one leg dies and the next is born.
-**Stages** — the recognizer's four beats at a level: flush-stage → stall-stage
-→ flip-stage → confirm-stage.
+**Stages** — the recognizer's four-part sequence at a level: flush-stage →
+stall-stage → flip-stage → confirm-stage.
 **Episode** — one whole engagement of price with a level, start to resolution.
 **LIVE / HINDSIGHT** — the stamp on every quantity: knowable in the minute, or
 only computable after the day completes. Percentiles, cells, legs, and
