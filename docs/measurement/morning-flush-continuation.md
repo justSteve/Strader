@@ -147,6 +147,56 @@ survives; its members are correlated with each other, and honesty requires
 saying the meter is closer to "three views of one underlying state" than
 three independent confirmations.
 
+## VVIX pass (2026-08-03, third pass same session — st-lru8)
+
+VVIX = implied vol of ~30-day VIX options — the quoted price of crash-tail
+convexity, one derivative beyond VIX. **$VVIX serves and is now captured**
+(30 days backfilled, zero rows lost; symbol roster is 8). July morning range:
+86.3–107.7 — no stress episode in-window. Script:
+`scripts/measurement/morning_flush_vvix.py` (same 1,882 minutes, parity
+asserted).
+
+**Coupling:** ΔVVIX_5m = 0.02 + 2.15·ΔVIX_5m, **R² = 0.53** — only half of
+VVIX's minute movement is the VIX print (vs 0.79 for VIX-on-ES). The other
+half is its own animal — but that half carries no continuation signal:
+**residual AUC 0.532 (day-median 0.479), the same coin-flip verdict** the
+VIX residual earned. At 5-minute granularity inside a morning move,
+vol-of-vol adds nothing beyond the VIX print as a continuous signal.
+
+**VVIX/VIX ratio slope comes out INVERTED** (AUC 0.375 as naively oriented
+⇒ 0.625 flipped): the ratio *compressing* accompanies continuation. Largely
+mechanical — in percentage terms VIX moves far more than VVIX during a
+flush, so sustained moves compress the ratio. Do not trade the naive
+"ratio rising = tails bid = bearish" read intraday.
+
+**The VIX × VVIX quadrants are where VVIX earns its seat:**
+
+| Context | State of the vol complex | n | P(CONT) |
+|---|---|---|---|
+| Down move | VIX+ / VVIX+ (complex bid) | 466 | **73.8 %** |
+| Down move | VIX+ / VVIX− | 74 | 63.5 % |
+| Down move | VIX− / VVIX+ | 112 | 54.5 % |
+| Down move | **VIX− / VVIX− (complex releasing)** | 293 | **46.8 %** |
+| Up move | **VIX+ / VVIX+ (complex bid AGAINST the rally)** | 220 | **30.9 %** |
+| Up move | VIX+ / VVIX− | 72 | 48.6 % |
+| Up move | VIX− / VVIX+ | 78 | 48.7 % |
+| Up move | VIX− / VVIX− (complex releasing) | 388 | 65.7 % |
+
+Plain words: **when the whole vol complex agrees with the move, it
+continues (74 % / 66 %); when the whole complex leans against it, it dies.**
+The up-move death rattle sharpens to **30.9 % on n = 220** — the strongest
+single warning state measured today, and better-sampled than the ES-quadrant
+version (33.6 %, n = 274). And unlike the failed ES-side monetization read,
+the *both-releasing* state during a down move genuinely weakens continuation
+(46.8 % vs 57 % base) — the vol complex letting go IS the fuel-gone signal,
+you just have to read it in vol space, not price space.
+
+**What this does NOT test:** the practitioner (DonK-style) early-warning use
+of VVIX is day-to-regime scale — VVIX firming for days while VIX sleeps,
+absolute levels pushing 110–120+. July's window never left calm territory
+and 22 days can't span regimes. That read stays open, and the capture now
+feeds it a day per session.
+
 ## Follow-on lane
 
 A live **continuation meter** — the three traces + score rendered in a desk
