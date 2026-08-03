@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Corpus pull: NYSE market internals minute candles via Schwab. [st-3fr]
 
-Fetches $TICK / $TRIN / $ADD / $VOLD minute candles from Schwab price history
-and writes them into the per-day corpus (`data/corpus/YYYY-MM-DD/internals.jsonl`,
-one row per symbol-minute). Schwab's minute history is a ROLLING ~47-day
-window — running this weekly makes the history permanent before it rolls off.
+Fetches $TICK / $TRIN / $ADD / $VOLD / $VIX minute candles from Schwab price
+history and writes them into the per-day corpus
+(`data/corpus/YYYY-MM-DD/internals.jsonl`, one row per symbol-minute).
+Schwab's minute history is a ROLLING ~47-day window — running this weekly
+makes the history permanent before it rolls off.
+
+$VIX added 2026-08-03 [st-cdwe]: the symbol is `$VIX` (`$VIX.X` returns
+EMPTY), serves ~389 RTH minute candles/day with v=0 (an index — volume is
+meaningless). Rows before the add date carry only the original four symbols.
 
 Idempotent by day: a day whose file already exists is skipped, EXCEPT the
 current session day, which is always rewritten (it may have been partial on
@@ -31,7 +36,7 @@ from market.corpus.paths import central_date, internals_path  # noqa: E402
 from market.corpus.writer import append_jsonl, update_manifest, utc_now_iso  # noqa: E402
 
 CENTRAL = ZoneInfo("America/Chicago")
-SYMBOLS = ("$TICK", "$TRIN", "$ADD", "$VOLD")
+SYMBOLS = ("$TICK", "$TRIN", "$ADD", "$VOLD", "$VIX")
 
 
 def fetch_symbol(client, symbol: str, days: int) -> list[dict]:

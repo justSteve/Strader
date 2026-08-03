@@ -1,0 +1,102 @@
+# Morning Flush Continuation Traces — Internals, VIX, Orderflow
+
+**Bead:** Continuation Trace (st-cdwe) · discovered from Grade The Flush (st-gzwb)
+**Date:** 2026-08-03 · **Script:** `scripts/measurement/morning_flush_continuation.py` → `data/measurement/morning_flush_continuation.json`
+**Data:** the 22 July morning-move days (spans from `morning_flush_study.json`); internals $TICK/$TRIN/$ADD/$VOLD 1-min candles; **$VIX backfilled this session** (added to `corpus_pull_internals.py` [st-cdwe] — symbol is `$VIX`, `$VIX.X` is empty; 29 corpus days now carry it, zero rows lost in the force-rewrite, backup at `data/corpus/_internals_backup_20260803/`).
+
+## The question
+
+Steve, after reading the contention review: *"I'm less interested in the
+statistical alignment than in finding a metric that bolsters confidence in
+continuation. Market Internals or VIX for example. These moves that have been
+so one-sided must be leaving some trace apart from 'it's happening more often
+in the last couple of months.'"*
+
+Answer: **they do, and it's a convergence.** Three live-readable traces — $TICK
+sitting on the move's side, VIX still traveling with the move, breadth still
+expanding — each separate continuing from dying minutes at AUC ≈ 0.65, and
+stacked they grade continuation from 25 % to 73 %.
+
+## Method (one paragraph)
+
+Each minute from a move's start to 10:15 CT is labeled **CONT** if price
+extended ≥ 2 pts beyond the extreme-standing-at-that-minute within the next
+15 minutes, else **TERM** (last 15 min of window excluded — truncated
+lookahead). 1,882 labeled minutes: 1,071 CONT / 811 TERM (base rate 56.9 %).
+Every trace is causal (data through minute *t* only) and oriented so higher =
+confirms the move. AUC is rank-sum P(CONT sample > TERM sample); "day med" is
+the median of per-day AUCs (minutes cluster within days — the honest check).
+
+## Minute-level trace ranking
+
+| Trace (oriented) | AUC | day med | CONT median | TERM median | Read |
+|---|---|---|---|---|---|
+| **$TICK level × dir** | **.665** | .600 | **+116** | **−49** | TICK sits on the move's side while it lives; it has *already flipped sides* when the move is dying. The sign is the signal. |
+| **$VIX 5-min slope × (−dir)** | **.660** | **.640** | +0.06 | −0.01 | VIX still traveling with the move = alive; VIX flattening while price stalls = done. Most day-robust trace. |
+| **$ADD 10-min slope × dir** | **.653** | .574 | +41 | 0 | Breadth still expanding in the move's direction. |
+| $TICK 10-min sign-share | .638 | .565 | 0.70 | 0.50 | Same story as level, slower. |
+| $VOLD 10-min slope × dir | .638 | .542 | +3.58 M | +0.49 M | Volume breadth; correlated with $ADD. |
+| Volume pace (5-min vs move avg) | .616 | .532 | 0.90 | 0.79 | Tape quieting marks exhaustion, weakly. |
+| Wiggle-calm (backtest depth trend) | .578 | .580 | −0.0 | −1.0 | Deepening wiggles precede the end, weakly. |
+| ES 5-min aggressor delta × dir | .548 | .634 | +87 | −49 | Aggregate-weak; day-robust median suggests day-mix effects. |
+| $TRIN oriented | **.439** | .456 | −0.07 | 0.00 | **Dead — slightly inverted.** Do not use. |
+
+**Delta divergence points the WRONG way.** The classic "price made a new
+extreme but delta didn't" exhaustion flag fired in **22 %** of continuing
+minutes vs **10.5 %** of dying ones — at this granularity it is a
+*continuation* accompaniment, not a warning. A popular heuristic, refuted on
+this tape.
+
+## The convergence score — the deliverable
+
+Count how many of {$TICK on move's side, $VIX 5-min slope with the move,
+$ADD 10-min slope with the move} currently confirm:
+
+| Score | n minutes | P(extends ≥2 pts in next 15 min) |
+|---|---|---|
+| 0/3 | 277 | **25.3 %** |
+| 1/3 | 417 | 48.9 % |
+| 2/3 | 517 | 65.2 % |
+| 3/3 | 539 | **72.9 %** |
+
+Monotone, base rate 56.9 %, combined AUC .678. In plain words: **while all
+three still make the move's case, stay with it or re-enter into it; when all
+three have quit, the move is over regardless of what price just did.**
+
+## Day-level: the one-sidedness trace Steve intuited
+
+| Day metric over the move's span | vs move size | Note |
+|---|---|---|
+| **VIX net travel × (−dir)** | **ρ +0.85, and positive 22/22 days** | VIX rose during *every* down move and fell during *every* up move in July — no exceptions — and how far it traveled ranks the move's size almost perfectly. |
+| $TICK sign-share | ρ +0.35 | Weaker than expected; two decent moves ran with TICK mostly on the wrong side (07-15, 07-22 — grinders). |
+| $VOLD end level × dir | ρ +0.19 | Not a size grader. |
+
+Honesty note: VIX moving inverse to SPX is mechanically expected; the
+non-obvious, usable parts are (a) the *graded magnitude* (ρ +0.85 with move
+size), and (b) the minute-level *flattening at exhaustion* (TERM median
+slope ≈ 0 while CONT stays positive).
+
+## Backtest-event cut (the re-entry decision point)
+
+At the 448 matched 2-pt backtest events, only **11–12 failed to resume** —
+too few for any trace to filter (all AUCs .35–.59 on n=12). Practical
+consequence: **at 2-pt backtests inside a live morning move, no filter is
+needed; re-entry is justified by the base rate alone** (96 % resume,
+st-gzwb). The one whisper: failed events ran hotter volume (pace 1.11 vs
+0.95), consistent with climax-heat (st-u05) — n far too small to act on.
+
+## Caveats
+
+- 22 days, minutes clustered within days; aggregate AUCs flatter than per-day
+  medians for some traces. No out-of-sample exists — internals capture begins
+  2026-06-18. Every added corpus day extends this for free.
+- Internals are 1-min candles read at close: up to 59 s stale vs the tape.
+- Label parameters (≥2 pts within 15 min) chosen once, not swept.
+- $VIX candles carry v=0 (index); price fields only.
+
+## Follow-on lane
+
+A live **continuation meter** — the three traces + score rendered in a desk
+pane during the morning window — is the natural FD0/st-ug5 integration. Not
+built here; it belongs with the harness work (st-apzt / st-ug5), where the
+score's 25-to-73 gradient becomes the confidence input Steve asked for.
