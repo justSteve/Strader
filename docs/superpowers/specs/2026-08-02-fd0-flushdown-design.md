@@ -122,6 +122,37 @@ never uses a STOP order type, it uses a held-back market order. Closing an
 option position off the underlying's price is a well-worn TOS pattern,
 not an exotic one.
 
+**8. The Advanced Order drop-down does NOT create the closing leg.**
+Steve hit this live: he pasted the entry, got the To Open line, then went
+looking in *Advanced Order* for something that would produce the To Close
+line. It isn't there, and it isn't that control's job — the drop-down
+only names the *relationship* between orders that already exist:
+
+```
+Single Order · Blast All · 1st Trgs Seq · 1st Trgs All ·
+1st Trgs OCO · 1st Trgs 2 OCO · 1st Trgs 3 OCO · OCO · Pair
+```
+
+The documented way to get **both** lines in one action is from the chain,
+not the drop-down: **right-click the Ask → `Buy Custom` → `with STOP`**.
+That produces two orders at the bottom of the screen — a buy and a sell —
+and sets the Advanced Order type automatically. The second order's
+position effect is then set to *to close*.
+
+Two edits are needed after that, because the generated pair is not our
+shape:
+
+1. The generated exit is a **STOP** order, which stops on the *option's*
+   own premium. Change the order type to **MKT**. FD0's stop is a
+   held-back market order gated by an SPX condition — there is no STOP
+   order type anywhere in this design.
+2. Then the gear on that sell row → SPX · `mark` · at or above · trigger.
+
+This also reframes the paste string's role. If the reliable path to a
+two-line order starts from the chain, the paste is a convenience for the
+entry alone, not the front door. Worth revisiting once Steve reports which
+flow is actually faster at the desk.
+
 **Open, and worth confirming on the confirm dialog rather than assuming:**
 community reports note that combining 1st Triggers with a conditional leg
 has edge behaviour around whether a condition stays armed or resets after
