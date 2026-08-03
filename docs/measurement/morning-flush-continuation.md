@@ -197,9 +197,22 @@ absolute levels pushing 110–120+. July's window never left calm territory
 and 22 days can't span regimes. That read stays open, and the capture now
 feeds it a day per session.
 
-## Follow-on lane
+## Follow-on lane — BUILT 2026-08-03 (Meter Goes Live, st-byrg)
 
-A live **continuation meter** — the three traces + score rendered in a desk
-pane during the morning window — is the natural FD0/st-ug5 integration. Not
-built here; it belongs with the harness work (st-apzt / st-ug5), where the
-score's 25-to-73 gradient becomes the confidence input Steve asked for.
+The live **continuation meter** runs in the `meter` window of steves-desk
+(`tmux -L moocity attach -t steves-desk`, window: meter), refreshing every
+30 s from Schwab minute history: primary-move-so-far, the trace marks, the
+score with its measured mapping, and the named quadrant states (death
+rattle, fuel gone, bounce-not-believed, dip-with-protection-bid). Display
+only — no orders, no FD0 coupling; the human stays the trigger.
+
+    .venv/bin/python3 scripts/desk/continuation_meter.py [--once] [--interval N]
+
+Operational notes, learned on first live run: **$ADD/$VOLD publish a session
+late** on the minute-history endpoint, so live mornings run the two-trace
+score (TICK+VIX: 33/57/74 %, measured on the same minutes — barely worse
+than the three-trace 25/…/73 %); a >3-min-stale feed puts a loud STALE
+banner on every number; each frame journals to
+`data/exec/continuation-meter-<day>.jsonl` so the meter's own calls can be
+scored later. Schwab token wall (st-ndc) takes the feed down when it hits —
+the meter degrades to feed-error lines, not silence.
