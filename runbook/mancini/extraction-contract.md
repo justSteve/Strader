@@ -20,10 +20,19 @@ PYTHONPATH=. .venv/bin/python -c "from runbook.mancini.fetch import fetch_latest
 # 2. Read it, apply the instructions below, write the JSON.
 #    clean_newsletter() strips the Substack HTML down to ~30k chars of prose.
 
-# 3. Feed it back in.
+# 3. Feed it back in. This is the last step — it publishes AND concludes by
+#    loading the Daily Payload into Steve's Windows clipboard.
 PYTHONPATH=. .venv/bin/python -m runbook.mancini.run \
     --from-blob --date YYYY-MM-DD --extraction-json /path/to/extraction.json
 ```
+
+**The procedure concludes at the clipboard.** [st-llor] A completed interpretive
+parse loads the Daily Payload automatically — no flag — so the morning routine is
+double-click the indicator, Ctrl+A, Ctrl+V with nothing in between. The push is
+the *last* thing the run does, after the store, the chart, and the desk doc, so a
+run that halts leaves the clipboard holding whatever it held before. Pass
+`--no-clip` when backfilling an old day or checking a renderer change; that is a
+diagnostic, not the procedure, and it must not seize a live desktop surface.
 
 Validation is **not** bypassed by this route. `validate.check()` still requires
 every price to appear verbatim in the source text, and a failure still keeps

@@ -62,11 +62,16 @@ if [[ -z "${STRADER_AZ_BIN:-}" && -x "$AZ_INTEROP" ]]; then
 fi
 export PATH="$PATH:$(dirname "$AZ_INTEROP")"
 
-# --clip is passed HERE and only here [st-0x9]. run.py defaults the clipboard
-# push OFF, because a diagnostic or backfill parse must not seize a live desktop
-# surface. This job is the one that legitimately owns it: it fires 15 minutes
-# before the open, so whatever it leaves in the clipboard is exactly what the
-# morning routine pastes into the Mancini Forecast field.
+# --clip FORCES the payload push [st-0x9, refined by st-llor]. run.py now loads
+# the clipboard by default when the run is an interpretive parse — but this job
+# has no agent in the loop, so it is always hybrid and would never trigger that
+# default. It still legitimately owns the clipboard: it fires 15 minutes before
+# the open, so whatever it leaves there is exactly what the morning routine
+# pastes into the Mancini Forecast field.
+#
+# If an in-session Mancini Parse already ran for this plan-day, run.py skips
+# ahead of this job entirely (it will not clobber a richer parse with a
+# levels-only one), so the clipboard keeps the better payload.
 #
 # Overridable to "" so this wrapper can be smoke-tested end to end without
 # taking Steve's clipboard — a job that cannot be exercised without a side

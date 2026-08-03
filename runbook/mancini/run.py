@@ -123,6 +123,37 @@ def _run_gate(args, gate_day: date_cls | None) -> bool:
     return False
 
 
+def _clip_wanted(args) -> bool:
+    """Should this run conclude by loading the Daily Payload? [st-llor]
+
+    A completed interpretive parse is the Mancini Parse procedure and owns the
+    clipboard by default. Hybrid/diagnostic runs do not, unless --clip forces
+    it (the pre-open wrapper, which never has an extraction). --no-clip opts an
+    interpretive run out for backfill or a renderer check.
+    """
+    if args.no_clip:
+        return False
+    if args.clip:
+        return True
+    return bool(args.extraction_json)
+
+
+def _push_payload(result: ParseResult, payload_path: Path | None = None) -> str:
+    """Build the Daily Payload from ``result`` and load it. Returns a brief note."""
+    from . import payload_emitter
+
+    payload = payload_emitter.build_payload(result)
+    size = len(payload.encode())
+    rc = payload_emitter.push_clipboard(payload)
+    if rc == 0:
+        logger.info("Daily Payload -> clipboard (%d bytes)", size)
+        return (f"clipboard: Daily Payload loaded ({size} bytes) — "
+                "Ctrl+V onto the indicator")
+    logger.warning("clipboard push returned rc=%d", rc)
+    where = payload_path or "the payload file"
+    return f"clipboard: PUSH FAILED (rc={rc}) — paste from {where}"
+
+
 def _render_brief(result: ParseResult) -> str:
     lines = [
         f"=== MANCINI MORNING BRIEF — {result.instrument or '?'} {result.date or ''} ===",
@@ -303,13 +334,22 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-desk", action="store_true",
                     help="skip publishing the plan doc to the steves-desk "
                          "Trading window")
-    ap.add_argument("--clip", action="store_true",
-                    help="ALSO push the stable-renderer payload to the Windows "
-                         "clipboard. Off by default [st-0x9]: the payload file "
-                         "is always written, but the clipboard is Steve's live "
-                         "desktop and a diagnostic or backfill parse must not "
-                         "seize it. The 08:15 CT pre-open wrapper sets this — "
-                         "it is the only thing that should.")
+    # Clipboard policy [st-llor, refining st-0x9]. A COMPLETED interpretive
+    # parse — the Mancini Parse procedure — concludes by loading the Daily
+    # Payload, because that run IS the pre-open routine. Hybrid, diagnostic and
+    # backfill runs still leave the clipboard alone: it is Steve's live desktop,
+    # and whatever sits there at 08:29 is what lands on the chart.
+    clip_group = ap.add_mutually_exclusive_group()
+    clip_group.add_argument("--clip", action="store_true",
+                            help="force the Daily Payload push even when the run "
+                                 "is hybrid/diagnostic. Set by the 08:15 CT "
+                                 "pre-open wrapper, which has no agent in the "
+                                 "loop and so never has an extraction to trigger "
+                                 "the default.")
+    clip_group.add_argument("--no-clip", action="store_true",
+                            help="suppress the push on an interpretive parse — "
+                                 "for backfilling an old day or checking a "
+                                 "renderer change without seizing the clipboard.")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
 
@@ -413,7 +453,22 @@ def main(argv: list[str] | None = None) -> int:
             if prev_model and prev_model != "deterministic-lists":
                 logger.info("hybrid skip: %s already parsed by %r — keeping it",
                             day, prev_model)
-                print(f"OK (no-op): {day} already has a richer parse ({prev_model}).")
+                msg = f"OK (no-op): {day} already has a richer parse ({prev_model})."
+                # The parse is a no-op, but the CLIPBOARD is not. [st-llor]
+                # This is the 08:15 pre-open job's real work when an in-session
+                # parse already ran overnight: the payload it would have loaded
+                # is hours stale by now, so reload the RICHER stored parse. The
+                # morning routine must find the best available payload waiting,
+                # not whatever Steve last copied.
+                if _clip_wanted(args):
+                    try:
+                        prev = ParseResult.from_dict(
+                            json.loads(existing.read_text(encoding="utf-8")))
+                        msg += " " + _push_payload(prev, existing)
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning("payload reload failed (non-fatal): %s", e)
+                        msg += f" clipboard: RELOAD FAILED ({e})"
+                print(msg)
                 return 0
         hybrid = True
         logger.warning("HYBRID MODE: publishing %d deterministic list levels; "
@@ -484,30 +539,23 @@ def main(argv: list[str] | None = None) -> int:
         logger.warning("chart emit failed (non-fatal): %s", e)
         chart_path = None
 
-    # 3b2. Stable-renderer payload (#st-5rc). Non-fatal.
+    # 3b2. Daily Payload for the stable renderer (#st-5rc). Non-fatal.
     # Parallel-run: 3b keeps emitting the per-day script during migration week.
     #
-    # The FILE is always written; the CLIPBOARD is opt-in behind --clip [st-0x9].
-    # Steve's clipboard is a live desktop surface, not an output directory: the
-    # morning routine is double-click the indicator, Ctrl+A, Ctrl+V, and whatever
-    # sits there at 08:29 is what lands on the chart. A parse run to READ the
-    # letter, to backfill an old day, or to check a renderer change must not
-    # overwrite it. Only the 08:15 pre-open wrapper passes --clip.
+    # The FILE is written here; the CLIPBOARD push is deferred to the end of the
+    # run [st-llor] so the payload only lands once the whole procedure has
+    # actually succeeded — a half-finished parse must never leave Steve holding
+    # a payload that looks authoritative.
     payload_path = None
+    payload = None
     try:
         from . import payload_emitter
 
         payload = payload_emitter.build_payload(result)
         payload_path = CHARTS_ROOT / f"{result.date or day}.payload.txt"
         payload_path.write_text(payload, encoding="utf-8")
-        if args.clip:
-            rc = payload_emitter.push_clipboard(payload)
-            logger.info("stable-renderer payload: %s (%d bytes, clip rc=%d)",
-                        payload_path, len(payload.encode()), rc)
-        else:
-            logger.info("stable-renderer payload: %s (%d bytes, clipboard "
-                        "untouched — pass --clip to load it)",
-                        payload_path, len(payload.encode()))
+        logger.info("Daily Payload: %s (%d bytes)",
+                    payload_path, len(payload.encode()))
     except Exception as e:  # noqa: BLE001
         logger.warning("payload emit failed (non-fatal): %s", e)
 
@@ -526,13 +574,36 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:  # noqa: BLE001
             logger.warning("desk publish failed (non-fatal): %s", e)
 
-    # 4. Brief (mini #9).
+    # 4. Conclude by loading the Daily Payload. [st-llor]
+    # Default ON for an interpretive parse — that run is the Mancini Parse
+    # procedure and the clipboard is its last step, so the morning routine is
+    # double-click the indicator, Ctrl+A, Ctrl+V with nothing in between.
+    # Hybrid/diagnostic runs stay off unless --clip forces it; --no-clip opts
+    # an interpretive run out (backfill, renderer check).
+    should_clip = _clip_wanted(args)
+
+    clip_note = None
+    if payload is None:
+        if should_clip:
+            logger.warning("no payload built — clipboard left untouched")
+    elif should_clip:
+        try:
+            clip_note = _push_payload(result, payload_path)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("clipboard push failed (non-fatal): %s", e)
+            clip_note = f"clipboard: PUSH FAILED ({e}) — paste from {payload_path}"
+    else:
+        clip_note = f"clipboard: untouched — payload at {payload_path}"
+
+    # 5. Brief (mini #9).
     brief = _render_brief(result)
     if chart_path is not None:
         brief += f"\nchart: {chart_path}  (apply via tradingview-mcp pine_set_source)"
     if desk_path is not None:
         brief += ("\ndesk: Trading window title mancini-latest-es-plan.md "
                   f"<- {desk_path.name}")
+    if clip_note is not None:
+        brief += f"\n{clip_note}"
     print(brief)
     return 0
 

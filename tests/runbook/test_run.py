@@ -341,12 +341,17 @@ def test_no_desk_flag_suppresses_publication(tmp_path, monkeypatch, _isolate_des
     assert not (run_mod.DESK_REPORTS / "mancini-es-2026-06-29.md").exists()
 
 
-# --- clipboard is opt-in [st-0x9] -------------------------------------------
+# --- clipboard policy [st-0x9, refined by st-llor] --------------------------
 # Regression pair for 2026-07-30, when three pytest runs during unrelated work
 # replaced the day's 60-level payload in Steve's clipboard with the two-line
 # _good_outcome fixture. Two independent things have to hold: the suite can
 # never reach clip.exe (tests/conftest.py, which is what `_no_clipboard` is),
-# and a parse without --clip must not even attempt the push.
+# and a HYBRID/diagnostic parse must not even attempt the push.
+#
+# st-llor then made a completed INTERPRETIVE parse push by default — that run is
+# the Mancini Parse procedure and loading the payload is its last step. The
+# distinction under test is therefore extraction-vs-no-extraction, not flag
+# presence; both halves of it matter.
 
 def _run_for_payload(tmp_path, monkeypatch, extra_args):
     nl = tmp_path / "nl.txt"
@@ -363,6 +368,7 @@ def _run_for_payload(tmp_path, monkeypatch, extra_args):
 
 def test_payload_file_written_but_clipboard_untouched_by_default(
         tmp_path, monkeypatch, _no_clipboard):
+    # Hybrid run (no --extraction-json): file yes, clipboard no.
     payload_path = _run_for_payload(tmp_path, monkeypatch, [])
     # The file is the durable artifact and is always produced...
     assert payload_path.exists()
@@ -374,3 +380,75 @@ def test_payload_file_written_but_clipboard_untouched_by_default(
 def test_clip_flag_pushes_the_payload(tmp_path, monkeypatch, _no_clipboard):
     payload_path = _run_for_payload(tmp_path, monkeypatch, ["--clip"])
     assert _no_clipboard == [payload_path.read_text()]
+
+
+def test_interpretive_parse_pushes_payload_by_default(
+        tmp_path, monkeypatch, _no_clipboard):
+    # The procedure concludes by loading the Daily Payload — no flag needed.
+    payload_path = _run_for_payload(
+        tmp_path, monkeypatch, ["--extraction-json", _extraction(tmp_path)])
+    assert _no_clipboard == [payload_path.read_text()]
+
+
+def test_no_clip_suppresses_the_interpretive_push(
+        tmp_path, monkeypatch, _no_clipboard):
+    # Backfill / renderer check: interpretive, but hands off the clipboard.
+    payload_path = _run_for_payload(
+        tmp_path, monkeypatch,
+        ["--extraction-json", _extraction(tmp_path), "--no-clip"])
+    assert payload_path.exists()
+    assert _no_clipboard == []
+
+
+def test_clip_and_no_clip_are_mutually_exclusive(tmp_path, monkeypatch):
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
+    with pytest.raises(SystemExit):
+        run_mod.main(["--file", str(nl), "--no-gate", "--clip", "--no-clip"])
+
+
+def test_hybrid_skip_still_reloads_the_richer_payload(
+        tmp_path, monkeypatch, _no_clipboard):
+    """The 08:15 pre-open job's real work when an in-session parse ran overnight.
+
+    The parse is a no-op — it must not clobber the richer stored result — but the
+    clipboard is hours stale by then, so --clip must still reload the payload
+    built from the RICHER parse, not from the deterministic lists. [st-llor]
+    """
+    parsed_root = tmp_path / "parsed"
+    parsed_root.mkdir()
+    rich = _good_outcome().result
+    rich.model = "in-session:opus-5"
+    (parsed_root / "2026-06-29.json").write_text(json.dumps(rich.to_dict()))
+
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
+    monkeypatch.setattr(run_mod, "PARSED_ROOT", parsed_root)
+    monkeypatch.setattr(run_mod, "CHARTS_ROOT", tmp_path / "charts")
+    # No --extraction-json: the cron is always hybrid. --clip is what it passes.
+    rc = run_mod.main(["--file", str(nl), "--no-gate", "--date", "2026-06-29",
+                       "--no-desk", "--clip",
+                       "--store-root", str(tmp_path / "c")])
+    assert rc == 0
+    # The richer parse survived untouched...
+    kept = json.loads((parsed_root / "2026-06-29.json").read_text())
+    assert kept["model"] == "in-session:opus-5"
+    # ...and the clipboard was reloaded from it anyway.
+    assert len(_no_clipboard) == 1
+    assert "5800" in _no_clipboard[0]
+
+
+def test_failed_parse_never_loads_the_clipboard(tmp_path, monkeypatch, _no_clipboard):
+    # An extraction was supplied but did not survive parse -> rc 3. The payload
+    # push is the LAST step precisely so a halted run leaves the clipboard
+    # holding whatever it held before. [st-llor]
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
+    monkeypatch.setattr(parse_mod, "parse", _raise)
+    monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
+    monkeypatch.setattr(run_mod, "CHARTS_ROOT", tmp_path / "charts")
+    rc = run_mod.main(["--file", str(nl), "--no-gate", "--no-desk",
+                       "--extraction-json", _extraction(tmp_path),
+                       "--store-root", str(tmp_path / "c")])
+    assert rc == 3
+    assert _no_clipboard == []

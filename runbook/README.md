@@ -58,6 +58,14 @@ Pipeline and exit codes:
 - **Newsletter source:** `--from-blob` fetches the newest letter from the COO
   email-ingress container via the Azure CLI (`mancini/fetch.py`, cached under
   `data/mancini-letters/`). `--file`/stdin also work.
+- **Daily Payload -> clipboard:** the procedure's last step. A completed
+  interpretive parse loads it automatically; `--no-clip` opts out for backfills
+  and renderer checks; `--clip` forces it for the hybrid pre-open cron, which
+  has no agent in the loop. When that cron finds a richer in-session parse
+  already stored it skips the parse but still reloads the payload from it —
+  otherwise an overnight parse would leave the 08:29 clipboard hours stale.
+  Tests can never reach `clip.exe`: `tests/conftest.py` severs it repo-wide
+  [st-0x9].
 
 ## Anti-hallucination
 
