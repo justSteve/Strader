@@ -153,6 +153,44 @@ two-line order starts from the chain, the paste is a convenience for the
 entry alone, not the front door. Worth revisiting once Steve reports which
 flow is actually faster at the desk.
 
+**9. The two-line construct is CONFIRMED working (08-03 confirm dialog).**
+Steve built it and the dialog rendered:
+
+```
+#1  BUY  +5 SPX 100 (Weeklys) 3 AUG 26 7495 PUT @6.00 LMT              [TO OPEN]
+#2  SELL -5 SPX 100 (Weeklys) 3 AUG 26 7495 PUT @5.00 (BASE-1.00)
+                              STPLMT 5.00 (BASE-1.00) TRG BY #1        [TO CLOSE]
+```
+
+`TRG BY #1` is the trigger relationship and `[TO OPEN]` / `[TO CLOSE]` are
+the position effects, both correct. The compound order shape FD0 needs is
+real and reachable.
+
+What that dialog does **not** contain is any SPX condition — the exit is a
+stop-limit on the *option's own premium*, priced relative to entry
+(`BASE-1.00`). That is what `Buy Custom → with STOP` generates, and it is
+not this design. The condition still has to be attached via the gear, and
+whether it then appears in the confirm text is still unverified.
+
+**10. RISK: `mark` on an index may not be the number you think.**
+The same dialog's quote row read:
+
+```
+SPX   Last 7489.72   Bid 7440.83   Ask 7519.05
+```
+
+A 78-point bid/ask on the cash index — those quotes are synthetic and
+meaningless. If TOS derives `mark` as the bid/ask midpoint, SPX `mark`
+would be ≈7479.94 while the index is actually 7489.72: **~10 points of
+error, which is roughly ten times FD0's entire stop distance.** A
+condition on a mark like that would fire at the wrong level, or never.
+
+The Method drop-down offers no `last` for this row, so if `mark` is a
+midpoint there may be no usable price method at all and the
+SPX-conditional stop needs rethinking. **This is now the highest-value
+open question in the design** — ahead of the feed adapter, because it
+decides whether the stop mechanism works at all.
+
 **Open, and worth confirming on the confirm dialog rather than assuming:**
 community reports note that combining 1st Triggers with a conditional leg
 has edge behaviour around whether a condition stays armed or resets after
