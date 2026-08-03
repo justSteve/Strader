@@ -181,6 +181,47 @@ grades the day.
 4. **The V-shape is real but window-incomplete** — 9/22 strong-retrace days.
    Flush-direction campaigns should not assume the V completes by 10:30.
 
+## 6. Out-of-sample addendum (2026-08-03, later the same session)
+
+A scout sweep surfaced 14 pre-July corpus days with 08:30–13:00 CT morning
+tape (the rest of the 267-day corpus is afternoon-only). 12 were usable
+(2025-07-22 → 2026-04-23; one lacked near-open tape) — an out-of-sample
+morning set spanning a year, run through the same script
+(`--days … --out data/measurement/morning_flush_oos.json`). This addresses
+the coverage confound the Recency Regime Lens bead (st-4ts) worries about:
+its 51 %→88 % morning-share claim compares windows with structurally
+different pull coverage; restricted to full-RTH days the shift is 78 %→88 %.
+
+| | July 2026 (n=22) | Out-of-sample (n=12) |
+|---|---|---|
+| Primary move, median | **52.6 pts** | 31.0 pts |
+| Days ≥ 45 pts | 15/22 (68 %) | 4/12 (33 %) |
+| V-shape (≥50 % retrace by 10:30) | 5/22 | 5/12 |
+| Resume rate T=1 / 2 / 5 | 98 / 96 / 90 % | 97 / 94 / 84 % |
+| f5 direction agreement | 8/22 (inverted) | 7/12 (not inverted) |
+| Fade-f5 ≥ 4 rule | 12/18 | **3/9 — fails** |
+| Energy→size, ρ (f5rng / f15rng / f15vol) | +.46 / +.48 / +.57 | **+.82 / +.87 / +.90** |
+
+Sampling caveat: the OOS days were pulled for earlier studies, i.e. selected
+*because* they were interesting — which biases them toward big days and makes
+the size gap, if anything, understated.
+
+What this changes:
+
+1. **"Recently consistent regime" upgrades from eyeball to measured.** July's
+   median morning move is ~1.7× the year-spanning baseline, against a
+   selection bias running the other way.
+2. **The anatomy is structural, not regime.** Resume rates are statistically
+   indistinguishable across samples — backtests-resume is how ES mornings
+   work, not a July novelty. The indictment of noise-level cuts stands
+   everywhere; the license for liberal re-entry stands everywhere.
+3. **The fade-the-open direction rule is demoted** from candidate to
+   July-local artifact (3/9 out-of-sample). Direction remains unsolved.
+   $TICK could not be tested (internals begin 2026-06-18).
+4. **Early energy for size is the one grader that replicates**, strongly, in
+   both samples. The first 15 minutes tell you *how big* today is — still
+   not *which way*.
+
 ## Follow-on lanes (not started)
 
 - Bar-level dip-entry sim with cooldown (the unresolved lane in §3).

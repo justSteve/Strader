@@ -337,7 +337,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--since", type=date.fromisoformat, default=None,
                     help="skip corpus days before this date")
+    ap.add_argument("--days", default=None,
+                    help="comma-separated explicit day list (overrides --since)")
+    ap.add_argument("--out", type=Path, default=OUT,
+                    help="output path (default: %(default)s)")
     args = ap.parse_args()
+    day_filter = (set(args.days.split(",")) if args.days else None)
 
     results = []
     skipped = []
@@ -348,7 +353,10 @@ def main():
             d = date.fromisoformat(p.name)
         except ValueError:
             continue
-        if args.since and d < args.since:
+        if day_filter is not None:
+            if p.name not in day_filter:
+                continue
+        elif args.since and d < args.since:
             continue
         try:
             trades = read_corpus_day(d)
@@ -437,9 +445,9 @@ def main():
               file=sys.stderr)
     for d, why in skipped:
         print(f"{d} SKIP {why}", file=sys.stderr)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(results, indent=1))
-    print(f"wrote {len(results)} days -> {OUT}", file=sys.stderr)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps(results, indent=1))
+    print(f"wrote {len(results)} days -> {args.out}", file=sys.stderr)
 
 
 if __name__ == "__main__":
