@@ -1,7 +1,11 @@
-"""CLI wiring tests for the Mancini Runbook. [co-7lyf / co-i10h]
+"""CLI wiring tests for the Mancini Runbook. [co-7lyf / co-i10h / st-26q5]
 
-No live LLM call: the parse step is monkeypatched. These cover the gate, the
-halt/keep-last-good error paths, and the brief render.
+The runbook calls no model — the interpretive leg is an in-session extraction
+handed in via --extraction-json. Tests that mean to exercise that leg must pass
+the flag (``_extraction()`` writes a stub file); the parse step itself is
+monkeypatched. Without the flag the run takes the hybrid branch by design, and
+``parse()`` is never called at all. These cover the gate, the
+halt/keep-last-good error paths, hybrid mode, and the brief render.
 """
 import json
 import shutil
@@ -27,6 +31,22 @@ def _isolate_desk(tmp_path_factory, monkeypatch):
     return root
 
 
+def _extraction(tmp_path, payload=None) -> str:
+    """Write a stub in-session extraction and return its path. [st-26q5]
+
+    Content only has to be loadable JSON — every test that uses this also
+    monkeypatches parse_mod.parse, so the dict never reaches ParseResult. What
+    it exercises is the CLI taking the interpretive branch rather than hybrid.
+    """
+    p = tmp_path / "extraction.json"
+    p.write_text(json.dumps(payload if payload is not None else {
+        "date": "2026-06-29", "instrument": "ES", "session_bias": "bullish above 5800",
+        "levels": [{"price": 5800, "kind": "support", "source_quote": "5800"}],
+        "commentary": [],
+    }))
+    return str(p)
+
+
 def _good_outcome() -> parse_mod.ParseOutcome:
     result = ParseResult(
         date="2026-06-29", instrument="ES", session_bias="bullish above 5800",
@@ -48,6 +68,7 @@ def test_happy_path(tmp_path, monkeypatch, capsys):
 
     rc = run_mod.main([
         "--file", str(nl), "--no-gate",
+        "--extraction-json", _extraction(tmp_path),
         "--store-root", str(tmp_path / "commentary"),
     ])
     assert rc == 0
@@ -121,6 +142,7 @@ def test_gate_day_decoupled_from_parse_day(tmp_path, monkeypatch):
     nl.write_text(SOURCE)
     rc = run_mod.main([
         "--file", str(nl), "--date", plan_day,
+        "--extraction-json", _extraction(tmp_path),
         "--store-root", str(tmp_path / "commentary"),
     ])
     assert rc == 0
@@ -143,7 +165,9 @@ def test_validation_failure_keeps_last_good(tmp_path, monkeypatch):
     monkeypatch.setattr(parse_mod, "parse", lambda *a, **k: bad)
     monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
     rc = run_mod.main([
-        "--file", str(nl), "--no-gate", "--store-root", str(tmp_path / "c"),
+        "--file", str(nl), "--no-gate",
+        "--extraction-json", _extraction(tmp_path),
+        "--store-root", str(tmp_path / "c"),
     ])
     assert rc == 4
     # nothing published
@@ -151,26 +175,39 @@ def test_validation_failure_keeps_last_good(tmp_path, monkeypatch):
 
 
 def _raise(*a, **k):
-    raise RuntimeError("ANTHROPIC_API_KEY_DIRECT not set")
+    raise RuntimeError("malformed extraction")
 
 
-def test_extraction_error_without_lists_is_graceful(tmp_path, monkeypatch):
-    # No Supports/Resistances list sentences -> hybrid impossible -> rc 3.
+def test_no_extraction_without_lists_is_graceful(tmp_path, monkeypatch):
+    # No extraction supplied and no Supports/Resistances list sentences to fall
+    # back on -> hybrid impossible -> rc 3.
     nl = tmp_path / "nl.txt"
     nl.write_text("ES Trade Plan. Holding above the pivot targets more.\n")
-    monkeypatch.setattr(parse_mod, "parse", _raise)
     monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
     rc = run_mod.main(["--file", str(nl), "--no-gate",
                        "--store-root", str(tmp_path / "c")])
     assert rc == 3
 
 
-def test_extraction_error_with_lists_publishes_hybrid(tmp_path, monkeypatch, capsys):
-    # Interpretive leg down + lists present -> deterministic levels publish,
-    # commentary flagged pending. [st-ze6 hybrid mode]
+def test_bad_extraction_json_keeps_last_good(tmp_path, monkeypatch):
+    # An extraction WAS supplied but does not survive parse -> never silently
+    # demote to hybrid; halt and keep last-good. [st-26q5]
     nl = tmp_path / "nl.txt"
     nl.write_text(SOURCE)
     monkeypatch.setattr(parse_mod, "parse", _raise)
+    monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
+    rc = run_mod.main(["--file", str(nl), "--no-gate",
+                       "--extraction-json", _extraction(tmp_path),
+                       "--store-root", str(tmp_path / "c")])
+    assert rc == 3
+    assert not (tmp_path / "parsed").exists()
+
+
+def test_no_extraction_with_lists_publishes_hybrid(tmp_path, monkeypatch, capsys):
+    # No in-session extraction + lists present -> deterministic levels publish,
+    # commentary flagged pending. [st-ze6 hybrid mode]
+    nl = tmp_path / "nl.txt"
+    nl.write_text(SOURCE)
     monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path / "parsed")
     monkeypatch.setattr(run_mod, "CHARTS_ROOT", tmp_path / "charts")
     rc = run_mod.main(["--file", str(nl), "--no-gate", "--date", "2026-06-29",

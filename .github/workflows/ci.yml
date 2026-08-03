@@ -36,10 +36,11 @@ jobs:
           # The install is tiny (pytest + editable pkg), so caching buys nothing.
 
       - name: Install (editable + dev deps)
-        # httpx is the runbook pilot's only heavy dep (runbook/mancini/llm.py
-        # calls the API over raw httpx). The feed/broker libs (databento,
-        # schwab-py) are intentionally NOT installed — their suites are excluded
-        # below until those deps are pinned.
+        # httpx is needed by the gexbot ingest/stream modules (market/ingest/
+        # gexbot.py, market/corpus/gexbot_stream.py). The runbook pilot no
+        # longer needs it — its API extraction path was removed in st-26q5.
+        # The feed/broker libs (databento, schwab-py) are intentionally NOT
+        # installed — their suites are excluded below until those deps are pinned.
         run: python -m pip install --upgrade pip && pip install -e ".[dev]" httpx
 
       - name: Run tests

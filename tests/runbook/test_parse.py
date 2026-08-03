@@ -1,7 +1,8 @@
-"""Parse orchestration tests with a mocked extractor. [co-7lyf]
+"""Parse orchestration tests with a stub extractor. [co-7lyf / st-26q5]
 
-No network: the LLM call is injected as a stub returning the tool-input dict the
-real model would produce. This exercises ParseResult assembly, stamping, and the
+No network — there is no network path to take. The extractor is injected as a
+stub returning the extraction dict an in-session prompt parse would produce
+(extraction-contract.md). This exercises ParseResult assembly, stamping, and the
 validation gate end to end.
 """
 from runbook.mancini import parse as parse_mod
@@ -38,13 +39,13 @@ def test_parse_good_extraction_passes():
     outcome = parse_mod.parse(
         SOURCE,
         extractor=lambda _t: GOOD_EXTRACTION,
-        model="claude-opus-4-8",
+        model="in-session:test",
         parsed_at="2026-06-29T18:00:00Z",
     )
     assert outcome.ok, outcome.validation.errors
     r = outcome.result
     assert r.instrument == "ES"
-    assert r.model == "claude-opus-4-8"          # stamped by harness, not model
+    assert r.model == "in-session:test"          # stamped by harness, not extractor
     assert r.parsed_at == "2026-06-29T18:00:00Z"
     assert len(r.levels) == 2
     assert r.commentary[0].trigger.anchor_prices == [5800.0, 5840.0]

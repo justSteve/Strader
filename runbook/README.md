@@ -15,7 +15,8 @@ runbook/
     gate.py        # co-i10h — pre-open health gate over data/corpus/<day>/manifest.json
   mancini/
     schema.py      # ParseResult / Level / Commentary / Trigger dataclasses
-    llm.py         # co-7lyf — bounded Claude call, forced tool_use, model claude-opus-4-8
+    listlevels.py  # st-ze6 — regex scrape of the explicit Supports/Resistances lists
+    extraction-contract.md  # st-26q5 — the in-session prompt parse: instructions + JSON shape
     validate.py    # anti-hallucination: every price must appear verbatim in source
     store.py       # append-only JSONL commentary store (commentary/<day>.jsonl)
     parse.py       # orchestrate extract -> validate
@@ -46,13 +47,17 @@ Pipeline and exit codes:
 
 ## Configuration
 
-- **Claude credential:** `ANTHROPIC_API_KEY_DIRECT`.
-  Deliberately the *direct* key, not `ANTHROPIC_API_KEY` — see COO `co-8gp`
-  (the standard key diverts subagents off the Max sub).
-- **Model:** `claude-opus-4-8` (override with `--model`).
-- **Newsletter source:** v1 reads `--file`/stdin. Production wiring pipes the COO
-  email-ingress blob in via `infra/azure/email-ingress/scripts/read-latest.sh`
-  (COO repo) — that fetch step is v2.
+- **Credential: none.** The runbook calls no model API. [st-26q5]
+- **Interpretive leg:** an in-session prompt parse. An agent reads the letter,
+  writes the extraction JSON per `mancini/extraction-contract.md`, and passes it
+  with `--extraction-json`. `--model` records a label for who did the reading;
+  omit it and the parse is stamped `in-session`.
+- **Without an extraction:** the run publishes deterministic list levels alone
+  with commentary flagged pending (hybrid mode), and will not clobber a richer
+  parse already stored for that plan-day.
+- **Newsletter source:** `--from-blob` fetches the newest letter from the COO
+  email-ingress container via the Azure CLI (`mancini/fetch.py`, cached under
+  `data/mancini-letters/`). `--file`/stdin also work.
 
 ## Anti-hallucination
 
@@ -93,6 +98,8 @@ Per the feasibility verdict (spec addendum 2026-06-29), #3 splits:
   (`run.py` currently prints a text brief — the mini version).
 - **#10 intraday commentary highlighting** (`co-3qrw`): evaluate stored triggers
   against live price/time/regime.
-- A **live end-to-end run** against a real newsletter (needs `ANTHROPIC_API_KEY_DIRECT`;
-  gated on `co-8gp`).
+- **Cron wiring for the interpretive leg**: the scheduled pre-open run has no
+  agent in the loop, so it can only ever produce hybrid (levels-only) output.
+  Getting commentary into the automated run means scheduling an agent session,
+  not a script.
 - The **per-strat Quant scaffold prompt** asset (manual authoring path).

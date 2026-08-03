@@ -2,21 +2,25 @@
 
 Daily run, end to end:
 
-    datastream gate (#1) -> parse (#2, bounded LLM call) -> validate
+    datastream gate (#1) -> parse (#2, in-session extraction) -> validate
       -> on pass: write commentary store + last-good ParseResult + print brief
       -> on fail: alert, keep last-good, exit non-zero (never publish suspect levels)
 
 Usage:
     # From the Strader repo root, with the venv active or via ./.venv/bin/python:
+    python -m runbook.mancini.run --from-blob --extraction-json /tmp/x.json
     python -m runbook.mancini.run --file /tmp/mancini-latest.txt
     cat newsletter.txt | python -m runbook.mancini.run --date 2026-06-29
     python -m runbook.mancini.run --file nl.txt --no-gate   # offline / no live feeds
 
-The newsletter text comes from --file or stdin. In production the COO
-email-ingress blob is fetched first (infra/azure/email-ingress/scripts/
-read-latest.sh) and piped in; wiring that fetch into this CLI is the v2 step.
+The newsletter text comes from --from-blob, --file, or stdin.
 
-Requires ANTHROPIC_API_KEY_DIRECT for the live parse.
+This CLI calls no model. The deterministic list scrape (listlevels.py) runs on
+every pass and needs no judgment. The interpretive leg is an in-session prompt
+parse: an agent reads the letter, writes the extraction JSON, and passes it via
+--extraction-json — see extraction-contract.md for the instructions and the JSON
+shape. Without --extraction-json the run publishes deterministic levels alone
+with commentary flagged pending (hybrid mode). No credential is required.
 """
 from __future__ import annotations
 
@@ -285,12 +289,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-gate", action="store_true", help="skip the datastream gate")
     ap.add_argument("--manifest", help="explicit manifest.json path for the gate")
     ap.add_argument("--store-root", help="override commentary store root (testing)")
-    ap.add_argument("--model", default=None, help="override model id")
+    ap.add_argument("--model", default=None,
+                    help="label recorded alongside the in-session parse, e.g. "
+                         "the agent/model that read the letter (default: the "
+                         "generic 'in-session')")
     ap.add_argument("--extraction-json",
-                    help="pre-built tool-input dict (JSON file) — bypasses the "
-                         "live LLM call but NOT validation/persistence. The "
-                         "in-session parse path while ANTHROPIC_API_KEY_DIRECT "
-                         "is credit-blocked (co-8gp, st-ze6 hybrid mode)")
+                    help="the in-session extraction (JSON file) — THE "
+                         "interpretive leg [st-26q5]. Written by an agent that "
+                         "read the letter; see extraction-contract.md. Skips no "
+                         "validation or persistence. Omit it and the run "
+                         "publishes deterministic list levels alone with "
+                         "commentary pending (st-ze6 hybrid mode)")
     ap.add_argument("--no-desk", action="store_true",
                     help="skip publishing the plan doc to the steves-desk "
                          "Trading window")
@@ -366,26 +375,33 @@ def main(argv: list[str] | None = None) -> int:
                 sum(1 for l in det_levels if l.kind == "support"),
                 sum(1 for l in det_levels if l.kind == "resistance"))
 
-    # 2 + validate. Live LLM call.
+    # 2 + validate. The interpretive leg is an in-session prompt parse supplied
+    # via --extraction-json (extraction-contract.md) — this CLI calls no model
+    # and needs no credential. [st-26q5]
     parsed_at = datetime.now(timezone.utc).isoformat()
-    kwargs = {"parsed_at": parsed_at}
-    if args.model:
-        kwargs["model"] = args.model
+    hybrid = False
+
     if args.extraction_json:
         prebuilt = json.loads(Path(args.extraction_json).read_text(encoding="utf-8"))
-        kwargs["extractor"] = lambda _text: prebuilt
-        kwargs["model"] = f"in-session:{args.model or 'claude-fable-5'}"
-    hybrid = False
-    try:
-        outcome = parse_mod.parse(raw, **kwargs)
-    except Exception as e:  # network, refusal, missing tool block
-        logger.exception("extraction failed: %s", e)
-        if args.extraction_json or not det_levels:
+        try:
+            outcome = parse_mod.parse(
+                raw,
+                extractor=lambda _text: prebuilt,
+                model=f"in-session:{args.model}" if args.model else "in-session",
+                parsed_at=parsed_at,
+            )
+        except Exception as e:  # malformed extraction, shape mismatch
+            logger.exception("extraction failed: %s", e)
             print(f"FAILED: extraction error ({e}). Keeping last-good.", file=sys.stderr)
             return 3
-        # Hybrid mode [st-ze6]: interpretive leg unavailable (credit block
-        # co-8gp / network) — publish the deterministic list levels alone,
-        # commentary flagged pending. Still validated, still gated.
+    else:
+        # Hybrid mode [st-ze6]: no in-session extraction was supplied — publish
+        # the deterministic list levels alone, commentary flagged pending.
+        # Still validated, still gated.
+        if not det_levels:
+            print("FAILED: no --extraction-json, and no Supports/Resistances "
+                  "lists to fall back on. Keeping last-good.", file=sys.stderr)
+            return 3
         # Never clobber a richer parse already published for this plan-day
         # (e.g. cron firing after an in-session parse).
         existing = PARSED_ROOT / f"{day}.json"
@@ -401,11 +417,11 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
         hybrid = True
         logger.warning("HYBRID MODE: publishing %d deterministic list levels; "
-                       "commentary pending (interpretive leg unavailable)",
+                       "commentary pending (no in-session extraction supplied)",
                        len(det_levels))
         result = ParseResult(
             date=day, instrument="ES",
-            session_bias="(commentary pending — interpretive leg unavailable; "
+            session_bias="(commentary pending — no in-session extraction; "
                          "deterministic list levels only)",
             levels=det_levels, commentary=[],
             raw_excerpt=raw[:2000], model="deterministic-lists",
