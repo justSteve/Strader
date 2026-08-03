@@ -423,14 +423,24 @@ def exit_fields(stop_trigger_spx: float) -> dict:
     But they live in the UI, so this is a short list of numbers to enter rather
     than anything pasteable.
 
-    Kept to a plain price comparison on purpose: a saved template is documented
-    to lose a *custom study* condition on reload, keeping only the study's name.
-    A plain comparison avoids that trap entirely.
+    ``attach_to`` leads because it is the thing that goes wrong silently. A TOS
+    condition gates order *submission*, and the Order Rules gear belongs to the
+    row you clicked. Hung on the entry it would gate when you BUY — the opposite
+    of a stop. It belongs on the SELL leg of a 1st Triggers pair, which comes
+    into existence when the entry fills and then waits for SPX.
+
+    ``method`` is ``mark``: a number compared to a number. The live Method list
+    is bid / ask / mark / vol index / front vol / back vol / vol diff / study —
+    there is no ``last``. ``study`` is thinkScript and is the one a saved order
+    degrades, keeping the study's name but not its script, so nothing here is
+    ever script-shaped.
     """
     return {
+        "attach_to": "the SELL leg of a 1st Triggers order — never the entry",
         "trigger_symbol": CONDITION_SYMBOL,
-        "trigger_price": round(stop_trigger_spx, 2),
+        "method": "mark",
         "trigger_direction": "at or above",
+        "trigger_price": round(stop_trigger_spx, 2),
         "action": "SELL -1, MARKET",
     }
 

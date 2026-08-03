@@ -301,6 +301,8 @@ def test_exit_fields_trigger_on_the_cash_index_not_the_option():
     assert f["trigger_symbol"] == "SPX"
     assert f["trigger_price"] == 7441.32
     assert f["trigger_direction"] == "at or above"
+    assert f["method"] == "mark"
+    assert "SELL" in f["attach_to"] and "never the entry" in f["attach_to"]
     assert "MARKET" in f["action"]
 
 

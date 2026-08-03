@@ -74,17 +74,56 @@ way back to a saved conditional order, and it sidesteps the template
 question entirely: nothing is being reloaded from a file, so nothing can
 be lost in the round trip.
 
-**6. "Plain price condition" vs a study condition.** When attaching a
-condition, TOS asks for a *Method*. Two families matter here:
+**6. The Method drop-down — observed in the live UI, 08-03.** Steve read
+it off the screen while building the condition:
 
-- **a straight price comparison** — "SPX last is at or above 7441.32".
-  Nothing to compile, nothing to go stale.
-- **a STUDY condition** — a thinkScript expression. This is the one that
-  breaks on a saved template: the save keeps only the study's *name*, not
-  its script, "so it would not function as intended".
+```
+bid · ask · mark · vol index · front vol · back vol · vol diff · study
+```
 
-FD0 uses the first kind exclusively, which is why `exit_fields()` renders
-a symbol, a number and a direction and never anything script-shaped.
+`study` opens a flyout. **There is no `last`** — an earlier note here
+suggested falling back to LAST and that was wrong; it was inferred from
+the adjacent *STOP Linked To* drop-down, which is a different control.
+Ground truth beat the inference. **Use `mark`.**
+
+Note what that list is made of: bid, ask, mark, and four *volatility*
+measures. Those are option quantities, which says the Method list is
+scoped to whatever symbol sits in that row's Symbol field. **Set Symbol
+first, then read Method** — the choices for an index row need not match
+the choices for an option row.
+
+A `mark` condition is the "plain price comparison" this document meant:
+a number compared to a number, nothing to compile. `study` is thinkScript,
+and is the one a saved order degrades — it keeps the study's *name*, not
+its script, "so it would not function as intended". FD0 never emits
+anything script-shaped.
+
+**7. A condition gates SUBMISSION — so it must hang on the SELL, not the
+BUY.** Steve caught this in the UI: the Order Rules gear belongs to the
+order whose row you clicked, and the Conditions area holds "rules for
+order submission and cancellation… submission rules on the left".
+Attached to the entry, an SPX condition would gate *when you buy*, which
+is the opposite of a stop.
+
+The correct construct is **1st Triggers**: "an order, once filled,
+triggers execution of another order". So:
+
+| Order | What it is | Where the condition goes |
+|---|---|---|
+| BUY +1 …PUT @limit LMT | the entry | **no condition** |
+| SELL −1 same put @MARKET | triggered by the entry's fill | **condition here** — SPX `mark` at or above trigger |
+
+The exit order comes into existence when the entry fills, then sits
+unsubmitted until SPX crosses the level. That *is* the stop: this design
+never uses a STOP order type, it uses a held-back market order. Closing an
+option position off the underlying's price is a well-worn TOS pattern,
+not an exotic one.
+
+**Open, and worth confirming on the confirm dialog rather than assuming:**
+community reports note that combining 1st Triggers with a conditional leg
+has edge behaviour around whether a condition stays armed or resets after
+the first trigger. Those reports concern *study* conditions and FD0 uses
+`mark`, but the interaction has not been verified for our shape.
 
 ### The one thing still genuinely his
 
