@@ -87,10 +87,13 @@ the adjacent *STOP Linked To* drop-down, which is a different control.
 Ground truth beat the inference. **Use `mark`.**
 
 Note what that list is made of: bid, ask, mark, and four *volatility*
-measures. Those are option quantities, which says the Method list is
-scoped to whatever symbol sits in that row's Symbol field. **Set Symbol
-first, then read Method** — the choices for an index row need not match
-the choices for an option row.
+measures — option quantities. That suggested the Method list is scoped to
+the symbol in the row, so the order of operations matters: **set Symbol
+first, then read Method.**
+
+**Confirmed in the UI, 08-03: with `SPX` in the Symbol field, `mark` is
+present.** The exit condition is therefore buildable exactly as designed —
+SPX `mark` at or above the trigger — and this line is closed.
 
 A `mark` condition is the "plain price comparison" this document meant:
 a number compared to a number, nothing to compile. `study` is thinkScript,
