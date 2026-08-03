@@ -54,26 +54,46 @@ mode", and the answer is both, split by role:**
 | Entry leg | paste string → clipboard → one click |
 | Conditional exit | **cannot be pasted.** Built once in the UI; the harness renders the two values Steve types into it: trigger symbol `SPX` and trigger price |
 
-**4. Saved templates carry a documented trap.** A saved order template
-"will not automatically reference a custom script as a condition… the
-saved order would only reference the name of the study, and not the
-actual script itself, so it would not function as intended." The
-documented workaround is re-adding the condition per leg via the gear.
+**4. There is no conditional paste string. Confirmed, not inferred.**
 
-That limitation is stated for **custom studies**. Whether a *plain price
-comparison* (`SPX ≥ N`, no thinkScript) survives a save/reload is not
-documented either way.
+A compound order does have a text representation — one surfaced in the
+wild looks like `FIRST_TRIGGERS_OCO 1 SELL MARKET/1 MU STUDY 'TMLSMA()…`
+— but that is the *saved order's internal form*, not paste input. In the
+thread where it appears, the answer given is explicitly not to paste it.
+And on the paste feature itself: **no user reports successfully pasting a
+conditional order string**, and every working example is the plain
+legs-price-ordertype shape.
+
+So the harness must not try to emit one. Rendering a conditional string
+that TOS silently mangles is worse than rendering nothing.
+
+**5. The reuse path is the chart context menu, not a template reload.**
+A saved OCO/bracket order — *including a conditional one* — appears in
+the **right-click menu on a chart** (`Buy Custom…`). That is the intended
+way back to a saved conditional order, and it sidesteps the template
+question entirely: nothing is being reloaded from a file, so nothing can
+be lost in the round trip.
+
+**6. "Plain price condition" vs a study condition.** When attaching a
+condition, TOS asks for a *Method*. Two families matter here:
+
+- **a straight price comparison** — "SPX last is at or above 7441.32".
+  Nothing to compile, nothing to go stale.
+- **a STUDY condition** — a thinkScript expression. This is the one that
+  breaks on a saved template: the save keeps only the study's *name*, not
+  its script, "so it would not function as intended".
+
+FD0 uses the first kind exclusively, which is why `exit_fields()` renders
+a symbol, a number and a direction and never anything script-shaped.
 
 ### The one thing still genuinely his
 
-Build the conditional exit **once** with a plain price condition — no
-custom study — save it as a template named `FD0`, restart TOS, reload it,
-and report whether the condition survived and whether the trigger price
-is editable in seconds.
+Build the exit condition once, save it, and confirm it comes back from
+the chart right-click menu with the trigger price editable in seconds.
 
-That is account-specific behaviour against a documented ambiguity, which
-is the only kind of question worth spending his time on. Everything else
-above came out of the manual.
+That is account behaviour, not documentation — the only kind of question
+worth his time. Everything else above came out of the manual and the
+platform's own community record.
 
 Entry leg grammar (matches the documented paste shape):
 `BUY +1 SPX 100 (Weeklys) 3 AUG 26 <strike> PUT @<limit> LMT`
