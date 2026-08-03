@@ -62,6 +62,11 @@ BT_THRESHOLDS = [1.0, 1.5, 2.0, 3.0, 5.0]
 SIM_TRIGGERS = [5.0, 8.0]          # pts off window open that arm a campaign
 SIM_STOPS = [1.0, 2.0, 3.0, 5.0]   # pts adverse from entry
 R_END = 8.0                        # campaign-over reversal from extreme
+# dip mode: 0.75 sits inside ES bid-ask bounce and produced a tick-churn
+# artifact (1300+ attempts/day); 1.5 is the smallest turn that means anything
+# at tick granularity
+DIP_TURN = 1.5
+DIP_COOLDOWN = 0.5                 # fresh counter-extreme required post-stop
 FRICTION_PTS = 0.6                 # per attempt, ES-pt equivalent (FD0 model)
 
 
@@ -174,7 +179,7 @@ def resume_events(points, move, thresholds):
 
 
 def simulate(points, w_close_p, trig, stop, oracle_dir=None,
-             dip_entry=None):
+             dip_entry=None, max_attempts=None):
     """Chase campaign; see module docstring for the model.
 
     oracle_dir: if given, the campaign trades that direction (hindsight upper
@@ -182,11 +187,13 @@ def simulate(points, w_close_p, trig, stop, oracle_dir=None,
     still waits for the first +/- trig excursion off the open IN that
     direction. If None, direction = whichever side triggers first.
 
-    dip_entry: if set (pts), re-entry after an exit happens when price backs
-    off the running extreme by >= dip_entry pts — joining the backtest —
-    instead of on the breakout to a new extreme. The stop then sits `stop`
-    pts beyond that dip entry, i.e. the wiggle has to EXTEND by `stop` to
-    cut you, not merely continue past a breakout fill.
+    dip_entry: if set (pts), re-entry joins the backtest instead of buying
+    the breakout: price must back off the running trend extreme by
+    >= dip_entry, then TURN back toward trend by DIP_TURN off the
+    counter-move's own extreme ("buy the turn, not the falling knife").
+    The stop sits `stop` pts beyond that counter-extreme — the natural
+    invalidation: the wiggle taking out its own turn low cuts you. Risk per
+    failed attempt ~ DIP_TURN + stop.
     """
     open_p = points[0][1]
     entry_p = entry_ts = None
@@ -205,29 +212,46 @@ def simulate(points, w_close_p, trig, stop, oracle_dir=None,
     e_p = entry_p
     camp_ext = entry_p          # campaign extreme (post-entry best)
     stop_level_ext = entry_p    # extreme standing when last exited
+    counter_ext = None          # worst adverse price of the current wiggle
+    # dip mode: fixed invalidation price; the campaign-opening entry uses a
+    # plain stop-distance stop, dip re-entries use the counter-extreme
+    stop_px = (entry_p - d * stop) if dip_entry is not None else None
     trail_exits = 0
     for ts, p in points:
         if ts < entry_ts:
             continue
         if (p - camp_ext) * d > 0:
             camp_ext = p
+        if not in_pos and max_attempts and len(attempts) >= max_attempts:
+            break
         if in_pos:
+            stopped = ((stop_px is not None and (stop_px - p) * d >= 0)
+                       if dip_entry is not None
+                       else (e_p - p) * d >= stop)
             if (camp_ext - p) * d >= R_END:
                 attempts.append((e_p, p))       # trail exit: move over for now
                 in_pos = False
                 trail_exits += 1
                 stop_level_ext = camp_ext
-            elif (e_p - p) * d >= stop:
+                counter_ext, stop_px = p, None
+            elif stopped:
                 attempts.append((e_p, p))       # stop-out; await resumption
                 in_pos = False
                 stop_level_ext = camp_ext
+                # cooldown: the wiggle must carve a FRESH extreme beyond the
+                # stop before another dip entry arms — kills the tick-loop
+                counter_ext = p - d * DIP_COOLDOWN
+                stop_px = None
         else:
             if dip_entry is not None:
-                if (stop_level_ext - p) * d >= dip_entry:  # join the backtest
+                if counter_ext is None or (counter_ext - p) * d > 0:
+                    counter_ext = p
+                deep = (camp_ext - counter_ext) * d >= dip_entry
+                turned = (p - counter_ext) * d >= DIP_TURN
+                if deep and turned:              # join the turned backtest
                     in_pos = True
                     e_p = p
-                elif (p - stop_level_ext) * d > 0:
-                    stop_level_ext = p           # extreme ran on without us
+                    stop_px = counter_ext - d * stop
             elif (p - stop_level_ext) * d > 0:   # flush resumed (breakout)
                 in_pos = True
                 e_p = p
@@ -393,11 +417,16 @@ def main():
                     r2 = simulate(points, close_p, trig, s, oracle_dir=odir)
                     if r2:
                         row["sim"][f"t{trig:g}_s{s:g}_oracle"] = r2
-                    for dip in (2.0, 3.0):
-                        r3 = simulate(points, close_p, trig, s,
-                                      dip_entry=dip)
-                        if r3:
-                            row["sim"][f"t{trig:g}_s{s:g}_dip{dip:g}"] = r3
+                    for cap in (2, 5):
+                        rc = simulate(points, close_p, trig, s,
+                                      max_attempts=cap)
+                        if rc:
+                            row["sim"][f"t{trig:g}_s{s:g}_cap{cap}"] = rc
+                        for dip in (2.0, 3.0):
+                            r3 = simulate(points, close_p, trig, s,
+                                          dip_entry=dip, max_attempts=cap)
+                            if r3:
+                                row["sim"][f"t{trig:g}_s{s:g}_dip{dip:g}_cap{cap}"] = r3
         row["cov"] = covariates(d, w, points)
         results.append(row)
         mv = row.get("move", {})
