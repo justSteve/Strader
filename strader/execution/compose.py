@@ -57,6 +57,17 @@ FEES_RT_USD = 3.0
 PREMIUM_TICK_PTS = 0.05
 
 
+def _usd(x: float) -> str:
+    """Money, for operator-facing text.
+
+    Snaps sub-cent magnitudes to zero. A ledger that has been drawn exactly to
+    its ceiling lands on float noise like -7.1e-15, which prints as "$-0.00" —
+    and a refusal that shows the operator negative zero looks like a bug in the
+    arithmetic it exists to justify.
+    """
+    return f"${0.0 if abs(x) < 0.005 else x:.2f}"
+
+
 class NoStrikeInBand(Exception):
     """No contract sits inside the delta band. Compose refuses rather than
     reaching for the nearest strike outside it — a 0.5δ put doubles the dollar
@@ -327,10 +338,10 @@ def derive(
 
     if attempt_risk_usd <= 0:
         raise CannotFund(
-            f"${budget.remaining_usd:.2f} remaining / {budget.attempts_left} "
-            f"attempt(s) = ${slice_usd:.2f} per attempt, but friction is "
-            f"${friction_usd:.2f} (${contract.spread_usd:.2f} spread + "
-            f"${fees_rt_usd:.2f} fees). Nothing left to risk."
+            f"{_usd(budget.remaining_usd)} remaining / {budget.attempts_left} "
+            f"attempt(s) = {_usd(slice_usd)} per attempt, but friction is "
+            f"{_usd(friction_usd)} ({_usd(contract.spread_usd)} spread + "
+            f"{_usd(fees_rt_usd)} fees). Nothing left to risk."
         )
 
     stop_premium_pts = attempt_risk_usd / CONTRACT_MULTIPLIER
