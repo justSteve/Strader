@@ -214,6 +214,38 @@ runaway rally, and one contract at ~0.30δ in a liquid book is exactly
 where market-on-trigger is defensible. Steve can override with a limit
 offset if he prefers.
 
+## HOLDING PERIOD: SECONDS — read this before changing anything
+
+Steve, 08-03: *"reference to 'hours' is wholly inappropriate to the task at
+hand… I'm trying to protect from overly large loss when I'm trying to chase,
+[and that] is a matter of seconds. Theta is not a factor in this exploration.
+I'm trying to protect against the snap back and nothing more."*
+
+This is the frame everything else must be read against, and it was missing
+from the original document. The trade is **entered into a flush and held for
+seconds**. The single risk being managed is an immediate violent reversal.
+
+Consequences, because reasoning at the wrong timescale produced two wrong
+recommendations in one morning:
+
+- **Theta is out.** Over seconds, decay is nothing. Any argument that a
+  premium-based stop "fires on the clock" is void at this holding period.
+- **A premium stop and an SPX-level stop are the same instrument here**,
+  related by delta: 0.32 pts of premium at 0.30δ *is* 1.07 SPX pts. Choose
+  between them on quote-noise versus index-price reliability — not on decay.
+- **A manual cut is not realistic.** Seconds do not allow a considered
+  human call. This is precisely the case where a resting order earns its
+  place, so the "harness shows the number, Steve cuts" option is weaker than
+  it looked, not stronger.
+- **The noise floor is measured at the wrong timescale.** `median 1-min
+  high-low of the last 15 min` is a minutes-to-hours instrument. Against a
+  ~1 pt stop on a seconds hold it will exceed the stop essentially always,
+  so the warning fires on every ticket and therefore means nothing. It needs
+  a sub-minute measure — rolling ~10s ranges, or tick jitter. **Open defect.**
+- **Friction dominates.** $15 spread + $3 fees against a $50 slice is 36% of
+  the attempt gone before the market does anything. At this scale the spread
+  is not overhead, it is the main opponent.
+
 ## What FD0 is, in one paragraph
 
 You suspect a flush down and press one key. The harness reads the live
