@@ -12,22 +12,31 @@ options, `databento_glbx_es.jsonl` for ES futures — with one extra marker,
 `provenance.source = "live"`, so a consumer can tell a live-collected row
 from a T+1 batch row.
 
-Two datasets, two gateways
---------------------------
+One worker per stream
+---------------------
 A Databento Live session is bound to a single dataset, so OPRA.PILLAR and
 GLBX.MDP3 cannot share one connection. Each requested stream therefore runs
 on its own worker thread with its own `LiveClient`, its own file handle, and
 independent reconnect handling. The shared manifest is updated under a lock.
 
+`es` and `es-mbp1` are two sessions against the SAME dataset rather than one
+session carrying both schemas. `DatabentoLive.events()` could interleave them,
+but a worker owns exactly one output file, and trades and quotes belong in
+different corpus files. Two workers keeps the file-per-stream invariant.
+
 Cost
 ----
-Live OPRA is covered by the account's flat OPRA subscription (no per-GB
-charge), so this collector defaults to OPRA only. ES (GLBX.MDP3) is NOT
-subscribed for live — keep collecting ES via the T+1 batch puller
-(`corpus_pull_databento_es.py`), which is cheap historical usage. `--probe`,
-`--max-ticks`, and `--max-seconds` are for mechanical validation and scope
-control, not cost gating. Requesting `--streams es` would stream live GLBX at
-pay-as-you-go rates; don't, unless a GLBX live subscription is added.
+Both live streams are covered by flat subscriptions — OPRA by the OPRA
+Equity Options plan, GLBX/ES by the CME Standard plan added 2026-08-01 and
+verified live 2026-08-03. Neither incurs a per-GB charge.
+
+Do NOT quote `metadata.list_unit_prices` as the cost of these streams: that
+endpoint returns pay-as-you-go list rates, and it returns them identically
+whether or not the account is subscribed. Historical (batch) pulls remain
+usage-rated; live is not.
+
+`--probe`, `--max-ticks`, and `--max-seconds` are for mechanical validation
+and scope control, not cost gating.
 
 Persistence (two layers)
 ------------------------
@@ -73,6 +82,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from market.corpus.paths import (  # noqa: E402
     central_date,
+    databento_glbx_es_mbp1_path,
     databento_glbx_es_path,
     databento_path,
     day_dir,
@@ -124,12 +134,28 @@ class StreamSpec:
         }.get(self.stype_in, "symbol")
 
 
-def default_specs(schema: str) -> dict[str, StreamSpec]:
+#: Schemas whose records are top-of-book snapshots rather than prints. These
+#: are consumed through ``quotes()`` and serialised with the book row shape.
+BOOK_SCHEMAS = ("mbp-1", "tbbo")
+
+
+def default_specs(schema: str | None = None) -> dict[str, StreamSpec]:
+    """The named streams, each carrying its own natural schema. [st-jy3i]
+
+    ``schema`` is a manual override applied to every stream — useful for
+    probing one schema across the board, wrong for normal operation. Leave it
+    None so ``es-mbp1`` keeps ``mbp-1`` while the trade streams keep ``trades``;
+    a single global schema is exactly what stopped trades and quotes running
+    together before Phase B.
+    """
+    def _schema(natural: str) -> str:
+        return schema or natural
+
     return {
         "opra": StreamSpec(
             name="databento_opra",
             dataset="OPRA.PILLAR",
-            schema=schema,
+            schema=_schema("trades"),
             symbols=["SPXW.OPT"],
             stype_in="parent",
             out_path=databento_path,
@@ -137,10 +163,20 @@ def default_specs(schema: str) -> dict[str, StreamSpec]:
         "es": StreamSpec(
             name="databento_glbx_es",
             dataset="GLBX.MDP3",
-            schema=schema,
+            schema=_schema("trades"),
             symbols=["ES.c.0"],
             stype_in="continuous",
             out_path=databento_glbx_es_path,
+        ),
+        # Phase B (st-d5f): the book stream absorption's refill_events needs.
+        # Quotes are NEVER backfilled — captured forward from here or not at all.
+        "es-mbp1": StreamSpec(
+            name="databento_glbx_es_mbp1",
+            dataset="GLBX.MDP3",
+            schema=_schema("mbp-1"),
+            symbols=["ES.c.0"],
+            stype_in="continuous",
+            out_path=databento_glbx_es_mbp1_path,
         ),
     }
 
@@ -297,19 +333,25 @@ class StreamWorker(threading.Thread):
     def _consume(self, client) -> None:
         last_flush = time.monotonic()
         last_commit = time.monotonic()
-        for trade in client.trades():
+        # A book stream yields top-of-book snapshots, not prints: different
+        # iterator, different row shape, same bookkeeping. [st-jy3i]
+        is_book = self.spec.schema in BOOK_SCHEMAS
+        records = client.quotes() if is_book else client.trades()
+        for rec in records:
             if self.stop_event.is_set() or self._done.is_set():
                 break
 
             self.status.ticks += 1
-            self.status.last_symbol = trade.symbol or "?"
-            self.status.last_price = trade.price
-            self.status.last_ts = trade.ts.isoformat()
-            if not trade.symbol:
+            self.status.last_symbol = rec.symbol or "?"
+            # A quote has no single price; mid is the honest one-number summary
+            # and is only ever used for the status line.
+            self.status.last_price = rec.mid if is_book else rec.price
+            self.status.last_ts = rec.ts.isoformat()
+            if not rec.symbol:
                 self.status.unmapped += 1
 
             if not self.probe:
-                self._fh.write(self._row(trade))
+                self._fh.write(self._book_row(rec) if is_book else self._row(rec))
                 now = time.monotonic()
                 if now - last_flush >= self.flush_interval:
                     self._fh.flush()
@@ -341,6 +383,46 @@ class StreamWorker(threading.Thread):
                 "size": trade.size,
                 "side": trade.side,
                 "action": "T",
+                "sequence": None,
+                "flags": None,
+            },
+        }
+        return json.dumps(rec, default=str) + "\n"
+
+    def _book_row(self, q) -> str:
+        """Serialise a top-of-book snapshot. [st-jy3i]
+
+        Key names match `corpus_pull_databento_es_mbp1.py` exactly so live and
+        T+1 rows land in one homogeneous file. The fields the live Quote entity
+        does not carry — order counts, sequence, flags, and the trade-side
+        columns MBP-1 populates only on a trade event — are written null and
+        recovered from the raw DBN archive if microstructure work ever needs
+        them, the same contract the trade rows already use.
+        """
+        rec = {
+            "ts_pull_utc": utc_now_iso(),
+            "stream": self.spec.name,
+            "provenance": {
+                "dataset": self.spec.dataset,
+                "schema": self.spec.schema,
+                self.spec.symbol_key: self.spec.symbols[0],
+                "stype_in": self.spec.stype_in,
+                "ts_event": q.ts.astimezone(UTC).isoformat(),
+                "source": "live",
+            },
+            "data": {
+                "symbol": q.symbol or None,
+                "instrument_id": q.instrument_id,
+                "action": None,
+                "side": None,
+                "price": None,
+                "size": None,
+                "bid_px": q.bid_price,
+                "ask_px": q.ask_price,
+                "bid_sz": q.bid_size,
+                "ask_sz": q.ask_size,
+                "bid_ct": None,
+                "ask_ct": None,
                 "sequence": None,
                 "flags": None,
             },
@@ -444,10 +526,14 @@ def main() -> int:
     parser.add_argument("--date", default=None,
                         help="Trading date YYYY-MM-DD (US/Central). Default: today CT")
     parser.add_argument("--streams", default="opra",
-                        help="Comma list of streams: opra,es (default opra — "
-                             "ES has no live sub; collect ES via T+1 batch)")
-    parser.add_argument("--schema", default="trades",
-                        help="Databento schema (default trades)")
+                        help="Comma list of streams: opra, es, es-mbp1 "
+                             "(default opra). Phase B round-the-clock ES "
+                             "capture is 'es,es-mbp1' — trades for the "
+                             "footprint, mbp-1 for absorption.")
+    parser.add_argument("--schema", default=None,
+                        help="Override the schema for EVERY stream (manual "
+                             "probing only). Leave unset so each stream uses "
+                             "its own: trades for opra/es, mbp-1 for es-mbp1.")
     parser.add_argument("--start-ct", default="13:00",
                         help="Begin streaming at this CT HH:MM (default 13:00)")
     parser.add_argument("--until-ct", default="15:00",
@@ -503,7 +589,10 @@ def main() -> int:
     print("# Databento LIVE streamer")
     print(f"  date     = {d.isoformat()}")
     print(f"  streams  = {[s.name for s in chosen]}")
-    print(f"  schema   = {args.schema}")
+    # Per-stream now: one global schema is what kept trades and quotes apart.
+    print(f"  schemas  = {', '.join(f'{s.name}:{s.schema}' for s in chosen)}")
+    if args.schema:
+        print(f"  [WARN]   --schema {args.schema} overrides EVERY stream")
     if probe:
         print(f"  MODE     = PROBE {args.probe}s (no corpus writes)")
     else:

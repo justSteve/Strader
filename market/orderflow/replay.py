@@ -24,6 +24,7 @@ from datetime import date as _date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from market.corpus.paths import open_corpus_text, resolve_existing
 from market.entities.trade import Trade
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,21 @@ _ES_FILENAME = "databento_glbx_es.jsonl"
 
 
 def es_day_path(day: _date) -> Path:
+    """The canonical (uncompressed) ES file for ``day``.
+
+    This is a NAME, not a promise the file exists in that form — a compacted
+    day lives at ``<this>.gz``. Use ``has_es_day`` to test presence.
+    """
     return _CORPUS_ROOT / day.isoformat() / _ES_FILENAME
+
+
+def has_es_day(day: _date) -> bool:
+    """True if ``day`` has ES trades readable, compacted or not. [st-itky]
+
+    Callers used to write ``es_day_path(day).exists()``, which reads a
+    compacted day as an absent one and silently skips it.
+    """
+    return resolve_existing(es_day_path(day)) is not None
 
 
 def read_corpus_day(day: _date | Path) -> list[Trade]:
@@ -46,16 +61,18 @@ def read_corpus_day(day: _date | Path) -> list[Trade]:
     deduped and sorted per the module rule. Raises ``FileNotFoundError`` if
     the day has no ES file — a silent empty day would poison downstream
     determinism assumptions.
+
+    Transparently reads a compaction-packed ``.jsonl.gz`` when the plain file
+    has been removed.
     """
     path = day if isinstance(day, Path) else es_day_path(day)
-    if not path.exists():
-        raise FileNotFoundError(f"no ES corpus file at {path}")
 
     trades: list[tuple[datetime, int, Trade]] = []
     seen: set[tuple[int | None, str]] = set()
     dupes = 0
     bad = 0
-    for lineno, line in enumerate(path.open(encoding="utf-8"), 1):
+    fh = open_corpus_text(path)
+    for lineno, line in enumerate(fh, 1):
         line = line.strip()
         if not line:
             continue
@@ -86,6 +103,7 @@ def read_corpus_day(day: _date | Path) -> list[Trade]:
             bad += 1
             logger.warning("%s:%d unparseable corpus row (%s) — skipped",
                            path.name, lineno, e)
+    fh.close()
 
     trades.sort(key=lambda t: (t[0], t[1]))
     if dupes or bad:

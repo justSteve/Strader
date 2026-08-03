@@ -38,7 +38,7 @@ from market.orderflow.anchors import mancini_levels_for            # noqa: E402
 from market.orderflow.bars import build_bars                       # noqa: E402
 from market.orderflow.profile import build_profile, profile_levels  # noqa: E402
 from market.orderflow.recognizer import Anchor, SetupRecognizer    # noqa: E402
-from market.orderflow.replay import es_day_path, read_corpus_day   # noqa: E402
+from market.orderflow.replay import has_es_day, read_corpus_day   # noqa: E402
 from market.orderflow.tpo import (                                 # noqa: E402
     build_tpo, classify_day_type, developing_upto)
 
@@ -67,7 +67,7 @@ def prior_day_lvns(day: _date, open_px: float) -> list[float]:
     """Support-side LVNs from the most recent prior corpus day (≤4 back)."""
     for back in range(1, 5):
         prev = day - timedelta(days=back)
-        if es_day_path(prev).exists():
+        if has_es_day(prev):
             try:
                 trades = read_corpus_day(prev)
             except Exception:

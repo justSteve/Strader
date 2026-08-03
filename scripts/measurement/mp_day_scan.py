@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from market.orderflow.replay import es_day_path, read_corpus_day       # noqa: E402
+from market.orderflow.replay import has_es_day, read_corpus_day       # noqa: E402
 from market.orderflow.tpo import (                                     # noqa: E402
     build_tpo,
     classify_day_type,
@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
                 day = _date.fromisoformat(p.name)     # skips _health.jsonl etc.
             except ValueError:
                 continue
-            if p.is_dir() and es_day_path(day).exists():
+            if p.is_dir() and has_es_day(day):
                 days.append(day)
     tally: dict[str, int] = {}
     for day in days:

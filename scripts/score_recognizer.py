@@ -32,7 +32,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from market.orderflow.bars import build_bars                     # noqa: E402
 from market.orderflow.recognizer import Anchor, SetupRecognizer  # noqa: E402
-from market.orderflow.replay import read_corpus_day, es_day_path  # noqa: E402
+from market.orderflow.replay import read_corpus_day, has_es_day  # noqa: E402
 
 logger = logging.getLogger("score_recognizer")
 
@@ -105,7 +105,7 @@ def main() -> int:
     results = []
     for day_s in sorted(by_day):
         day = _date.fromisoformat(day_s)
-        if not es_day_path(day).exists():
+        if not has_es_day(day):
             continue
         try:
             results.append(score_day(day, by_day[day_s]))

@@ -89,3 +89,42 @@ def internals_path(d: date | None = None) -> Path:
 
 def manifest_path(d: date | None = None) -> Path:
     return day_dir(d) / "manifest.json"
+
+
+# --------------------------------------------------------------------------
+# Compaction-aware reading [st-itky]
+#
+# The path helpers above are the canonical WRITE locations and always name the
+# uncompressed file — a writer must never be handed a .gz. Reading is the
+# asymmetric half: corpus_compact_databento.py packs a finished day's JSONL to
+# .jsonl.gz and REMOVES the source, so from a reader's side a day's data may
+# live under either name. Every reader must therefore go through these two
+# helpers rather than touching the raw path, or it will silently treat a
+# compacted day as a missing one.
+# --------------------------------------------------------------------------
+
+def resolve_existing(p: Path) -> Path | None:
+    """The readable file for ``p``: itself, its .gz, or None.
+
+    Prefers the uncompressed file when both exist (a --keep compaction, or a
+    re-pull landing beside an older archive).
+    """
+    if p.exists():
+        return p
+    gz = p.with_suffix(p.suffix + ".gz")
+    return gz if gz.exists() else None
+
+
+def open_corpus_text(p: Path):
+    """Open a corpus JSONL for reading, transparently handling .jsonl.gz.
+
+    Raises FileNotFoundError naming BOTH candidates, so a missing day never
+    reads as "the compactor ate it" or vice versa.
+    """
+    resolved = resolve_existing(p)
+    if resolved is None:
+        raise FileNotFoundError(f"no corpus file at {p} (nor {p}.gz)")
+    if resolved.suffix == ".gz":
+        import gzip
+        return gzip.open(resolved, "rt", encoding="utf-8")
+    return resolved.open(encoding="utf-8")

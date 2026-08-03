@@ -49,8 +49,29 @@ class FakeTrade:
         self.side = side
 
 
+class FakeQuote:
+    """Stand-in for the typed Quote entity a book stream yields. [st-jy3i]"""
+    def __init__(self, symbol, instrument_id, bid_price, bid_size,
+                 ask_price, ask_size, minute=0):
+        self.ts = datetime(2026, 6, 8, 13, minute, 0, tzinfo=CENTRAL)
+        self.symbol = symbol
+        self.instrument_id = instrument_id
+        self.bid_price = bid_price
+        self.bid_size = bid_size
+        self.ask_price = ask_price
+        self.ask_size = ask_size
+
+    @property
+    def mid(self):
+        return (self.bid_price + self.ask_price) / 2.0
+
+
 class FakeLiveClient:
-    """Yields a fixed list of trades, optionally raising after some of them."""
+    """Yields a fixed list of records, optionally raising after some of them.
+
+    Serves both iterators: ``trades()`` for print streams and ``quotes()`` for
+    book streams. A worker only ever calls the one its schema selects.
+    """
     def __init__(self, trades, raise_after=None):
         self._trades = trades
         self._raise_after = raise_after
@@ -63,11 +84,17 @@ class FakeLiveClient:
     def tee_raw(self, stream, exception_callback=None):
         self.raw_stream = stream
 
-    def trades(self):
+    def _iter(self):
         for i, t in enumerate(self._trades):
             yield t
             if self._raise_after is not None and i + 1 >= self._raise_after:
                 raise RuntimeError("simulated gateway drop")
+
+    def trades(self):
+        yield from self._iter()
+
+    def quotes(self):
+        yield from self._iter()
 
     def close(self):
         self.closed = True
@@ -219,3 +246,77 @@ def test_probe_mode_skips_raw(corpus_tmp):
 
     ddir = paths.databento_path(D).parent
     assert not ddir.exists() or not list(ddir.glob("*.dbn"))
+
+
+# --- Phase B: the ES book stream [st-jy3i] ----------------------------------
+# Absorption's refill_events needs MBP-1, and MBP-1 is never backfilled — it is
+# captured forward from this stream or not at all. Two things must hold: the
+# book stream reaches quotes() rather than trades(), and its rows land in the
+# same shape the T+1 batch puller writes, so one file holds both sources.
+
+def test_es_mbp1_spec_defaults_to_the_book_schema():
+    specs = streamer.default_specs()
+    assert specs["es"].schema == "trades"
+    assert specs["es-mbp1"].schema == "mbp-1"
+    assert specs["es-mbp1"].dataset == "GLBX.MDP3"
+    assert specs["es-mbp1"].schema in streamer.BOOK_SCHEMAS
+    # Trades and quotes must not collide in one file.
+    assert specs["es"].out_path(D) != specs["es-mbp1"].out_path(D)
+
+
+def test_global_schema_override_still_applies_to_every_stream():
+    # Backward compatibility: --schema trades is how the pre-Phase-B callers
+    # (and this module's other tests) drive the streamer.
+    specs = streamer.default_specs("trades")
+    assert {s.schema for s in specs.values()} == {"trades"}
+
+
+def test_book_stream_writes_rows_matching_the_batch_mbp1_schema(corpus_tmp):
+    spec = streamer.default_specs()["es-mbp1"]
+    quotes = [
+        FakeQuote("ESU6", 501, 7562.75, 12, 7563.00, 8, minute=1),
+        FakeQuote("ESU6", 501, 7563.00, 3, 7563.25, 21, minute=2),
+    ]
+    worker = _make_worker(spec, lambda: FakeLiveClient(quotes), max_ticks=2)
+    worker.run()
+
+    rows = _read_rows(paths.databento_glbx_es_mbp1_path(D))
+    assert len(rows) == 2
+
+    r = rows[0]
+    assert r["stream"] == "databento_glbx_es_mbp1"
+    assert r["provenance"]["source"] == "live"
+    assert r["provenance"]["dataset"] == "GLBX.MDP3"
+    assert r["provenance"]["schema"] == "mbp-1"
+    assert r["provenance"]["continuous_symbol"] == "ES.c.0"
+    assert r["provenance"]["ts_event"].endswith("+00:00")
+
+    d = r["data"]
+    assert d["bid_px"] == 7562.75 and d["bid_sz"] == 12
+    assert d["ask_px"] == 7563.00 and d["ask_sz"] == 8
+    assert d["instrument_id"] == 501
+    # Key names must match corpus_pull_databento_es_mbp1.py exactly, including
+    # the columns the live Quote entity cannot fill.
+    assert set(d) == {
+        "symbol", "instrument_id", "action", "side", "price", "size",
+        "bid_px", "ask_px", "bid_sz", "ask_sz", "bid_ct", "ask_ct",
+        "sequence", "flags",
+    }
+    for absent in ("action", "side", "price", "size", "bid_ct", "ask_ct",
+                   "sequence", "flags"):
+        assert d[absent] is None
+
+    manifest = json.loads(paths.manifest_path(D).read_text())
+    assert manifest["streams"]["databento_glbx_es_mbp1"]["cycles"] == 2
+
+
+def test_trade_stream_untouched_by_the_book_path(corpus_tmp):
+    # The es spec must still go through trades() and keep the print row shape.
+    spec = streamer.default_specs()["es"]
+    trades = [FakeTrade("ESU6", 501, 7562.75, 5, "B", minute=1)]
+    worker = _make_worker(spec, lambda: FakeLiveClient(trades), max_ticks=1)
+    worker.run()
+
+    d = _read_rows(paths.databento_glbx_es_path(D))[0]["data"]
+    assert d["price"] == 7562.75 and d["size"] == 5 and d["action"] == "T"
+    assert "bid_px" not in d
