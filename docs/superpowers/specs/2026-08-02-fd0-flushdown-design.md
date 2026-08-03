@@ -4,30 +4,84 @@
 **Date:** 2026-08-02, pre-export window · **Target:** Monday 2026-08-03 open
 **Go/no-go:** Steve's call Monday morning. If any checklist line fails, NO-GO.
 
-## Steve's validation card (read this on the iPad tomorrow)
+## What the platform actually does — RESEARCHED 2026-08-03
 
-The one thing only you can answer: **can a TOS order carry an
-SPX-underlying condition when pasted as a string, or is the condition
-UI-only?** Two candidates, in order of preference — build each in TOS
-(confirm dialog only, never send), tell me what it accepts verbatim:
+**This section replaces the original "Steve's validation card", which was
+wrong to exist.** It asked Steve to go discover thinkorswim's order
+grammar as though it were unknown territory. TOS order syntax and
+conditional orders are documented and decades old; three of its four
+questions were answerable from the manual and should never have been put
+to him. Corrected under st-apzt after his 08-03 pushback.
 
-1. **Paste-string with conditional exit** — paste the entry, then check
-   whether the attached exit can express: *SELL −1 SPXW put, MARKET,
-   submit when SPX index ≥ (entry mark + stop distance)*. If the paste
-   grammar can't say it, note exactly where it breaks.
-2. **Fallback: saved order template** — build the same two-legged order
-   once by hand in TOS (entry + conditional exit), save it as a template
-   named `FD0`. Monday you'd load `FD0`, overwrite two numbers (strike,
-   condition price) from my ticket, and send. Confirm the template
-   survives restart and the two fields are editable in seconds.
+**1. Paste-from-clipboard is a real, supported feature.** *Order Entry
+Tools* (lower left of the main window) → *Order Entry* sub-tab → **Paste
+order from clipboard**, lower right. It handles stocks, options, futures
+and forex. Documented format, from a working example:
 
-Entry leg base grammar (survey §2.1, validated spine):
+```
+BUY +1 BUTTERFLY AMZN 100 17 Dec 21 3390/3400/3410 CALL @.20 LMT
+```
+
+Shape: action · signed qty · [strategy] · underlying · multiplier ·
+expiry · strike(s) · CALL/PUT · `@`price · order type. Our entry-leg
+grammar matches it. **Caveat that matters for a clipboard-driven
+harness: stray spaces or extra text break the paste.** The renderer must
+emit the order string and nothing else — no leading indent, no trailing
+newline, no surrounding pane furniture.
+
+**2. A condition CAN trigger on a different symbol, including an index.**
+The TOS manual's conditional-order page says to "type in the desirable
+symbol name in the corresponding form"; secondary documentation states
+conditions may be based on "the price of other equities or indices (such
+as the S&P 500)". So an SPX-index-conditional exit attached to an SPXW
+option order is a supported, documented construct. **This was the
+design's central open question and it is answered: yes.**
+
+UI path: in the Order Entry form, the *Order Rules* column carries a gear
+icon → *Order Rules* window → *Conditions* area, submission rules on the
+left, cancellation on the right.
+
+**3. The condition does NOT ride in the paste string.** The documented
+paste grammar carries legs, price and order type — nothing else. There is
+no condition syntax in it. Conditions are attached per-leg through the
+gear icon, in the UI.
+
+**Consequence for the renderer — this settles "string mode vs template
+mode", and the answer is both, split by role:**
+
+| Piece | How it reaches TOS |
+|---|---|
+| Entry leg | paste string → clipboard → one click |
+| Conditional exit | **cannot be pasted.** Built once in the UI; the harness renders the two values Steve types into it: trigger symbol `SPX` and trigger price |
+
+**4. Saved templates carry a documented trap.** A saved order template
+"will not automatically reference a custom script as a condition… the
+saved order would only reference the name of the study, and not the
+actual script itself, so it would not function as intended." The
+documented workaround is re-adding the condition per leg via the gear.
+
+That limitation is stated for **custom studies**. Whether a *plain price
+comparison* (`SPX ≥ N`, no thinkScript) survives a save/reload is not
+documented either way.
+
+### The one thing still genuinely his
+
+Build the conditional exit **once** with a plain price condition — no
+custom study — save it as a template named `FD0`, restart TOS, reload it,
+and report whether the condition survived and whether the trigger price
+is editable in seconds.
+
+That is account-specific behaviour against a documented ambiguity, which
+is the only kind of question worth spending his time on. Everything else
+above came out of the manual.
+
+Entry leg grammar (matches the documented paste shape):
 `BUY +1 SPX 100 (Weeklys) 3 AUG 26 <strike> PUT @<limit> LMT`
 
-Also confirm: the exit as **MARKET** on trigger. A limit exit can miss in
-a runaway rally; one contract at ~0.30δ into a liquid book is the case
-where market-on-trigger is defensible. If you want a limit buffer
-instead, say the offset.
+Exit remains **MARKET** on trigger: a limit can miss outright in a
+runaway rally, and one contract at ~0.30δ in a liquid book is exactly
+where market-on-trigger is defensible. Steve can override with a limit
+offset if he prefers.
 
 ## What FD0 is, in one paragraph
 

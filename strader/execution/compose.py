@@ -388,12 +388,20 @@ def _round_limit_up(pts: float, tick: float = PREMIUM_TICK_PTS) -> float:
 
 
 def order_string(contract: Contract, limit_pts: float) -> str:
-    """The validated entry-leg spine from the design (survey §2.1).
+    """The entry leg, in thinkorswim's documented paste-from-clipboard grammar.
 
-    The conditional exit is deliberately absent: whether the paste grammar can
-    carry an SPX-underlying condition is exactly the open question on Steve's
-    TOS validation card. Until he answers, the exit is rendered as separate
-    fields rather than guessed into this string.
+    Shape confirmed against TOS documentation (researched 08-03, design §"What
+    the platform actually does"): action · signed qty · underlying · multiplier
+    · expiry · strike · CALL/PUT · ``@``price · order type.
+
+    **Returns the bare string and nothing else** — no indent, no trailing
+    newline, no surrounding furniture. TOS's paste breaks on stray whitespace
+    or extra text, and this value goes to the clipboard verbatim.
+
+    The conditional exit is absent because the paste grammar cannot express one
+    — that is a property of the platform, not an open question. The exit is
+    built once in the UI via the Order Rules gear; see :func:`exit_fields` for
+    the values that go into it.
     """
     return (
         f"BUY +1 SPX 100 (Weeklys) {_tos_expiry(contract.expiration)} "
@@ -401,9 +409,34 @@ def order_string(contract: Contract, limit_pts: float) -> str:
     )
 
 
+# The condition triggers on the cash index, not the option and not the future.
+# The stop distance is derived in SPX index points, so the trigger must watch
+# the same instrument the arithmetic is denominated in.
+CONDITION_SYMBOL = "SPX"
+
+
+def exit_fields(stop_trigger_spx: float) -> dict:
+    """The values Steve types into the TOS Order Rules condition.
+
+    TOS conditions can trigger on a symbol other than the one being traded —
+    documented, and the reason the SPX-conditional stop is buildable at all.
+    But they live in the UI, so this is a short list of numbers to enter rather
+    than anything pasteable.
+
+    Kept to a plain price comparison on purpose: a saved template is documented
+    to lose a *custom study* condition on reload, keeping only the study's name.
+    A plain comparison avoids that trap entirely.
+    """
+    return {
+        "trigger_symbol": CONDITION_SYMBOL,
+        "trigger_price": round(stop_trigger_spx, 2),
+        "trigger_direction": "at or above",
+        "action": "SELL -1, MARKET",
+    }
+
+
 def template_fields(contract: Contract, limit_pts: float, stop_trigger_spx: float) -> dict:
-    """The two-number overwrite for the saved-template fallback: load ``FD0``,
-    replace strike and condition price, send."""
+    """Everything the operator retypes when reloading a saved ``FD0`` template."""
     return {
         "strike": contract.strike,
         "limit_pts": round(limit_pts, 2),

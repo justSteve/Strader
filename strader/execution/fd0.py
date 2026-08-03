@@ -325,7 +325,13 @@ class Fd0:
             f"which at {d.delta_live:.2f} delta is {d.stop_distance_spx:.2f} SPX points",
             f"    the tape's own noise is about {d.noise_floor_spx:.2f} points",
             "",
+            "  ENTRY — paste this (clipboard already holds it):",
             f"  {ticket.order_string}",
+            "",
+            "  EXIT — cannot be pasted. Order Rules gear, then type:",
+            f"    trigger symbol   SPX",
+            f"    trigger price    {ticket.stop_trigger_spx:.2f}  (at or above)",
+            f"    action           SELL -1, MARKET",
         ]
         for w in ticket.warnings:
             lines += ["", f"  ** {w}"]

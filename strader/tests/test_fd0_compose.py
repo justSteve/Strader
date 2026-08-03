@@ -280,3 +280,35 @@ def test_the_record_carries_the_whole_derivation_chain():
                 "noise_floor_spx", "inside_noise_floor"):
         assert key in rec["derivation"]
     assert json.dumps(rec)          # journal-serializable
+
+
+# ------------------------------------------- TOS paste grammar (08-03 research) ---
+
+def test_order_string_is_bare_with_no_stray_whitespace():
+    # TOS's paste-from-clipboard breaks on extra spaces or text. This value
+    # goes to the clipboard verbatim, so it must carry nothing else.
+    s = order_string(_contract(), 1.60)
+    assert s == s.strip()
+    assert "\n" not in s and "\t" not in s
+    assert "  " not in s          # no doubled spaces anywhere
+
+
+def test_exit_fields_trigger_on_the_cash_index_not_the_option():
+    # The stop distance is derived in SPX index points, so the condition must
+    # watch the same instrument the arithmetic is denominated in.
+    from strader.execution.compose import exit_fields
+    f = exit_fields(7441.32)
+    assert f["trigger_symbol"] == "SPX"
+    assert f["trigger_price"] == 7441.32
+    assert f["trigger_direction"] == "at or above"
+    assert "MARKET" in f["action"]
+
+
+def test_exit_fields_stay_a_plain_price_comparison():
+    # A saved TOS template is documented to lose a *custom study* condition on
+    # reload, keeping only its name. A plain comparison sidesteps that entirely,
+    # so nothing here may imply a study or a script.
+    from strader.execution.compose import exit_fields
+    blob = " ".join(str(v) for v in exit_fields(7441.32).values()).lower()
+    for forbidden in ("study", "script", "thinkscript", "plot"):
+        assert forbidden not in blob
