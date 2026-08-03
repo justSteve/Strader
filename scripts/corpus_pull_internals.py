@@ -7,9 +7,10 @@ history and writes them into the per-day corpus
 Schwab's minute history is a ROLLING ~47-day window — running this weekly
 makes the history permanent before it rolls off.
 
-$VIX added 2026-08-03 [st-cdwe]: the symbol is `$VIX` (`$VIX.X` returns
-EMPTY), serves ~389 RTH minute candles/day with v=0 (an index — volume is
-meaningless). Rows before the add date carry only the original four symbols.
+$VIX added 2026-08-03 [st-cdwe]; $VIX9D and $VIX3M added same day
+[st-40fv] for the term-structure read. Index symbols are bare (`$VIX` —
+`$VIX.X` returns EMPTY), serve ~389 RTH minute candles/day with v=0 (indices
+— volume is meaningless). Rows before the add dates carry fewer symbols.
 
 Idempotent by day: a day whose file already exists is skipped, EXCEPT the
 current session day, which is always rewritten (it may have been partial on
@@ -36,7 +37,7 @@ from market.corpus.paths import central_date, internals_path  # noqa: E402
 from market.corpus.writer import append_jsonl, update_manifest, utc_now_iso  # noqa: E402
 
 CENTRAL = ZoneInfo("America/Chicago")
-SYMBOLS = ("$TICK", "$TRIN", "$ADD", "$VOLD", "$VIX")
+SYMBOLS = ("$TICK", "$TRIN", "$ADD", "$VOLD", "$VIX", "$VIX9D", "$VIX3M")
 
 
 def fetch_symbol(client, symbol: str, days: int) -> list[dict]:

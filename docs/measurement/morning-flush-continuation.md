@@ -94,6 +94,59 @@ st-gzwb). The one whisper: failed events ran hotter volume (pace 1.11 vs
 - Label parameters (≥2 pts within 15 min) chosen once, not swept.
 - $VIX candles carry v=0 (index); price fields only.
 
+## VIX depth pass (2026-08-03, later the same session — st-40fv)
+
+Steve pushed past rising/falling: de-seasoned slope, beta residual, quadrant
+flags, term structure. Script: `scripts/measurement/morning_flush_vix_depth.py`
+(joins the same 1,882 labeled minutes; parity asserted). Capture: **$VIX9D and
+$VIX3M both serve** via Schwab minute history and are now in
+`corpus_pull_internals.py`; 30 days backfilled, zero rows lost.
+
+**The honest headline is a negative result.** The 5-min coupling fit is
+ΔVIX = −0.005 − 1.55·ΔES% with **R² = 0.79** — four-fifths of VIX slope
+variance is the concurrent ES move, mechanically. Subtract it and the
+**beta residual grades continuation at AUC 0.522 (day-median 0.463) — a coin
+flip.** So yesterday's "VIX still traveling with the move" trace (AUC .660)
+was substantially *price momentum wearing a VIX costume*, not independent
+protection-demand information. The continuation meter still works — but its
+VIX leg should be understood as a smoothed momentum proxy, not vol
+intelligence. De-seasoning, likewise, changes nothing at this granularity
+(AUC .667 vs .660 raw; the intraday decay is real at day scale but too slow
+to matter inside a 5-minute slope).
+
+**The quadrants are the keeper.** sign(ΔES_5m) × sign(ΔVIX_5m), split by
+move direction, P(extends ≥2 pts in next 15 min):
+
+| Context | Quadrant | n | P(CONT) | Read |
+|---|---|---|---|---|
+| Down move | ES− / VIX+ (flush, vol bid) | 501 | **73.1 %** | The freight train. |
+| Down move | **ES+ / VIX+ (bounce, vol STILL bid)** | 38 | **65.8 %** | **The bounce isn't believed** — protection still being paid for while price lifts; flush tends to resume. The spot-up-vol-up read, working exactly as doctrine says. |
+| Down move | ES− / VIX− (monetization?) | 58 | 63.8 % | **The monetization/exhaustion read FAILS** — predicted fuel-gone, measured mildly *elevated* continuation. |
+| Down move | ES+ / VIX− (bounce, vol crush) | 335 | 45.1 % | The only sub-base state in a down move. |
+| Up move | ES+ / VIX− (rally, vol crush) | 446 | 62.6 % | Healthy up. |
+| Up move | **ES− / VIX+ (dip, vol bid)** | 274 | **33.6 %** | Dip with protection bid — the up-move's death rattle. |
+| Up move | ES+ / VIX+ (spot-up-vol-up) | 38 | 52.6 % | Classic suspicion read: directionally right (down from 62.6 %), mild, thin n. |
+| Up move | ES− / VIX− | 58 | 44.8 % | — |
+
+The asymmetry is the finding: **within down moves, VIX+ keeps continuation
+elevated no matter what price is doing this minute (73 %, 66 %); within up
+moves, VIX+ anywhere is the warning state (34 %, 53 %).** Both anomalous
+quadrants run n = 38 — flagged, not validated.
+
+**Term structure:** as a 5-min slope, no upgrade (AUC .631). At day scale it
+tells a July story: the 9D−30D spread sat at −3.4 to −1.9 (deep contango)
+early July, compressed toward flat through the late-July flush cluster, and
+**inverted intraday on 07-23 (+0.13) and 07-27 (+0.37) — the 68-pt and 91-pt
+days** — with 07-28 touching 0.00. But 07-31 (87.75 pts) ran at −2.4, so
+front-end stress is descriptive of the late-July regime, not a per-day size
+grader. Now captured daily; worth rechecking at n ≥ 60 days.
+
+**Re-scored convergence** (de-seasoned slope swapped in): 24.9 / 48.2 / 64.9
+/ **73.6 %**, AUC .683 — marginal over the original .678. The trio's value
+survives; its members are correlated with each other, and honesty requires
+saying the meter is closer to "three views of one underlying state" than
+three independent confirmations.
+
 ## Follow-on lane
 
 A live **continuation meter** — the three traces + score rendered in a desk
