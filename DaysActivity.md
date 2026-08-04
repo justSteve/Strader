@@ -1,5 +1,38 @@
 # DaysActivity - 2026-08-04
 
+## 08:50 - Session Handoff [First Full Mancini Procedure + OPRA Cost Ruling]
+
+**Summary**: Ran the Mancini Parse end to end for the first time under the new procedure — clipboard loaded automatically — and settled that the OPRA subscription's replacement by the Futures plan means the daily OPRA pull is now metered and should stop. Live capture has been up since 02:51 and is healthy.
+
+**Live at handoff** (tmux `steves-desk:footprint`):
+- CAPTURE pid 496170, **5h31m up** — 39 MB ES trades, 757 MB MBP-1 into `data/corpus/2026-08-04/`
+- bridge + feeder alive, **124 live bars** built
+- `capture_health.py --porcelain` reports `status=ok actionable=0`
+
+**Decisions taken**:
+- **`st-7av4` (P1) — stop the daily OPRA pull.** Steve confirmed on the Databento portal that the $199 OPRA subscription is gone and the Futures plan replaced it, so `corpus_daily`'s daily OPRA pull has been running as usage-billed historical (~$280/GB, est. ~$6.40/day, ~$134/mo — estimate only, record size inferred). **Schwab cannot replace it**: no historical options tape, quotes/chains are now-only. Seven measurement tools read that tape, including `fly_replay.py`, which reconstructs a butterfly's price path over the final hour — the instrument that measures the actual edge. What makes stopping safe is the asymmetry: MBP-1 live quotes are captured forward or lost forever, but historical OPRA is purchasable any time, so the daily pull buys only convenience. **Apply after the close, not mid-session** — the gate change risks the pre-open path.
+- **Supervisor built but NOT installed** (`st-6qx4`, commit `99ea95e`). Its default is round-the-clock, so installing as proposed extends capture past 15:05 into evening Globex. That is the capture-window ruling Steve has been reserving — needs his consent, both crontab variants are in the bead.
+
+**Open Work**:
+- `st-7av4` — four code sites must move together: `gate.py DEFAULT_REQUIRED_STREAMS`, the compaction wrapper's `REQUIRED`, `corpus_daily`'s stream/window maps plus its now-false "OPRA flat-fee" comment, and the streamer's stale `--streams opra` default (wrong regardless).
+- `st-6qx4` — install decision pending. Supervisor gaps it names: holidays unmodeled, a legitimate second capture reads as `duplicate`, **bridge and feeder are unsupervised** so a dead feeder freezes the live page looking like a quiet tape, no night push.
+- `st-re1o` — **the live footprint has still never been eyeballed in a browser.** Data path proven, rendering unverified. 124 bars are sitting there waiting.
+- `st-d5f` — capture-window ruling, whether our footprint replaces TradingView's, and the held pre-build spend.
+- `st-jwtn` — Schwab streaming preclusion, still parked on Steve's own TOS-vs-API test.
+- `st-ndc` — **due tomorrow (Wed 08-05, 10:17 CDT). Raise it early that morning, per the standing rule; not before.**
+
+**Tried**:
+- Suspecting the supervision sub was hung after 2.5h of no file writes → **it was not**; it ran 5.5h and completed with 67 tests. File mtimes are a poor liveness signal for an agent that spends its time testing.
+- Expecting the OPRA switch to have broken the gate and compaction → **it had not**. This morning's 06:30 pull got 475,073 OPRA cycles cleanly, because historical is usage-billed rather than subscription-gated. The breakage was economic, not functional — checking beat assuming.
+
+**Files Changed**:
+runbook/mancini/parsed/2026-08-04.json
+runbook/mancini/commentary/2026-08-04.jsonl
+runbook/mancini/charts/2026-08-04.pine
+runbook/mancini/charts/2026-08-04.payload.txt
+
+---
+
 ## 03:40 - Session Handoff [Phase B Live Capture + Live Footprint v1]
 
 **Summary**: The GLBX/ES live subscription was verified real, Phase B was un-deferred, and the drills-only footprint became a live surface — with ES trades and MBP-1 now capturing continuously for the first time. Long single session spanning 08-02 evening through 08-04 pre-dawn; the 08-02 log was archived and this file opened fresh.

@@ -3,7 +3,7 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
-**Last refreshed**: 2026-08-04 [st-d5f, st-re1o, st-itky]
+**Last refreshed**: 2026-08-04 [st-d5f, st-re1o, st-itky, st-6qx4]
 
 > Standing operational snapshot — what is wired up, live, or paused right now.
 > Session history lives in `DaysActivity.md`; work lives in beads; durable
@@ -78,6 +78,7 @@ missing its `leases` table). The working channel is file-convention A2A under
    resolvable). Fires every weekday at 08:15 until fixed.
 3. **`st-08p` blocked externally** — training steps 3–5 need Steve's NotebookLM
    upload and COO's deck import.
-4. **Live capture unsupervised** — the streamer is the first long-lived
-   process here and nothing watches it; a death overnight is noticed at the
-   open, costing unbackfillable quotes. `st-6qx4`.
+4. **Live capture unsupervised** — supervisor is BUILT (`99ea95e`) but NOT
+   installed; no crontab entry, so nothing watches the streamer yet. Installing
+   it as proposed also extends capture into evening Globex, which is the
+   capture-window ruling still outstanding. `st-6qx4`.
