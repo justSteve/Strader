@@ -17,7 +17,8 @@ useVisible       = input.bool(false, "B. Visible-range only", group="Activation"
 visibleLookback  = input.int(150,    "Visible lookback (bars)", group="Activation", minval=10, maxval=2000)
 useSessionFilter = input.bool(false, "C. Hide touched-today levels", group="Activation")
 touchTolerance   = input.float(2,    "Touch tolerance (points)", group="Activation", minval=0, step=0.25)
-alwaysShowKey    = input.bool(false, "Always show key levels (ignores radius - stretches the scale)", group="Activation")
+alwaysShowKey    = input.bool(false, "Always show key levels (within the key cap below)", group="Activation")
+keyRadiusMult    = input.float(2.0,  "Key cap (x radius) - hard limit even for key levels", group="Activation", minval=1, maxval=10, step=0.5)
 nonKeyAlpha      = input.int(50,     "Non-key transparency (%)", group="Activation", minval=0, maxval=100)
 
 // === Display ===
@@ -172,7 +173,10 @@ _shouldShow(float price, bool isKey, int st, bool isMajor) =>
         pass := false
     if useSessionFilter and st >= 1
         pass := false
-    if alwaysShowKey and isKey
+    // Key levels may pierce the radius, but never past the hard cap — an
+    // uncapped exemption let deep key supports stretch the price scale until
+    // the chart compressed beyond usable zoom (recurred 2026-08-04). [st-wqr]
+    if alwaysShowKey and isKey and math.abs(price - centerPrice) <= radius * keyRadiusMult
         pass := true
     pass
 

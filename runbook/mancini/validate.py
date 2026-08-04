@@ -102,3 +102,46 @@ def check(raw_text: str, result: ParseResult) -> ValidationResult:
                 )
 
     return ValidationResult(ok=not errors, errors=errors, missing_prices=missing)
+
+
+# --- Emit-time level sanity band [st-wqr] -----------------------------------
+#
+# The anti-hallucination check above catches prices the MODEL invented; it
+# cannot catch prices the LETTER itself got wrong. Mancini's 2026-07-30 letter
+# contained 'Resistances are: 743, 7449 ...' — a dropped digit the extractor
+# faithfully carried onto the chart, where a level an order of magnitude below
+# the traded band stretches the renderer's price scale into uselessness.
+#
+# The band is relative — median of the session's own level set ± pct — so it
+# needs no market-data fetch and survives regime moves. At ES ~7500 the default
+# 10% band is ±~750 pts: an order-of-magnitude typo (743) or an extra digit
+# (74490) falls far outside it, while Mancini's legitimately deep ladders
+# (~400-500 pts) stay comfortably inside. A dropped level is a SIGNAL the
+# letter has a typo: emitters log each one loudly, and the morning brief
+# surfaces them — never drop silently.
+
+SANITY_BAND_PCT = 0.10
+
+
+def level_sanity_band(prices: list[float], pct: float = SANITY_BAND_PCT):
+    """(lo, hi) around the median, or None when too few points to judge."""
+    if len(prices) < 3:
+        return None
+    s = sorted(prices)
+    mid = s[len(s) // 2] if len(s) % 2 else (s[len(s) // 2 - 1] + s[len(s) // 2]) / 2
+    return (mid * (1 - pct), mid * (1 + pct))
+
+
+def split_out_of_band(levels, pct: float = SANITY_BAND_PCT):
+    """Partition levels into (kept, dropped) against the session's own band.
+
+    ``levels`` is any sequence with a ``.price`` attribute (schema.Level).
+    With fewer than 3 levels there is no meaningful median: keep everything.
+    """
+    band = level_sanity_band([lv.price for lv in levels], pct)
+    if band is None:
+        return list(levels), []
+    lo, hi = band
+    kept = [lv for lv in levels if lo <= lv.price <= hi]
+    dropped = [lv for lv in levels if not (lo <= lv.price <= hi)]
+    return kept, dropped

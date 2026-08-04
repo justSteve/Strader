@@ -20,6 +20,8 @@ recipe, surfaced (not auto-delivered) by the Runbook.
 """
 from __future__ import annotations
 
+import dataclasses
+import logging
 from typing import Any
 
 # Absolute imports resolve to Strader's top-level packages (not runbook.mancini).
@@ -27,6 +29,19 @@ from mancini.parser import ManciniEmail, Level as RegexLevel
 from mancini.pine_emitter import emit as emit_pine_source
 
 from .schema import ParseResult
+from .validate import split_out_of_band
+
+logger = logging.getLogger(__name__)
+
+
+def _sane_result(result: ParseResult) -> ParseResult:
+    """Drop out-of-band levels (letter typos) before any chart emit. [st-wqr]"""
+    sane, dropped = split_out_of_band(result.levels)
+    for lv in dropped:
+        logger.warning("SANITY: level %s (%s, %r) outside session band — "
+                       "dropped from chart emit; letter likely has a typo",
+                       lv.price, lv.kind, lv.source_quote)
+    return dataclasses.replace(result, levels=sane) if dropped else result
 
 
 def _is_major(label: str) -> bool:
@@ -84,7 +99,7 @@ def to_mancini_email(result: ParseResult) -> ManciniEmail:
 def emit_pine(result: ParseResult, *, generated_at: str = "") -> str:
     """Render Pine v6 overlay source for the day's validated levels."""
     return emit_pine_source(
-        to_mancini_email(result),
+        to_mancini_email(_sane_result(result)),
         generated_at=generated_at or None,
     )
 
@@ -97,6 +112,7 @@ def apply_plan(result: ParseResult, *, generated_at: str = "") -> dict[str, Any]
       - ``lines``: per-level specs for ``draw_shape`` horizontal_line at exact price.
     The Runbook (or a thin tradingview-mcp client) consumes whichever is wired.
     """
+    result = _sane_result(result)
     keys = key_prices(result)
     lines = [
         {

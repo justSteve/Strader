@@ -13,12 +13,16 @@ extras remain commentary-side. Prices render trailing-zero-free (7458, 7461.5).
 """
 from __future__ import annotations
 
+import logging
 import re
 import subprocess
 from typing import Sequence
 
 from .chart import key_prices
 from .schema import Level, ParseResult
+from .validate import split_out_of_band
+
+logger = logging.getLogger(__name__)
 
 CONFLUENCE_TOLERANCE_PTS = 2.0
 _PROFILE_KINDS = ("poc", "vah", "val", "lvn", "hvn")
@@ -113,11 +117,20 @@ def build_payload(result: ParseResult,
     keys = key_prices(result)
     prof_prices = [p for k, p in profile_levels if k in _PROFILE_KINDS]
 
+    # Out-of-band levels (letter typos, e.g. 743 for 7443) never reach the
+    # chart — a level far outside the traded band stretches the renderer's
+    # price scale into uselessness. Loud, never silent. [st-wqr]
+    sane, dropped = split_out_of_band(result.levels)
+    for lv in dropped:
+        logger.warning("SANITY: level %s (%s, %r) outside session band — "
+                       "dropped from payload; letter likely has a typo",
+                       lv.price, lv.kind, lv.source_quote)
+
     # Zone pairing: ladder levels sharing (kind, source_quote) in pairs are the
     # two edges the extractor expanded from one "7640-45" token.
     groups: dict[tuple[str, str], list[Level]] = {}
     ordered: list[tuple[str, str]] = []
-    for lv in result.levels:
+    for lv in sane:
         if lv.kind not in ("support", "resistance"):
             continue
         gk = (lv.kind, lv.source_quote or f"__solo_{_fmt(lv.price)}")

@@ -186,3 +186,58 @@ def test_descriptor_after_its_price_in_a_two_price_sentence():
                          "Nothing below 7358 until 7311, which is a very strong support.",
                          ["support"])
     assert build_payload(r).splitlines()[1].endswith('"very strong"')
+
+
+# --- Emit-time level sanity guard [st-wqr] ----------------------------------
+
+def test_out_of_band_typo_level_dropped_and_logged(caplog):
+    # The 2026-07-30 incident: letter said '743' for ~7443. The guard drops it
+    # from the payload and warns loudly; in-band levels ship untouched.
+    import logging
+    r = _result([
+        Level(price=743.0, kind="resistance", label="major", source_quote="743"),
+        Level(price=7449.0, kind="resistance", label="major", source_quote="7449 (major)"),
+        Level(price=7443.0, kind="support", label="", source_quote="7443"),
+        Level(price=7530.0, kind="support", label="major", source_quote="7530 (major)"),
+    ])
+    with caplog.at_level(logging.WARNING, logger="runbook.mancini.payload_emitter"):
+        lines = build_payload(r).splitlines()
+    assert not any("743 " in ln or ln.endswith("743") for ln in lines
+                   if ln.startswith(("S", "R")) and "7443" not in ln and "7430" not in ln)
+    assert "R 7449 . major" in lines
+    assert "S 7443 . minor" in lines
+    assert any("SANITY" in rec.message and "743" in rec.getMessage()
+               for rec in caplog.records)
+
+
+def test_in_band_deep_ladder_survives_guard():
+    # Mancini's legitimate deep ladders (~400-500 pts) must never be dropped:
+    # the 2026-08-04 payload spans 7223-7790 and every level is real.
+    prices = [7223.0, 7451.0, 7567.0, 7611.0, 7649.0, 7790.0]
+    r = _result([Level(price=p, kind="support" if p < 7615 else "resistance",
+                       label="", source_quote=f"{p:g}") for p in prices])
+    lines = build_payload(r).splitlines()
+    assert len([ln for ln in lines if ln.startswith(("S", "R"))]) == len(prices)
+
+
+def test_guard_skips_tiny_level_sets():
+    # <3 levels: no meaningful median, keep everything (even weird ones).
+    r = _result([
+        Level(price=743.0, kind="support", label="", source_quote="743"),
+        Level(price=7449.0, kind="resistance", label="", source_quote="7449"),
+    ])
+    lines = build_payload(r).splitlines()
+    assert len([ln for ln in lines if ln.startswith(("S", "R"))]) == 2
+
+
+def test_emit_pine_applies_same_guard():
+    from runbook.mancini.chart import emit_pine
+    r = _result([
+        Level(price=743.0, kind="resistance", label="major", source_quote="743"),
+        Level(price=7449.0, kind="resistance", label="major", source_quote="7449 (major)"),
+        Level(price=7443.0, kind="support", label="", source_quote="7443"),
+        Level(price=7530.0, kind="support", label="major", source_quote="7530 (major)"),
+    ])
+    src = emit_pine(r)
+    assert "743.0," not in src and "(743.0" not in src and " 743.0" not in src
+    assert "7449.0" in src

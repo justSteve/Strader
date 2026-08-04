@@ -141,17 +141,26 @@ def _clip_wanted(args) -> bool:
 def _push_payload(result: ParseResult, payload_path: Path | None = None) -> str:
     """Build the Daily Payload from ``result`` and load it. Returns a brief note."""
     from . import payload_emitter
+    from .validate import split_out_of_band
 
     payload = payload_emitter.build_payload(result)
     size = len(payload.encode())
+    # A dropped level means the LETTER likely has a typo — that is a finding
+    # the brief must carry, not bury in a log file. [st-wqr]
+    _, dropped = split_out_of_band(result.levels)
+    sanity = ""
+    if dropped:
+        listed = ", ".join(f"{lv.price:g} ({lv.kind})" for lv in dropped)
+        sanity = (f"\nSANITY: {len(dropped)} out-of-band level(s) dropped from "
+                  f"emit — {listed}. Check the letter for typos.")
     rc = payload_emitter.push_clipboard(payload)
     if rc == 0:
         logger.info("Daily Payload -> clipboard (%d bytes)", size)
         return (f"clipboard: Daily Payload loaded ({size} bytes) — "
-                "Ctrl+V onto the indicator")
+                "Ctrl+V onto the indicator" + sanity)
     logger.warning("clipboard push returned rc=%d", rc)
     where = payload_path or "the payload file"
-    return f"clipboard: PUSH FAILED (rc={rc}) — paste from {where}"
+    return f"clipboard: PUSH FAILED (rc={rc}) — paste from {where}" + sanity
 
 
 def _render_brief(result: ParseResult) -> str:
