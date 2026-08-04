@@ -72,6 +72,70 @@ def test_json_mode(monkeypatch, capsys):
 
 # --- the real check functions against a fixture tree ------------------------
 
+def _capture_state(tmp_path, monkeypatch, **fields):
+    from datetime import datetime, timezone
+    doc = {"status": "ok", "message": "capture alive and receiving",
+           "checked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+           "day": "2026-07-31", "restarts": 0}
+    doc.update(fields)
+    p = tmp_path / "_capture_health.json"
+    p.write_text(json.dumps(doc))
+    monkeypatch.setattr(heartbeat, "CAPTURE_STATE", p)
+    return p
+
+
+# --- capture: the overnight streamer, surfaced where it gets read [st-6qx4] --
+
+def test_check_capture_healthy(monkeypatch, tmp_path):
+    _capture_state(tmp_path, monkeypatch)
+    c = heartbeat.check_capture()
+    assert c["ok"] and c["hard"] is False and c["reasons"] == []
+
+
+def test_check_capture_missing_state_reports_the_supervisor_itself(monkeypatch, tmp_path):
+    """No state file means nobody is watching. The absence of the guard has to
+    show up on the surface, or it is the Mancini silent-rc=0 failure again."""
+    monkeypatch.setattr(heartbeat, "CAPTURE_STATE", tmp_path / "nope.json")
+    c = heartbeat.check_capture()
+    assert not c["ok"]
+    assert "capture-supervisor-wrapper.sh" in c["reasons"][0]
+
+
+def test_check_capture_reports_a_bad_verdict(monkeypatch, tmp_path):
+    _capture_state(tmp_path, monkeypatch, status="dead",
+                   message="no capture process, and one is expected")
+    c = heartbeat.check_capture()
+    assert not c["ok"]
+    assert "dead: no capture process" in c["reasons"][0]
+
+
+def test_check_capture_detects_a_dead_watcher(monkeypatch, tmp_path):
+    """A stale state file is its own alarm: the verdict says ok, but it is an
+    ok from hours ago and nothing has looked since."""
+    _capture_state(tmp_path, monkeypatch, checked_at="2026-07-31T02:00:00Z")
+    c = heartbeat.check_capture()
+    assert not c["ok"]
+    assert "supervisor itself has stopped" in " ".join(c["reasons"])
+
+
+def test_check_capture_surfaces_overnight_restarts(monkeypatch, tmp_path):
+    """Healthy now, but the night had holes — the gap is the thing worth reading."""
+    _capture_state(tmp_path, monkeypatch, restarts=3,
+                   last_restart_utc="2026-07-31T07:14:00Z")
+    c = heartbeat.check_capture()
+    assert c["ok"]
+    assert "3 supervisor restart(s)" in c["reasons"][0]
+
+
+def test_capture_is_in_the_default_check_set(monkeypatch, tmp_path):
+    _capture_state(tmp_path, monkeypatch)
+    monkeypatch.setattr(heartbeat, "check_corpus", lambda: dict(GOOD))
+    monkeypatch.setattr(heartbeat, "check_mancini", lambda: dict(GOOD, name="mancini"))
+    monkeypatch.setattr(heartbeat, "check_risk", lambda: dict(GOOD, name="risk"))
+    monkeypatch.setattr(heartbeat, "check_schwab", lambda: dict(SOFT_BAD))
+    assert [c["name"] for c in heartbeat.run_checks()][-1] == "capture"
+
+
 def test_check_mancini_reads_todays_artifact(monkeypatch, tmp_path):
     monkeypatch.setattr(heartbeat, "PARSED_ROOT", tmp_path)
     monkeypatch.setattr(heartbeat, "central_date", lambda: date(2026, 7, 31))

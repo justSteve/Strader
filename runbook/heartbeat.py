@@ -17,6 +17,12 @@ Soft checks (reported, never fail the run):
   schwab   — today's manifest carries a schwab snapshot (the 07:00 premarket
              stage fire, st-096). Not gate-required, so not a hard stop —
              but a missing premarket snapshot on a live morning is worth a line.
+  capture  — the live Databento streamer survived the night (st-6qx4). Read from
+             the supervisor's state file, not re-derived: the supervisor fires
+             every two minutes and this runs once, so its accumulated view is
+             what matters at 08:25. Soft because a lost night of ES tape does not
+             make TODAY's plan unsafe — but it is unrecoverable data, so it must
+             appear on a surface someone actually reads. This is that surface.
 
 Scheduling: 08:25 CT weekdays via scripts/cron/preopen-heartbeat-wrapper.sh —
 after the 08:15 parse has had its window, five minutes before the bell.
@@ -36,6 +42,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from market.corpus.paths import (  # noqa: E402
+    CORPUS_ROOT,
     central_date,
     manifest_path,
     most_recent_session_day,
@@ -43,6 +50,14 @@ from market.corpus.paths import (  # noqa: E402
 from runbook.datastream import gate  # noqa: E402
 
 PARSED_ROOT = REPO_ROOT / "runbook" / "mancini" / "parsed"
+
+# Live-capture supervisor state [st-6qx4] — written every run by
+# scripts/capture_health.py, which scripts/cron/capture-supervisor-wrapper.sh
+# fires every two minutes.
+CAPTURE_STATE = CORPUS_ROOT / "_capture_health.json"
+# A state file older than this means the SUPERVISOR stopped, which is a silent
+# failure of the guard itself. Generous against a 2-minute cadence.
+CAPTURE_STATE_MAX_AGE_MIN = 30.0
 
 
 def check_corpus() -> dict:
@@ -98,8 +113,59 @@ def check_risk() -> dict:
             "day": today.isoformat(), "reasons": reasons}
 
 
+def check_capture() -> dict:
+    """Did the live Databento capture survive the night (soft) [st-6qx4].
+
+    Reports the supervisor's own verdict rather than re-deriving liveness — and
+    reports the supervisor's ABSENCE too. An alert nobody reads is not a guard:
+    the health log is durable but unread, so the overnight capture story is
+    surfaced here, on the one thing already looked at before every open.
+    """
+    from datetime import datetime, timezone
+
+    reasons: list[str] = []
+    today = central_date()
+    if not CAPTURE_STATE.exists():
+        return {"name": "capture", "hard": False, "ok": False,
+                "day": today.isoformat(),
+                "reasons": [f"no capture watcher state ({CAPTURE_STATE.name}) — "
+                            "is capture-supervisor-wrapper.sh in cron?"]}
+    try:
+        state = json.loads(CAPTURE_STATE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        return {"name": "capture", "hard": False, "ok": False,
+                "day": today.isoformat(),
+                "reasons": [f"capture watcher state unreadable: {e}"]}
+
+    status = state.get("status", "unknown")
+    checked = state.get("checked_at")
+    age_min = None
+    try:
+        seen = datetime.strptime(checked, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        age_min = (datetime.now(timezone.utc) - seen).total_seconds() / 60
+    except (TypeError, ValueError):
+        reasons.append(f"capture watcher state has no usable checked_at ({checked!r})")
+
+    ok = status in ("ok", "starting", "quiet", "idle")
+    if age_min is not None and age_min > CAPTURE_STATE_MAX_AGE_MIN:
+        ok = False
+        reasons.append(f"capture watcher last ran {age_min:.0f} min ago — the "
+                       f"supervisor itself has stopped; liveness is UNKNOWN")
+    if not ok and status not in ("ok", "starting", "quiet", "idle"):
+        reasons.append(f"{status}: {state.get('message', '')}".strip())
+
+    restarts = int(state.get("restarts") or 0)
+    if restarts:
+        reasons.append(f"{restarts} supervisor restart(s) today (last "
+                       f"{state.get('last_restart_utc', '?')}) — expect gaps in "
+                       f"the tape around those times")
+    return {"name": "capture", "hard": False, "ok": ok,
+            "day": state.get("day", today.isoformat()), "reasons": reasons}
+
+
 def run_checks() -> list[dict]:
-    return [check_corpus(), check_mancini(), check_risk(), check_schwab()]
+    return [check_corpus(), check_mancini(), check_risk(), check_schwab(),
+            check_capture()]
 
 
 def main(argv: list[str] | None = None) -> int:
