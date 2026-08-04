@@ -106,7 +106,50 @@ setTimeout(() => {
      `${panel.querySelectorAll("tbody tr").length} row(s)`);
   ok("panel carries the 'why' column",
      [...panel.querySelectorAll("th")].some(t => /why/i.test(t.textContent)));
-  ok("panel overlays the control strip", panel.closest(".controls") !== null);
+  // The panel is an absolute overlay, so what decides whether it can cover
+  // whole rows is its CONTAINING BLOCK. Anchored to the control strip alone it
+  // ended mid-way through the readouts and cut the text. The invariant that
+  // has to hold: the rows it overlays are inside the same positioned ancestor.
+  const block = panel.closest("#ctlblock");
+  ok("panel is anchored to the control block", block !== null);
+  ok("the readouts row is inside that block — so the panel can cover it whole",
+     !!block && block.contains(d.querySelector(".readouts")));
+  ok("the emissions row is inside it too",
+     !!block && block.contains(d.getElementById("emrow")));
+
+  // Confidence: an invalidated setup is scored 0.0, meaning not-applicable.
+  // Printing "0.00" invites reading it as a measurement. [st-emy5]
+  const invalidated = bars.findIndex(b =>
+    (b.ev || []).some(e => e.type === "SetupRecognition" && e.state === "invalidated"));
+  if (invalidated >= 0) {
+    w.eval(`seekTo(${invalidated}); openEmPanel(${invalidated})`);
+    const cells = [...d.querySelectorAll("#empanel tbody tr")]
+      .filter(r => /invalidated/.test(r.textContent)).map(r => r.cells[2].textContent.trim());
+    ok("invalidated setup shows no confidence number", !cells.includes("0.00"),
+       JSON.stringify(cells));
+  }
+  const scoredAt = bars.findIndex(b =>
+    (b.ev || []).some(e => e.type === "SetupRecognition" && e.state === "forming"));
+  if (scoredAt >= 0) {
+    w.eval(`seekTo(${scoredAt}); openEmPanel(${scoredAt})`);
+    const cells = [...d.querySelectorAll("#empanel tbody tr")]
+      .filter(r => /forming/.test(r.textContent)).map(r => r.cells[2].textContent.trim());
+    ok("a scored emission still prints its confidence",
+       cells.some(s => /^\d\.\d\d$/.test(s)), JSON.stringify(cells));
+  }
+
+  // "stages", never "beats" — the four-part sequence collides with the musical
+  // sense. Read RENDERED text only: the embedded DATA blob legitimately carries
+  // a field named `beats`, and body.textContent would sweep the <script> in.
+  const walker = d.createTreeWalker(d.body, w.NodeFilter.SHOW_TEXT);
+  const banned = [];
+  for (let n; (n = walker.nextNode()); ) {
+    const tag = n.parentElement?.tagName;
+    if (tag === "SCRIPT" || tag === "STYLE") continue;
+    if (/\bbeats?\b/i.test(n.textContent)) banned.push(n.textContent.trim().slice(0, 80));
+  }
+  ok("no 'beats' in rendered text — the sequence is STAGES", banned.length === 0,
+     banned.length ? JSON.stringify(banned.slice(0, 3)) : "");
 
   const finN = w.eval("FINAL.length");
   ok("end-of-session block renders when present",

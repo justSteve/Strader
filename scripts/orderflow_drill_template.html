@@ -116,7 +116,14 @@ td:first-child, th:first-child { text-align:left; }
 .beat-pill.current { color:var(--ink); border-color:var(--buy);
   background:color-mix(in srgb, var(--buy) 14%, var(--surface-1)); }
 /* emissions: what the stack said about this bar (st-b0n9) */
-.controls { position:relative; }          /* the panel anchors over this strip */
+/* The panel's containing block is the controls + readouts + emissions row as a
+   UNIT, not the control strip alone. Anchored to the strip it was a variable-
+   height overlay whose bottom edge landed mid-way through the readouts and cut
+   the text — the Bar/Time/Last/Delta context neither readable nor cleanly
+   covered, which is the worst of both. Spanning the block (min-height below)
+   means it always covers whole rows, and nothing is lost: the panel header
+   already restates the bar number and its clock. [st-emy5] */
+#ctlblock { position:relative; }
 #emrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap;
   padding:2px 16px 6px; font-size:12px; color:var(--ink-2);
   font-variant-numeric:tabular-nums; }
@@ -138,6 +145,7 @@ td:first-child, th:first-child { text-align:left; }
    the tape jump under Steve's eye mid-read. */
 #empanel { display:none; position:absolute; inset:0 auto auto 0; z-index:40;
   min-width:min(760px, calc(100vw - 32px)); max-width:calc(100vw - 32px);
+  min-height:100%;                        /* cover whole rows, never half a line */
   max-height:340px; overflow:auto; margin:0 16px;
   background:var(--surface-1); border:1px solid var(--axis); border-radius:8px;
   box-shadow:0 6px 22px var(--ring); padding:8px 12px 10px; font-size:12px; }
@@ -162,6 +170,7 @@ td:first-child, th:first-child { text-align:left; }
   <h1>Orderflow Drill</h1>
   <span class="meta" id="meta"></span>
 </header>
+<div id="ctlblock">
 <div class="controls">
   <button id="play" class="primary">▶ Play</button>
   <button id="back">⟨ Bar</button><button id="fwd">Bar ⟩</button>
@@ -193,7 +202,6 @@ td:first-child, th:first-child { text-align:left; }
   <button id="tbl">Table view</button>
   <button id="anat" title="Walk the recognizer's four-stage setups on this day">Anatomy</button>
   <button id="helpbtn" title="What am I looking at?">?</button>
-  <div id="empanel"></div>
 </div>
 <div class="readouts">
   <span>Bar <b id="ro-bar">0</b></span>
@@ -205,6 +213,8 @@ td:first-child, th:first-child { text-align:left; }
   <span>Score <b id="ro-score">0/0</b></span>
 </div>
 <div id="emrow"></div>
+<div id="empanel"></div>
+</div>
 <div id="visits"></div>
 <div id="scendeck"></div>
 <div id="anatomy"></div>
@@ -808,12 +818,20 @@ function renderEmissions() {
   if (emPinned) openEmPanel(idx);
 }
 
+// An invalidated setup is scored 0.0 by the recognizer, which is "not
+// applicable", not "zero confidence" — printing 0.00 invites reading it as a
+// measurement. Kept narrow to that one case on purpose: blanket-hiding any
+// 0.00 would mask a genuine zero somewhere else. [st-emy5]
+function emConf(e) {
+  if (e.type === "SetupRecognition" && e.state === "invalidated") return "—";
+  return e.confidence != null ? (+e.confidence).toFixed(2) : "—";
+}
 function emTable(ev) {
   if (!ev.length) return `<div class="em-empty">Nothing emitted on this bar.</div>`;
   const rows = ev.map(e =>
     `<tr><td style="text-align:left">${emName(e)}</td>`
     + `<td class="why">${emGist(e)}</td>`
-    + `<td>${e.confidence != null ? (+e.confidence).toFixed(2) : "—"}</td>`
+    + `<td>${emConf(e)}</td>`
     + `<td class="why">${e.reason || ""}</td></tr>`).join("");
   return `<table><thead><tr><th style="text-align:left">What</th>`
     + `<th style="text-align:left">Read</th><th>Conf</th>`

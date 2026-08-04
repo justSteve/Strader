@@ -298,11 +298,16 @@ class SetupRecognizer:
                 "confirmed": ((0.9 if stacked else 0.8) if fire_index < 4
                               else (0.7 if stacked else 0.6)),
                 "invalidated": 0.0}[state]
+        # "stages", never "beats" — the four-part sequence collides with the
+        # musical sense and Steve reads this string directly in the emissions
+        # panel's "why the stack said it" column. The internal field is still
+        # named `beats`; renaming it touches the replay records, the anatomy
+        # payload and the template together, which is st-g9y's job. [st-emy5]
         words = {
-            "forming": f"beats so far: {'+'.join(eng.beats)}",
+            "forming": f"stages so far: {'+'.join(eng.beats)}",
             "confirmed": ("confirmed with stacked imbalance" if stacked
                           else "confirmed on opposite delta"),
-            "invalidated": f"no reclaim (beats: {'+'.join(eng.beats)})",
+            "invalidated": f"no reclaim (stages: {'+'.join(eng.beats)})",
         }[state]
         proposed = " [proposed two-branch LVN read — validate empirically]" \
             if eng.setup == "return_to_lvn" else ""
