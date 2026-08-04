@@ -65,7 +65,7 @@ gate is the single highest-leverage follow-up.
 
 | Hour | n | Win | Med MFE/MAE |
 |---|---|---|---|
-| 08 | 42 | 52% | 17.2 / 9.1 |
+| 08 | 42 | 52% † | 17.2 / 9.1 |
 | 09 | 59 | 48% | 8.8 / 10.2 |
 | **10** | 20 | **26%** | 4.8 / 7.8 |
 | 11 | 26 | 48% | 6.5 / 6.4 |
@@ -77,6 +77,23 @@ Midday (10:00, 12:00) is where confirms go to die — 20–26% — which
 independently validates the playbook's 10:00–13:00 no-trade window. The
 14:00 hour is the largest bucket and the best risk profile (median MAE 4.0).
 The open hour wins less often than it moves (huge MFE *and* MAE).
+
+**† The 08 hour is not an edge — quote it with this p-value or not at all.**
+52% is **22 wins / 20 losses**: binomial one-sided p = **0.44** against a
+coin, two-sided p = 0.88, Wilson 95% CI **[37.7%, 66.6%]**. That is a coin
+flip with a wide interval, not a measured edge. It is footnoted because the
+number travelled: st-ug5 cites a "first-hour edge 54% wins", and correcting
+54 → 52 leaves intact the false impression that *something* was measured
+here. Nothing was. (Recomputed 2026-08-04 from
+`data/measurement/acuity-run2-confirmations.jsonl` filtered on run
+`20260727T054148Z` — every cell of this table reproduces, and the overall
+149W/169L/35-undecided line reproduces exactly. Auditor's report §4.5,
+`docs/audits/2026-08-04-auditor-report.md`; bead st-kzhe.)
+
+Two rows in this table *do* clear a conventional bar and are worth the
+contrast: hour 12 is 4/20, two-sided p = **0.012**, and hour 10 is 5/19,
+p = 0.064. The midday no-trade finding is the statistically real one here;
+the open-hour "edge" is the artifact.
 
 ### Setup type · anchor source · coverage
 
