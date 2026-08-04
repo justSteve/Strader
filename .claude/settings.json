@@ -107,7 +107,9 @@
       "Bash(tmux -L moocity capture-pane *)",
       "Bash(tmux -L moocity list-sessions*)",
       "Bash(tmux -L moocity list-windows *)",
-      "Bash(tmux -L moocity has-session *)"
+      "Bash(tmux -L moocity has-session *)",
+      "Bash(ps *)",
+      "Bash(curl *)"
     ],
     "deny": [
       "Read(.env)",
