@@ -1,5 +1,37 @@
 # DaysActivity - 2026-08-04
 
+## 09:32 - Session Handoff [Live Footprint Painting — Boot Path Fixed]
+
+**Summary**: The live footprint renders — Steve confirmed it painting mid-session, the first time anyone has watched it. Getting there took fixing three live-only boot crashes that the headless data-path proof could never have caught.
+
+**Live at handoff** (tmux `steves-desk:footprint`):
+- CAPTURE pid 496170, **6h10m up** — 63 MB ES trades, **1.2 GB** MBP-1
+- **215 live bars**; page confirmed rendering at `file://wsl.localhost/Zgent/tmp/desk-live-footprint.html`
+- ES ran to ~7695 — through Mancini's 7683 major and out the top of his 08-04 ladder
+
+**Fixed** (`ea77d7a`) — three defects, all live-only, firing in sequence at page init:
+1. **The killer.** The level-chip loop called `addChip(label, DATA.levels[k])` and `fmtPrice` does `p.toFixed()`. A live page has no session-derived levels at boot, so the first undefined price threw at the TOP of the boot script — nothing below ran, no bridge, no poller, no bars. Chrome rendered and the page sat empty, which reads as a network fault and is not one.
+2. `seekTo(0)` on an empty tape: the clamp yields `t=0`, the loop runs once, `bars[0].d` throws.
+3. `connectBridge` was one-shot — the launcher starts bridge and page together, so losing that race left a live page dead with nothing retrying.
+
+Every other `DATA.*` access was already guarded with `|| []`; `DATA.levels[k]` was the lone unguarded one, because a replay always has session levels.
+
+**Open Work**:
+- `st-b0n9` (NEW) — live emissions panel: show what the stack emitted at a given bar, via a rollover panel over the control strip. **Scope warning in the bead**: the live feeder does not run the engine at all, so this is putting `parity.full_stack_events` into the live path, not a UI tweak. Deferred deliberately; `replay_day.py` gives the full emission record for today after the close.
+- `st-7av4` (P1) — stop the daily OPRA pull. **After the close**, four code sites move together.
+- `st-6qx4` — supervisor built (`99ea95e`), NOT installed. Its default extends capture into evening Globex, which is the capture-window ruling.
+- `st-re1o` — v1 now visually confirmed. Remaining: bridge/feeder unsupervised, live bars catch up instantly rather than animating.
+- `st-ndc` — **due tomorrow (Wed 08-05, 10:17 CDT). Raise early that morning per the standing rule.**
+
+**Tried**:
+- Guessed twice at the blank-page cause (empty-tape `seekTo`, then `connectBridge` retry) → **both were real bugs but neither was the one**. What actually found it was enumerating every `DATA.*` access and checking each against the stub payload. Guessing cost two rounds; the enumeration took one command.
+- Reasoning that the headless proof covered the page → **it covered the DATA path, not the BOOT path**. Bars in, bars out, byte-identical — and three crashes upstream of any of that.
+
+**Files Changed**:
+scripts/orderflow_drill_template.html
+
+---
+
 ## 08:50 - Session Handoff [First Full Mancini Procedure + OPRA Cost Ruling]
 
 **Summary**: Ran the Mancini Parse end to end for the first time under the new procedure — clipboard loaded automatically — and settled that the OPRA subscription's replacement by the Futures plan means the daily OPRA pull is now metered and should stop. Live capture has been up since 02:51 and is healthy.
