@@ -85,9 +85,39 @@ false-positive rate say so, not when its process ran.
 4. Build phase gets planned then — detector → alert → staged execution, a
    paper pilot before anything touches a real order.
 
+## Amendment 2026-08-04 (same day) — ClaudeClaw vetoed; Claude-native path is primary
+
+Steve vetoed ClaudeClaw/Telegram and redirected to the channel he already uses
+daily: **Claude iOS via Remote Control**. The original candidate list missed
+it — an instance-level enumeration of "push services" instead of a traversal
+of "channels already open between Steve and this machine"; the audit's exact
+class of failure, caught by the operator again. Verified against the harness
+tool contracts (not assumed):
+
+- **PushNotification** — a session's push "if Remote Control is connected,
+  also pushes to their phone."
+- **Monitor** — a session can persistently tail the detector's event journal
+  (or a WebSocket) and react to each event.
+
+**New primary architecture [D]** — the Strader desk session *is* the
+intermediary: detector event → Monitor → PushNotification → Steve opens the
+session from his phone → it presents the staged single ticket with the
+evidence → he confirms in conversation → session fires via Schwab REST →
+append-only journal. Rails unchanged; the confirm step gains the ability to
+interrogate before firing; no new exposed surface and no third party in the
+order path. [A] Tailscale PWA demoted to fallback; [B] Telegram dead.
+
+R2's first question is now the notification's delivery semantics (app
+backgrounded, Remote Control not attached, iOS Focus) — and a dumb-pipe
+critical-alert backup fired straight from the daemon stays REQUIRED, because
+the guaranteed ping must not depend on a Claude session being alive (the
+2026-08-04 spend-limit event that killed a running agent is the live example
+of that failure mode).
+
 ## Open decisions for Steve (not needed yet)
 
-- Architecture A/B/C after the R3 memo.
+- Ratify [D] as primary after the R2 delivery measurements and R3's Schwab
+  order-surface verification come back.
 - Whether alert-only ships as its own milestone ahead of phone execution
   (recommended: yes — value lands weeks earlier, risk is zero).
-- Where ClaudeClaw should live and run if R2 recommends it.
+- Choice of dumb-pipe backup ping (Pushover-class critical alert vs ntfy).
