@@ -307,8 +307,13 @@ const LIVE = !!(DATA.meta && DATA.meta.source === "live");
 let liveFollow = true;   // auto-advance to the newest bar as it lands
 const $ = id => document.getElementById(id);
 function refreshMeta() {
-  const contracts = DATA.meta.contracts != null ? DATA.meta.contracts
-                                                : bars.reduce((a, b) => a + b.v, 0);
+  // Truthy, not `!= null` [st-6vi0]: a live payload seeds contracts as 0 at
+  // boot because the session has not happened, and `0 != null` is true — so
+  // the literal 0 won for the whole session and the bars-sum fallback, which
+  // exists FOR the live case, never ran. The header read "0 contracts" beside
+  // 511 bars carrying a million. A genuinely empty page sums to 0 anyway, so
+  // there is no total this loses.
+  const contracts = DATA.meta.contracts || bars.reduce((a, b) => a + b.v, 0);
   $("meta").textContent = `${DATA.meta.symbol} · ${DATA.meta.date} · `
     + `N=${DATA.meta.bar_n} contracts/bar · ${bars.length} bars · `
     + `${contracts.toLocaleString()} contracts` + (LIVE ? " · LIVE" : "");

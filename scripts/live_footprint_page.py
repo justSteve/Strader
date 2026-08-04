@@ -56,7 +56,11 @@ def live_payload(day: _date, bar_n: int, mancini: list[float]) -> dict:
             "bar_n": bar_n,
             "tick": TICK,
             "n_bars": 0,
-            "contracts": 0,
+            # None, not 0 [st-6vi0]: a live page cannot know the session's
+            # contract count at boot, and stating 0 is not "unknown" — it is a
+            # wrong number the header then displayed all session. None lets the
+            # template count the bars it actually holds.
+            "contracts": None,
             "source": "live",
             "candles_file": "",
         },
