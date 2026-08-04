@@ -67,6 +67,9 @@ def live_payload(day: _date, bar_n: int, mancini: list[float]) -> dict:
         "bars": [],
         "mancini_candidates": mancini,
         "anatomy": {"instances": []},
+        # End-of-session emissions [st-b0n9]: empty until the feeder posts them
+        # at stream end, then delivered on every /bars poll.
+        "final": [],
     }
 
 

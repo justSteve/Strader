@@ -172,9 +172,125 @@ def test_compacted_day_is_read_and_not_followed(tmp_path):
 
 def test_bar_payload_shape_matches_the_drill_column(tmp_path):
     live = _run_feeder(_write_day(tmp_path, _synthetic_rows()), 200)
+    # Key-for-key the drill column, "ev" included [st-b0n9]: the emissions
+    # panel reads the same field on both surfaces, so a rep drilled on a replay
+    # reads the identical thing live. Drifting these apart is the whole failure
+    # this assertion exists to catch.
     assert set(live[0]) == {
         "t0", "t1", "o", "h", "l", "c", "v", "d", "nv", "dur", "poc",
-        "cells", "steps",
+        "cells", "steps", "ev",
     }
     assert len(live[0]["steps"]) == 8          # FILL_STEPS
     assert all(len(c) == 3 for c in live[0]["cells"])
+    assert isinstance(live[0]["ev"], list)
+
+
+# --- emissions parity [st-b0n9] --------------------------------------------
+# The live surface now carries what the stack emitted, not just bars. The bar
+# parity above is only half the guarantee: if the live drive and the batch
+# pipeline can disagree about WHAT FIRED, the panel Steve reads mid-session
+# stops matching the record he reviews after the close.
+
+def _even_rows(n=600, size=5):
+    """Constant-size rows so the tape divides exactly into bars — no trailing
+    partial bar, which is the one place live and batch differ by design."""
+    rows, price = [], 7500.0
+    for i in range(n):
+        price += (0.25 if i % 3 else -0.25)
+        rows.append(_row(i, round(price, 2), size,
+                         "B" if i % 2 else ("A" if i % 5 else "N")))
+    return rows
+
+
+def _anchors():
+    from market.orderflow.recognizer import Anchor
+    return [Anchor(7500.0, "support", "test-support"),
+            Anchor(7520.0, "resistance", "test-resistance")]
+
+
+def test_live_drive_emits_exactly_what_the_batch_pipeline_emits(tmp_path):
+    """StackDriver fed bar-by-bar (the live path) == full_stack_events over the
+    same tape (the batch path the replay recorder runs)."""
+    from market.orderflow.parity import StackDriver, full_stack_events
+
+    rows = _even_rows(600, size=5)          # 3000 contracts
+    bar_n = 100                             # -> 30 exact bars, no partial
+    path = _write_day(tmp_path, rows)
+    trades = read_corpus_day(path)
+    assert sum(t.size for t in trades) % bar_n == 0, "tape must divide evenly"
+
+    batch = full_stack_events(trades, bar_n=bar_n, anchors=_anchors())
+
+    driver = StackDriver(anchors=_anchors())
+    live: list = []
+    buf: list = []
+
+    def tee(it):
+        for t in it:
+            buf.append(t)
+            yield t
+
+    for bar_i, bar in enumerate(build_bars(tee(iter(trades)), n=bar_n)):
+        live += driver.on_bar(bar_i, bar, feed.take_bar_trades(bar, buf))
+    live += driver.finish(buf)
+
+    assert live == batch
+    assert any(e["bar_i"] is not None for e in live), "tape emitted nothing on bars"
+
+
+def test_feeder_attaches_emissions_to_the_bar_that_produced_them(tmp_path):
+    """`ev` rides ON the bar, and every event in it is stamped with that bar."""
+    from market.orderflow.parity import StackDriver
+
+    rows = _even_rows(600, size=5)
+    bar_n = 100
+    path = _write_day(tmp_path, rows)
+    driver = StackDriver(anchors=_anchors())
+    trades = read_corpus_day(path)
+    buf: list = []
+
+    def tee(it):
+        for t in it:
+            buf.append(t)
+            yield t
+
+    payloads = []
+    for bar_i, bar in enumerate(build_bars(tee(iter(trades)), n=bar_n)):
+        bt = feed.take_bar_trades(bar, buf)
+        payloads.append(feed.bar_payload(bar, bt, driver.on_bar(bar_i, bar, bt)))
+
+    for i, p in enumerate(payloads):
+        for e in p["ev"]:
+            assert e["bar_i"] == i, f"bar {i} carries an event stamped {e['bar_i']}"
+    assert sum(len(p["ev"]) for p in payloads) > 0
+
+
+def test_end_of_stream_emissions_belong_to_no_bar(tmp_path):
+    """finish() carries flush + profile levels, all bar_i=None — the `final`
+    channel exists because these cannot be attached to a column."""
+    from market.orderflow.parity import StackDriver
+
+    trades = read_corpus_day(_write_day(tmp_path, _even_rows(600, size=5)))
+    driver = StackDriver(anchors=_anchors())
+    buf: list = []
+
+    def tee(it):
+        for t in it:
+            buf.append(t)
+            yield t
+
+    for bar_i, bar in enumerate(build_bars(tee(iter(trades)), n=100)):
+        driver.on_bar(bar_i, bar, feed.take_bar_trades(bar, buf))
+    final = driver.finish(buf)
+
+    assert final, "a real tape must yield profile levels at least"
+    assert all(e["bar_i"] is None for e in final)
+    assert any(e["type"] == "Level" for e in final)
+
+
+def test_driver_finish_on_an_empty_stream_does_not_raise():
+    """A live page can boot, connect, and see no trade at all (pre-open, or a
+    dead tape). build_profile raises on zero trades; finish() must not."""
+    from market.orderflow.parity import StackDriver
+
+    assert StackDriver(anchors=_anchors()).finish([]) == []

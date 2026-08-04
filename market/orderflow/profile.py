@@ -35,6 +35,52 @@ logger = logging.getLogger(__name__)
 _BUCKET = PROFILE_BUCKET_TICKS * TICK
 
 
+class ProfileAccumulator:
+    """Streaming form of ``build_profile`` — the histogram without the trade list.
+
+    A live session cannot hand the profile a completed window: it has one trade
+    at a time and no end. Holding every trade to rebuild at the close costs
+    hundreds of MB over a full ES day for a result that is a few thousand
+    buckets, so the live stack folds each trade in as it passes and materialises
+    the ``VolumeProfile`` on demand.
+
+    ``build_profile`` delegates here, so batch and live share ONE histogram.
+    Reimplementing this loop in the live path is the divergence the spec §5
+    parity guarantee exists to prevent. [st-b0n9]
+    """
+
+    __slots__ = ("bucket", "_vols", "_symbol", "_first_ts", "_last_ts", "n")
+
+    def __init__(self, bucket_ticks: int = PROFILE_BUCKET_TICKS):
+        self.bucket = bucket_ticks * TICK
+        self._vols: dict[int, int] = {}
+        self._symbol: str | None = None
+        self._first_ts: datetime | None = None
+        self._last_ts: datetime | None = None
+        self.n = 0
+
+    def add(self, trade: Trade) -> None:
+        k = int(trade.price // self.bucket)
+        self._vols[k] = self._vols.get(k, 0) + trade.size
+        if self.n == 0:
+            self._symbol, self._first_ts = trade.symbol, trade.ts
+        self._last_ts = trade.ts
+        self.n += 1
+
+    def build(self) -> VolumeProfile:
+        if not self.n:
+            raise ValueError("cannot build a profile from zero trades")
+        lo, hi = min(self._vols), max(self._vols)
+        keys = range(lo, hi + 1)
+        return VolumeProfile(
+            symbol=self._symbol,
+            start_ts=self._first_ts, end_ts=self._last_ts,
+            bucket_pts=self.bucket,
+            prices=tuple(round(k * self.bucket, 2) for k in keys),
+            volumes=tuple(self._vols.get(k, 0) for k in keys),
+        )
+
+
 def build_profile(trades: Iterable[Trade], bucket_ticks: int = PROFILE_BUCKET_TICKS) -> VolumeProfile:
     """Histogram a completed window's trades into price buckets.
 
@@ -42,23 +88,10 @@ def build_profile(trades: Iterable[Trade], bucket_ticks: int = PROFILE_BUCKET_TI
     7541.00 covers [7541.00, 7542.00). The bucket range is made contiguous
     (zero-volume buckets included) so local-extremum tests are well-defined.
     """
-    trades = list(trades)
-    if not trades:
-        raise ValueError("cannot build a profile from zero trades")
-    bucket = bucket_ticks * TICK
-    vols: dict[int, int] = {}
+    acc = ProfileAccumulator(bucket_ticks)
     for t in trades:
-        k = int(t.price // bucket)
-        vols[k] = vols.get(k, 0) + t.size
-    lo, hi = min(vols), max(vols)
-    keys = range(lo, hi + 1)
-    return VolumeProfile(
-        symbol=trades[0].symbol,
-        start_ts=trades[0].ts, end_ts=trades[-1].ts,
-        bucket_pts=bucket,
-        prices=tuple(round(k * bucket, 2) for k in keys),
-        volumes=tuple(vols.get(k, 0) for k in keys),
-    )
+        acc.add(t)
+    return acc.build()
 
 
 def _local_extrema(vols: tuple[int, ...]) -> tuple[list[int], list[int]]:

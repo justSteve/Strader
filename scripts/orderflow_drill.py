@@ -36,6 +36,7 @@ from market.orderflow.replay import read_corpus_day   # noqa: E402
 from market.orderflow.recognizer import SetupRecognizer  # noqa: E402
 from market.orderflow.anatomy import anatomy_payload, build_instances  # noqa: E402
 from market.orderflow.anchors import day_anchors, mancini_levels_for  # noqa: E402
+from market.orderflow.parity import full_stack_events  # noqa: E402
 from market.signals.orderflow_config import TICK, VOLUME_BAR_N  # noqa: E402
 
 logger = logging.getLogger("orderflow_drill")
@@ -128,6 +129,7 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
             "poc": b.poc_price,
             "cells": [[c.price, c.bid_vol, c.ask_vol] for c in b.cells],
             "steps": steps,
+            "ev": [],
         })
 
     # level chips the drill offers out of the box (session-derived; the UI
@@ -142,6 +144,26 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
     }
     mancini = mancini_levels if mancini_levels is not None else mancini_levels_for(day)
     anatomy = build_anatomy(bars, suggested, mancini)
+
+    # Emissions per bar [st-b0n9] — the same panel the live surface carries, so
+    # a rep drilled on a replay reads the identical thing live. Same anchor rule
+    # as build_anatomy, so the two cannot disagree about what fired. (Known
+    # waste: the recognizer runs twice over the day, once here and once inside
+    # build_anatomy, because build_instances consumes SetupRecognition objects
+    # rather than serialized events. Deterministic either way — same anchors,
+    # same input, same result.)
+    final: list[dict] = []
+    events = full_stack_events(trades, bar_n=bar_n,
+                               anchors=day_anchors(mancini, suggested["session_high"],
+                                                   suggested["session_low"]),
+                               mancini_prices=mancini)
+    for e in events:
+        i = e.get("bar_i")
+        if i is None:
+            final.append(e)
+        elif 0 <= i < len(out_bars):
+            out_bars[i]["ev"].append(e)
+    logger.info("emissions: %d on bars, %d end-of-stream", len(events) - len(final), len(final))
     return {
         "meta": {
             "symbol": bars[0].symbol or "ES.c.0",
@@ -157,6 +179,7 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
         "bars": out_bars,
         "mancini_candidates": mancini,
         "anatomy": anatomy,
+        "final": final,
         "scenarios": scenario_deck_for(day, bar_n),
     }
 

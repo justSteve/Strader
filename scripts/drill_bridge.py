@@ -13,8 +13,8 @@ Endpoints (all JSON; POST bodies are sent as text/plain so file:// pages make
   GET  /state/tail?n=50            -> last n logged events (coach convenience)
   POST /coach                      <- {type: say|arm|jump|pause|play, ...}
   GET  /commands?since=<id>        -> {commands: [...], last: <id>} (drill poll)
-  POST /bars                       <- {bars: [...], meta: {...}} from the feeder
-  GET  /bars?since=<n>             -> {bars: [...], total, meta} (live footprint)
+  POST /bars                       <- {bars: [...], meta: {...}, final: [...]} from the feeder
+  GET  /bars?since=<n>             -> {bars: [...], total, meta, final} (live footprint)
 
 The bar channel [st-re1o] carries a LIVE session into the same surface the
 replay drills use. ``since`` is a count, not an id: a page asks for everything
@@ -64,6 +64,7 @@ class BridgeState:
         # which is what makes the session transcript show live cadence.
         self._bars: list[dict] = []
         self._bar_meta: dict = {}
+        self._final: list[dict] = []   # end-of-stream emissions [st-b0n9]
         self._events = 0
         self.started = datetime.now(timezone.utc).isoformat(timespec="seconds")
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -93,33 +94,44 @@ class BridgeState:
             self._append({"channel": "coach", **cmd})
             return cmd
 
-    def add_bars(self, bars: list[dict], meta: dict | None = None) -> int:
+    def add_bars(self, bars: list[dict], meta: dict | None = None,
+                 final: list[dict] | None = None) -> int:
         """Append closed footprint bars from the live feeder. [st-re1o]
 
         Returns the new total. ``meta`` (bar size, tick, anchors, session day)
         is replaced wholesale when supplied, so a page that connects mid-session
         gets the setup along with the backlog rather than having to infer it.
+
+        ``final`` is the end-of-stream emission block — engine flush signals and
+        the session's profile levels, which belong to no bar [st-b0n9]. Held
+        like meta (replaced, not appended) and served on every /bars response,
+        so a page that connects after the close still gets it.
         """
         if not isinstance(bars, list):
             raise ValueError("bars must be a list")
+        if final is not None and not isinstance(final, list):
+            raise ValueError("final must be a list")
         with self._lock:
             if meta:
                 self._bar_meta = meta
+            if final:
+                self._final = final
             for b in bars:
                 if not isinstance(b, dict):
                     raise ValueError("each bar must be an object")
                 self._bars.append({**b, "i": len(self._bars)})
             total = len(self._bars)
-            if bars:
+            if bars or final:
                 self._append({"channel": "bars", "kind": "bar_push",
-                              "n": len(bars), "total": total})
+                              "n": len(bars), "total": total,
+                              "final": len(final or [])})
             return total
 
     def bars_since(self, n: int) -> dict:
         with self._lock:
             start = max(0, min(n, len(self._bars)))
             return {"bars": self._bars[start:], "total": len(self._bars),
-                    "meta": self._bar_meta}
+                    "meta": self._bar_meta, "final": self._final}
 
     def commands_since(self, last_id: int) -> list[dict]:
         with self._lock:
@@ -207,7 +219,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(200, {"ok": True})
             elif url.path == "/bars":
                 total = STATE.add_bars(payload.get("bars") or [],
-                                       payload.get("meta"))
+                                       payload.get("meta"),
+                                       payload.get("final"))
                 self._send(200, {"ok": True, "total": total})
             elif url.path == "/coach":
                 cmd = STATE.add_coach(payload)

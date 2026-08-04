@@ -41,7 +41,7 @@ from market.orderflow.absorption import AbsorptionTracker
 from market.orderflow.bars import build_bars
 from market.orderflow.engine import OrderflowEngine
 from market.orderflow.imbalance import find_stacks
-from market.orderflow.profile import build_profile, profile_levels
+from market.orderflow.profile import ProfileAccumulator, profile_levels
 from market.orderflow.recognizer import Anchor, SetupRecognizer
 from market.signals.types import Signal
 
@@ -95,47 +95,104 @@ def serialize(sig: Signal) -> dict:
     return out
 
 
+class StackDriver:
+    """The canonical pipeline as an INCREMENTAL drive — one bar at a time.
+
+    ``full_stack_events`` is a batch pass over a finished day; a live session
+    has no finished day to pass. Rather than let the live feeder grow a second
+    drive loop — the exact divergence the spec §5 parity guarantee exists to
+    prevent — the loop lives here and ``full_stack_events`` is a thin caller of
+    it. Whatever the live surface shows, the replay record therefore recomputes
+    identically. [st-b0n9]
+
+    Contract: feed COMPLETED bars in order together with the trade slice that
+    built each one, then call ``finish``. The per-bar emission order and the
+    end-of-stream order are the module docstring's ordering rules.
+
+    ONE KNOWN LIVE/RECORD DIVERGENCE, by construction: ``full_stack_events``
+    builds bars with ``include_partial=True``, so a day's trailing under-N bar
+    is a real bar whose stacks and recognitions carry its ``bar_i``. The live
+    feeder renders closed bars only, so those same trades reach ``finish`` as
+    trailing trades and produce engine signals with ``bar_i=None`` and no
+    stacks or recognitions. Only the final partial bar of a session is
+    affected; every closed bar agrees exactly.
+    """
+
+    def __init__(self, *, anchors: Iterable[Anchor],
+                 mancini_prices: Iterable[float] = ()):
+        self.engine = OrderflowEngine()
+        self.recognizer = SetupRecognizer(list(anchors),
+                                          mancini_prices=list(mancini_prices))
+        self._profile = ProfileAccumulator()
+        self._last_price: float | None = None
+
+    def _observe(self, t: Trade) -> None:
+        self._profile.add(t)
+        self._last_price = t.price
+
+    def on_bar(self, bar_i: int, bar, trades: Iterable[Trade]) -> list[dict]:
+        """Emissions for one completed bar: engine signals raised while its
+        trades were processed, then its imbalance stacks, then its recognizer
+        events. ``trades`` is the bar's own slice in stream order."""
+        out: list[dict] = []
+        for t in trades:
+            for s in self.engine.process(t):
+                out.append(serialize(s) | {"bar_i": bar_i})
+            self._observe(t)
+        for stack in find_stacks(bar):
+            out.append(serialize(stack) | {"bar_i": bar_i})
+        for rec in self.recognizer.on_bar(bar):
+            out.append(serialize(rec) | {"bar_i": bar_i})
+        return out
+
+    def finish(self, trailing_trades: Iterable[Trade] = ()) -> list[dict]:
+        """End-of-stream emissions: any trades past the last completed bar,
+        then engine ``flush()``, then the session's profile levels. All carry
+        ``bar_i=None``. Safe on an empty stream — a live page that never saw a
+        trade gets an empty list, not a raised profile."""
+        out: list[dict] = []
+        for t in trailing_trades:
+            for s in self.engine.process(t):
+                out.append(serialize(s) | {"bar_i": None})
+            self._observe(t)
+        for s in self.engine.flush():
+            out.append(serialize(s) | {"bar_i": None})
+        if self._profile.n:
+            prof = self._profile.build()
+            for lv in profile_levels(prof, reference_price=self._last_price):
+                out.append(serialize(lv) | {"bar_i": None})
+        return out
+
+
 def full_stack_events(trades: list[Trade], *, bar_n: int,
                       anchors: Iterable[Anchor],
                       mancini_prices: Iterable[float] = ()) -> list[dict]:
     """One deterministic pass of the full stack at CURRENT module thresholds.
 
-    The canonical drive loop (ordering rules in the module docstring), shared
+    The canonical batch run (ordering rules in the module docstring), shared
     by the parity harness (fixture floors via ``_overridden``) and the replay
     recorder (production floors, st-055). Every event dict carries ``bar_i``
     — the index of the completed bar it was emitted under, ``None`` for
     end-of-stream flush signals and profile levels.
+
+    The drive itself is ``StackDriver``; this function only slices trades to
+    bars. The live feeder drives the same object one bar at a time.
     """
+    driver = StackDriver(anchors=anchors, mancini_prices=mancini_prices)
     events: list[dict] = []
-    engine = OrderflowEngine()
-    recognizer = SetupRecognizer(list(anchors), mancini_prices=list(mancini_prices))
 
     idx = 0
-    # Drive engine per-trade and bar-consumers per-bar in one pass: bars close
-    # on known trade boundaries, so process trades until each bar's volume is
-    # covered — same faithful drive as the live adapter would produce.
+    # Bars close on known trade boundaries, so walk trades until each bar's
+    # volume is covered — the slice a live adapter reclaims per bar is the
+    # same slice, by the same straddle convention.
     for bar_i, bar in enumerate(build_bars(iter(trades), n=bar_n, include_partial=True)):
         vol = 0
+        start = idx
         while idx < len(trades) and vol < bar.volume:
-            t = trades[idx]
-            for s in engine.process(t):
-                events.append(serialize(s) | {"bar_i": bar_i})
-            vol += t.size
+            vol += trades[idx].size
             idx += 1
-        for stack in find_stacks(bar):
-            events.append(serialize(stack) | {"bar_i": bar_i})
-        for rec in recognizer.on_bar(bar):
-            events.append(serialize(rec) | {"bar_i": bar_i})
-    while idx < len(trades):
-        for s in engine.process(trades[idx]):
-            events.append(serialize(s) | {"bar_i": None})
-        idx += 1
-    for s in engine.flush():
-        events.append(serialize(s) | {"bar_i": None})
-
-    prof = build_profile(trades)
-    for lv in profile_levels(prof, reference_price=trades[-1].price):
-        events.append(serialize(lv) | {"bar_i": None})
+        events += driver.on_bar(bar_i, bar, trades[start:idx])
+    events += driver.finish(trades[idx:])
     return events
 
 

@@ -115,6 +115,48 @@ td:first-child, th:first-child { text-align:left; }
 .beat-pill.done { color:var(--ink); border-color:var(--buy); }
 .beat-pill.current { color:var(--ink); border-color:var(--buy);
   background:color-mix(in srgb, var(--buy) 14%, var(--surface-1)); }
+/* emissions: what the stack said about this bar (st-b0n9) */
+.controls { position:relative; }          /* the panel anchors over this strip */
+#emrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+  padding:2px 16px 6px; font-size:12px; color:var(--ink-2);
+  font-variant-numeric:tabular-nums; }
+#emrow .em-lbl { color:var(--muted); letter-spacing:.03em; text-transform:uppercase;
+  font-size:10px; font-weight:600; }
+#emrow .em-none { color:var(--muted); font-style:italic; }
+.em-chip { display:inline-flex; gap:6px; align-items:center; cursor:default;
+  padding:2px 9px; border:1px solid var(--axis); border-radius:12px;
+  background:var(--surface-1); color:var(--ink); white-space:nowrap; }
+.em-chip .em-k { font-size:10px; text-transform:uppercase; letter-spacing:.04em;
+  font-weight:600; color:var(--ink-2); }
+.em-chip.buy  { border-color:var(--buy); }
+.em-chip.sell { border-color:var(--sell); }
+.em-chip.confirmed { border-color:var(--good); }
+.em-chip.invalidated { border-color:var(--muted); color:var(--muted); }
+.em-chip.more { border-style:dashed; color:var(--ink-2); }
+/* The panel sits OVER the control strip rather than pushing the chart down:
+   emissions are a glance, and a layout that reflows every time one lands makes
+   the tape jump under Steve's eye mid-read. */
+#empanel { display:none; position:absolute; inset:0 auto auto 0; z-index:40;
+  min-width:min(760px, calc(100vw - 32px)); max-width:calc(100vw - 32px);
+  max-height:340px; overflow:auto; margin:0 16px;
+  background:var(--surface-1); border:1px solid var(--axis); border-radius:8px;
+  box-shadow:0 6px 22px var(--ring); padding:8px 12px 10px; font-size:12px; }
+#empanel h4 { margin:0 0 6px; font-size:12px; color:var(--ink-2); font-weight:600;
+  display:flex; gap:10px; align-items:baseline; }
+#empanel h4 .x { margin-left:auto; cursor:pointer; color:var(--muted); }
+#empanel table { font-size:12px; }
+#empanel td, #empanel th { padding:3px 8px; }
+#empanel .why { color:var(--ink-2); text-align:left; }
+#empanel .em-empty { color:var(--muted); font-style:italic; padding:6px 2px; }
+#empanel .em-final { margin-top:8px; border-top:1px solid var(--grid); padding-top:6px; }
+/* A bar that emitted is marked ON the tape. Without this the only way to find
+   the handful of bars in a session that said anything is to step through all
+   600 of them watching the row — which is not a glance, it is a search. */
+.col .evmark { position:absolute; top:2px; left:50%; transform:translateX(-50%);
+  width:0; height:0; z-index:5; cursor:pointer;
+  border-left:4px solid transparent; border-right:4px solid transparent;
+  border-top:6px solid var(--ink-2); }
+.col .evmark.setup { border-top-color:var(--good); }
 </style></head><body>
 <header>
   <h1>Orderflow Drill</h1>
@@ -151,6 +193,7 @@ td:first-child, th:first-child { text-align:left; }
   <button id="tbl">Table view</button>
   <button id="anat" title="Walk the recognizer's four-stage setups on this day">Anatomy</button>
   <button id="helpbtn" title="What am I looking at?">?</button>
+  <div id="empanel"></div>
 </div>
 <div class="readouts">
   <span>Bar <b id="ro-bar">0</b></span>
@@ -161,6 +204,7 @@ td:first-child, th:first-child { text-align:left; }
   <span>Bar took <b id="ro-dur">–</b></span>
   <span>Score <b id="ro-score">0/0</b></span>
 </div>
+<div id="emrow"></div>
 <div id="visits"></div>
 <div id="scendeck"></div>
 <div id="anatomy"></div>
@@ -431,6 +475,17 @@ function renderColumn(b, i) {
   foot.appendChild(fill); foot.appendChild(txt);
   foot.title = `bar ${i} · closed ${fmtClock(b.t1)} CT: Δ ${b.d >= 0 ? "+" : ""}${b.d} · vol ${b.v} (none ${b.nv}) · ${b.dur}s`;
   col.appendChild(foot);
+  // Marks the bars that said something [st-b0n9]. The emissions row reads the
+  // CURRENT bar, which answers "what fired here" but not "where did anything
+  // fire" — and most bars are quiet, so without a mark on the tape the only
+  // way to find the handful that spoke is to step through the whole session.
+  if (b.ev && b.ev.length) {
+    const m = document.createElement("div");
+    m.className = "evmark" + (b.ev.some(e => e.type === "SetupRecognition") ? " setup" : "");
+    m.title = b.ev.map(e => `${emName(e)}: ${emGist(e)}`).join("\n");
+    m.onclick = () => { seekTo(i); emPinned = true; openEmPanel(i); };
+    col.appendChild(m);
+  }
   return col;
 }
 function repaintAll() {
@@ -465,6 +520,9 @@ function repaintReadouts() {
   const judged = drillLog.filter(e => e.verdict === "correct" || e.verdict === "wrong");
   $("ro-score").textContent = `${judged.filter(e => e.verdict === "correct").length}/${judged.length}`;
   $("seek").value = Math.max(idx, 0);
+  // The one choke point every render path already goes through — step,
+  // progressive fill, seek and the live poller all land here. [st-b0n9]
+  if (typeof renderEmissions === "function") renderEmissions();
 }
 function appendBarRow(b, i) {
   const tr = document.createElement("tr");
@@ -635,6 +693,148 @@ let anatomyPtr = 0;         // beats narrated so far
 const SETUP_LABEL = { failed_breakdown:"Failed Breakdown", level_reclaim:"Level Reclaim",
                       range_trap:"Range Trap", return_to_lvn:"Return to LVN" };
 const setupName = s => SETUP_LABEL[s] || s;
+
+// ── emissions: what the stack said about this bar (st-b0n9) ──────────────
+// Every bar carries `ev` — the engine signals, imbalance stacks and setup
+// recognitions the pipeline emitted while that bar was building, in the
+// canonical order (market/orderflow/parity.py). Live and replay fill the same
+// field from the same driver, so what Steve reads here mid-session is what a
+// replay of the tape recomputes afterward. `DATA.final` / the bridge's `final`
+// holds the end-of-session block: engine flush plus the day's profile levels,
+// which belong to no single bar.
+let FINAL = DATA.final || [];
+let emPinned = false;
+
+const EM_LABEL = {
+  SweepPrint: "Sweep", ImbalanceStack: "Stack", SetupRecognition: "Setup",
+  DeltaDivergence: "Divergence", AbsorptionRead: "Absorption", Level: "Level",
+};
+const emName = e => EM_LABEL[e.type] || e.type;
+
+// Buy/sell polarity drives the chip's border color; a recognition wears its
+// state instead, because "confirmed" is the thing the eye should catch.
+function emTone(e) {
+  if (e.type === "SetupRecognition") return e.state === "forming" ? (e.bias === "bullish" ? "buy" : "sell") : e.state;
+  if (e.direction) return e.direction === "buy" ? "buy" : "sell";
+  if (e.kind === "bullish") return "buy";
+  if (e.kind === "bearish") return "sell";
+  if (e.side) return e.side === "bid" ? "buy" : "sell";
+  return "";
+}
+
+// One-glance summary. Terms are spelled out — no bare stage codes — because
+// this row is read at speed mid-session.
+//
+// EVERY field access here goes through a guard. A blank-page post-mortem
+// (ea77d7a) traced three live-only boot crashes to fields a replay always
+// populates and a live payload does not; an unguarded `p.toFixed()` on the
+// first undefined price killed the whole boot script. Emissions are exactly
+// that shape of data — sparse, optional, and absent for most of a session — so
+// a malformed or partial event must degrade to text, never throw.
+const emP = p => (typeof p === "number" && isFinite(p)) ? fmtPrice(p) : "?";
+const emN = n => (typeof n === "number" && isFinite(n)) ? n : "?";
+function emGist(e) {
+  switch (e.type) {
+    case "SweepPrint":
+      return `${e.direction || "?"} ${emN(e.total_size)} through ${emN(e.ticks_swept)} ticks, `
+        + `${emP(e.start_price)}→${emP(e.end_price)}`;
+    case "ImbalanceStack": {
+      const px = (e.prices || []).filter(p => typeof p === "number" && isFinite(p));
+      const span = px.length ? `, ${emP(Math.min(...px))}–${emP(Math.max(...px))}` : "";
+      return `${e.direction || "?"} ${px.length} level${px.length === 1 ? "" : "s"}${span}`;
+    }
+    case "SetupRecognition": {
+      const stages = (e.beats || []).join(" → ") || "none";
+      return `${setupName(e.setup)} @ ${emP(e.anchor_price)} — ${e.state || "?"}`
+        + ` · stages: ${stages}` + (e.mancini_confluence ? " · Mancini level" : "")
+        + (e.fire_index > 1 ? ` · fire #${e.fire_index}` : "");
+    }
+    case "DeltaDivergence":
+      return `${e.kind || "?"} — price ${emP(e.price_extreme)} past ${emP(e.prior_extreme)}, `
+        + `delta ${emN(e.cvd_at_extreme)} vs ${emN(e.cvd_at_prior)}`;
+    case "AbsorptionRead":
+      return `${e.side || "?"} defended @ ${emP(e.price)} — ${emN(e.aggressive_vol)} absorbed, `
+        + `${e.displacement_ticks >= 0 ? "+" : ""}${emN(e.displacement_ticks)} ticks`;
+    case "Level":
+      return `${e.level_type || "level"} @ ${emP(e.price)}`;
+    default:
+      return e.reason || "";
+  }
+}
+
+function emChip(e, onOpen) {
+  const c = document.createElement("span");
+  c.className = "em-chip " + emTone(e);
+  c.innerHTML = `<span class="em-k">${emName(e)}</span>`;
+  c.append(emGist(e));
+  c.title = e.reason || "";
+  c.addEventListener("mouseenter", onOpen);
+  return c;
+}
+
+// The header row: always present, never reflows the chart. It shows the
+// current bar's emissions inline and is the rollover surface for the panel.
+function renderEmissions() {
+  const row = $("emrow"); if (!row) return;
+  row.innerHTML = "";
+  const b = bars[idx];
+  const ev = (b && b.ev) || [];
+  const lbl = document.createElement("span");
+  lbl.className = "em-lbl";
+  lbl.textContent = "emitted";
+  row.appendChild(lbl);
+  if (!ev.length) {
+    const none = document.createElement("span");
+    none.className = "em-none";
+    none.textContent = b ? "nothing on this bar" : "waiting for the first bar";
+    row.appendChild(none);
+    if (!emPinned) closeEmPanel();
+    return;
+  }
+  const open = () => openEmPanel(idx);
+  for (const e of ev.slice(0, 3)) row.appendChild(emChip(e, open));
+  if (ev.length > 3) {
+    const more = document.createElement("span");
+    more.className = "em-chip more";
+    more.textContent = `+${ev.length - 3} more`;
+    more.addEventListener("mouseenter", open);
+    row.appendChild(more);
+  }
+  if (emPinned) openEmPanel(idx);
+}
+
+function emTable(ev) {
+  if (!ev.length) return `<div class="em-empty">Nothing emitted on this bar.</div>`;
+  const rows = ev.map(e =>
+    `<tr><td style="text-align:left">${emName(e)}</td>`
+    + `<td class="why">${emGist(e)}</td>`
+    + `<td>${e.confidence != null ? (+e.confidence).toFixed(2) : "—"}</td>`
+    + `<td class="why">${e.reason || ""}</td></tr>`).join("");
+  return `<table><thead><tr><th style="text-align:left">What</th>`
+    + `<th style="text-align:left">Read</th><th>Conf</th>`
+    + `<th style="text-align:left">Why the stack said it</th></tr></thead>`
+    + `<tbody>${rows}</tbody></table>`;
+}
+
+function openEmPanel(i) {
+  const p = $("empanel"); if (!p) return;
+  const b = bars[i];
+  const ev = (b && b.ev) || [];
+  let html = `<h4>Bar ${i + 1}${b ? " · " + fmtClock(b.t1) + " CT" : ""} · `
+    + `${ev.length} emission${ev.length === 1 ? "" : "s"}`
+    + `<span class="x" title="${emPinned ? "unpin" : "close"}">×</span></h4>`
+    + emTable(ev);
+  if (FINAL.length) {
+    html += `<div class="em-final"><h4>End of session · ${FINAL.length}</h4>`
+      + emTable(FINAL) + `</div>`;
+  }
+  p.innerHTML = html;
+  p.style.display = "block";
+  p.querySelector(".x").onclick = () => { emPinned = false; closeEmPanel(); };
+}
+function closeEmPanel() {
+  const p = $("empanel"); if (p && !emPinned) p.style.display = "none";
+}
 
 function renderAnatomyList() {
   const wrap = $("anatomy"); wrap.innerHTML = "";
@@ -1078,6 +1278,10 @@ async function pollBars() {
       DATA.meta.bar_n = d.meta.bar_n;
       if (d.meta.day) DATA.meta.date = d.meta.day;
     }
+    // End-of-session emissions (engine flush + the day's profile levels).
+    // Served on every response, so a page opened after the close still gets
+    // them; they belong to no bar, so they live beside the array. [st-b0n9]
+    if (d.final && d.final.length !== FINAL.length) { FINAL = d.final; renderEmissions(); }
     const fresh = d.bars || [];
     if (fresh.length) {
       const wasAtTip = idx >= bars.length - 1;
@@ -1131,6 +1335,16 @@ judgePending = function () {
 document.querySelectorAll("#panel button").forEach(btn => {
   const prev = btn.onclick;
   btn.onclick = () => { sendState("call", { call: btn.dataset.call, level }); prev(); };
+});
+
+// Emissions rollover [st-b0n9]: hovering a chip opens the panel over the
+// control strip, leaving the pair closes it, clicking pins it open so the
+// detail survives while the tape keeps advancing.
+$("emrow").addEventListener("mouseleave", () => setTimeout(closeEmPanel, 120));
+$("empanel").addEventListener("mouseleave", closeEmPanel);
+$("emrow").addEventListener("click", () => {
+  emPinned = !emPinned;
+  if (emPinned) openEmPanel(idx); else closeEmPanel();
 });
 
 // boot: show the first bar, paused

@@ -34,7 +34,7 @@ practice, and is validated empirically, not experientially.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Iterable, Literal
 
 from market.entities.footprint import FootprintBar
@@ -140,6 +140,45 @@ class SetupRecognizer:
                 self._blocked[key] = eng.direction
         self._prev_close = bar.close
         return out
+
+    def is_idle(self, anchor: Anchor) -> bool:
+        """True when ``anchor`` has no engagement forming and is not blocked.
+
+        Anchors carry their state in ``_active``/``_blocked`` keyed on ``id``,
+        so an idle anchor is one with no state to lose. [st-b0n9]
+        """
+        key = id(anchor)
+        return key not in self._active and key not in self._blocked
+
+    def retarget(self, anchor: Anchor, price: float) -> Anchor | None:
+        """Move an IDLE anchor to a new price; return the replacement, or None.
+
+        A live session's range edges develop with the tape, so the recognizer
+        has to be able to move a level it is watching (see
+        market.orderflow.anchors.LiveAnchors). ``Anchor`` is frozen, so the
+        move is a swap, not a mutation — and because engagement state is keyed
+        on ``id(anchor)``, a swap of an ENGAGED anchor would silently orphan
+        that state. Hence the guard lives here, with the state, rather than in
+        the caller: an engaged or blocked anchor refuses to move and the caller
+        gets None.
+        """
+        if not self.is_idle(anchor):
+            return None
+        # Identity, not equality: Anchor has dataclass value semantics, and
+        # index() would happily find a different anchor that merely compares
+        # equal.
+        i = next((k for k, a in enumerate(self.anchors) if a is anchor), None)
+        if i is None:
+            return None
+        new = replace(anchor, price=price)
+        self.anchors[i] = new
+        self._confluent[id(new)] = self._confluent.pop(id(anchor), new.mancini)
+        # Carry the fire history: this is the SAME anchor ("day high") at a new
+        # price, not a new one. Dropping it would quietly re-arm the >= 4th-fire
+        # damping every time the session made a new extreme.
+        if id(anchor) in self._fires:
+            self._fires[id(new)] = self._fires.pop(id(anchor))
+        return new
 
     def run(self, bars: Iterable[FootprintBar]) -> list[SetupRecognition]:
         sigs: list[SetupRecognition] = []

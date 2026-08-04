@@ -74,3 +74,28 @@ def test_double_build_identical():
     b = build_profile(_bimodal())
     assert a == b
     assert profile_levels(a, 7505.0) == profile_levels(b, 7505.0)
+
+
+# --- streaming form [st-b0n9] ----------------------------------------------
+
+def test_accumulator_matches_build_profile_exactly():
+    """The live stack folds trades in one at a time; batch passes a list. One
+    histogram, or the live surface and the replay record disagree about where
+    the session's nodes are."""
+    from market.orderflow.profile import ProfileAccumulator
+
+    trades = _bimodal()
+    acc = ProfileAccumulator()
+    for t in trades:
+        acc.add(t)
+    assert acc.build() == build_profile(trades)
+    assert acc.n == len(trades)
+
+
+def test_accumulator_is_empty_until_fed():
+    from market.orderflow.profile import ProfileAccumulator
+
+    acc = ProfileAccumulator()
+    assert acc.n == 0
+    with pytest.raises(ValueError):
+        acc.build()

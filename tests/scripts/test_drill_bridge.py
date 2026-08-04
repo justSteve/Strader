@@ -59,3 +59,40 @@ def test_tail_bounds(state):
         state.add_state({"kind": "bar", "bar": i})
     assert len(state.tail(5)) == 5
     assert len(state.tail(10_000)) == 31  # capped read, full log smaller
+
+
+# --- end-of-session emissions channel [st-b0n9] ----------------------------
+
+def test_final_emissions_are_served_on_every_bars_response(state):
+    """Flush signals and the day's profile levels belong to no bar. They are
+    held like meta — replaced, not appended — so a page that opens AFTER the
+    close still receives them instead of having missed the one push."""
+    state.add_bars([{"o": 1.0}], {"bar_n": 500})
+    assert state.bars_since(0)["final"] == []
+
+    final = [{"type": "Level", "price": 7541.0, "bar_i": None}]
+    state.add_bars([], None, final)
+    # served regardless of `since` — a late page asks for nothing new and must
+    # still get the block
+    assert state.bars_since(0)["final"] == final
+    assert state.bars_since(99)["final"] == final
+    assert state.bars_since(0)["total"] == 1     # no phantom bar appended
+
+
+def test_final_block_is_replaced_not_accumulated(state):
+    state.add_bars([], None, [{"type": "Level", "price": 1.0}])
+    state.add_bars([], None, [{"type": "Level", "price": 2.0}])
+    assert state.bars_since(0)["final"] == [{"type": "Level", "price": 2.0}]
+
+
+def test_final_must_be_a_list(state):
+    with pytest.raises(ValueError, match="final must be a list"):
+        state.add_bars([], None, {"not": "a list"})
+
+
+def test_bars_carry_their_emissions_through_the_bridge(state):
+    ev = [{"type": "SweepPrint", "bar_i": 0, "direction": "buy"}]
+    state.add_bars([{"o": 1.0, "ev": ev}], {"bar_n": 500})
+    got = state.bars_since(0)["bars"]
+    assert got[0]["ev"] == ev
+    assert got[0]["i"] == 0

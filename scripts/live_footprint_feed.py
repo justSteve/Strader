@@ -54,8 +54,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from market.corpus.paths import central_date, resolve_existing  # noqa: E402
+from market.orderflow.anchors import LiveAnchors, mancini_levels_for  # noqa: E402
 from market.orderflow.bars import build_bars                    # noqa: E402
 from market.orderflow.fill import bar_fill_steps                # noqa: E402
+from market.orderflow.parity import StackDriver                 # noqa: E402
 from market.orderflow.replay import (                           # noqa: E402
     dedup_key, es_day_path, trade_from_row,
 )
@@ -203,12 +205,19 @@ def take_bar_trades(bar, buf: list) -> list:
     return taken
 
 
-def bar_payload(bar, trades: list) -> dict:
+def bar_payload(bar, trades: list, events: list[dict] | None = None) -> dict:
     """Serialise a FootprintBar into the exact column shape the page renders.
 
     Key-for-key identical to orderflow_drill.bars_payload's per-bar dict —
     including ``steps``, so a live column animates the same way a drilled one
     does instead of popping in fully formed.
+
+    ``ev`` carries the stack's emissions for this bar [st-b0n9]. It rides ON
+    the bar rather than a second bridge channel because the page already holds
+    bars in an indexed array and pushes them on close, so attaching keeps one
+    ordering and one arrival: a bar and what it emitted can never be out of
+    step or half-delivered. End-of-stream emissions (engine flush, profile
+    levels) belong to no bar and go on the separate ``final`` channel instead.
     """
     return {
         "t0": bar.start_ts.isoformat(), "t1": bar.end_ts.isoformat(),
@@ -218,6 +227,7 @@ def bar_payload(bar, trades: list) -> dict:
         "poc": bar.poc_price,
         "cells": [[c.price, c.bid_vol, c.ask_vol] for c in bar.cells],
         "steps": bar_fill_steps(trades, [bar])[0] if trades else [],
+        "ev": events or [],
     }
 
 
@@ -226,8 +236,8 @@ def bar_payload(bar, trades: list) -> dict:
 # --------------------------------------------------------------------------
 
 def post_bars(bridge: str, bars: list[dict], meta: dict | None = None,
-              *, timeout: float = 5.0) -> int | None:
-    body = json.dumps({"bars": bars, "meta": meta}).encode()
+              final: list[dict] | None = None, *, timeout: float = 5.0) -> int | None:
+    body = json.dumps({"bars": bars, "meta": meta, "final": final}).encode()
     req = urllib.request.Request(f"{bridge}/bars", data=body,
                                  headers={"Content-Type": "application/json"},
                                  method="POST")
@@ -256,6 +266,9 @@ def main() -> int:
                          "replay a finished day through the live path")
     ap.add_argument("--idle-stop", type=float, default=None,
                     help="stop after N seconds with no new rows")
+    ap.add_argument("--mancini-levels",
+                    help="comma-separated ES levels the recognizer watches; "
+                         "default reads the day's parse (same rule as the page)")
     ap.add_argument("--dry-run", action="store_true",
                     help="build and log bars, post nothing")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -274,11 +287,36 @@ def main() -> int:
     if resolved is not None:
         path = resolved
 
-    meta = {"day": day.isoformat(), "bar_n": args.bar_n, "tick": TICK,
-            "source": "live", "started": datetime.now().isoformat(timespec="seconds")}
+    # The full stack, driven live [st-b0n9]. StackDriver IS the pipeline
+    # market/orderflow/parity.py defines — the same object the replay recorder
+    # runs — so what the page shows is what a later replay of this tape
+    # recomputes. Anchors: today's Mancini levels plus range edges that develop
+    # with the session (LiveAnchors owns that rule and why it differs from the
+    # replay's lookahead).
+    if args.mancini_levels:
+        mancini = [float(x) for x in args.mancini_levels.split(",") if x.strip()]
+    else:
+        try:
+            mancini = mancini_levels_for(day)
+        except Exception as e:  # noqa: BLE001 — no anchors must not stop the chart
+            logger.warning("no Mancini levels for %s (%s) — range edges only", day, e)
+            mancini = []
+    live_anchors = LiveAnchors(mancini)
+    driver = StackDriver(anchors=live_anchors.anchors, mancini_prices=mancini)
+    live_anchors.attach(driver.recognizer)
 
-    logger.info("live footprint feed — day=%s bar_n=%d reorder_lag=%.1fs bridge=%s",
-                day, args.bar_n, args.reorder_lag, "(dry-run)" if args.dry_run else args.bridge)
+    # meta carries the Mancini set only: the two range edges are placeholders
+    # until the first bar seeds them, so publishing them at start would ship
+    # 0.0 as a level the recognizer is watching.
+    meta = {"day": day.isoformat(), "bar_n": args.bar_n, "tick": TICK,
+            "source": "live", "started": datetime.now().isoformat(timespec="seconds"),
+            "mancini": mancini}
+
+    logger.info("live footprint feed — day=%s bar_n=%d reorder_lag=%.1fs bridge=%s "
+                "anchors=%d (%d mancini)",
+                day, args.bar_n, args.reorder_lag,
+                "(dry-run)" if args.dry_run else args.bridge,
+                len(live_anchors.anchors), len(mancini))
 
     rows = tail_rows(path, follow=not args.catch_up_only,
                      stop_after_idle_s=args.idle_stop)
@@ -297,19 +335,22 @@ def main() -> int:
     batch: list[dict] = []
     last_push = time.monotonic()
     first = True
-    for bar in build_bars(_tee(trades), n=args.bar_n):
-        batch.append(bar_payload(bar, take_bar_trades(bar, pending_trades)))
+    n_ev = 0
+    for bar_i, bar in enumerate(build_bars(_tee(trades), n=args.bar_n)):
+        bar_trades = take_bar_trades(bar, pending_trades)
+        # Extend the developing range BEFORE the bar is judged, so this bar is
+        # measured against the session it belongs to.
+        live_anchors.observe(bar)
+        events = driver.on_bar(bar_i, bar, bar_trades)
+        n_ev += len(events)
+        batch.append(bar_payload(bar, bar_trades, events))
         now = time.monotonic()
         # Push promptly — a bar the page has not seen is a bar Steve is not
         # watching — but coalesce the catch-up burst so a full day does not
         # become hundreds of round trips.
         if len(batch) >= 25 or now - last_push >= 1.0:
             if args.dry_run:
-                for j, b in enumerate(batch, sent):
-                    logger.info("bar %d: o=%.2f h=%.2f l=%.2f c=%.2f v=%d d=%+d "
-                                "%.1fs steps=%d",
-                                j, b["o"], b["h"], b["l"], b["c"], b["v"],
-                                b["d"], b["dur"], len(b["steps"]))
+                _log_batch(batch, sent)
             else:
                 post_bars(args.bridge, batch, meta if first else None)
             sent += len(batch)
@@ -317,19 +358,33 @@ def main() -> int:
             batch = []
             last_push = now
 
-    if batch:
+    # End of stream: engine flush + the session's profile levels. These belong
+    # to no bar, so they ride the separate `final` channel rather than being
+    # smuggled onto the last one. [st-b0n9]
+    final = driver.finish(pending_trades)
+    n_ev += len(final)
+
+    if batch or final:
         if args.dry_run:
-            for j, b in enumerate(batch, sent):
-                logger.info("bar %d: o=%.2f h=%.2f l=%.2f c=%.2f v=%d d=%+d "
-                            "%.1fs steps=%d",
-                            j, b["o"], b["h"], b["l"], b["c"], b["v"],
-                            b["d"], b["dur"], len(b["steps"]))
+            _log_batch(batch, sent)
+            for e in final:
+                logger.info("final: %s", e)
         else:
-            post_bars(args.bridge, batch, meta if first else None)
+            post_bars(args.bridge, batch, meta if first else None, final or None)
         sent += len(batch)
 
-    logger.info("done — %d bars", sent)
+    logger.info("done — %d bars, %d emissions (%d end-of-stream)",
+                sent, n_ev, len(final))
     return 0
+
+
+def _log_batch(batch: list[dict], sent: int) -> None:
+    for j, b in enumerate(batch, sent):
+        logger.info("bar %d: o=%.2f h=%.2f l=%.2f c=%.2f v=%d d=%+d %.1fs "
+                    "steps=%d ev=%d%s",
+                    j, b["o"], b["h"], b["l"], b["c"], b["v"], b["d"], b["dur"],
+                    len(b["steps"]), len(b["ev"]),
+                    "  " + ", ".join(e["type"] for e in b["ev"]) if b["ev"] else "")
 
 
 if __name__ == "__main__":
