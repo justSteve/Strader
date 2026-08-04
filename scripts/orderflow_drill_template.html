@@ -255,10 +255,22 @@ const DUR_CEIL = 120;        // seconds; at or above this the fill is full
 let cellH = 13;              // zoom control; numbers hidden below 12px
 let cellMode = "delta";      // delta | vol | pair — what the cell text shows
 
+// `bars` is const but the ARRAY is mutable: in live mode the feeder appends to
+// it through pollBars() and every render path below reads the same object.
+// [st-re1o]
 const bars = DATA.bars;
+const LIVE = !!(DATA.meta && DATA.meta.source === "live");
+let liveFollow = true;   // auto-advance to the newest bar as it lands
 const $ = id => document.getElementById(id);
-$("meta").textContent = `${DATA.meta.symbol} · ${DATA.meta.date} · N=${DATA.meta.bar_n} contracts/bar · ${DATA.meta.n_bars} bars · ${DATA.meta.contracts.toLocaleString()} contracts`;
-$("seek").max = bars.length - 1;
+function refreshMeta() {
+  const contracts = DATA.meta.contracts != null ? DATA.meta.contracts
+                                                : bars.reduce((a, b) => a + b.v, 0);
+  $("meta").textContent = `${DATA.meta.symbol} · ${DATA.meta.date} · `
+    + `N=${DATA.meta.bar_n} contracts/bar · ${bars.length} bars · `
+    + `${contracts.toLocaleString()} contracts` + (LIVE ? " · LIVE" : "");
+  $("seek").max = Math.max(0, bars.length - 1);
+}
+refreshMeta();
 
 // level chips: session-derived + optional externally supplied (e.g. Mancini
 // candidates from session_review.py — labeled M:, harvested not parsed)
@@ -476,10 +488,11 @@ function finishBar(i) {
   judgePending();
   checkAnatomyBeat(i);
   checkLevelApproach(b);
-  maybeQuiz(i);
+  if (!LIVE) maybeQuiz(i);
 }
 function step() {
-  if (idx >= bars.length - 1) { pause(); return; }
+  // In live mode the end of the array is "caught up", not "finished".
+  if (idx >= bars.length - 1) { if (!LIVE) pause(); return; }
   idx++;
   const b = bars[idx];
   const shifted = updateView();
@@ -543,7 +556,7 @@ function animateBar(i, ms) {
 function scheduleNext() {
   if (!playing) return;
   const next = bars[idx + 1];
-  if (!next) { pause(); return; }
+  if (!next) { if (!LIVE) pause(); return; }
   const ms = Math.max(30, next.dur * 1000 / Number($("speed").value));
   animateBar(idx + 1, ms);
 }
@@ -559,6 +572,7 @@ function seekTo(target) {
   const t = Math.max(0, Math.min(target, bars.length - 1));
   for (let i = 0; i <= t; i++) { idx = i; cvd += bars[i].d; appendBarRow(bars[i], i); }
   repaintAll(); repaintReadouts();
+  if (LIVE) noteSeek();
 }
 
 // ── level visits: find every episode where price approached the level ────
@@ -1034,10 +1048,47 @@ async function pollCoach() {
   } catch { bridgeUp = false; $("bridge-dot").textContent = "—"; setTimeout(connectBridge, 10000); return; }
   setTimeout(pollCoach, 2000);
 }
+// ── live bar feed [st-re1o] ──────────────────────────────────────────────
+// The feeder POSTs closed bars to the bridge; we pull everything past what we
+// already hold. `since` is a COUNT, so opening this page mid-session backfills
+// the whole day in one response and renders identically to having been open
+// from the first bar.
+let liveErrs = 0;
+async function pollBars() {
+  if (!LIVE) return;
+  try {
+    const r = await fetch(`${BRIDGE}/bars?since=${bars.length}`);
+    const d = await r.json();
+    liveErrs = 0;
+    if (d.meta && d.meta.bar_n) {
+      DATA.meta.bar_n = d.meta.bar_n;
+      if (d.meta.day) DATA.meta.date = d.meta.day;
+    }
+    const fresh = d.bars || [];
+    if (fresh.length) {
+      const wasAtTip = idx >= bars.length - 1;
+      for (const b of fresh) bars.push(b);
+      refreshMeta();
+      // Catch up instantly rather than animating: a bar only reaches us after
+      // it has closed, so replaying each at its own duration would fall further
+      // behind the tape with every bar. The duration footer still carries pace.
+      if (liveFollow && wasAtTip) { while (idx < bars.length - 1) step(); }
+      $("bridge-dot").textContent = `live · ${bars.length} bars`;
+    }
+  } catch {
+    if (++liveErrs === 3) $("bridge-dot").textContent = "feed stalled";
+  }
+  setTimeout(pollBars, 2000);
+}
+// Seeking back through the session turns following off; returning to the tip
+// turns it back on, so studying a level does not silently freeze the chart.
+function noteSeek() { liveFollow = idx >= bars.length - 1; }
+
 function connectBridge() {
   fetch(BRIDGE + "/health").then(r => r.json()).then(() => {
     bridgeUp = true;
-    $("bridge-dot").textContent = "connected";
+    $("bridge-dot").textContent = LIVE ? "live" : "connected";
+    if (LIVE) pollBars();
     sendState("session_open", { n_bars: bars.length, bar_n: DATA.meta.bar_n });
     pollCoach();
   }).catch(() => { $("bridge-dot").textContent = "—"; });

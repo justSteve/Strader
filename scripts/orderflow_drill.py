@@ -92,6 +92,24 @@ def build_anatomy(bars: list, suggested: dict, mancini_levels: list[float]) -> l
     return anatomy_payload(instances)
 
 
+def minute_candles(trades) -> list[list]:
+    """1-minute OHLCV from the tape — the companion 'familiar view' (st-9lh).
+    ``[minuteISO, o, h, l, c, v]`` per traded minute; empty minutes omitted."""
+    out: list[list] = []
+    cur_key = None
+    for t in trades:
+        key = t.ts.replace(second=0, microsecond=0)
+        if key != cur_key:
+            out.append([key.isoformat(), t.price, t.price, t.price, t.price, 0])
+            cur_key = key
+        k = out[-1]
+        k[2] = max(k[2], t.price)
+        k[3] = min(k[3], t.price)
+        k[4] = t.price
+        k[5] += t.size
+    return out
+
+
 def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = None) -> dict:
     trades = read_corpus_day(day)
     if not trades:
