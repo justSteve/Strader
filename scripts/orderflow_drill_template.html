@@ -282,7 +282,16 @@ function addChip(label, price) {
   b.onclick = () => { $("lvlinput").value = fmtPrice(price); armLevel(true); };
   $("chips").appendChild(b);
 }
-for (const [k, label] of chipDefs) addChip(label, DATA.levels[k]);
+// A LIVE page has no session-derived levels at boot — the session has not
+// happened yet. Skipping absent ones matters more than it looks: fmtPrice does
+// p.toFixed(), so one undefined price throws HERE, at the top of the boot
+// script, and nothing below it ever runs — no bridge, no poller, no bars. The
+// page renders its chrome and sits empty, which reads as a network problem and
+// is not one. [st-re1o]
+for (const [k, label] of chipDefs) {
+  const price = DATA.levels ? DATA.levels[k] : undefined;
+  if (price != null) addChip(label, price);
+}
 const mLvls = DATA.mancini_candidates || [];
 if (mLvls.length) {
   const sel = document.createElement("select");
@@ -569,6 +578,11 @@ function pause() {
 function seekTo(target) {
   pause(); strip.innerHTML = ""; $("bartable").tBodies[0].innerHTML = "";
   cvd = 0; idx = -1; viewHi = viewLo = null; pending = null;
+  // A live page boots with an EMPTY tape. Without this guard the clamp below
+  // yields t=0, the loop runs once, and bars[0].d throws during init — killing
+  // the rest of the boot script. Replay never has zero bars, so this only ever
+  // bites live. [st-re1o]
+  if (!bars.length) { repaintAll(); repaintReadouts(); return; }
   const t = Math.max(0, Math.min(target, bars.length - 1));
   for (let i = 0; i <= t; i++) { idx = i; cvd += bars[i].d; appendBarRow(bars[i], i); }
   repaintAll(); repaintReadouts();
@@ -1091,7 +1105,12 @@ function connectBridge() {
     if (LIVE) pollBars();
     sendState("session_open", { n_bars: bars.length, bar_n: DATA.meta.bar_n });
     pollCoach();
-  }).catch(() => { $("bridge-dot").textContent = "—"; });
+  }).catch(() => {
+    // One-shot was wrong: if the first health call loses the race with the
+    // bridge starting up, a LIVE page would sit dead forever with no retry.
+    $("bridge-dot").textContent = "connecting…";
+    setTimeout(connectBridge, 3000);
+  });
 }
 connectBridge();
 
