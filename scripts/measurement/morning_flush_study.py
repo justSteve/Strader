@@ -22,11 +22,28 @@ into 100+ noise legs, so the structure is measured on the primary move):
 Chase simulation (no hindsight): direction is whichever side of the window
 open price triggers first at +/- TRIG pts. Enter on trigger; stop S pts
 adverse from entry; re-enter when price takes out the pre-stop extreme
-("the flush resumes"); campaign ends when price retraces R_END pts from the
-campaign extreme without a new extreme (move over) or at window close.
+("the flush resumes"). A retrace of R_END pts from the campaign extreme is a
+TRAIL EXIT: it closes the current attempt, not the campaign — the loop keeps
+running and re-enters on the next breakout to a new extreme, exactly as a
+stop-out does. The campaign ends only at window close (or when max_attempts
+is reached, for the capped variants). So the Chase rows report the sum of
+every attempt inside the window, which is why they carry double-digit attempt
+counts on trending days; do not read them as one entry, one trail exit, done.
 Baselines from the same entry: one-and-done (single position, R_END trailing
-exit, no re-entry) and endure (hold to window close). Friction per attempt:
-FD0 model, $15 spread + $3 fees at 0.30 delta = 0.6 ES-pt equivalent.
+exit, no re-entry -- this is the only path that actually breaks on the trail
+exit) and endure (hold to window close). Friction per attempt: FD0 model,
+$15 spread + $3 fees at 0.30 delta = 0.6 ES-pt equivalent.
+
+The docstring previously described the trail exit as ending the campaign,
+which does not match `simulate()` (see the trail-exit branch, which sets
+in_pos = False and continues). Corrected 2026-08-04 [st-kmmg] after the
+cold-context audit flagged it (docs/audits/2026-08-04-auditor-report.md
+section 6.3). Computations are unchanged; only the prose was wrong.
+
+Forward-looking companion: `morning_flush_forward_stats.py` re-measures this
+script's `resume_events()` output without the terminal-extreme hindsight
+(see that function's docstring) and prices the stop distances this study's
+sweep does not cover.
 
 Usage:
     .venv/bin/python3 scripts/measurement/morning_flush_study.py
@@ -135,14 +152,34 @@ def interruptions(points, move, thresholds):
 
 
 def resume_events(points, move, thresholds):
-    """Whole-window resume rates — the honest version of `interruptions`.
+    """Whole-window counter-move events. NOT a forward-looking resume rate.
 
     Tracks the running extreme in the primary move's direction from the
-    move's start to the WINDOW end (not clipped at the move's extreme, which
-    would make every event resume by construction). Each counter-move >= T
-    is an event; resumed means a new move-direction extreme printed later in
-    the window. remaining = extreme-to-final-extreme travel still ahead at
-    event start — what a re-entry could still capture.
+    move's start to the WINDOW end. That fixes the span-clipping artifact in
+    `interruptions` (clipping at the move's extreme makes every event resume
+    by construction), and it is why the EVENT SET produced here is the right
+    one -- but the outcome fields are not what they look like.
+
+    WARNING [st-kmmg]. `resumed` and `remaining` are both derived from
+    `final_ext`, the primary move's TERMINAL extreme, which is hindsight:
+      resumed    a new move-direction extreme printed later in the window
+      remaining  (final_ext - ext_p) * d at event start
+    An event has remaining > 0 exactly when a later extreme prints, so the
+    two fields are the same fact twice: across the 2,535 stored events
+    (5 thresholds x 22 days), resumed == (remaining > 0) in 2,535 of 2,535.
+    Failures are therefore capped at one per day at every threshold, and any
+    resume rate conditioned on `remaining` is true by construction -- which
+    is how morning-flush-anatomy.md came to print "with >= 5 pts still
+    ahead, 415/415 (100%)". See docs/audits/2026-08-04-auditor-report.md
+    section 1.2.
+
+    Use these events for their timing and depth. For whether a backtest
+    resumes, and at what adverse cost, use
+    `morning_flush_forward_stats.py`, which walks forward from each event
+    and never reads the terminal extreme. Fields kept as-is because the
+    stored JSON and downstream scripts (morning_flush_continuation.py) index
+    them; the defect is in what they mean, not in whether they are computed
+    as documented.
     """
     d = move["dir"]
     seg = [(ts, p) for ts, p in points if ts >= move["start_ts"]]
