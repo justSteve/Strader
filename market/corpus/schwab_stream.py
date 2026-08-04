@@ -79,13 +79,21 @@ def _strikes_window(chain: dict, n: int = 10) -> list[dict]:
     return rows
 
 
+def create_client():
+    """Lazy seam over broker_schwab.client.create_client.
+
+    The real import stays deferred so this module imports under the system
+    interpreter (the snapshot cron runs outside the venv) [st-096], while the
+    module-level name gives the tests their monkeypatch target — moving the
+    import inside pull_cycle in e312f80 removed that seam and silently broke
+    them [st-sugg].
+    """
+    from broker_schwab.client import create_client as _real
+    return _real()
+
+
 def pull_cycle(symbol: str = "$SPX") -> dict:
     """Run one Schwab corpus pull. Returns the JSONL-ready record."""
-    # Imported here, not at module top: the schwab package lives only in the
-    # venv, and importing this module must stay possible for tests running on
-    # the system interpreter [st-096].
-    from broker_schwab.client import create_client
-
     ts_pull = utc_now_iso()
     client = create_client()
     errors: list[str] = []
