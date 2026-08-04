@@ -114,10 +114,37 @@ the guaranteed ping must not depend on a Claude session being alive (the
 2026-08-04 spend-limit event that killed a running agent is the live example
 of that failure mode).
 
+## Amendment 2, 2026-08-04 (same day) — Steve's counter-ruling: form fires, session thinks
+
+Steve demoted [D]-as-trigger on two grounds: observed agent processing lag is
+too slow for the fire moment, and a purpose-built web form beats a wall of
+chat text as an execution canvas. Accepted, with one supporting fact from the
+RC doc: while Remote Control is connected, the session transcript is stored
+on Anthropic servers — the Tailscale form keeps order details phone→local.
+
+**Final shape:**
+- **Fire surface: [A] Tailscale-private web form** — staged single ticket,
+  FIRE + confirm, hard caps, kill switch, append-only journal.
+- **Alert: dumb-pipe critical push carrying the form URL** (tap → form, no
+  chat hop), with Claude-native push as the redundant second ping.
+- **Claude session: staging brain, watchdog, and optional depth** — open it
+  from the phone when you want to interrogate the setup; never required to
+  fire.
+
+Two findings from the official RC doc land regardless of architecture:
+- **Hard-wire exists**: `/config` → *Enable Remote Control for all sessions*
+  = `true`. One toggle, user-level, covers every COO and Strader session on
+  this box; sessions appear by name under Code in the app. Push toggles:
+  *Push when Claude decides* / *Push when actions required*.
+- **"Not in my chair" gating exists natively**: pushes are skipped while
+  focused on the terminal, and `CLAUDE_CLIENT_PRESENCE_FILE` (v2.1.181+)
+  extends suppression to any-time-at-the-machine via a screen-lock-driven
+  marker file — the exact away-detection this project needs, and a pattern
+  the dumb-pipe leg should copy.
+
 ## Open decisions for Steve (not needed yet)
 
-- Ratify [D] as primary after the R2 delivery measurements and R3's Schwab
-  order-surface verification come back.
+- Choice of dumb-pipe push (Pushover-class critical alert vs ntfy) after
+  R2's latency/Focus measurements.
 - Whether alert-only ships as its own milestone ahead of phone execution
   (recommended: yes — value lands weeks earlier, risk is zero).
-- Choice of dumb-pipe backup ping (Pushover-class critical alert vs ntfy).
