@@ -42,6 +42,12 @@ from market.signals.orderflow_config import TICK, VOLUME_BAR_N  # noqa: E402
 logger = logging.getLogger("orderflow_drill")
 
 TEMPLATE = Path(__file__).parent / "orderflow_drill_template.html"
+# The companion minute-candle page render() writes beside the drill. Lost in
+# ba9e512 — the bar_fill_steps extraction removed the FILL_STEPS line directly
+# above this one and took this with it, which killed drill generation outright
+# (render() always reaches the candles branch, because bars_payload always sets
+# "_candles"). [st-en7w]
+CANDLE_TEMPLATE = Path(__file__).parent / "candles_template.html"
 DECK = Path(__file__).resolve().parent.parent / "docs/drills/scenario-deck.json"
 
 
