@@ -127,6 +127,11 @@ def sgn_tag(v, pos, neg):
 def build_frame(client):
     now = datetime.now(tz=CT)
     day_start = datetime.combine(now.date(), SESSION_OPEN, CT)
+    if now < day_start:
+        # Schwab rejects start>end ("Enddate is before startDate", HTTP 400) —
+        # never ask for a session that hasn't opened yet [st-t7cf]
+        return dict(ts=now.isoformat(), preopen=True,
+                    opens_in_min=int((day_start - now).total_seconds() // 60))
     series = {}
     errors = []
     for sym in SYMBOLS:
@@ -204,6 +209,12 @@ def render(frame):
     now = datetime.fromisoformat(frame["ts"])
     hdr = f"{BOLD}CONTINUATION METER{END}  {now.strftime('%a %H:%M:%S CT')}"
     out.append(hdr)
+    if frame.get("preopen"):
+        out.append(f"{DIM}Pre-open — session opens "
+                   f"{SESSION_OPEN.strftime('%H:%M')} CT "
+                   f"(in {frame['opens_in_min']} min). Polling resumes at the "
+                   f"open.{END}")
+        return "\n".join(out) + "\n"
     if frame.get("no_data"):
         out.append(f"{RED}No $SPX data — session closed or feed down.{END}")
         for e in frame.get("errors", []):
@@ -308,10 +319,16 @@ def main():
             continue
         sys.stdout.write(render(frame))
         sys.stdout.flush()
-        journal(frame)
+        if not frame.get("preopen"):
+            journal(frame)          # idle pre-open frames carry no signal
         if args.once:
             return 0
-        _time.sleep(args.interval)
+        if frame.get("preopen"):
+            # coarse refresh far from the open, normal cadence within a minute
+            _time.sleep(max(args.interval,
+                            min(300, frame["opens_in_min"] * 60 - 60)))
+        else:
+            _time.sleep(args.interval)
 
 
 if __name__ == "__main__":
