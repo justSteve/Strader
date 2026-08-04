@@ -3,7 +3,7 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
-**Last refreshed**: 2026-08-02 [st-0ji, st-ysj7, st-n42a]
+**Last refreshed**: 2026-08-04 [st-d5f, st-re1o, st-itky]
 
 > Standing operational snapshot — what is wired up, live, or paused right now.
 > Session history lives in `DaysActivity.md`; work lives in beads; durable
@@ -24,15 +24,17 @@ summative pass.
 | TradingView MCP | **Removed.** No `.mcp.json`. Chart state comes from screenshots; Pine scripts are pasted by Steve by hand. |
 | GEXBot | **Paused** since 2026-07-22. No live GEX feed — never cite current GEX levels. |
 | Schwab API | `lib/schwab-py` on the `hobbled-readonly` fork — account/order/transaction methods physically removed. Only `broker_schwab/readers/{quote,chain}.py` are auto-allowed. |
-| Databento | Live tick-stream collection, forward corpus. Historical corpus is tape-only — no GEX history. |
+| Databento | **CME Standard live GLBX verified 2026-08-03.** ES trades + MBP-1 capture continuously via `scripts/live-footprint-up.sh` (tmux `steves-desk:footprint`). OPRA live sub-covered. Historical corpus is tape-only — no GEX history. Quotes are NEVER backfilled: an uncaptured session is gone. |
 | Mancini | Pre-open cron wired; `st-i68` PATH bug open against it. |
-| Market internals | `scripts/mi_gauge.py`, captured on the 5-minute session cron. |
+| Market internals | `scripts/mi_gauge.py`, captured on the 5-minute session cron. Single-sourced from Schwab — no cross-check exists (`st-jwtn`). |
+| Live footprint | v1 running: bridge `127.0.0.1:7788` + JSONL feeder → `/tmp/desk-live-footprint.html`. Same surface as the replay drills; bars proven byte-identical to replay. Browser rendering not yet eyeballed. |
 
 ## Crons (weekdays, CT)
 
 | Time | Job |
 |------|-----|
-| 06:30 | Corpus daily (COO-side wrapper) — weekdays only, so **Friday's tape first lands Monday**, not Saturday (`st-n42a`) |
+| 06:30 | Corpus daily (COO-side wrapper) — Mon–Sat since `st-n42a`, so Friday's tape lands Saturday |
+| 07:30 | Corpus compaction (`st-itky`) — Mon–Sat, packs the pulled day. Measured 27.4× on 07-31. Refuses to pack a day whose manifest is not healthy |
 | 07:00 / 08:30 / 13:00 / 14:45 | Schwab stage-boundary snapshots |
 | 08:15 | Mancini pre-open — **`st-i68` open** |
 | 08:25 | Pre-open heartbeat + risk-state reset |
@@ -76,6 +78,6 @@ missing its `leases` table). The working channel is file-convention A2A under
    resolvable). Fires every weekday at 08:15 until fixed.
 3. **`st-08p` blocked externally** — training steps 3–5 need Steve's NotebookLM
    upload and COO's deck import.
-4. **07-31 tape absent** — `data/corpus/2026-07-31/` has no Databento streams;
-   Friday's T+1 pull was due Saturday and the corpus cron is weekdays-only. The
-   08-03 06:30 run targets 07-31 and recovers it. Blocks `st-u56`.
+4. **Live capture unsupervised** — the streamer is the first long-lived
+   process here and nothing watches it; a death overnight is noticed at the
+   open, costing unbackfillable quotes. `st-6qx4`.
