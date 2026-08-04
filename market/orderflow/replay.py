@@ -53,6 +53,43 @@ def has_es_day(day: _date) -> bool:
     return resolve_existing(es_day_path(day)) is not None
 
 
+def dedup_key(row: dict) -> tuple[int | None, str]:
+    """Identity of a corpus trade row, for duplicate suppression. [st-re1o]
+
+    (sequence, ts_event). Live reconnects can redeliver rows the previous
+    connection already wrote, so both the replay reader and the live feeder
+    must agree on what "the same trade" means.
+    """
+    return (row["data"].get("sequence"), row["provenance"]["ts_event"])
+
+
+def trade_from_row(row: dict) -> tuple[datetime, int, Trade]:
+    """Parse one corpus row into ``(ts, sort_seq, Trade)``. [st-re1o]
+
+    THE shared parse. read_corpus_day and the live footprint feeder both go
+    through here, so a live-collected bar cannot diverge from the replayed one
+    — which is the whole basis of the spec §5 live/replay parity guarantee.
+    Raises KeyError/TypeError/ValueError on a malformed row; callers decide
+    whether to skip or fail.
+    """
+    data = row["data"]
+    ts_raw = row["provenance"]["ts_event"]
+    seq = data.get("sequence")
+    ts = datetime.fromisoformat(ts_raw).astimezone(CENTRAL)
+    side = data.get("side") or "N"
+    if side not in ("B", "A", "N"):
+        side = "N"
+    return (ts, seq if seq is not None else -1, Trade(
+        ts=ts,
+        symbol=data.get("symbol") or "",
+        instrument_id=int(data.get("instrument_id") or 0),
+        price=float(data["price"]),
+        size=int(data["size"]),
+        side=side,  # type: ignore[arg-type]
+        sequence=seq,
+    ))
+
+
 def read_corpus_day(day: _date | Path) -> list[Trade]:
     """Load one corpus day of ES trades in canonical order.
 
@@ -78,27 +115,12 @@ def read_corpus_day(day: _date | Path) -> list[Trade]:
             continue
         try:
             row = json.loads(line)
-            data = row["data"]
-            ts_raw = row["provenance"]["ts_event"]
-            seq = data.get("sequence")
-            key = (seq, ts_raw)
+            key = dedup_key(row)
             if key in seen:
                 dupes += 1
                 continue
             seen.add(key)
-            ts = datetime.fromisoformat(ts_raw).astimezone(CENTRAL)
-            side = data.get("side") or "N"
-            if side not in ("B", "A", "N"):
-                side = "N"
-            trades.append((ts, seq if seq is not None else -1, Trade(
-                ts=ts,
-                symbol=data.get("symbol") or "",
-                instrument_id=int(data.get("instrument_id") or 0),
-                price=float(data["price"]),
-                size=int(data["size"]),
-                side=side,  # type: ignore[arg-type]
-                sequence=seq,
-            )))
+            trades.append(trade_from_row(row))
         except (KeyError, TypeError, ValueError) as e:
             bad += 1
             logger.warning("%s:%d unparseable corpus row (%s) — skipped",

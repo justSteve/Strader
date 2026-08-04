@@ -13,10 +13,20 @@ Endpoints (all JSON; POST bodies are sent as text/plain so file:// pages make
   GET  /state/tail?n=50            -> last n logged events (coach convenience)
   POST /coach                      <- {type: say|arm|jump|pause|play, ...}
   GET  /commands?since=<id>        -> {commands: [...], last: <id>} (drill poll)
+  POST /bars                       <- {bars: [...], meta: {...}} from the feeder
+  GET  /bars?since=<n>             -> {bars: [...], total, meta} (live footprint)
 
-Everything (state + coach) appends to data/drill-bridge/state-YYYY-MM-DD.jsonl
-(gitignored via data/): the session transcript IS the artifact — replayable,
-reviewable, and the raw material for coached-session study later.
+The bar channel [st-re1o] carries a LIVE session into the same surface the
+replay drills use. ``since`` is a count, not an id: a page asks for everything
+past what it already holds, so one that connects mid-session gets the whole
+backlog plus ``meta`` in a single response and renders identically to one that
+was open from the first bar.
+
+State and coach append to data/drill-bridge/state-YYYY-MM-DD.jsonl (gitignored
+via data/): the session transcript IS the artifact — replayable, reviewable,
+and the raw material for coached-session study later. Bars are held in memory
+and logged only as a compact per-push marker; the corpus JSONL is their durable
+record and the feeder can rebuild them from it.
 
 Run:      .venv/bin/python scripts/drill_bridge.py           # port 7788
 Override: DRILL_BRIDGE_PORT=7799 (must match BRIDGE in the drill template)
@@ -47,6 +57,13 @@ class BridgeState:
     def __init__(self, log_dir: Path = LOG_DIR):
         self._lock = threading.Lock()
         self._commands: list[dict] = []   # each carries "id" (1-based, monotonic)
+        # Live footprint bars [st-re1o]: append-only, index == position. Held in
+        # memory only — the corpus JSONL is the durable record and these are
+        # derived from it, so persisting them here would duplicate data the
+        # feeder can rebuild. The log gets a compact marker per push instead,
+        # which is what makes the session transcript show live cadence.
+        self._bars: list[dict] = []
+        self._bar_meta: dict = {}
         self._events = 0
         self.started = datetime.now(timezone.utc).isoformat(timespec="seconds")
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -76,6 +93,34 @@ class BridgeState:
             self._append({"channel": "coach", **cmd})
             return cmd
 
+    def add_bars(self, bars: list[dict], meta: dict | None = None) -> int:
+        """Append closed footprint bars from the live feeder. [st-re1o]
+
+        Returns the new total. ``meta`` (bar size, tick, anchors, session day)
+        is replaced wholesale when supplied, so a page that connects mid-session
+        gets the setup along with the backlog rather than having to infer it.
+        """
+        if not isinstance(bars, list):
+            raise ValueError("bars must be a list")
+        with self._lock:
+            if meta:
+                self._bar_meta = meta
+            for b in bars:
+                if not isinstance(b, dict):
+                    raise ValueError("each bar must be an object")
+                self._bars.append({**b, "i": len(self._bars)})
+            total = len(self._bars)
+            if bars:
+                self._append({"channel": "bars", "kind": "bar_push",
+                              "n": len(bars), "total": total})
+            return total
+
+    def bars_since(self, n: int) -> dict:
+        with self._lock:
+            start = max(0, min(n, len(self._bars)))
+            return {"bars": self._bars[start:], "total": len(self._bars),
+                    "meta": self._bar_meta}
+
     def commands_since(self, last_id: int) -> list[dict]:
         with self._lock:
             return [c for c in self._commands if c["id"] > last_id]
@@ -95,6 +140,7 @@ class BridgeState:
         with self._lock:
             return {"ok": True, "started": self.started,
                     "events": self._events, "queued": len(self._commands),
+                    "bars": len(self._bars),
                     "log": str(self._log_path)}
 
 
@@ -141,6 +187,9 @@ class _Handler(BaseHTTPRequestHandler):
                 cmds = STATE.commands_since(since)
                 self._send(200, {"commands": cmds,
                                  "last": cmds[-1]["id"] if cmds else since})
+            elif url.path == "/bars":
+                since = int(parse_qs(url.query).get("since", ["0"])[0])
+                self._send(200, STATE.bars_since(since))
             elif url.path == "/state/tail":
                 n = int(parse_qs(url.query).get("n", ["50"])[0])
                 self._send(200, {"events": STATE.tail(n)})
@@ -156,6 +205,10 @@ class _Handler(BaseHTTPRequestHandler):
             if url.path == "/state":
                 STATE.add_state(payload)
                 self._send(200, {"ok": True})
+            elif url.path == "/bars":
+                total = STATE.add_bars(payload.get("bars") or [],
+                                       payload.get("meta"))
+                self._send(200, {"ok": True, "total": total})
             elif url.path == "/coach":
                 cmd = STATE.add_coach(payload)
                 self._send(200, {"ok": True, "id": cmd["id"]})

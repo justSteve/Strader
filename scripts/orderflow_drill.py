@@ -31,6 +31,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from market.orderflow.bars import build_bars          # noqa: E402
+from market.orderflow.fill import bar_fill_steps      # noqa: E402
 from market.orderflow.replay import read_corpus_day   # noqa: E402
 from market.orderflow.recognizer import SetupRecognizer  # noqa: E402
 from market.orderflow.anatomy import anatomy_payload, build_instances  # noqa: E402
@@ -89,66 +90,6 @@ def build_anatomy(bars: list, suggested: dict, mancini_levels: list[float]) -> l
     logger.info("anatomy: %d anchors -> %d recs -> %d instances",
                 len(anchors), len(recs), len(instances))
     return anatomy_payload(instances)
-
-
-FILL_STEPS = 8  # progressive-build chunks per bar (st-9lh) — real tape slices
-CANDLE_TEMPLATE = Path(__file__).parent / "candles_template.html"
-
-
-def minute_candles(trades) -> list[list]:
-    """1-minute OHLCV from the tape — the companion 'familiar view' (st-9lh).
-    ``[minuteISO, o, h, l, c, v]`` per traded minute; empty minutes omitted."""
-    out: list[list] = []
-    cur_key = None
-    for t in trades:
-        key = t.ts.replace(second=0, microsecond=0)
-        if key != cur_key:
-            out.append([key.isoformat(), t.price, t.price, t.price, t.price, 0])
-            cur_key = key
-        k = out[-1]
-        k[2] = max(k[2], t.price)
-        k[3] = min(k[3], t.price)
-        k[4] = t.price
-        k[5] += t.size
-    return out
-
-
-def bar_fill_steps(trades, bars, n_steps: int = FILL_STEPS) -> list[list]:
-    """Per bar: equal-volume cumulative fill chunks for progressive rendering.
-
-    Honest sub-bar data, not animation guesswork: the bar's own trades are
-    split into ``n_steps`` equal-volume chunks (whole trade lands in the chunk
-    it completes, mirroring the bar straddle rule). Each chunk is
-    ``[close_price, elapsed_seconds, [[price, sellAggrAdd, buyAggrAdd], ...]]``
-    — additive deltas the template accumulates into partial cells. Side "N"
-    trades advance volume/close/clock only, matching the cells convention.
-    """
-    out: list[list] = []
-    ti = 0
-    for b in bars:
-        vol = 0
-        bar_trades = []
-        while ti < len(trades) and vol < b.volume:
-            t = trades[ti]
-            ti += 1
-            vol += t.size
-            bar_trades.append(t)
-        steps, adds = [], {}
-        done_vol, k = 0, 1
-        for t in bar_trades:
-            done_vol += t.size
-            if t.side != "N":
-                a = adds.setdefault(t.price, [0, 0])
-                a[0 if t.side == "A" else 1] += t.size
-            if done_vol >= b.volume * k / n_steps and k <= n_steps:
-                elapsed = (t.ts - b.start_ts).total_seconds()
-                steps.append([t.price, round(elapsed, 1),
-                              [[p, sa, ba] for p, (sa, ba) in sorted(adds.items())]])
-                adds = {}
-                while done_vol >= b.volume * k / n_steps and k <= n_steps:
-                    k += 1
-        out.append(steps)
-    return out
 
 
 def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = None) -> dict:
