@@ -8,7 +8,11 @@ Schwab's minute history is a ROLLING ~47-day window — running this weekly
 makes the history permanent before it rolls off.
 
 $VIX added 2026-08-03 [st-cdwe]; $VIX9D/$VIX3M [st-40fv] and $VVIX
-[st-lru8] added same day for term-structure and vol-of-vol reads. Index symbols are bare (`$VIX` —
+[st-lru8] same day; $VIX1D/$COR1M/$COR3M 2026-08-04 [st-b3jq] completing
+the vol-complex roster. Probed and NOT served (do not re-probe blind):
+$SKEW(+.X), put/call ($PCSP/$PCALL/$PC), $DXY(+.X). /ZN and TLT serve but
+are cross-asset with different session semantics — deliberately not in
+this stream. Index symbols are bare (`$VIX` —
 `$VIX.X` returns EMPTY), serve ~389 RTH minute candles/day with v=0 (indices
 — volume is meaningless). Rows before the add dates carry fewer symbols.
 
@@ -37,7 +41,8 @@ from market.corpus.paths import central_date, internals_path  # noqa: E402
 from market.corpus.writer import append_jsonl, update_manifest, utc_now_iso  # noqa: E402
 
 CENTRAL = ZoneInfo("America/Chicago")
-SYMBOLS = ("$TICK", "$TRIN", "$ADD", "$VOLD", "$VIX", "$VIX9D", "$VIX3M", "$VVIX")
+SYMBOLS = ("$TICK", "$TRIN", "$ADD", "$VOLD", "$VIX", "$VIX9D",
+           "$VIX3M", "$VVIX", "$VIX1D", "$COR1M", "$COR3M")
 
 
 def fetch_symbol(client, symbol: str, days: int) -> list[dict]:
