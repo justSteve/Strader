@@ -68,6 +68,7 @@ in it covered external domain knowledge or facts about the operator.
 
 ### rule
 
+- [Channel Family Taxonomy](channel-family-taxonomy.md) — The ten channel families a study design must traverse before measuring, with a written verdict per family — a family with no entry is a finding, not a silence
 - [Never Guess Chart Readings](never-guess-chart-readings.md) — MANDATORY procedure for reading chart screenshots — crop regions at full resolution before quoting any number
 
 ### runbook
