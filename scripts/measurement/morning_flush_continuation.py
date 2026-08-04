@@ -8,7 +8,7 @@ live state. Candidates: market internals ($TICK/$TRIN/$ADD/$VOLD), $VIX
 wiggle depth).
 
 Method: for each day in data/measurement/morning_flush_study.json (the
-st-gzwb move spans), walk minutes from the primary move's start to 10:15 CT
+st-gzwb move spans), walk minutes from the primary move's start to 10:14 CT
 (the last 15 minutes are excluded — truncated lookahead). A minute is
 labeled CONT if price extends >= EXT_PTS beyond the extreme-standing-at-t
 within the next LOOKAHEAD minutes, else TERM. Every trace is causal (uses
@@ -18,6 +18,26 @@ Internals are 1-minute candles read at their close — up to 59s stale vs the
 tape. Minutes within a day are autocorrelated; day-clustered honesty:
 aggregate AUC is reported alongside the median of per-day AUCs.
 
+Every trace AUC goes through `residual_gate.grade_trace()` [st-4cgo]. The
+2026-08-04 audit (§2.3/§5.3) found the residual test had been run on VIX and
+VVIX and then dropped, so the top-ranked trace — $TICK at .665 — was published
+untested and fails it (day-median residual .502). The gate now returns raw
+AUC, the residual after the concurrent 5-min ES move is regressed out, the
+day-median of that residual, and a trivial clock+geometry baseline on the same
+rows, or it raises. No trace in this script can reach the output file with
+only the first of those four.
+
+Two label-loop corrections landed with the gate (same audit):
+  §3.5  LAST_LABELED is now derived from W_END and LOOKAHEAD_MIN. It was
+        10:15, which saw 14 forward minutes, not 15, because bars stop at
+        10:29. The last fully-covered minute is 10:14 — 22 minutes (one per
+        day) leave the sample, 1,882 -> 1,860.
+  §3.6  the new-extreme detector used the OUTER minute index inside a
+        comprehension over the 5-minute window and `minutes.index(mm)` with
+        max(0, -1) resolving to mm itself, so the day's first minute could
+        never register as a new extreme. It is now a precomputed per-minute
+        flag that means what it reads as.
+
 Usage:
     .venv/bin/python3 scripts/measurement/morning_flush_continuation.py
 
@@ -26,25 +46,66 @@ Output: data/measurement/morning_flush_continuation.json + a stderr summary.
 from __future__ import annotations
 
 import json
+import math
 import sys
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+SCRIPTS = Path(__file__).resolve().parent
+ROOT = SCRIPTS.parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(SCRIPTS))
 
 from market.orderflow.replay import read_corpus_day  # noqa: E402
+from residual_gate import (  # noqa: E402
+    GateRow, grade_trace, markdown_table, rank_auc as auc)
 
 CT = ZoneInfo("America/Chicago")
 CORPUS = ROOT / "data" / "corpus"
 STUDY = ROOT / "data" / "measurement" / "morning_flush_study.json"
 OUT = ROOT / "data" / "measurement" / "morning_flush_continuation.json"
 
+W_START = time(8, 30)   # study window, from st-gzwb's move spans
+W_END = time(10, 30)
 LOOKAHEAD_MIN = 15   # minutes ahead a new extreme must print
 EXT_PTS = 2.0        # how far beyond the standing extreme counts as continuation
-LAST_LABELED = time(10, 15)  # minutes after this lack full lookahead
+ES_MOVE_MIN = 5      # window of the concurrent ES move the residual gate removes
+
+# The nine traces, keyed as they appear in the sample rows. Single source of
+# truth for what gets graded and how it is named in the published table — a
+# trace added here is a trace the gate grades.
+TRACE_NAMES = {
+    "tick_aligned": "$TICK level x dir",
+    "tick_share10": "$TICK 10-min sign-share",
+    "add_slope10": "$ADD 10-min slope x dir",
+    "vold_slope10": "$VOLD 10-min slope x dir",
+    "trin_aligned": "$TRIN oriented",
+    "vix_slope5": "$VIX 5-min slope x (-dir)",
+    "delta5_aligned": "ES 5-min aggressor delta x dir",
+    "vol_pace": "Volume pace (5-min vs move avg)",
+    "wiggle_calm": "Wiggle-calm (backtest depth trend)",
+}
+COMBO_KEYS = ("tick_aligned", "vix_slope5", "add_slope10")
+
+
+def last_fully_labeled(w_end: time, lookahead: int) -> time:
+    """Last minute carrying `lookahead` whole forward bars inside the window.
+
+    Bars are minute-stamped and cover [m, m+1), so the final bar of a window
+    closing at `w_end` starts at w_end - 1 min. A minute m's label reads bars
+    m+1 .. m+lookahead, so m is fully covered only when
+    m + lookahead <= w_end - 1 min.
+
+    This was hardcoded to 10:15 (= 10:30 - 15), which is one minute short: the
+    10:15 minute saw 14 forward bars, not 15. Auditor's report §3.5.
+    """
+    anchor = datetime.combine(date(2000, 1, 1), w_end)
+    return (anchor - timedelta(minutes=lookahead + 1)).time()
+
+
+LAST_LABELED = last_fully_labeled(W_END, LOOKAHEAD_MIN)  # 10:14
 
 
 def load_internals(day: date) -> dict[str, dict[datetime, float]]:
@@ -89,19 +150,24 @@ def minute_bars(trades, start: datetime, end: datetime):
     return bars
 
 
-def auc(cont_vals, term_vals):
-    """Rank-sum P(cont > term) with tie credit — the Mann-Whitney AUC."""
-    if not cont_vals or not term_vals:
-        return None
-    wins = ties = 0
-    sv = sorted(term_vals)
-    import bisect
-    for x in cont_vals:
-        lo = bisect.bisect_left(sv, x)
-        hi = bisect.bisect_right(sv, x)
-        wins += lo
-        ties += hi - lo
-    return (wins + 0.5 * ties) / (len(cont_vals) * len(term_vals))
+# `auc` is residual_gate.rank_auc, imported above. One implementation of the
+# Mann-Whitney statistic in the program, and it lives next to the gate that
+# forces its companions. Re-exported under the old name because
+# morning_flush_vix_depth / morning_flush_vvix / decision_aligned_study import
+# `auc` from this module.
+
+
+def _gate_dict(g):
+    """A TraceGrade as JSON — every field a reader needs to judge the trace."""
+    return dict(name=g.trace, n=g.n, n_days=g.n_days,
+                n_dropped_no_es=g.n_dropped_no_es,
+                auc_raw=g.auc_raw, auc_raw_day_median=g.auc_raw_day_median,
+                auc_residual=g.auc_residual,
+                auc_residual_day_median=g.auc_residual_day_median,
+                auc_baseline=g.auc_baseline,
+                auc_baseline_day_median=g.auc_baseline_day_median,
+                es_beta=g.es_beta, es_r2=g.es_r2,
+                verdict=g.verdict, beats_baseline=g.beats_baseline)
 
 
 def main():
@@ -109,6 +175,7 @@ def main():
     samples = []          # one dict per labeled minute
     day_events = []       # backtest-event states (T=2 resume_events)
     day_rows = []         # day-level one-sidedness
+    day_dir = {}          # date -> +1 up move / -1 down move
 
     for row in study:
         d = date.fromisoformat(row["date"])
@@ -116,28 +183,42 @@ def main():
         if not move:
             continue
         mdir = 1 if move["dir"] == "up" else -1
+        day_dir[row["date"]] = mdir
         m_start = datetime.combine(
             d, time.fromisoformat(move["start"]), CT)
-        w_end = datetime.combine(d, time(10, 30), CT)
+        w_end = datetime.combine(d, W_END, CT)
         try:
             trades = read_corpus_day(d)
         except FileNotFoundError:
             continue
-        w_trades = [t for t in trades if time(8, 30) <= t.ts.time() < time(10, 30)]
+        w_trades = [t for t in trades if W_START <= t.ts.time() < W_END]
         bars = minute_bars(w_trades, m_start.replace(second=0), w_end)
         if not bars:
             continue
         internals = load_internals(d)
         minutes = sorted(bars)
 
-        # running extreme series + forward continuation label
+        # running extreme series + forward continuation label, plus the
+        # per-minute "this bar set a new extreme" flag.
+        #
+        # new_ext_at was an inline comprehension that guarded on the OUTER
+        # minute index and looked the previous minute up with
+        # minutes[max(0, minutes.index(mm) - 1)] — which resolves to mm itself
+        # at the start of the series, making the inequality trivially false, so
+        # the move's own first bar never counted (auditor's report §3.6). Here
+        # it is what it reads as: the bar printed the standing extreme AND the
+        # standing extreme moved at that bar; the first bar of the move sets
+        # the extreme by definition and counts.
         ext = None
         ext_series = {}
-        for m in minutes:
+        new_ext_at = {}
+        for j, m in enumerate(minutes):
             best = bars[m]["high"] if mdir == 1 else bars[m]["low"]
             ext = best if ext is None else (max(ext, best) if mdir == 1
                                             else min(ext, best))
             ext_series[m] = ext
+            new_ext_at[m] = (best == ext and
+                             (j == 0 or ext != ext_series[minutes[j - 1]]))
 
         day_samples = []
         for i, m in enumerate(minutes):
@@ -178,14 +259,25 @@ def main():
                 return (ref - worst) * mdir
 
             d5, dprev = depth(look5), depth(prev5)
-            new_ext_5 = any(
-                (bars[mm]["high"] if mdir == 1 else bars[mm]["low"]) == ext_series[mm]
-                and (i == 0 or ext_series[mm] != ext_series.get(
-                    minutes[max(0, minutes.index(mm) - 1)]))
-                for mm in look5)
+            new_ext_5 = any(new_ext_at[mm] for mm in look5)
+
+            # residual-gate covariates. es5_aligned is the concurrent ES move
+            # every trace is residualised against; it is measured on the move's
+            # own bar series, so the first ES_MOVE_MIN minutes of a move carry
+            # None and drop out of the gate's grade rather than reaching back
+            # into pre-move tape. elapsed_min and dist_ext are the two trivial
+            # competitors the gate scores every trace beside — how long the
+            # move has been running, and how far inside its own standing
+            # extreme price currently sits.
+            m_back = m - timedelta(minutes=ES_MOVE_MIN)
+            es5 = ((bars[m]["close"] - bars[m_back]["close"]) * mdir
+                   if m_back in bars else None)
 
             s = dict(
                 date=row["date"], minute=m.strftime("%H:%M"), cont=cont,
+                es5_aligned=round(es5, 2) if es5 is not None else None,
+                elapsed_min=round((m - minutes[0]).total_seconds() / 60, 1),
+                dist_ext=round((ext_series[m] - bars[m]["close"]) * mdir, 2),
                 tick_aligned=(tick_now * mdir) if tick_now is not None else None,
                 tick_share10=(sum(1 for v in tick10 if v * mdir > 0) / len(tick10)
                               if tick10 else None),
@@ -201,6 +293,8 @@ def main():
                             if vix5[0] is not None and vix5[5] is not None
                             else None),
                 delta5_aligned=delta5 * mdir,
+                new_ext_5=bool(new_ext_5),
+                new_ext_now=bool(new_ext_at[m]),
                 delta_div=bool(new_ext_5 and delta5 * mdir < 0),
                 vol_pace=(vol5 / avg_vol5 if avg_vol5 > 0 else None),
                 wiggle_calm=(-(d5 - dprev)
@@ -236,9 +330,32 @@ def main():
         ))
 
     # ---- aggregate ----
-    metrics = ["tick_aligned", "tick_share10", "add_slope10", "vold_slope10",
-               "trin_aligned", "vix_slope5", "delta5_aligned", "vol_pace",
-               "wiggle_calm"]
+    metrics = list(TRACE_NAMES)
+
+    def gate_rows(value_of):
+        """One GateRow per labeled minute for a callable returning its value."""
+        return [GateRow(date=s["date"], cont=s["cont"], value=value_of(s),
+                        es_move=s["es5_aligned"], clock=s["elapsed_min"],
+                        geometry=s["dist_ext"])
+                for s in samples]
+
+    # The gate runs FIRST and raises on anything it cannot grade, so no raw
+    # AUC below can reach the output file without its residual, its day-median
+    # residual, and the trivial baseline computed on the same rows. This is the
+    # standing version of the test that was run on VIX, run on VVIX, and then
+    # dropped before it reached $TICK (auditor's report §5.3).
+    grades = {k: grade_trace(TRACE_NAMES[k], gate_rows(lambda s, k=k: s[k]))
+              for k in metrics}
+
+    def score3(s):
+        """Convergence score 0-3 at this minute, or None if a leg is blind."""
+        if any(s[k] is None for k in COMBO_KEYS):
+            return None
+        return float(sum(1 for k in COMBO_KEYS if s[k] > 0))
+
+    grades["combo_score3"] = grade_trace("Convergence score 0-3",
+                                         gate_rows(score3))
+
     summary = {}
     for k in metrics:
         cont = [s[k] for s in samples if s["cont"] and s[k] is not None]
@@ -255,19 +372,118 @@ def main():
                 per_day.append(ad)
         per_day.sort()
         med = lambda v: v[len(v) // 2] if v else None
+        g = grades[k]
         summary[k] = dict(
+            # auc / auc_day_median stay the all-value-bearing-minutes numbers
+            # this study has always published, so the gate's effect is legible
+            # rather than silently substituted. The gate's own raw AUC sits in
+            # the gate block and is on its (smaller) row set.
             auc=round(a, 3) if a is not None else None,
             auc_day_median=(round(med(per_day), 3) if per_day else None),
             n_cont=len(cont), n_term=len(term),
             cont_median=round(med(sorted(cont)), 3) if cont else None,
-            term_median=round(med(sorted(term)), 3) if term else None)
-    # delta divergence is a flag, not a scalar
+            term_median=round(med(sorted(term)), 3) if term else None,
+            gate=_gate_dict(g))
+
+    # delta divergence is a flag, not a scalar — and the published version was
+    # unconditioned. `delta_div` can only fire when a new extreme has printed,
+    # and new extremes print far more often in CONT minutes than TERM ones, so
+    # the published CONT-vs-TERM flag-rate gap is that base-rate difference
+    # wearing an exhaustion-flag costume (auditor's report §2.2). Conditioning
+    # on the minutes where the heuristic is even defined is the honest
+    # comparison, and it reverses the sign of the published conclusion.
     dd_cont = [s for s in samples if s["cont"]]
     dd_term = [s for s in samples if not s["cont"]]
+    p_cont = lambda rows: (round(sum(1 for s in rows if s["cont"]) / len(rows), 3)
+                           if rows else None)
+
+    def conditioned(flag):
+        """P(CONT | delta against vs with) among minutes where `flag` fired.
+
+        Reported for both eligibility definitions — a new extreme anywhere in
+        the 5-minute window (what `delta_div` uses) and one in this minute
+        alone — because the conclusion should not depend on which one a
+        reader has in mind, and the audit's own eligible set (855 minutes)
+        matches neither exactly.
+        """
+        elig = [s for s in samples if s[flag]]
+        against = [s for s in elig if s["delta5_aligned"] < 0]
+        with_ = [s for s in elig if s["delta5_aligned"] >= 0]
+        # Naive two-proportion z on the gap. It treats minutes as independent
+        # draws, which they are not (they cluster inside 22 mornings), so it is
+        # the OPTIMISTIC bound on the gap's significance — if it is not
+        # significant here it is certainly not significant day-clustered.
+        z = p2 = None
+        pa, pw = p_cont(against), p_cont(with_)
+        if against and with_:
+            pool = ((sum(1 for s in against if s["cont"])
+                     + sum(1 for s in with_ if s["cont"])) / len(elig))
+            se = math.sqrt(pool * (1 - pool) * (1 / len(against) + 1 / len(with_)))
+            if se > 0:
+                z = (pa - pw) / se
+                p2 = math.erfc(abs(z) / math.sqrt(2))
+        return dict(
+            n_eligible=len(elig),
+            eligible_rate_cont=round(
+                sum(1 for s in dd_cont if s[flag]) / len(dd_cont), 3),
+            eligible_rate_term=round(
+                sum(1 for s in dd_term if s[flag]) / len(dd_term), 3),
+            divergence=dict(n=len(against), p_cont=pa),
+            with_move=dict(n=len(with_), p_cont=pw),
+            gap=round(pa - pw, 3) if pa is not None and pw is not None else None,
+            z_naive=round(z, 2) if z is not None else None,
+            p_two_sided_naive=round(p2, 3) if p2 is not None else None)
+
     summary["delta_div_rate"] = dict(
         cont=round(sum(1 for s in dd_cont if s["delta_div"]) / len(dd_cont), 3),
         term=round(sum(1 for s in dd_term if s["delta_div"]) / len(dd_term), 3),
-        n_cont=len(dd_cont), n_term=len(dd_term))
+        n_cont=len(dd_cont), n_term=len(dd_term),
+        # the confound, and the comparison that removes it
+        conditioned_new_ext_5=conditioned("new_ext_5"),
+        conditioned_new_ext_now=conditioned("new_ext_now"))
+
+    # ---- what the VIX leg of a quadrant adds over the bare ES sign ----
+    # The published quadrant cells (morning_flush_vix_depth.py) split on
+    # sign(dES_5m) x sign(dVIX_5m). Splitting on the ES sign ALONE first shows
+    # how much of each cell is the price move you can already see: the headline
+    # "flush running, vol bid" cell is within a rounding error of it, and the
+    # dramatic reads sit in n=35-55 cells (auditor's report §2.4). z is a naive
+    # two-proportion test against the ES-only cell — no clustering correction,
+    # no multiple-comparison correction, so it is the optimistic bound.
+    quad_rows = [dict(mdir=day_dir[s["date"]], es_with=s["es5_aligned"] > 0,
+                      vix_conf=s["vix_slope5"] > 0, cont=s["cont"])
+                 for s in samples
+                 if s["es5_aligned"] not in (None, 0)
+                 and s["vix_slope5"] not in (None, 0)]
+
+    def _cell(pred):
+        r = [x for x in quad_rows if pred(x)]
+        return dict(n=len(r), p_cont=(round(sum(1 for x in r if x["cont"])
+                                            / len(r), 3) if r else None))
+
+    def _z(a, b):
+        if not a["n"] or not b["n"]:
+            return None, None
+        ka, kb = a["p_cont"] * a["n"], b["p_cont"] * b["n"]
+        pool = (ka + kb) / (a["n"] + b["n"])
+        se = math.sqrt(pool * (1 - pool) * (1 / a["n"] + 1 / b["n"]))
+        if se == 0:
+            return None, None
+        z = (a["p_cont"] - b["p_cont"]) / se
+        return round(z, 2), round(math.erfc(abs(z) / math.sqrt(2)), 3)
+
+    vix_lift = {}
+    for mdir, mname in ((-1, "dn_move"), (1, "up_move")):
+        for es_with, ename in ((True, "es_with"), (False, "es_against")):
+            def pred(x, mdir=mdir, es_with=es_with):
+                return x["mdir"] == mdir and x["es_with"] == es_with
+            base = _cell(pred)
+            conf = _cell(lambda x, p=pred: p(x) and x["vix_conf"])
+            agst = _cell(lambda x, p=pred: p(x) and not x["vix_conf"])
+            z, pv = _z(conf, base)
+            vix_lift[f"{mname}|{ename}"] = dict(
+                es_alone=base, vix_confirming=conf, vix_against=agst,
+                z_conf_vs_es_alone=z, p_two_sided_naive=pv)
 
     ev_summary = {}
     res = [e for e in day_events if e["resumed"]]
@@ -283,29 +499,36 @@ def main():
                              n_resumed=len(rv), n_failed=len(fv))
 
     # convergence score: how many of the three interpretable traces confirm
-    combo_keys = ("tick_aligned", "vix_slope5", "add_slope10")
     combo = {}
     for s in samples:
-        vals = [s[k] for k in combo_keys]
-        if any(v is None for v in vals):
+        score = score3(s)
+        if score is None:
             continue
-        score = sum(1 for v in vals if v > 0)
-        c = combo.setdefault(score, [0, 0])
+        c = combo.setdefault(int(score), [0, 0])
         c[0] += 1
         c[1] += s["cont"]
     combo_table = {
         str(score): dict(n=n, cont=k, p_cont=round(k / n, 3))
         for score, (n, k) in sorted(combo.items())}
-    sc = [sum(1 for k in combo_keys if s[k] > 0) for s in samples
-          if s["cont"] and all(s[k] is not None for k in combo_keys)]
-    st_ = [sum(1 for k in combo_keys if s[k] > 0) for s in samples
-           if not s["cont"] and all(s[k] is not None for k in combo_keys)]
-    combo_auc = auc(sc, st_)
+    scored = [(s["cont"], v) for s in samples if (v := score3(s)) is not None]
+    combo_auc = auc([v for c, v in scored if c], [v for c, v in scored if not c])
 
     out = dict(samples=len(samples), summary=summary,
                event_summary=ev_summary, events=len(day_events),
-               combo=dict(keys=list(combo_keys), table=combo_table,
-                          auc=round(combo_auc, 3) if combo_auc else None),
+               combo=dict(keys=list(COMBO_KEYS), table=combo_table,
+                          auc=round(combo_auc, 3) if combo_auc else None,
+                          gate=_gate_dict(grades["combo_score3"])),
+               gate=dict(
+                   note="every trace + the convergence score, graded by "
+                        "residual_gate.grade_trace: raw AUC, residual after "
+                        "the concurrent 5-min ES move is regressed out "
+                        "(leave-one-day-out fit), the day-median of that "
+                        "residual, and a leave-one-day-out clock+geometry "
+                        "baseline on the same rows [st-4cgo]",
+                   es_move_window_min=ES_MOVE_MIN,
+                   traces={k: _gate_dict(g) for k, g in grades.items()},
+                   markdown=markdown_table(list(grades.values()))),
+               vix_lift_over_es_sign=vix_lift,
                day_rows=day_rows, minute_samples=samples)
     OUT.write_text(json.dumps(out, indent=1))
     print(f"labeled minutes: {len(samples)} "
@@ -317,6 +540,10 @@ def main():
     print("-- backtest-event cut --", file=sys.stderr)
     for k, v in ev_summary.items():
         print(f"  {k:16s} {json.dumps(v)}", file=sys.stderr)
+    print("-- residual gate (st-4cgo) --", file=sys.stderr)
+    for g in grades.values():
+        print(f"  {g.line()}", file=sys.stderr)
+    print(markdown_table(list(grades.values())), file=sys.stderr)
     print(f"wrote {OUT}", file=sys.stderr)
 
 
