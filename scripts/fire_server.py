@@ -163,6 +163,7 @@ PAGE = """<!doctype html><html><head>
       border:0;margin:.6em 0;cursor:pointer}
  .arm{background:#b45309;color:#fff} .fire{background:#b91c1c;color:#fff}
  .cancel{background:#333;color:#eee}
+ .exit{background:#7f1d1d;color:#fff;border:2px solid #f87171}
  h1{font-size:1.2em;letter-spacing:.08em} .mode{color:#60a5fa}
 </style></head><body>
 <h1>FIRE SERVER <span class=mode>· DRY RUN — no order client exists</span></h1>
@@ -199,17 +200,23 @@ def health():
             "ticket_staged": TICKET_PATH.exists()}
 
 
+EXIT_BLOCK = """<hr style="border:0;border-top:1px solid #333;margin:2.5em 0">
+<form method=post action=/exit-all>
+<button class='big exit'>EXIT ALL POSITIONS</button></form>
+<div class=k>Always available — including when the kill switch is on.</div>"""
+
+
 @app.get("/")
 def index():
     if killed():
-        return render("<div class='card bad'>KILL SWITCH ON — remove "
-                      "data/exec/FIRE_DISABLED to re-enable.</div>",
-                      refresh=True)
+        return render("<div class='card bad'>KILL SWITCH ON — entries "
+                      "disabled. Remove data/exec/FIRE_DISABLED to re-enable."
+                      "</div>" + EXIT_BLOCK, refresh=True)
     t, problems = load_ticket()
     if t is None:
         return render("<div class=card><span class=k>No ticket staged.</span>"
                       "<br>Agents stage by writing data/exec/fire-ticket.json."
-                      "</div>", refresh=True)
+                      "</div>" + EXIT_BLOCK, refresh=True)
     age = ticket_age_min(t)
     stale = age is None or age > STALE_MIN
     body = _ticket_card(t, problems, age)
@@ -221,11 +228,49 @@ def index():
     else:
         body += ("<form method=post action=/arm>"
                  "<button class='big arm'>ARM</button></form>")
-    return render(body, refresh=True)
+    return render(body + EXIT_BLOCK, refresh=True)
+
+
+@app.post("/exit-all")
+def exit_all():
+    """Panic surface. Deliberately NOT gated by the kill switch.
+
+    FIRE_DISABLED exists to stop the machine ENTERING trades. If it also
+    blocked exits it would trap Steve in positions at precisely the moment
+    he most needs out — backwards, and the reason this route checks nothing
+    but its own confirm. Ticket state, staleness and the qty cap are equally
+    irrelevant here: exit acts on live account state, not a staged ticket.
+    """
+    n = mint_nonce()
+    journal({"event": "exit_all_armed", "nonce": n[:6] + "…"})
+    return render(
+        "<div class='card bad'>CLOSE EVERY OPEN POSITION.</div>"
+        "<div class=card><span class=k>positions</span> unknown — the broker "
+        "fork is hobbled (no account access), so this cannot enumerate them. "
+        "Phase 2 lists each position here before you confirm.</div>"
+        f"<form method=post action=/exit-all/confirm>"
+        f"<input type=hidden name=nonce value='{n}'>"
+        f"<button class='big exit'>CONFIRM — FLATTEN (dry run)</button></form>"
+        "<form method=get action=/><button class='big cancel'>cancel</button></form>")
+
+
+@app.post("/exit-all/confirm")
+def exit_all_confirm():
+    if not burn_nonce(request.form.get("nonce", "")):
+        journal({"event": "exit_all_refused", "reason": "bad or expired nonce"})
+        return render("<div class='card bad'>Exit refused: confirm window "
+                      "lapsed. Tap EXIT ALL again.</div><a href=/>back</a>"), 409
+    journal({"event": "exit_all", "transmitted": False,
+             "reason_not_transmitted": "phase 1 — no order client exists"})
+    return render(
+        "<div class='card ok'>DRY RUN COMPLETE — nothing transmitted.<br>"
+        "Intent journaled. Phase 2 (st-bxls) closes each open position with "
+        "a market order.</div><a href=/>back</a>")
 
 
 @app.get("/arm")
 @app.get("/fire")
+@app.get("/exit-all")
 def _action_get_redirects_home():
     """A refresh or back-button on an action URL lands home, never a 405."""
     return redirect("/", code=303)

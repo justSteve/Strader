@@ -134,3 +134,58 @@ def test_get_on_action_routes_redirects_home_not_405(rig):
         r = c.get(path)
         assert r.status_code == 303, f"{path} should redirect, got {r.status_code}"
         assert r.headers["Location"].endswith("/")
+
+
+# --- Exit-all panic surface [st-pbfg] ---------------------------------------
+
+def _exit_nonce(c):
+    return c.post("/exit-all").data.split(b"name=nonce value='")[1].split(b"'")[0].decode()
+
+
+def test_exit_button_present_in_every_idle_state(rig):
+    c = _client()
+    assert b"EXIT ALL POSITIONS" in c.get("/").data          # no ticket
+    _stage(rig)
+    assert b"EXIT ALL POSITIONS" in c.get("/").data          # armable ticket
+    _stage(rig, qty=fs.QTY_CAP + 1)
+    assert b"EXIT ALL POSITIONS" in c.get("/").data          # unarmable ticket
+
+
+def test_kill_switch_does_not_block_exit(rig):
+    """The kill switch stops entries. Blocking exits would trap Steve in
+    positions at the worst moment — the inverse of what it is for."""
+    (rig / "FIRE_DISABLED").touch()
+    c = _client()
+    assert b"EXIT ALL POSITIONS" in c.get("/").data
+    assert c.post("/arm").status_code == 409                 # entry blocked
+    nonce = _exit_nonce(c)                                   # exit allowed
+    r = c.post("/exit-all/confirm", data={"nonce": nonce})
+    assert r.status_code == 200 and b"DRY RUN COMPLETE" in r.data
+
+
+def test_exit_works_with_no_ticket_and_journals(rig):
+    c = _client()
+    nonce = _exit_nonce(c)
+    r = c.post("/exit-all/confirm", data={"nonce": nonce})
+    assert r.status_code == 200
+    ev = _journal_events(rig)
+    assert [e["event"] for e in ev] == ["exit_all_armed", "exit_all"]
+    assert ev[-1]["transmitted"] is False
+
+
+def test_exit_confirm_needs_valid_nonce(rig):
+    c = _client()
+    assert c.post("/exit-all/confirm", data={"nonce": "bogus"}).status_code == 409
+    nonce = _exit_nonce(c)
+    assert c.post("/exit-all/confirm", data={"nonce": nonce}).status_code == 200
+    assert c.post("/exit-all/confirm", data={"nonce": nonce}).status_code == 409
+
+
+def test_exit_is_independent_of_stale_ticket(rig):
+    from datetime import datetime, timedelta, timezone
+    old = (datetime.now(timezone.utc) - timedelta(minutes=fs.STALE_MIN + 5)).isoformat()
+    _stage(rig, ts_staged=old)
+    c = _client()
+    assert c.post("/arm").status_code == 409                 # entry refused
+    nonce = _exit_nonce(c)
+    assert c.post("/exit-all/confirm", data={"nonce": nonce}).status_code == 200

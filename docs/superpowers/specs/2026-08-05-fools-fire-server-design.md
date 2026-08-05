@@ -40,6 +40,30 @@ Steve alone fires. The phone changes where his finger is, not who decides.
 - **Tests**: 9 rail tests (`tests/scripts/test_fire_server.py`), full suite
   690 green.
 
+## The exit-all panic surface [st-pbfg]
+
+`EXIT ALL POSITIONS` sits on every idle page state, separated from ARM so a
+fat finger can't reach it. Two taps (EXIT ALL → confirm with a single-use
+nonce) — one more than instant, far less than the entry ceremony, because
+exit is the lower-risk direction: the worst case of an unwanted exit is
+being flat when you didn't mean to be, while an unwanted entry creates risk
+you never chose.
+
+**The kill switch does not block exit, deliberately.** `FIRE_DISABLED`
+exists to stop the machine *entering* trades. If it also blocked exits it
+would trap Steve in positions at exactly the moment he most needs out —
+the inverse of the switch's purpose. Ticket staleness and the qty cap are
+equally irrelevant here: exit acts on live account state, not on a staged
+ticket. Tests assert all of this (`test_kill_switch_does_not_block_exit`).
+
+Phase 1 cannot enumerate positions (the fork has no account access) or
+transmit anything, and the page says so rather than faking a position list.
+Phase 2 adds a fifth endpoint — a positions read — so the confirm screen
+lists each open position before Steve flattens it, and closes each with a
+**market order**: in a panic, certainty of exit beats price improvement.
+That order-type choice is Steve's to overrule; the wide-spread cost of
+market orders in fast SPX conditions is the tradeoff it accepts.
+
 ## Phase 2 gate (before any real transmission)
 
 1. Steve creates `~/.schwab_fire_key` (`touch` — agent never creates it).
