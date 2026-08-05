@@ -58,3 +58,7 @@ session-briefing.md
 # Runbook generated caches (regenerable; commentary/ is intentionally tracked)
 runbook/mancini/parsed/
 runbook/mancini/charts/
+
+# Tailscale cert/key written into the repo root by `tailscale cert` [st-1o47]
+*.ts.net.crt
+*.ts.net.key

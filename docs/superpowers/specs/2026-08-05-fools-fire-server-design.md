@@ -23,6 +23,13 @@ Steve alone fires. The phone changes where his finger is, not who decides.
 
 - **Binding**: resolved Tailscale address only (`100.108.58.5:8777`), loud
   failure if tailscaled is down. Never 0.0.0.0, never LAN, never public.
+- **HTTPS** (2026-08-05): `tailscale serve` terminates TLS with a real
+  Let's Encrypt cert and proxies to the app, so the surface is
+  `https://mydesk-1.tail89f676.ts.net` — padlock, no browser warning on a
+  page with a FIRE button. Verified `tailnet only`; **funnel is off and must
+  stay off** (`tailscale funnel` would publish this to the internet — never
+  run it against this service). Re-arm after a reboot with:
+  `tailscale serve --bg --https=443 http://<tailnet-ip>:8777`.
 - **Flow**: staged ticket renders with its evidence → **ARM** → single-use
   nonce (60 s) → **FIRE** → Phase 1 journals the intent and reports
   *"DRY RUN COMPLETE — nothing transmitted."*
