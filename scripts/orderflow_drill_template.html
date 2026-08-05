@@ -165,6 +165,11 @@ td:first-child, th:first-child { text-align:left; }
   border-left:4px solid transparent; border-right:4px solid transparent;
   border-top:6px solid var(--ink-2); }
 .col .evmark.setup { border-top-color:var(--good); }
+/* Mode gate [st-o216]. One template serves the drill and the live session —
+   deliberately, because a rep drilled on a replay has to transfer to the live
+   surface and two templates would drift. So the difference is a class on
+   <body>, not a fork: .live hides what only a finished tape can support. */
+body.live .drill-only { display:none !important; }
 </style></head><body>
 <header>
   <h1>Orderflow Drill</h1>
@@ -172,13 +177,13 @@ td:first-child, th:first-child { text-align:left; }
 </header>
 <div id="ctlblock">
 <div class="controls">
-  <button id="play" class="primary">▶ Play</button>
+  <button id="play" class="primary drill-only">▶ Play</button>
   <button id="back">⟨ Bar</button><button id="fwd">Bar ⟩</button>
-  <label>Speed <select id="speed">
+  <label class="drill-only">Speed <select id="speed">
     <option value="0.5">½× slow</option><option value="1" selected>1× real</option>
     <option value="2">2×</option><option value="5">5×</option>
   </select></label>
-  <label title="The learning ladder — each phase directs your attention at one thing">Phase <select id="phase">
+  <label class="drill-only" title="The learning ladder — each phase directs your attention at one thing">Phase <select id="phase">
     <option value="watch" selected>0 · Watch</option>
     <option value="mechanics">1 · Mechanics</option>
     <option value="perception">2 · Perception</option>
@@ -188,7 +193,7 @@ td:first-child, th:first-child { text-align:left; }
   <label>Level <input type="text" id="lvlinput" size="7" placeholder="price"></label>
   <button id="arm">Arm level</button>
   <span id="chips"></span>
-  <label title="The skill ladder — scenarios in concentration order (docs/drills/skill-ladder.md)">Ladder
+  <label class="drill-only" title="The skill ladder — scenarios in concentration order (docs/drills/skill-ladder.md)">Ladder
     <select id="scenario"><option value="">scenario ▾</option></select></label>
   <label>Rows <select id="zoom">
     <option value="9">Compact</option><option value="13" selected>Medium</option>
@@ -200,7 +205,7 @@ td:first-child, th:first-child { text-align:left; }
     <option value="pair">bid×ask</option>
   </select></label>
   <button id="tbl">Table view</button>
-  <button id="anat" title="Walk the recognizer's four-stage setups on this day">Anatomy</button>
+  <button id="anat" class="drill-only" title="Walk the recognizer's four-stage setups on this day">Anatomy</button>
   <button id="helpbtn" title="What am I looking at?">?</button>
 </div>
 <div class="readouts">
@@ -210,15 +215,15 @@ td:first-child, th:first-child { text-align:left; }
   <span>Bar Δ <b id="ro-delta">–</b></span>
   <span>Session Δ (sum of bars) <b id="ro-cvd">–</b></span>
   <span>Bar took <b id="ro-dur">–</b></span>
-  <span>Score <b id="ro-score">0/0</b></span>
+  <span class="drill-only">Score <b id="ro-score">0/0</b></span>
 </div>
 <div id="emrow"></div>
 <div id="empanel"></div>
 </div>
 <div id="visits"></div>
-<div id="scendeck"></div>
-<div id="anatomy"></div>
-<div id="beatrail"></div>
+<div id="scendeck" class="drill-only"></div>
+<div id="anatomy" class="drill-only"></div>
+<div id="beatrail" class="drill-only"></div>
 <div id="stage"><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
   <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
 </div>
@@ -261,7 +266,7 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
   </ol>
   <p style="text-align:right"><button onclick="document.getElementById('help').style.display='none'">Got it</button></p>
 </div></div>
-<div id="panel"><div class="card">
+<div id="panel" class="drill-only"><div class="card">
   <h2 id="q-title">Price approaching level</h2>
   <p id="q-body"></p>
   <div class="btns">
@@ -270,12 +275,12 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
     <button data-call="skip">No call</button>
   </div>
 </div></div>
-<div id="quiz"><div class="card">
+<div id="quiz" class="drill-only"><div class="card">
   <h2 id="quiz-title"></h2>
   <p id="quiz-body"></p>
   <div class="btns" id="quiz-btns"></div>
 </div></div>
-<div id="log">
+<div id="log" class="drill-only">
   <h3>Drill log <button id="export">Export JSON</button> <button id="clear">Clear</button></h3>
   <table id="logtable"><thead><tr>
     <th>When (bar time)</th><th>Level</th><th>From</th><th>Your call</th><th>Outcome</th><th>Verdict</th>
@@ -314,6 +319,16 @@ let cellMode = "delta";      // delta | vol | pair — what the cell text shows
 // [st-re1o]
 const bars = DATA.bars;
 const LIVE = !!(DATA.meta && DATA.meta.source === "live");
+// Mode gate [st-o216]. Set BEFORE any render so the live page never paints a
+// drill control and then yanks it. Everything hidden here needs a finished
+// tape: playback (a live bar only arrives after it closed, so there is nothing
+// to play), the learning ladder, the scenario deck, anatomy (DATA.anatomy
+// ships empty live), and the whole scoring apparatus. Seek, level arming,
+// chips and the display controls stay — they are as useful live as drilled.
+if (LIVE) {
+  document.body.classList.add("live");
+  document.querySelector("header h1").textContent = "Live Footprint";
+}
 let liveFollow = true;   // auto-advance to the newest bar as it lands
 const $ = id => document.getElementById(id);
 function refreshMeta() {
