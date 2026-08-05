@@ -1,13 +1,19 @@
 """GexBot stream pull — one cycle. [st-1yp]
 
-Hits 5 endpoints in sequence respecting the 1 req/sec/metric rate limit:
+Hits 6 endpoints in sequence respecting the 1 req/sec/metric rate limit:
   /SPX/state/gamma_zero
   /SPX/state/vanna_zero
   /SPX/state/charm_zero
   /SPX/state/delta_zero
   /SPX/classic/gex_zero/majors
+  /SPX/orderflow/orderflow      (OPTIONAL — Quant/Orderflow tiers only, st-fyey)
 
-Bundles all 5 responses into one record ready to write via writer.
+Bundles the responses into one record ready to write via writer.
+
+Optional endpoints skip silently on 401/403 (recorded in the response slot,
+NOT in errors[]) so the same collector runs correctly at every subscription
+tier — a State-tier key must not generate an error per cycle for a leg it
+was never entitled to, and the poller's failure back-off must stay meaningful.
 """
 from __future__ import annotations
 
@@ -30,7 +36,13 @@ ENDPOINTS_DEFAULT = [
     "/SPX/state/charm_zero",
     "/SPX/state/delta_zero",
     "/SPX/classic/gex_zero/majors",
+    "/SPX/orderflow/orderflow",
 ]
+
+# Endpoints gated behind tiers we may not be subscribed to. 401/403 here is a
+# subscription fact, not a failure — recorded in the response slot, kept out
+# of errors[]. [st-fyey]
+OPTIONAL_ENDPOINTS = {"/SPX/orderflow/orderflow"}
 
 
 def _load_api_key() -> str:
@@ -72,10 +84,23 @@ def pull_cycle(ticker: str = "SPX") -> dict:
                 resp = client.get(url, headers=headers)
                 if resp.status_code >= 400:
                     body_text = resp.text[:300]
-                    errors.append(f"{ep} HTTP {resp.status_code}: {body_text}")
-                    by_endpoint[ep] = {"status_code": resp.status_code, "error_body": body_text}
+                    optional = ENDPOINTS_DEFAULT[i] in OPTIONAL_ENDPOINTS
+                    if optional and resp.status_code in (401, 403):
+                        by_endpoint[ep] = {"status_code": resp.status_code,
+                                           "skipped": "not entitled at current tier"}
+                    else:
+                        errors.append(f"{ep} HTTP {resp.status_code}: {body_text}")
+                        by_endpoint[ep] = {"status_code": resp.status_code, "error_body": body_text}
                 else:
-                    by_endpoint[ep] = resp.json()
+                    body = resp.json()
+                    # GexBot signals "not subscribed" for the orderflow package
+                    # inside an HTTP 200 — same subscription-fact handling.
+                    if (ENDPOINTS_DEFAULT[i] in OPTIONAL_ENDPOINTS
+                            and isinstance(body, dict) and set(body) == {"error"}):
+                        by_endpoint[ep] = {"status_code": 200,
+                                           "skipped": body["error"]}
+                    else:
+                        by_endpoint[ep] = body
             except httpx.HTTPError as e:
                 errors.append(f"{ep} transport: {type(e).__name__}: {e}")
                 by_endpoint[ep] = {"transport_error": f"{type(e).__name__}: {e}"}
