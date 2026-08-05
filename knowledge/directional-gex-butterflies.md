@@ -17,6 +17,31 @@ The v-drop/return setup is still his priority (he takes it every time, cuts on t
 
 **How to apply:** Read every fly setup through "how far is price from the GEX magnet, and is there room + time to travel there." Distance-to-GEX-magnet is the shared signal across flies (collect at the destination, convex) and singles (collect on the journey, linear). Related: [[project_pin_projection_research]], [[feedback_v_day_target_is_down_only]].
 
+**2026-08-05 — banned framing, and why this kept recurring [st-frco]:**
+
+Never write that a fly "wants" a consolidation range, that it needs price to stay
+range-bound, or that it is price-neutral / harvests theta. **The precondition is a
+departure and a return, not range occupancy.** A market extended far from its
+supports is not hostile to this play — distance from the target is what makes the
+fly cheap and gives it room to travel. The body goes at the DESTINATION (the V-return
+level, or the GEX magnet); the consolidation range is the landmark that identifies
+that destination, never a requirement.
+
+Root cause of the repetition: CLAUDE.md — always loaded and declared authoritative —
+said "centering butterflies relative to the consolidation range." The `Why` note
+above spotted that in July but the source was never fixed, so instructions outranked
+this concept every session and the correction had to be re-issued by hand. CLAUDE.md
+was corrected on 2026-08-05.
+
+Steve's corrections, verbatim (claude-monitor record):
+- 2026-06-09 — "Textbook approaches to flies read them as price neutral. I don't.
+  I'm not taking atm and trying to live off theta decay. i'm diretionally oriented
+  guided by GEX."
+- 2026-06-24 — "I'm not looking to center and hold. I'm buying late to buy the
+  movement... so you say: Fly wants: isn't the fly i want."
+- 2026-06-24 — "i rarely take a fly atm even if i think that's the pin. I'll hold out
+  for the v-shaped dump and return. i guess my litmus is less theta than it is delta."
+
 **2026-07-13 additions (foundation-check conversation):**
 - Steve's SPX parlance: "one level" ≈ 10 SPX points.
 - Bet-structure doctrine: he EXPECTS a ~10-pt (one-level) EOD reversion off a late flush but won't pay up to bet exactly that — he prefers the cheaper fly pinned ~20 pts away (2 levels), accepting full-loss risk, and takes early profit if only the expected 10-pt move materializes. The expected move is his profit-taking trigger, not his pin.
