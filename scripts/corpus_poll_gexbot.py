@@ -51,7 +51,7 @@ def main() -> int:
             rec = gexbot_cycle()
             append_jsonl(gexbot_path(), rec)
             update_manifest(d=None, stream="gexbot", increment_cycles=1,
-                            errors=len(rec["errors"]))
+                            errors=rec["errors"] or None)
             s = rec["data"]["summary"]
             print(f"  [{rec['ts_pull_utc']}] gexbot  spot={s.get('spot_at_gamma_zero')}  "
                   f"bracket={s.get('major_negative')}-{s.get('major_positive')}  "
@@ -61,7 +61,12 @@ def main() -> int:
             consecutive_failures += 1
             print(f"  gexbot CYCLE FAILED ({consecutive_failures} consecutive): "
                   f"{type(e).__name__}: {e}", file=sys.stderr, flush=True)
-            update_manifest(d=None, stream="gexbot", increment_cycles=1, errors=1)
+            try:
+                update_manifest(d=None, stream="gexbot", increment_cycles=1,
+                                errors=[f"{type(e).__name__}: {e}"])
+            except Exception as me:
+                # Manifest bookkeeping must never kill the collector.
+                print(f"  manifest update failed too: {me}", file=sys.stderr, flush=True)
 
         runs += 1
         if args.max_runs is not None and runs >= args.max_runs:
