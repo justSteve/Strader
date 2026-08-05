@@ -12,6 +12,12 @@ tokens/
 
 # Data (runtime, not tracked)
 data/
+# EXCEPTION, tracked via `git add -f`: data/measurement/decision_aligned_truth.json.
+# The live meter READS it at runtime, so an untracked copy means a rebuilt box
+# runs a meter that degrades to "truth table absent" until someone remembers to
+# regenerate it — and CI cannot check the meter/study bucket contract at all
+# (20 red runs, st-yyuz). It is a 200K published measurement result, not raw
+# corpus; the rule above exists to keep gigabytes of tape out, not this.
 
 # Claude Code local settings (security)
 .claude/settings.local.json
