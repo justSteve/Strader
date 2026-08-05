@@ -43,7 +43,7 @@ import time as _time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, render_template_string, request
+from flask import Flask, redirect, render_template_string, request
 from markupsafe import escape
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -153,7 +153,7 @@ def burn_nonce(n: str) -> bool:
 
 PAGE = """<!doctype html><html><head>
 <meta name=viewport content="width=device-width, initial-scale=1">
-<meta http-equiv=refresh content=10>
+{% if refresh %}<meta http-equiv=refresh content=10>{% endif %}
 <title>FIRE — dry run</title><style>
  body{background:#111;color:#eee;font:18px/1.5 -apple-system,system-ui,sans-serif;
       max-width:34em;margin:2em auto;padding:0 1em}
@@ -170,8 +170,15 @@ PAGE = """<!doctype html><html><head>
 </body></html>"""
 
 
-def render(body: str) -> str:
-    return render_template_string(PAGE, body=body)
+def render(body: str, *, refresh: bool = False) -> str:
+    """Auto-refresh belongs ONLY on the idle page.
+
+    Two reasons, both learned live 2026-08-05: a refresh of a POST response
+    re-requests /arm as a GET and 405s, and — worse — a page that reloads
+    itself during the confirm window would yank the FIRE button out from
+    under Steve mid-decision. The armed page holds still.
+    """
+    return render_template_string(PAGE, body=body, refresh=refresh)
 
 
 def _ticket_card(t: dict, problems: list[str], age: float | None) -> str:
@@ -196,12 +203,13 @@ def health():
 def index():
     if killed():
         return render("<div class='card bad'>KILL SWITCH ON — remove "
-                      "data/exec/FIRE_DISABLED to re-enable.</div>")
+                      "data/exec/FIRE_DISABLED to re-enable.</div>",
+                      refresh=True)
     t, problems = load_ticket()
     if t is None:
         return render("<div class=card><span class=k>No ticket staged.</span>"
                       "<br>Agents stage by writing data/exec/fire-ticket.json."
-                      "</div>")
+                      "</div>", refresh=True)
     age = ticket_age_min(t)
     stale = age is None or age > STALE_MIN
     body = _ticket_card(t, problems, age)
@@ -213,7 +221,14 @@ def index():
     else:
         body += ("<form method=post action=/arm>"
                  "<button class='big arm'>ARM</button></form>")
-    return render(body)
+    return render(body, refresh=True)
+
+
+@app.get("/arm")
+@app.get("/fire")
+def _action_get_redirects_home():
+    """A refresh or back-button on an action URL lands home, never a 405."""
+    return redirect("/", code=303)
 
 
 @app.post("/arm")

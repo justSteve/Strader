@@ -117,3 +117,20 @@ def test_fire_rechecks_stale_after_arm(rig, monkeypatch):
     _stage(rig, ts_staged=old)
     r = c.post("/fire", data={"nonce": nonce})
     assert r.status_code == 409 and b"stale" in r.data
+
+
+def test_idle_page_refreshes_armed_page_does_not(rig):
+    """Auto-refresh on the armed page would 405 and yank FIRE mid-decision."""
+    _stage(rig)
+    c = _client()
+    assert b"http-equiv=refresh" in c.get("/").data
+    assert b"http-equiv=refresh" not in c.post("/arm").data
+
+
+def test_get_on_action_routes_redirects_home_not_405(rig):
+    _stage(rig)
+    c = _client()
+    for path in ("/arm", "/fire"):
+        r = c.get(path)
+        assert r.status_code == 303, f"{path} should redirect, got {r.status_code}"
+        assert r.headers["Location"].endswith("/")
