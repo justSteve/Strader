@@ -65,6 +65,7 @@ class BridgeState:
         self._bars: list[dict] = []
         self._bar_meta: dict = {}
         self._final: list[dict] = []   # end-of-stream emissions [st-b0n9]
+        self._developing: dict | None = None  # the bar still forming [st-e91l]
         self._events = 0
         self.started = datetime.now(timezone.utc).isoformat(timespec="seconds")
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -95,7 +96,8 @@ class BridgeState:
             return cmd
 
     def add_bars(self, bars: list[dict], meta: dict | None = None,
-                 final: list[dict] | None = None) -> int:
+                 final: list[dict] | None = None,
+                 developing: dict | None = None) -> int:
         """Append closed footprint bars from the live feeder. [st-re1o]
 
         Returns the new total. ``meta`` (bar size, tick, anchors, session day)
@@ -106,11 +108,20 @@ class BridgeState:
         the session's profile levels, which belong to no bar [st-b0n9]. Held
         like meta (replaced, not appended) and served on every /bars response,
         so a page that connects after the close still gets it.
+
+        ``developing`` is the bar the tape is currently writing [st-e91l]:
+        REPLACED on every push, never appended, and cleared the moment real bars
+        arrive — because a closed bar IS the developing one, finished. Holding a
+        single slot rather than a list is what keeps it from ever being mistaken
+        for history: there is nothing here to accumulate, seek through or
+        replay.
         """
         if not isinstance(bars, list):
             raise ValueError("bars must be a list")
         if final is not None and not isinstance(final, list):
             raise ValueError("final must be a list")
+        if developing is not None and not isinstance(developing, dict):
+            raise ValueError("developing must be an object")
         with self._lock:
             if meta:
                 self._bar_meta = meta
@@ -120,6 +131,12 @@ class BridgeState:
                 if not isinstance(b, dict):
                     raise ValueError("each bar must be an object")
                 self._bars.append({**b, "i": len(self._bars)})
+            # Order matters: a push carrying closed bars retires whatever was
+            # developing, even if this same push also carries a newer one.
+            if bars:
+                self._developing = None
+            if developing is not None:
+                self._developing = developing
             total = len(self._bars)
             if bars or final:
                 self._append({"channel": "bars", "kind": "bar_push",
@@ -131,7 +148,8 @@ class BridgeState:
         with self._lock:
             start = max(0, min(n, len(self._bars)))
             return {"bars": self._bars[start:], "total": len(self._bars),
-                    "meta": self._bar_meta, "final": self._final}
+                    "meta": self._bar_meta, "final": self._final,
+                    "developing": self._developing}
 
     def commands_since(self, last_id: int) -> list[dict]:
         with self._lock:
@@ -220,7 +238,8 @@ class _Handler(BaseHTTPRequestHandler):
             elif url.path == "/bars":
                 total = STATE.add_bars(payload.get("bars") or [],
                                        payload.get("meta"),
-                                       payload.get("final"))
+                                       payload.get("final"),
+                                       payload.get("developing"))
                 self._send(200, {"ok": True, "total": total})
             elif url.path == "/coach":
                 cmd = STATE.add_coach(payload)

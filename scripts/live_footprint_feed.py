@@ -205,7 +205,8 @@ def take_bar_trades(bar, buf: list) -> list:
     return taken
 
 
-def bar_payload(bar, trades: list, events: list[dict] | None = None) -> dict:
+def bar_payload(bar, trades: list, events: list[dict] | None = None,
+                *, include_steps: bool = True) -> dict:
     """Serialise a FootprintBar into the exact column shape the page renders.
 
     Key-for-key identical to orderflow_drill.bars_payload's per-bar dict —
@@ -218,6 +219,11 @@ def bar_payload(bar, trades: list, events: list[dict] | None = None) -> dict:
     ordering and one arrival: a bar and what it emitted can never be out of
     step or half-delivered. End-of-stream emissions (engine flush, profile
     levels) belong to no bar and go on the separate ``final`` channel instead.
+
+    ``include_steps`` is off for the DEVELOPING bar [st-e91l]: fill steps exist
+    to animate a bar that is already complete, and recomputing them once a
+    second for a bar the tape is still writing is work whose output is
+    immediately stale.
     """
     return {
         "t0": bar.start_ts.isoformat(), "t1": bar.end_ts.isoformat(),
@@ -226,9 +232,38 @@ def bar_payload(bar, trades: list, events: list[dict] | None = None) -> dict:
         "dur": round(bar.duration_seconds, 3),
         "poc": bar.poc_price,
         "cells": [[c.price, c.bid_vol, c.ask_vol] for c in bar.cells],
-        "steps": bar_fill_steps(trades, [bar])[0] if trades else [],
+        "steps": (bar_fill_steps(trades, [bar])[0]
+                  if include_steps and trades else []),
         "ev": events or [],
     }
+
+
+def developing_payload(pending: list, bar_n: int) -> dict | None:
+    """The bar the tape is CURRENTLY writing, as a display-only column. [st-e91l]
+
+    ``build_bars(..., include_partial=True)`` over the trades accumulated since
+    the last close yields exactly one under-``n`` bar — the same accumulator,
+    the same cell construction and the same delta the closed bar will be built
+    from, so a developing column cannot render differently from the bar it is
+    about to become. Nothing here is reimplemented.
+
+    DISPLAY ONLY, and that is the whole safety argument. This bar never enters
+    the page's ``bars`` array, never drives ``StackDriver`` and never reaches
+    the replay record. Feeding a partial bar to the recognizer would corrupt the
+    engagement state it is measuring, and re-processing its trades through the
+    engine would double-emit every signal — so it carries no emissions at all.
+    The tape is re-read from the same pending list on every tick, which is cheap
+    because the list never exceeds one bar of trades.
+    """
+    if not pending:
+        return None
+    bars = list(build_bars(iter(pending), n=bar_n, include_partial=True))
+    if not bars:
+        return None
+    # Guard, not decoration: if the pending slice ever reached a full bar the
+    # main loop would have closed it, so more than one bar here means the
+    # tee/reclaim invariant broke and the newest is the only honest one.
+    return bar_payload(bars[-1], [], include_steps=False)
 
 
 # --------------------------------------------------------------------------
@@ -236,8 +271,10 @@ def bar_payload(bar, trades: list, events: list[dict] | None = None) -> dict:
 # --------------------------------------------------------------------------
 
 def post_bars(bridge: str, bars: list[dict], meta: dict | None = None,
-              final: list[dict] | None = None, *, timeout: float = 5.0) -> int | None:
-    body = json.dumps({"bars": bars, "meta": meta, "final": final}).encode()
+              final: list[dict] | None = None, developing: dict | None = None,
+              *, timeout: float = 5.0) -> int | None:
+    body = json.dumps({"bars": bars, "meta": meta, "final": final,
+                       "developing": developing}).encode()
     req = urllib.request.Request(f"{bridge}/bars", data=body,
                                  headers={"Content-Type": "application/json"},
                                  method="POST")
@@ -269,6 +306,10 @@ def main() -> int:
     ap.add_argument("--mancini-levels",
                     help="comma-separated ES levels the recognizer watches; "
                          "default reads the day's parse (same rule as the page)")
+    ap.add_argument("--developing-interval", type=float, default=1.0,
+                    help="seconds between pushes of the DEVELOPING (still "
+                         "forming) bar; 0 disables and the page shows closed "
+                         "bars only, as it did before [st-e91l]")
     ap.add_argument("--dry-run", action="store_true",
                     help="build and log bars, post nothing")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -326,9 +367,30 @@ def main() -> int:
     # intra-bar fill steps; build_bars otherwise swallows them.
     pending_trades: list = []
 
+    # The developing bar is emitted from HERE, not the main loop [st-e91l].
+    # The loop below blocks inside build_bars between closes — it only runs when
+    # a bar completes — so the tee is the one place that sees the tape while a
+    # bar is still forming. A wall-clock gate keeps it to one push per interval
+    # however fast the prints arrive; single-threaded, no new concurrency.
+    #
+    # Suppressed during catch-up: replaying a finished day would emit a
+    # developing bar per interval of WALL time while racing through hours of
+    # tape, which is noise, and the last one would be left standing after the
+    # run ends.
+    dev_on = args.developing_interval > 0 and not args.catch_up_only and not args.dry_run
+    last_dev = 0.0
+
     def _tee(it):
+        nonlocal last_dev
         for t in it:
             pending_trades.append(t)
+            if dev_on:
+                now = time.monotonic()
+                if now - last_dev >= args.developing_interval:
+                    last_dev = now
+                    payload = developing_payload(pending_trades, args.bar_n)
+                    if payload is not None:
+                        post_bars(args.bridge, [], None, None, payload)
             yield t
 
     sent = 0

@@ -170,6 +170,13 @@ td:first-child, th:first-child { text-align:left; }
    surface and two templates would drift. So the difference is a class on
    <body>, not a fork: .live hides what only a finished tape can support. */
 body.live .drill-only { display:none !important; }
+/* The bar the tape is still writing [st-e91l]. Must never be mistaken for a
+   closed bar: dashed edge, dimmed, and its footer says so. */
+.col.dev { opacity:.72; border-right:1px dashed var(--axis);
+  border-left:1px dashed var(--axis); }
+.col.dev .foot { border-top:1px dashed var(--axis); }
+.col.dev .cell { border-radius:1px; }
+.col.dev .foot .txt .lbl { font-size:8px; letter-spacing:.06em; opacity:.85; }
 </style></head><body>
 <header>
   <h1>Orderflow Drill</h1>
@@ -330,6 +337,12 @@ if (LIVE) {
   document.querySelector("header h1").textContent = "Live Footprint";
 }
 let liveFollow = true;   // auto-advance to the newest bar as it lands
+// Declared HERE, not beside renderDeveloping() far below, because repaintAll()
+// calls that function during boot — and a `let` read before its declaration
+// executes is a ReferenceError, which at the top of the boot script kills
+// everything after it. That is precisely the failure ea77d7a spent a session
+// chasing. [st-e91l]
+let DEV = null;          // the bar still forming, or null
 const $ = id => document.getElementById(id);
 function refreshMeta() {
   // Truthy, not `!= null` [st-6vi0]: a live payload seeds contracts as 0 at
@@ -521,6 +534,7 @@ function renderColumn(b, i) {
 function repaintAll() {
   updateView(); drawAxis(); strip.innerHTML = "";
   for (let i = Math.max(0, idx - KEEP_COLS + 1); i <= idx; i++) strip.appendChild(renderColumn(bars[i], i));
+  renderDeveloping();   // wiped with the strip, so put it back [st-e91l]
 }
 const fmtClock = iso => iso.slice(11, 19);
 
@@ -1320,6 +1334,7 @@ async function pollBars() {
     // Served on every response, so a page opened after the close still gets
     // them; they belong to no bar, so they live beside the array. [st-b0n9]
     if (d.final && d.final.length !== FINAL.length) { FINAL = d.final; renderEmissions(); }
+    DEV = d.developing || null;    // null once its closed version lands [st-e91l]
     const fresh = d.bars || [];
     if (fresh.length) {
       const wasAtTip = idx >= bars.length - 1;
@@ -1331,14 +1346,53 @@ async function pollBars() {
       if (liveFollow && wasAtTip) { while (idx < bars.length - 1) step(); }
       $("bridge-dot").textContent = `live · ${bars.length} bars`;
     }
+    renderDeveloping();   // after any append, so it lands right of the newest
   } catch {
     if (++liveErrs === 3) $("bridge-dot").textContent = "feed stalled";
   }
   setTimeout(pollBars, 2000);
 }
+// ── the developing bar [st-e91l] ─────────────────────────────────────────
+// The bar the tape is CURRENTLY writing, pushed ~1/s by the feeder. A volume
+// bar can take minutes to fill in quiet tape (median 24.8s on 2026-08-05, max
+// 489s), and without this the right edge simply freezes for that whole time —
+// so a flush that is building right now is invisible until 2000 contracts have
+// printed.
+//
+// DELIBERATELY NOT IN `bars`. It is held here, rendered as one extra column
+// after the last real one, and dropped the moment its closed version arrives.
+// Pushing it into the array would put it in reach of bars.length, idx, seek,
+// the episode scan and the anatomy walk — every one of which means "closed
+// bars" — and that is where this feature would go wrong.
+//
+// It carries NO emissions by construction: the engine and recognizer run on
+// completed bars only, and feeding them a partial would corrupt the engagement
+// state they are measuring.
+function renderDeveloping() {
+  const old = strip.querySelector(".col.dev");
+  if (old) strip.removeChild(old);
+  // Only at the tip: while seeking back through the session a live-updating
+  // column on the right would be lying about where you are looking.
+  if (!DEV || !LIVE || idx < bars.length - 1 || !bars.length) return;
+  const col = renderColumn(DEV, bars.length);
+  col.classList.add("dev");
+  col.removeAttribute("data-i");        // not addressable as a real bar
+  const txt = col.querySelector(".foot .txt");
+  if (txt) {
+    // Delta is the headline: a delta building mid-bar is what says a flush has
+    // started. Volume-so-far replaces the bar index, which it does not have.
+    txt.children[1].textContent = `${DEV.v}/${DATA.meta.bar_n}`;
+    txt.children[2].textContent = "building";
+    txt.children[2].className = "lbl";
+  }
+  col.title = `developing bar — ${DEV.v} of ${DATA.meta.bar_n} contracts, `
+    + `Δ ${DEV.d >= 0 ? "+" : ""}${DEV.d}, ${DEV.dur.toFixed(0)}s so far`;
+  strip.appendChild(col);
+}
+
 // Seeking back through the session turns following off; returning to the tip
 // turns it back on, so studying a level does not silently freeze the chart.
-function noteSeek() { liveFollow = idx >= bars.length - 1; }
+function noteSeek() { liveFollow = idx >= bars.length - 1; renderDeveloping(); }
 
 function connectBridge() {
   fetch(BRIDGE + "/health").then(r => r.json()).then(() => {
