@@ -142,9 +142,19 @@ Two findings from the official RC doc land regardless of architecture:
   marker file — the exact away-detection this project needs, and a pattern
   the dumb-pipe leg should copy.
 
-## Open decisions for Steve (not needed yet)
+## Status 2026-08-05 — two of four lanes closed, both halves of the remote arm exist
 
-- Choice of dumb-pipe push (Pushover-class critical alert vs ntfy) after
-  R2's latency/Focus measurements.
+| Piece | State |
+|---|---|
+| Transport | **DONE** — Tailscale node `mydesk-1` (100.108.58.5); HTTPS via `tailscale serve`, tailnet-only, funnel prohibited |
+| Fire surface | **DONE (dry-run)** — `scripts/fire_server.py` at https://mydesk-1.tail89f676.ts.net; staged-ticket form, ARM→nonce→FIRE, exit-all panic button, all rails, nothing transmittable |
+| Alert leg | **DONE, verified live** — `strader/alerts.py` → Pushover; raw Python to phone, no Claude session in the path (st-mk56) |
+| Order client | **BLOCKED on Steve** — `~/.schwab_fire_key`, then preview-only milestone (st-bxls) |
+| Detector | **OPEN** — R1/R4: what fires the alert, and how the "obvious line" is measured |
+
+The remaining risk moved entirely into the detector. Everything downstream of
+"a flush is happening" now works and has been exercised by hand.
+
+## Open decisions for Steve (not needed yet)
 - Whether alert-only ships as its own milestone ahead of phone execution
   (recommended: yes — value lands weeks earlier, risk is zero).
