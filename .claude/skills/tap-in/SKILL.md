@@ -57,6 +57,24 @@ Note open work items, recent state, continuity threads.
 cat "${CLAUDE_PROJECT_DIR}/CurrentStatus.md" 2>/dev/null
 ```
 
+### 4b. Observe the Surfaces (not just read about them)
+
+```bash
+bash "${CLAUDE_PROJECT_DIR}/scripts/surface_liveness.sh"
+```
+
+`CurrentStatus.md` above is a **claim** — what was true when someone last wrote
+it. This is an **observation**. Where they disagree, the observation wins, and
+the briefing should say so rather than quietly repeating the file.
+
+> Added 2026-08-05 (st-42mn). Steve resubscribed GEXBot mid-afternoon; the
+> session spent the rest of the day telling him "we have no GEX" while the
+> collector was writing to the corpus in the next tmux window. Nothing was
+> broken — the belief came from a memory file and a status line that were true
+> when written. This is the same failure mode step 5's co-vf9q note describes:
+> plausible, well-formed, wrong. A surface can change mid-session, and the
+> operator should never have to remember to circle the agent in.
+
 ### 5. Check the Ready Queue (name-first)
 
 The store is Dolt-backed (`.beads/embeddeddolt`). Read it through `bd`, and use
