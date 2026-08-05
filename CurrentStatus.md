@@ -22,7 +22,7 @@ summative pass.
 | Surface | State |
 |---------|-------|
 | TradingView MCP | **Removed.** No `.mcp.json`. Chart state comes from screenshots; Pine scripts are pasted by Steve by hand. |
-| GEXBot | **Paused** since 2026-07-22. No live GEX feed — never cite current GEX levels. |
+| GEXBot | **ACTIVE — State tier ($150/mo), resumed 2026-08-05** (pause ran 2026-07-03 → 08-05). Key verified live; forward collection running (stopgap: tmux `steves-desk:gexbot-collect`, 60s cadence → `data/corpus/<date>/gexbot.jsonl`; real service = st-p3lv). `/hist` Quant historical is NOT included at State (verified: permission denied) — 90-day backfill blocked pending Quant add-on decision (st-trbn deferred on it). Legacy GEX history remains 3 days (May 22, Jun 8–9). |
 | Schwab API | `lib/schwab-py` on the `hobbled-readonly` fork — account/order/transaction methods physically removed. Only `broker_schwab/readers/{quote,chain}.py` are auto-allowed. |
 | Databento | **CME Standard live GLBX verified 2026-08-03.** ES trades + MBP-1 capture continuously via `scripts/live-footprint-up.sh` (tmux `steves-desk:footprint`). OPRA live sub-covered. Historical corpus is tape-only — no GEX history. Quotes are NEVER backfilled: an uncaptured session is gone. |
 | Mancini | Pre-open cron wired; `st-i68` PATH bug open against it. |
