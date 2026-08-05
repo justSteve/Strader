@@ -70,6 +70,26 @@ TIMEOUT_S = 10
 RETRIES = 3           # a meltdown alert is worth three tries; the loop is <1s
 
 
+def _pushover_key(value: str) -> str | None:
+    """Pushover keys are 30 alphanumeric chars — never an email address.
+
+    Pushover hands a user three different identifiers and the dashboard shows
+    the email gateway address prominently, so pasting the email into
+    PUSHOVER_USER is the easy mistake (Steve hit exactly this 2026-08-05). It
+    would fail at the API with an opaque error; catch it here with the fix.
+    """
+    v = value.strip()
+    if "@" in v:
+        return ("looks like an email address — that is Pushover's email "
+                "gateway, not an API credential. PUSHOVER_USER is the 30-char "
+                "user key on your dashboard; PUSHOVER_TOKEN comes from "
+                "registering an app at pushover.net/apps/build")
+    if not (v.isalnum() and len(v) == 30):
+        return (f"should be 30 alphanumeric characters, got {len(v)} "
+                f"({'non-alphanumeric' if not v.isalnum() else 'wrong length'})")
+    return None
+
+
 @dataclass
 class AlertResult:
     ok: bool
@@ -136,8 +156,11 @@ def _config(env_path=DEFAULT_ENV_PATH) -> tuple[str, dict]:
         raise RuntimeError(
             f"ALERT_BACKEND={backend!r} is not one of {sorted(_BACKENDS)}")
     _, keys = _BACKENDS[backend]
-    fields = tuple(Field(k, secret=True,
-                         validators=(non_empty, no_comment_residue)) for k in keys)
+    fields = tuple(
+        Field(k, secret=True,
+              validators=(non_empty, no_comment_residue)
+                         + ((_pushover_key,) if k.startswith("PUSHOVER_") else ()))
+        for k in keys)
     return backend, load(fields, env_path=env_path)
 
 

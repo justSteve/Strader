@@ -45,7 +45,7 @@ def test_unknown_backend_is_rejected(rig, tmp_path):
 
 def test_pushover_urgent_uses_emergency_priority(rig, tmp_path, monkeypatch):
     env = _env(tmp_path, ALERT_BACKEND="pushover",
-               PUSHOVER_TOKEN="tok", PUSHOVER_USER="usr")
+               PUSHOVER_TOKEN="a" * 30, PUSHOVER_USER="b" * 30)
     seen = {}
     monkeypatch.setattr(alerts, "_post",
                         lambda url, data, auth=None: seen.update(data) or '{"status":1}')
@@ -58,7 +58,7 @@ def test_pushover_urgent_uses_emergency_priority(rig, tmp_path, monkeypatch):
 
 def test_retries_then_journals_failure(rig, tmp_path, monkeypatch):
     env = _env(tmp_path, ALERT_BACKEND="pushover",
-               PUSHOVER_TOKEN="tok", PUSHOVER_USER="usr")
+               PUSHOVER_TOKEN="a" * 30, PUSHOVER_USER="b" * 30)
     calls = []
 
     def boom(*a, **k):
@@ -74,7 +74,7 @@ def test_retries_then_journals_failure(rig, tmp_path, monkeypatch):
 
 def test_success_after_transient_failure(rig, tmp_path, monkeypatch):
     env = _env(tmp_path, ALERT_BACKEND="pushover",
-               PUSHOVER_TOKEN="tok", PUSHOVER_USER="usr")
+               PUSHOVER_TOKEN="a" * 30, PUSHOVER_USER="b" * 30)
     n = {"i": 0}
 
     def flaky(*a, **k):
@@ -102,8 +102,25 @@ def test_twilio_sends_sms_body(rig, tmp_path, monkeypatch):
 
 def test_send_never_raises_on_any_backend_error(rig, tmp_path, monkeypatch):
     env = _env(tmp_path, ALERT_BACKEND="pushover",
-               PUSHOVER_TOKEN="tok", PUSHOVER_USER="usr")
+               PUSHOVER_TOKEN="a" * 30, PUSHOVER_USER="b" * 30)
     monkeypatch.setattr(alerts, "_post",
                         lambda *a, **k: (_ for _ in ()).throw(ValueError("weird")))
     r = alerts.send("t", "m", env_path=env)      # must not propagate
     assert not r.ok
+
+
+def test_pushover_email_paste_is_caught_with_the_fix(rig, tmp_path):
+    """Pasting the email-gateway address into PUSHOVER_USER must fail here,
+    not opaquely at the API. Steve hit this during setup 2026-08-05."""
+    env = _env(tmp_path, ALERT_BACKEND="pushover",
+               PUSHOVER_TOKEN="a" * 30, PUSHOVER_USER="steve+abc123@pomail.net")
+    r = alerts.send("t", "m", env_path=env)
+    assert not r.ok
+    assert "email gateway" in r.detail and "apps/build" in r.detail
+
+
+def test_pushover_wrong_length_key_is_caught(rig, tmp_path):
+    env = _env(tmp_path, ALERT_BACKEND="pushover",
+               PUSHOVER_TOKEN="short", PUSHOVER_USER="b" * 30)
+    r = alerts.send("t", "m", env_path=env)
+    assert not r.ok and "30 alphanumeric" in r.detail
