@@ -64,7 +64,18 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
-from broker_schwab.client import create_client  # noqa: E402
+def create_client():
+    """Lazy seam over broker_schwab.client.create_client.
+
+    Deferred so this module imports without the schwab-py package present:
+    CI deliberately does not install the broker/feed libs, and the render,
+    mapping and bucket logic below is pure and worth testing there. The same
+    seam pattern (and the same CI breakage) as market/corpus/schwab_stream.py
+    [st-sugg]; reintroduced here by the st-em4r rework and caught by 20 red
+    CI runs flooding Steve's email 2026-08-05.
+    """
+    from broker_schwab.client import create_client as _real
+    return _real()
 
 CT = ZoneInfo("America/Chicago")
 SYMBOLS = ("$SPX", "$TICK", "$ADD", "$VIX", "$VVIX", "$VIX9D")

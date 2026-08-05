@@ -41,11 +41,16 @@ jobs:
         # longer needs it — its API extraction path was removed in st-26q5.
         # The feed/broker libs (databento, schwab-py) are intentionally NOT
         # installed — their suites are excluded below until those deps are pinned.
-        run: python -m pip install --upgrade pip && pip install -e ".[dev]" httpx
+        # flask IS installed: the fire server (scripts/fire_server.py) is pure
+        # stdlib+flask, its 16 rail tests are exactly the kind CI should run,
+        # and the dep is tiny. [st-fixci]
+        run: python -m pip install --upgrade pip && pip install -e ".[dev]" httpx flask
 
       - name: Run tests
         # strader package + the carried-infra suites that run without the live
         # feed/broker libs. test_paths.py is named explicitly to skip the
         # databento/schwab tests that share tests/market/corpus/.
         # pythonpath=["."] (pyproject) makes market.*/runbook.* importable.
-        run: pytest strader/tests tests/runbook tests/market/corpus/test_paths.py tests/scripts tests/market/entities tests/market/orderflow
+        # tests/test_alerts.py is named explicitly: it is stdlib-only and was
+        # otherwise unrun by CI, sitting outside every listed path.
+        run: pytest strader/tests tests/runbook tests/market/corpus/test_paths.py tests/scripts tests/market/entities tests/market/orderflow tests/test_alerts.py
