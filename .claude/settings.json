@@ -109,7 +109,13 @@
       "Bash(tmux -L moocity list-windows *)",
       "Bash(tmux -L moocity has-session *)",
       "Bash(ps *)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(TZ=America/Chicago date *)",
+      "Bash(tmux -L moocity *)",
+      "Bash(crontab -l*)",
+      "Bash(until *)",
+      "Bash(df *)",
+      "Bash(command -v *)"
     ],
     "deny": [
       "Read(.env)",
