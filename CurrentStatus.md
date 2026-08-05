@@ -3,7 +3,7 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
-**Last refreshed**: 2026-08-04 [st-d5f, st-re1o, st-itky, st-6qx4]
+**Last refreshed**: 2026-08-05 [st-6qx4, st-btu, st-q5xu, st-e91l, st-g63j]
 
 > Standing operational snapshot — what is wired up, live, or paused right now.
 > Session history lives in `DaysActivity.md`; work lives in beads; durable
@@ -24,10 +24,10 @@ summative pass.
 | TradingView MCP | **Removed.** No `.mcp.json`. Chart state comes from screenshots; Pine scripts are pasted by Steve by hand. |
 | GEXBot | **ACTIVE — State tier ($150/mo), resumed 2026-08-05** (pause ran 2026-07-03 → 08-05). Key verified live; forward collection running (stopgap: tmux `steves-desk:gexbot-collect`, 60s cadence → `data/corpus/<date>/gexbot.jsonl`; real service = st-p3lv). `/hist` Quant historical is NOT included at State (verified: permission denied) — 90-day backfill blocked pending Quant add-on decision (st-trbn deferred on it). Legacy GEX history remains 3 days (May 22, Jun 8–9). |
 | Schwab API | `lib/schwab-py` on the `hobbled-readonly` fork — account/order/transaction methods physically removed. Only `broker_schwab/readers/{quote,chain}.py` are auto-allowed. |
-| Databento | **CME Standard live GLBX verified 2026-08-03.** ES trades + MBP-1 capture continuously via `scripts/live-footprint-up.sh` (tmux `steves-desk:footprint`). OPRA live sub-covered. Historical corpus is tape-only — no GEX history. Quotes are NEVER backfilled: an uncaptured session is gone. |
+| Databento | **CME Standard live GLBX verified 2026-08-03.** ES trades + MBP-1 capture the session window 02:50–15:05 CT via `scripts/live-footprint-up.sh` (tmux `steves-desk:footprint`), now supervised. **GLBX historical is $0.00 on the Futures plan** (measured 2026-08-05, `--estimate-only`; OPRA control $6.07/2h), so an uncaptured GLBX session is **recoverable, not gone** — the old "quotes are NEVER backfilled" premise is false for GLBX and holds only for OPRA. Historical corpus is tape-only — no GEX history. |
 | Mancini | Pre-open cron wired; `st-i68` PATH bug open against it. |
 | Market internals | `scripts/mi_gauge.py`, captured on the 5-minute session cron. Single-sourced from Schwab — no cross-check exists (`st-jwtn`). |
-| Live footprint | v1 running: bridge `127.0.0.1:7788` + JSONL feeder → `/tmp/desk-live-footprint.html`. Same surface as the replay drills; bars proven byte-identical to replay. Browser rendering not yet eyeballed. |
+| Live footprint | v1 running: bridge `127.0.0.1:7788` + JSONL feeder → `/tmp/desk-live-footprint.html`. Same surface as the replay drills (one template, `.live` mode gate hides drill-only controls); bars proven byte-identical to replay. **Rendering confirmed live by Steve 2026-08-04.** Carries the per-bar emissions row + rollover panel. Intra-bar progressive rendering built and tested but **NOT deployed** (`st-e91l`) — needs a feeder+bridge restart, do it after a 15:05 stop. |
 
 ## Crons (weekdays, CT)
 
@@ -39,6 +39,7 @@ summative pass.
 | 08:15 | Mancini pre-open — **`st-i68` open** |
 | 08:25 | Pre-open heartbeat + risk-state reset |
 | every 5 min, 08:00–15:55 | Market-internals gauge |
+| every 2 min, all day | **Capture supervisor** (`st-6qx4`, installed 2026-08-05) — relaunches a dead streamer inside the 02:50–15:05 window; idempotent by process, not tmux window |
 
 First full Monday-morning fire: **2026-08-03**.
 
@@ -78,7 +79,14 @@ missing its `leases` table). The working channel is file-convention A2A under
    resolvable). Fires every weekday at 08:15 until fixed.
 3. **`st-08p` blocked externally** — training steps 3–5 need Steve's NotebookLM
    upload and COO's deck import.
-4. **Live capture unsupervised** — supervisor is BUILT (`99ea95e`) but NOT
-   installed; no crontab entry, so nothing watches the streamer yet. Installing
-   it as proposed also extends capture into evening Globex, which is the
-   capture-window ruling still outstanding. `st-6qx4`.
+4. **Recognizer is direction-blind upward** — all four setups are downside
+   forms (no failed-breakout), and every Mancini level enters as
+   `kind=support`, including parsed **resistances**. A rejection at overhead
+   supply emits as a bullish `failed_breakdown`. Treat recognizer reads at
+   resistance levels as unreliable in direction. Two calls outstanding from
+   Steve: the mirrored setup's name, and whether to apply the interim
+   kind-filter-to-supports the acuity path already uses. `st-q5xu`, `st-tme`.
+5. **Capture window ruled 2026-08-05** — live capture is session-only
+   (02:50–15:05 CT); the uncovered hours backfill free. The backfill leg is
+   built-but-not-written (`st-wy6u`) and must never run while a feeder is
+   tailing the day, so 24h coverage is not yet actually complete.

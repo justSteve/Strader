@@ -1,129 +1,53 @@
-# DaysActivity - 2026-08-04
+# DaysActivity - 2026-08-05
 
-## 09:32 - Session Handoff [Live Footprint Painting — Boot Path Fixed]
+## 14:35 - Session Handoff [Capture Rescue, Mancini Parse, Fly Doctrine Corrected]
 
-**Summary**: The live footprint renders — Steve confirmed it painting mid-session, the first time anyone has watched it. Getting there took fixing three live-only boot crashes that the headless data-path proof could never have caught.
+**Summary**: Found live capture dead 1h49m before the open and rescued it, then installed the supervisor that had been built-but-uninstalled for a day; published the Mancini parse for today; took a direct correction from Steve on fly doctrine and fixed it at the source rather than in memory; ran down a delta claim from 08-04 that turned out to rest on a relationship that does not exist in our data.
 
-**Live at handoff** (tmux `steves-desk:footprint`):
-- CAPTURE pid 496170, **6h10m up** — 63 MB ES trades, **1.2 GB** MBP-1
-- **215 live bars**; page confirmed rendering at `file://wsl.localhost/Zgent/tmp/desk-live-footprint.html`
-- ES ran to ~7695 — through Mancini's 7683 major and out the top of his 08-04 ladder
+**[ALERT] Capture was dead this morning.** `corpus_stream_databento.py` stopped at yesterday's `--until-ct 15:05` and nothing restarted it — no cron launches it, it is a hand-run ritual. Found at 06:41, started 06:45. The desk window *looked* healthy because bridge and feeder were still up from yesterday: the feeder was tailing 08-04's finished file and the bridge still served its 690 bars. That stale-stack trap is the exact failure `st-6qx4` named ("a dead feeder freezes the live page looking like a quiet tape") — now observed, not hypothetical.
 
-**Fixed** (`ea77d7a`) — three defects, all live-only, firing in sequence at page init:
-1. **The killer.** The level-chip loop called `addChip(label, DATA.levels[k])` and `fmtPrice` does `p.toFixed()`. A live page has no session-derived levels at boot, so the first undefined price threw at the TOP of the boot script — nothing below ran, no bridge, no poller, no bars. Chrome rendered and the page sat empty, which reads as a network fault and is not one.
-2. `seekTo(0)` on an empty tape: the clamp yields `t=0`, the loop runs once, `bars[0].d` throws.
-3. `connectBridge` was one-shot — the launcher starts bridge and page together, so losing that race left a live page dead with nothing retrying.
+**Correction issued to Steve on my own alarm.** I said the tape "was otherwise gone." False. GLBX historical is **$0.00** under the current Databento Futures plan — measured via `--estimate-only` (`metadata.get_cost`, pulls nothing): ES trades and mbp-1 for the gap, and a full settled day (07-31 02:50–15:05), all $0.0000, against an **OPRA control of $6.0663/2h** proving the estimator returns non-zero when it should. So the codebase premise that MBP-1 and live trades are "captured forward or lost forever" is **false for GLBX**. The OPRA half of that asymmetry does hold, so `st-7av4`'s conclusion stands on the surviving half.
 
-Every other `DATA.*` access was already guarded with `|| []`; `DATA.levels[k]` was the lone unguarded one, because a replay always has session levels.
+**That unblocked the capture-window ruling** Steve had reserved since 07-31. It stopped being a spend question: overnight and evening Globex need no live process, because they backfill free. **Ruled: live capture covers the session only (02:50–15:05 CT); uncovered hours are backfilled.** 24h coverage without asking a long-lived process to survive 24h — which is precisely what failed this morning. `st-6qx4` and `st-btu` both closed; backfill leg filed as `st-wy6u`.
 
-**Open Work**:
-- `st-b0n9` (NEW) — live emissions panel: show what the stack emitted at a given bar, via a rollover panel over the control strip. **Scope warning in the bead**: the live feeder does not run the engine at all, so this is putting `parity.full_stack_events` into the live path, not a UI tweak. Deferred deliberately; `replay_day.py` gives the full emission record for today after the close.
-- `st-7av4` (P1) — stop the daily OPRA pull. **After the close**, four code sites move together.
-- `st-6qx4` — supervisor built (`99ea95e`), NOT installed. Its default extends capture into evening Globex, which is the capture-window ruling.
-- `st-re1o` — v1 now visually confirmed. Remaining: bridge/feeder unsupervised, live bars catch up instantly rather than animating.
-- `st-ndc` — **due tomorrow (Wed 08-05, 10:17 CDT). Raise early that morning per the standing rule.**
+**Fly doctrine — corrected at the source.** Steve caught me framing a setup as "the consolidation range a fly wants to center on." Per claude-monitor, that is at least the fourth correction (2026-05-06, 2026-06-09, 2026-06-24 ×2). Root cause was not recall: **CLAUDE.md** — always loaded, declared authoritative — said "centering butterflies relative to the consolidation range," so instructions outranked the knowledge bundle every session. The bundle's own `Why` note had diagnosed this in July and the source was never fixed. Now fixed: body at the **destination**, delta not theta, precondition is **departure-and-return, not range occupancy**, both entry engines named, banned-framing block in CLAUDE.md and the concept with Steve's three corrections verbatim.
 
-**Tried**:
-- Guessed twice at the blank-page cause (empty-tape `seekTo`, then `connectBridge` retry) → **both were real bugs but neither was the one**. What actually found it was enumerating every `DATA.*` access and checking each against the stub payload. Guessing cost two rounds; the enumeration took one command.
-- Reasoning that the headless proof covered the page → **it covered the DATA path, not the BOOT path**. Bars in, bars out, byte-identical — and three crashes upstream of any of that.
+**Delta run-down (the 08-04 "rally bought by nobody" claim).** Tooling cleared, claim demolished. Aggressor convention verified against our own MBP-1 top-of-book — `'A'` printed at/below the bid **100.0%** (16,362 trades), `'B'` at/above the ask **100.0%**, reproduced on a second window; delta is **not** inverted. Both live bridge readings reproduce from the corpus exactly (13:45 → 525 bars/7769.75/−1,453; 14:46 → 593 bars/7783.75/−7,856) — the "discrepancy" I flagged was my own reconciliation error comparing mismatched windows. The finding: ES carries a **persistent positive aggressor tilt**, 17 of 21 days positive, median **+1.11%** of session volume — a baseline that exists nowhere in the codebase, which is why a −0.50% day read as dramatic. And **corr(session delta%, price change) = −0.22 (n=21)** — slightly inverse, effectively noise. Session-scale delta carries no directional edge in our own data.
 
-**Files Changed**:
-scripts/orderflow_drill_template.html
-
----
-
-## 08:50 - Session Handoff [First Full Mancini Procedure + OPRA Cost Ruling]
-
-**Summary**: Ran the Mancini Parse end to end for the first time under the new procedure — clipboard loaded automatically — and settled that the OPRA subscription's replacement by the Futures plan means the daily OPRA pull is now metered and should stop. Live capture has been up since 02:51 and is healthy.
-
-**Live at handoff** (tmux `steves-desk:footprint`):
-- CAPTURE pid 496170, **5h31m up** — 39 MB ES trades, 757 MB MBP-1 into `data/corpus/2026-08-04/`
-- bridge + feeder alive, **124 live bars** built
-- `capture_health.py --porcelain` reports `status=ok actionable=0`
-
-**Decisions taken**:
-- **`st-7av4` (P1) — stop the daily OPRA pull.** Steve confirmed on the Databento portal that the $199 OPRA subscription is gone and the Futures plan replaced it, so `corpus_daily`'s daily OPRA pull has been running as usage-billed historical (~$280/GB, est. ~$6.40/day, ~$134/mo — estimate only, record size inferred). **Schwab cannot replace it**: no historical options tape, quotes/chains are now-only. Seven measurement tools read that tape, including `fly_replay.py`, which reconstructs a butterfly's price path over the final hour — the instrument that measures the actual edge. What makes stopping safe is the asymmetry: MBP-1 live quotes are captured forward or lost forever, but historical OPRA is purchasable any time, so the daily pull buys only convenience. **Apply after the close, not mid-session** — the gate change risks the pre-open path.
-- **Supervisor built but NOT installed** (`st-6qx4`, commit `99ea95e`). Its default is round-the-clock, so installing as proposed extends capture past 15:05 into evening Globex. That is the capture-window ruling Steve has been reserving — needs his consent, both crontab variants are in the bead.
+**GEXBot is live again** — resumed during this session by another party. Collector pid 1669196, 22 polls into `data/corpus/2026-08-05/gexbot.jsonl`. My repeated "no GEX" statements today were true when made and are now stale; auto-memory updated.
 
 **Open Work**:
-- `st-7av4` — four code sites must move together: `gate.py DEFAULT_REQUIRED_STREAMS`, the compaction wrapper's `REQUIRED`, `corpus_daily`'s stream/window maps plus its now-false "OPRA flat-fee" comment, and the streamer's stale `--streams opra` default (wrong regardless).
-- `st-6qx4` — install decision pending. Supervisor gaps it names: holidays unmodeled, a legitimate second capture reads as `duplicate`, **bridge and feeder are unsupervised** so a dead feeder freezes the live page looking like a quiet tape, no night push.
-- `st-re1o` — **the live footprint has still never been eyeballed in a browser.** Data path proven, rendering unverified. 124 bars are sitting there waiting.
-- `st-d5f` — capture-window ruling, whether our footprint replaces TradingView's, and the held pre-build spend.
-- `st-jwtn` — Schwab streaming preclusion, still parked on Steve's own TOS-vs-API test.
-- `st-ndc` — **due tomorrow (Wed 08-05, 10:17 CDT). Raise it early that morning, per the standing rule; not before.**
+- `st-e91l` **IN PROGRESS** — intra-bar progressive rendering (the developing bar) is **built, tested, committed, NOT deployed.** Deploy needs a feeder restart, and the feeder re-reads the day file from the start, so the bridge must restart with it or bars duplicate. Run `scripts/live-footprint-up.sh` after the 15:05 stop, then refresh the tab.
+- `st-q5xu` (NEW) — **recognizer has no upside mirror.** All four setups are downside forms; there is no failed-breakout. Compounded by every Mancini level entering as `kind=support`, including today's 12 parsed **resistances** (7783…7894). Steve saw `failed_breakdown forming @ 7815 (support ∩ mancini)` while price was rejecting a resistance — same price action, opposite meaning. Two calls needed from him: the mirrored setup's **name**, and whether to apply the interim kind-filter-to-supports (which the acuity path already does). Overlaps `st-tme`.
+- `st-wy6u` (NEW) — nightly GLBX backfill. Append is safe for replay (`read_corpus_day` sorts and dedups) but **fatal to a live feeder mid-session** (`build_bars` raises on out-of-order), so it must run after the 15:05 stop. First target is today's own 02:50–06:45 gap, free.
+- `st-g63j` (NEW) — delta baseline write-up; re-run as the corpus grows (21 days is one regime, all uptrend). Open question whether the +1.11% baseline belongs on the live footprint so a reading is glanceable against its norm rather than zero.
+- `st-i68` — Mancini pre-open cron PATH bug, still open; today's parse was run in-session so it did not bite.
+- `st-7av4` — stop the daily OPRA pull; four code sites move together. Now better justified, since OPRA is confirmed at $6.07/2h.
+- `st-jfvu`, `st-ndc`, `st-6qx4`, `st-btu`, `st-en7w`, `st-6vi0`, `st-emy5`, `st-frco`, `st-o216` — closed this session.
 
 **Tried**:
-- Suspecting the supervision sub was hung after 2.5h of no file writes → **it was not**; it ran 5.5h and completed with 67 tests. File mtimes are a poor liveness signal for an agent that spends its time testing.
-- Expecting the OPRA switch to have broken the gate and compaction → **it had not**. This morning's 06:30 pull got 475,073 OPRA cycles cleanly, because historical is usage-billed rather than subscription-gated. The breakage was economic, not functional — checking beat assuming.
+- Suspected the aggressor sign was inverted, since a negative delta on a 129-point rally looks exactly like an inversion → **wrong, and the test said so cleanly.** The book-matching check is now written into the measurement doc so the next suspicion re-runs it instead of re-reasoning.
+- Flagged a live-vs-corpus data discrepancy → **there wasn't one.** I had compared a 13:00–14:46 live window against a 13:00–13:45 corpus window. Re-deriving both from the corpus reproduced the live numbers to the contract.
+- Read the 08-04 gate failure as st-7av4 breakage (OPRA missing from the manifest) → **it was a one-minute timing artifact**: I ran the parse at 06:29, and `corpus_daily` fills the T+1 OPRA leg at 06:30. Waited for the fill and ran with the gate intact rather than passing `--no-gate`.
+- Started writing the emissions panel from scratch before reading the working tree → **it was already built** by the tap-in agent running concurrently, which had also committed my in-flight column-marker edit. Cost a duplicate block that had to be deleted. Read the tree before building.
+- Two commit/bead bodies were written with unquoted backticks and got **shell-expanded**, silently dropping words from durable records. The `-m "$(cat <<'EOF' ... EOF)"` form is safe; a plain double-quoted string is not.
 
 **Files Changed**:
-runbook/mancini/parsed/2026-08-04.json
-runbook/mancini/commentary/2026-08-04.jsonl
-runbook/mancini/charts/2026-08-04.pine
-runbook/mancini/charts/2026-08-04.payload.txt
-
----
-
-## 03:40 - Session Handoff [Phase B Live Capture + Live Footprint v1]
-
-**Summary**: The GLBX/ES live subscription was verified real, Phase B was un-deferred, and the drills-only footprint became a live surface — with ES trades and MBP-1 now capturing continuously for the first time. Long single session spanning 08-02 evening through 08-04 pre-dawn; the 08-02 log was archived and this file opened fresh.
-
-**What shipped**:
-- **Mancini API path expunged** (`33b8917`) — `runbook/mancini/llm.py` deleted, every `ANTHROPIC_API_KEY_DIRECT` reference gone. `--extraction-json` (the in-session prompt parse) is now the only interpretive leg; `extraction-contract.md` preserves the SYSTEM_PROMPT/TOOL_SCHEMA knowledge the prompt path needs. Hybrid mode is an explicit branch now, not an exception handler, and a supplied-but-broken extraction halts rc=3 instead of silently demoting.
-- **First in-session Mancini parse** (`9a2a8d4`) — 08-03 published with 68 levels and 16 commentary items against the deterministic scrape's 61/0.
-- **Daily Payload → clipboard** (`8ed9faa`) — a completed interpretive parse now concludes by loading the clipboard. Closed a hole it exposed: the 08:15 cron's hybrid-skip path returned without touching the clipboard, which is exactly when it is stalest.
-- **Phase B steps 1–2** (`151e16a`) — streamer carries per-stream schemas plus a new `es-mbp1` spec; compaction wired to `30 7 * * 1-6`. Readers taught to resolve `.jsonl.gz` first — without that, packing a day would have made it read as *absent* across replay, drills and measurement.
-- **Live footprint v1** (`ba9e512`, `027a723`) — feeder, bridge bar channel, template live mode, page, tmux launcher.
-
-**Live right now** (started 02:51 CT, tmux `steves-desk:footprint`):
-- pane 1 CAPTURE `corpus_stream_databento.py --streams es,es-mbp1 --now --until-ct 15:05` — writing `data/corpus/2026-08-04/`
-- pane 0 bridge `127.0.0.1:7788`, pane 2 feeder — 7 live bars built by 03:37
-- page parked at `file://wsl.localhost/Zgent/tmp/desk-live-footprint.html`
-
-**Open Work**:
-- **st-6qx4 (P1, subagent running at handoff)** — streamer supervision. Its result had not arrived when this entry was written; check the task notification. Nothing supervises the capture process today, so a death goes unnoticed until someone looks.
-- **st-re1o** — live footprint v1 done, four gaps named in the bead: rendering never verified in an actual browser, no supervision, live bars catch up instantly rather than animating (intra-bar fill present in payload, unused live), absorption still needs the MBP-1 wiring.
-- **st-d5f** — Phase B un-deferred, gate cleared. Steps 3–5 remain. Three rulings still Steve's: capture window, whether our footprint replaces TradingView's as the watching surface, and whether the held ~$4 pre-build spend is now moot.
-- **st-jwtn** — Schwab streaming preclusion, DEFERRED BY STEVE pending his own test of whether TOS conflicts with *any* API use or only streaming. Do not act on it.
-- **st-939c** — `listlevels` regex drops `(major)` levels when Mancini leaves the paren unclosed; ate 7374 and 7353 on 08-03.
-- **st-4mi4** — entitlement half resolved; Globex capture gap now closed by the running streamer.
-- **st-ndc (P1)** — Schwab re-auth. **Per Steve's new rule, do not raise this until the day it expires (Wed 2026-08-05, 10:17 CDT), then raise it early.**
-
-**Tried**:
-- `probe_databento_access.py` for entitlement → **cannot answer it**; returns the public catalog and rate card identically whether subscribed or not. Do not reach for it again on that question. A live `db.Live` session is the only real test.
-- Estimating overnight MBP-1 volume from one 30s probe → **wrong by ~3×**. Claimed ~4% of RTH intensity; actual capture shows ~18 KB/s, ~66 MB/h, so a full overnight is ~1.2 GB uncompressed — about a third of an RTH day, not a ninth. The scope doc's capture-window arithmetic is understated; do not quote it.
-- Removing `bar_fill_steps` from `orderflow_drill.py` by span → **also removed `minute_candles`**. Caught by `test_day_browser` collection, not by review.
-- Running the compaction wrapper on 07-31 → 4.0 GB to 148 MB (27.4×), read back to 473,507 trades intact.
-
-**Files Changed**:
-runbook/mancini/llm.py (deleted)
-runbook/mancini/extraction-contract.md
-runbook/mancini/parse.py
-runbook/mancini/run.py
-runbook/mancini/__init__.py
-runbook/README.md
-scripts/cron/mancini-preopen-wrapper.sh
-scripts/cron/corpus-compact-wrapper.sh
-scripts/corpus_stream_databento.py
-scripts/live_footprint_feed.py
-scripts/live_footprint_page.py
-scripts/live-footprint-up.sh
-scripts/drill_bridge.py
+CLAUDE.md
+knowledge/directional-gex-butterflies.md
+knowledge/log.md
+docs/measurement/cumulative-delta-session-baseline.md
+market/orderflow/recognizer.py
 scripts/orderflow_drill.py
 scripts/orderflow_drill_template.html
-scripts/acuity_run2.py
-scripts/score_recognizer.py
-scripts/measurement/mp_day_scan.py
-market/corpus/paths.py
-market/orderflow/replay.py
-market/orderflow/fill.py
-docs/superpowers/specs/2026-08-03-phase-b-live-footprint-scope.md
-tests/runbook/test_run.py
-tests/runbook/test_parse.py
-tests/market/corpus/test_stream_databento.py
-tests/market/corpus/test_compact_databento.py
-tests/scripts/test_live_footprint_feed.py
-.github/workflows/ci.yml
+scripts/live_footprint_feed.py
+scripts/live_footprint_page.py
+scripts/drill_bridge.py
+scripts/cron/capture-supervisor-session.sh
+tools/drill_page_check.mjs
+tests/scripts/test_developing_bar.py
+tests/market/fixtures/parity/expected_signals_20260702.json
+tests/market/fixtures/parity/CHANGES.md
+runbook/mancini/commentary/2026-08-05.jsonl
 
 ---
