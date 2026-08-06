@@ -1,3 +1,4 @@
+#!/root/projects/Strader/.venv/bin/python3
 """Level strength — how hard did it trade THERE? [st-8ywx]
 
 Carmine's differentiator is not that price reached a level. It is the conviction
