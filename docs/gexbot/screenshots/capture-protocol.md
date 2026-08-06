@@ -50,5 +50,5 @@ combine OFF, 30min: **aggregate dex / net gex / net convexity**. Readable
 content: net gex ≈ −$9,000MM band; net convexity's strongest positive spikes
 of the window (+2,000 to +4,000 $MM) during the 3:40–3:45 spot slide
 ~7713 → ~7705 (vendor sell-off signature); levels drawn: long gamma 7710,
-short gamma 7716, call 7720, put 7718, spot 7707. Stored in COO session
-image cache; file to be moved here on next drop.
+short gamma 7716, call 7720, put 7718, spot 7707. Saved as
+`2026-08-06-1546-spx-aggdex-netgex-netconvexity.png` in this directory.
