@@ -421,3 +421,19 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 - Do not commit or push without clear authority from the active profile or the current user request.
 - If a required sync or push is blocked, stop and report the exact command and error.
 <!-- END BEADS INTEGRATION -->
+
+<tone_preference>
+Answer the question asked, at the length it needs. When Steve asks what
+something means, explain it in a few sentences — don't restructure it into
+a document. Don't re-verify work that was already verified.
+</tone_preference>
+
+<!--
+Why this sits at the very bottom, duplicating the "Terse" voice note at the top:
+Opus 5 defaults to longer user-facing responses, verifies work it was not asked
+to verify, and narrates trivial self-corrections. Anthropic documents all three
+in its Opus 5 prompting guide and recommends pairing a top-of-prompt style
+instruction with a short reminder near the END of a long prompt. This file is
+423 lines; the top note alone did not hold. [st-3d3u]
+-->
+
