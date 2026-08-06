@@ -1,0 +1,15 @@
+{
+  "made_at_ct": "2026-08-06T12:51",
+  "made_at_note": "recorded from the turn's own clock, NOT inferred from the gap between tool calls",
+  "by": "Steve",
+  "instrument_stated": "ES",
+  "context": "GEXBot Classic screen, SPX 7706.41 on the capture; SPX 7703.92 / ES 7730.0 live at 12:51:07 CT",
+  "gex_at_call": {"bracket_0dte": [7690, 7715], "flip": 7715.83, "net_gex_oi": -11275.0},
+  "read": "magnets still pulling lower but not with a great deal of force",
+  "call": "drop below to 7722 ES, then recover; close 7740 ES",
+  "position_taken": false,
+  "es_targets": {"low": 7722, "close": 7740},
+  "spx_equivalent_at_26pt_basis": {"low": 7696, "close": 7714},
+  "score_at": "2026-08-06 15:00 CT close",
+  "scoring": "did ES trade <= 7722 after 12:51, and where did it settle vs 7740"
+}

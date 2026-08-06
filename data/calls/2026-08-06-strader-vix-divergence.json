@@ -1,0 +1,15 @@
+{
+  "made_at_ct": "2026-08-06T10:23",
+  "by": "Strader",
+  "signal": "VIX falling into new SPX lows",
+  "observed": "VIX 15.46, -2.21% on the day, near its own session low of 15.30, while SPX printed 7709.90 LOD",
+  "claim": "argues against continuation; move is positional/mechanical, not fear-driven",
+  "context_against_it": "tape delta -30%, net GEX -6759 and deepening, all four level sources aligned short",
+  "retracted_at_ct": "2026-08-06T10:37",
+  "retraction_reason": "SPX fell 12 more points in 14 minutes; called it 'not the operative signal on that timeframe'",
+  "outcome": "SPX bottomed 7698.15, recovered to 7712.56 by 13:38 CT; VIX never bid, low 15.14",
+  "verdict": "signal correct, retraction premature and made near the low",
+  "lesson": "a lone dissenting instrument is abandoned first precisely when the others are loudest; short-horizon adverse price action is not evidence against a structural read",
+  "score_at": "2026-08-06 15:00 CT close",
+  "n_instances_of_this_signal": 1
+}

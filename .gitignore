@@ -12,6 +12,12 @@ tokens/
 
 # Data (runtime, not tracked)
 data/
+# EXCEPTION, tracked via `git add -f`: data/calls/*.json — dated predictions, a
+# few hundred bytes each, kept so a read can be SCORED rather than remembered.
+# Steve's calls and Strader's both go in, including the retracted and the wrong
+# ones; a record that keeps only the hits is a story, not evidence. A `!` rule
+# cannot work here — git will not re-include a path under an excluded
+# directory — hence -f, same as the measurement exception above. [st-8ywx]
 # EXCEPTION, tracked via `git add -f`: data/measurement/decision_aligned_truth.json.
 # The live meter READS it at runtime, so an untracked copy means a rebuilt box
 # runs a meter that degrades to "truth table absent" until someone remembers to
