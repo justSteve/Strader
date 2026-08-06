@@ -4,8 +4,12 @@ Pulls every package/category for every date in the /hist look-back window
 (90 calendar days) and stores the files as received (gzip) under
 data/corpus/gexbot-hist/<date>/<package>_<category>.json.gz.
 
-Resumable: existing non-empty files are skipped, so re-running after an
-interruption (or at month-end for a final sweep) only fetches what's missing.
+Resumable: existing non-empty files are skipped — locally OR in the Z: archive
+(/mnt/z/Harvest/gexbot-hist, where gexbot_hist_migrate.py [st-me3z] moves
+completed days) — so re-running after an interruption (or at month-end for a
+final sweep) only fetches what's missing from both locations. If Z: is not
+mounted the archive check is simply false, which degrades to re-fetching
+already-archived days; run the migration afterward to dedupe.
 A manifest line is appended per attempt to gexbot-hist/manifest.jsonl.
 
 Category roster mirrors the vendor's own downloader (nfa-llc/quant-historical
@@ -46,7 +50,15 @@ COMBOS = (
 )
 
 HIST_ROOT = REPO / "data" / "corpus" / "gexbot-hist"
+ARCHIVE_ROOT = Path("/mnt/z/Harvest/gexbot-hist")  # migrated days live here [st-me3z]
 MANIFEST = HIST_ROOT / "manifest.jsonl"
+
+
+def _present(path: Path) -> bool:
+    try:
+        return path.exists() and path.stat().st_size > 0
+    except OSError:  # unmounted /mnt/z, transient DrvFs error — treat as absent
+        return False
 
 
 def _load_api_key() -> str:
@@ -89,7 +101,8 @@ def main() -> int:
             day_dir = HIST_ROOT / d.isoformat()
             for package, category in COMBOS:
                 out = day_dir / f"{package}_{category}.json.gz"
-                if out.exists() and out.stat().st_size > 0:
+                if _present(out) or _present(
+                        ARCHIVE_ROOT / d.isoformat() / out.name):
                     skipped += 1
                     continue
                 url = f"{BASE_URL}/hist/{args.ticker}/{package}/{category}/{d.isoformat()}"
