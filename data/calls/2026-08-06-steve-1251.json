@@ -4,12 +4,37 @@
   "by": "Steve",
   "instrument_stated": "ES",
   "context": "GEXBot Classic screen, SPX 7706.41 on the capture; SPX 7703.92 / ES 7730.0 live at 12:51:07 CT",
-  "gex_at_call": {"bracket_0dte": [7690, 7715], "flip": 7715.83, "net_gex_oi": -11275.0},
+  "gex_at_call": {
+    "bracket_0dte": [
+      7690,
+      7715
+    ],
+    "flip": 7715.83,
+    "net_gex_oi": -11275.0
+  },
   "read": "magnets still pulling lower but not with a great deal of force",
   "call": "drop below to 7722 ES, then recover; close 7740 ES",
   "position_taken": false,
-  "es_targets": {"low": 7722, "close": 7740},
-  "spx_equivalent_at_26pt_basis": {"low": 7696, "close": 7714},
+  "es_targets": {
+    "low": 7722,
+    "close": 7740
+  },
+  "spx_equivalent_at_26pt_basis": {
+    "low": 7696,
+    "close": 7714
+  },
   "score_at": "2026-08-06 15:00 CT close",
-  "scoring": "did ES trade <= 7722 after 12:51, and where did it settle vs 7740"
+  "scoring": "did ES trade <= 7722 after 12:51, and where did it settle vs 7740",
+  "result": {
+    "scored_at_ct": "2026-08-06T15:16",
+    "window": "12:51-15:00 CT",
+    "es_low_after_call": 7727.0,
+    "es_low_time_ct": "14:50:47",
+    "es_last_1459": 7735.25,
+    "low_leg": "MISS - called <=7722, low was 7727.0, short by 5.0",
+    "close_leg": "MISS by 4.75 - called 7740, settled 7735.25",
+    "direction_leg": "CORRECT - called a dip then recovery; ES dipped to 7727.0 at 14:50 then closed up 8.25 from there",
+    "verdict": "shape right, levels short. Both legs missed on magnitude, neither on direction.",
+    "note": "the 7724.25 session low was set at 11:15, BEFORE this 12:51 call. Scoring only the post-call window is what makes this a prediction rather than a description."
+  }
 }

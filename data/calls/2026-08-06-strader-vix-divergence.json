@@ -11,5 +11,16 @@
   "verdict": "signal correct, retraction premature and made near the low",
   "lesson": "a lone dissenting instrument is abandoned first precisely when the others are loudest; short-horizon adverse price action is not evidence against a structural read",
   "score_at": "2026-08-06 15:00 CT close",
-  "n_instances_of_this_signal": 1
+  "n_instances_of_this_signal": 1,
+  "result": {
+    "scored_at_ct": "2026-08-06T15:16",
+    "spx_low_after_call": 7698.15,
+    "spx_close_area": 7711.5,
+    "vix_close_area": 15.26,
+    "vix_session_low": 15.14,
+    "vix_never_bid": true,
+    "verdict": "CORRECT - SPX fell 11.75 further to 7698.15 then recovered ~13 into the close; VIX never bid and finished DOWN on a day the index lost 60 points from its high",
+    "retraction_verdict": "WRONG - the 10:37 retraction was made 12 points into the adverse move and near the low",
+    "lesson_confirmed": "short-horizon adverse price action is not evidence against a structural read"
+  }
 }
