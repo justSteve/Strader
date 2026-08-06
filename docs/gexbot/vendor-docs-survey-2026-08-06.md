@@ -429,3 +429,264 @@ Base URL `https://api.gex.bot/v2`, except `/{package}/categories` and `/tickers/
 | `PATCH /negotiate` | **Quant** | group replacement result |
 | `GET /negotiate` | **Quant** | deprecated legacy |
 | `/research/{ticker}/{metric}` | Research addon (`gbR` key) | chart/data, many formats |
+
+---
+
+## Related repos (2026-08-06)
+
+Two GexBot-adjacent repositories were reviewed by reading their source, not their
+READMEs. Both were cloned to a scratchpad, inspected read-only, and **neither was
+installed or executed**. Nothing below is derived from running their code.
+
+| Repo | Author | License | Commits | Last commit |
+|---|---|---|---|---|
+| [nfa-llc/tradingview](https://github.com/nfa-llc/tradingview) | vendor (`jasperSha`) | PolyForm Noncommercial 1.0.0 | 6 | 2026-08-02 |
+| [dgnsrekt/gexsync](https://github.com/dgnsrekt/gexsync) | third party (`dgnsrekt`) | MIT | 149 | 2026-08-05 |
+
+### `nfa-llc/tradingview` — the vendor's own desktop integration
+
+A Node.js companion process (~4,900 lines, **zero npm dependencies**, Node 22+)
+that drives **TradingView Desktop** over the Chrome DevTools Protocol and draws
+GEX/Gamma/Vanna/Charm profiles onto its charts. It is not a browser extension and
+not a library — it launches TradingView Desktop with a debugging port, connects,
+and injects a settings panel plus profile drawings.
+
+Licensing is materially more restrictive than the spec repo: **PolyForm
+Noncommercial 1.0.0, source-available, not open source.** The README explicitly
+prohibits use "in connection with any paid product, paid service, subscription
+service … market-data service, analytics service," and prohibits "replacing,
+adapting, or configuring the integration to operate with a third-party or
+competing commercial data feed." Lifting code from this repo into our tooling is a
+licensing decision, not merely a technical one.
+
+#### It publishes the Protobuf wire schema this survey listed as undocumented
+
+`app/expiry-protobuf.js` (197 lines) is a hand-rolled Protobuf reader plus
+`node:zlib`'s `zstdDecompressSync`. It resolves gap #8 in §10 — the `.proto`
+schema is not published as a `.proto`, but the **field numbering and scaling are
+now fully readable from vendor code**.
+
+`decodeGex` maps the GEX payload by field number: 1 `timestamp`, 2 `ticker`,
+3 `min_dte`, 4 `sec_min_dte`, 5 `spot`, 6 `zero_gamma`, 7–10 the four `major_*`
+fields, 11 repeated `strikes`, 12 `sum_gex_vol`, 13 `sum_gex_oi`,
+14 `delta_risk_reversal`. Wire values are integers: most are scaled by **100**,
+the three sum/risk-reversal fields by **1000**, and signed fields use zigzag
+encoding. (This scaling is a wire-format detail — REST JSON already carries
+decimals.)
+
+#### It confirms the `strikes` tuple is 4-element and names the fourth "priors"
+
+`decodeStrike` returns exactly four positions: `field1/100`,
+`zigzag(field2)/100`, `zigzag(field3)/100`, and a nested repeated array the vendor
+names **`priors`**. This upgrades part of §8.1 from "undocumented" to
+vendor-confirmed: the 4-element shape is real, elements 1 and 2 are signed, and
+the nested array is priors. **The vendor still does not name elements 1 and 2** —
+the decoder is positional. The volume-versus-OI reading remains unconfirmed by
+vendor material (but see the gexsync corroboration below).
+
+It also confirms the published OpenAPI schema is wrong: the spec types the inner
+arrays as flat `array of float`, which cannot represent the nested priors array
+that the vendor's own decoder builds.
+
+#### It reveals an undocumented second response schema — and our archive confirms it
+
+`decodeGreek` decodes a payload **structurally different from `basic_response`**:
+1 `timestamp`, 2 `ticker`, 3 `spot`, 4 `min_dte`, 5 `sec_min_dte`,
+6 `major_positive`, 7 `major_negative`, 8 `major_long_gamma`,
+9 `major_short_gamma`, 10 repeated `mini_contracts`.
+
+This corrects §10 items 3 and 7 and a claim in §8.1. `major_long_gamma`,
+`major_short_gamma`, and `mini_contracts` are **not** orphan schemas — they are
+the fields of the greek response. The OpenAPI spec declares
+`/{ticker}/state/{category}` returns `basic_response` for *all* state categories;
+**that is incorrect for the greek categories.**
+
+Verified against our own live corpus (`data/corpus/2026-08-05/gexbot.jsonl`,
+first record). The four greek routes return exactly the decoder's field set and
+nothing else:
+
+```
+/SPX/state/gamma_zero -> [major_long_gamma, major_negative, major_positive,
+                          major_short_gamma, min_dte, mini_contracts,
+                          sec_min_dte, spot, ticker, timestamp]
+```
+
+No `strikes`, no `zero_gamma`, no `sum_gex_*`, no `delta_risk_reversal`. The
+greek categories and the `gex_*` categories are **different schemas**, and any
+reader assuming `basic_response` for `delta_zero`/`gamma_one`/etc. is wrong.
+
+`mini_contracts` is confirmed as a **7-element** tuple, matching
+`decodeMiniContract` position for position. From the same corpus record
+(84 rows, every row length 7), with `spot` 7741.72:
+
+```
+[7685, 0.481, 0.315, -74.42, [-105.57, -103.02, -120.08], 0, null]
+[7925, 0.851, 0.989,   2.00, [   1.72,     1.90,    2.07], 0, null]
+```
+
+Position 0 is the strike and position 3 is the signed greek exposure; position 4
+is a priors array (**3 entries here, versus 5 in the classic `strikes` example** —
+prior counts differ by payload type). Positions 1 and 2 are unnamed positive
+floats in a ~0.3–1.3 band, position 5 was `0` and position 6 `null` in every
+sampled row. **The vendor names none of these positions** — the decoder is
+positional and our corpus confirms only the shape. Do not assume positions 1/2
+are per-side IV; that is a guess, not a finding.
+
+#### It is a complete, working zstd-Protobuf WebSocket client
+
+This is the capability §7 flagged as the sharpest live-versus-hist asymmetry.
+`app/companion.js` implements the full documented flow: `POST /negotiate` with a
+group list, `PATCH /negotiate` for group replacement, per-hub `WebSocket`
+connections, and message decode. Three details go **beyond** what
+`docs/websocket.md` states:
+
+1. The subprotocol is **`json.reliable.webpubsub.azure.v1`**, not the
+   `json.webpubsub.azure.v1` shown in the vendor's own `wscat` example.
+2. The client must **acknowledge sequence IDs** —
+   `socket.send(JSON.stringify({ type: "sequenceAck", sequenceId }))` — which the
+   WebSocket doc never mentions. The reliable protocol requires it.
+3. Payloads arrive as a base64 `data` field inside a JSON envelope, wrapped in a
+   Protobuf `Any` (type URL + value), and only *then* zstd-compressed. The doc's
+   "Zstandard-compressed Protobufs" understates the nesting.
+
+It builds explicit-expiry groups directly (`${symbol}_state_${profile}_${compact}`
+on the `state_greeks` hub) and enforces the documented 150-group cap client-side.
+
+**Enterprise relevance.** This is a working reference for the one capability we
+established is unrecoverable after the fact. It does not duplicate our poller,
+backfill, or distiller — it is a charting front-end — but it is the missing piece
+for live explicit-expiry capture. Note the licensing constraint above before
+adapting any of it.
+
+#### Security posture (vendor repo)
+
+Reviewed because it launches a browser with a debugging port. The posture is
+careful:
+
+- Debug port is bound to **`--remote-debugging-address=127.0.0.1`** (loopback,
+  not `0.0.0.0`).
+- API key lives in a gitignored `api-key.txt`, `chmod 600` enforced in code on
+  every read/write; the key is explicitly stripped before config is serialized
+  (`delete copy.apiKey`). Runtime/state/config dirs are `chmod 700`.
+- Network egress is limited to `api.gex.bot`, `api.gexbot.com`, and localhost.
+  No telemetry, no analytics, no third-party hosts.
+- The Linux `--no-sandbox` fallback is a **real reduction in Chromium renderer
+  isolation**, but it is opt-in, prompted with an explanation, persisted only via
+  an explicit consent file, and never runs as root.
+
+It also settles the auth contradiction flagged in §2: the vendor's current code
+sends `Authorization: Bearer ${apiKey}`, not the `Basic` its older
+`quant-historical` sample uses. **Bearer is correct.**
+
+#### A third key type
+
+The README documents a **`gexbot_tradingview_`** key prefix, created from
+https://www.gexbot.com/user/connections. That is a third key type beyond the
+`gexbot_custom_` and `research_` prefixes recorded in §2, and it is per-integration.
+"A Quant-enabled API key is required for Quant profiles."
+
+**Maturity:** 6 commits, single author, 2026-07-22 to 2026-08-02. No tests, no CI.
+New and lightly exercised, but the code is disciplined.
+
+### `dgnsrekt/gexsync` — third-party Chrome extension
+
+A Manifest V3 Chrome extension (~5,300 lines, no build step, **zero npm
+dependencies**) that keeps multiple gexbot.com tabs in sync across three modes
+(Profiles, Ticker, Replay), and since 1.16.0 draws GEX major levels onto
+TradingView web charts. MIT licensed. It is a **UI convenience layer over the
+GEXbot web app** — it does not collect, store, or analyze market data.
+
+**Enterprise relevance: essentially none.** It duplicates nothing we built and
+obsoletes nothing. It has **no WebSocket client** — its own UI string concedes
+"live streaming (WebSocket) will arrive later," and it polls REST on clock marks.
+It therefore does **not** unlock explicit-expiry capture. Its GEXbot usage is one
+full-chain REST call per ticker/source/category with a 500 ms anti-stampede cache.
+
+Its one genuine value to us is **independent corroboration of two open questions
+in this survey**, from a practitioner who reached the same conclusions separately:
+
+- `background.js:145` — "strikes tuple is `[strike, netGEX_vol, netGEX_oi,
+  [5 prior vol readings]]`". This matches §8.1's candidate reading exactly. It is
+  a **third-party assertion, not vendor documentation**, but it now agrees with
+  the vendor decoder's confirmed 4-element structure.
+- `background.js:151` — "`gex_zero`=latest (**nearest expiry, not literally 0dte**
+  — VIX has its own calendar), `gex_one`=next, `gex_full`=90d". Independent
+  agreement with §5 that these are expiry-ordinal, not day-count. The VIX
+  observation is a useful concrete case.
+
+#### Trust assessment
+
+Read with deliberate skepticism, since it is third-party code that runs in-browser
+on an authenticated session. **Findings are reassuring, with two caveats.**
+
+*Credentials.* All storage is `chrome.storage.local` — 86 call sites, and
+**zero uses of `chrome.storage.sync`**, so keys are never uploaded to a Google
+account. Keys travel only as `Authorization: Bearer` headers to their own APIs.
+
+*Network reach.* Only 10 network call sites exist in the entire codebase (5 in the
+background worker, 4 in TradingView scripts, 1 in the popup). Every absolute URL
+resolves to a declared host: `gexbot.com`, `api.gex.bot`, `api.massive.com`,
+`apewisdom.io`, plus `w3.org` (an SVG namespace string, not a request). **There is
+no analytics, telemetry, beacon, or reporting endpoint of any kind.**
+
+*The two non-vendor hosts are benign and opt-in.* `api.massive.com` is a
+market-data API whose paths (`/v3/reference/tickers/`,
+`/v2/aggs/ticker/…/range/1/day/…`) are Polygon-shaped — the UI labels it "Massive
+(Polygon)". It requires the user's own key and is inert without one. **It is not
+the bandwidth-sharing "Massive" proxyware SDK** — no such code exists in the repo.
+`apewisdom.io` returns a public Reddit-mention ranking, needs no key, is off by
+default, and the ticker match happens locally, so the site is never told which
+symbol the user is viewing.
+
+*`netwatch.js` is the highest-risk file by design and is genuinely narrow.* It
+runs in the page's MAIN world at `document_start` and monkey-patches `fetch` and
+`XMLHttpRequest`. It reads **only `url` and `status`**, filters to
+`/gexbot\.com/`, and dispatches a DOM event when it sees a 429 or a 4xx/5xx on
+`/hist/`. It never touches request or response **bodies**, never reads headers,
+and never sends anything outward. A rate-limit detector, not an interceptor.
+
+*No dynamic code execution.* No `eval`, no `new Function`, no `document.write`, no
+`chrome.tabs.executeScript`, no remote script loading. No build step, so the
+repository content is what runs. The only CI is a daily job that diffs the
+packaged ticker list against GEXbot's `/tickers`; it runs their own two scripts
+and nothing else. **No install-time code execution** — it is a load-unpacked
+extension with no `npm install`.
+
+**Caveat 1 — their safety doc understates current network reach.**
+`knowledge/safety.md` (dated 2026-07-25) lists `host_permissions` as three hosts:
+`gexbot.com`, `api.massive.com`, `apewisdom.io`. The shipped `manifest.json` grants
+**five**, adding `api.gex.bot` and `api.gexbot.com` — added 2026-08-04 with the
+TradingView overlay feature. The document was simply not updated alongside the
+manifest, and the added hosts are the vendor's own API. But the practical lesson
+stands: **audit the manifest, not the safety write-up.**
+
+**Caveat 2 — minor DOM hygiene.** There are ~19 `innerHTML` assignments. Nearly
+all are static icon/layout templates. `popup.js:102` interpolates user-typed
+watchlist symbols into an `<option value="${s}">` without escaping. Worst case is
+self-inflicted markup inside the extension's own popup — not a meaningful attack
+path, since the input is the user's own and never crosses an origin — but it is
+the one place unescaped input reaches the DOM.
+
+**Maturity:** genuinely active — 149 commits and 27 tagged releases, last commit
+2026-08-05, with five plain-Node test files (`.mjs`, no framework) covering ticker
+shape, retry, cycling, and lines. **Bus factor 1**: a single author
+(`dgnsrekt@pm.me`) wrote every commit.
+
+*Aside:* the author's `knowledge/` directory is written in **OKF v0.1** with typed
+frontmatter and an `index.md` entry point — the same knowledge format this
+enterprise uses.
+
+### Net effect on this survey
+
+Three §10 gaps close or narrow, all from the **vendor** repo:
+
+| §10 gap | New status |
+|---|---|
+| #8 Protobuf schema unpublished | **Closed** — field numbers, zigzag, and scaling readable from `expiry-protobuf.js` |
+| #7 `major_long_gamma`/`major_short_gamma` orphaned | **Closed** — they are greek-response fields, confirmed in our corpus |
+| #3 `strikes` tuple ordering | **Narrowed** — 4-element shape and "priors" vendor-confirmed; the vol/OI naming of elements 1–2 rests on third-party assertion |
+
+And one gap is **added**: the OpenAPI spec's claim that `/{ticker}/state/{category}`
+returns `basic_response` is wrong for the four greek categories, which return an
+undocumented schema built on `mini_contracts`. Anything in our pipeline that
+assumes one shape across all state categories should be checked against this.
