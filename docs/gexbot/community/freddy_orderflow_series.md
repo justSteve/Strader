@@ -5,13 +5,14 @@ Tracker for Freddy's multi-part educational series introducing GexBot's
 
 ## Subscription status
 
-**We do not currently subscribe to OrderFlow.** Steve flagged this
-series as "worth tracking" because the conceptual material in the
-early parts is broadly applicable (RV vs IV, vol regimes), and the
-later parts may inform a future decision about whether to subscribe.
-
-Treat synthesis below as background material, not operational input,
-unless/until we have OrderFlow data in the corpus.
+**We subscribe as of 2026-08-05** — the Quant tier (one month, tier
+decision ~Sep 1) includes the Orderflow package, and the 62-day
+orderflow archive is on Z:. This section previously read "we do not
+currently subscribe"; that preamble and its treat-as-background caveat
+are superseded [st-20nw]. This series is now primary doctrine input
+for the Orderflow Mastery effort (epic st-ygy1) — synthesized against
+`../orderflow-intended-read.md`, verified against the archive in
+Phase 2.
 
 ## Series
 
@@ -299,7 +300,7 @@ The result is the right rule with the wrong mechanism.
 - The four-scenario framework (morning, scalping, event days, EOD) is the operational scaffold for using OrderFlow
 - The "read both charts together" requirement is the discipline that prevents false signals
 - The mechanism explanation in *[12:00]–[13:30]* should be read through canonical theory + the customer-flow nuance above, not taken at face value
-- We don't currently subscribe to OrderFlow, so all of this remains background — to be revisited if/when subscription is added
+- ~~We don't currently subscribe to OrderFlow, so all of this remains background~~ — superseded 2026-08-06 [st-20nw]: we subscribe (Quant month); these reads are now Phase 2 verification targets, see `../orderflow-intended-read.md` §6
 
 ### Confidence
 
