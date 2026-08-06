@@ -18,12 +18,15 @@ archive each session.
 | When | Panes (top → bottom) | Why |
 |---|---|---|
 | ~9:40–9:45 AM | convexity orderflow / gex orderflow / net convexity | Two-signal entry pair + regime tape; Freddy's morning scenario |
-| ~3:45–3:55 PM | **net vanna** / gex orderflow / net convexity | The $800MM/$1000MM last-hour thresholds (stated for net -vanna) + EOD positioning read; add net charm as a 4th pane if the UI allows |
+| ~3:45–3:55 PM | **net vanna** / gex orderflow / net convexity | The $800MM/$1000MM last-hour thresholds (stated for net -vanna) + EOD positioning read |
 | Nightly (optional) | same as close, window widened 30min → full session | Freddy's nightly whole-day-shape practice |
 | On-call | whatever is up | Doctrine in motion: convexity dump after a lift morning; spikes dwarfing the day's prior bars |
 
-If the UI allows a fourth pane, run all four (convexity OF / gex OF / net
-convexity / net -vanna-charm) all day and skip the close-time dropdown swap.
+The view is fixed at three panes (confirmed 2026-08-06 — no add-pane
+affordance), so the close capture is a one-dropdown swap of the top pane:
+convexity orderflow → net vanna. Net charm is not routinely displayed; the
+archived `zcharm` field covers it continuously, and on suspected extreme
+days an on-call swap to net charm is the exception.
 
 ## Standing settings
 
