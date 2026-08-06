@@ -1,12 +1,26 @@
 """GexBot stream pull — one cycle. [st-1yp]
 
-Hits 6 endpoints in sequence respecting the 1 req/sec/metric rate limit:
-  /SPX/state/gamma_zero
+Hits 10 endpoints in sequence respecting the 1 req/sec/metric rate limit:
+  /SPX/state/gamma_zero         0DTE — the primary late-day read
   /SPX/state/vanna_zero
   /SPX/state/charm_zero
   /SPX/state/delta_zero
   /SPX/classic/gex_zero/majors
+  /SPX/state/gamma_one          1DTE — tomorrow's book, st-8ywx
+  /SPX/state/vanna_one
+  /SPX/state/charm_one
+  /SPX/state/delta_one
   /SPX/orderflow/orderflow      (OPTIONAL — Quant/Orderflow tiers only, st-fyey)
+
+The State package defines eight categories — {gamma,delta,vanna,charm} x
+{_zero,_one} — and until 2026-08-06 this collector took only the four _zero
+legs, so every 1DTE reading was dropped on the floor. 0DTE stays FIRST in the
+order: it is what the butterfly window trades, and a cycle that dies partway
+must have it already written. [st-8ywx]
+
+Ordering note: the _one legs sit after classic/majors rather than beside their
+_zero siblings for that reason. Do not "tidy" them into greek-alphabetical
+order — the sequence encodes what survives a truncated cycle.
 
 Bundles the responses into one record ready to write via writer.
 
@@ -36,6 +50,10 @@ ENDPOINTS_DEFAULT = [
     "/SPX/state/charm_zero",
     "/SPX/state/delta_zero",
     "/SPX/classic/gex_zero/majors",
+    "/SPX/state/gamma_one",
+    "/SPX/state/vanna_one",
+    "/SPX/state/charm_one",
+    "/SPX/state/delta_one",
     "/SPX/orderflow/orderflow",
 ]
 
@@ -108,6 +126,7 @@ def pull_cycle(ticker: str = "SPX") -> dict:
                 time.sleep(RATE_DELAY_S)
 
     gamma_zero = by_endpoint.get(f"/{ticker}/state/gamma_zero", {})
+    gamma_one = by_endpoint.get(f"/{ticker}/state/gamma_one", {})
     summary = {
         "ts_response_gamma_zero": gamma_zero.get("timestamp"),
         "spot_at_gamma_zero": gamma_zero.get("spot"),
@@ -117,6 +136,12 @@ def pull_cycle(ticker: str = "SPX") -> dict:
         "major_short_gamma": gamma_zero.get("major_short_gamma"),
         "min_dte": gamma_zero.get("min_dte"),
         "sec_min_dte": gamma_zero.get("sec_min_dte"),
+        # 1DTE bracket, kept under its own keys so nothing already reading the
+        # 0DTE names silently starts seeing tomorrow's book. [st-8ywx]
+        "one_major_positive": gamma_one.get("major_positive"),
+        "one_major_negative": gamma_one.get("major_negative"),
+        "one_major_long_gamma": gamma_one.get("major_long_gamma"),
+        "one_major_short_gamma": gamma_one.get("major_short_gamma"),
     }
 
     return {

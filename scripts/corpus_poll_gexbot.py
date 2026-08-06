@@ -53,8 +53,10 @@ def main() -> int:
             update_manifest(d=None, stream="gexbot", increment_cycles=1,
                             errors=rec["errors"] or None)
             s = rec["data"]["summary"]
+            one = (f"  1dte={s.get('one_major_negative')}-{s.get('one_major_positive')}"
+                   if s.get("one_major_positive") is not None else "")
             print(f"  [{rec['ts_pull_utc']}] gexbot  spot={s.get('spot_at_gamma_zero')}  "
-                  f"bracket={s.get('major_negative')}-{s.get('major_positive')}  "
+                  f"bracket={s.get('major_negative')}-{s.get('major_positive')}{one}  "
                   f"errs={len(rec['errors'])}", flush=True)
             consecutive_failures = consecutive_failures + 1 if rec["errors"] else 0
         except Exception as e:
