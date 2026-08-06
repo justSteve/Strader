@@ -42,28 +42,48 @@ probe() {           # probe <label> <pgrep-pattern> <detail>
     fi
 }
 
-fsize() {           # fsize <label> <path>
-    local label="$1" path="$2"
+fsize() {           # fsize <label> <path> [why-absent-is-normal]
+    local label="$1" path="$2" note="${3:-}"
     if [[ -f "$path" ]]; then
         printf '%-22s %-8s %-10s %s\n' "$label" "present" \
             "$(date -r "$path" +%H:%M 2>/dev/null || echo -)" \
             "$(du -h "$path" 2>/dev/null | cut -f1) — $(basename "$path")"
     else
-        printf '%-22s %-8s %-10s %s\n' "$label" "ABSENT" "-" "$(basename "$path")"
+        printf '%-22s %-8s %-10s %s\n' "$label" "ABSENT" "-" \
+            "$(basename "$path")${note:+ · $note}"
     fi
 }
+
+# The tmux server itself, FIRST — every surface below is hosted in it, so one
+# server death reads as five independent failures unless this row is present.
+# Observed 2026-08-05 ~19:56 CT: the moocity server died and took the GEX
+# collector and the 90-day backfill with it. The script reported five DOWN
+# rows and gave no hint they shared one cause. [st-p3lv]
+if tmux -L moocity ls >/dev/null 2>&1; then
+    printf '%-22s %-8s %-10s %s\n' "tmux moocity" "UP" "-" \
+        "$(tmux -L moocity ls 2>/dev/null | wc -l) session(s) — hosts the surfaces below"
+else
+    printf '%-22s %-8s %-10s %s\n' "tmux moocity" "DOWN" "-" \
+        "SOCKET ABSENT — every DOWN below is explained by this, not by 5 faults"
+fi
 
 probe "ES capture"        "corpus_stream_databento.py"  "trades + MBP-1"
 probe "drill bridge"      "drill_bridge.py"             "127.0.0.1:7788"
 probe "footprint feeder"  "live_footprint_feed.py"      "tails today's ES JSONL"
 probe "GEX collector"     "corpus_poll_gexbot.py"       "SPX GEX -> corpus"
 probe "MI gauge"          "mi_gauge"                    "cron-driven, usually DOWN between ticks"
+probe "GEX hist backfill" "gexbot_hist_backfill.py"     "90-day harvest — only matters during the paid window (st-ox9x); delete this row when it completes"
 
 printf '\n'
 fsize "ES tape"      "$DAY_DIR/databento_glbx_es.jsonl"
 fsize "MBP-1 quotes" "$DAY_DIR/databento_glbx_es_mbp1.jsonl"
 fsize "GEX polls"    "$DAY_DIR/gexbot.jsonl"
-fsize "internals"    "$DAY_DIR/internals.jsonl"
+fsize "MI gauge ticks"   "$DAY_DIR/mi_gauge_live.jsonl"
+# internals.jsonl is written by the 06:30 T+1 corpus_daily cron, NOT during the
+# session — so ABSENT is the NORMAL same-day state and was being read as an
+# alarm at tap-in. The live intraday surface is mi_gauge_live.jsonl above.
+fsize "internals (T+1)"  "$DAY_DIR/internals.jsonl" \
+      "normal until tomorrow's 06:30 corpus_daily — not an alarm today"
 
 printf '\n'
 printf 'Read this OVER CurrentStatus.md where the two disagree: that file records\n'
