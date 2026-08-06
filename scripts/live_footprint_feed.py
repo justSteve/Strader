@@ -53,8 +53,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from market.corpus.paths import central_date, resolve_existing  # noqa: E402
+from market.corpus.paths import central_date, gexbot_path, resolve_existing  # noqa: E402
 from market.orderflow.anchors import LiveAnchors, mancini_levels_for  # noqa: E402
+from market.orderflow.gex_context import GexContext                # noqa: E402
 from market.orderflow.bars import build_bars                    # noqa: E402
 from market.orderflow.fill import bar_fill_steps                # noqa: E402
 from market.orderflow.parity import StackDriver                 # noqa: E402
@@ -206,7 +207,7 @@ def take_bar_trades(bar, buf: list) -> list:
 
 
 def bar_payload(bar, trades: list, events: list[dict] | None = None,
-                *, include_steps: bool = True) -> dict:
+                *, include_steps: bool = True, gex: dict | None = None) -> dict:
     """Serialise a FootprintBar into the exact column shape the page renders.
 
     Key-for-key identical to orderflow_drill.bars_payload's per-bar dict —
@@ -224,8 +225,13 @@ def bar_payload(bar, trades: list, events: list[dict] | None = None,
     to animate a bar that is already complete, and recomputing them once a
     second for a bar the tape is still writing is work whose output is
     immediately stale.
+
+    ``gex`` is the dealer positioning that was published when this bar closed
+    [st-8ywx]. The key is OMITTED rather than sent as null when there is no
+    context — the feed is RTH-only and can be down, and an absent key reads as
+    "not known" where ``"gex": null`` on every pre-open bar reads as a fault.
     """
-    return {
+    payload = {
         "t0": bar.start_ts.isoformat(), "t1": bar.end_ts.isoformat(),
         "o": bar.open, "h": bar.high, "l": bar.low, "c": bar.close,
         "v": bar.volume, "d": bar.delta, "nv": bar.none_vol,
@@ -236,6 +242,9 @@ def bar_payload(bar, trades: list, events: list[dict] | None = None,
                   if include_steps and trades else []),
         "ev": events or [],
     }
+    if gex:
+        payload["gex"] = gex
+    return payload
 
 
 def developing_payload(pending: list, bar_n: int) -> dict | None:
@@ -310,6 +319,10 @@ def main() -> int:
                     help="seconds between pushes of the DEVELOPING (still "
                          "forming) bar; 0 disables and the page shows closed "
                          "bars only, as it did before [st-e91l]")
+    ap.add_argument("--no-gex", action="store_true",
+                    help="do not stamp bars with GexBot dealer positioning "
+                         "[st-8ywx]; the stamp is already a no-op when the "
+                         "feed is absent, so this is for isolating it")
     ap.add_argument("--dry-run", action="store_true",
                     help="build and log bars, post nothing")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -349,9 +362,15 @@ def main() -> int:
     # meta carries the Mancini set only: the two range edges are placeholders
     # until the first bar seeds them, so publishing them at start would ship
     # 0.0 as a level the recognizer is watching.
+    # Dealer positioning for each bar [st-8ywx]. Constructed unconditionally —
+    # the reader resolves an absent or dead feed to None per bar, so a session
+    # that starts pre-open picks GEX up mid-morning without a restart.
+    gex = None if args.no_gex else GexContext(gexbot_path(day))
+
     meta = {"day": day.isoformat(), "bar_n": args.bar_n, "tick": TICK,
             "source": "live", "started": datetime.now().isoformat(timespec="seconds"),
-            "mancini": mancini}
+            "mancini": mancini,
+            "gex": bool(gex is not None and gexbot_path(day).exists())}
 
     logger.info("live footprint feed — day=%s bar_n=%d reorder_lag=%.1fs bridge=%s "
                 "anchors=%d (%d mancini)",
@@ -405,7 +424,14 @@ def main() -> int:
         live_anchors.observe(bar)
         events = driver.on_bar(bar_i, bar, bar_trades)
         n_ev += len(events)
-        batch.append(bar_payload(bar, bar_trades, events))
+        # Stamp AFTER the engine has judged the bar: the context is recorded
+        # alongside recognition, never an input to it. Stage 1 changes no
+        # recognition behaviour, and this ordering is what enforces that.
+        gex_ctx = None
+        if gex is not None:
+            gex.refresh()
+            gex_ctx = gex.for_bar(bar)
+        batch.append(bar_payload(bar, bar_trades, events, gex=gex_ctx))
         now = time.monotonic()
         # Push promptly — a bar the page has not seen is a bar Steve is not
         # watching — but coalesce the catch-up burst so a full day does not
