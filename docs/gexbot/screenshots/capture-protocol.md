@@ -18,7 +18,7 @@ archive each session.
 | When | Panes (top → bottom) | Why |
 |---|---|---|
 | ~9:40–9:45 AM | convexity orderflow / gex orderflow / net convexity | Two-signal entry pair + regime tape; Freddy's morning scenario |
-| ~3:45–3:55 PM | **net -vanna/charm** / gex orderflow / net convexity | The $800MM/$1000MM last-hour thresholds + EOD positioning read |
+| ~3:45–3:55 PM | **net vanna** / gex orderflow / net convexity | The $800MM/$1000MM last-hour thresholds (stated for net -vanna) + EOD positioning read; add net charm as a 4th pane if the UI allows |
 | Nightly (optional) | same as close, window widened 30min → full session | Freddy's nightly whole-day-shape practice |
 | On-call | whatever is up | Doctrine in motion: convexity dump after a lift morning; spikes dwarfing the day's prior bars |
 
@@ -33,12 +33,22 @@ convexity / net -vanna-charm) all day and skip the close-time dropdown swap.
   until its tooltip/meaning is recorded)
 - Window **30min** intraday; full session for the nightly capture
 
+## UI metric roster — observed 2026-08-06 (drift from docs noted)
+
+The metric dropdown offers **eight** choices (screenshot
+`2026-08-06-1554-spx-metric-dropdown-roster.png`): aggregate dex, net gex,
+net convexity, **net vanna (β)**, **net charm (β)**, dex orderflow, gex
+orderflow, convexity orderflow. Drift from the captured docs
+(`../canonical/orderflow_view.md`): the docs describe a combined "Net
+-Vanna/Charm" section; the UI splits it into two metrics, both beta-flagged —
+matching the vendor's own "still learning best practices" caveat on that
+layer. There is no "net gamma" metric; net gex is the gamma-family pane.
+
 ## One-off: the mapping tour (pending)
 
-Cycle the metric dropdown through all seven values — dex orderflow, gex
-orderflow, convexity orderflow, net gex, net convexity, aggregate dex, net
--vanna/charm — one screenshot each, tooltip hover showing value + timestamp
-where possible. Purpose: empirical pane↔field mapping against the archive at
+Cycle the metric dropdown through all eight values above — one screenshot
+each, tooltip hover showing value + timestamp where possible (Snipping Tool
+delay timer captures hover states; ClipMate cannot). Purpose: empirical pane↔field mapping against the archive at
 the same second — net convexity vs `zcvr` (Phase 2 experiment #1), net gex vs
 `zgr`, -vanna/charm vs `zvanna`/`zcharm`, flow panes vs `dexoflow`/`gexoflow`/
 `cvroflow`.

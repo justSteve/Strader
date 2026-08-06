@@ -195,6 +195,11 @@ long/short axis, Gex OF differences the call/put imbalance. Panes and reads:
 - This pane connects directly to the late-day pinning doctrine
   (`canonical/convexity_ladder.md`: 0DTE negative convexity as close magnets
   via -vanna/charm) and to Steve's late-day fly lane.
+- **[STRUCTURAL — UI observation 2026-08-06]** The live UI splits this into
+  two separate metrics, **net vanna** and **net charm**, both beta-flagged
+  (`screenshots/capture-protocol.md`) — a one-to-one match to the archived
+  `zvanna`/`zcharm` field pair, and cleaner for the mapping than the docs'
+  combined section suggested.
 
 ## 3. The doctrine hierarchy — what governs what
 
