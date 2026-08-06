@@ -86,7 +86,8 @@ def test_success_after_transient_failure(rig, tmp_path, monkeypatch):
     monkeypatch.setattr(alerts, "_post", flaky)
     r = alerts.send("Flush", "SPX -40", env_path=env)
     assert r.ok and r.attempts == 2
-    assert _journal(rig)[-1]["event"] == "alert_sent"
+    sent = [e for e in _journal(rig) if e["event"] == "alert_sent"]
+    assert sent and sent[-1]["attempts"] == 2
 
 
 def test_twilio_sends_sms_body(rig, tmp_path, monkeypatch):
@@ -124,3 +125,73 @@ def test_pushover_wrong_length_key_is_caught(rig, tmp_path):
                PUSHOVER_TOKEN="short", PUSHOVER_USER="b" * 30)
     r = alerts.send("t", "m", env_path=env)
     assert not r.ok and "30 alphanumeric" in r.detail
+
+
+# --- ack-confirmation echo [st-g5y7] ---------------------------------------
+
+def _pushover_env(tmp_path):
+    return _env(tmp_path, ALERT_BACKEND="pushover",
+                PUSHOVER_TOKEN="a" * 30, PUSHOVER_USER="b" * 30)
+
+
+def test_urgent_send_spawns_ack_watcher(rig, tmp_path, monkeypatch):
+    import subprocess
+    env = _pushover_env(tmp_path)
+    monkeypatch.setattr(alerts, "_post",
+                        lambda *a, **k: '{"status":1,"receipt":"r" * 1}'.replace('"r" * 1', '"rcpt123"'))
+    spawned = []
+    monkeypatch.setattr(subprocess, "Popen",
+                        lambda cmd, **k: spawned.append(cmd) or type("P", (), {})())
+    assert alerts.send("Flush", "SPX -40", urgent=True, env_path=env)
+    assert spawned and "--watch-receipt" in spawned[0]
+    assert spawned[0][spawned[0].index("--watch-receipt") + 1] == "rcpt123"
+    events = [e["event"] for e in _journal(rig)]
+    assert "ack_watch_spawned" in events
+
+
+def test_calm_and_optout_sends_do_not_spawn(rig, tmp_path, monkeypatch):
+    import subprocess
+    env = _pushover_env(tmp_path)
+    monkeypatch.setattr(alerts, "_post", lambda *a, **k: '{"status":1,"receipt":"x"}')
+    monkeypatch.setattr(subprocess, "Popen",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("spawned")))
+    assert alerts.send("Note", "calm", urgent=False, env_path=env)
+    assert alerts.send("Flush", "m", urgent=True, ack_echo=False, env_path=env)
+
+
+def test_priority_override_is_informational(rig, tmp_path, monkeypatch):
+    env = _pushover_env(tmp_path)
+    seen = {}
+    monkeypatch.setattr(alerts, "_post",
+                        lambda url, data, auth=None: seen.update(data) or '{"status":1}')
+    assert alerts.send("Ack ✓", "echo", urgent=False, priority=0,
+                       ack_echo=False, env_path=env)
+    assert seen["priority"] == 0 and "retry" not in seen
+
+
+def test_watch_receipt_ack_sends_priority0_echo(rig, tmp_path, monkeypatch):
+    import subprocess
+    env = _pushover_env(tmp_path)
+    monkeypatch.setattr(alerts, "_get",
+                        lambda url: '{"acknowledged":1,"acknowledged_at":1786029477,'
+                                    '"acknowledged_by_device":"iphone"}')
+    posts = []
+    monkeypatch.setattr(alerts, "_post",
+                        lambda url, data, auth=None: posts.append(dict(data)) or '{"status":1}')
+    monkeypatch.setattr(subprocess, "Popen",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("echo must not spawn")))
+    assert alerts.watch_receipt("rcpt123", "EMERGENCY TEST", env_path=env) == 0
+    assert len(posts) == 1 and posts[0]["priority"] == 0
+    assert "iphone" in posts[0]["message"] and "Repeats stopped" in posts[0]["message"]
+    events = [e["event"] for e in _journal(rig)]
+    assert events.index("ack_confirmed") < events.index("alert_sent")
+
+
+def test_watch_receipt_expiry_journals_no_echo(rig, tmp_path, monkeypatch):
+    env = _pushover_env(tmp_path)
+    monkeypatch.setattr(alerts, "_get", lambda url: '{"acknowledged":0,"expired":1}')
+    monkeypatch.setattr(alerts, "_post",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("no echo on expiry")))
+    assert alerts.watch_receipt("rcpt123", "EMERGENCY TEST", env_path=env) == 0
+    ev = _journal(rig)[-1]
+    assert ev["event"] == "ack_expired" and ev["title"] == "EMERGENCY TEST"
