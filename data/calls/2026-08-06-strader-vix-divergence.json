@@ -15,12 +15,20 @@
   "result": {
     "scored_at_ct": "2026-08-06T15:16",
     "spx_low_after_call": 7698.15,
-    "spx_close_area": 7711.5,
-    "vix_close_area": 15.26,
-    "vix_session_low": 15.14,
+    "vix_session_low": 15.11,
     "vix_never_bid": true,
-    "verdict": "CORRECT - SPX fell 11.75 further to 7698.15 then recovered ~13 into the close; VIX never bid and finished DOWN on a day the index lost 60 points from its high",
+    "verdict": "CORRECT and STRONGER at the settle than when scored: SPX closed -13.59 and 44.7 points off its high, while VIX closed -4.17% at 15.15, near its session low of 15.11. Volatility was sold hard on a day the index broke its opening range low. The divergence never resolved against the read.",
     "retraction_verdict": "WRONG - the 10:37 retraction was made 12 points into the adverse move and near the low",
-    "lesson_confirmed": "short-horizon adverse price action is not evidence against a structural read"
+    "lesson_confirmed": "short-horizon adverse price action is not evidence against a structural read",
+    "corrected_at_ct": "2026-08-06T15:22",
+    "correction_note": "prior values were a 14:58:42 reading mislabelled as the close; these are the settle",
+    "spx_close": 7709.96,
+    "spx_change": -13.59,
+    "spx_change_pct": -0.18,
+    "spx_high": 7742.85,
+    "spx_low": 7698.15,
+    "vix_close": 15.15,
+    "vix_change": -0.66,
+    "vix_change_pct": -4.17
   }
 }

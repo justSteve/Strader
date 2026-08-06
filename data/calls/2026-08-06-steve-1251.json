@@ -35,6 +35,9 @@
     "close_leg": "MISS by 4.75 - called 7740, settled 7735.25",
     "direction_leg": "CORRECT - called a dip then recovery; ES dipped to 7727.0 at 14:50 then closed up 8.25 from there",
     "verdict": "shape right, levels short. Both legs missed on magnitude, neither on direction.",
-    "note": "the 7724.25 session low was set at 11:15, BEFORE this 12:51 call. Scoring only the post-call window is what makes this a prediction rather than a description."
+    "note": "the 7724.25 session low was set at 11:15, BEFORE this 12:51 call. Scoring only the post-call window is what makes this a prediction rather than a description.",
+    "corrected_at_ct": "2026-08-06T15:22",
+    "spx_close": 7709.96,
+    "es_scoring_note": "scored on ES because the call was stated in ES. ES keeps trading past the 15:00 cash close (7736.00 at 15:22), so the 14:59:59 print of 7735.25 is the honest comparison to a call about 'the close'."
   }
 }
