@@ -57,6 +57,13 @@ class LevelInteraction:
     break_time: str | None = None  # "HH:MM CT"
     reclaim_time: str | None = None
     extreme: float | None = None   # worst excursion beyond the level while broken
+    # Evidence trail [st-qih1]: every state-changing event with the candle row
+    # behind it, so any claim ("7549 held three times") is checkable against
+    # the tape rather than believed. The brief ignores these; the level-state
+    # tracker serializes them.
+    first_touch: str | None = None   # ISO UTC of the first touching candle
+    last_event_ts: str | None = None
+    events: list = field(default_factory=list)
 
 
 @dataclass
@@ -81,6 +88,19 @@ def letter_window_start(plan_date: str) -> datetime:
 def _fmt_ct(ts_ms: int) -> str:
     return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).astimezone(
         CENTRAL).strftime("%a %H:%M CT")
+
+
+def _iso_utc(ts_ms: int) -> str:
+    return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat(
+        timespec="seconds")
+
+
+def _evidence(it: "LevelInteraction", event: str, c: dict) -> None:
+    ts = _iso_utc(c["datetime"])
+    it.last_event_ts = ts
+    it.events.append({"event": event, "ts": ts,
+                      "candle": {k: c[k] for k in
+                                 ("open", "high", "low", "close") if k in c}})
 
 
 def fetch_overnight_candles(start_utc: datetime,
@@ -132,12 +152,16 @@ def compute_interactions(levels: Sequence[Level], candles: Sequence[dict],
 
             if touched:
                 it.touches += 1
+                if it.first_touch is None:
+                    it.first_touch = _iso_utc(c["datetime"])
+                    _evidence(it, "first_touch", c)
             if it.state in ("untouched",) and touched:
                 it.state = "tested-held"
             if it.state in ("untouched", "tested-held") and broken_close:
                 it.state = "broken"
                 it.break_time = _fmt_ct(c["datetime"])
                 it.extreme = c["low"] if is_sup else c["high"]
+                _evidence(it, "break", c)
             elif it.state == "broken":
                 worst = c["low"] if is_sup else c["high"]
                 if it.extreme is None or (worst < it.extreme if is_sup
@@ -146,8 +170,10 @@ def compute_interactions(levels: Sequence[Level], candles: Sequence[dict],
                 if held_close:
                     it.state = "reclaimed"
                     it.reclaim_time = _fmt_ct(c["datetime"])
+                    _evidence(it, "reclaim", c)
             if it.state in ("tested-held", "reclaimed") and touched and held_close:
                 it.defenses += 1
+                _evidence(it, "defended_close", c)
         out.append(it)
     return out
 

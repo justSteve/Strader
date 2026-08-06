@@ -1,0 +1,335 @@
+{
+ "date": "2026-08-05",
+ "instrument": "ES",
+ "session_bias": "",
+ "levels": [
+  {
+   "price": 7774.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7774"
+  },
+  {
+   "price": 7763.0,
+   "kind": "support",
+   "label": "major",
+   "source_quote": "7763 (major)"
+  },
+  {
+   "price": 7755.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7755"
+  },
+  {
+   "price": 7742.0,
+   "kind": "support",
+   "label": "major",
+   "source_quote": "7742 (major)"
+  },
+  {
+   "price": 7739.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7739"
+  },
+  {
+   "price": 7733.0,
+   "kind": "support",
+   "label": "major",
+   "source_quote": "7733 (major)"
+  },
+  {
+   "price": 7720.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7720"
+  },
+  {
+   "price": 7712.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7712"
+  },
+  {
+   "price": 7707.0,
+   "kind": "support",
+   "label": "major",
+   "source_quote": "7707 (major)"
+  },
+  {
+   "price": 7695.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7695"
+  },
+  {
+   "price": 7682.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7682"
+  },
+  {
+   "price": 7673.0,
+   "kind": "support",
+   "label": "major",
+   "source_quote": "7673 (major)"
+  },
+  {
+   "price": 7668.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7668"
+  },
+  {
+   "price": 7655.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7655"
+  },
+  {
+   "price": 7650.0,
+   "kind": "support",
+   "label": "major",
+   "source_quote": "7650 (major)"
+  },
+  {
+   "price": 7640.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7640"
+  },
+  {
+   "price": 7637.0,
+   "kind": "support",
+   "label": "major",
+   "source_quote": "7637 (major)"
+  },
+  {
+   "price": 7632.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7632"
+  },
+  {
+   "price": 7620.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7620"
+  },
+  {
+   "price": 7611.0,
+   "kind": "support",
+   "label": "major",
+   "source_quote": "7611 (major)"
+  },
+  {
+   "price": 7602.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7602"
+  },
+  {
+   "price": 7594.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7594"
+  },
+  {
+   "price": 7583.0,
+   "kind": "support",
+   "label": "major",
+   "source_quote": "7583 (major)"
+  },
+  {
+   "price": 7575.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7575"
+  },
+  {
+   "price": 7567.0,
+   "kind": "support",
+   "label": "major",
+   "source_quote": "7567 (major)"
+  },
+  {
+   "price": 7553.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7553"
+  },
+  {
+   "price": 7549.0,
+   "kind": "support",
+   "label": "major",
+   "source_quote": "7549 (major)"
+  },
+  {
+   "price": 7537.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7537"
+  },
+  {
+   "price": 7527.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7527"
+  },
+  {
+   "price": 7524.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "7524"
+  },
+  {
+   "price": 7517.0,
+   "kind": "support",
+   "label": "major",
+   "source_quote": "7517 (major)"
+  },
+  {
+   "price": 7783.0,
+   "kind": "resistance",
+   "label": "major",
+   "source_quote": "7783 (major)"
+  },
+  {
+   "price": 7790.0,
+   "kind": "resistance",
+   "label": "",
+   "source_quote": "7790"
+  },
+  {
+   "price": 7803.0,
+   "kind": "resistance",
+   "label": "major",
+   "source_quote": "7803 (major)"
+  },
+  {
+   "price": 7815.0,
+   "kind": "resistance",
+   "label": "",
+   "source_quote": "7815"
+  },
+  {
+   "price": 7826.0,
+   "kind": "resistance",
+   "label": "major",
+   "source_quote": "7826 (major)"
+  },
+  {
+   "price": 7835.0,
+   "kind": "resistance",
+   "label": "major",
+   "source_quote": "7835 (major)"
+  },
+  {
+   "price": 7846.0,
+   "kind": "resistance",
+   "label": "",
+   "source_quote": "7846"
+  },
+  {
+   "price": 7855.0,
+   "kind": "resistance",
+   "label": "major",
+   "source_quote": "7855 (major)"
+  },
+  {
+   "price": 7867.0,
+   "kind": "resistance",
+   "label": "",
+   "source_quote": "7867"
+  },
+  {
+   "price": 7875.0,
+   "kind": "resistance",
+   "label": "major",
+   "source_quote": "7875 (major)"
+  },
+  {
+   "price": 7882.0,
+   "kind": "resistance",
+   "label": "",
+   "source_quote": "7882"
+  },
+  {
+   "price": 7894.0,
+   "kind": "resistance",
+   "label": "major",
+   "source_quote": "7894 (major)"
+  },
+  {
+   "price": 7542.0,
+   "kind": "trigger",
+   "label": "",
+   "source_quote": "you want to see 7542 sweep and then recover 7549 to long"
+  },
+  {
+   "price": 7499.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "Nothing below there until 7499. We closed here on Friday at 5pm"
+  },
+  {
+   "price": 7483.0,
+   "kind": "trigger",
+   "label": "",
+   "source_quote": "Bonus if ES tags 7483 on this."
+  },
+  {
+   "price": 7516.0,
+   "kind": "pivot",
+   "label": "",
+   "source_quote": "Bulls fully and completely control above 7516"
+  },
+  {
+   "price": 7649.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "ES will either hold the 7649 backtest discussed above"
+  },
+  {
+   "price": 7418.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "No remote bear case until 7418 fails."
+  },
+  {
+   "price": 7624.0,
+   "kind": "trigger",
+   "label": "",
+   "source_quote": "Likely 7624 trigger down."
+  },
+  {
+   "price": 7710.0,
+   "kind": "support",
+   "label": "",
+   "source_quote": "There are no supports until much, much lower (7710, then 7650)."
+  },
+  {
+   "price": 7803.0,
+   "kind": "target",
+   "label": "",
+   "source_quote": "Next slate of targets are 7803, 7826, 7855."
+  },
+  {
+   "price": 7826.0,
+   "kind": "target",
+   "label": "",
+   "source_quote": "Next slate of targets are 7803, 7826, 7855."
+  },
+  {
+   "price": 7855.0,
+   "kind": "target",
+   "label": "",
+   "source_quote": "My general lean is ES can simply continue the run to 7803, 7826, 7855."
+  }
+ ],
+ "commentary": [],
+ "raw_excerpt": "",
+ "model": "fixture",
+ "parsed_at": "2026-08-05T11:32:23.615616+00:00"
+}
