@@ -56,6 +56,29 @@ the same second — net convexity vs `zcvr` (Phase 2 experiment #1), net gex vs
 `zgr`, -vanna/charm vs `zvanna`/`zcharm`, flow panes vs `dexoflow`/`gexoflow`/
 `cvroflow`.
 
+## Tooltip anchors — pane↔field verification ledger
+
+One row per tooltip capture; verified against the archive when the day's
+harvest lands (`/mnt/z/Harvest/gexbot-hist/`).
+
+| Anchor time (ET) | Pane metric | Tooltip values | Screenshot | Archive check |
+|---|---|---|---|---|
+| 2026-08-06 3:59:59 PM | aggregate dex | aggregate dex 449.20; agg call dex 265.15; agg put dex 184.05; spot 7709.64 | `2026-08-06-1559-spx-aggdex-tooltip-anchor.png` | **pending** — 08-06 harvest not yet landed (archive ends 08-05). UI-side identity already confirmed: 265.15 + 184.05 = 449.20. Expected match: `agg_dex`/`agg_call_dex`/`agg_put_dex` at 19:59:59 UTC−4 snapshot. |
+
+Remaining tour: net gex, net convexity (→`zcvr`, experiment #1), net vanna,
+net charm, dex orderflow, gex orderflow, convexity orderflow.
+
+## UI color legend — from the Settings panel (2026-08-06 capture)
+
+Settings panel (`2026-08-06-1559-spx-aggdex-tooltip-anchor.png`, right side)
+decodes every line: **zero gamma** orange · **major positive/negative
+history** green/red · **major call gamma** green · **major put gamma** red ·
+**major long gamma** cyan · **major short gamma** purple · **net convexity**
+blue · **aggregate DEX** cyan · **aggregate call DEX** green · **aggregate
+put DEX** red · **net GEX** green. Also present: Show Tooltips toggle, Price
+Transform (multiplier + offset — the index/ETF converter the State docs
+mention), timezone New York (UTC−4).
+
 ## Baseline record — first capture, 2026-08-06 3:46:18 PM
 
 Settings active: SPX, spot price; three panes all latest (08/06), spot ON,
