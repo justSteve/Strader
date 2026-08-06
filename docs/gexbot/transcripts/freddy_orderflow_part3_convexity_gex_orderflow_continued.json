@@ -1,0 +1,2782 @@
+[
+  {
+    "start": 0.48,
+    "duration": 6.799,
+    "text": "Hi everyone, welcome to part three of"
+  },
+  {
+    "start": 4.08,
+    "duration": 5.8,
+    "text": "gets bit order flow. So basically today"
+  },
+  {
+    "start": 7.279,
+    "duration": 6.24,
+    "text": "I'm going to show you how to"
+  },
+  {
+    "start": 9.88,
+    "duration": 6.12,
+    "text": "analyze get order flow and how to trade"
+  },
+  {
+    "start": 13.519,
+    "duration": 5.76,
+    "text": "it combine it with convexity order flow."
+  },
+  {
+    "start": 16.0,
+    "duration": 5.359,
+    "text": "So in the previous video in part two we"
+  },
+  {
+    "start": 19.279,
+    "duration": 5.281,
+    "text": "studied convexity order flow and we"
+  },
+  {
+    "start": 21.359,
+    "duration": 6.0,
+    "text": "mentioned that it's a powerful tool but"
+  },
+  {
+    "start": 24.56,
+    "duration": 5.119,
+    "text": "when we combine it with gets order flow"
+  },
+  {
+    "start": 27.359,
+    "duration": 5.601,
+    "text": "it will give you some amazing signals"
+  },
+  {
+    "start": 29.679,
+    "duration": 5.441,
+    "text": "and I'm going to show you how and also"
+  },
+  {
+    "start": 32.96,
+    "duration": 6.0,
+    "text": "in this video I'm going to show you how"
+  },
+  {
+    "start": 35.12,
+    "duration": 6.48,
+    "text": "to change that futures linear mentality"
+  },
+  {
+    "start": 38.96,
+    "duration": 5.84,
+    "text": "to a nonlinear mentality of the options"
+  },
+  {
+    "start": 41.6,
+    "duration": 6.4,
+    "text": "trader. That's a key on this analysis."
+  },
+  {
+    "start": 44.8,
+    "duration": 6.64,
+    "text": "Right? So let's dive in. Gets order"
+  },
+  {
+    "start": 48.0,
+    "duration": 5.36,
+    "text": "flow. When we visualize gets order flow,"
+  },
+  {
+    "start": 51.44,
+    "duration": 5.119,
+    "text": "we see like this like we see like"
+  },
+  {
+    "start": 53.36,
+    "duration": 7.039,
+    "text": "positive yellow lines like pick uh they"
+  },
+  {
+    "start": 56.559,
+    "duration": 6.081,
+    "text": "spikes up on the positive side and also"
+  },
+  {
+    "start": 60.399,
+    "duration": 4.561,
+    "text": "they spike down, right? So on the"
+  },
+  {
+    "start": 62.64,
+    "duration": 6.08,
+    "text": "positive side that's what we call coal"
+  },
+  {
+    "start": 64.96,
+    "duration": 6.64,
+    "text": "gets basically is is positive spikes"
+  },
+  {
+    "start": 68.72,
+    "duration": 5.92,
+    "text": "that's positive gamma. But what's"
+  },
+  {
+    "start": 71.6,
+    "duration": 5.44,
+    "text": "important here is that the cause of"
+  },
+  {
+    "start": 74.64,
+    "duration": 4.159,
+    "text": "upside is lifted. What it means"
+  },
+  {
+    "start": 77.04,
+    "duration": 5.759,
+    "text": "basically means that it's a positive"
+  },
+  {
+    "start": 78.799,
+    "duration": 6.96,
+    "text": "gamma positive guess and the upside got"
+  },
+  {
+    "start": 82.799,
+    "duration": 5.921,
+    "text": "more expensive. So for instance in this"
+  },
+  {
+    "start": 85.759,
+    "duration": 5.521,
+    "text": "level options above this level you know"
+  },
+  {
+    "start": 88.72,
+    "duration": 4.719,
+    "text": "when the price is trending up got more"
+  },
+  {
+    "start": 91.28,
+    "duration": 4.32,
+    "text": "expensive right they go more expensive"
+  },
+  {
+    "start": 93.439,
+    "duration": 5.601,
+    "text": "on the upside."
+  },
+  {
+    "start": 95.6,
+    "duration": 7.08,
+    "text": "But when we combine that with long gamma"
+  },
+  {
+    "start": 99.04,
+    "duration": 6.8,
+    "text": "is basically is a sign for reversion."
+  },
+  {
+    "start": 102.68,
+    "duration": 6.04,
+    "text": "Right? Be careful of the time of the day"
+  },
+  {
+    "start": 105.84,
+    "duration": 5.52,
+    "text": "and the market structure. What it means?"
+  },
+  {
+    "start": 108.72,
+    "duration": 5.679,
+    "text": "It means that if the price is moving up,"
+  },
+  {
+    "start": 111.36,
+    "duration": 6.56,
+    "text": "you know, we're trending up and then we"
+  },
+  {
+    "start": 114.399,
+    "duration": 6.561,
+    "text": "see um for instance this big line like"
+  },
+  {
+    "start": 117.92,
+    "duration": 6.08,
+    "text": "spikes up and it's quite meaningful"
+  },
+  {
+    "start": 120.96,
+    "duration": 6.4,
+    "text": "compared to the other lines. And we also"
+  },
+  {
+    "start": 124.0,
+    "duration": 6.399,
+    "text": "have on the uh convexity orderflow we"
+  },
+  {
+    "start": 127.36,
+    "duration": 5.92,
+    "text": "see a long gamma that's a sign for"
+  },
+  {
+    "start": 130.399,
+    "duration": 5.281,
+    "text": "reversal right that's what I mean by"
+  },
+  {
+    "start": 133.28,
+    "duration": 5.44,
+    "text": "market structure so for instance if we"
+  },
+  {
+    "start": 135.68,
+    "duration": 4.8,
+    "text": "the market is trending down and we see a"
+  },
+  {
+    "start": 138.72,
+    "duration": 4.72,
+    "text": "spike on the yellow on the on the"
+  },
+  {
+    "start": 140.48,
+    "duration": 4.64,
+    "text": "positive side a call get that's quite"
+  },
+  {
+    "start": 143.44,
+    "duration": 4.48,
+    "text": "different because it's nothing to"
+  },
+  {
+    "start": 145.12,
+    "duration": 4.479,
+    "text": "reverse right so I going to show you"
+  },
+  {
+    "start": 147.92,
+    "duration": 4.08,
+    "text": "later on I going to show you with some"
+  },
+  {
+    "start": 149.599,
+    "duration": 5.761,
+    "text": "examples but that's what it means right"
+  },
+  {
+    "start": 152.0,
+    "duration": 6.0,
+    "text": "So use market structure. If market is"
+  },
+  {
+    "start": 155.36,
+    "duration": 6.8,
+    "text": "trending up, you know, where we have a"
+  },
+  {
+    "start": 158.0,
+    "duration": 6.879,
+    "text": "clear trend and and we see this positive"
+  },
+  {
+    "start": 162.16,
+    "duration": 4.96,
+    "text": "spike, the yellow one, that's that's"
+  },
+  {
+    "start": 164.879,
+    "duration": 5.601,
+    "text": "that's a warning signal. It's like"
+  },
+  {
+    "start": 167.12,
+    "duration": 6.119,
+    "text": "someone is putting breaks on that on"
+  },
+  {
+    "start": 170.48,
+    "duration": 5.759,
+    "text": "that trend up. Right"
+  },
+  {
+    "start": 173.239,
+    "duration": 6.761,
+    "text": "now, on the downside, on the negative"
+  },
+  {
+    "start": 176.239,
+    "duration": 5.92,
+    "text": "side is what we call puts. Right? What's"
+  },
+  {
+    "start": 180.0,
+    "duration": 4.959,
+    "text": "important to know is that basically"
+  },
+  {
+    "start": 182.159,
+    "duration": 6.281,
+    "text": "means that cost of downside is lifted"
+  },
+  {
+    "start": 184.959,
+    "duration": 7.36,
+    "text": "right so it's negative gets"
+  },
+  {
+    "start": 188.44,
+    "duration": 6.519,
+    "text": "and the downside go more expensive so"
+  },
+  {
+    "start": 192.319,
+    "duration": 5.041,
+    "text": "this is a perfect example when combined"
+  },
+  {
+    "start": 194.959,
+    "duration": 6.081,
+    "text": "with long gamma although I don't put it"
+  },
+  {
+    "start": 197.36,
+    "duration": 6.4,
+    "text": "here but that's equal a reversion look"
+  },
+  {
+    "start": 201.04,
+    "duration": 5.199,
+    "text": "the market is trending down and then we"
+  },
+  {
+    "start": 203.76,
+    "duration": 4.88,
+    "text": "see some negative spikes you see this"
+  },
+  {
+    "start": 206.239,
+    "duration": 6.64,
+    "text": "one is the first one and this one is the"
+  },
+  {
+    "start": 208.64,
+    "duration": 6.879,
+    "text": "second one and these two puts are quite"
+  },
+  {
+    "start": 212.879,
+    "duration": 4.961,
+    "text": "meaningful compared to the put gets that"
+  },
+  {
+    "start": 215.519,
+    "duration": 5.121,
+    "text": "we have before of the in general the"
+  },
+  {
+    "start": 217.84,
+    "duration": 4.959,
+    "text": "gets that we have before. So basically"
+  },
+  {
+    "start": 220.64,
+    "duration": 4.56,
+    "text": "this is telling us hey wait a second"
+  },
+  {
+    "start": 222.799,
+    "duration": 5.281,
+    "text": "someone is putting some breaks on this"
+  },
+  {
+    "start": 225.2,
+    "duration": 4.599,
+    "text": "move. Someone is changing the regime"
+  },
+  {
+    "start": 228.08,
+    "duration": 5.84,
+    "text": "right"
+  },
+  {
+    "start": 229.799,
+    "duration": 6.52,
+    "text": "and by doing that they they they taking"
+  },
+  {
+    "start": 233.92,
+    "duration": 5.28,
+    "text": "the liquidity here and these options are"
+  },
+  {
+    "start": 236.319,
+    "duration": 5.761,
+    "text": "becoming more expensive on the downside."
+  },
+  {
+    "start": 239.2,
+    "duration": 5.039,
+    "text": "Right. And the algorithm of guest"
+  },
+  {
+    "start": 242.08,
+    "duration": 4.239,
+    "text": "orderflow basically showing us that when"
+  },
+  {
+    "start": 244.239,
+    "duration": 5.041,
+    "text": "we see these lines and the market is"
+  },
+  {
+    "start": 246.319,
+    "duration": 5.84,
+    "text": "trending down this is a break. This is a"
+  },
+  {
+    "start": 249.28,
+    "duration": 5.599,
+    "text": "sign for reversal, right? But be"
+  },
+  {
+    "start": 252.159,
+    "duration": 6.08,
+    "text": "careful, bear in mind that this spikes"
+  },
+  {
+    "start": 254.879,
+    "duration": 6.721,
+    "text": "down, this put gets has to be meaningful"
+  },
+  {
+    "start": 258.239,
+    "duration": 6.081,
+    "text": "compared to the previous ones. Okay? So"
+  },
+  {
+    "start": 261.6,
+    "duration": 7.84,
+    "text": "we can say that gets order flow is"
+  },
+  {
+    "start": 264.32,
+    "duration": 7.28,
+    "text": "actually directional. Now again just to"
+  },
+  {
+    "start": 269.44,
+    "duration": 5.24,
+    "text": "remind again so when we have a positive"
+  },
+  {
+    "start": 271.6,
+    "duration": 6.48,
+    "text": "get means that the cause of upsides been"
+  },
+  {
+    "start": 274.68,
+    "duration": 6.36,
+    "text": "lifted that's called gamma. that means"
+  },
+  {
+    "start": 278.08,
+    "duration": 5.44,
+    "text": "that the upside go more expensive right"
+  },
+  {
+    "start": 281.04,
+    "duration": 4.719,
+    "text": "so the market is trending up so that's"
+  },
+  {
+    "start": 283.52,
+    "duration": 4.959,
+    "text": "what I mean by market structure combined"
+  },
+  {
+    "start": 285.759,
+    "duration": 5.921,
+    "text": "always have a look market structure so"
+  },
+  {
+    "start": 288.479,
+    "duration": 6.241,
+    "text": "we have a trending up market then we see"
+  },
+  {
+    "start": 291.68,
+    "duration": 5.68,
+    "text": "some positive guess spikes remember has"
+  },
+  {
+    "start": 294.72,
+    "duration": 5.44,
+    "text": "to be meaningful spikes compared to the"
+  },
+  {
+    "start": 297.36,
+    "duration": 4.96,
+    "text": "previous ones right this is a break"
+  },
+  {
+    "start": 300.16,
+    "duration": 5.039,
+    "text": "right this is someone is changing the"
+  },
+  {
+    "start": 302.32,
+    "duration": 4.879,
+    "text": "regime that we currently have and most"
+  },
+  {
+    "start": 305.199,
+    "duration": 4.161,
+    "text": "likely than not and the probability"
+  },
+  {
+    "start": 307.199,
+    "duration": 5.761,
+    "text": "ility shows that this is a sign for"
+  },
+  {
+    "start": 309.36,
+    "duration": 5.839,
+    "text": "reversal. Okay. Now the put comma is"
+  },
+  {
+    "start": 312.96,
+    "duration": 4.56,
+    "text": "when we have a spikes on the downside"
+  },
+  {
+    "start": 315.199,
+    "duration": 4.521,
+    "text": "right that's negative gets. So that"
+  },
+  {
+    "start": 317.52,
+    "duration": 5.84,
+    "text": "means the cause of downside has been"
+  },
+  {
+    "start": 319.72,
+    "duration": 6.52,
+    "text": "lifted. So downside the downside options"
+  },
+  {
+    "start": 323.36,
+    "duration": 4.52,
+    "text": "go more expensive. So what it means if"
+  },
+  {
+    "start": 326.24,
+    "duration": 4.56,
+    "text": "we are trending"
+  },
+  {
+    "start": 327.88,
+    "duration": 6.92,
+    "text": "down and we have the negative gets or"
+  },
+  {
+    "start": 330.8,
+    "duration": 6.48,
+    "text": "the put gets spikes has to be meaningful"
+  },
+  {
+    "start": 334.8,
+    "duration": 5.92,
+    "text": "compared to the previous ones. Right? So"
+  },
+  {
+    "start": 337.28,
+    "duration": 6.359,
+    "text": "that's a sign for a reversal. Okay? And"
+  },
+  {
+    "start": 340.72,
+    "duration": 6.319,
+    "text": "the probability is high on on on those"
+  },
+  {
+    "start": 343.639,
+    "duration": 5.481,
+    "text": "points. Now we need to understand so key"
+  },
+  {
+    "start": 347.039,
+    "duration": 4.321,
+    "text": "concepts, right? And this is pay"
+  },
+  {
+    "start": 349.12,
+    "duration": 4.4,
+    "text": "attention because this is the part when"
+  },
+  {
+    "start": 351.36,
+    "duration": 5.44,
+    "text": "we're going to change that linear"
+  },
+  {
+    "start": 353.52,
+    "duration": 6.56,
+    "text": "futures mentality into an options"
+  },
+  {
+    "start": 356.8,
+    "duration": 5.679,
+    "text": "nonlinear mentality. Right? So what is"
+  },
+  {
+    "start": 360.08,
+    "duration": 5.119,
+    "text": "orderflow measuring? What is he act what"
+  },
+  {
+    "start": 362.479,
+    "duration": 4.961,
+    "text": "is actually measuring? Basically it"
+  },
+  {
+    "start": 365.199,
+    "duration": 7.201,
+    "text": "measures the change in the state of the"
+  },
+  {
+    "start": 367.44,
+    "duration": 7.28,
+    "text": "options change from t0 to t1 right what"
+  },
+  {
+    "start": 372.4,
+    "duration": 4.639,
+    "text": "is all the means basically so we have"
+  },
+  {
+    "start": 374.72,
+    "duration": 5.759,
+    "text": "gets profile we have options profile"
+  },
+  {
+    "start": 377.039,
+    "duration": 7.761,
+    "text": "right so in gets profile we know we have"
+  },
+  {
+    "start": 380.479,
+    "duration": 7.84,
+    "text": "uh um imbalances of of of positive gamma"
+  },
+  {
+    "start": 384.8,
+    "duration": 6.56,
+    "text": "and imbalances of negative gamma and opt"
+  },
+  {
+    "start": 388.319,
+    "duration": 5.481,
+    "text": "in options profile we have buying of"
+  },
+  {
+    "start": 391.36,
+    "duration": 5.839,
+    "text": "options and selling of options"
+  },
+  {
+    "start": 393.8,
+    "duration": 5.48,
+    "text": "strike. It's very difficult for our eye"
+  },
+  {
+    "start": 397.199,
+    "duration": 4.961,
+    "text": "to actually"
+  },
+  {
+    "start": 399.28,
+    "duration": 6.08,
+    "text": "um see all the strikes and and kind of"
+  },
+  {
+    "start": 402.16,
+    "duration": 5.599,
+    "text": "be aware when everything is changing in"
+  },
+  {
+    "start": 405.36,
+    "duration": 5.2,
+    "text": "any of these strikes. What about if an"
+  },
+  {
+    "start": 407.759,
+    "duration": 4.641,
+    "text": "institutional came selling, you know,"
+  },
+  {
+    "start": 410.56,
+    "duration": 4.639,
+    "text": "they take a short position in the"
+  },
+  {
+    "start": 412.4,
+    "duration": 6.079,
+    "text": "futures market and they're hedge their"
+  },
+  {
+    "start": 415.199,
+    "duration": 6.041,
+    "text": "position buying a call, right? We don't"
+  },
+  {
+    "start": 418.479,
+    "duration": 6.0,
+    "text": "see it here. is it's very difficult to"
+  },
+  {
+    "start": 421.24,
+    "duration": 5.079,
+    "text": "actually kind of see oh you know this"
+  },
+  {
+    "start": 424.479,
+    "duration": 4.72,
+    "text": "guy is buying a call because he's going"
+  },
+  {
+    "start": 426.319,
+    "duration": 5.201,
+    "text": "short in the options market. So this is"
+  },
+  {
+    "start": 429.199,
+    "duration": 5.361,
+    "text": "what orderflow does and this is what is"
+  },
+  {
+    "start": 431.52,
+    "duration": 6.959,
+    "text": "so clever because it measure the change"
+  },
+  {
+    "start": 434.56,
+    "duration": 7.039,
+    "text": "from t0 to t1 in the whole options"
+  },
+  {
+    "start": 438.479,
+    "duration": 5.44,
+    "text": "change and it give us everything in a"
+  },
+  {
+    "start": 441.599,
+    "duration": 5.121,
+    "text": "nice kind of lines you know like the"
+  },
+  {
+    "start": 443.919,
+    "duration": 6.081,
+    "text": "positive negative convexity positive and"
+  },
+  {
+    "start": 446.72,
+    "duration": 5.44,
+    "text": "negative gamma gets sorry and so"
+  },
+  {
+    "start": 450.0,
+    "duration": 5.12,
+    "text": "basically is is like having some bird's"
+  },
+  {
+    "start": 452.16,
+    "duration": 4.8,
+    "text": "eye here and and have everything you"
+  },
+  {
+    "start": 455.12,
+    "duration": 4.0,
+    "text": "know we can detect when something"
+  },
+  {
+    "start": 456.96,
+    "duration": 4.6,
+    "text": "happened when something happens in the"
+  },
+  {
+    "start": 459.12,
+    "duration": 5.28,
+    "text": "whole options change."
+  },
+  {
+    "start": 461.56,
+    "duration": 5.96,
+    "text": "Now what's the easy ways like the"
+  },
+  {
+    "start": 464.4,
+    "duration": 6.96,
+    "text": "easiest way to remember this? So every"
+  },
+  {
+    "start": 467.52,
+    "duration": 7.119,
+    "text": "time convexity spikes up, think of"
+  },
+  {
+    "start": 471.36,
+    "duration": 5.76,
+    "text": "reversion, right? Think of friction."
+  },
+  {
+    "start": 474.639,
+    "duration": 5.361,
+    "text": "Some breaks have been applied. The"
+  },
+  {
+    "start": 477.12,
+    "duration": 5.199,
+    "text": "market is trending up and someone is"
+  },
+  {
+    "start": 480.0,
+    "duration": 5.12,
+    "text": "putting the brakes on that move. The"
+  },
+  {
+    "start": 482.319,
+    "duration": 4.72,
+    "text": "trend the market is trending down and"
+  },
+  {
+    "start": 485.12,
+    "duration": 5.359,
+    "text": "someone is putting the brakes. Right? So"
+  },
+  {
+    "start": 487.039,
+    "duration": 6.72,
+    "text": "it's always the convexity on the upside"
+  },
+  {
+    "start": 490.479,
+    "duration": 6.681,
+    "text": "like the positive side. Now everything"
+  },
+  {
+    "start": 493.759,
+    "duration": 6.56,
+    "text": "is everything it spikes down think of"
+  },
+  {
+    "start": 497.16,
+    "duration": 6.039,
+    "text": "momentum liquidity is being added right"
+  },
+  {
+    "start": 500.319,
+    "duration": 5.201,
+    "text": "options as be are being sold that's what"
+  },
+  {
+    "start": 503.199,
+    "duration": 4.881,
+    "text": "it means. So options in the upside"
+  },
+  {
+    "start": 505.52,
+    "duration": 5.399,
+    "text": "options are being bought. So people"
+  },
+  {
+    "start": 508.08,
+    "duration": 6.0,
+    "text": "change the regime by buying"
+  },
+  {
+    "start": 510.919,
+    "duration": 4.841,
+    "text": "volatility and when everything is is is"
+  },
+  {
+    "start": 514.08,
+    "duration": 4.8,
+    "text": "when we have a momentum I going to"
+  },
+  {
+    "start": 515.76,
+    "duration": 5.36,
+    "text": "explain it later but options market sell"
+  },
+  {
+    "start": 518.88,
+    "duration": 4.6,
+    "text": "options right because they like to sell"
+  },
+  {
+    "start": 521.12,
+    "duration": 5.36,
+    "text": "options when everything is"
+  },
+  {
+    "start": 523.48,
+    "duration": 6.12,
+    "text": "predictable now and this is what I mean"
+  },
+  {
+    "start": 526.48,
+    "duration": 5.68,
+    "text": "option sellers profit when the price"
+  },
+  {
+    "start": 529.6,
+    "duration": 5.6,
+    "text": "move consistently and I think I"
+  },
+  {
+    "start": 532.16,
+    "duration": 7.92,
+    "text": "mentioned before but if the market is"
+  },
+  {
+    "start": 535.2,
+    "duration": 8.28,
+    "text": "trending down like one, two, three,"
+  },
+  {
+    "start": 540.08,
+    "duration": 6.56,
+    "text": "four, five, you know, and it's trending"
+  },
+  {
+    "start": 543.48,
+    "duration": 5.4,
+    "text": "consistently in an orderly manner."
+  },
+  {
+    "start": 546.64,
+    "duration": 4.24,
+    "text": "Option sellers is good. This is the"
+  },
+  {
+    "start": 548.88,
+    "duration": 4.2,
+    "text": "perfect environment for option sellers"
+  },
+  {
+    "start": 550.88,
+    "duration": 5.519,
+    "text": "because they're making money."
+  },
+  {
+    "start": 553.08,
+    "duration": 6.68,
+    "text": "Volatility remains predictable, right?"
+  },
+  {
+    "start": 556.399,
+    "duration": 6.401,
+    "text": "So the implied volatility is equals to"
+  },
+  {
+    "start": 559.76,
+    "duration": 6.56,
+    "text": "the realized volatility. So these guys"
+  },
+  {
+    "start": 562.8,
+    "duration": 6.479,
+    "text": "they make money by selling options right"
+  },
+  {
+    "start": 566.32,
+    "duration": 5.92,
+    "text": "and that's what I mean by momentum right"
+  },
+  {
+    "start": 569.279,
+    "duration": 6.481,
+    "text": "and we detect momentum when we see the"
+  },
+  {
+    "start": 572.24,
+    "duration": 5.88,
+    "text": "convexity the um the sure gamma going"
+  },
+  {
+    "start": 575.76,
+    "duration": 6.24,
+    "text": "you know the lines going the the cyan"
+  },
+  {
+    "start": 578.12,
+    "duration": 7.56,
+    "text": "bars going down in the convexity but"
+  },
+  {
+    "start": 582.0,
+    "duration": 8.24,
+    "text": "what happen if that you know one two"
+  },
+  {
+    "start": 585.68,
+    "duration": 8.0,
+    "text": "three four five steadily very constant"
+  },
+  {
+    "start": 590.24,
+    "duration": 6.0,
+    "text": "move down suddenly change someone came"
+  },
+  {
+    "start": 593.68,
+    "duration": 4.36,
+    "text": "into the market put some breaks and"
+  },
+  {
+    "start": 596.24,
+    "duration": 3.92,
+    "text": "changed that"
+  },
+  {
+    "start": 598.04,
+    "duration": 4.6,
+    "text": "environment. So what would happen is"
+  },
+  {
+    "start": 600.16,
+    "duration": 3.64,
+    "text": "volatility chief uh sorry volatility"
+  },
+  {
+    "start": 602.64,
+    "duration": 4.08,
+    "text": "shifts"
+  },
+  {
+    "start": 603.8,
+    "duration": 6.44,
+    "text": "unexpectedly leading to large moves than"
+  },
+  {
+    "start": 606.72,
+    "duration": 6.359,
+    "text": "anticipated. So in this moment realized"
+  },
+  {
+    "start": 610.24,
+    "duration": 5.68,
+    "text": "volatility is different than implied"
+  },
+  {
+    "start": 613.079,
+    "duration": 5.561,
+    "text": "volatility and the options market"
+  },
+  {
+    "start": 615.92,
+    "duration": 5.68,
+    "text": "doesn't care about direction right they"
+  },
+  {
+    "start": 618.64,
+    "duration": 5.759,
+    "text": "only care how smoothly or erratically"
+  },
+  {
+    "start": 621.6,
+    "duration": 5.44,
+    "text": "price move right if implied volatility"
+  },
+  {
+    "start": 624.399,
+    "duration": 5.68,
+    "text": "is equal to realized volatility option"
+  },
+  {
+    "start": 627.04,
+    "duration": 5.52,
+    "text": "sellers are happy selling options right"
+  },
+  {
+    "start": 630.079,
+    "duration": 4.481,
+    "text": "but if something change you know"
+  },
+  {
+    "start": 632.56,
+    "duration": 3.0,
+    "text": "realized volatility is different than"
+  },
+  {
+    "start": 634.56,
+    "duration": 3.519,
+    "text": "implied"
+  },
+  {
+    "start": 635.56,
+    "duration": 5.959,
+    "text": "volatility that's when the regime change"
+  },
+  {
+    "start": 638.079,
+    "duration": 5.921,
+    "text": "happen. So by buying volatility mean"
+  },
+  {
+    "start": 641.519,
+    "duration": 6.0,
+    "text": "expecting price to move different than"
+  },
+  {
+    "start": 644.0,
+    "duration": 6.6,
+    "text": "before and we can detect it here when we"
+  },
+  {
+    "start": 647.519,
+    "duration": 6.401,
+    "text": "see the long gamma,"
+  },
+  {
+    "start": 650.6,
+    "duration": 5.64,
+    "text": "right? Okay. So be careful with this"
+  },
+  {
+    "start": 653.92,
+    "duration": 5.12,
+    "text": "because a trend don't doesn't always"
+  },
+  {
+    "start": 656.24,
+    "duration": 6.839,
+    "text": "reverse, right? So basically if we see"
+  },
+  {
+    "start": 659.04,
+    "duration": 8.08,
+    "text": "the price going up and then we see some"
+  },
+  {
+    "start": 663.079,
+    "duration": 7.641,
+    "text": "um positive uh some long gamma right in"
+  },
+  {
+    "start": 667.12,
+    "duration": 6.64,
+    "text": "the convexity and long yellow g like"
+  },
+  {
+    "start": 670.72,
+    "duration": 4.799,
+    "text": "cold g it doesn't mean that it it"
+  },
+  {
+    "start": 673.76,
+    "duration": 4.88,
+    "text": "doesn't mean that it automatically"
+  },
+  {
+    "start": 675.519,
+    "duration": 5.44,
+    "text": "reverse right so basically it just means"
+  },
+  {
+    "start": 678.64,
+    "duration": 4.319,
+    "text": "that there is some stop there has been"
+  },
+  {
+    "start": 680.959,
+    "duration": 5.601,
+    "text": "some some brakes had been applied to the"
+  },
+  {
+    "start": 682.959,
+    "duration": 6.401,
+    "text": "at move right and what we have to think"
+  },
+  {
+    "start": 686.56,
+    "duration": 6.16,
+    "text": "is Right? Some brakes have been applied"
+  },
+  {
+    "start": 689.36,
+    "duration": 6.2,
+    "text": "and the market might move unpredictable"
+  },
+  {
+    "start": 692.72,
+    "duration": 6.239,
+    "text": "or might pause. Right? Waiting for a new"
+  },
+  {
+    "start": 695.56,
+    "duration": 6.36,
+    "text": "direction. So this chief marks a regime"
+  },
+  {
+    "start": 698.959,
+    "duration": 5.761,
+    "text": "change right signaling uncertainty"
+  },
+  {
+    "start": 701.92,
+    "duration": 5.52,
+    "text": "before the next move. But more often"
+  },
+  {
+    "start": 704.72,
+    "duration": 4.48,
+    "text": "than not, it means that the market is"
+  },
+  {
+    "start": 707.44,
+    "duration": 4.959,
+    "text": "going to change the regime. It's going"
+  },
+  {
+    "start": 709.2,
+    "duration": 6.199,
+    "text": "to change the the move. For instance, in"
+  },
+  {
+    "start": 712.399,
+    "duration": 5.0,
+    "text": "this example, the F move that we're"
+  },
+  {
+    "start": 715.399,
+    "duration": 5.0,
+    "text": "having."
+  },
+  {
+    "start": 717.399,
+    "duration": 5.641,
+    "text": "Now, more concepts that we need to think"
+  },
+  {
+    "start": 720.399,
+    "duration": 6.0,
+    "text": "about is so short gamma again is linked"
+  },
+  {
+    "start": 723.04,
+    "duration": 6.16,
+    "text": "to momentum while long gamma is linked"
+  },
+  {
+    "start": 726.399,
+    "duration": 5.841,
+    "text": "to reversion. Okay? So, why? Because"
+  },
+  {
+    "start": 729.2,
+    "duration": 5.92,
+    "text": "when traders buy long gamma, whether"
+  },
+  {
+    "start": 732.24,
+    "duration": 5.12,
+    "text": "through puts or out of the money calls,"
+  },
+  {
+    "start": 735.12,
+    "duration": 4.719,
+    "text": "they expect the market to move"
+  },
+  {
+    "start": 737.36,
+    "duration": 5.2,
+    "text": "differently than before. So if the"
+  },
+  {
+    "start": 739.839,
+    "duration": 5.201,
+    "text": "market is trending up and they think"
+  },
+  {
+    "start": 742.56,
+    "duration": 5.68,
+    "text": "they want to change that regime, they go"
+  },
+  {
+    "start": 745.04,
+    "duration": 5.68,
+    "text": "and they buy volatility. Right? So"
+  },
+  {
+    "start": 748.24,
+    "duration": 5.08,
+    "text": "again, if the market is trending up in"
+  },
+  {
+    "start": 750.72,
+    "duration": 6.239,
+    "text": "this case and it's constantly and it's"
+  },
+  {
+    "start": 753.32,
+    "duration": 7.639,
+    "text": "steadily, this is a perfect like one two"
+  },
+  {
+    "start": 756.959,
+    "duration": 6.481,
+    "text": "three four five on the move up. This is"
+  },
+  {
+    "start": 760.959,
+    "duration": 5.521,
+    "text": "a perfect environment for uh option"
+  },
+  {
+    "start": 763.44,
+    "duration": 5.36,
+    "text": "sellers, right? But if someone some"
+  },
+  {
+    "start": 766.48,
+    "duration": 5.039,
+    "text": "institution came and wants to change"
+  },
+  {
+    "start": 768.8,
+    "duration": 6.08,
+    "text": "that regime, they buy options, they buy"
+  },
+  {
+    "start": 771.519,
+    "duration": 6.721,
+    "text": "volatility because they expect that this"
+  },
+  {
+    "start": 774.88,
+    "duration": 5.84,
+    "text": "up move is going to change that this"
+  },
+  {
+    "start": 778.24,
+    "duration": 5.36,
+    "text": "steadily move. Remember options traders"
+  },
+  {
+    "start": 780.72,
+    "duration": 4.239,
+    "text": "they trade volatility. So they basically"
+  },
+  {
+    "start": 783.6,
+    "duration": 3.56,
+    "text": "say we're going to change that"
+  },
+  {
+    "start": 784.959,
+    "duration": 5.201,
+    "text": "volatility regime,"
+  },
+  {
+    "start": 787.16,
+    "duration": 5.32,
+    "text": "right? So the exact structure of the"
+  },
+  {
+    "start": 790.16,
+    "duration": 4.64,
+    "text": "trade matters less than the expectation"
+  },
+  {
+    "start": 792.48,
+    "duration": 5.68,
+    "text": "of change. And that's what we have to"
+  },
+  {
+    "start": 794.8,
+    "duration": 5.44,
+    "text": "think expectation of change. Right? So"
+  },
+  {
+    "start": 798.16,
+    "duration": 5.28,
+    "text": "again I put it again and I'm going to"
+  },
+  {
+    "start": 800.24,
+    "duration": 6.32,
+    "text": "put it again. Long gamma is positive"
+  },
+  {
+    "start": 803.44,
+    "duration": 6.8,
+    "text": "convexity which means when options"
+  },
+  {
+    "start": 806.56,
+    "duration": 7.44,
+    "text": "participants came on by long calls or by"
+  },
+  {
+    "start": 810.24,
+    "duration": 6.159,
+    "text": "long puts right. So every time we have"
+  },
+  {
+    "start": 814.0,
+    "duration": 5.68,
+    "text": "we have this long gamma every time it"
+  },
+  {
+    "start": 816.399,
+    "duration": 6.961,
+    "text": "speak spikes up think of reversion."
+  },
+  {
+    "start": 819.68,
+    "duration": 5.68,
+    "text": "Right? And every time it speaks down"
+  },
+  {
+    "start": 823.36,
+    "duration": 4.68,
+    "text": "basically it's negative convexity"
+  },
+  {
+    "start": 825.36,
+    "duration": 8.24,
+    "text": "options mark options traders are selling"
+  },
+  {
+    "start": 828.04,
+    "duration": 9.159,
+    "text": "options and think of momentum. Okay. So"
+  },
+  {
+    "start": 833.6,
+    "duration": 6.56,
+    "text": "again when traders buy calls or puts"
+  },
+  {
+    "start": 837.199,
+    "duration": 5.841,
+    "text": "they remove liquidity from the market"
+  },
+  {
+    "start": 840.16,
+    "duration": 5.359,
+    "text": "and this is something very important you"
+  },
+  {
+    "start": 843.04,
+    "duration": 5.76,
+    "text": "need to remember and to keep in mind"
+  },
+  {
+    "start": 845.519,
+    "duration": 5.921,
+    "text": "when you're trading. Okay. So basically"
+  },
+  {
+    "start": 848.8,
+    "duration": 5.24,
+    "text": "this can increase the ch the ch the"
+  },
+  {
+    "start": 851.44,
+    "duration": 5.6,
+    "text": "chances sorry of a price reversion"
+  },
+  {
+    "start": 854.04,
+    "duration": 5.4,
+    "text": "because too many buyers at one level"
+  },
+  {
+    "start": 857.04,
+    "duration": 4.039,
+    "text": "might eventually get caught and forced"
+  },
+  {
+    "start": 859.44,
+    "duration": 5.04,
+    "text": "to exit."
+  },
+  {
+    "start": 861.079,
+    "duration": 6.841,
+    "text": "Right? So long gamma often signals"
+  },
+  {
+    "start": 864.48,
+    "duration": 6.96,
+    "text": "liquidity removal. Think of these"
+  },
+  {
+    "start": 867.92,
+    "duration": 6.479,
+    "text": "always. Long gamma is liquidity removal"
+  },
+  {
+    "start": 871.44,
+    "duration": 6.8,
+    "text": "which can lead to market chief of remain"
+  },
+  {
+    "start": 874.399,
+    "duration": 7.521,
+    "text": "ch of regime change and short gamma is"
+  },
+  {
+    "start": 878.24,
+    "duration": 7.839,
+    "text": "often signals liquidity added momentum"
+  },
+  {
+    "start": 881.92,
+    "duration": 5.76,
+    "text": "from the current trend. Okay. So I've"
+  },
+  {
+    "start": 886.079,
+    "duration": 4.841,
+    "text": "been explaining this so many times"
+  },
+  {
+    "start": 887.68,
+    "duration": 6.32,
+    "text": "because this is the hardest part"
+  },
+  {
+    "start": 890.92,
+    "duration": 5.479,
+    "text": "thinking as an futures trader. or the"
+  },
+  {
+    "start": 894.0,
+    "duration": 5.36,
+    "text": "market is going up or it's going down."
+  },
+  {
+    "start": 896.399,
+    "duration": 5.201,
+    "text": "Now it's difficult to think in options"
+  },
+  {
+    "start": 899.36,
+    "duration": 4.88,
+    "text": "trading turns but that's what we need to"
+  },
+  {
+    "start": 901.6,
+    "duration": 4.72,
+    "text": "do when we trade with orderflow. We need"
+  },
+  {
+    "start": 904.24,
+    "duration": 4.32,
+    "text": "to think of these guys are coming into"
+  },
+  {
+    "start": 906.32,
+    "duration": 3.959,
+    "text": "the market. These options trader to"
+  },
+  {
+    "start": 908.56,
+    "duration": 5.36,
+    "text": "trade first of all"
+  },
+  {
+    "start": 910.279,
+    "duration": 6.92,
+    "text": "volatility and how these guys sell you"
+  },
+  {
+    "start": 913.92,
+    "duration": 5.599,
+    "text": "know in a in a stable environment when"
+  },
+  {
+    "start": 917.199,
+    "duration": 4.601,
+    "text": "implied volatility equals the realized"
+  },
+  {
+    "start": 919.519,
+    "duration": 5.68,
+    "text": "volatility. These guys like to sell"
+  },
+  {
+    "start": 921.8,
+    "duration": 6.0,
+    "text": "options. But if someone came and changed"
+  },
+  {
+    "start": 925.199,
+    "duration": 5.601,
+    "text": "the regime, they changing by buying"
+  },
+  {
+    "start": 927.8,
+    "duration": 6.44,
+    "text": "volatility, right? By buying long by"
+  },
+  {
+    "start": 930.8,
+    "duration": 6.479,
+    "text": "going long gamma. And that is liquidity"
+  },
+  {
+    "start": 934.24,
+    "duration": 6.64,
+    "text": "removal, right? And which actually leads"
+  },
+  {
+    "start": 937.279,
+    "duration": 5.68,
+    "text": "to a market regime or a regime change."
+  },
+  {
+    "start": 940.88,
+    "duration": 4.639,
+    "text": "And when they sell options, they"
+  },
+  {
+    "start": 942.959,
+    "duration": 5.041,
+    "text": "actually adding liquidity which which"
+  },
+  {
+    "start": 945.519,
+    "duration": 5.841,
+    "text": "helps for the momentum."
+  },
+  {
+    "start": 948.0,
+    "duration": 6.079,
+    "text": "Now again if options are be both are"
+  },
+  {
+    "start": 951.36,
+    "duration": 5.399,
+    "text": "being bought liquidity is being taken"
+  },
+  {
+    "start": 954.079,
+    "duration": 5.521,
+    "text": "right they buy options they take that"
+  },
+  {
+    "start": 956.759,
+    "duration": 7.0,
+    "text": "liquidity and the price tend to move"
+  },
+  {
+    "start": 959.6,
+    "duration": 6.4,
+    "text": "away from those levels right so instead"
+  },
+  {
+    "start": 963.759,
+    "duration": 5.2,
+    "text": "of over complicating things with"
+  },
+  {
+    "start": 966.0,
+    "duration": 6.639,
+    "text": "multiple steps it's just easier to think"
+  },
+  {
+    "start": 968.959,
+    "duration": 6.481,
+    "text": "in terms of liquidity flow so how is"
+  },
+  {
+    "start": 972.639,
+    "duration": 5.601,
+    "text": "that so think of markets are drawn to"
+  },
+  {
+    "start": 975.44,
+    "duration": 5.16,
+    "text": "liquidity providers Right? So when the"
+  },
+  {
+    "start": 978.24,
+    "duration": 6.32,
+    "text": "liquidity when the options traders sell"
+  },
+  {
+    "start": 980.6,
+    "duration": 6.76,
+    "text": "options, the market is drawn to these"
+  },
+  {
+    "start": 984.56,
+    "duration": 5.76,
+    "text": "sellers of options. Right? And the"
+  },
+  {
+    "start": 987.36,
+    "duration": 4.68,
+    "text": "market likes to move away from liquidity"
+  },
+  {
+    "start": 990.32,
+    "duration": 5.36,
+    "text": "takers."
+  },
+  {
+    "start": 992.04,
+    "duration": 5.52,
+    "text": "Okay? Now market makers hedge their"
+  },
+  {
+    "start": 995.68,
+    "duration": 5.04,
+    "text": "position based on"
+  },
+  {
+    "start": 997.56,
+    "duration": 5.959,
+    "text": "liquidity. If options are being sold,"
+  },
+  {
+    "start": 1000.72,
+    "duration": 5.919,
+    "text": "liquidity is being provided and prices"
+  },
+  {
+    "start": 1003.519,
+    "duration": 5.68,
+    "text": "tend to move towards those areas. Right?"
+  },
+  {
+    "start": 1006.639,
+    "duration": 6.56,
+    "text": "So that's it every time. That's why"
+  },
+  {
+    "start": 1009.199,
+    "duration": 6.88,
+    "text": "every time on the convexity we have a a"
+  },
+  {
+    "start": 1013.199,
+    "duration": 6.961,
+    "text": "short gamma the short spikes basically"
+  },
+  {
+    "start": 1016.079,
+    "duration": 7.281,
+    "text": "is momentum right. So this is a very"
+  },
+  {
+    "start": 1020.16,
+    "duration": 5.96,
+    "text": "kind of way to remember this and again"
+  },
+  {
+    "start": 1023.36,
+    "duration": 5.04,
+    "text": "every time you see long gamma positive"
+  },
+  {
+    "start": 1026.12,
+    "duration": 4.6,
+    "text": "convexity if you don't want to remember"
+  },
+  {
+    "start": 1028.4,
+    "duration": 4.639,
+    "text": "all of these just think that is a"
+  },
+  {
+    "start": 1030.72,
+    "duration": 5.92,
+    "text": "reversion that's friction that is"
+  },
+  {
+    "start": 1033.039,
+    "duration": 6.561,
+    "text": "happening in the market and then think"
+  },
+  {
+    "start": 1036.64,
+    "duration": 5.24,
+    "text": "of momentum when you see short negative"
+  },
+  {
+    "start": 1039.6,
+    "duration": 4.76,
+    "text": "convexity think of"
+  },
+  {
+    "start": 1041.88,
+    "duration": 7.24,
+    "text": "momentum."
+  },
+  {
+    "start": 1044.36,
+    "duration": 7.16,
+    "text": "Now how to trade this? You can sculp"
+  },
+  {
+    "start": 1049.12,
+    "duration": 5.36,
+    "text": "right but"
+  },
+  {
+    "start": 1051.52,
+    "duration": 5.92,
+    "text": "um we do not recommend that the scalp on"
+  },
+  {
+    "start": 1054.48,
+    "duration": 5.92,
+    "text": "ES right. We do recommend if you can"
+  },
+  {
+    "start": 1057.44,
+    "duration": 9.119,
+    "text": "sculpt with this you can take like 15 to"
+  },
+  {
+    "start": 1060.4,
+    "duration": 8.96,
+    "text": "20 uh or 30 ticks on the ENQ. Okay. But"
+  },
+  {
+    "start": 1066.559,
+    "duration": 6.081,
+    "text": "how I found it is very useful and and"
+  },
+  {
+    "start": 1069.36,
+    "duration": 6.64,
+    "text": "and the way is very useful if if you"
+  },
+  {
+    "start": 1072.64,
+    "duration": 6.08,
+    "text": "wait for the price to hit a key level"
+  },
+  {
+    "start": 1076.0,
+    "duration": 5.919,
+    "text": "right we can see key levels in classic"
+  },
+  {
+    "start": 1078.72,
+    "duration": 6.0,
+    "text": "we can see key levels in gets profile or"
+  },
+  {
+    "start": 1081.919,
+    "duration": 4.721,
+    "text": "in gamma in option profile. So if the"
+  },
+  {
+    "start": 1084.72,
+    "duration": 5.28,
+    "text": "price get close to those levels or"
+  },
+  {
+    "start": 1086.64,
+    "duration": 4.96,
+    "text": "actually touch those levels then you"
+  },
+  {
+    "start": 1090.0,
+    "duration": 4.72,
+    "text": "keep an eye on order flow what's"
+  },
+  {
+    "start": 1091.6,
+    "duration": 6.079,
+    "text": "happening right. So by combining order"
+  },
+  {
+    "start": 1094.72,
+    "duration": 5.44,
+    "text": "flow with important gamma levels right"
+  },
+  {
+    "start": 1097.679,
+    "duration": 5.041,
+    "text": "like the you know complexity l and gets"
+  },
+  {
+    "start": 1100.16,
+    "duration": 5.2,
+    "text": "profile that I just mentioned you can"
+  },
+  {
+    "start": 1102.72,
+    "duration": 5.52,
+    "text": "determine if in determine if the coming"
+  },
+  {
+    "start": 1105.36,
+    "duration": 6.4,
+    "text": "flow support the trend or goes against"
+  },
+  {
+    "start": 1108.24,
+    "duration": 6.4,
+    "text": "it right so this helps to identify"
+  },
+  {
+    "start": 1111.76,
+    "duration": 6.72,
+    "text": "whether a level would act as a reversal"
+  },
+  {
+    "start": 1114.64,
+    "duration": 7.039,
+    "text": "point or not okay I'm going to give you"
+  },
+  {
+    "start": 1118.48,
+    "duration": 6.4,
+    "text": "some examples but the more you see this"
+  },
+  {
+    "start": 1121.679,
+    "duration": 5.601,
+    "text": "the more you you know um take a"
+  },
+  {
+    "start": 1124.88,
+    "duration": 4.56,
+    "text": "screenshots that's what I do every night"
+  },
+  {
+    "start": 1127.28,
+    "duration": 5.2,
+    "text": "every night I take the screenshots from"
+  },
+  {
+    "start": 1129.44,
+    "duration": 5.92,
+    "text": "the day right and I can see this clearly"
+  },
+  {
+    "start": 1132.48,
+    "duration": 5.84,
+    "text": "and on part on the next part which is"
+  },
+  {
+    "start": 1135.36,
+    "duration": 4.8,
+    "text": "going to be uh I believe part four what"
+  },
+  {
+    "start": 1138.32,
+    "duration": 3.84,
+    "text": "we're going to do we're going to bring"
+  },
+  {
+    "start": 1140.16,
+    "duration": 4.639,
+    "text": "different examples of different"
+  },
+  {
+    "start": 1142.16,
+    "duration": 6.24,
+    "text": "situations right remember that you can"
+  },
+  {
+    "start": 1144.799,
+    "duration": 5.841,
+    "text": "use orderflow when it's morning right uh"
+  },
+  {
+    "start": 1148.4,
+    "duration": 6.72,
+    "text": "when we have an event date like you know"
+  },
+  {
+    "start": 1150.64,
+    "duration": 7.68,
+    "text": "FOMC CPI stuff like that and also you"
+  },
+  {
+    "start": 1155.12,
+    "duration": 5.84,
+    "text": "can also use it in a different way like"
+  },
+  {
+    "start": 1158.32,
+    "duration": 4.44,
+    "text": "the last five or 10 minutes before the"
+  },
+  {
+    "start": 1160.96,
+    "duration": 4.24,
+    "text": "market close."
+  },
+  {
+    "start": 1162.76,
+    "duration": 4.76,
+    "text": "Okay. So remember I said at the"
+  },
+  {
+    "start": 1165.2,
+    "duration": 5.599,
+    "text": "beginning we need to change that futures"
+  },
+  {
+    "start": 1167.52,
+    "duration": 6.0,
+    "text": "mentality linear mentality of bullish or"
+  },
+  {
+    "start": 1170.799,
+    "duration": 5.12,
+    "text": "bearish bearish and we need to change it"
+  },
+  {
+    "start": 1173.52,
+    "duration": 5.84,
+    "text": "to order flow like options terms"
+  },
+  {
+    "start": 1175.919,
+    "duration": 5.76,
+    "text": "reversions and continuations and how"
+  },
+  {
+    "start": 1179.36,
+    "duration": 6.04,
+    "text": "regime change happens when the options"
+  },
+  {
+    "start": 1181.679,
+    "duration": 6.481,
+    "text": "guys came into the market. Okay."
+  },
+  {
+    "start": 1185.4,
+    "duration": 5.519,
+    "text": "Now I know this is you know this is this"
+  },
+  {
+    "start": 1188.16,
+    "duration": 5.92,
+    "text": "is a lot of concepts to get in"
+  },
+  {
+    "start": 1190.919,
+    "duration": 6.281,
+    "text": "but instead of focusing on being bullish"
+  },
+  {
+    "start": 1194.08,
+    "duration": 6.0,
+    "text": "or bearish be bearish sorry is better to"
+  },
+  {
+    "start": 1197.2,
+    "duration": 5.56,
+    "text": "think in terms of trends. So are we"
+  },
+  {
+    "start": 1200.08,
+    "duration": 5.76,
+    "text": "supporting the trend? Are the option"
+  },
+  {
+    "start": 1202.76,
+    "duration": 6.6,
+    "text": "sellers selling options? Sorry. And and"
+  },
+  {
+    "start": 1205.84,
+    "duration": 6.24,
+    "text": "supporting the trend or if the market is"
+  },
+  {
+    "start": 1209.36,
+    "duration": 4.8,
+    "text": "going up or down, someone came someone"
+  },
+  {
+    "start": 1212.08,
+    "duration": 4.959,
+    "text": "is coming into the market to put a break"
+  },
+  {
+    "start": 1214.16,
+    "duration": 5.84,
+    "text": "on that current regime and they want to"
+  },
+  {
+    "start": 1217.039,
+    "duration": 4.481,
+    "text": "change it by buying volatility. You know"
+  },
+  {
+    "start": 1220.0,
+    "duration": 4.64,
+    "text": "that's that's the questions we have to"
+  },
+  {
+    "start": 1221.52,
+    "duration": 5.519,
+    "text": "ask. So complexity of the flow helps to"
+  },
+  {
+    "start": 1224.64,
+    "duration": 5.76,
+    "text": "identify if the market regime is"
+  },
+  {
+    "start": 1227.039,
+    "duration": 5.041,
+    "text": "shifting. Okay. and get order follow"
+  },
+  {
+    "start": 1230.4,
+    "duration": 2.84,
+    "text": "sorry gets order flow provides"
+  },
+  {
+    "start": 1232.08,
+    "duration": 5.2,
+    "text": "directional"
+  },
+  {
+    "start": 1233.24,
+    "duration": 6.76,
+    "text": "insight. So what's important to to know"
+  },
+  {
+    "start": 1237.28,
+    "duration": 7.2,
+    "text": "is that index options we trade you know"
+  },
+  {
+    "start": 1240.0,
+    "duration": 6.12,
+    "text": "we trade NQ or ES okay so so these are"
+  },
+  {
+    "start": 1244.48,
+    "duration": 4.88,
+    "text": "the futures from the"
+  },
+  {
+    "start": 1246.12,
+    "duration": 4.679,
+    "text": "indexes this volatility and price you"
+  },
+  {
+    "start": 1249.36,
+    "duration": 2.6,
+    "text": "know the volatility and price have"
+  },
+  {
+    "start": 1250.799,
+    "duration": 4.081,
+    "text": "inverse"
+  },
+  {
+    "start": 1251.96,
+    "duration": 5.8,
+    "text": "relationship so when volatility drops if"
+  },
+  {
+    "start": 1254.88,
+    "duration": 8.4,
+    "text": "you see the charts of the pigs and then"
+  },
+  {
+    "start": 1257.76,
+    "duration": 7.68,
+    "text": "you go to the NQ or NDX Q's SPX or SPY"
+  },
+  {
+    "start": 1263.28,
+    "duration": 4.639,
+    "text": "Okay, you see that the rel the"
+  },
+  {
+    "start": 1265.44,
+    "duration": 5.84,
+    "text": "relationship is inverse. When this when"
+  },
+  {
+    "start": 1267.919,
+    "duration": 6.321,
+    "text": "the pics goes down, the indexes goes up"
+  },
+  {
+    "start": 1271.28,
+    "duration": 5.2,
+    "text": "and vice versa. Okay, so selling"
+  },
+  {
+    "start": 1274.24,
+    "duration": 4.64,
+    "text": "volatility is generally bullish for"
+  },
+  {
+    "start": 1276.48,
+    "duration": 5.04,
+    "text": "indexes, right? But the key is to"
+  },
+  {
+    "start": 1278.88,
+    "duration": 4.24,
+    "text": "understanding momentum and reversion. If"
+  },
+  {
+    "start": 1281.52,
+    "duration": 2.8,
+    "text": "you want to trade with other flow, you"
+  },
+  {
+    "start": 1283.12,
+    "duration": 4.08,
+    "text": "have to have, you know, you have to"
+  },
+  {
+    "start": 1284.32,
+    "duration": 4.88,
+    "text": "incorporate this in your thinking. So"
+  },
+  {
+    "start": 1287.2,
+    "duration": 6.08,
+    "text": "what happened with unexpected events"
+  },
+  {
+    "start": 1289.2,
+    "duration": 7.44,
+    "text": "like major news tweets or you know um"
+  },
+  {
+    "start": 1293.28,
+    "duration": 5.32,
+    "text": "some data CPI you know worse than"
+  },
+  {
+    "start": 1296.64,
+    "duration": 4.96,
+    "text": "expected or better than"
+  },
+  {
+    "start": 1298.6,
+    "duration": 5.72,
+    "text": "expected. Remember that options"
+  },
+  {
+    "start": 1301.6,
+    "duration": 4.4,
+    "text": "participants like options they they they"
+  },
+  {
+    "start": 1304.32,
+    "duration": 3.599,
+    "text": "like to come into the market to sell"
+  },
+  {
+    "start": 1306.0,
+    "duration": 5.2,
+    "text": "options. They like to come to try to"
+  },
+  {
+    "start": 1307.919,
+    "duration": 5.921,
+    "text": "provide liquidity right. Why? Because"
+  },
+  {
+    "start": 1311.2,
+    "duration": 5.359,
+    "text": "they expect the market to move you know"
+  },
+  {
+    "start": 1313.84,
+    "duration": 5.36,
+    "text": "in a steady way. implied volatility"
+  },
+  {
+    "start": 1316.559,
+    "duration": 4.561,
+    "text": "equals to realized volatility."
+  },
+  {
+    "start": 1319.2,
+    "duration": 5.76,
+    "text": "But if something happens you know on"
+  },
+  {
+    "start": 1321.12,
+    "duration": 8.4,
+    "text": "that event day FOMC data you know any"
+  },
+  {
+    "start": 1324.96,
+    "duration": 7.28,
+    "text": "one of those if that change you know and"
+  },
+  {
+    "start": 1329.52,
+    "duration": 4.88,
+    "text": "and it change very aggressively what"
+  },
+  {
+    "start": 1332.24,
+    "duration": 4.48,
+    "text": "would happen is they can they can short"
+  },
+  {
+    "start": 1334.4,
+    "duration": 4.88,
+    "text": "volatility traders of war you know all"
+  },
+  {
+    "start": 1336.72,
+    "duration": 4.88,
+    "text": "these guys selling volatility they can"
+  },
+  {
+    "start": 1339.28,
+    "duration": 4.48,
+    "text": "they can they can be scared basically"
+  },
+  {
+    "start": 1341.6,
+    "duration": 4.4,
+    "text": "let's put in that way and then they are"
+  },
+  {
+    "start": 1343.76,
+    "duration": 4.32,
+    "text": "forced to exit and increase the"
+  },
+  {
+    "start": 1346.0,
+    "duration": 4.799,
+    "text": "volatility. So they're forced to exiting"
+  },
+  {
+    "start": 1348.08,
+    "duration": 4.8,
+    "text": "their positions and increase volatility"
+  },
+  {
+    "start": 1350.799,
+    "duration": 3.481,
+    "text": "and that's when the regime change"
+  },
+  {
+    "start": 1352.88,
+    "duration": 3.799,
+    "text": "happens as"
+  },
+  {
+    "start": 1354.28,
+    "duration": 5.0,
+    "text": "well."
+  },
+  {
+    "start": 1356.679,
+    "duration": 5.48,
+    "text": "Now we're going to do some I mean I'm"
+  },
+  {
+    "start": 1359.28,
+    "duration": 5.04,
+    "text": "going to try to explain it how we"
+  },
+  {
+    "start": 1362.159,
+    "duration": 4.64,
+    "text": "combine these two to have a clear"
+  },
+  {
+    "start": 1364.32,
+    "duration": 4.479,
+    "text": "picture. I'm sorry I know there is a lot"
+  },
+  {
+    "start": 1366.799,
+    "duration": 3.0,
+    "text": "of concepts. So if you want to have a"
+  },
+  {
+    "start": 1368.799,
+    "duration": 4.401,
+    "text": "look this"
+  },
+  {
+    "start": 1369.799,
+    "duration": 6.281,
+    "text": "video one, two, three, four, five times"
+  },
+  {
+    "start": 1373.2,
+    "duration": 5.839,
+    "text": "because you know all these concepts are"
+  },
+  {
+    "start": 1376.08,
+    "duration": 4.88,
+    "text": "important and and I know they're"
+  },
+  {
+    "start": 1379.039,
+    "duration": 3.921,
+    "text": "probably for futures traders the first"
+  },
+  {
+    "start": 1380.96,
+    "duration": 5.44,
+    "text": "time they see all of these it could be"
+  },
+  {
+    "start": 1382.96,
+    "duration": 6.079,
+    "text": "difficult but when you see this review"
+  },
+  {
+    "start": 1386.4,
+    "duration": 5.519,
+    "text": "this right and then go and have a look"
+  },
+  {
+    "start": 1389.039,
+    "duration": 4.161,
+    "text": "convexity and order flow and then"
+  },
+  {
+    "start": 1391.919,
+    "duration": 4.401,
+    "text": "everything is going to start to make"
+  },
+  {
+    "start": 1393.2,
+    "duration": 5.12,
+    "text": "sense right. So now for instance what"
+  },
+  {
+    "start": 1396.32,
+    "duration": 5.92,
+    "text": "happened on the reversion. So price is"
+  },
+  {
+    "start": 1398.32,
+    "duration": 7.12,
+    "text": "coming down. Okay. Then we have"
+  },
+  {
+    "start": 1402.24,
+    "duration": 7.2,
+    "text": "liquidity taking. So we have long gamma"
+  },
+  {
+    "start": 1405.44,
+    "duration": 6.16,
+    "text": "and then on the downside we go put"
+  },
+  {
+    "start": 1409.44,
+    "duration": 6.32,
+    "text": "right. This is the perfect combination"
+  },
+  {
+    "start": 1411.6,
+    "duration": 7.68,
+    "text": "for a reversal. Why? Because the market"
+  },
+  {
+    "start": 1415.76,
+    "duration": 6.56,
+    "text": "is moving down right. Someone is putting"
+  },
+  {
+    "start": 1419.28,
+    "duration": 5.759,
+    "text": "a break on this move by buying"
+  },
+  {
+    "start": 1422.32,
+    "duration": 6.28,
+    "text": "volatility. Right? And then when they"
+  },
+  {
+    "start": 1425.039,
+    "duration": 7.321,
+    "text": "buy volatility they take liquidity."
+  },
+  {
+    "start": 1428.6,
+    "duration": 7.559,
+    "text": "Okay. And on top of"
+  },
+  {
+    "start": 1432.36,
+    "duration": 6.12,
+    "text": "that guess is showing us that the the"
+  },
+  {
+    "start": 1436.159,
+    "duration": 6.721,
+    "text": "down cycle more expensive because it's a"
+  },
+  {
+    "start": 1438.48,
+    "duration": 8.48,
+    "text": "puts right. So options below this level"
+  },
+  {
+    "start": 1442.88,
+    "duration": 6.159,
+    "text": "are be are expens are more expensive and"
+  },
+  {
+    "start": 1446.96,
+    "duration": 4.24,
+    "text": "on the convexity they show that"
+  },
+  {
+    "start": 1449.039,
+    "duration": 5.12,
+    "text": "liquidity has been taken. So this is the"
+  },
+  {
+    "start": 1451.2,
+    "duration": 6.479,
+    "text": "perfect perfect environment sorry"
+  },
+  {
+    "start": 1454.159,
+    "duration": 5.76,
+    "text": "perfect environment for a reversal. Now"
+  },
+  {
+    "start": 1457.679,
+    "duration": 4.641,
+    "text": "what happen after you take the trade"
+  },
+  {
+    "start": 1459.919,
+    "duration": 5.841,
+    "text": "okay you take the trade and then what"
+  },
+  {
+    "start": 1462.32,
+    "duration": 7.44,
+    "text": "you want is you want to see lots of"
+  },
+  {
+    "start": 1465.76,
+    "duration": 7.279,
+    "text": "spikes on momentum on the uh convexity"
+  },
+  {
+    "start": 1469.76,
+    "duration": 5.32,
+    "text": "on the downside. Why? Because remember"
+  },
+  {
+    "start": 1473.039,
+    "duration": 4.721,
+    "text": "the concept that we just"
+  },
+  {
+    "start": 1475.08,
+    "duration": 4.68,
+    "text": "explained this means that liquidity is"
+  },
+  {
+    "start": 1477.76,
+    "duration": 4.32,
+    "text": "being provided you know and when the"
+  },
+  {
+    "start": 1479.76,
+    "duration": 4.96,
+    "text": "liquidity is being provided equal"
+  },
+  {
+    "start": 1482.08,
+    "duration": 6.32,
+    "text": "momentum and that helps the price to"
+  },
+  {
+    "start": 1484.72,
+    "duration": 8.199,
+    "text": "keep going up in this example. Now on"
+  },
+  {
+    "start": 1488.4,
+    "duration": 8.879,
+    "text": "the other side if market is trending up"
+  },
+  {
+    "start": 1492.919,
+    "duration": 7.721,
+    "text": "okay and you see a long gamma again"
+  },
+  {
+    "start": 1497.279,
+    "duration": 7.041,
+    "text": "liquidity is been taken but the key is"
+  },
+  {
+    "start": 1500.64,
+    "duration": 7.76,
+    "text": "the upside uh call gigs which means the"
+  },
+  {
+    "start": 1504.32,
+    "duration": 6.959,
+    "text": "upside go more expensive. Okay. So when"
+  },
+  {
+    "start": 1508.4,
+    "duration": 5.399,
+    "text": "you see this combination like upside"
+  },
+  {
+    "start": 1511.279,
+    "duration": 5.441,
+    "text": "liquidity taking upside go more"
+  },
+  {
+    "start": 1513.799,
+    "duration": 6.041,
+    "text": "expensive the market has been trending"
+  },
+  {
+    "start": 1516.72,
+    "duration": 6.64,
+    "text": "up and someone decided to change this"
+  },
+  {
+    "start": 1519.84,
+    "duration": 6.64,
+    "text": "regime by buying volatility and when"
+  },
+  {
+    "start": 1523.36,
+    "duration": 5.52,
+    "text": "they buy volatility they take liquidity"
+  },
+  {
+    "start": 1526.48,
+    "duration": 5.439,
+    "text": "and they make the options above this"
+  },
+  {
+    "start": 1528.88,
+    "duration": 6.399,
+    "text": "level more expensive. So the upside more"
+  },
+  {
+    "start": 1531.919,
+    "duration": 6.681,
+    "text": "expensive which is called gets and that"
+  },
+  {
+    "start": 1535.279,
+    "duration": 6.241,
+    "text": "is a high probability trade for a"
+  },
+  {
+    "start": 1538.6,
+    "duration": 6.92,
+    "text": "reversal. Now once you go into the trade"
+  },
+  {
+    "start": 1541.52,
+    "duration": 6.56,
+    "text": "what you want you want to monitor the um"
+  },
+  {
+    "start": 1545.52,
+    "duration": 5.44,
+    "text": "the complexity and see these spikes on"
+  },
+  {
+    "start": 1548.08,
+    "duration": 5.52,
+    "text": "the downside. Why? Because it means that"
+  },
+  {
+    "start": 1550.96,
+    "duration": 4.12,
+    "text": "liquidity is being added and that helps"
+  },
+  {
+    "start": 1553.6,
+    "duration": 4.88,
+    "text": "the"
+  },
+  {
+    "start": 1555.08,
+    "duration": 5.32,
+    "text": "momentum. Now I hope you guys like it. I"
+  },
+  {
+    "start": 1558.48,
+    "duration": 5.199,
+    "text": "know it's a lot of concepts, a lot of"
+  },
+  {
+    "start": 1560.4,
+    "duration": 5.92,
+    "text": "things to take um in one video, but what"
+  },
+  {
+    "start": 1563.679,
+    "duration": 5.681,
+    "text": "I'm going to do in the next part of uh"
+  },
+  {
+    "start": 1566.32,
+    "duration": 5.64,
+    "text": "this order flow series is I'm going to"
+  },
+  {
+    "start": 1569.36,
+    "duration": 5.679,
+    "text": "bring some real, you know, real life"
+  },
+  {
+    "start": 1571.96,
+    "duration": 5.56,
+    "text": "examples. And so that is going to help"
+  },
+  {
+    "start": 1575.039,
+    "duration": 4.52,
+    "text": "to make everything everything clear in"
+  },
+  {
+    "start": 1577.52,
+    "duration": 4.24,
+    "text": "your mind and help you to trade with"
+  },
+  {
+    "start": 1579.559,
+    "duration": 4.441,
+    "text": "orderflow. Anyway, thank you guys. Thank"
+  },
+  {
+    "start": 1581.76,
+    "duration": 5.399,
+    "text": "you for listening and and see you in the"
+  },
+  {
+    "start": 1584.0,
+    "duration": 3.159,
+    "text": "next video."
+  }
+]
