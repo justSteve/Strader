@@ -62,16 +62,12 @@ if [[ -z "${STRADER_AZ_BIN:-}" && -x "$AZ_INTEROP" ]]; then
 fi
 export PATH="$PATH:$(dirname "$AZ_INTEROP")"
 
-# --clip FORCES the payload push [st-0x9, refined by st-llor]. run.py now loads
-# the clipboard by default when the run is an interpretive parse — but this job
-# has no agent in the loop, so it is always hybrid and would never trigger that
-# default. It still legitimately owns the clipboard: it fires 15 minutes before
-# the open, so whatever it leaves there is exactly what the morning routine
-# pastes into the Mancini Forecast field.
-#
-# If an in-session Mancini Parse already ran for this plan-day, run.py skips
-# ahead of this job entirely (it will not clobber a richer parse with a
-# levels-only one), so the clipboard keeps the better payload.
+# --clip [st-0x9, st-llor, narrowed by st-lw58]. In prepare-only mode the only
+# clipboard action left to this job is the good case: an in-session parse
+# already ran overnight, its payload is hours stale by 08:15, and --clip
+# authorizes reloading that RICHER stored parse so the morning routine finds
+# the best payload waiting. When no parse exists yet, prepare-only never
+# touches the clipboard — there is no plan to load, and the alert says so.
 #
 # Overridable to "" so this wrapper can be smoke-tested end to end without
 # taking Steve's clipboard — a job that cannot be exercised without a side
@@ -95,7 +91,12 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 
     cd "$STRADER_REPO" || { log "FATAL: repo dir missing: $STRADER_REPO"; exit 2; }
 
-    PYTHONPATH="$STRADER_REPO" "$PY" -m runbook.mancini.run --from-blob $CLIP_ARG "$@"
+    # --prepare-only [st-lw58, ruled 2026-08-06]: this job no longer publishes.
+    # It fetches, cleans, scrapes the deterministic lists, then alerts "ready
+    # to parse" — Steve triggers every real parse in-session (/mancini-parse).
+    # When an in-session parse already exists it reloads the richer payload
+    # into the clipboard, which is this job's whole value in the good case.
+    PYTHONPATH="$STRADER_REPO" "$PY" -m runbook.mancini.run --from-blob --prepare-only $CLIP_ARG "$@"
     rc=$?
     log "=== mancini-preopen end $(date +%Y-%m-%dT%H:%M:%S%z) (rc=$rc) ==="
 

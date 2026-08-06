@@ -138,6 +138,59 @@ def _clip_wanted(args) -> bool:
     return bool(args.extraction_json)
 
 
+def _prepare_only(args, day: str, det_levels: list) -> int:
+    """08:15 pre-open mode [st-lw58]: every no-judgment step, then stop.
+
+    Under the 2026-08-06 ruling Steve triggers every parse, so the old hybrid
+    publish put a lesser, commentary-free plan on the desk 15 minutes before
+    the open — exactly when he'd read it. This mode fetches, cleans, and
+    scrapes the deterministic lists (all done by the time we're called), then
+    ALERTS readiness instead of publishing. The desk and parsed/<day>.json are
+    only ever written by a real parse.
+
+    The one thing it still owns in the good case: when an in-session parse
+    already ran overnight, the clipboard payload is hours stale by 08:15, so
+    reload the richer stored parse — the morning routine must find the best
+    payload waiting. [st-llor]
+    """
+    existing = PARSED_ROOT / f"{day}.json"
+    prev_model = ""
+    if existing.exists():
+        try:
+            prev_model = json.loads(existing.read_text(encoding="utf-8")).get("model", "")
+        except (OSError, ValueError):
+            prev_model = ""
+    if prev_model and prev_model != "deterministic-lists":
+        msg = f"OK (prepared): {day} already parsed by {prev_model!r}."
+        if _clip_wanted(args):
+            try:
+                prev = ParseResult.from_dict(
+                    json.loads(existing.read_text(encoding="utf-8")))
+                msg += " " + _push_payload(prev, existing)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("payload reload failed (non-fatal): %s", e)
+                msg += f" clipboard: RELOAD FAILED ({e})"
+        print(msg)
+        return 0
+
+    n_sup = sum(1 for lv in det_levels if lv.kind == "support")
+    n_res = sum(1 for lv in det_levels if lv.kind == "resistance")
+    summary = (f"Mancini letter fetched for {day}: {len(det_levels)} levels "
+               f"scraped ({n_sup} supports, {n_res} resistances). "
+               "Ready to parse — run /mancini-parse.")
+    logger.info("prepare-only: %s", summary)
+    # Readiness ping, not an emergency: no session is in the loop at 08:15, so
+    # the signal goes code-to-phone. Failure to alert must not fail the run —
+    # the health log and cron log still carry the readiness line.
+    try:
+        from strader.alerts import send as alert_send
+        alert_send("Mancini ready to parse", summary, urgent=False)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("ready-alert failed (non-fatal): %s", e)
+    print(f"OK (prepared, awaiting parse): {summary}")
+    return 0
+
+
 def _push_payload(result: ParseResult, payload_path: Path | None = None) -> str:
     """Build the Daily Payload from ``result`` and load it. Returns a brief note."""
     from . import payload_emitter
@@ -340,6 +393,10 @@ def main(argv: list[str] | None = None) -> int:
                          "validation or persistence. Omit it and the run "
                          "publishes deterministic list levels alone with "
                          "commentary pending (st-ze6 hybrid mode)")
+    ap.add_argument("--prepare-only", action="store_true",
+                    help="fetch/clean/scrape then stop and alert readiness; "
+                         "never publish. The 08:15 cron mode [st-lw58]. "
+                         "Reloads the clipboard from an existing richer parse.")
     ap.add_argument("--no-desk", action="store_true",
                     help="skip publishing the plan doc to the steves-desk "
                          "Trading window")
@@ -423,6 +480,11 @@ def main(argv: list[str] | None = None) -> int:
                 len(det_levels),
                 sum(1 for l in det_levels if l.kind == "support"),
                 sum(1 for l in det_levels if l.kind == "resistance"))
+
+    # Pre-open prepare mode stops here: everything above needed no judgment,
+    # everything below builds a publishable plan. [st-lw58]
+    if args.prepare_only:
+        return _prepare_only(args, day, det_levels)
 
     # 2 + validate. The interpretive leg is an in-session prompt parse supplied
     # via --extraction-json (extraction-contract.md) — this CLI calls no model
