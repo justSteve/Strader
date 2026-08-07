@@ -165,6 +165,12 @@ td:first-child, th:first-child { text-align:left; }
   border-left:4px solid transparent; border-right:4px solid transparent;
   border-top:6px solid var(--ink-2); }
 .col .evmark.setup { border-top-color:var(--good); }
+/* "Not following" must not look like "nothing arriving" [st-ug3f]. The old
+   readout said `live · N bars` whether the page was tracking the tip or frozen
+   behind it, so a page that had silently stopped auto-advancing was
+   indistinguishable from a dead feed. */
+#bridge-dot.paused { color:var(--critical); cursor:pointer;
+  text-decoration:underline dotted; font-weight:600; }
 /* Mode gate [st-o216]. One template serves the drill and the live session —
    deliberately, because a rep drilled on a replay has to transfer to the live
    surface and two templates would drift. So the difference is a class on
@@ -526,7 +532,13 @@ function renderColumn(b, i) {
     const m = document.createElement("div");
     m.className = "evmark" + (b.ev.some(e => e.type === "SetupRecognition") ? " setup" : "");
     m.title = b.ev.map(e => `${emName(e)}: ${emGist(e)}`).join("\n");
-    m.onclick = () => { seekTo(i); emPinned = true; openEmPanel(i); };
+    // Reading what a bar said is not the same as navigating to it. In LIVE the
+    // seek was a trap: it landed idx behind a MOVING tip, noteSeek() turned
+    // following off, and nothing short of a reload turned it back on — the page
+    // looked identical to a stalled feed while the tape ran on without it.
+    // Replay keeps the seek (the tape is fixed there, so it costs nothing and
+    // the drills are built on it). [st-ug3f]
+    m.onclick = () => { if (!LIVE) seekTo(i); emPinned = true; emPinnedIdx = i; openEmPanel(i); };
     col.appendChild(m);
   }
   return col;
@@ -747,7 +759,11 @@ const setupName = s => SETUP_LABEL[s] || s;
 // holds the end-of-session block: engine flush plus the day's profile levels,
 // which belong to no single bar.
 let FINAL = DATA.final || [];
-let emPinned = false;
+// `emPinnedIdx` is the bar the panel is pinned TO, which in LIVE is no longer
+// the bar you are looking at — clicking a mark reads a past bar without
+// navigating to it, so the panel needs its own anchor or the next arriving
+// bar repoints it and the click is lost. [st-ug3f]
+let emPinned = false, emPinnedIdx = null;
 
 const EM_LABEL = {
   SweepPrint: "Sweep", ImbalanceStack: "Stack", SetupRecognition: "Setup",
@@ -844,7 +860,7 @@ function renderEmissions() {
     more.addEventListener("mouseenter", open);
     row.appendChild(more);
   }
-  if (emPinned) openEmPanel(idx);
+  if (emPinned) openEmPanel(emPinnedIdx != null ? emPinnedIdx : idx);
 }
 
 // An invalidated setup is scored 0.0 by the recognizer, which is "not
@@ -882,7 +898,7 @@ function openEmPanel(i) {
   }
   p.innerHTML = html;
   p.style.display = "block";
-  p.querySelector(".x").onclick = () => { emPinned = false; closeEmPanel(); };
+  p.querySelector(".x").onclick = () => { emPinned = false; emPinnedIdx = null; closeEmPanel(); };
 }
 function closeEmPanel() {
   const p = $("empanel"); if (p && !emPinned) p.style.display = "none";
@@ -1208,7 +1224,12 @@ function gradeMidFlight(b) {
 
 // ── wiring ───────────────────────────────────────────────────────────────
 $("play").onclick = () => playing ? pause() : play();
-$("fwd").onclick = () => { pause(); step(); };
+// Stepping forward BY HAND has to be able to re-arm follow too [st-ug3f] —
+// but it is not a reliable way back, because the tip moves while you step.
+// That is what the click-to-follow readout is for; this only makes the
+// manual path honest when it does happen to catch up.
+function stepUser() { pause(); step(); if (LIVE) noteSeek(); }
+$("fwd").onclick = stepUser;
 $("back").onclick = () => seekTo(idx - 1);
 $("seek").oninput = e => seekTo(Number(e.target.value));
 $("arm").onclick = () => armLevel(true);
@@ -1265,7 +1286,7 @@ document.addEventListener("keydown", e => {
     return;
   }
   if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
-  if (e.code === "ArrowRight") { pause(); step(); }
+  if (e.code === "ArrowRight") stepUser();
   if (e.code === "ArrowLeft") seekTo(idx - 1);
 });
 window.addEventListener("resize", () => {
@@ -1311,7 +1332,7 @@ async function pollCoach() {
     const d = await r.json();
     for (const c of d.commands || []) applyCoach(c);
     lastCmdId = d.last ?? lastCmdId;
-  } catch { bridgeUp = false; $("bridge-dot").textContent = "—"; setTimeout(connectBridge, 10000); return; }
+  } catch { bridgeUp = false; setDot("—"); setTimeout(connectBridge, 10000); return; }
   setTimeout(pollCoach, 2000);
 }
 // ── live bar feed [st-re1o] ──────────────────────────────────────────────
@@ -1344,11 +1365,11 @@ async function pollBars() {
       // it has closed, so replaying each at its own duration would fall further
       // behind the tape with every bar. The duration footer still carries pace.
       if (liveFollow && wasAtTip) { while (idx < bars.length - 1) step(); }
-      $("bridge-dot").textContent = `live · ${bars.length} bars`;
+      setDot(`live · ${bars.length} bars`);
     }
     renderDeveloping();   // after any append, so it lands right of the newest
   } catch {
-    if (++liveErrs === 3) $("bridge-dot").textContent = "feed stalled";
+    if (++liveErrs === 3) setDot("feed stalled");
   }
   setTimeout(pollBars, 2000);
 }
@@ -1392,19 +1413,50 @@ function renderDeveloping() {
 
 // Seeking back through the session turns following off; returning to the tip
 // turns it back on, so studying a level does not silently freeze the chart.
-function noteSeek() { liveFollow = idx >= bars.length - 1; renderDeveloping(); }
+function noteSeek() { liveFollow = idx >= bars.length - 1; renderDeveloping(); renderDot(); }
+
+// Every writer of the coach/feed readout goes through here [st-ug3f]. The 2s
+// poll used to stomp the element unconditionally, so no other writer could put
+// a durable warning in it. `dotBase` is the connection story; the follow state
+// overrides it, because a page that has stopped advancing is the more urgent
+// fact about it.
+let dotBase = "—";
+function setDot(t) { dotBase = t; renderDot(); }
+function renderDot() {
+  const el = $("bridge-dot"); if (!el) return;
+  if (LIVE && bars.length && !liveFollow) {
+    el.textContent = `⏸ holding at bar ${idx + 1} of ${bars.length} — click to follow`;
+    el.className = "paused";
+    el.title = "You are looking back through the session. New bars are still "
+      + "arriving and are NOT being drawn. Click to jump to the newest bar and "
+      + "resume auto-advance.";
+    el.onclick = resumeFollow;
+    return;
+  }
+  el.textContent = dotBase; el.className = ""; el.title = ""; el.onclick = null;
+}
+// The guaranteed way back to the tip. Stepping there by hand cannot be relied
+// on — the tip moves while you step, so idx never catches bars.length-1 and
+// follow never re-arms. This does the catch-up in one go and re-arms
+// unconditionally, which is the whole point of it being an explicit control.
+function resumeFollow() {
+  if (!LIVE) return;
+  liveFollow = true;
+  while (idx < bars.length - 1) step();
+  renderDeveloping(); renderDot();
+}
 
 function connectBridge() {
   fetch(BRIDGE + "/health").then(r => r.json()).then(() => {
     bridgeUp = true;
-    $("bridge-dot").textContent = LIVE ? "live" : "connected";
+    setDot(LIVE ? "live" : "connected");
     if (LIVE) pollBars();
     sendState("session_open", { n_bars: bars.length, bar_n: DATA.meta.bar_n });
     pollCoach();
   }).catch(() => {
     // One-shot was wrong: if the first health call loses the race with the
     // bridge starting up, a LIVE page would sit dead forever with no retry.
-    $("bridge-dot").textContent = "connecting…";
+    setDot("connecting…");
     setTimeout(connectBridge, 3000);
   });
 }
@@ -1435,7 +1487,7 @@ document.querySelectorAll("#panel button").forEach(btn => {
 $("emrow").addEventListener("mouseleave", () => setTimeout(closeEmPanel, 120));
 $("empanel").addEventListener("mouseleave", closeEmPanel);
 $("emrow").addEventListener("click", () => {
-  emPinned = !emPinned;
+  emPinned = !emPinned; emPinnedIdx = null;
   if (emPinned) openEmPanel(idx); else closeEmPanel();
 });
 
