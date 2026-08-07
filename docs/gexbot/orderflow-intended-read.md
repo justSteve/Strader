@@ -255,12 +255,12 @@ connect as follows:
 
 | View concept | API fields | Evidence tier |
 |---|---|---|
-| Aggregate Dex pane, "aggdex" call/put/net | `agg_call_dex`, `agg_put_dex`, `agg_dex` (+ `one_*`) | **[CANONICAL]** — the docs' Aggregate Dex section uses the exact term "aggdex"; identities agg = call+put hold exactly **[MEASURED]** |
+| Aggregate Dex pane, "aggdex" call/put/net | `agg_call_dex`, `agg_put_dex`, `agg_dex` (+ `one_*`) | **[MEASURED — VERIFIED 2026-08-07]** tooltip anchor at 2026-08-06 19:59:59 UTC matches all three fields + spot exactly (`screenshots/capture-protocol.md` ledger) |
 | DEX pane, "net" variant | `net_dex`, `net_call_dex`, `net_put_dex` (+ `one_*`) | **[MEASURED, unexplained]** — agg-vs-net distinction is vendor question #1; correlation 0.9989→0.53 across days. The docs define only "aggdex"; no "net dex" pane text found — the distinction remains undocumented. |
 | Net Convexity tape (jass's cyan line) | plausibly `zcvr`/`ocvr` | **[STRUCTURAL, strengthened]** — the docs now publish the formula: net convexity = customer-bought GEX − customer-sold GEX. Phase 2 experiment #1 (`zcvr` vs summed customer-signed state ladder) now tests the vendor's own published definition rather than a guess. |
 | Convexity/GEX OrderFlow spikes | plausibly `cvroflow`/`gexoflow`/`dexoflow` (+ `one_*`) | **[MEASURED]** these are exact first differences of `cvr`/`gr`/`agg_dex` per snapshot — i.e. the *flow* of the cumulative series; **[STRUCTURAL]** naming match to the spike charts |
 | Ladder levels repeated in view tooltips (major long/short gamma etc.) | `z_mlgamma`, `z_msgamma`, `o_*` — verbatim `state` republications | **[MEASURED]** 16 identities hold exactly |
-| Higher-order pane(s) if any | `zvanna`, `ovanna`, `zcharm`, `ocharm` | undecoded semantics beyond name |
+| Net vanna / net charm panes | `zvanna`, `ovanna`, `zcharm`, `ocharm` | **[MEASURED — VERIFIED 2026-08-07]** net vanna @ "latest" = `zvanna` exactly (tooltip anchor 13:55:41 UTC; `ovanna` differs, ruling out second expiry) — confirming the `z*` ↔ latest / `o*` ↔ next mapping family-wide. `zcharm` presumed symmetric, one tour capture to confirm. |
 
 ## 6. Claims to test in Phase 2 (verification against the 62-day archive)
 

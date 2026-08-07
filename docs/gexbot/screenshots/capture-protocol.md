@@ -63,21 +63,33 @@ harvest lands (`/mnt/z/Harvest/gexbot-hist/`).
 
 | Anchor time (ET) | Pane metric | Tooltip values | Screenshot | Archive check |
 |---|---|---|---|---|
-| 2026-08-06 3:59:59 PM | aggregate dex | aggregate dex 449.20; agg call dex 265.15; agg put dex 184.05; spot 7709.64 | `2026-08-06-1559-spx-aggdex-tooltip-anchor.png` | **pending** — 08-06 harvest not yet landed (archive ends 08-05). UI-side identity already confirmed: 265.15 + 184.05 = 449.20. Expected match: `agg_dex`/`agg_call_dex`/`agg_put_dex` at 19:59:59 UTC−4 snapshot. |
-| 2026-08-06 8:55:41 AM **CT** (9:55:41 ET) | net vanna | net vanna 46.97; spot 7735.35 | `2026-08-06-fullday-spx-netvanna.jpg` | **pending** — same harvest. Expected match: `zvanna` at that second. Note the frame is America/Chicago (UTC−5); tooltip self-labels the zone. |
+| 2026-08-06 3:59:59 PM | aggregate dex | aggregate dex 449.20; agg call dex 265.15; agg put dex 184.05; spot 7709.64 | `2026-08-06-1559-spx-aggdex-tooltip-anchor.png` | **VERIFIED 2026-08-07** — archive snapshot 19:59:59 UTC exact: `agg_dex` 449.20, `agg_call_dex` 265.15, `agg_put_dex` 184.05, spot 7709.64. Pane ↔ field mapping closed. |
+| 2026-08-06 8:55:41 AM **CT** (9:55:41 ET) | net vanna | net vanna 46.97; spot 7735.35 | `2026-08-06-fullday-spx-netvanna.jpg` | **VERIFIED 2026-08-07** — archive snapshot 13:55:41 UTC exact: `zvanna` 46.97, spot 7735.35 (`ovanna` 102.75 ≠, ruling out second expiry). Net vanna @ latest = `zvanna`; confirms `z*` ↔ "latest" family-wide. |
 
 Remaining tour: net gex, net convexity (→`zcvr`, experiment #1), net charm,
 dex orderflow, gex orderflow, convexity orderflow.
 
-### First -vanna threshold observation (2026-08-06, full-day frame)
+### First -vanna threshold observation (2026-08-06) — MEASURED, ambiguous
 
-From `2026-08-06-fullday-spx-netvanna.jpg`: net vanna climbed from ≈−400
-early to a +$1,100–1,500MM plateau from midday, holding above $800MM (parts
-above $1,000MM) through the last hour. Doctrine prediction (positive, above
-threshold, late): bullish passive dealer flows into close. Observed: spot
-lifted ~7703 → ~7711 in the final 45 min after a morning-long selloff from
-~7737. **Consistent with doctrine — 1 observation, hit/miss tally starts
-here.** Verify properly from `zvanna` once mapping is anchor-confirmed.
+Initially pixel-read from `2026-08-06-fullday-spx-netvanna.jpg` as "plateau
+holding above $800MM through the last hour, spot lifting into close —
+consistent." **The measured `zvanna` series corrects that** (computed
+2026-08-07 from the verified archive, last hour 3–4 PM ET, 2,678 snapshots):
+
+- `zvanna` range −227 … +1,276, closing at +608 — it *collapsed* off the
+  midday plateau (session max +1,703) during the last hour, dipping negative
+  once
+- above the $800MM threshold only **56%** of the hour; above $1,000MM 22%
+- spot over the same hour: 7713.03 → 7711.38 (**−1.65, net flat**), with a
+  mid-hour dip to ~7703 and recovery
+
+Verdict: **ambiguous, not a hit.** Sign positive and magnitude intermittently
+over threshold, but the prediction target (bullish passive flows into close)
+reads net-flat at best. Lesson recorded: the doctrine claim needs an
+operationalized hit/miss definition *before* tallying (what counts as
+"relevant effects" — direction? magnitude? the mid-hour recovery?). That
+definition is Phase 2 test #8's first deliverable. Tally: 0 hits, 0 misses,
+1 ambiguous.
 
 ## UI color legend — from the Settings panel (2026-08-06 capture)
 
