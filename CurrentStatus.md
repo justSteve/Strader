@@ -3,7 +3,7 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
-**Last refreshed**: 2026-08-05 [st-6qx4, st-btu, st-q5xu, st-e91l, st-g63j]
+**Last refreshed**: 2026-08-07 [st-8ywx, st-7av4, st-sgr1, st-p3lv]
 
 > Standing operational snapshot — what is wired up, live, or paused right now.
 > Session history lives in `DaysActivity.md`; work lives in beads; durable
@@ -22,12 +22,12 @@ summative pass.
 | Surface | State |
 |---------|-------|
 | TradingView MCP | **Removed.** No `.mcp.json`. Chart state comes from screenshots; Pine scripts are pasted by Steve by hand. |
-| GEXBot | **ACTIVE — QUANT tier ($350/mo, one-month commitment) since 2026-08-05 PM** (State AM, upgraded same day; pause ran 07-03→08-05). Live 6-endpoint collection in tmux `steves-desk:gexbot-collect` (orderflow leg auto-skips — entitlement missing despite Quant rollup, raise with vendor if it persists). **90-day /hist backfill running** → `data/corpus/gexbot-hist/` (~65-113MB/category-day, manifest.jsonl tracks fetched/denied). Program brief: `docs/a2a/2026-08-05-gexbot-quant-month-program.md`. Month-end sweep + downgrade decision ~Sep 1. |
+| GEXBot | **ACTIVE — QUANT tier ($350/mo, one-month commitment) since 2026-08-05 PM** (State AM, upgraded same day; pause ran 07-03→08-05). Live **10-endpoint** collection in tmux `steves-desk:gex`: the full State package — {gamma,delta,vanna,charm} × {`_zero`,`_one`}, 87 strikes each — plus `classic/gex_zero/majors` and the **orderflow leg, which went live 2026-08-06 with 37 fields** (it was auto-skipping on entitlement before the upgrade; no code change was needed). 0DTE legs are requested first so a truncated cycle keeps what the fly window trades. Feed is **RTH-only** — collector DOWN outside 08:30–15:00 CT is normal. Program brief: `docs/a2a/2026-08-05-gexbot-quant-month-program.md`. Month-end sweep + downgrade decision ~Sep 1. |
 | Schwab API | `lib/schwab-py` on the `hobbled-readonly` fork — account/order/transaction methods physically removed. Only `broker_schwab/readers/{quote,chain}.py` are auto-allowed. |
-| Databento | **CME Standard live GLBX verified 2026-08-03.** ES trades + MBP-1 capture the session window 02:50–15:05 CT via `scripts/live-footprint-up.sh` (tmux `steves-desk:footprint`), now supervised. **GLBX historical is $0.00 on the Futures plan** (measured 2026-08-05, `--estimate-only`; OPRA control $6.07/2h), so an uncaptured GLBX session is **recoverable, not gone** — the old "quotes are NEVER backfilled" premise is false for GLBX and holds only for OPRA. Historical corpus is tape-only — no GEX history. |
+| Databento | **CME Standard live GLBX verified 2026-08-03.** ES trades + MBP-1 capture the session window 02:50–15:05 CT via `scripts/live-footprint-up.sh` (tmux `steves-desk:footprint`), now supervised. **GLBX historical is $0.00 on the Futures plan** (measured 2026-08-05, `--estimate-only`; OPRA control $6.07/2h), so an uncaptured GLBX session is **recoverable, not gone** — the old "quotes are NEVER backfilled" premise is false for GLBX and holds only for OPRA. **Daily OPRA import HALTED 2026-08-07** (`st-7av4`, Steve's call): historical OPRA is an ad hoc fetch now via `corpus_backfill_databento.py --opra`. The datastream gate no longer requires the stream; the six measurement scripts that read `databento_opra.jsonl` must each fail loudly on a day without it. Historical corpus is tape-only — no GEX history before 2026-08-05. |
 | Mancini | Pre-open cron wired; `st-i68` PATH bug open against it. |
 | Market internals | `scripts/mi_gauge.py`, captured on the 5-minute session cron. Single-sourced from Schwab — no cross-check exists (`st-jwtn`). |
-| Live footprint | v1 running: bridge `127.0.0.1:7788` + JSONL feeder → `/tmp/desk-live-footprint.html`. Same surface as the replay drills (one template, `.live` mode gate hides drill-only controls); bars proven byte-identical to replay. **Rendering confirmed live by Steve 2026-08-04.** Carries the per-bar emissions row + rollover panel. Intra-bar progressive rendering built and tested but **NOT deployed** (`st-e91l`) — needs a feeder+bridge restart, do it after a 15:05 stop. |
+| Live footprint | v1 running: bridge `127.0.0.1:7788` + JSONL feeder → `/tmp/desk-live-footprint.html`. Same surface as the replay drills (one template, `.live` mode gate hides drill-only controls); bars proven byte-identical to replay. **Rendering confirmed live by Steve 2026-08-04.** Carries the per-bar emissions row + rollover panel. Intra-bar progressive rendering built and tested but **NOT deployed** (`st-e91l`) — needs a feeder+bridge restart, do it after a 15:05 stop. **Every closed bar now carries a `gex` stamp** (`st-8ywx`, live since 2026-08-07): flip, 0DTE and 1DTE brackets, net-GEX regime sign, distance to flip, which majors the bar's range covered, and the age of the poll. Resolved at-or-BEFORE the bar close — never lookahead — and applied *after* the recogniser judges the bar, so it is recorded alongside recognition and can never become an input to it. Absent feed degrades to no stamp, never to a broken bar. |
 
 ## Crons (weekdays, CT)
 
@@ -39,7 +39,7 @@ summative pass.
 | 08:15 | Mancini pre-open — **`st-i68` open** |
 | 08:25 | Pre-open heartbeat + risk-state reset |
 | every 5 min, 08:00–15:55 | Market-internals gauge |
-| every 2 min, all day | **Capture supervisor** (`st-6qx4`, installed 2026-08-05) — relaunches a dead streamer inside the 02:50–15:05 window; idempotent by process, not tmux window |
+| every 2 min, all day | **Capture supervisor** (`st-6qx4`, installed 2026-08-05) — relaunches a dead streamer inside the 02:50–15:05 window; idempotent by process, not tmux window. **Does not survive a tmux server death**: the `moocity` server died ~19:55 on 2026-08-05 and took the supervisor down with the collectors it was supervising. A supervisor hosted inside the thing it supervises is not one. Settles `st-p3lv` toward a systemd unit |
 
 First full Monday-morning fire: **2026-08-03**.
 
@@ -86,7 +86,12 @@ missing its `leases` table). The working channel is file-convention A2A under
    resistance levels as unreliable in direction. Two calls outstanding from
    Steve: the mirrored setup's name, and whether to apply the interim
    kind-filter-to-supports the acuity path already uses. `st-q5xu`, `st-tme`.
-5. **Capture window ruled 2026-08-05** — live capture is session-only
+5. **`rcl` is sticky on the Mancini Pine indicator** — `lvState` 3 (RECLAIMED)
+   has no outgoing transition, so a level that reclaims and then breaks again
+   reads `rcl` for the rest of the session. Observed live on 7741, 2026-08-06.
+   Must be fixed together with the asymmetric hysteresis (break needs a 2pt
+   buffer, reclaim needs none) or the label oscillates. Not yet beaded.
+6. **Capture window ruled 2026-08-05** — live capture is session-only
    (02:50–15:05 CT); the uncovered hours backfill free. The backfill leg is
    built-but-not-written (`st-wy6u`) and must never run while a feeder is
    tailing the day, so 24h coverage is not yet actually complete.
