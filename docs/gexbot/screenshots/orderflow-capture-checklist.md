@@ -22,7 +22,8 @@
 **Settings (gear icon):**
 
 - Show Tooltips: **ON**
-- Time Zone: **New York (UTC-4)**
+- Time Zone: **Chicago (UTC-5)** — Steve's call 2026-08-07; tooltips and
+  axis stamp Central, so chart times read open = 8:30, close = 3:00
 - Price Transform: 1 x + 0 (leave alone)
 
 ## 2. The standing pane lineup (normal trading day)
