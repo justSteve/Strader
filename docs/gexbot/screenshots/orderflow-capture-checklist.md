@@ -77,23 +77,12 @@ the timestamp is in the frame, no notes needed.
 6. **Anything that makes you say "huh."** Capture it. Cheap to take,
    impossible to reconstruct.
 
-## 5. The tooltip tour — one-time, any quiet moment
+## 5. The tooltip tour — COMPLETE ✓
 
-Goal: one tooltip capture per metric so I can tie each pane to its API
-field in our archive. **Done: aggregate dex.** Remaining seven:
-
-net gex · net convexity · net vanna · net charm · dex orderflow ·
-gex orderflow · convexity orderflow
-
-How, with the built-in Snipping Tool (ClipMate can't hold a hover):
-
-1. Start menu → **Snipping Tool**
-2. Click the **Delay** (clock) control → pick **5 seconds**
-3. Click **New**, then move the mouse onto the chart line so the tooltip
-   is showing when the timer fires
-4. Full-screen snip, save to zgent-bridge
-
-Anywhere on the line is fine. Recent times are slightly better.
+All eight metrics captured 2026-08-06 (filed as `2026-08-06-1500-tooltip-*.png`
+in the screenshots directory). Nothing left to do here — section kept for the
+record. The Snipping Tool delay trick (5-second timer, hover during countdown)
+remains the way to capture any future hover state ClipMate can't hold.
 
 ## 6. Reading the line colors (from the vendor's settings panel)
 
