@@ -33,9 +33,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# Streams a healthy trading day must have. Databento ES front-month and SPXW
-# OPRA options are the two the Mancini pilot depends on.
-DEFAULT_REQUIRED_STREAMS = ("databento_glbx_es", "databento_opra")
+# Streams a healthy trading day must have.
+#
+# databento_opra was required here until 2026-08-07, when Steve halted the daily
+# OPRA import — historical OPRA is now pulled ad hoc when something warrants it
+# (st-7av4). A gate that requires a stream nobody collects fails every single
+# morning, and a gate that always fails teaches its operator to bypass it, which
+# costs more than the check was ever worth.
+#
+# This does NOT mean OPRA stopped mattering. The measurement scripts that read
+# databento_opra.jsonl — fly_replay, premium_trajectory, iv_pin_study,
+# expected_move, greek_snapshot_study, trough_time_volume_analysis — still need
+# it, and they should each fail loudly on a day that has no OPRA file rather
+# than lean on this gate to have caught it upstream.
+DEFAULT_REQUIRED_STREAMS = ("databento_glbx_es",)
 DEFAULT_MAX_AGE_HOURS = 36.0  # T+1 batch + weekend slack
 
 

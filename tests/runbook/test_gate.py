@@ -42,10 +42,24 @@ def test_healthy_manifest_passes():
 
 def test_missing_stream_fails():
     m = _manifest()
-    del m["streams"]["databento_opra"]
+    del m["streams"]["databento_glbx_es"]
     res = gate.evaluate(m, now=NOW)
     assert not res.ok
-    assert any("databento_opra" in r and "missing" in r for r in res.reasons)
+    assert any("databento_glbx_es" in r and "missing" in r for r in res.reasons)
+
+
+def test_missing_opra_no_longer_fails():
+    """Steve halted the daily OPRA import 2026-08-07; it is ad hoc now (st-7av4).
+
+    A gate that requires a stream nobody collects fails every morning, and a
+    gate that always fails gets bypassed. Absence of OPRA is a fact about the
+    collection policy, not a health failure — the measurement scripts that
+    actually read the OPRA tape own their own missing-file errors.
+    """
+    m = _manifest()
+    del m["streams"]["databento_opra"]
+    res = gate.evaluate(m, now=NOW)
+    assert res.ok, res.reasons
 
 
 def test_zero_cycles_fails():
@@ -55,7 +69,7 @@ def test_zero_cycles_fails():
 
 
 def test_errors_present_fails():
-    res = gate.evaluate(_manifest(opra_errors=["429 from gexbot"]), now=NOW)
+    res = gate.evaluate(_manifest(es_errors=["429 from gexbot"]), now=NOW)
     assert not res.ok
     assert any("error" in r for r in res.reasons)
 
