@@ -66,8 +66,21 @@ harvest lands (`/mnt/z/Harvest/gexbot-hist/`).
 | 2026-08-06 3:59:59 PM | aggregate dex | aggregate dex 449.20; agg call dex 265.15; agg put dex 184.05; spot 7709.64 | `2026-08-06-1559-spx-aggdex-tooltip-anchor.png` | **VERIFIED 2026-08-07** — archive snapshot 19:59:59 UTC exact: `agg_dex` 449.20, `agg_call_dex` 265.15, `agg_put_dex` 184.05, spot 7709.64. Pane ↔ field mapping closed. |
 | 2026-08-06 8:55:41 AM **CT** (9:55:41 ET) | net vanna | net vanna 46.97; spot 7735.35 | `2026-08-06-fullday-spx-netvanna.jpg` | **VERIFIED 2026-08-07** — archive snapshot 13:55:41 UTC exact: `zvanna` 46.97, spot 7735.35 (`ovanna` 102.75 ≠, ruling out second expiry). Net vanna @ latest = `zvanna`; confirms `z*` ↔ "latest" family-wide. |
 
-Remaining tour: net gex, net convexity (→`zcvr`, experiment #1), net charm,
-dex orderflow, gex orderflow, convexity orderflow.
+| 2026-08-06 3:00:00 PM CT (close snapshot, all **next 08/07**) | gex orderflow | gex flow (next) 36.15; spot 7711.38 | `…tooltip-gexoflow-next.png` | **VERIFIED 2026-08-07** — `one_gexoflow` = 36.15 exact |
+| ″ | net gex | net gex (next) 34_._ _ (partially obscured); spot 7711.38 | `…tooltip-netgex-next.png` | **VERIFIED 2026-08-07** — `ogr` = 346.95, matching visible digits. **Net Gex pane = `gr`.** |
+| ″ | net convexity | net convexity (next) −1854.82; major long gamma 7709.83; major short gamma 7715.71; spot 7711.38 | `…tooltip-netconvexity-next.png` | **VERIFIED 2026-08-07** — `ocvr` = −1854.82 exact. **`cvr` = Net Convexity — the last unknown field, solved.** |
+| ″ | net vanna | net vanna (next) 73.64 | `…tooltip-netvanna-next.png` | **VERIFIED** — `ovanna` = 73.64 exact |
+| ″ | net charm | net charm (next) 2.32 | `…tooltip-netcharm-next.png` | **VERIFIED** — `ocharm` = 2.32 exact |
+| ″ | dex orderflow | dex flow (next) −0.49 | `…tooltip-dexoflow-next.png` | **VERIFIED** — `one_dexoflow` = −0.49 exact |
+| ″ | convexity orderflow | convexity flow (next) −6.30; major long gamma 7709.83; major short gamma 7715.71 | `…tooltip-convexityoflow-next.png` | **VERIFIED** — `one_cvroflow` = −6.30 exact |
+
+**TOUR COMPLETE 2026-08-07.** All eight metrics anchored and verified; the
+whole pane↔field map is measured. Batch bonus: the after-close captures were
+on **next (08/07)**, so both expiry families are exercised (`z*`/`agg_*` via
+the 08-06 latest anchors, `o*`/`one_*` via this batch). UI detail observed:
+the spike panes (gex/dex/convexity orderflow) carry a **"+/− filter ($MM)"**
+input (0 = show all) — a spike-size floor, useful for Freddy's
+"meaningful spikes" qualifier.
 
 ### First -vanna threshold observation (2026-08-06) — MEASURED, ambiguous
 

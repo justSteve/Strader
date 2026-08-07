@@ -257,8 +257,9 @@ connect as follows:
 |---|---|---|
 | Aggregate Dex pane, "aggdex" call/put/net | `agg_call_dex`, `agg_put_dex`, `agg_dex` (+ `one_*`) | **[MEASURED — VERIFIED 2026-08-07]** tooltip anchor at 2026-08-06 19:59:59 UTC matches all three fields + spot exactly (`screenshots/capture-protocol.md` ledger) |
 | DEX pane, "net" variant | `net_dex`, `net_call_dex`, `net_put_dex` (+ `one_*`) | **[MEASURED, unexplained]** — agg-vs-net distinction is vendor question #1; correlation 0.9989→0.53 across days. The docs define only "aggdex"; no "net dex" pane text found — the distinction remains undocumented. |
-| Net Convexity tape (jass's cyan line) | plausibly `zcvr`/`ocvr` | **[STRUCTURAL, strengthened]** — the docs now publish the formula: net convexity = customer-bought GEX − customer-sold GEX. Phase 2 experiment #1 (`zcvr` vs summed customer-signed state ladder) now tests the vendor's own published definition rather than a guess. |
-| Convexity/GEX OrderFlow spikes | plausibly `cvroflow`/`gexoflow`/`dexoflow` (+ `one_*`) | **[MEASURED]** these are exact first differences of `cvr`/`gr`/`agg_dex` per snapshot — i.e. the *flow* of the cumulative series; **[STRUCTURAL]** naming match to the spike charts |
+| Net Convexity tape (jass's cyan line) | `zcvr`/`ocvr` | **[MEASURED — VERIFIED 2026-08-07]** tooltip anchor: net convexity (next) −1854.82 = `ocvr` exact at the 20:00:00 UTC snapshot. **`cvr` = Net Convexity — the last unknown field, identified.** Experiment #1 remains as the *formula* cross-check: does the value equal the summed customer-signed state ladder, as the docs' formula claims. |
+| Net Gex pane | `zgr`/`ogr` | **[MEASURED — VERIFIED 2026-08-07]** net gex (next) = `ogr` 346.95 at the same snapshot — consistent with the earlier `zgr` ≈ volume-based total GEX identity (docs: "condenses the gex profile into a single measure") |
+| Convexity/GEX/DEX OrderFlow spike panes | `cvroflow`/`gexoflow`/`dexoflow` (+ `one_*`) | **[MEASURED — VERIFIED 2026-08-07]** tooltip anchors match all three `one_*oflow` fields exactly (36.15 / −6.30 / −0.49 at the close snapshot). Combined with the first-difference identities, the spike panes are literally the per-snapshot deltas of the cumulative panes. |
 | Ladder levels repeated in view tooltips (major long/short gamma etc.) | `z_mlgamma`, `z_msgamma`, `o_*` — verbatim `state` republications | **[MEASURED]** 16 identities hold exactly |
 | Net vanna / net charm panes | `zvanna`, `ovanna`, `zcharm`, `ocharm` | **[MEASURED — VERIFIED 2026-08-07]** net vanna @ "latest" = `zvanna` exactly (tooltip anchor 13:55:41 UTC; `ovanna` differs, ruling out second expiry) — confirming the `z*` ↔ latest / `o*` ↔ next mapping family-wide. `zcharm` presumed symmetric, one tour capture to confirm. |
 
@@ -266,11 +267,13 @@ connect as follows:
 
 Ordered by leverage:
 
-1. **`zcvr` = net customer convexity of the day's transactions?** The vendor
-   defines convexity ladder = net customer gamma of the day's transactions; sum
-   the customer-signed state ladder and compare to `zcvr`. Closes the last
-   unknown field and, if it matches, gives us jass's cyan line from data we
-   already store.
+1. **Does Net Convexity equal its published formula?** The pane↔field identity
+   is settled (2026-08-07: `cvr` *is* the Net Convexity pane, verified by
+   tooltip anchor), so the experiment sharpens to internal consistency: sum
+   the customer-signed state ladder and compare against `zcvr` — does the
+   vendor's number actually equal "customer-bought GEX − customer-sold GEX"
+   computed from their own ladder? A match makes jass's cyan line fully
+   reconstructable and auditable from data we already store.
 2. **Convexity-dump-then-ramp** (jass 2025-07-25): detect lift mornings, dump
    events (>50% drop from peak inside 30 min), test forward returns 30/60/120
    min post-dump vs baseline. "Juice to lean on" is a falsifiable

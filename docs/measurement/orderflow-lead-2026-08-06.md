@@ -21,6 +21,16 @@ total GEX to within 1 part in 10⁴. That leaves **`zcvr`/`ocvr` as the only
 fields whose meaning remains genuinely unknown**, and the DEX family as the only
 substantial *new* content in the package.
 
+> **Addendum 2026-08-07 [st-ygy1]: `cvr` is identified.** UI tooltip anchors
+> verified against this archive show `ocvr` = the Orderflow view's **Net
+> Convexity** pane exactly (−1854.82 at the 2026-08-06 close snapshot), whose
+> vendor-published formula is "total customer-bought GEX − total customer-sold
+> GEX". All 34 fields now have meanings. Anchor ledger:
+> `../gexbot/screenshots/capture-protocol.md`; doctrine:
+> `../gexbot/orderflow-intended-read.md` §5. Whether the value equals the
+> summed customer-signed ladder (internal consistency) is the remaining
+> experiment.
+
 **Part B: flow does not lead price. This is a clean null, and it is
 decision-grade.** Across 182 signal-days (7 days × 13 signals × 2 smoothing
 windows), the peak cross-correlation with forward spot returns sits at a lead of
