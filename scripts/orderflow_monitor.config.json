@@ -1,0 +1,52 @@
+{
+  "_comment": "Orderflow Doctrine Monitor thresholds [st-2n69]. All values tunable; every emitted event records the threshold that fired it. Units: flow fields are $MM per GexBot; spot/walls are SPX points.",
+
+  "fields": {
+    "_comment": "API fields backing each pane at expiry=latest (0DTE). Verified 2026-08-07: bottom pane is zcvr NOT ocvr (ocvr is all-expiry and diverges completely); wall lines are zero_mcall/zero_mput from the same response. cvroflow/gexoflow have no expiry prefix (only one_* variants exist).",
+    "netcvx": "zcvr",
+    "wall_call": "zero_mcall",
+    "wall_put": "zero_mput"
+  },
+
+  "spike": {
+    "_comment": "A print is a spike when |x| exceeds max(abs_floor, pctl_mult * P95 of |last window_pulls prints|). Warmup: no spike events until window has min_warmup prints.",
+    "window_pulls": 48,
+    "min_warmup": 12,
+    "pctl_mult": 1.6,
+    "cvr_abs_floor": 150.0,
+    "gex_abs_floor": 150.0
+  },
+
+  "two_signal": {
+    "_comment": "Brake (cvr up-spike) and gex spike within max_gap_pulls of each other (checklist pattern 3). Trend direction = sign of spot change over trend_lookback_pulls.",
+    "max_gap_pulls": 2,
+    "trend_lookback_pulls": 24
+  },
+
+  "netcvx": {
+    "_comment": "ocvr regime, hysteresis in $MM. DUMP starts when drop from rolling max (over lookback) exceeds dump_drop; ends when recovered dump_clear off the post-dump min. RAMP is the mirror. VTURN emits when, while in DUMP, ocvr rises vturn_rise off the min within vturn_pulls.",
+    "lookback_pulls": 48,
+    "dump_drop": 1500.0,
+    "dump_clear": 750.0,
+    "ramp_rise": 1500.0,
+    "ramp_clear": 750.0,
+    "vturn_rise": 600.0,
+    "vturn_pulls": 15
+  },
+
+  "walls": {
+    "_comment": "WALL_MOVE when the effective level shifts >= move_pts AND the new level persists persist_pulls consecutive pulls (the raw series blips for single pulls, e.g. 7735->7755->7735 on 2026-08-07). Inversion and SPOT_CROSS use the debounced effective levels; cross_hysteresis_pts avoids flutter at the line.",
+    "move_pts": 2.0,
+    "persist_pulls": 2,
+    "cross_hysteresis_pts": 0.5
+  },
+
+  "runtime": {
+    "_comment_rth": "rth_utc clips processing to regular trading hours (UTC); pre-market pulls carry session-start artifacts (e.g. gexoflow 11490 prints at 00:00 CT).",
+    "rth_utc": ["13:30", "20:00"],
+    "poll_seconds": 5,
+    "heartbeat_path": "/var/moo/state/orderflow-monitor.json",
+    "events_dir": "data/derived/orderflow-events",
+    "corpus_dir": "data/corpus"
+  }
+}
