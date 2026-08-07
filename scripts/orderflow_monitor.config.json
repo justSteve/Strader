@@ -26,6 +26,7 @@
   "netcvx": {
     "_comment": "ocvr regime, hysteresis in $MM. DUMP starts when drop from rolling max (over lookback) exceeds dump_drop; ends when recovered dump_clear off the post-dump min. RAMP is the mirror. VTURN emits when, while in DUMP, ocvr rises vturn_rise off the min within vturn_pulls.",
     "lookback_pulls": 48,
+    "state_warmup_pulls": 8,
     "dump_drop": 1500.0,
     "dump_clear": 750.0,
     "ramp_rise": 1500.0,

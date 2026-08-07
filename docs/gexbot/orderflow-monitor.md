@@ -13,7 +13,7 @@ the mastery effort, not a signal engine.
 |---|---|
 | Detector | `scripts/orderflow_monitor.py` |
 | Thresholds | `scripts/orderflow_monitor.config.json` (all tuning lives here) |
-| Launcher | `scripts/orderflow_monitor_up.sh` (window `of-monitor` in the `gexbot-pipeline` tmux session, socket `moocity`) |
+| Launcher | `scripts/orderflow_monitor_up.sh` (window `of-monitor` in the `steves-desk` tmux session, socket `moocity`) |
 | Events journal | `data/derived/orderflow-events/<date>.jsonl` |
 | Heartbeat | `/var/moo/state/orderflow-monitor.json` |
 
@@ -57,14 +57,34 @@ always reconstruct why something did or didn't emit.
 
 ## Operating notes
 
-- Start: `bash scripts/orderflow_monitor_up.sh` (idempotent). View:
-  `tmux -L moocity attach -t gexbot-pipeline`, window `of-monitor`.
+- Start: `bash scripts/orderflow_monitor_up.sh` each trading morning
+  (idempotent: detects a dead monitor behind a leftover window and
+  recycles it; verifies the process and heartbeat before reporting
+  success). View: `tmux -L moocity attach -t steves-desk`, window
+  `of-monitor`.
+- Follow mode exits cleanly at midnight Central (day rollover) and on
+  30 consecutive loop errors; the morning launcher restarts it onto the
+  new day. Mid-day restarts are safe: the journal deduplicates, so
+  re-deriving state from byte 0 never duplicates events.
+- `--replay` REWRITES that day's journal from scratch — it is the
+  canonical way to rebuild a day after a threshold change. Don't replay
+  the current day while the follower runs.
 - EOD review: read `data/derived/orderflow-events/<date>.jsonl`;
-  `WALL_MOVE`/`SPOT_CROSS` are the chatty structural layer (~60/day) —
-  filter them out to see the flow story in ~40 events.
+  `WALL_MOVE`/`SPOT_CROSS` are the chatty structural layer — filter
+  them out to see the flow story.
 - Known limits: the ~75s poll undersamples GB's few-second render, so
   spike extremes between pulls are missed (logged on st-fyey);
   pre-market pulls carry session-start artifacts, so processing is
   clipped to RTH (`runtime.rth_utc`).
-- The monitor dies silently if the collector stops — check the
-  heartbeat's `ts` and `status: following` when in doubt.
+
+## Health semantics (read this before declaring it healthy)
+
+The heartbeat (`/var/moo/state/orderflow-monitor.json`) separates the
+two failure domains:
+
+| Signal | Meaning |
+|---|---|
+| `ts` stale (> ~1 min) | the **monitor** died — relaunch |
+| `ts` fresh, `last_pull_ts` frozen during RTH | the **collector** died — the monitor is fine but starving |
+| `day` ≠ today during RTH | rollover misfire — relaunch |
+| `status: error-loop` | the monitor gave up after repeated errors — read the pane |
