@@ -71,3 +71,13 @@ day-mean +26 pts (2026-06-05) — concentrated in regime, not in one day.
    differs. Parked pending the transcript study (st-qei0) for the
    precise definition. The below-bar days (n=8) do show visibly quieter
    closes, directionally consistent with the claim's spirit.
+
+## ERRATUM (2026-08-08, discovered in round 3 [st-gkbo])
+
+The study-1 table's n column counts events, but events within 30 min of
+the close have no +30m outcome. For fix2000 only 23 of 137 events (15
+days) have a measurable +30m delta — the fix2000 medians rest on that
+smaller sample, and the "12/15 days" clustering claim covers only the
+measurable days. p95x6 is mildly affected (165/236 measurable). The
+dose-response conclusion stands on p95x6; treat fix2000 rows as
+late-session-censored. Round 3 reports corrected counts.
