@@ -793,18 +793,29 @@ function emTone(e) {
 // a malformed or partial event must degrade to text, never throw.
 const emP = p => (typeof p === "number" && isFinite(p)) ? fmtPrice(p) : "?";
 const emN = n => (typeof n === "number" && isFinite(n)) ? n : "?";
+// " (0.50 pt)" — the travel, spelled out. A count of prices touched is not a
+// distance, and the reader should never have to do the arithmetic. [st-hnl7]
+const emSpan = (a, b) => {
+  if (typeof a !== "number" || typeof b !== "number" || !isFinite(a) || !isFinite(b)) return "";
+  const pts = Math.abs(b - a);
+  return ` (${pts.toFixed(2)} pt${pts === 1 ? "" : "s"})`;
+};
 function emGist(e) {
   switch (e.type) {
     case "SweepPrint":
       // ticks_swept is a COUNT OF PRICE LEVELS, not ticks of travel (engine.py
       // _end_run: ticks = len(r["prices"])). Rendering it as "ticks" reads as
       // distance and misled Steve on the 8/07 close. Say levels. [st-hnl7]
-      return `${e.direction || "?"} ${emN(e.total_size)} across ${emN(e.ticks_swept)} levels, `
-        + `${emP(e.start_price)}→${emP(e.end_price)}`;
+      // ticks_swept is a COUNT OF PRICES TOUCHED, not ticks of travel and not
+      // structural levels — "level" is already taken on this page (armed level
+      // chips, Mancini chips, "Price approaching level"). Say prices, and give
+      // the span in points so the size of the thing is never in doubt. [st-hnl7]
+      return `${e.direction || "?"} ${emN(e.total_size)} across ${emN(e.ticks_swept)} prices, `
+        + `${emP(e.start_price)}→${emP(e.end_price)}${emSpan(e.start_price, e.end_price)}`;
     case "ImbalanceStack": {
       const px = (e.prices || []).filter(p => typeof p === "number" && isFinite(p));
       const span = px.length ? `, ${emP(Math.min(...px))}–${emP(Math.max(...px))}` : "";
-      return `${e.direction || "?"} ${px.length} level${px.length === 1 ? "" : "s"}${span}`;
+      return `${e.direction || "?"} ${px.length} price${px.length === 1 ? "" : "s"}${span}`;
     }
     case "SetupRecognition": {
       const stages = (e.beats || []).join(" → ") || "none";
