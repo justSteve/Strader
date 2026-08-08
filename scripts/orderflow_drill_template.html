@@ -796,7 +796,10 @@ const emN = n => (typeof n === "number" && isFinite(n)) ? n : "?";
 function emGist(e) {
   switch (e.type) {
     case "SweepPrint":
-      return `${e.direction || "?"} ${emN(e.total_size)} through ${emN(e.ticks_swept)} ticks, `
+      // ticks_swept is a COUNT OF PRICE LEVELS, not ticks of travel (engine.py
+      // _end_run: ticks = len(r["prices"])). Rendering it as "ticks" reads as
+      // distance and misled Steve on the 8/07 close. Say levels. [st-hnl7]
+      return `${e.direction || "?"} ${emN(e.total_size)} across ${emN(e.ticks_swept)} levels, `
         + `${emP(e.start_price)}→${emP(e.end_price)}`;
     case "ImbalanceStack": {
       const px = (e.prices || []).filter(p => typeof p === "number" && isFinite(p));
