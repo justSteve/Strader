@@ -175,6 +175,39 @@ setTimeout(() => {
   ok("markers name their emissions on hover",
      [...marks].every(m => (m.getAttribute("title") || "").length > 0));
 
+  // ── closing churn [st-hnl7] ────────────────────────────────────────────
+  // From 14:50 CT the tape is settlement flow, not auction: a sweep there
+  // renders identically to a 09:45 sweep and means nothing like the same
+  // thing. The page has to SAY that. Suppressing the emissions would be a
+  // lie about the record, so the assertion is that they are demoted and
+  // captioned — still present, visibly discounted. Both directions matter:
+  // an unconditional banner would be exactly as useless as none.
+  const minCT = b => { const m = /T(\d{2}):(\d{2})/.exec(b.t0 || ""); return m ? +m[1] * 60 + +m[2] : null; };
+  const churnBar = emitting.find(i => (minCT(bars[i]) ?? 0) >= 14 * 60 + 50);
+  const dayBar = emitting.find(i => { const m = minCT(bars[i]); return m != null && m < 14 * 60 + 50; });
+  if (churnBar != null) {
+    w.eval(`seekTo(${churnBar}); openEmPanel(${churnBar})`);
+    const p = d.getElementById("empanel");
+    ok("closing-churn bar is captioned in the panel", !!p.querySelector(".em-churn"),
+       `bar ${churnBar + 1} @ ${bars[churnBar].t0.slice(11, 16)} CT`);
+    ok("its emissions are still listed, not suppressed",
+       p.querySelectorAll("tbody tr").length > 0,
+       `${p.querySelectorAll("tbody tr").length} row(s)`);
+    ok("its chips are demoted", d.querySelectorAll("#emrow .em-chip.churn").length > 0);
+    ok("its tape mark is demoted", !!d.querySelector("#colstrip .evmark.churn"));
+  } else {
+    console.log("  SKIP  closing churn — this page has no emitting bar after 14:50 CT");
+  }
+  if (dayBar != null) {
+    w.eval(`seekTo(${dayBar}); openEmPanel(${dayBar})`);
+    ok("a mid-session bar is NOT captioned as churn",
+       !d.getElementById("empanel").querySelector(".em-churn"),
+       `bar ${dayBar + 1} @ ${bars[dayBar].t0.slice(11, 16)} CT`);
+    ok("mid-session chips are not demoted",
+       d.querySelectorAll("#emrow .em-chip.churn").length === 0);
+  }
+  w.eval("emPinned = false; closeEmPanel()");
+
   if (errors.length) {
     console.error(`\nFAIL — ${errors.length}:`);
     errors.forEach(e => console.error("  " + e));

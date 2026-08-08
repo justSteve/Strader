@@ -165,6 +165,18 @@ td:first-child, th:first-child { text-align:left; }
   border-left:4px solid transparent; border-right:4px solid transparent;
   border-top:6px solid var(--ink-2); }
 .col .evmark.setup { border-top-color:var(--good); }
+/* Closing churn: the mark stays (the bar DID emit — hiding it would be a lie
+   about the record) but it stops competing for the eye with the bars that mean
+   something. Hollow, muted, half-opacity. [st-hnl7] */
+.col .evmark.churn { border-top-color:var(--muted); opacity:.4; }
+.em-chip.churn { border-color:var(--grid); color:var(--muted); opacity:.7; }
+.em-chip.churn .em-k { color:var(--muted); }
+#emrow .em-churn-tag { color:var(--muted); font-style:italic; font-size:11px; }
+#empanel .em-churn { margin:0 0 8px; padding:6px 9px; border-radius:6px;
+  border:1px solid var(--grid); background:var(--surface-2, var(--surface-1));
+  color:var(--ink-2); line-height:1.45; }
+#empanel .em-churn b { color:var(--ink); }
+#empanel.churn table tbody td { color:var(--muted); }
 /* "Not following" must not look like "nothing arriving" [st-ug3f]. The old
    readout said `live · N bars` whether the page was tracking the tip or frozen
    behind it, so a page that had silently stopped auto-advancing was
@@ -530,8 +542,10 @@ function renderColumn(b, i) {
   // way to find the handful that spoke is to step through the whole session.
   if (b.ev && b.ev.length) {
     const m = document.createElement("div");
-    m.className = "evmark" + (b.ev.some(e => e.type === "SetupRecognition") ? " setup" : "");
-    m.title = b.ev.map(e => `${emName(e)}: ${emGist(e)}`).join("\n");
+    m.className = "evmark" + (b.ev.some(e => e.type === "SetupRecognition") ? " setup" : "")
+      + (inChurn(b) ? " churn" : "");
+    m.title = (inChurn(b) ? "CLOSING CHURN — settlement flow, not auction signal\n" : "")
+      + b.ev.map(e => `${emName(e)}: ${emGist(e)}`).join("\n");
     // Reading what a bar said is not the same as navigating to it. In LIVE the
     // seek was a trap: it landed idx behind a MOVING tip, noteSeek() turned
     // following off, and nothing short of a reload turned it back on — the page
@@ -836,6 +850,35 @@ function emGist(e) {
   }
 }
 
+// ── closing churn ─────────────────────────────────────────────────────────
+// After ~14:50 CT the cash close takes the tape over: MOC imbalance, index arb
+// and basis unwinds print because they have to settle, not because anyone has
+// a view. Measured on 2026-08-07 — 14:59 alone was 50,740 contracts, 33% of
+// the last 45 minutes' volume, at delta +416 (0.8% of its own volume), and it
+// carried two OPPOSING minimum-size sweeps through the same three prices one
+// second apart. A sweep there renders identically to a 09:45 sweep and does
+// not mean remotely the same thing.
+//
+// So the surface says so, rather than expecting the reader to watch the clock.
+// The emissions are NOT suppressed: the stack did emit them and the record has
+// to stay honest. They are demoted and captioned. Steve called this window
+// unreadable in real time on 2026-08-08 and he is right. [st-hnl7]
+const CHURN_FROM_MIN = 14 * 60 + 50;   // 14:50 CT
+function barMinuteCT(b) {
+  const m = b && b.t0 && /T(\d{2}):(\d{2})/.exec(b.t0);
+  return m ? (+m[1] * 60 + +m[2]) : null;
+}
+function inChurn(b) {
+  const m = barMinuteCT(b);
+  return m != null && m >= CHURN_FROM_MIN;
+}
+const CHURN_NOTE =
+  `<div class="em-churn"><b>Closing churn — read this as settlement, not auction.</b> `
+  + `From 14:50 CT the tape is dominated by flow that must print regardless of price `
+  + `(MOC imbalance, index arb, basis unwinds). Delta goes near-flat on enormous volume `
+  + `and sweeps fire in both directions at the same prices. These emissions are real `
+  + `— the stack did say them — but they are not evidence about who is winning.</div>`;
+
 function emChip(e, onOpen) {
   const c = document.createElement("span");
   c.className = "em-chip " + emTone(e);
@@ -866,13 +909,24 @@ function renderEmissions() {
     return;
   }
   const open = () => openEmPanel(idx);
-  for (const e of ev.slice(0, 3)) row.appendChild(emChip(e, open));
+  const churn = inChurn(b);
+  for (const e of ev.slice(0, 3)) {
+    const chip = emChip(e, open);
+    if (churn) chip.classList.add("churn");
+    row.appendChild(chip);
+  }
   if (ev.length > 3) {
     const more = document.createElement("span");
     more.className = "em-chip more";
     more.textContent = `+${ev.length - 3} more`;
     more.addEventListener("mouseenter", open);
     row.appendChild(more);
+  }
+  if (churn) {
+    const tag = document.createElement("span");
+    tag.className = "em-churn-tag";
+    tag.textContent = "closing churn — settlement flow, not auction signal";
+    row.appendChild(tag);
   }
   if (emPinned) openEmPanel(emPinnedIdx != null ? emPinnedIdx : idx);
 }
@@ -905,12 +959,14 @@ function openEmPanel(i) {
   let html = `<h4>Bar ${i + 1}${b ? " · " + fmtClock(b.t1) + " CT" : ""} · `
     + `${ev.length} emission${ev.length === 1 ? "" : "s"}`
     + `<span class="x" title="${emPinned ? "unpin" : "close"}">×</span></h4>`
+    + (inChurn(b) ? CHURN_NOTE : "")
     + emTable(ev);
   if (FINAL.length) {
     html += `<div class="em-final"><h4>End of session · ${FINAL.length}</h4>`
       + emTable(FINAL) + `</div>`;
   }
   p.innerHTML = html;
+  p.classList.toggle("churn", inChurn(b));
   p.style.display = "block";
   p.querySelector(".x").onclick = () => { emPinned = false; emPinnedIdx = null; closeEmPanel(); };
 }
