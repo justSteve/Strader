@@ -29,5 +29,10 @@ include = ["strader*"]
 # Repo root on sys.path so tests can import both `strader.*` and the carried
 # infra packages (`market.*`, `broker_schwab.*`, `runbook.*`) that live at root.
 pythonpath = ["."]
-testpaths = ["strader/tests"]
+# BOTH trees. `strader/tests` alone is 12 files / 186 tests; the root `tests`
+# tree is 78 files / 734 — the entire orderflow layer, the parity harness, the
+# feeder and the measurement code. Bare `pytest` collected only the small one,
+# so every session that reported "186 passed" as its quality gate had run none
+# of the code this repo actually changes day to day. [st-hw5e]
+testpaths = ["tests", "strader/tests"]
 addopts = "-q"

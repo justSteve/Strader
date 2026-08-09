@@ -164,6 +164,30 @@ class StackDriver:
         return out
 
 
+def live_drive(bars_with_trades, driver: "StackDriver", live_anchors):
+    """The LIVE drive order, in one place. [st-x2mp]
+
+    Yields ``(bar_i, bar, trades, events)`` per completed bar. Two rules ride
+    here and nowhere else, because both are silent when broken and both change
+    what the recognizer sees:
+
+      1. ``live_anchors.observe(bar)`` runs BEFORE ``driver.on_bar`` — the bar
+         extends the developing range it belongs to, then is judged against
+         it. Reversed, a bar that sets a new extreme is judged against the
+         range it just broke.
+      2. Closed bars only. The caller's iterator must not include a partial.
+
+    The feeder consumes this live; ``scripts/live_parity_check.py`` consumes it
+    over a replayed tape. That is the whole point: if the loop existed twice,
+    the parity check would be measuring the copy rather than the original.
+    ``live_anchors`` may be None when nothing is developing (tests).
+    """
+    for bar_i, (bar, bar_trades) in enumerate(bars_with_trades):
+        if live_anchors is not None:
+            live_anchors.observe(bar)
+        yield bar_i, bar, bar_trades, driver.on_bar(bar_i, bar, bar_trades)
+
+
 def full_stack_events(trades: list[Trade], *, bar_n: int,
                       anchors: Iterable[Anchor],
                       mancini_prices: Iterable[float] = ()) -> list[dict]:

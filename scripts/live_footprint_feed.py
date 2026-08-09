@@ -58,10 +58,11 @@ from market.orderflow.anchors import LiveAnchors, mancini_levels_for  # noqa: E4
 from market.orderflow.gex_context import GexContext                # noqa: E402
 from market.orderflow.bars import build_bars                    # noqa: E402
 from market.orderflow.fill import bar_fill_steps                # noqa: E402
-from market.orderflow.parity import StackDriver                 # noqa: E402
+from market.orderflow.parity import StackDriver, live_drive     # noqa: E402
 from market.orderflow.replay import (                           # noqa: E402
     dedup_key, es_day_path, trade_from_row,
 )
+from market.orderflow.run_log import RunLogWriter, run_log_path  # noqa: E402
 from market.signals.orderflow_config import TICK, VOLUME_BAR_N  # noqa: E402
 
 logger = logging.getLogger("live_footprint_feed")
@@ -297,6 +298,18 @@ def post_bars(bridge: str, bars: list[dict], meta: dict | None = None,
         return None
 
 
+class _NullRunLog:
+    """No-op stand-in so the main loop never branches on whether logging is on.
+    A branch per bar is a branch that can be wrong; an object that does nothing
+    cannot be."""
+    path = None
+    live = False
+
+    def on_bar(self, *a, **k) -> None: ...
+    def on_final(self, *a, **k) -> None: ...
+    def close(self, **k) -> None: ...
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -323,6 +336,12 @@ def main() -> int:
                     help="do not stamp bars with GexBot dealer positioning "
                          "[st-8ywx]; the stamp is already a no-op when the "
                          "feed is absent, so this is for isolating it")
+    ap.add_argument("--no-run-log", action="store_true",
+                    help="do not record this run's bars and emissions to "
+                         "data/derived/live-parity/<day>.jsonl [st-x2mp]. The "
+                         "log is what scripts/live_parity_check.py diffs a "
+                         "replay against, so a session run without it can "
+                         "never be checked afterwards")
     ap.add_argument("--dry-run", action="store_true",
                     help="build and log bars, post nothing")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -372,6 +391,16 @@ def main() -> int:
             "mancini": mancini,
             "gex": bool(gex is not None and gexbot_path(day).exists())}
 
+    # The diffable record of what this run emitted [st-x2mp]. Written for real
+    # and catch-up runs alike (the mode is in the header, so the checker can
+    # tell them apart); skipped for --dry-run, which posts nothing and is not
+    # a session worth certifying.
+    runlog = RunLogWriter(
+        run_log_path(day), day=day, bar_n=args.bar_n, mancini=mancini,
+        reorder_lag=args.reorder_lag, catch_up=bool(args.catch_up_only),
+        started=datetime.now(),
+    ) if not (args.no_run_log or args.dry_run) else _NullRunLog()
+
     logger.info("live footprint feed — day=%s bar_n=%d reorder_lag=%.1fs bridge=%s "
                 "anchors=%d (%d mancini)",
                 day, args.bar_n, args.reorder_lag,
@@ -417,13 +446,16 @@ def main() -> int:
     last_push = time.monotonic()
     first = True
     n_ev = 0
-    for bar_i, bar in enumerate(build_bars(_tee(trades), n=args.bar_n)):
-        bar_trades = take_bar_trades(bar, pending_trades)
-        # Extend the developing range BEFORE the bar is judged, so this bar is
-        # measured against the session it belongs to.
-        live_anchors.observe(bar)
-        events = driver.on_bar(bar_i, bar, bar_trades)
+    # The drive order (observe the bar into the developing range, THEN judge
+    # it) lives in parity.live_drive so the parity checker replays through the
+    # identical loop rather than a copy of it. [st-x2mp]
+    def _closed_bars():
+        for bar in build_bars(_tee(trades), n=args.bar_n):
+            yield bar, take_bar_trades(bar, pending_trades)
+
+    for bar_i, bar, bar_trades, events in live_drive(_closed_bars(), driver, live_anchors):
         n_ev += len(events)
+        runlog.on_bar(bar_i, bar, events)
         # Stamp AFTER the engine has judged the bar: the context is recorded
         # alongside recognition, never an input to it. Stage 1 changes no
         # recognition behaviour, and this ordering is what enforces that.
@@ -451,6 +483,8 @@ def main() -> int:
     # smuggled onto the last one. [st-b0n9]
     final = driver.finish(pending_trades)
     n_ev += len(final)
+    runlog.on_final(final)
+    runlog.close()
 
     if batch or final:
         if args.dry_run:
@@ -461,8 +495,9 @@ def main() -> int:
             post_bars(args.bridge, batch, meta if first else None, final or None)
         sent += len(batch)
 
-    logger.info("done — %d bars, %d emissions (%d end-of-stream)",
-                sent, n_ev, len(final))
+    logger.info("done — %d bars, %d emissions (%d end-of-stream)%s",
+                sent, n_ev, len(final),
+                f"; run log {runlog.path}" if runlog.live else "")
     return 0
 
 
