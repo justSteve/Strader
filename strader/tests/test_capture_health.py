@@ -249,3 +249,88 @@ def test_stream_keys_match_the_streamer():
 
 def test_resolve_stream_names_accepts_both_spellings():
     assert resolve_stream_names(["es", MBP1, ""]) == [ES, MBP1]
+
+
+# --- venues [st-p3lv] --------------------------------------------------------
+# The GexBot collector reuses this assessor with a different calendar. What must
+# hold: the ES tenant's behaviour is untouched, and the cash tenant stands down
+# on days the cash market is shut.
+
+GX = "gexbot"
+#: Monday inside the GexBot collect window.
+GX_OPEN = datetime(2026, 8, 10, 9, 0, tzinfo=CENTRAL)
+
+
+def gx_manifest(cycles=90):
+    return {"date": "2026-08-10", "streams": {
+        GX: {"cycles": cycles, "errors": [], "last_pull_utc": "2026-08-10T14:00:00Z"},
+    }}
+
+
+def gx_assess(now, *, pids, manifest=None, prev=None, **kw):
+    return assess_capture(
+        now, day=now.date(), manifest=manifest, pids=pids, prev=prev,
+        streams=(GX,), venue="cash", window_start="07:30", window_end="15:05", **kw)
+
+
+def test_cash_venue_calls_a_missing_collector_dead_in_session():
+    h = gx_assess(GX_OPEN, pids=[])
+    assert h.status == STATUS_DEAD
+    assert h.expected
+
+
+def test_cash_venue_is_idle_on_a_saturday():
+    """2026-08-08 — the day the ungated poller wrote 58.4 MB."""
+    h = gx_assess(datetime(2026, 8, 8, 11, 0, tzinfo=CENTRAL), pids=[])
+    assert h.status == STATUS_IDLE
+    assert not h.expected
+
+
+def test_cash_venue_is_idle_on_thanksgiving():
+    """A holiday must not be relaunched into every two minutes for seven hours."""
+    h = gx_assess(datetime(2026, 11, 26, 10, 0, tzinfo=CENTRAL), pids=[])
+    assert h.status == STATUS_IDLE
+
+
+def test_globex_venue_still_expects_es_on_thanksgiving():
+    """The contrast that justifies two venues: CME trades a shortened session on
+    most NYSE closures, so an NYSE holiday is NOT evidence ES is quiet."""
+    h = assess_capture(
+        datetime(2026, 11, 26, 10, 0, tzinfo=CENTRAL),
+        day=datetime(2026, 11, 26).date(), manifest=None, pids=[],
+        streams=("es",), window_start="00:00", window_end="23:59")
+    assert h.status == STATUS_DEAD
+
+
+def test_cash_venue_is_idle_after_the_window_closes():
+    h = gx_assess(datetime(2026, 8, 10, 16, 0, tzinfo=CENTRAL), pids=[])
+    assert h.status == STATUS_IDLE
+
+
+def test_cash_venue_expects_a_collector_during_the_preopen_ramp():
+    """07:30-08:30 is the ramp. A cash-open-aware venue predicate would report
+    idle here and the supervisor would never start the collector."""
+    h = gx_assess(datetime(2026, 8, 10, 7, 45, tzinfo=CENTRAL), pids=[])
+    assert h.status == STATUS_DEAD
+
+
+def test_cash_venue_flags_a_frozen_collector_as_stale():
+    prev = gx_assess(GX_OPEN, pids=[4242], manifest=gx_manifest(90)).to_dict()
+    later = GX_OPEN + timedelta(seconds=DEFAULT_STALE_SECS + 60)
+    h = gx_assess(later, pids=[4242], manifest=gx_manifest(90), prev=prev)
+    assert h.status == STATUS_STALE
+    assert h.stale_streams == [GX]
+    assert "the cash market" in h.message
+
+
+def test_cash_venue_is_ok_while_cycles_advance():
+    prev = gx_assess(GX_OPEN, pids=[4242], manifest=gx_manifest(90)).to_dict()
+    later = GX_OPEN + timedelta(seconds=DEFAULT_STALE_SECS + 60)
+    h = gx_assess(later, pids=[4242], manifest=gx_manifest(101), prev=prev)
+    assert h.status == STATUS_OK
+
+
+def test_an_unknown_venue_is_an_error_not_a_silent_default():
+    with pytest.raises(ValueError, match="unknown venue"):
+        assess_capture(GX_OPEN, day=GX_OPEN.date(), manifest=None, pids=[],
+                       venue="nasdaq")

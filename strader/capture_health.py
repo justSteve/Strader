@@ -35,15 +35,28 @@ Why the venue calendar is here
 closures, and without them a supervisor cries wolf twice a day and gets ignored,
 which is worse than no supervisor: the daily 15:15-15:30 CT pause, the
 16:00-17:00 CT maintenance halt, the Friday 16:00 close and the Sunday 17:00
-re-open. Holidays are NOT modeled — same choice `most_recent_session_day` makes,
-and the same consequence: a holiday can produce one spurious `stale`. That is the
-safe direction to be wrong in.
+re-open. Holidays are NOT modeled for GLBX — same choice `most_recent_session_day`
+makes, and the same consequence: a holiday can produce one spurious `stale`. That
+is the safe direction to be wrong in, and it is deliberately not "fixed" by
+pointing GLBX at the NYSE holiday table: CME equity-index futures trade a
+shortened session on most NYSE closures (MLK, Presidents, Memorial, Juneteenth,
+Labor, July 4, Thanksgiving), so an NYSE-closed day is a day ES really is
+printing. Calling it closed would suppress a genuine `stale` seven times a year.
+
+VENUES. The `venue` argument picks which calendar `expected` is measured against.
+`"globex"` is the ES streamer's, above. `"cash"` [st-p3lv] means "the US cash
+equity market holds a session today at all", holiday-aware via
+`strader.market_calendar`, with the clock bounds left entirely to
+`--window-start/--window-end` — that is what a GexBot collector wants, since its
+pre-open ramp starts an hour before the cash open but a holiday is dead all day.
 """
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import date as _date, datetime, time as _time, timezone
 from zoneinfo import ZoneInfo
+
+from strader.market_calendar import is_trading_day
 
 CENTRAL = ZoneInfo("America/Chicago")
 UTC = timezone.utc
@@ -101,6 +114,25 @@ def globex_open(now_ct: datetime) -> bool:
     if dow == 4:                    # Friday — closed from 16:00 to Sunday
         return t < GLOBEX_WEEK_CLOSE
     return not (GLOBEX_MAINT[0] <= t < GLOBEX_MAINT[1])
+
+
+def cash_venue_open(now_ct: datetime) -> bool:
+    """True when the US cash equity market holds a session on this date. [st-p3lv]
+
+    Deliberately date-only. The clock window belongs to ``--window-start`` /
+    ``--window-end``, which the GexBot collector sets wider than the cash session
+    on purpose (pre-open ramp). Folding the 08:30 open in here would report
+    ``idle`` through the ramp and the supervisor would never start the collector.
+    """
+    return is_trading_day(now_ct.date())
+
+
+#: venue key -> (predicate, label used in verdict messages).
+VENUES: dict[str, tuple] = {
+    "globex": (globex_open, "GLBX"),
+    "cash": (cash_venue_open, "the cash market"),
+}
+DEFAULT_VENUE = "globex"
 
 
 def _hm(s: str) -> _time:
@@ -202,6 +234,7 @@ def assess_capture(
     grace_secs: float = DEFAULT_GRACE_SECS,
     window_start: str = "00:00",
     window_end: str = "23:59",
+    venue: str = DEFAULT_VENUE,
 ) -> CaptureHealth:
     """Pure verdict from (process list, manifest, previous verdict).
 
@@ -214,7 +247,13 @@ def assess_capture(
     now_utc = now_ct.astimezone(UTC)
     now_iso = utc_iso(now_utc)
     day_iso = day.isoformat()
-    gopen = globex_open(now_ct)
+    try:
+        venue_open, venue_label = VENUES[venue]
+    except KeyError:
+        raise ValueError(
+            f"unknown venue {venue!r}; expected one of {sorted(VENUES)}"
+        ) from None
+    gopen = venue_open(now_ct)
     inwin = in_window(now_ct, window_start, window_end)
     expected = gopen and inwin
 
@@ -262,11 +301,11 @@ def assess_capture(
         if expected:
             status = STATUS_DEAD
             message = (f"no capture process, and one is expected "
-                       f"({window_start}-{window_end} CT, GLBX open). Live trades "
-                       f"and MBP-1 quotes are not backfillable — every minute down "
-                       f"is gone.")
+                       f"({window_start}-{window_end} CT, {venue_label} open). Live "
+                       f"data is not backfillable — every minute down is gone.")
         else:
-            why = "GLBX closed" if not gopen else f"outside {window_start}-{window_end} CT"
+            why = (f"{venue_label} closed" if not gopen
+                   else f"outside {window_start}-{window_end} CT")
             status = STATUS_IDLE
             message = f"no capture running and none expected ({why})."
     elif not stale_streams:
@@ -276,8 +315,8 @@ def assess_capture(
                                for n, o in observed.items()))
     elif not gopen:
         status = STATUS_QUIET
-        message = ("capture alive, nothing arriving — GLBX is closed, which is "
-                   "the correct state. Not a fault.")
+        message = (f"capture alive, nothing arriving — {venue_label} is closed, "
+                   "which is the correct state. Not a fault.")
     elif capture_age_secs is not None and capture_age_secs < grace_secs:
         status = STATUS_STARTING
         message = (f"capture launched {capture_age_secs:.0f}s ago; still connecting "
@@ -287,8 +326,8 @@ def assess_capture(
         worst = max(observed[n]["quiet_secs"] for n in stale_streams)
         message = (f"capture process is ALIVE but not receiving: "
                    f"{', '.join(n.replace('databento_', '') for n in stale_streams)} "
-                   f"has not advanced in {worst / 60:.0f} min with GLBX open. A live "
-                   f"pid is not a live feed.")
+                   f"has not advanced in {worst / 60:.0f} min with {venue_label} "
+                   f"open. A live pid is not a live feed.")
 
     since = prev.get("since_utc") if prev.get("status") == status else None
     last_ok = now_iso if status == STATUS_OK else prev.get("last_ok_utc")
