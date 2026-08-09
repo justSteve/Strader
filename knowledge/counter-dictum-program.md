@@ -114,6 +114,50 @@ lane exists and is governed separately ([[directional-gex-butterflies]],
    options layer (0DTE theta and gamma) will change every number; a favorable
    5-point excursion in minute one and minute ten are not the same trade.
 
+## 4a. The stop doctrine (Steve, 2026-08-09 — supersedes "zero-tolerance")
+
+Steve withdrew the zero-tolerance framing as **overstated**. It was never his
+position properly stated, and this matters because the measurement that
+"refuted the tight stop" tested the overstatement, not the position.
+
+**The doctrine, in his words:**
+
+> until P/L is green a drawdown of more than 3 points needs to be avoided.
+> tolerance for drawdowns need to balance probability of profit against — can
+> increase tolerance but only to an extent.
+>
+> Getting back into a trade liberally is counter to 'don't over trade'. But
+> semi-automated API management should be able to mitigate the stress/friction
+> points and ease the management process.
+
+Three things follow, and all three are design-bearing:
+
+1. **The stop is state-dependent, not a number.** Before the position is green
+   the budget is ~3 points. After it is green the tolerance widens — but
+   bounded, traded off against probability of profit. This is a **ratchet**, not
+   a fixed stop, and "green" is doing real work as a state boundary: it is a
+   proxy for *the thesis is working*.
+2. **The refutation may not touch this rule.** What st-gzwb killed was
+   zero-tolerance and near-noise-floor cuts — FD0's ~1.1-pt budget-derived stop
+   measured roughly 3× *inside* the noise floor. Separately measured: at 2-pt
+   backtests the move resumes 96–98%. A 3-point pre-green stop sits just
+   **outside** that common backtest band, which is a materially different animal
+   from anything tested. **Treat the tight-stop question as OPEN, not settled.**
+   The cheap decisive test is a sweep of pre-green budgets (2 / 3 / 4 / 5 pts)
+   against a post-green ratchet, on the corpus already on disk.
+3. **Liberal re-entry is knowingly counter to "don't overtrade."** Steve is not
+   claiming otherwise — he is claiming the friction that made overtrading
+   expensive is a tooling artifact, and that semi-automated management removes
+   it. That is the wager the whole program tests.
+
+**On "semi-automated":** Steve's own words — *"I don't know exactly what
+'semi-automated' means yet but it is in the vein of the life-long goal of
+software — to lubricate the mechanics of the problem domain."* It is
+deliberately undefined and he has asked for **creative approaches** to it. The
+fixed points are §7's boundaries: the human triggers, code prepares. Everything
+between is open design space, and proposals are wanted rather than merely
+tolerated.
+
 ## 5. What is settled — the ledger
 
 **Live:**
@@ -158,16 +202,21 @@ lane exists and is governed separately ([[directional-gex-butterflies]],
 
 Ordered by §1: entry-and-stop codification leads, signal hunting follows.
 
-- **THE MAIN LINE — entry and stop geometry.** Every tight-stop variant tested
-  was net-negative at the median *even given oracle direction*, while
-  oracle-direction endure made +18.5 pts/day (st-gzwb). But that tested
-  **breakout** entry with zero-tolerance cuts — one point in a design space
-  nobody has mapped. The untested inversion is [[Join The Turn]] (st-chat, never
-  built): enter *on* the backtest, so each failed cycle risks turn-plus-stop
-  instead of the full wiggle amplitude. Adjacent and also unbuilt: the
-  execution harness itself (st-ug5) — stop attached at entry, coded re-entry
-  after a stop-out, human-triggered. Steve's 2026-08-09 reframe puts this ahead
-  of the signal hunt, not beside it.
+- **THE MAIN LINE — entry and stop geometry.** The tight-stop variants that
+  tested net-negative (st-gzwb) were zero-tolerance and near-noise-floor cuts on
+  **breakout** entry — one corner of a design space nobody has mapped, and
+  explicitly *not* the doctrine in §4a. Two untested shapes, both cheap on data
+  already on disk:
+  - **The pre-green/post-green ratchet** (§4a) — sweep pre-green budgets
+    2/3/4/5 pts against a post-green widening rule. This is Steve's actual
+    position and it has never been measured.
+  - **[[Join The Turn]]** (st-chat, never built) — enter *on* the backtest, so
+    each failed cycle risks turn-plus-stop instead of the full wiggle amplitude.
+
+  Adjacent and also unbuilt: the execution harness itself (st-ug5) — stop
+  attached at entry, coded re-entry after a stop-out, human-triggered. Steve's
+  2026-08-09 reframe puts all of this ahead of the signal hunt, not beside it,
+  and he has asked for **creative approaches** to the semi-automation layer.
 - **Stop-survivability is measured but unexploited.** The excursion asymmetry in
   §5 (3 points of MFE per point of MAE in positive gamma, at identical win
   rates) is a stop-design input sitting unused. It says *where a stop can live*,
