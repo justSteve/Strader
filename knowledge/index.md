@@ -42,6 +42,7 @@ in it covered external domain knowledge or facts about the operator.
 
 ### decision
 
+- [**The Counter-Dictum Program**](counter-dictum-program.md) — **CURRENT FOCUS.** Canonical charter: what the orderflow/execution effort is trying to do and why. Read before designing or resuming any study in it. Movement is abundant; codifying entry and stop-loss is the greater problem, direction only part of it
 - [Checkpoint Loop Discontinued](checkpoint-loop-discontinued.md) — The 30-min /checkpoint auto-save loop is discontinued (2026-07-13) — do not start it at session start
 - [Databento Live Collection](databento-live-collection.md) — Databento forward-collection mode is LIVE tick stream (chosen over T+1 batch), via scripts/corpus_stream_databento.py
 - [Grow Into Live Trading](grow-into-live-trading.md) — 8/1/2026 go-live is a hard start date but NOT full-size — graduated entry, permission to grow into the system
