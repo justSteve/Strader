@@ -21,17 +21,45 @@ Health criteria (pilot v1):
   * each required stream is present
   * each required stream has cycles > 0
   * each required stream has an empty errors list
-  * each required stream's last_pull_utc is within ``max_age_hours`` of ``now``
+  * each required stream's last write COVERS the data-day (see below)
 
-The exact production liveness signals (live-tick recency vs T+1 batch, expected
-symbol coverage) are defined in #1's own follow-on spec.
+Freshness is coverage, not recency [st-jc8p]
+-------------------------------------------
+This check used to be "last_pull_utc is within 36h of now", and that is the
+wrong question for a stream filled by LIVE capture. For a T+1 batch stream
+last_pull_utc is the FETCH time, so it refreshes every morning and 36h works.
+For a live stream it is the SESSION END — 2026-08-07T20:05:00Z, Friday 15:05 CT
+— and nothing ever touches it again, because the batch has nothing to fetch for
+a day live capture already filled. Friday close to Monday morning is 64h, so the
+gate failed EVERY MONDAY by construction. It took down the 06:30 corpus job and
+the 08:15 Mancini pre-open on 2026-08-10 while the data was perfectly good:
+2026-08-07 held 377,721 ES ticks with a clean "0 reconnect(s)" close.
+
+The two obvious repairs are both worse than the bug:
+
+  * ``--no-gate`` at the call site — a gate that is routinely bypassed is not a
+    gate, and the operator learns to reach for the flag before reading why.
+  * raising 36h to 72h — buys one weekend and blinds the check to a Friday feed
+    that genuinely died at 10:00, which is the exact failure it exists to catch.
+
+So the question changed instead. A stream covers its day if its last write lands
+at or after that day's session close. That is true of a T+1 batch (fetched after
+the close), true of a healthy live capture (stops at 15:05 CT, five minutes past
+the 15:00 cash close), and false of a capture that died mid-session — which is
+what we actually want to know. Wall-clock age no longer enters into it, so the
+answer does not change just because a weekend went by.
+
+``max_age_hours`` survives only as the fallback for a manifest with no usable
+``date`` field, where there is no session close to measure against.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date as _date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+from strader.market_calendar import CENTRAL, session_close_ct
 
 # Streams a healthy trading day must have.
 #
@@ -47,7 +75,17 @@ from typing import Any
 # it, and they should each fail loudly on a day that has no OPRA file rather
 # than lean on this gate to have caught it upstream.
 DEFAULT_REQUIRED_STREAMS = ("databento_glbx_es",)
-DEFAULT_MAX_AGE_HOURS = 36.0  # T+1 batch + weekend slack
+
+#: Fallback only — used when a manifest carries no usable ``date`` and there is
+#: therefore no session close to measure coverage against. Not the primary rule;
+#: see the module docstring on why wall-clock age is the wrong question.
+DEFAULT_MAX_AGE_HOURS = 36.0
+
+#: How far before the session close a stream's last write may land and still
+#: count as having covered the day. Live capture stops at 15:05 CT against a
+#: 15:00 close, so it clears this comfortably; the slack absorbs a final commit
+#: that lands a few minutes early without excusing a feed that died at lunchtime.
+DEFAULT_CLOSE_SLACK_MIN = 10.0
 
 
 @dataclass
@@ -73,12 +111,34 @@ def _parse_iso(ts: str) -> datetime | None:
     return dt
 
 
+def _parse_day(value: Any) -> _date | None:
+    """The data-day a manifest describes, or None if it does not say."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return _date.fromisoformat(value.strip())
+    except ValueError:
+        return None
+
+
+def coverage_deadline(day: _date, *, slack_min: float = DEFAULT_CLOSE_SLACK_MIN) -> datetime:
+    """Earliest UTC instant a last write may land and still cover ``day``.
+
+    Holiday- and early-close-aware via ``strader.market_calendar``, so a 12:00 CT
+    half session is judged against noon rather than against a 15:00 close it was
+    never going to reach.
+    """
+    close = datetime.combine(day, session_close_ct(day), tzinfo=CENTRAL)
+    return (close - timedelta(minutes=slack_min)).astimezone(timezone.utc)
+
+
 def evaluate(
     manifest: dict[str, Any],
     *,
     now: datetime | None = None,
     max_age_hours: float = DEFAULT_MAX_AGE_HOURS,
     required_streams: tuple[str, ...] = DEFAULT_REQUIRED_STREAMS,
+    close_slack_min: float = DEFAULT_CLOSE_SLACK_MIN,
 ) -> GateResult:
     """Pure evaluation of a manifest dict. No I/O."""
     now = now or datetime.now(timezone.utc)
@@ -88,6 +148,9 @@ def evaluate(
     streams = manifest.get("streams") or {}
     if not isinstance(streams, dict):
         return GateResult(ok=False, reasons=["manifest has no 'streams' object"])
+
+    day = _parse_day(manifest.get("date"))
+    deadline = coverage_deadline(day, slack_min=close_slack_min) if day else None
 
     for name in required_streams:
         st = streams.get(name)
@@ -110,6 +173,8 @@ def evaluate(
             "errors": len(errors),
             "last_pull_utc": last_pull,
             "age_hours": round(age_hours, 2) if age_hours is not None else None,
+            "covers_day": (None if last_dt is None or deadline is None
+                           else last_dt >= deadline),
         }
 
         if cycles <= 0:
@@ -120,10 +185,25 @@ def evaluate(
             reasons.append(
                 f"stream '{name}' has missing/invalid last_pull_utc {last_pull!r}"
             )
+        elif deadline is not None:
+            # Coverage, not recency. A stream that stopped before its day closed
+            # has a hole in it; one that stopped after does not, however long ago
+            # that was. See the module docstring.
+            if last_dt < deadline:
+                short_by = (deadline - last_dt).total_seconds() / 60.0
+                reasons.append(
+                    f"stream '{name}' stopped before {day} closed: last pull "
+                    f"{last_pull}, {short_by:.0f} min short of the "
+                    f"{session_close_ct(day).strftime('%H:%M')} CT close. The "
+                    f"day has a hole in it — this is not a staleness warning."
+                )
         elif age_hours is not None and age_hours > max_age_hours:
+            # Fallback: no data-day in the manifest, so there is no close to
+            # measure against and wall-clock age is all we have.
             reasons.append(
                 f"stream '{name}' is stale: last pull {age_hours:.1f}h ago "
-                f"(> {max_age_hours}h)"
+                f"(> {max_age_hours}h; manifest carries no 'date' so coverage "
+                f"could not be checked)"
             )
 
     return GateResult(ok=not reasons, reasons=reasons, checked=checked)
@@ -136,6 +216,7 @@ def check(
     now: datetime | None = None,
     max_age_hours: float = DEFAULT_MAX_AGE_HOURS,
     required_streams: tuple[str, ...] = DEFAULT_REQUIRED_STREAMS,
+    close_slack_min: float = DEFAULT_CLOSE_SLACK_MIN,
 ) -> GateResult:
     """Load the manifest file and evaluate it.
 
@@ -161,4 +242,5 @@ def check(
         now=now,
         max_age_hours=max_age_hours,
         required_streams=required_streams,
+        close_slack_min=close_slack_min,
     )

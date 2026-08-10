@@ -1,34 +1,50 @@
-"""Datastream health gate tests. [co-i10h]
+"""Datastream health gate tests. [co-i10h, st-jc8p]
 
 All against the pure ``evaluate`` function with a fixed ``now`` so they are
 deterministic.
+
+Fixtures are anchored to a CT CLOCK TIME on the data-day, not to an age relative
+to ``now`` [st-jc8p]. That is the whole point of the rule change: the gate asks
+whether a stream covered the session it claims to describe, so what matters is
+when it stopped relative to that day's close — not how long ago that was in
+wall-clock terms. An age-anchored fixture cannot express "healthy Friday read on
+Monday morning", which is the case that used to fail.
 """
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from runbook.datastream import gate
+from strader.market_calendar import CENTRAL
 
-NOW = datetime(2026, 6, 29, 12, 0, 0, tzinfo=timezone.utc)
+#: A Monday.
+DATA_DAY = date(2026, 6, 29)
+#: The Tuesday morning after it — the gate's normal running condition.
+NOW = datetime(2026, 6, 30, 12, 0, 0, tzinfo=timezone.utc)
 
 
-def _manifest(es_age_h=2, opra_age_h=2, es_cycles=124928, opra_cycles=435985,
-              es_errors=None, opra_errors=None):
-    from datetime import timedelta
+def _stamp(hhmm: str, day: date = DATA_DAY) -> str:
+    """A last_pull_utc for `hhmm` US/Central on `day`, in the writer's format."""
+    h, m = (int(x) for x in hhmm.split(":"))
+    return (datetime(day.year, day.month, day.day, h, m, tzinfo=CENTRAL)
+            .astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
 
-    def stamp(age_h):
-        return (NOW - timedelta(hours=age_h)).isoformat().replace("+00:00", "Z")
 
+def _manifest(es_end="15:05", opra_end="15:05", es_cycles=124928,
+              opra_cycles=435985, es_errors=None, opra_errors=None,
+              day: date = DATA_DAY):
+    """A day's manifest. Defaults are a healthy session: live capture stops at
+    15:05 CT, five minutes past the 15:00 cash close."""
     return {
-        "date": "2026-06-29",
+        "date": day.isoformat(),
         "streams": {
             "databento_glbx_es": {
                 "cycles": es_cycles,
                 "errors": es_errors or [],
-                "last_pull_utc": stamp(es_age_h),
+                "last_pull_utc": _stamp(es_end, day),
             },
             "databento_opra": {
                 "cycles": opra_cycles,
                 "errors": opra_errors or [],
-                "last_pull_utc": stamp(opra_age_h),
+                "last_pull_utc": _stamp(opra_end, day),
             },
         },
     }
@@ -74,10 +90,13 @@ def test_errors_present_fails():
     assert any("error" in r for r in res.reasons)
 
 
-def test_stale_stream_fails():
-    res = gate.evaluate(_manifest(es_age_h=100), now=NOW, max_age_hours=36)
+def test_a_capture_that_died_mid_session_fails():
+    """The failure the gate exists to catch: ES stopped at 10:00 CT and the day
+    has a five-hour hole. Wall-clock age would call this the FRESHEST case."""
+    res = gate.evaluate(_manifest(es_end="10:00"), now=NOW)
     assert not res.ok
-    assert any("stale" in r for r in res.reasons)
+    assert any("stopped before" in r and "hole" in r for r in res.reasons)
+    assert res.checked["databento_glbx_es"]["covers_day"] is False
 
 
 def test_no_streams_object_fails():
@@ -86,7 +105,7 @@ def test_no_streams_object_fails():
 
 
 def test_z_suffix_timestamp_parses():
-    m = _manifest(es_age_h=1)
+    m = _manifest()
     # Confirm the Z-suffixed stamp the manifest writer uses round-trips.
     assert m["streams"]["databento_glbx_es"]["last_pull_utc"].endswith("Z")
     res = gate.evaluate(m, now=NOW)
@@ -120,3 +139,92 @@ def test_check_reads_manifest_for_the_resolved_gate_day(tmp_path, monkeypatch):
     missing = gate.check(day=date(2026, 7, 1), now=NOW)
     assert not missing.ok
     assert any("not found" in r for r in missing.reasons)
+
+
+# --- coverage, not recency [st-jc8p] ----------------------------------------
+# The gate used to ask "was this written recently". For a stream filled by live
+# capture, last_pull_utc is the SESSION END and nothing touches it again, so
+# Friday close to Monday morning is ~64h against a 36h ceiling and the check
+# failed every Monday by construction. On 2026-08-10 it took down both the 06:30
+# corpus job and the 08:15 Mancini pre-open while 2026-08-07's tape was complete:
+# 377,721 ES ticks, clean "0 reconnect(s)" close.
+
+FRIDAY = date(2026, 8, 7)
+MONDAY_0715 = datetime(2026, 8, 10, 12, 15, 0, tzinfo=timezone.utc)  # 07:15 CT
+
+
+def test_the_monday_regression_a_complete_friday_passes_on_monday():
+    """THE bug. 64 hours old, and correct — the day is fully covered."""
+    m = _manifest(day=FRIDAY, es_end="15:05", opra_end="15:05")
+    res = gate.evaluate(m, now=MONDAY_0715)
+    assert res.ok, res.reasons
+    assert res.checked["databento_glbx_es"]["age_hours"] > 36
+    assert res.checked["databento_glbx_es"]["covers_day"] is True
+
+
+def test_a_holed_friday_still_fails_on_monday():
+    """The rule must not become 'weekends are always fine'."""
+    m = _manifest(day=FRIDAY, es_end="10:00")
+    res = gate.evaluate(m, now=MONDAY_0715)
+    assert not res.ok
+    assert any("stopped before" in r for r in res.reasons)
+
+
+def test_the_verdict_does_not_change_with_the_passage_of_time():
+    """Same manifest, judged a day apart, must give the same answer. Under the
+    old rule the second call flipped to failing for no reason but the clock."""
+    m = _manifest(day=FRIDAY)
+    soon = gate.evaluate(m, now=datetime(2026, 8, 7, 21, 0, tzinfo=timezone.utc))
+    later = gate.evaluate(m, now=datetime(2026, 9, 30, 21, 0, tzinfo=timezone.utc))
+    assert soon.ok and later.ok
+
+
+# --- early closes ------------------------------------------------------------
+
+BLACK_FRIDAY = date(2026, 11, 27)   # 12:00 CT close
+
+
+def test_an_early_close_day_is_judged_against_noon():
+    """A 12:05 stop covers a 12:00 close. Judged against 15:00 it would look
+    like a three-hour hole every half session."""
+    res = gate.evaluate(_manifest(day=BLACK_FRIDAY, es_end="12:05",
+                                  opra_end="12:05"), now=NOW)
+    assert res.ok, res.reasons
+
+
+def test_an_early_close_day_still_catches_a_real_hole():
+    res = gate.evaluate(_manifest(day=BLACK_FRIDAY, es_end="10:00"), now=NOW)
+    assert not res.ok
+    assert any("12:00 CT close" in r for r in res.reasons)
+
+
+# --- the slack window --------------------------------------------------------
+
+def test_a_stop_just_inside_the_slack_passes():
+    """14:55 is five minutes early — a final commit landing short, not a hole."""
+    res = gate.evaluate(_manifest(es_end="14:55"), now=NOW)
+    assert res.ok, res.reasons
+
+
+def test_a_stop_outside_the_slack_fails():
+    res = gate.evaluate(_manifest(es_end="14:35"), now=NOW)
+    assert not res.ok
+
+
+# --- fallback when the manifest cannot say which day it is -------------------
+
+def test_a_manifest_with_no_date_falls_back_to_wall_clock_age():
+    m = _manifest()
+    del m["date"]
+    res = gate.evaluate(m, now=datetime(2026, 9, 30, 12, 0, tzinfo=timezone.utc),
+                        max_age_hours=36)
+    assert not res.ok
+    assert any("no 'date'" in r for r in res.reasons)
+    assert res.checked["databento_glbx_es"]["covers_day"] is None
+
+
+def test_a_manifest_with_an_unparseable_date_falls_back_too():
+    m = _manifest()
+    m["date"] = "last tuesday"
+    res = gate.evaluate(m, now=NOW, max_age_hours=36)
+    assert res.ok, res.reasons          # 20h old, inside the fallback ceiling
