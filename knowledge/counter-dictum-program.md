@@ -12,7 +12,10 @@ metadata:
 
 > ## ⚠ TABLED — UNDER CONSTRUCTION. DO NOT APPLY.
 >
-> **Steve, 2026-08-10: this program is tabled.** Everything below — the charter,
+> **Steve, 2026-08-10: this body of work is tabled.** ("Program" here has always
+> meant the counter-dictum *effort* — the goals, the reasoning, the design
+> directions — not a piece of software. The name is ambiguous in a repo full of
+> actual programs; read it as "the counter-dictum work.") Everything below — the charter,
 > the stop doctrine, the scoring rules, and every inference drawn from them — is
 > **still under construction and must not affect our work product yet.**
 >
