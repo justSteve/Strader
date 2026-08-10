@@ -25,7 +25,7 @@ summative pass.
 | GEXBot | **ACTIVE — QUANT tier ($350/mo, one-month commitment) since 2026-08-05 PM** (State AM, upgraded same day; pause ran 07-03→08-05). Live **10-endpoint** collection in tmux `steves-desk:gex`: the full State package — {gamma,delta,vanna,charm} × {`_zero`,`_one`}, 87 strikes each — plus `classic/gex_zero/majors` and the **orderflow leg, which went live 2026-08-06 with 37 fields** (it was auto-skipping on entitlement before the upgrade; no code change was needed). 0DTE legs are requested first so a truncated cycle keeps what the fly window trades. Feed is **RTH-only** — collector DOWN outside 08:30–15:00 CT is normal. Now measured rather than asserted: on 2026-08-07 `spot_at_gamma_zero` sat frozen at one value from midnight, took its first new value at **08:30:02 CT**, updated on a ~76s cadence to **15:00:33 CT**, then went flat; Saturday 2026-08-08 never moved once across 1153 polls. The collector is gated to that window (`corpus_poll_gexbot.py`, restored 2026-08-10) and cron `*/2` restarts it inside the window via `scripts/cron/gexbot-supervisor-session.sh` [st-a6zm, st-p3lv]. **Consumer warning — `gexbot.jsonl` files dated 2026-08-09 or earlier are ~70% duplicate rows**: the collector polled around the clock, and a frozen feed returns the last RTH value unchanged, so an overnight row is not stale-but-plausible data, it is a verbatim repeat. 2026-08-07 holds 352 in-session rows against 783 repeats. Filter by timestamp — and never count, average, or weight these rows without deduplicating first. [co-hvxye] **A dedicated live 1 Hz orderflow leg runs beside the 60s collector since 2026-08-10** [st-ipn0]: `corpus_poll_gexbot_orderflow_1s.py` polls `/SPX/orderflow/orderflow` alone at ≥1.1s spacing (the vendor's stated per-metric ceiling), same 08:30–15:05 CT gate, writes flat rows to `data/corpus/<date>/gexbot_orderflow_1s.jsonl` (~1.3s native feed cadence, consecutive duplicates skipped), supervised by cron `*/2` via `scripts/cron/gexbot-orderflow-1s-supervisor.sh` in tmux window `gexbot-of1s`. This is the real-time spike-train read the 60s cycle cannot see; nightly `/hist` remains the archival 1s source. Program brief: `docs/a2a/2026-08-05-gexbot-quant-month-program.md`. Month-end sweep + downgrade decision ~Sep 1. |
 | Schwab API | `lib/schwab-py` on the `hobbled-readonly` fork — account/order/transaction methods physically removed. Only `broker_schwab/readers/{quote,chain}.py` are auto-allowed. |
 | Databento | **CME Standard live GLBX verified 2026-08-03.** ES trades + MBP-1 capture the session window 02:50–15:05 CT via `scripts/live-footprint-up.sh` (tmux `steves-desk:footprint`), now supervised. **GLBX historical is $0.00 on the Futures plan** (measured 2026-08-05, `--estimate-only`; OPRA control $6.07/2h), so an uncaptured GLBX session is **recoverable, not gone** — the old "quotes are NEVER backfilled" premise is false for GLBX and holds only for OPRA. **Daily OPRA import HALTED 2026-08-07** (`st-7av4`, Steve's call): historical OPRA is an ad hoc fetch now via `corpus_backfill_databento.py --opra`. The datastream gate no longer requires the stream; the six measurement scripts that read `databento_opra.jsonl` must each fail loudly on a day without it. Historical corpus is tape-only — no GEX history before 2026-08-05. |
-| Mancini | Pre-open cron wired and working. The `st-i68` PATH bug is fixed (closed 2026-08-10). The 08:15 job's current blocker is the datastream gate, `st-jc8p`. |
+| Mancini | Pre-open cron wired and working, verified rc=0 end to end on 2026-08-10. The `st-i68` PATH bug and the `st-1qpz` gate bug are both fixed and closed. |
 | Market internals | `scripts/mi_gauge.py`, captured on the 5-minute session cron. Single-sourced from Schwab — no cross-check exists (`st-jwtn`). |
 | Live footprint | v1 running: bridge `127.0.0.1:7788` + JSONL feeder → `/tmp/desk-live-footprint.html`. Same surface as the replay drills (one template, `.live` mode gate hides drill-only controls); bars proven byte-identical to replay. **Rendering confirmed live by Steve 2026-08-04.** Carries the per-bar emissions row + rollover panel. Intra-bar progressive rendering built and tested but **NOT deployed** (`st-e91l`) — needs a feeder+bridge restart, do it after a 15:05 stop. **Every closed bar now carries a `gex` stamp** (`st-8ywx`, live since 2026-08-07): flip, 0DTE and 1DTE brackets, net-GEX regime sign, distance to flip, which majors the bar's range covered, and the age of the poll. Resolved at-or-BEFORE the bar close — never lookahead — and applied *after* the recogniser judges the bar, so it is recorded alongside recognition and can never become an input to it. Absent feed degrades to no stamp, never to a broken bar. |
 
@@ -36,7 +36,7 @@ summative pass.
 | 06:30 | Corpus daily (COO-side wrapper) — Mon–Sat since `st-n42a`, so Friday's tape lands Saturday |
 | 07:30 | Corpus compaction (`st-itky`) — Mon–Sat, packs the pulled day. Measured 27.4× on 07-31. Refuses to pack a day whose manifest is not healthy |
 | 07:00 / 08:30 / 13:00 / 14:45 | Schwab stage-boundary snapshots |
-| 08:15 | Mancini pre-open. The Azure-CLI PATH bug (`st-i68`) is **fixed** — `az` has resolved via the pinned interop path and the job exited rc=0 on 08-04, 08-05, 08-06 and 08-07. It failed on 08-10 for an unrelated reason: the datastream gate (**`st-jc8p` open**) |
+| 08:15 | Mancini pre-open — **green**. The Azure-CLI PATH bug (`st-i68`) was already fixed: `az` resolves via the pinned interop path and the job exited rc=0 on 08-04 through 08-07. Its 08-10 failure was the datastream gate (`st-1qpz`), fixed the same day |
 | 08:25 | Pre-open heartbeat + risk-state reset |
 | every 5 min, 08:00–15:55 | Market-internals gauge |
 | every 2 min, all day | **Capture supervisor** (`st-6qx4`, installed 2026-08-05) — relaunches a dead ES streamer inside the 02:50–15:05 window; idempotent by process, not tmux window |
@@ -85,16 +85,12 @@ missing its `leases` table). The working channel is file-convention A2A under
 
 1. **Risk cap unarmed** — `account_balance_usd: null`. Steve's ruling on the
    whole risk table is outstanding.
-2. **`st-jc8p`** — the datastream gate reads a live-capture stream's
-   `last_pull_utc` as a freshness proxy, but for live capture that timestamp is
-   the *session end*, not the fetch time. Friday close to Monday morning is 64h
-   against a 36h ceiling, so it now fails **every Monday** by construction. It
-   halted both the 06:30 corpus job and the 08:15 Mancini pre-open on 08-10.
-   The data is fine — 08-07 landed 377,721 ES ticks with a clean close — so the
-   tempting fix is `--no-gate`, and that is the trap. Do not just raise 36 to 72
-   either; that blinds the gate to a genuinely dead Friday feed.
-   *(This item was `st-i68`, closed 2026-08-10: the Azure-CLI PATH bug was
-   already fixed and the entry was four sessions stale.)*
+2. **Nothing here — this slot held a stale item for four sessions.** It read
+   "`st-i68` — Mancini pre-open cron fails on cron PATH … fires every weekday at
+   08:15 until fixed" while that job was exiting rc=0 on 08-04 through 08-07.
+   Closed 2026-08-10, along with the gate bug (`st-1qpz`) that was its actual
+   08-10 failure. Both verified green end to end. Left as a marker: an Attention
+   Item nobody re-checks against observable state is worse than an empty list.
 3. **`st-08p` blocked externally** — training steps 3–5 need Steve's NotebookLM
    upload and COO's deck import.
 4. **Recognizer is direction-blind upward** — all four setups are downside
