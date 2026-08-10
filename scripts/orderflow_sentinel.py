@@ -75,6 +75,8 @@ class LevelWatch:
     MIN_ROWS = 20        # no verdicts before the window has substance
     DOMINANT = 0.85      # share that makes a cluster the stable value
     CONTENDER = 0.25     # share that makes a second cluster a real contender
+    ZONE_REOPEN_S = 1800  # same pair re-contesting within this -> it's a ZONE
+    ZONE_EXIT_ROWS = 450  # ~10 min of one-cluster dominance dissolves the zone
 
     def __init__(self, key: str, band: float, rearm: float, move: float) -> None:
         self.key = key
@@ -84,6 +86,10 @@ class LevelWatch:
         self.window: deque[float] = deque(maxlen=self.WINDOW)
         self.value: float | None = None       # current stable cluster center
         self.contested = False
+        self.zone: tuple[float, float] | None = None
+        self.zone_stable_rows = 0
+        self.last_pair: tuple[float, float] | None = None
+        self.last_pair_at: float = 0.0
         self.prev_dist: float | None = None
         self.armed = True
 
@@ -112,8 +118,41 @@ class LevelWatch:
         share = top_n / len(self.window)
         second_share = (cl[1][1] / len(self.window)) if len(cl) > 1 else 0.0
 
+        if self.zone is not None:
+            # In a zone, contest/resolve chatter is suppressed. The zone
+            # dissolves only after sustained one-cluster dominance.
+            self.zone_stable_rows = self.zone_stable_rows + 1 \
+                if share >= self.DOMINANT else 0
+            if self.zone_stable_rows >= self.ZONE_EXIT_ROWS:
+                _emit({"kind": "zone_dissolved", "level": self.key,
+                       "name": LEVEL_NAMES[self.key], "spot": spot,
+                       "zone": list(self.zone), "settled": round(top_center, 2)})
+                self.zone = None
+                self.value = top_center
+                self.contested = False
+                self.armed = True
+                self.prev_dist = None
+            return
+
         if not self.contested:
             if second_share >= self.CONTENDER:
+                pair = tuple(sorted(round(c, 2) for c, _ in cl[:2]))
+                now_s = time.monotonic()
+                same_pair = (self.last_pair is not None
+                             and abs(pair[0] - self.last_pair[0]) <= self.move
+                             and abs(pair[1] - self.last_pair[1]) <= self.move)
+                if same_pair and now_s - self.last_pair_at <= self.ZONE_REOPEN_S:
+                    self.zone = pair
+                    self.zone_stable_rows = 0
+                    _emit({"kind": "zone", "level": self.key,
+                           "name": LEVEL_NAMES[self.key], "spot": spot,
+                           "low": pair[0], "high": pair[1],
+                           "note": "recurring two-node contest — treat as a "
+                                   "support/resistance ZONE; contest chatter "
+                                   "suppressed until one node holds ~10 min"})
+                    self.last_pair, self.last_pair_at = pair, now_s
+                    return
+                self.last_pair, self.last_pair_at = pair, now_s
                 self.contested = True
                 _emit({"kind": "contested", "level": self.key,
                        "name": LEVEL_NAMES[self.key], "spot": spot,
