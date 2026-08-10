@@ -49,7 +49,22 @@ def _alerts_path() -> Path:
     return CORPUS_ROOT / central_date().isoformat() / "orderflow_alerts.jsonl"
 
 
+def _strike(x: float) -> int:
+    """Nearest SPX strike (5-pt grid near the money). Ladder values are
+    computed centers (7754.83); Steve trades strikes (7755)."""
+    return int(round(x / 5.0) * 5)
+
+
 def _emit(alert: dict) -> None:
+    for src in ("value", "new", "settled"):
+        if src in alert:
+            alert["strike"] = _strike(alert[src])
+            break
+    if "low" in alert and "high" in alert:
+        alert["strike_low"] = _strike(alert["low"])
+        alert["strike_high"] = _strike(alert["high"])
+    for c in alert.get("contenders", []):
+        c["strike"] = _strike(c["value"])
     alert["ts_alert_utc"] = utc_now_iso()
     append_jsonl(_alerts_path(), alert)
     print(json.dumps(alert), flush=True)
