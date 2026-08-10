@@ -27,12 +27,36 @@ channel enumeration, 34 videos — no Part 4 despite Part 3 promising one "with
 real life examples"; the channel pivoted to live-trading recaps from May 2025
 and course promos from Jan 2026). Channel: **GexFuturesTrading**
 (`@gextrading`, UCH1qiP2SN83pCKRwGlM9oNg), operator Fredy Sarmiento
-(one "d" — inferred via LinkedIn/X, not stated on the channel). The de-facto
-Part 4 material is the live-trading application videos, chiefly
-`ihRxcBJPYnU` (2025-05-06, NQ Orderflow live) and the hour-long pre-series
-`5yms1oOGp6k` ("Concepts review — Intro to OrderFlow", 2025-02-17), plus
-`AsNlSzOMxnA` (2025-10-27) for post-series product changes. Queued, not yet
-transcribed.
+(one "d" — inferred via LinkedIn/X, not stated on the channel).
+
+## Surrounding material — the de-facto Part 4
+
+All three fetched 2026-08-10 [co-yzhrw]; **transcribed, not yet synthesized**.
+Synthesis belongs to the comprehension work under st-ygy1.
+
+| Video | Date | Length | Captions | Transcript |
+|---|---|---|---|---|
+| `5yms1oOGp6k` — "Concepts review — Intro to OrderFlow" (pre-series primer) | 2025-02-17 | 65:01 | en | [`…_pre_concepts_review_intro.txt`](../transcripts/freddy_orderflow_pre_concepts_review_intro.txt) |
+| `ihRxcBJPYnU` — NQ Orderflow live application | 2025-05-06 | 56:10 | **es** | [`…_live_nq_2025-05-06.txt`](../transcripts/freddy_orderflow_live_nq_2025-05-06.txt) |
+| `AsNlSzOMxnA` — post-series GexBot product changes | 2025-10-27 | 38:28 | **es** | [`…_post_series_2025-10-27.txt`](../transcripts/freddy_orderflow_post_series_2025-10-27.txt) |
+
+Two are **Spanish-language**, not English videos with Spanish captions — the
+channel's later material is delivered in Spanish. They are usable as-is; note
+the language before quoting.
+
+**The pre-series primer is the largest single piece of Freddy doctrine we
+hold** — 65 minutes and 10,000 words against 8,724 words for the three-part
+series combined. Freddy opens by naming its purpose: futures traders "are
+usually thinking in linear terms" and the gamma-exposure vocabulary is
+different, so he reviews concepts first and then gives the Orderflow intro.
+It predates Part 1 and was not in the synthesis below.
+
+**Staleness caution for everything synthesized below.** `AsNlSzOMxnA`
+(2025-10-27) is Freddy walking through GexBot updates he calls "supremamente
+importantes" — product changes that landed *after* the three-part series was
+recorded. The doctrine in this file describes the tool as it stood in early
+2025. Reconcile against that video (and against the live dataset) before
+treating any of it as a description of what we collect today.
 
 ---
 
