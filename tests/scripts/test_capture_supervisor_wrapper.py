@@ -243,9 +243,7 @@ def test_duplicate_captures_are_reported_never_killed(h):
     h.manifest()
     rc, log = h.run()
     assert rc == 1
-    # "capture" here is the default STRADER_CAPTURE_LABEL — the wrapper hosts a
-    # second tenant now and names it in its log lines [st-p3lv].
-    assert "duplicate capture processes" in log and "NOT killing from cron" in log
+    assert "duplicate captures" in log and "NOT killing from cron" in log
     assert a.poll() is None and b.poll() is None
     assert len(h.pids()) == 2            # and no third one launched
     assert h.alerts()[-1]["kind"] == "capture_duplicate"

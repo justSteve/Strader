@@ -70,7 +70,7 @@ fi
 probe "ES capture"        "corpus_stream_databento.py"  "trades + MBP-1"
 probe "drill bridge"      "drill_bridge.py"             "127.0.0.1:7788"
 probe "footprint feeder"  "live_footprint_feed.py"      "tails today's ES JSONL"
-probe "GEX collector"     "corpus_poll_gexbot.py"       "SPX GEX -> corpus · session-gated 07:30-15:05 CT weekdays (NYSE holidays off): DOWN outside that is NORMAL. Cron */2 restarts it — DOWN *inside* the window means the supervisor is failing too [st-p3lv]"
+probe "GEX collector"     "corpus_poll_gexbot.py"       "SPX GEX -> corpus · RTH-only: DOWN before 08:30 / after 15:00 CT is NORMAL, not a fault"
 probe "MI gauge"          "mi_gauge"                    "cron-driven, usually DOWN between ticks"
 probe "GEX hist backfill" "gexbot_hist_backfill.py"     "90-day harvest — only matters during the paid window (st-ox9x); delete this row when it completes"
 

@@ -3,7 +3,7 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
-**Last refreshed**: 2026-08-09 [st-a6zm, st-p3lv, st-z92a]
+**Last refreshed**: 2026-08-07 [st-8ywx, st-7av4, st-sgr1, st-p3lv]
 
 > Standing operational snapshot — what is wired up, live, or paused right now.
 > Session history lives in `DaysActivity.md`; work lives in beads; durable
@@ -22,7 +22,7 @@ summative pass.
 | Surface | State |
 |---------|-------|
 | TradingView MCP | **Removed.** No `.mcp.json`. Chart state comes from screenshots; Pine scripts are pasted by Steve by hand. |
-| GEXBot | **ACTIVE — QUANT tier ($350/mo, one-month commitment) since 2026-08-05 PM** (State AM, upgraded same day; pause ran 07-03→08-05). Live **10-endpoint** collection in tmux `steves-desk:gex`: the full State package — {gamma,delta,vanna,charm} × {`_zero`,`_one`}, 87 strikes each — plus `classic/gex_zero/majors` and the **orderflow leg, which went live 2026-08-06 with 37 fields** (it was auto-skipping on entitlement before the upgrade; no code change was needed). 0DTE legs are requested first so a truncated cycle keeps what the fly window trades. Feed is **session-gated to 07:30–15:05 CT, weekdays, NYSE holidays excluded** — collector DOWN outside that window is normal, and it is now enforced rather than assumed: the gate is in `corpus_poll_gexbot.py` itself and cron `*/2` restarts it via `scripts/cron/gexbot-supervisor-session.sh` [st-p3lv, 2026-08-09]. Before that date the claim was false — the poller was a bare 60s loop that wrote 58.4 MB across closed-market Saturday 2026-08-08, so **any gexbot.jsonl row dated before 2026-08-09 may be a weekend or after-hours snapshot** and consumers must filter by timestamp, not trust the day directory. Program brief: `docs/a2a/2026-08-05-gexbot-quant-month-program.md`. Month-end sweep + downgrade decision ~Sep 1. |
+| GEXBot | **ACTIVE — QUANT tier ($350/mo, one-month commitment) since 2026-08-05 PM** (State AM, upgraded same day; pause ran 07-03→08-05). Live **10-endpoint** collection in tmux `steves-desk:gex`: the full State package — {gamma,delta,vanna,charm} × {`_zero`,`_one`}, 87 strikes each — plus `classic/gex_zero/majors` and the **orderflow leg, which went live 2026-08-06 with 37 fields** (it was auto-skipping on entitlement before the upgrade; no code change was needed). 0DTE legs are requested first so a truncated cycle keeps what the fly window trades. Feed is **RTH-only** — collector DOWN outside 08:30–15:00 CT is normal. Program brief: `docs/a2a/2026-08-05-gexbot-quant-month-program.md`. Month-end sweep + downgrade decision ~Sep 1. |
 | Schwab API | `lib/schwab-py` on the `hobbled-readonly` fork — account/order/transaction methods physically removed. Only `broker_schwab/readers/{quote,chain}.py` are auto-allowed. |
 | Databento | **CME Standard live GLBX verified 2026-08-03.** ES trades + MBP-1 capture the session window 02:50–15:05 CT via `scripts/live-footprint-up.sh` (tmux `steves-desk:footprint`), now supervised. **GLBX historical is $0.00 on the Futures plan** (measured 2026-08-05, `--estimate-only`; OPRA control $6.07/2h), so an uncaptured GLBX session is **recoverable, not gone** — the old "quotes are NEVER backfilled" premise is false for GLBX and holds only for OPRA. **Daily OPRA import HALTED 2026-08-07** (`st-7av4`, Steve's call): historical OPRA is an ad hoc fetch now via `corpus_backfill_databento.py --opra`. The datastream gate no longer requires the stream; the six measurement scripts that read `databento_opra.jsonl` must each fail loudly on a day without it. Historical corpus is tape-only — no GEX history before 2026-08-05. |
 | Mancini | Pre-open cron wired; `st-i68` PATH bug open against it. |
@@ -39,20 +39,7 @@ summative pass.
 | 08:15 | Mancini pre-open — **`st-i68` open** |
 | 08:25 | Pre-open heartbeat + risk-state reset |
 | every 5 min, 08:00–15:55 | Market-internals gauge |
-| every 2 min, all day | **Capture supervisor** (`st-6qx4`, installed 2026-08-05) — relaunches a dead ES streamer inside the 02:50–15:05 window; idempotent by process, not tmux window |
-| every 2 min, all day | **GexBot supervisor** (`st-p3lv`, installed 2026-08-09) — same wrapper, second tenant: window 07:30–15:05, `--venue cash` so NYSE holidays report idle instead of relaunching all day |
-| 15:15 | **EOD fact packet** (`st-z92a`, installed 2026-08-09) — gathers the trading day's facts to `data/eod/<date>.md` and alerts only on a hard gap. Prepare-only; `/eod` writes the Day Close entry |
-
-> **Erratum, 2026-08-09.** This table previously said the capture supervisor
-> "does not survive a tmux server death" and that the 2026-08-05 19:55 incident
-> took it down with its collectors — and `st-p3lv` carried the same reading,
-> concluding a systemd unit was required. That is wrong on the mechanism. The
-> supervisor is a **cron** job, not a tmux one; cron kept firing, and the wrapper
-> has an explicit `has-session` branch that bootstraps a minimal session when the
-> socket is gone. What actually happened at 19:55 is that 19:55 is outside the
-> 02:50–15:05 capture window, so the supervisor correctly stood down — and the
-> GexBot collector, which had no supervisor at all, simply stayed dead. Hence the
-> 2026-08-09 build reuses this cron supervisor rather than introducing systemd.
+| every 2 min, all day | **Capture supervisor** (`st-6qx4`, installed 2026-08-05) — relaunches a dead streamer inside the 02:50–15:05 window; idempotent by process, not tmux window. **Does not survive a tmux server death**: the `moocity` server died ~19:55 on 2026-08-05 and took the supervisor down with the collectors it was supervising. A supervisor hosted inside the thing it supervises is not one. Settles `st-p3lv` toward a systemd unit |
 
 First full Monday-morning fire: **2026-08-03**.
 

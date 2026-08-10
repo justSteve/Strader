@@ -61,11 +61,6 @@
 #   STRADER_CAPTURE_CORPUS_ROOT  STRADER_CAPTURE_STATE  STRADER_CAPTURE_HEALTH_LOG
 #   STRADER_CAPTURE_NOW  STRADER_TMUX_SOCKET  STRADER_TMUX_SESSION
 #   STRADER_CAPTURE_WIN  STRADER_CAPTURE_LOGDIR  STRADER_CAPTURE_GRACE_SECS
-#
-# Second-tenant knobs [st-p3lv] — see scripts/cron/gexbot-supervisor-session.sh
-# for a worked example of all six:
-#   STRADER_CAPTURE_STREAMER  STRADER_CAPTURE_VENUE  STRADER_CAPTURE_LABEL
-#   STRADER_CAPTURE_STREAMS   STRADER_CAPTURE_STALE_SECS  STRADER_CAPTURE_STATE
 set -uo pipefail
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -73,11 +68,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 REPO="${STRADER_REPO:-/root/projects/Strader}"
 PY="${STRADER_PY:-$REPO/.venv/bin/python}"
 CHECK="$REPO/scripts/capture_health.py"
-# Parameterised so a second long-lived collector can reuse this whole supervisor
-# rather than grow a parallel copy of it [st-p3lv]. Whatever is set here is what
-# the preflight insists exists — leaving it hardcoded meant the GexBot wrapper's
-# preflight passed by checking a file it never launches.
-STREAMER="${STRADER_CAPTURE_STREAMER:-$REPO/scripts/corpus_stream_databento.py}"
+STREAMER="$REPO/scripts/corpus_stream_databento.py"
 
 : "${HOME:=/root}"
 export HOME
@@ -93,12 +84,6 @@ START_CT="${STRADER_CAPTURE_START_CT:-00:00}"
 STALE_SECS="${STRADER_CAPTURE_STALE_SECS:-600}"
 GRACE_SECS="${STRADER_CAPTURE_GRACE_SECS:-180}"
 RESTART_STALE="${STRADER_CAPTURE_RESTART_STALE:-0}"
-# Which calendar decides "a capture is expected right now". globex = ES (the
-# original tenant); cash = NYSE sessions, holiday-aware [st-p3lv].
-VENUE="${STRADER_CAPTURE_VENUE:-globex}"
-# What this supervisor calls its tenant in log lines. Two supervisors now share
-# this file and both used to say "capture".
-LABEL="${STRADER_CAPTURE_LABEL:-capture}"
 
 # --- where it lives --------------------------------------------------------
 SOCKET="${STRADER_TMUX_SOCKET:-moocity}"
@@ -120,7 +105,7 @@ TMUX=(tmux -L "$SOCKET")
 # Flags shared by the check and the restart record, so both touch the same
 # state file and the same health log.
 CHECK_ARGS=(--streams "$STREAMS" --stale-secs "$STALE_SECS"
-            --grace-secs "$GRACE_SECS" --venue "$VENUE"
+            --grace-secs "$GRACE_SECS"
             --window-start "$START_CT" --window-end "$UNTIL_CT")
 [[ -n "${STRADER_CAPTURE_MATCH:-}" ]]       && CHECK_ARGS+=(--match "$STRADER_CAPTURE_MATCH")
 [[ -n "${STRADER_CAPTURE_PROC_ROOT:-}" ]]   && CHECK_ARGS+=(--proc-root "$STRADER_CAPTURE_PROC_ROOT")
@@ -137,7 +122,7 @@ live_pids() {
 }
 
 {
-    log "=== $LABEL-supervisor start $(date +%Y-%m-%dT%H:%M:%S%z) socket=$SOCKET venue=$VENUE window=$START_CT-$UNTIL_CT ==="
+    log "=== capture-supervisor start $(date +%Y-%m-%dT%H:%M:%S%z) socket=$SOCKET ==="
 
     # --- preflight --------------------------------------------------------
     if [[ ! -x "$PY" ]]; then
@@ -147,7 +132,7 @@ live_pids() {
         log "FATAL: checker missing: $CHECK"; exit 2
     fi
     if [[ ! -f "$STREAMER" ]]; then
-        log "FATAL: $LABEL process script missing: $STREAMER"; exit 2
+        log "FATAL: streamer missing: $STREAMER"; exit 2
     fi
 
     # --- the verdict ------------------------------------------------------
@@ -167,7 +152,7 @@ live_pids() {
     printf '%s\n' "$OUT" | sed 's/^/    /'
 
     if [[ -z "$STATUS" ]]; then
-        log "FATAL: checker produced no verdict (rc=$CHECK_RC) — $LABEL liveness is UNKNOWN."
+        log "FATAL: checker produced no verdict (rc=$CHECK_RC) — capture liveness is UNKNOWN."
         exit 2
     fi
 
@@ -181,7 +166,7 @@ live_pids() {
             # Two captures double-append the same JSONL. Picking which to kill
             # needs a human eye on what each one is writing; killing the wrong
             # one loses the good stream. Report loudly, touch nothing.
-            log "ALERT: duplicate ${LABEL} processes [$PIDS] — both appending the same corpus files. NOT killing from cron; stop all but one by hand."
+            log "ALERT: duplicate captures [$PIDS] — both appending the same corpus files. NOT killing from cron; stop all but one by hand."
             exit 1
             ;;
         stale)
@@ -220,10 +205,10 @@ live_pids() {
             NOW_MIN=$(( 10#${NOW_HM%%:*} * 60 + 10#${NOW_HM##*:} ))
             END_MIN=$(( 10#${UNTIL_CT%%:*} * 60 + 10#${UNTIL_CT##*:} ))
             if (( NOW_MIN >= END_MIN - 2 )); then
-                log "$LABEL is down at $NOW_HM CT, inside the final 2 minutes of the $START_CT-$UNTIL_CT window — not relaunching; the next tick starts the new day's run."
+                log "capture is down at $NOW_HM CT, inside the final 2 minutes of the $START_CT-$UNTIL_CT window — not relaunching; the next tick starts the new day's capture."
                 exit 0
             fi
-            log "$LABEL is DOWN inside the expected window — relaunching."
+            log "capture is DOWN inside the expected window — relaunching."
             ;;
         *)
             log "FATAL: unrecognised status '$STATUS'"; exit 2
@@ -232,7 +217,7 @@ live_pids() {
 
     # --- relaunch ---------------------------------------------------------
     if ! "${TMUX[@]}" has-session -t "$SESSION" 2>/dev/null; then
-        log "session '$SESSION' on socket '$SOCKET' is DOWN — bootstrapping a minimal one to host the ${LABEL}. NOTE: not COO's full desk; reconcile if COO rebuilds."
+        log "session '$SESSION' on socket '$SOCKET' is DOWN — bootstrapping a minimal one to host the capture. NOTE: not COO's full desk; reconcile if COO rebuilds."
         WID="$("${TMUX[@]}" new-session -d -s "$SESSION" -n "$WIN_NAME" \
                  -c "$REPO" -P -F '#{window_id}' "$LAUNCH_CMD" 2>/dev/null)"
         if [[ -z "$WID" ]]; then
@@ -263,7 +248,7 @@ live_pids() {
     sleep 3
     NEWPIDS="$(live_pids)"
     if [[ -n "${NEWPIDS// }" ]]; then
-        log "OK: ${LABEL} relaunched (pid $NEWPIDS) in $SESSION window '$WIN_NAME' ($WID), streams=$STREAMS until $UNTIL_CT CT."
+        log "OK: capture relaunched (pid $NEWPIDS) in $SESSION window '$WIN_NAME' ($WID), streams=$STREAMS until $UNTIL_CT CT."
         "$PY" "$CHECK" "${CHECK_ARGS[@]}" \
             --record-restart "was $STATUS; relaunched pid $NEWPIDS in $SESSION:$WIN_NAME (streams=$STREAMS until $UNTIL_CT CT)" \
             || log "WARN: restart record failed"

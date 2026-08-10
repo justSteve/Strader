@@ -1,49 +1,42 @@
-# DaysActivity - 2026-08-09
+# DaysActivity - 2026-08-07
 
-## 21:55 - Session Handoff [GexBot gate + supervision, EOD ritual]
+## 09:58 - Session Handoff [GEX→Footprint join, live session read, OPRA halt]
 
-**Summary**: Closed the GexBot collector's two opposite failures — it ran 24/7 with no session gate and had no supervisor to restart it — then built the EOD ritual, which closes a trading day rather than a session, so a day like 2026-08-08 cannot again end with its only record inside a commit message.
+**Summary**: Integrated the Quant-tier GEX feed into the footprint pipeline — full State package captured, every closed bar now stamped with the dealer positioning behind it — then ran the 08-06 session live against it, and cut the daily OPRA import at Steve's direction.
 
 **Open Work**:
-- `st-p3lv` (in_progress) — GexBot supervisor installed and smoke-tested, but it has never run a real session. First unattended fire is Monday 2026-08-10 07:30 CT. Close it once one full session collects >300 cycles with no hand-holding.
-- `st-z92a` (in_progress) — EOD ritual built and cron-installed; the ritual has not run once. First packet fires Monday 15:15 CT; close when one cycle has produced a Day Close entry that `--audit` accepts.
-- `st-x2mp` (in_progress) — live/replay parity tool committed (`c8138dc`) and green, but exercised replay-to-replay only. The live-vs-replay measurement it exists for needs a live feeder; Monday is the first opportunity.
-- `st-k68o` (in_progress, P1) — counter-dictum program charter, plus two new studies in the ready queue (`st-1bv1` clock-family traversal, `st-56pu` pre-green stop budget). This is the current focus and this session did not touch it.
-- `st-a6zm` closed. Duplicates closed: `st-fo6j` (dup of `st-v5a8`, midday no-trade window), `st-5uqz` (dup of `st-av7b`, Pine sticky `rcl`) — both filed on a tap-in claim that those items were un-beaded. They were beaded on 08-07. Check `bd list` before filing off a briefing.
+- `st-7av4` (in_progress) — daily OPRA import halted; gate no longer requires it. Collection-side disable is Steve's; ad hoc fetch path is `scripts/corpus_backfill_databento.py` (`opra` target). 2026-08-06 has no OPRA and is the one day arguably worth an ad hoc pull — it carries GEX-stamped bars plus a clean 22-point directional move, which is the test case for the distance-to-GEX-target engine.
+- `st-sgr1` (open) — duplicate-capture guard fixed to `pgrep` on the process, but the render-only path is **verified by inspection only**. Needs one clean-start morning to exercise.
+- `st-ox9x` (in_progress) — 90-day gexbot-hist backfill; COO ran a migration overnight, day-dirs moved out of `data/corpus/gexbot-hist/`. Destination and completeness unconfirmed by Strader.
+- `st-kr4a` (P1) — gexbot-hist files named `.json.gz` are plain JSON. Untouched by design.
+- Pine indicator defect, **not yet beaded**: `lvState` 3 (RECLAIMED) has no outgoing transition, so `rcl` is sticky for the session even after the level breaks again. Pairs with asymmetric hysteresis (break needs 2pt buffer, reclaim needs none). Both fixes must land together or the label oscillates.
+- Midday no-trade-window question, **not yet beaded**: 2026-08-06's one clean directional move ran 09:50–11:15, inside the 10:00–13:00 no-trade window; 13:00-onward was 5–11pt chop. Measurable across the 90 days of ES tape on disk.
 
 **Tried**:
-- Reading the tap-in briefing's "not yet beaded" items as fact → **wrong**, twice. Both were already beaded on 08-07 with better descriptions than the ones I wrote. A briefing's claim about what does not exist is the claim most worth checking.
-- A systemd user unit for the GexBot collector, which `st-p3lv` explicitly argued for → **rejected on a corrected premise**. The bead's reasoning was that the 2026-08-05 19:55 tmux death took the capture supervisor down with its collectors, so a tmux-hosted supervisor cannot be trusted. But that supervisor is a *cron* job, and its wrapper has a `has-session` branch that bootstraps a session when the socket is gone. What actually happened at 19:55 is that it is outside the 02:50–15:05 capture window, so the supervisor correctly stood down; GexBot, having no supervisor at all, stayed dead. Reused the existing cron supervisor as a second tenant instead — six env knobs, no second copy of its process-identity and restart-safety reasoning. Erratum recorded in `CurrentStatus.md`.
-- Pointing the ES supervisor's `globex_open` at the new NYSE holiday table, since it admits holidays are unmodeled → **rejected**. CME equity-index futures trade shortened sessions on most NYSE closures, so an NYSE-closed day is a day ES really is printing; calling it closed would suppress a genuine `stale` verdict seven times a year. Added a `--venue` switch instead: `cash` is holiday-aware, `globex` stays deliberately blind.
-- Restructuring `DaysActivity.md` to be day-keyed with sessions as spans inside it → **rejected**. The file exists in 9+ enterprise repos and its format is COO's authority. A trading day is the one thing only Strader has, which justifies a Strader-only sibling ritual, not a convention change. `/handoff`, `/tap-in`'s roll and the archive step are untouched.
-- Having a cron-fired agent write the Day Close entry unattended → **rejected** in favour of the split Steve already ruled for `/mancini-parse` (`st-lw58`): cron prepares and alerts, the skill interprets. Cron writes facts to `data/eod/<date>.md`; an agent writes the reading. The packet is durable on disk *before* any agent reads it, because the failure being fixed is a day whose facts evaporated with nobody at the desk — a packet living only inside a session that may never happen reproduces the bug.
-- Alerting on every gap the packet finds → **rejected**. Only hard gaps alert (a stream at 0 cycles, or GEX rows outside the collect window). An ungraded call is for `/eod` to notice; an alert that fires most days is not an alert.
+- `live-footprint-up.sh` to bring up the footprint stack → **did not run it.** Its duplicate-capture guard tests for a tmux window named `footprint`; capture was running in a window named `capture`, so the guard would not have fired and the script would have started a second `corpus_stream_databento.py` against the same corpus file. Started bridge + feeder by hand instead, then fixed the guard.
+- Gate `--no-gate` bypass for the halted OPRA stream → rejected. A gate that fails every morning trains its operator to bypass it; removed `databento_opra` from `DEFAULT_REQUIRED_STREAMS` instead, with a test pinning the policy.
+- `!data/calls/` gitignore negation to track call records → does not work; git will not re-include a path under an excluded directory. Used `git add -f` per the repo's existing convention for `data/measurement/`.
+- Called the −322 delta at ES 7765.75 "absorption" at 09:35 → **wrong**; price fell 14 points and it was initiation. Absorption and initiation are the same print until price leaves the level. Steve caught it.
+- Retracted the VIX-divergence read at 10:37 after 12 adverse points → **wrong**; the signal held to the settle (VIX closed −4.17% on a day SPX closed 44.7 off its high). Recorded in `data/calls/` with the retraction preserved.
 
 **Files Changed**:
-strader/market_calendar.py
-strader/capture_health.py
-strader/tests/test_market_calendar.py
-strader/tests/test_capture_health.py
+market/corpus/gexbot_stream.py
+market/orderflow/gex_context.py
 scripts/corpus_poll_gexbot.py
-scripts/capture_health.py
-scripts/eod_packet.py
-scripts/surface_liveness.sh
-scripts/cron/capture-supervisor-wrapper.sh
-scripts/cron/gexbot-supervisor-session.sh
-scripts/cron/eod-packet-wrapper.sh
 scripts/live_footprint_feed.py
-scripts/live_parity_check.py
-scripts/cron/live-parity-wrapper.sh
-market/orderflow/run_log.py
-market/orderflow/parity.py
-tests/scripts/test_eod_packet.py
-tests/scripts/test_capture_supervisor_wrapper.py
-tests/market/orderflow/test_run_log.py
-.claude/skills/eod/SKILL.md
-.claude/skills/handoff/SKILL.md
-.claude/skills/tap-in/SKILL.md
-.claude/skills/daysactivity-format/SKILL.md
+scripts/level_strength.py
+scripts/level_watch.py
+scripts/live-footprint-up.sh
+scripts/surface_liveness.sh
+runbook/datastream/gate.py
+tests/test_gex_context.py
+tests/runbook/test_gate.py
+data/calls/2026-08-06-steve-1251.json
+data/calls/2026-08-06-strader-vix-divergence.json
+runbook/mancini/commentary/2026-08-06.jsonl
+runbook/mancini/commentary/2026-08-07.jsonl
+.gitignore
+CLAUDE.md
 CurrentStatus.md
-pyproject.toml
 
 ---

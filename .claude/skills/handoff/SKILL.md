@@ -8,25 +8,6 @@ allowed-tools: Bash, Read, Write
 
 Prepend a session handoff entry to `DaysActivity.md` (cumulative daily log).
 
-## This closes a SESSION, not a trading day
-
-`/eod` closes the trading day. They are different events and both are needed
-[st-z92a]:
-
-- A session may run Monday 22:00 → Tuesday 02:00 — **one** handoff, **two**
-  trading days. Sessions are allowed to span midnight.
-- A trading day may end with nobody at the desk and still needs its record. On
-  2026-08-08 five commits landed, no handoff ran, and the day's one substantive
-  result survived only in a commit message.
-
-Keep this entry **work-facing**: what was done, what was tried and rejected,
-what is uncommitted, where to resume. Market reads — tape shape, plan vs.
-actual, graded calls — belong in the Day Close entry, not here.
-
-If the session crossed midnight, date-stamp the heading (`## 2026-08-11 02:00 -
-Session Handoff`) per the `daysactivity-format` skill. Do not re-roll the file;
-that is `/tap-in`'s job.
-
 ## Anti-Shadowing Rule
 
 NEVER generate DaysActivity entries freeform. Only this skill writes to DaysActivity.md. Freeform summaries skip bead-status checks, timestamp formatting, and validation. If you need to record session state outside of this skill, use `bd remember` or `bd comment`.

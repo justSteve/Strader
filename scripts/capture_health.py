@@ -49,8 +49,6 @@ from strader.capture_health import (  # noqa: E402
     DEFAULT_GRACE_SECS,
     DEFAULT_STALE_SECS,
     DEFAULT_STREAMS,
-    DEFAULT_VENUE,
-    VENUES,
     assess_capture,
     resolve_stream_names,
     utc_iso,
@@ -205,12 +203,6 @@ def _add_args(ap: argparse.ArgumentParser) -> None:
                     help="CT clock time a capture is expected from (default 00:00)")
     ap.add_argument("--window-end", default="23:59",
                     help="CT clock time a capture is expected until (default 23:59)")
-    ap.add_argument("--venue", default=DEFAULT_VENUE, choices=sorted(VENUES),
-                    help="Which calendar decides whether a capture is expected: "
-                         "'globex' for the ES streamer (intraday pauses, no "
-                         "holidays), 'cash' for the GexBot collector (NYSE "
-                         "holidays, clock bounds left to --window-start/end). "
-                         f"Default {DEFAULT_VENUE}.")
     ap.add_argument("--corpus-root", default=str(DEFAULT_CORPUS_ROOT))
     ap.add_argument("--state", default=None, help=f"State file (default <corpus-root>/{STATE_NAME})")
     ap.add_argument("--health-log", default=None,
@@ -286,7 +278,6 @@ def main(argv: list[str] | None = None) -> int:
             grace_secs=args.grace_secs,
             window_start=args.window_start,
             window_end=args.window_end,
-            venue=args.venue,
         )
         _write_state(state_path, health.to_dict())
     except Exception as e:  # the checker itself broke — distinct from a bad verdict
