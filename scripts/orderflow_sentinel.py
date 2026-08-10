@@ -170,12 +170,14 @@ class LevelWatch:
                 self.value = top_center  # drift tracks silently
         elif share >= self.DOMINANT:
             self.contested = False
-            _emit({"kind": "resolved", "level": self.key,
-                   "name": LEVEL_NAMES[self.key], "spot": spot,
-                   "old": round(self.value, 2), "new": round(top_center, 2)})
+            # A contest that resolves back to the incumbent is not news.
+            if abs(top_center - self.value) > self.move:
+                _emit({"kind": "resolved", "level": self.key,
+                       "name": LEVEL_NAMES[self.key], "spot": spot,
+                       "old": round(self.value, 2), "new": round(top_center, 2)})
+                self.armed = True
+                self.prev_dist = None
             self.value = top_center
-            self.armed = True
-            self.prev_dist = None
 
     def update(self, level: float | None, spot: float | None) -> None:
         if level is None or spot is None:
@@ -183,6 +185,12 @@ class LevelWatch:
         self._last_level = level
         self._update_identity(spot)
 
+        # In a zone the instantaneous value flaps between the nodes; measuring
+        # proximity against it re-arms and re-fires on every swap (observed
+        # 16:28-16:30Z: three approach alerts in 90s). Measure against the
+        # nearest zone edge instead — stable by construction.
+        if self.zone is not None:
+            level = min(self.zone, key=lambda e: abs(spot - e))
         dist = abs(spot - level)
         approaching = self.prev_dist is not None and dist < self.prev_dist
         if self.armed and dist <= self.band and approaching:
