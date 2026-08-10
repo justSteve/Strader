@@ -15,7 +15,7 @@
 | hist `state` greeks (gamma/delta/charm/vanna, zero+one) | ✓ fetched (some 403s are *throttling in disguise* — the script retries with backoff before believing a denial) |
 | hist `classic gex_full` | ✓ fetched |
 | hist `state gex_*`, `classic gex_zero/one` | consistently 403 — apparent real gaps; manifest will confirm across the full run |
-| `/orderflow` (live and hist) | **"User is not subscribed to Orderflow package" — despite Quant supposedly rolling up all tiers.** If this persists past a day, Steve should raise it with the vendor; he paid for the rollup. |
+| `/orderflow` (live and hist) | ✓ **RESOLVED — entitlement is live; do NOT raise with the vendor.** Day one returned "User is not subscribed to Orderflow package", but that cleared by 2026-08-07: live capture pulled `/SPX/orderflow/orderflow` 1,135 times that day (one read-timeout, zero denials), and `orderflow_orderflow.json.gz` is present for every harvested hist day — the 63-day 1s archive behind every measurement round IS that data. Corrected 2026-08-10; the stale row had been carried forward three times. |
 
 ## The profit path, ranked (COO's read — the science is yours)
 
