@@ -34,7 +34,11 @@
 # this supervisor stands down instead of relaunching a collector that would exit
 # on its own gate every two minutes for seven hours.
 #
-# WINDOW 07:30-15:05 CT. 07:30 is the pre-open ramp st-p3lv asks for. 15:05
+# WINDOW 08:30-15:05 CT — measured, not assumed. This said 07:30 for one day, on
+# a belief about a pre-open ramp that turned out to be false: the GexBot feed is
+# frozen at a single value from midnight until 08:30:02 CT, when it takes its
+# first new value at the cash open to the second. See the constants block in
+# scripts/corpus_poll_gexbot.py for the full measurement. 15:05
 # matches capture-supervisor-session.sh's stop, so both live feeds close the day
 # on the same boundary. The window is duplicated in the launch command on purpose:
 # the collector enforces it, the supervisor merely agrees. If they ever disagree,
@@ -59,7 +63,7 @@ POLLER="$REPO/scripts/corpus_poll_gexbot.py"
 export STRADER_CAPTURE_LABEL="${STRADER_CAPTURE_LABEL:-gexbot collector}"
 export STRADER_CAPTURE_VENUE="${STRADER_CAPTURE_VENUE:-cash}"
 export STRADER_CAPTURE_STREAMS="${STRADER_CAPTURE_STREAMS:-gexbot}"
-export STRADER_CAPTURE_START_CT="${STRADER_CAPTURE_START_CT:-07:30}"
+export STRADER_CAPTURE_START_CT="${STRADER_CAPTURE_START_CT:-08:30}"
 export STRADER_CAPTURE_UNTIL_CT="${STRADER_CAPTURE_UNTIL_CT:-15:05}"
 export STRADER_CAPTURE_STALE_SECS="${STRADER_CAPTURE_STALE_SECS:-300}"
 export STRADER_CAPTURE_STREAMER="${STRADER_CAPTURE_STREAMER:-$POLLER}"

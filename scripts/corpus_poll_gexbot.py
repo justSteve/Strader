@@ -48,12 +48,32 @@ from strader.market_calendar import (  # noqa: E402
     year_is_known,
 )
 
-#: Default collect window, US/Central. 07:30 gives the pre-open ramp st-p3lv
-#: asks for — GexBot is already repricing off overnight positioning well before
-#: the 08:30 cash open. 15:05 matches the ES capture supervisor's stop, so the
-#: two live feeds end their day on the same boundary and a day's corpus is
-#: bounded by one window, not two.
-DEFAULT_START_CT = "07:30"
+#: Default collect window, US/Central — MEASURED from the feed, not assumed.
+#:
+#: This constant opened at 07:30 for one day, "to give the pre-open ramp st-p3lv
+#: asks for", on the stated belief that GexBot reprices off overnight
+#: positioning before the cash open. That belief was wrong and was never
+#: checked. The feed is RTH-only, which is what CurrentStatus.md had said all
+#: along. Measured on 2026-08-07's own capture:
+#:
+#:     00:00-08:29 CT   spot_at_gamma_zero frozen at ONE value, 8 hours
+#:     08:30:02 CT      first new value — the cash open, to the second
+#:     08:30-15:00 CT   304 distinct values, ~76s cadence
+#:     15:00:33 CT      last live update
+#:     Sat 2026-08-08   1153 polls, ONE distinct value, all day
+#:
+#: So 07:30 bought nothing but ~60 duplicate rows every morning. 08:30 is the
+#: first second the feed carries information.
+#:
+#: 15:05 is deliberate, not slack: the last live tick lands at 15:00:33, and the
+#: five-minute tail costs four frozen rows while guaranteeing a slow cycle never
+#: clips it.
+#:
+#: NOT COLLECTED, on purpose: two further updates land at ~16:08 and ~16:10 CT,
+#: a post-close recompute. Two rows a day, meaning unverified. Worth measuring
+#: before deciding whether they belong in the corpus — do NOT add a second
+#: window on a guess, which is precisely the mistake this comment records.
+DEFAULT_START_CT = "08:30"
 DEFAULT_UNTIL_CT = "15:05"
 
 _stop = False
@@ -91,7 +111,7 @@ def _await_window(start_ct: str, until_ct: str) -> bool:
                   flush=True)
             return False
         # "early": a trading day, before the window. Wait it out rather than
-        # exiting, so a pane opened at 06:00 is collecting by 07:30 unattended.
+        # exiting, so a pane opened at 06:00 is collecting by 08:30 unattended.
         wait = (resume_at - now).total_seconds()
         if not announced:
             print(f"  before the window — sleeping {wait / 60:.0f} min until "
