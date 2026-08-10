@@ -115,7 +115,15 @@
       "Bash(crontab -l*)",
       "Bash(until *)",
       "Bash(df *)",
-      "Bash(command -v *)"
+      "Bash(command -v *)",
+      "Bash(PYTHONPATH=. .venv/bin/python *)",
+      "Bash(PYTHONPATH=. .venv/bin/python3 *)",
+      "Bash(PYTHONPATH=. ./.venv/bin/python *)",
+      "Bash(PYTHONPATH=/root/projects/Strader *)",
+      "Bash(/root/projects/Strader/.venv/bin/python *)",
+      "Bash(/root/projects/Strader/.venv/bin/python3 *)",
+      "Bash(for *)",
+      "Bash(while *)"
     ],
     "deny": [
       "Read(.env)",
