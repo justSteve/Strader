@@ -10,6 +10,30 @@ metadata:
 
 # The Counter-Dictum Program
 
+> ## ⚠ TABLED — UNDER CONSTRUCTION. DO NOT APPLY.
+>
+> **Steve, 2026-08-10: this program is tabled.** Everything below — the charter,
+> the stop doctrine, the scoring rules, and every inference drawn from them — is
+> **still under construction and must not affect our work product yet.**
+>
+> Do not cite it, do not design against it, do not let it shape a study,
+> a recommendation, or a trade. It is not settled thinking; it is a draft
+> captured mid-discussion and parked.
+>
+> **What the work is instead:** simply understanding GexBot's **Orderflow
+> dataset**, guided by **Freddy**. Sources are
+> `docs/gexbot/community/freddy_orderflow_series.md` (three parts, synthesized),
+> `docs/gexbot/orderflow-intended-read.md`, and the vendor canonical set under
+> `docs/gexbot/canonical/`. Comprehension of the dataset first. No edge hunt,
+> no execution design, no stop doctrine.
+>
+> The measured ledger in §5 remains factually true — those studies ran and
+> their numbers stand — but the *program framing* around them is parked, and
+> §5 should be read as measurement history, not as direction.
+>
+> This banner comes off only when Steve says so.
+
+
 **This is the one canonical statement of the program's purpose.** Every memory
 store in this enterprise is per-repo — beads issues, `bd remember`, Claude
 auto-memory, `CLAUDE.md`, and the two OKF bundles are all repo-scoped, and
