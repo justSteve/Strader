@@ -27,6 +27,7 @@ import argparse
 import json
 import sys
 import time
+from collections import deque
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -55,46 +56,93 @@ def _emit(alert: dict) -> None:
 class LevelWatch:
     """Hysteresis per level: alert once on band entry, re-arm on clear exit.
 
-    Relocation is DEBOUNCED: observed live 2026-08-10 14:59, z_mlgamma flapped
-    7723.8 <-> 7740.0 on consecutive snapshots — two nodes of near-equal
-    magnitude trading the argmax. A relocation only alerts once the new value
-    has held PERSIST consecutive snapshots; a flap that reverts just resets.
+    Ladder identity is judged over a ROLLING WINDOW, not per snapshot. Observed
+    live 2026-08-10 ~15:00Z: z_mlgamma alternated 7721 <-> 7740 on a ~10s
+    cycle — two nodes of near-equal magnitude trading the argmax. Per-snapshot
+    debounce (v1: 5 held rows) still narrated every swap. The truthful states
+    are:
+
+      stable      one cluster dominates the window   -> relocation alerts only
+                  when the dominant cluster itself moves
+      contested   two clusters split the window      -> ONE alert on entry,
+                  silence until one side wins, then a resolution alert
+
+    Clusters are values within --move pts of a running center; window is the
+    last WINDOW snapshots (~2 min at feed cadence).
     """
 
-    PERSIST = 5
+    WINDOW = 90
+    MIN_ROWS = 20        # no verdicts before the window has substance
+    DOMINANT = 0.85      # share that makes a cluster the stable value
+    CONTENDER = 0.25     # share that makes a second cluster a real contender
 
     def __init__(self, key: str, band: float, rearm: float, move: float) -> None:
         self.key = key
         self.band = band
         self.rearm = rearm
         self.move = move
-        self.value: float | None = None
-        self.pending: tuple[float, int] | None = None
+        self.window: deque[float] = deque(maxlen=self.WINDOW)
+        self.value: float | None = None       # current stable cluster center
+        self.contested = False
         self.prev_dist: float | None = None
         self.armed = True
+
+    def _clusters(self) -> list[tuple[float, int]]:
+        """(center, count) sorted by count desc; centers are running means."""
+        out: list[list[float]] = []  # [center, count]
+        for v in self.window:
+            for c in out:
+                if abs(v - c[0]) <= self.move:
+                    c[0] += (v - c[0]) / (c[1] + 1)
+                    c[1] += 1
+                    break
+            else:
+                out.append([v, 1])
+        return sorted(((c, int(n)) for c, n in out), key=lambda t: -t[1])
+
+    def _update_identity(self, spot: float) -> None:
+        self.window.append(self._last_level)
+        if self.value is None:
+            self.value = self._last_level
+            return
+        if len(self.window) < self.MIN_ROWS:
+            return
+        cl = self._clusters()
+        top_center, top_n = cl[0]
+        share = top_n / len(self.window)
+        second_share = (cl[1][1] / len(self.window)) if len(cl) > 1 else 0.0
+
+        if not self.contested:
+            if second_share >= self.CONTENDER:
+                self.contested = True
+                _emit({"kind": "contested", "level": self.key,
+                       "name": LEVEL_NAMES[self.key], "spot": spot,
+                       "contenders": [{"value": round(c, 2),
+                                       "share": round(n / len(self.window), 2)}
+                                      for c, n in cl[:2]]})
+            elif share >= self.DOMINANT and abs(top_center - self.value) > self.move:
+                _emit({"kind": "relocation", "level": self.key,
+                       "name": LEVEL_NAMES[self.key], "spot": spot,
+                       "old": round(self.value, 2), "new": round(top_center, 2)})
+                self.value = top_center
+                self.armed = True
+                self.prev_dist = None
+            elif abs(top_center - self.value) <= self.move:
+                self.value = top_center  # drift tracks silently
+        elif share >= self.DOMINANT:
+            self.contested = False
+            _emit({"kind": "resolved", "level": self.key,
+                   "name": LEVEL_NAMES[self.key], "spot": spot,
+                   "old": round(self.value, 2), "new": round(top_center, 2)})
+            self.value = top_center
+            self.armed = True
+            self.prev_dist = None
 
     def update(self, level: float | None, spot: float | None) -> None:
         if level is None or spot is None:
             return
-        if self.value is None:
-            self.value = level
-        elif abs(level - self.value) > self.move:
-            if self.pending and abs(level - self.pending[0]) <= self.move:
-                self.pending = (level, self.pending[1] + 1)
-            else:
-                self.pending = (level, 1)
-            if self.pending[1] >= self.PERSIST:
-                _emit({"kind": "relocation", "level": self.key,
-                       "name": LEVEL_NAMES[self.key],
-                       "old": self.value, "new": level, "spot": spot,
-                       "held_snapshots": self.pending[1]})
-                self.value = level
-                self.pending = None
-                self.armed = True
-                self.prev_dist = None
-        else:
-            self.value = level  # small drift tracks silently
-            self.pending = None
+        self._last_level = level
+        self._update_identity(spot)
 
         dist = abs(spot - level)
         approaching = self.prev_dist is not None and dist < self.prev_dist
