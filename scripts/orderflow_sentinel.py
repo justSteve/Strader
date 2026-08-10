@@ -37,6 +37,8 @@ from market.corpus.writer import append_jsonl, utc_now_iso  # noqa: E402
 
 LEVELS = ("z_mlgamma", "z_msgamma")
 LEVEL_NAMES = {"z_mlgamma": "major long gamma", "z_msgamma": "major short gamma"}
+REARM_ROWS = 15            # re-arm needs SUSTAINED distance, not one flapped row
+APPROACH_COOLDOWN_S = 120  # a repeat approach inside this window is not news
 
 
 def _feed_path() -> Path:
@@ -92,6 +94,8 @@ class LevelWatch:
         self.last_pair_at: float = 0.0
         self.prev_dist: float | None = None
         self.armed = True
+        self.far_rows = 0
+        self.last_approach_at = 0.0
 
     def _clusters(self) -> list[tuple[float, int]]:
         """(center, count) sorted by count desc; centers are running means."""
@@ -194,13 +198,24 @@ class LevelWatch:
         dist = abs(spot - level)
         approaching = self.prev_dist is not None and dist < self.prev_dist
         if self.armed and dist <= self.band and approaching:
-            _emit({"kind": "approach", "level": self.key,
-                   "name": LEVEL_NAMES[self.key], "value": level,
-                   "spot": spot, "distance_pts": round(dist, 2),
-                   "side": "from_below" if spot < level else "from_above"})
+            # Cooldown guards the pre-zone window, where the instantaneous
+            # value still flaps: one row far away must not re-arm (that fired
+            # three alerts in 16s at 16:31Z), and even a legitimate re-arm
+            # inside APPROACH_COOLDOWN_S is a repeat, not news.
+            now_s = time.monotonic()
+            if now_s - self.last_approach_at >= APPROACH_COOLDOWN_S:
+                _emit({"kind": "approach", "level": self.key,
+                       "name": LEVEL_NAMES[self.key], "value": level,
+                       "spot": spot, "distance_pts": round(dist, 2),
+                       "side": "from_below" if spot < level else "from_above"})
+                self.last_approach_at = now_s
             self.armed = False
-        elif not self.armed and dist >= self.rearm:
-            self.armed = True
+            self.far_rows = 0
+        elif not self.armed:
+            self.far_rows = self.far_rows + 1 if dist >= self.rearm else 0
+            if self.far_rows >= REARM_ROWS:
+                self.armed = True
+                self.far_rows = 0
         self.prev_dist = dist
 
 
