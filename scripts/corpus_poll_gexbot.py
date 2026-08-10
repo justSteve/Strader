@@ -43,18 +43,12 @@ from market.corpus.paths import gexbot_path  # noqa: E402
 from market.corpus.writer import append_jsonl, update_manifest  # noqa: E402
 from strader.market_calendar import (  # noqa: E402
     CENTRAL,
+    GEX_COLLECT_START_CT as DEFAULT_START_CT,
+    GEX_COLLECT_UNTIL_CT as DEFAULT_UNTIL_CT,
     describe,
     window_state,
     year_is_known,
 )
-
-#: Default collect window, US/Central. 07:30 gives the pre-open ramp st-p3lv
-#: asks for — GexBot is already repricing off overnight positioning well before
-#: the 08:30 cash open. 15:05 matches the ES capture supervisor's stop, so the
-#: two live feeds end their day on the same boundary and a day's corpus is
-#: bounded by one window, not two.
-DEFAULT_START_CT = "07:30"
-DEFAULT_UNTIL_CT = "15:05"
 
 _stop = False
 

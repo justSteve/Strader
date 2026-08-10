@@ -36,6 +36,13 @@ EARLY_CLOSE_CT = time(12, 0)
 #: Cash-session open, US/Central.
 SESSION_OPEN_CT = time(8, 30)
 
+#: The GexBot collect window [st-a6zm]. 07:30 gives the pre-open ramp; 15:05
+#: matches the ES capture supervisor's stop, so both live feeds close the day on
+#: the same boundary. Defined here rather than in the collector because the EOD
+#: packet audits rows against this window and the two must not drift.
+GEX_COLLECT_START_CT = "07:30"
+GEX_COLLECT_UNTIL_CT = "15:05"
+
 #: NYSE full-closure holidays, keyed by year. Observed dates, not nominal ones —
 #: 2026-07-03 is here because July 4 falls on a Saturday, and 2027-12-24 because
 #: Christmas falls on a Saturday. A test asserts none of these lands on a

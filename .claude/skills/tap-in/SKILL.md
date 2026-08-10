@@ -75,6 +75,24 @@ the briefing should say so rather than quietly repeating the file.
 > plausible, well-formed, wrong. A surface can change mid-session, and the
 > operator should never have to remember to circle the agent in.
 
+### 4c. Check for Unclosed Trading Days
+
+```bash
+timeout 120 .venv/bin/python scripts/eod_packet.py --audit
+```
+
+A `GAP` line is a trading day whose facts were gathered but whose **Day Close**
+entry was never written. Say so in the briefing and offer `/eod <date>` — days go
+cold fast, and the oldest gap is the one closest to being unrecoverable.
+
+`packet=no` on a past trading day is worse than a missing entry: the 15:15 CT
+cron did not run at all that day. Check `/var/moo/logs/eod-packet/`.
+
+> Added 2026-08-09 (st-z92a). On 2026-08-08 five commits landed with no handoff
+> and the day got no record anywhere but the commit log. `/handoff` closes a
+> SESSION; `/eod` closes a TRADING DAY. A session is allowed to span midnight,
+> which is precisely why the day's record cannot hang off it.
+
 ### 5. Check the Ready Queue (name-first)
 
 The store is Dolt-backed (`.beads/embeddeddolt`). Read it through `bd`, and use
