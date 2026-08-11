@@ -142,6 +142,9 @@
       "Bash(*tokens/schwab*)",
       "Bash(*.env*schwab*)",
       "Bash(*schwab*.env*)"
+    ],
+    "additionalDirectories": [
+      "/var/moo"
     ]
   }
 }
