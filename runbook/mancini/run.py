@@ -56,6 +56,12 @@ DESK_REFRESH = Path("/root/projects/COO/myDesk/trading/trading-desk-refresh.sh")
 # in reply to st-qx4 — moving it breaks a bookmark no error will explain.
 DESK_HTML = Path("/tmp/desk-mancini-latest-es-plan.html")
 DESK_HTML_SCRIPT = Path("/root/projects/COO/tmuxMOO/bin/desk-html.sh")
+# Standing vocabulary section appended to every plan doc [st-eo0]: what the
+# letter's own terms mean (Failed Breakdown, quick trap, acceptance vs the
+# non-acceptance protocol) and how they show on a footprint. Hand-editable —
+# Steve's edits are authoritative and the parse never rewrites it. Absent file
+# simply omits the section.
+METHOD_NOTES = Path(__file__).resolve().parent / "method-notes.md"
 
 
 def _read_newsletter(file_arg: str | None) -> str:
@@ -294,6 +300,20 @@ def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = No
     return "\n".join(lines)
 
 
+def _method_notes_section() -> list[str]:
+    """The standing vocabulary section, if the notes file is present. [st-eo0]
+
+    Returned as a 0- or 1-element list so callers can splat it into
+    extra_sections without a conditional. Never raises: an unreadable notes
+    file drops the section rather than failing the parse."""
+    try:
+        text = METHOD_NOTES.read_text(encoding="utf-8").strip()
+    except OSError as e:
+        logger.warning("method notes skipped: %s", e)
+        return []
+    return [text] if text else []
+
+
 def _render_desk_html(doc: Path) -> Path | None:
     """Re-render the plan doc as the desk browser page at DESK_HTML. [st-lo2]
 
@@ -433,7 +453,7 @@ def main(argv: list[str] | None = None) -> int:
         result = ParseResult.from_dict(json.loads(path.read_text(encoding="utf-8")))
         print(_render_brief(result))
         if not args.no_desk:
-            _emit_desk_plan(result)
+            _emit_desk_plan(result, extra_sections=_method_notes_section())
         return 0
 
     gate_day = _resolve_gate_day()         # gate data-day (last completed session)
@@ -641,7 +661,9 @@ def main(argv: list[str] | None = None) -> int:
             from . import overnight
 
             desk_path = _emit_desk_plan(
-                result, extra_sections=[overnight.build_overnight_section(result)])
+                result,
+                extra_sections=[overnight.build_overnight_section(result),
+                                *_method_notes_section()])
         except Exception as e:  # noqa: BLE001
             logger.warning("desk publish failed (non-fatal): %s", e)
 
