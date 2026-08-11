@@ -73,13 +73,48 @@ class TestRender:
         assert "02:50" in page  # the corpus gap is disclosed, not hidden
 
 
-class TestFailureContract:
-    def test_fetch_failure_returns_nonzero_and_publishes_nothing(self, monkeypatch):
+def _dead(*a, **k):
+    raise RuntimeError("token dead")
+
+
+class TestSourceFallback:
+    def test_corpus_source_page_carries_the_missing_evening_banner(self, monkeypatch):
+        pages = []
+        monkeypatch.setattr(pvp, "bars_from_corpus", lambda *a, **k: _bars())
+        monkeypatch.setattr(pvp, "publish", lambda page, dry: pages.append(page))
+        assert pvp.main(["--date", "2026-08-10", "--source", "corpus"]) == 0
+        assert "Incomplete window" in pages[0]
+        assert "MISSING" in pages[0]
+
+    def test_schwab_source_page_has_no_banner(self, rendered):
+        page, _, _ = rendered
+        assert "Incomplete window" not in page
+
+    def test_auto_falls_back_to_corpus_when_schwab_dies(self, monkeypatch):
+        pages = []
+        monkeypatch.setattr(pvp, "fetch_bars", _dead)
+        monkeypatch.setattr(pvp, "bars_from_corpus", lambda *a, **k: _bars())
+        monkeypatch.setattr(pvp, "publish", lambda page, dry: pages.append(page))
+        assert pvp.main(["--date", "2026-08-10"]) == 0
+        assert "Incomplete window" in pages[0]  # degraded, and it says so
+
+    def test_auto_returns_nonzero_when_both_sources_fail(self, monkeypatch):
         published = []
-        monkeypatch.setattr(pvp, "fetch_bars",
-                            lambda *a, **k: (_ for _ in ()).throw(RuntimeError("token dead")))
+        monkeypatch.setattr(pvp, "fetch_bars", _dead)
+        monkeypatch.setattr(pvp, "bars_from_corpus", _dead)
         monkeypatch.setattr(pvp, "publish", lambda *a, **k: published.append(a))
         assert pvp.main(["--date", "2026-08-10"]) == 2
+        assert published == []
+
+
+class TestFailureContract:
+    def test_explicit_schwab_never_degrades_silently(self, monkeypatch):
+        """--source schwab must FAIL rather than quietly publish a lesser page."""
+        published = []
+        monkeypatch.setattr(pvp, "fetch_bars", _dead)
+        monkeypatch.setattr(pvp, "bars_from_corpus", lambda *a, **k: _bars())
+        monkeypatch.setattr(pvp, "publish", lambda *a, **k: published.append(a))
+        assert pvp.main(["--date", "2026-08-10", "--source", "schwab"]) == 2
         assert published == []
 
     def test_success_publishes_and_returns_zero(self, monkeypatch):

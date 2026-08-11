@@ -27,10 +27,11 @@ from __future__ import annotations
 
 import argparse
 import html
+import json
 import logging
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -75,12 +76,76 @@ def fetch_bars(start_utc: datetime, end_utc: datetime | None = None) -> list[dic
     return candles
 
 
+def bars_from_corpus(start_utc: datetime) -> list[dict]:
+    """Five-minute bars aggregated from the ES tick corpus. Offline fallback.
+
+    Honest but INCOMPLETE: the corpus captures 02:50-15:05 CT, so a profile
+    built this way is missing the 15:05->02:50 evening session entirely. The
+    rendered page says so in a banner — a gap you cannot see is the one that
+    reads as an LVN. Used when Schwab is unavailable (dead token), which
+    otherwise leaves this job with no source at all.
+    """
+    from market.corpus.paths import CORPUS_ROOT
+
+    bars: dict[int, dict] = {}
+    day = start_utc.astimezone(CENTRAL).date()
+    today = datetime.now(tz=CENTRAL).date()
+    while day <= today:
+        path = CORPUS_ROOT / day.isoformat() / "databento_glbx_es.jsonl"
+        if path.exists():
+            with path.open() as f:
+                for line in f:
+                    try:
+                        rec = json.loads(line)
+                        ts = datetime.fromisoformat(
+                            rec["provenance"]["ts_event"].replace("Z", "+00:00"))
+                    except (ValueError, KeyError):
+                        continue
+                    if ts < start_utc:
+                        continue
+                    price, size = rec["data"]["price"], rec["data"]["size"]
+                    k = int(ts.timestamp()) // 300 * 300
+                    b = bars.get(k)
+                    if b is None:
+                        bars[k] = {"datetime": k * 1000, "open": price, "high": price,
+                                   "low": price, "close": price, "volume": size}
+                    else:
+                        b["high"] = max(b["high"], price)
+                        b["low"] = min(b["low"], price)
+                        b["close"] = price
+                        b["volume"] += size
+        day += timedelta(days=1)
+    if not bars:
+        raise RuntimeError("tick corpus holds no ES trades in the anchor window")
+    return [bars[k] for k in sorted(bars)]
+
+
 def _ct(ts_ms: int) -> datetime:
     return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).astimezone(CENTRAL)
 
 
+SOURCES = {
+    "schwab": ("Schwab 5-minute extended-hours candles",
+               "Each bar's volume is spread across the prices it touched, so this is a "
+               "bar-resolution approximation, not a tick-exact profile. The tick corpus "
+               "is not used here — it captures 02:50–15:05 CT only, and would drop the "
+               "evening session silently."),
+    "corpus": ("the ES tick corpus, aggregated to 5-minute bars",
+               "Volume is real prints rather than distributed bar volume, but the window "
+               "is INCOMPLETE — see the banner above."),
+}
+# Shown when the profile is corpus-sourced. Loud by design: an invisible hole in
+# a profile reads as a price the market rejected, which is the opposite of true.
+CORPUS_BANNER = (
+    "Fallback source — the 15:05→02:50 CT evening session is MISSING from this "
+    "profile. The tick corpus does not capture it. Treat thin buckets in that "
+    "price region as unmeasured, not as rejected price."
+)
+
+
 def render_page(profile: VolumeProfile, va: ValueArea, bars: list[dict],
-                anchor_ct: datetime, generated_ct: datetime) -> str:
+                anchor_ct: datetime, generated_ct: datetime,
+                source: str = "schwab") -> str:
     """Self-contained HTML: horizontal histogram, value area shaded, last price
     marked. No external assets — desk pages must render with no network."""
     last = float(bars[-1]["close"])
@@ -138,6 +203,11 @@ def render_page(profile: VolumeProfile, va: ValueArea, bars: list[dict],
  tr.here td.px {{ color:var(--here); font-weight:700; }}
  tr.here td.px::after {{ content:" ◀ last"; font-weight:400; }}
  .note {{ margin-top:20px; color:var(--dim); font-size:12px; max-width:760px; }}
+ .banner {{ margin:0 0 18px; padding:11px 14px; max-width:760px; border-radius:8px;
+            background:#fff4e5; border:1px solid #f0c987; color:#7a4b06;
+            font-size:12.5px; }}
+ @media (prefers-color-scheme: dark) {{ .banner {{ background:#3a2c12;
+            border-color:#7a5a1e; color:#f0d9a8; }} }}
 </style>
 <h1>Premarket Volume Profile — {SYMBOL}</h1>
 <div class="sub">
@@ -146,6 +216,8 @@ def render_page(profile: VolumeProfile, va: ValueArea, bars: list[dict],
   {len(bars)} five-minute bars · {profile.total:,} contracts ·
   generated {generated_ct:%Y-%m-%d %H:%M CT}
 </div>
+{f'<div class="banner"><b>Incomplete window.</b> {CORPUS_BANNER}</div>'
+ if source == "corpus" else ""}
 <div class="stats">
   <div class="stat"><span>VAH</span><b>{va.vah:g}</b></div>
   <div class="stat"><span>POC</span><b>{va.poc:g}</b></div>
@@ -158,10 +230,7 @@ def render_page(profile: VolumeProfile, va: ValueArea, bars: list[dict],
 <p class="note">
   Price is <b>{html.escape(pos)}</b>. Value area holds {va.achieved:.0%} of
   volume ({va.volume:,} of {va.total:,} contracts) in {profile.bucket_pts:g}-point
-  buckets. Built from Schwab 5-minute extended-hours candles: each bar's volume
-  is spread across the prices it touched, so this is a bar-resolution
-  approximation, not a tick-exact profile. The tick corpus is not used here — it
-  captures 02:50–15:05 CT only, and would drop the evening session silently.
+  buckets. Built from {SOURCES[source][0]}. {SOURCES[source][1]}
 </p>
 """
 
@@ -194,6 +263,10 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--date", help="anchor session day (YYYY-MM-DD); "
                                    "default = most recent completed session")
+    ap.add_argument("--source", choices=("auto", "schwab", "corpus"), default="auto",
+                    help="auto (default): Schwab, falling back to the tick corpus "
+                         "with a MISSING-evening banner. schwab: fail instead of "
+                         "degrading. corpus: offline, never touches the API.")
     ap.add_argument("--dry-run", action="store_true",
                     help="build and summarise, publish nothing")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -207,19 +280,33 @@ def main(argv=None) -> int:
     anchor_ct = start.astimezone(CENTRAL)
     logger.info("anchor: %s (prior RTH open)", anchor_ct.strftime("%a %Y-%m-%d %H:%M CT"))
 
-    try:
-        bars = fetch_bars(start)
-    except Exception as e:  # noqa: BLE001 — last-good contract
-        logger.error("fetch failed, published page LEFT AS-IS: %s", e)
-        return 2
+    bars, source = None, args.source
+    if args.source in ("auto", "schwab"):
+        try:
+            bars, source = fetch_bars(start), "schwab"
+        except Exception as e:  # noqa: BLE001
+            if args.source == "schwab":
+                logger.error("fetch failed, published page LEFT AS-IS: %s", e)
+                return 2
+            # auto: degrade to the corpus rather than publish nothing. The page
+            # carries a banner saying the evening session is missing.
+            logger.warning("Schwab unavailable (%s) — falling back to the tick "
+                           "corpus; the evening session will be MISSING", e)
+    if bars is None:
+        try:
+            bars, source = bars_from_corpus(start), "corpus"
+        except Exception as e:  # noqa: BLE001 — last-good contract
+            logger.error("no usable source, published page LEFT AS-IS: %s", e)
+            return 2
 
     profile = build_profile_from_bars(bars, symbol=SYMBOL)
     va = value_area(profile)
     generated = datetime.now(tz=CENTRAL)
-    publish(render_page(profile, va, bars, anchor_ct, generated), args.dry_run)
+    publish(render_page(profile, va, bars, anchor_ct, generated, source), args.dry_run)
 
     last = float(bars[-1]["close"])
-    print(f"{SYMBOL} anchored VP — {len(bars)} bars, {profile.total:,} contracts\n"
+    print(f"{SYMBOL} anchored VP [{source}] — {len(bars)} bars, "
+          f"{profile.total:,} contracts\n"
           f"  anchor {anchor_ct:%a %H:%M CT}  ->  {_ct(bars[-1]['datetime']):%a %H:%M CT}\n"
           f"  VAH {va.vah:g}   POC {va.poc:g}   VAL {va.val:g}   "
           f"(VA {va.achieved:.0%}, width {va.width:g})\n"
