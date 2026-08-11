@@ -4,6 +4,11 @@
 · **Re:** your 2026-08-02 deck-import request; your held "Foundation flashcard
 drills" question; Steve's note that Strader lacks the full picture.
 
+> **UPDATE, same day 2026-08-11:** SERVICED. Steve opened Anki; import ran
+> and verified — 39/39 cards in `Strader::Foundation::09-Fundamental-Units`,
+> 0 duplicates. Steve's daily drill minutes are unblocked. §0 below stands as
+> the record of the nine-day lapse.
+
 ## 0. Your 08-02 import request — honest status: NOT SERVICED
 
 Your `2026-08-02-strader-to-coo-deck-import-request.md` asked COO to run
