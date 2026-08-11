@@ -43,6 +43,7 @@ from market.orderflow.anchored_profile import (
     ValueArea,
     anchor_utc,
     build_profile_from_bars,
+    build_split_profile,
     value_area,
 )
 
@@ -120,11 +121,75 @@ def bars_from_corpus(start_utc: datetime) -> list[dict]:
     return [bars[k] for k in sorted(bars)]
 
 
+def trades_from_corpus(start_utc: datetime):
+    """Real ES prints from the tick corpus, aggressor flag intact. [st-6gs3]
+
+    The high-resolution path. Bars cannot support tick buckets honestly — a
+    bar's volume has to be smeared across the prices it touched — and they
+    carry no aggressor at all. Prints carry both.
+    """
+    from market.corpus.paths import CORPUS_ROOT
+    from market.entities.trade import Trade
+
+    day = start_utc.astimezone(CENTRAL).date()
+    today = datetime.now(tz=CENTRAL).date()
+    n = 0
+    while day <= today:
+        path = CORPUS_ROOT / day.isoformat() / "databento_glbx_es.jsonl"
+        if path.exists():
+            with path.open() as f:
+                for line in f:
+                    try:
+                        rec = json.loads(line)
+                        ts = datetime.fromisoformat(
+                            rec["provenance"]["ts_event"].replace("Z", "+00:00"))
+                    except (ValueError, KeyError):
+                        continue
+                    if ts < start_utc:
+                        continue
+                    d = rec["data"]
+                    n += 1
+                    yield Trade(ts=ts.astimezone(CENTRAL), symbol=d["symbol"],
+                                instrument_id=d.get("instrument_id") or 0,
+                                price=d["price"], size=d["size"],
+                                side=d.get("side") or "N")
+        day += timedelta(days=1)
+    if not n:
+        raise RuntimeError("tick corpus holds no ES trades in the anchor window")
+
+
+class _Tally:
+    """Pass-through counter for a streaming trade generator.
+
+    The profile builder consumes the generator, so anything the page needs
+    about the raw stream — how many prints, and what the last one was — has to
+    be captured while it flows past. Re-reading a 100MB corpus file to answer
+    "what was the last price" would be absurd.
+    """
+
+    __slots__ = ("n", "last")
+
+    def __init__(self):
+        self.n = 0
+        self.last = None
+
+    def __call__(self, it):
+        for t in it:
+            self.n += 1
+            self.last = t
+            yield t
+
+
 def _ct(ts_ms: int) -> datetime:
     return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).astimezone(CENTRAL)
 
 
 SOURCES = {
+    "ticks": ("the ES tick corpus — real prints at native resolution",
+              "Every contract sits at the price it actually traded, and the buy/sell "
+              "split is Databento's aggressor flag, not an inference. Nothing is "
+              "smeared across a bar's range. The window is INCOMPLETE — see the "
+              "banner above."),
     "schwab": ("Schwab 5-minute extended-hours candles",
                "Each bar's volume is spread across the prices it touched, so this is a "
                "bar-resolution approximation, not a tick-exact profile. The tick corpus "
@@ -143,81 +208,118 @@ CORPUS_BANNER = (
 )
 
 
-def render_page(profile: VolumeProfile, va: ValueArea, bars: list[dict],
-                anchor_ct: datetime, generated_ct: datetime,
-                source: str = "schwab") -> str:
-    """Self-contained HTML: horizontal histogram, value area shaded, last price
-    marked. No external assets — desk pages must render with no network."""
-    last = float(bars[-1]["close"])
-    peak = max(profile.volumes) or 1
+def render_page(profile, va: ValueArea, last: float, bar_count: int,
+                end_ct: datetime, anchor_ct: datetime, generated_ct: datetime,
+                source: str = "ticks", aggressor: bool = True) -> str:
+    """TradingView-style profile: right-justified bars at tick resolution.
+
+    Layout follows TV's price scale — the axis is on the RIGHT and the bars
+    grow leftward from it, so the eye reads the histogram against the price
+    column the way it does on a chart. Each row splits buy-aggressor from
+    sell-aggressor volume when the source carries it.
+
+    Self-contained: no external assets, desk pages must render with no network.
+    """
+    prices = profile.prices
+    buys = getattr(profile, "buy_volumes", None)
+    sells = getattr(profile, "sell_volumes", None)
+    totals = profile.volumes
+    peak = max(totals) or 1
+
+    # Price labels only on whole points — at 1-tick resolution every row would
+    # be a label and the axis becomes unreadable noise.
+    label_every = max(1, int(round(1.0 / profile.bucket_pts)))
     rows = []
-    # High price at the top, the way a profile is read off a chart.
-    for price, vol in sorted(zip(profile.prices, profile.volumes),
-                             key=lambda pv: pv[0], reverse=True):
-        classes = []
+    for i in range(len(prices) - 1, -1, -1):          # high price at the top
+        price, tot = prices[i], totals[i]
+        cls = []
         if price == va.poc:
-            classes.append("poc")
+            cls.append("poc")
         elif va.val <= price <= va.vah:
-            classes.append("va")
+            cls.append("va")
         if price <= last < price + profile.bucket_pts:
-            classes.append("here")
+            cls.append("here")
+        if aggressor and buys is not None:
+            b, s = buys[i], sells[i]
+            seg = (f'<i class="sell" style="width:{s / peak * 100:.3f}%"></i>'
+                   f'<i class="buy" style="width:{b / peak * 100:.3f}%"></i>')
+            title = f"{price:g}  vol {tot:,}  buy {b:,}  sell {s:,}  delta {b - s:+,}"
+        else:
+            seg = f'<i class="flat" style="width:{tot / peak * 100:.3f}%"></i>'
+            title = f"{price:g}  vol {tot:,}"
+        show = (round(price / profile.bucket_pts) % label_every == 0)
+        label = f"{price:g}" if show else ""
         rows.append(
-            f'<tr class="{" ".join(classes)}">'
-            f'<td class="px">{price:g}</td>'
-            f'<td class="bar"><span style="width:{vol / peak * 100:.2f}%"></span></td>'
-            f'<td class="vol">{vol:,}</td></tr>'
+            f'<div class="r {" ".join(cls)}" title="{title}">'
+            f'<div class="bars">{seg}</div>'
+            f'<div class="px">{label}</div></div>'
         )
 
     pos = ("inside the value area" if va.val <= last <= va.vah
            else "above the value area" if last > va.vah else "below the value area")
+    delta = getattr(profile, "delta", None)
+    delta_stat = (f'<div class="stat"><span>Net delta</span>'
+                  f'<b class="{"up" if delta > 0 else "dn"}">{delta:+,}</b></div>'
+                  if aggressor and delta is not None else "")
+    legend = ('<span class="k"><i class="buy"></i>buy aggressor</span>'
+              '<span class="k"><i class="sell"></i>sell aggressor</span>'
+              if aggressor else '<span class="k"><i class="flat"></i>volume</span>')
+
     return f"""<!doctype html>
 <meta charset="utf-8">
 <title>Premarket Volume Profile — {SYMBOL} — anchored {anchor_ct:%a %b %-d} 08:30 CT</title>
 <style>
  :root {{ color-scheme: light dark; --ink:#1c1f24; --dim:#6b7280; --line:#e3e6ea;
-          --bg:#fff; --bar:#9aa7b8; --va:#cfe0f5; --poc:#f2b134; --here:#d1495b; }}
+          --bg:#fff; --buy:#26a69a; --sell:#ef5350; --flat:#9aa7b8;
+          --vaTint:rgba(120,160,220,.13); --poc:#f2b134; --here:#d1495b; }}
  @media (prefers-color-scheme: dark) {{ :root {{ --ink:#e8eaed; --dim:#9aa0a6;
-          --line:#2c3036; --bg:#15171a; --bar:#4a5568; --va:#24344a;
-          --poc:#d9992b; --here:#e06c78; }} }}
- body {{ margin:0; padding:24px 28px; background:var(--bg); color:var(--ink);
+          --line:#2c3036; --bg:#15171a; --flat:#4a5568;
+          --vaTint:rgba(120,160,220,.10); --poc:#d9992b; --here:#e06c78; }} }}
+ body {{ margin:0; padding:22px 26px; background:var(--bg); color:var(--ink);
         font:14px/1.5 ui-sans-serif,-apple-system,Segoe UI,Roboto,sans-serif; }}
  h1 {{ font-size:19px; margin:0 0 2px; }}
- .sub {{ color:var(--dim); font-size:12.5px; margin-bottom:18px; }}
- .stats {{ display:flex; gap:26px; flex-wrap:wrap; margin:0 0 20px;
-           padding:14px 16px; border:1px solid var(--line); border-radius:8px; }}
- .stat b {{ display:block; font:600 20px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; }}
+ .sub {{ color:var(--dim); font-size:12.5px; margin-bottom:16px; }}
+ .stats {{ display:flex; gap:24px; flex-wrap:wrap; margin:0 0 8px;
+           padding:13px 15px; border:1px solid var(--line); border-radius:8px; }}
+ .stat b {{ display:block; font:600 19px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; }}
+ .stat b.up {{ color:var(--buy); }} .stat b.dn {{ color:var(--sell); }}
  .stat span {{ color:var(--dim); font-size:11.5px; text-transform:uppercase;
                letter-spacing:.05em; }}
- .wrap {{ overflow-x:auto; }}
- table {{ border-collapse:collapse; width:100%; max-width:760px;
-          font:12.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace; }}
- td {{ padding:1px 8px; white-space:nowrap; }}
- td.px {{ text-align:right; width:1%; color:var(--dim); }}
- td.vol {{ text-align:right; width:1%; color:var(--dim); }}
- td.bar {{ width:100%; }}
- td.bar span {{ display:block; height:11px; background:var(--bar); border-radius:2px; }}
- tr.va td.bar span {{ background:var(--va); }}
- tr.va td.px {{ color:var(--ink); }}
- tr.poc td.bar span {{ background:var(--poc); }}
- tr.poc td.px, tr.poc td.vol {{ color:var(--ink); font-weight:700; }}
- tr.here td.px {{ color:var(--here); font-weight:700; }}
- tr.here td.px::after {{ content:" ◀ last"; font-weight:400; }}
- .note {{ margin-top:20px; color:var(--dim); font-size:12px; max-width:760px; }}
- .banner {{ margin:0 0 18px; padding:11px 14px; max-width:760px; border-radius:8px;
-            background:#fff4e5; border:1px solid #f0c987; color:#7a4b06;
-            font-size:12.5px; }}
+ .legend {{ display:flex; gap:16px; margin:0 0 6px; color:var(--dim); font-size:11.5px; }}
+ .k {{ display:flex; align-items:center; gap:5px; }}
+ .k i {{ width:11px; height:11px; border-radius:2px; display:inline-block; }}
+ i.buy {{ background:var(--buy); }} i.sell {{ background:var(--sell); }}
+ i.flat {{ background:var(--flat); }}
+ /* The profile itself: price axis right, bars growing leftward. */
+ .prof {{ border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+          padding:6px 0; overflow-x:auto; }}
+ .r {{ display:flex; align-items:center; height:4px; }}
+ .r .bars {{ flex:1; display:flex; justify-content:flex-end; align-items:center;
+             min-width:200px; }}
+ .r .bars i {{ display:block; height:4px; }}
+ .r .px {{ width:58px; flex:none; text-align:right; padding-left:8px; color:var(--dim);
+           font:10px/4px ui-monospace,SFMono-Regular,Menlo,monospace; }}
+ .r.va {{ background:var(--vaTint); }}
+ .r.poc {{ background:var(--vaTint); }}
+ .r.poc .bars i {{ height:5px; }}
+ .r.poc .px {{ color:var(--poc); font-weight:700; }}
+ .r.here .px {{ color:var(--here); font-weight:700; }}
+ .r.here {{ box-shadow:inset 0 -1px 0 var(--here); }}
+ .note {{ margin-top:16px; color:var(--dim); font-size:12px; max-width:820px; }}
+ .banner {{ margin:0 0 16px; padding:11px 14px; max-width:820px; border-radius:8px;
+            background:#fff4e5; border:1px solid #f0c987; color:#7a4b06; font-size:12.5px; }}
  @media (prefers-color-scheme: dark) {{ .banner {{ background:#3a2c12;
             border-color:#7a5a1e; color:#f0d9a8; }} }}
 </style>
 <h1>Premarket Volume Profile — {SYMBOL}</h1>
 <div class="sub">
-  Anchored {anchor_ct:%A %b %-d, 08:30 CT} (prior RTH open) →
-  {_ct(bars[-1]["datetime"]):%a %H:%M CT} ·
-  {len(bars)} five-minute bars · {profile.total:,} contracts ·
+  Anchored {anchor_ct:%A %b %-d, 08:30 CT} (prior RTH open) → {end_ct:%a %H:%M CT} ·
+  {bar_count:,} {"prints" if source == "ticks" else "bars"} ·
+  {profile.total:,} contracts · {profile.bucket_pts:g}-pt buckets ·
   generated {generated_ct:%Y-%m-%d %H:%M CT}
 </div>
 {f'<div class="banner"><b>Incomplete window.</b> {CORPUS_BANNER}</div>'
- if source == "corpus" else ""}
+ if source in ("ticks", "corpus") else ""}
 <div class="stats">
   <div class="stat"><span>VAH</span><b>{va.vah:g}</b></div>
   <div class="stat"><span>POC</span><b>{va.poc:g}</b></div>
@@ -225,15 +327,15 @@ def render_page(profile: VolumeProfile, va: ValueArea, bars: list[dict],
   <div class="stat"><span>VA width</span><b>{va.width:g}</b></div>
   <div class="stat"><span>Last</span><b>{last:g}</b></div>
   <div class="stat"><span>vs POC</span><b>{last - va.poc:+g}</b></div>
+  {delta_stat}
 </div>
-<div class="wrap"><table>{"".join(rows)}</table></div>
+<div class="legend">{legend}<span class="k">hover a row for exact volumes</span></div>
+<div class="prof">{"".join(rows)}</div>
 <p class="note">
-  Price is <b>{html.escape(pos)}</b>. Value area holds {va.achieved:.0%} of
-  volume ({va.volume:,} of {va.total:,} contracts) in {profile.bucket_pts:g}-point
-  buckets. Built from {SOURCES[source][0]}. {SOURCES[source][1]}
+  Price is <b>{html.escape(pos)}</b>. Value area holds {va.achieved:.0%} of volume
+  ({va.volume:,} of {va.total:,} contracts). {SOURCES[source][1]}
 </p>
 """
-
 
 def publish(page_html: str, dry_run: bool = False) -> None:
     if dry_run:
@@ -263,10 +365,14 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--date", help="anchor session day (YYYY-MM-DD); "
                                    "default = most recent completed session")
-    ap.add_argument("--source", choices=("auto", "schwab", "corpus"), default="auto",
-                    help="auto (default): Schwab, falling back to the tick corpus "
-                         "with a MISSING-evening banner. schwab: fail instead of "
-                         "degrading. corpus: offline, never touches the API.")
+    ap.add_argument("--source", choices=("ticks", "schwab", "corpus"), default="ticks",
+                    help="ticks (default): real prints from the tick corpus, tick "
+                         "resolution + buy/sell aggressor split, evening session "
+                         "MISSING. schwab: continuous coverage, 5-min bars, no "
+                         "aggressor. corpus: 5-min bars aggregated from ticks.")
+    ap.add_argument("--bucket-ticks", type=int, default=1,
+                    help="bucket width in ES ticks for the tick path "
+                         "(1 = 0.25pt, native; default 1)")
     ap.add_argument("--dry-run", action="store_true",
                     help="build and summarise, publish nothing")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -280,36 +386,39 @@ def main(argv=None) -> int:
     anchor_ct = start.astimezone(CENTRAL)
     logger.info("anchor: %s (prior RTH open)", anchor_ct.strftime("%a %Y-%m-%d %H:%M CT"))
 
-    bars, source = None, args.source
-    if args.source in ("auto", "schwab"):
-        try:
-            bars, source = fetch_bars(start), "schwab"
-        except Exception as e:  # noqa: BLE001
-            if args.source == "schwab":
-                logger.error("fetch failed, published page LEFT AS-IS: %s", e)
-                return 2
-            # auto: degrade to the corpus rather than publish nothing. The page
-            # carries a banner saying the evening session is missing.
-            logger.warning("Schwab unavailable (%s) — falling back to the tick "
-                           "corpus; the evening session will be MISSING", e)
-    if bars is None:
-        try:
-            bars, source = bars_from_corpus(start), "corpus"
-        except Exception as e:  # noqa: BLE001 — last-good contract
-            logger.error("no usable source, published page LEFT AS-IS: %s", e)
-            return 2
+    source, aggressor = args.source, False
+    try:
+        if source == "ticks":
+            # Tally as the generator drains: the profile streams, so the print
+            # count and the LAST PRINT (a real traded price, not a bucket floor)
+            # have to be captured in passing rather than recomputed.
+            tally = _Tally()
+            profile = build_split_profile(tally(trades_from_corpus(start)),
+                                          bucket_ticks=args.bucket_ticks)
+            va = value_area(profile.as_volume_profile())
+            last, end_ct, n = tally.last.price, tally.last.ts, tally.n
+            aggressor = True
+        else:
+            bars = fetch_bars(start) if source == "schwab" else bars_from_corpus(start)
+            profile = build_profile_from_bars(bars, symbol=SYMBOL)
+            va = value_area(profile)
+            last = float(bars[-1]["close"])
+            end_ct, n = _ct(bars[-1]["datetime"]), len(bars)
+    except Exception as e:  # noqa: BLE001 — last-good contract
+        logger.error("source %r unusable, published page LEFT AS-IS: %s", source, e)
+        return 2
 
-    profile = build_profile_from_bars(bars, symbol=SYMBOL)
-    va = value_area(profile)
     generated = datetime.now(tz=CENTRAL)
-    publish(render_page(profile, va, bars, anchor_ct, generated, source), args.dry_run)
+    publish(render_page(profile, va, last, n, end_ct, anchor_ct, generated,
+                        source, aggressor), args.dry_run)
 
-    last = float(bars[-1]["close"])
-    print(f"{SYMBOL} anchored VP [{source}] — {len(bars)} bars, "
-          f"{profile.total:,} contracts\n"
-          f"  anchor {anchor_ct:%a %H:%M CT}  ->  {_ct(bars[-1]['datetime']):%a %H:%M CT}\n"
+    extra = f"   delta {profile.delta:+,}" if aggressor else ""
+    print(f"{SYMBOL} anchored VP [{source}] — {n:,} "
+          f"{'prints' if source == 'ticks' else 'bars'}, "
+          f"{profile.total:,} contracts, {profile.bucket_pts:g}pt buckets\n"
+          f"  anchor {anchor_ct:%a %H:%M CT}  ->  {end_ct:%a %H:%M CT}\n"
           f"  VAH {va.vah:g}   POC {va.poc:g}   VAL {va.val:g}   "
-          f"(VA {va.achieved:.0%}, width {va.width:g})\n"
+          f"(VA {va.achieved:.0%}, width {va.width:g}){extra}\n"
           f"  last {last:g} ({last - va.poc:+g} vs POC)")
     return 0
 

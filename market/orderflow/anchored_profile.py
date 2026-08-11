@@ -69,6 +69,101 @@ class ValueArea:
         return self.vah - self.val
 
 
+@dataclass(frozen=True)
+class SplitProfile:
+    """A profile with buy- and sell-aggressor volume kept apart. [st-6gs3]
+
+    Databento's trades schema carries the aggressor on every print (side 'B' =
+    lifted the ask, 'A' = hit the bid), and it is fully populated — 114,043 ES
+    prints on 2026-08-11, none unknown. So the buy/sell split costs nothing
+    extra to compute and is exact, unlike the bar path where a bar's volume has
+    to be smeared across the prices it touched with no idea who was aggressing.
+
+    This is what TradingView renders as an up/down-volume profile.
+    """
+
+    symbol: str
+    start_ts: datetime
+    end_ts: datetime
+    bucket_pts: float
+    prices: tuple[float, ...]
+    buy_volumes: tuple[int, ...]
+    sell_volumes: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        if not (len(self.prices) == len(self.buy_volumes) == len(self.sell_volumes)):
+            raise ValueError("prices, buy_volumes and sell_volumes must be parallel")
+
+    @property
+    def volumes(self) -> tuple[int, ...]:
+        return tuple(b + s for b, s in zip(self.buy_volumes, self.sell_volumes))
+
+    @property
+    def deltas(self) -> tuple[int, ...]:
+        """Buy minus sell per bucket — where aggression net-leaned."""
+        return tuple(b - s for b, s in zip(self.buy_volumes, self.sell_volumes))
+
+    @property
+    def total(self) -> int:
+        return sum(self.volumes)
+
+    @property
+    def delta(self) -> int:
+        return sum(self.buy_volumes) - sum(self.sell_volumes)
+
+    def as_volume_profile(self) -> VolumeProfile:
+        """Collapse the split so POC/value-area code works unchanged."""
+        return VolumeProfile(
+            symbol=self.symbol, start_ts=self.start_ts, end_ts=self.end_ts,
+            bucket_pts=self.bucket_pts, prices=self.prices, volumes=self.volumes,
+        )
+
+
+def build_split_profile(trades: Iterable[Trade],
+                        bucket_ticks: int = 1) -> SplitProfile:
+    """Histogram real prints into buckets, keeping the aggressor sides apart.
+
+    Default bucket is ONE tick — the native resolution of the instrument. The
+    bar path defaults coarser (4 ticks) because a smeared bar cannot support
+    fine buckets honestly; real prints can.
+
+    Unknown-aggressor prints ('N') are counted in the total by splitting them
+    evenly, so the histogram total always equals the traded total. On ES this
+    is a no-op — Databento classifies every print.
+    """
+    bucket = bucket_ticks * TICK
+    buys: dict[int, int] = {}
+    sells: dict[int, int] = {}
+    symbol: str | None = None
+    first_ts = last_ts = None
+    n = 0
+    for t in trades:
+        k = int(t.price // bucket)
+        if t.side == "B":
+            buys[k] = buys.get(k, 0) + t.size
+        elif t.side == "A":
+            sells[k] = sells.get(k, 0) + t.size
+        else:
+            half = t.size / 2
+            buys[k] = buys.get(k, 0) + int(half)
+            sells[k] = sells.get(k, 0) + t.size - int(half)
+        if n == 0:
+            symbol, first_ts = t.symbol, t.ts
+        last_ts = t.ts
+        n += 1
+    if not n:
+        raise ValueError("cannot build a profile from zero trades")
+    lo, hi = min(min(buys or {0: 0}), min(sells or {0: 0})), \
+             max(max(buys or {0: 0}), max(sells or {0: 0}))
+    keys = range(lo, hi + 1)
+    return SplitProfile(
+        symbol=symbol, start_ts=first_ts, end_ts=last_ts, bucket_pts=bucket,
+        prices=tuple(round(k * bucket, 4) for k in keys),
+        buy_volumes=tuple(buys.get(k, 0) for k in keys),
+        sell_volumes=tuple(sells.get(k, 0) for k in keys),
+    )
+
+
 def anchor_utc(session_day, open_ct: time = RTH_OPEN_CT) -> datetime:
     """UTC datetime of ``session_day``'s cash open.
 
