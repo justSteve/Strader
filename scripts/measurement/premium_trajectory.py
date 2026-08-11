@@ -247,10 +247,18 @@ def analyze_premium_curve(curve: dict[int, dict], entry_minute: int,
 
 def main():
     results = []
+    # Skips are tracked by reason and reported. Since st-7av4 stopped the daily
+    # OPRA import (2026-08-07), the tape is pulled on demand for selected
+    # sessions, so a partially-populated date range is the normal case. Dropping
+    # days silently would let every statistic below be computed over an unnamed
+    # subset while reading as the full study.
+    missing_profile: list[str] = []
+    missing_opra: list[str] = []
 
     for date_str in CONFIRMED_V_DAYS:
         profile_path = PROFILES_DIR / f"tape_{date_str}.json"
         if not profile_path.exists():
+            missing_profile.append(date_str)
             continue
         with open(profile_path) as f:
             profile = json.load(f)
@@ -258,6 +266,7 @@ def main():
         corpus_path = CORPUS_DIR / date_str
         opra_path = corpus_path / "databento_opra.jsonl"
         if not opra_path.exists():
+            missing_opra.append(date_str)
             continue
 
         trough_minute = profile["trough_minute"]
@@ -325,9 +334,29 @@ def main():
 
         results.append(day_result)
 
+    # Coverage first, and on stderr, so a partial run cannot be mistaken for a
+    # full one no matter how the stdout table is piped or pasted.
+    total = len(CONFIRMED_V_DAYS)
+    if missing_profile or missing_opra:
+        print(f"\n[coverage] {len(results)}/{total} V-days processed", file=sys.stderr)
+        if missing_opra:
+            print(f"  {len(missing_opra)} skipped — no OPRA tape "
+                  f"(on-demand since st-7av4): {', '.join(missing_opra)}",
+                  file=sys.stderr)
+        if missing_profile:
+            print(f"  {len(missing_profile)} skipped — no tape profile: "
+                  f"{', '.join(missing_profile)}", file=sys.stderr)
+
+    if not results:
+        print(f"[FAIL] no V-day had both a tape profile and an OPRA tape; "
+              f"{total} candidates, none usable. Pull the tape with "
+              f"corpus_backfill_databento.py --opra before rerunning.",
+              file=sys.stderr)
+        return 1
+
     # Cross-day summary
     print(f"\n{'='*72}")
-    print(f"  PREMIUM TRAJECTORY ATLAS — {len(results)} V-days")
+    print(f"  PREMIUM TRAJECTORY ATLAS — {len(results)} of {total} V-days")
     print(f"{'='*72}\n")
 
     # For each day, show the best-performing strike (the one a trader would have picked)
@@ -398,7 +427,8 @@ def main():
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\n  Wrote {output_path}", file=sys.stderr)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
