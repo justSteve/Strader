@@ -26,14 +26,21 @@ different corpus files. Two workers keeps the file-per-stream invariant.
 
 Cost
 ----
-Both live streams are covered by flat subscriptions — OPRA by the OPRA
-Equity Options plan, GLBX/ES by the CME Standard plan added 2026-08-01 and
-verified live 2026-08-03. Neither incurs a per-GB charge.
+GLBX/ES live is covered by a flat subscription — the CME Standard plan added
+2026-08-01, verified live 2026-08-03. It incurs no per-GB charge.
 
-Do NOT quote `metadata.list_unit_prices` as the cost of these streams: that
-endpoint returns pay-as-you-go list rates, and it returns them identically
-whether or not the account is subscribed. Historical (batch) pulls remain
-usage-rated; live is not.
+OPRA live is NOT. The $199 OPRA Equity Options plan was replaced by the
+CME/Futures plan, confirmed on the portal 2026-08-04 (st-7av4) — so `opra`
+here names a subscription the account no longer holds, and streaming it would
+fall to pay-as-you-go rather than being sub-covered. Options tape is now pulled
+retrospectively on demand (`corpus_backfill_databento.py --opra`) for specific
+sessions worth assessing, not collected forward.
+
+Do NOT quote `metadata.list_unit_prices` as the cost of the *subscribed*
+streams: that endpoint returns pay-as-you-go list rates, and it returns them
+identically whether or not the account is subscribed. Historical (batch) pulls
+remain usage-rated; subscribed live is not. Note the trap that reading applies
+only to plans actually held — it was written when OPRA was one of them.
 
 `--probe`, `--max-ticks`, and `--max-seconds` are for mechanical validation
 and scope control, not cost gating.
@@ -525,11 +532,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Corpus Databento LIVE streamer")
     parser.add_argument("--date", default=None,
                         help="Trading date YYYY-MM-DD (US/Central). Default: today CT")
-    parser.add_argument("--streams", default="opra",
+    parser.add_argument("--streams", default="es,es-mbp1",
                         help="Comma list of streams: opra, es, es-mbp1 "
-                             "(default opra). Phase B round-the-clock ES "
-                             "capture is 'es,es-mbp1' — trades for the "
-                             "footprint, mbp-1 for absorption.")
+                             "(default 'es,es-mbp1' — trades for the "
+                             "footprint, mbp-1 for absorption; the streams the "
+                             "CME Standard plan actually covers). 'opra' names "
+                             "a subscription no longer held (st-7av4) and would "
+                             "bill pay-as-you-go; pull options tape "
+                             "retrospectively instead.")
     parser.add_argument("--schema", default=None,
                         help="Override the schema for EVERY stream (manual "
                              "probing only). Leave unset so each stream uses "
