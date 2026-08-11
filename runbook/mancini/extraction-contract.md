@@ -60,6 +60,36 @@ capture them all).
   capture these too, classified by how Mancini frames them
   (target / pivot / trigger / support / resistance).
 
+**Level callouts — put Mancini's own words in `label`.** [st-eo0, Steve
+2026-08-11] When the letter says something specific about a level, carry it:
+*"heavily used up now and risky to buy directly"*, *"nice shelf of lows from
+noon Thursday to midnight Friday"*, *"very weak, shaky support especially being
+in the middle of a range"*, *"a Failed Breakdown of this low is very
+actionable"*. These render under each ladder as **Mancini's callouts** and are
+the level colour Steve reads the plan for.
+
+The `label` field carries the `(major)` annotation and the callout together,
+with `major` as a **prefix**:
+
+| Letter says | `label` |
+|---|---|
+| `7724 (major)`, plus a shelf-of-lows note | `"major · nice shelf of lows from noon Thursday to midnight Friday"` |
+| `7751 (major)`, no note | `"major"` |
+| `7767`, called weak and shaky | `"1st support down — very weak, shaky, mid-range"` |
+
+Prefix, never substring: `schema.is_major()` tests `startswith("major")`
+precisely because a callout can contain the word ("lost the major June 11th
+low") and a substring test would promote that level on the Pine chart and in
+the Daily Payload. Do not write `label: "shelf of lows (major)"`.
+
+**Excluded from callouts: Mancini's own runners and position talk.** Steve does
+not want to read which runner Mancini is holding or when he entered it — skip
+*"I am still holding my 10% long runner from the 4:36PM 7325 Failed
+Breakdown"*. This exclusion is narrow: it removes **his positions**, not his
+level descriptions. An earlier reading of it collapsed every callout to
+`major`/`minor` and stripped the plan of its colour; that was wrong. Keep the
+level's character, drop the position.
+
 **Commentary** — the `Bull case tomorrow`, `Bear case tomorrow`, and
 `In summary for tomorrow` paragraphs are forward-looking conditional guidance
 ("defend 7435 then rip to 7458, 7472"; "below 7377 opens breakdown shorts").

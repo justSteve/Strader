@@ -19,6 +19,7 @@ import subprocess
 from typing import Sequence
 
 from .chart import key_prices
+from . import schema
 from .schema import Level, ParseResult
 from .validate import split_out_of_band
 
@@ -33,7 +34,7 @@ def _fmt(price: float) -> str:
 
 
 def _tier(level: Level) -> str:
-    return "major" if "major" in (level.label or "").lower() else "minor"
+    return "major" if schema.is_major(level.label) else "minor"
 
 
 # Commentary categories that belong in the letter summary and never on a chart

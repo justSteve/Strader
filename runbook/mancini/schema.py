@@ -18,6 +18,36 @@ from typing import Any
 LEVEL_KINDS = ("support", "resistance", "pivot", "target", "trigger")
 TRIGGER_TYPES = ("price_cross", "price_zone", "time", "regime", "unconditional")
 
+# Level.label carries two things at once [st-eo0]: the letter's `(major)`
+# annotation and Mancini's own callout for that level ("shelf of lows from noon
+# Thursday", "heavily used up now"). The convention is a `major` PREFIX,
+# optionally followed by the callout after a separator:
+#
+#     "major"                            -> major, no callout
+#     "major · shelf of lows from noon"  -> major + callout
+#     "1st support down — weak, shaky"   -> callout only
+#
+# Detection is deliberately prefix-based, not substring-based. A callout can
+# legitimately contain the word "major" ("lost the major June 11th low") and a
+# substring test would silently promote that level everywhere it is consumed —
+# the Pine chart, the Daily Payload, the overnight brief. Route every major
+# check through is_major() so the rule has one definition.
+_CALLOUT_SEPARATORS = ("·", "—", "-", ":", ",")
+
+
+def is_major(label: str) -> bool:
+    """True when the letter annotated this level `(major)`."""
+    return (label or "").strip().lower().startswith("major")
+
+
+def callout(label: str) -> str:
+    """Mancini's own note for a level, with the `major` prefix stripped."""
+    text = (label or "").strip()
+    if not is_major(text):
+        return text
+    rest = text[len("major"):].lstrip()
+    return rest.lstrip("".join(_CALLOUT_SEPARATORS)).strip()
+
 
 @dataclass
 class Level:

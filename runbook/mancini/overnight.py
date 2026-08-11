@@ -31,6 +31,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Callable, Sequence
 from zoneinfo import ZoneInfo
 
+from . import schema
 from .schema import Level, ParseResult
 
 logger = logging.getLogger("runbook.mancini")
@@ -139,7 +140,7 @@ def compute_interactions(levels: Sequence[Level], candles: Sequence[dict],
             continue
         it = LevelInteraction(
             price=lv.price, kind=lv.kind,
-            major="major" in (lv.label or "").lower(),
+            major=schema.is_major(lv.label),
         )
         is_sup = lv.kind == "support"
         for c in candles:

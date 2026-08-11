@@ -34,6 +34,7 @@ from pathlib import Path
 from . import clean
 from . import listlevels
 from . import parse as parse_mod
+from . import schema
 from . import store as store_mod
 from . import validate as validate_mod
 from .schema import ParseResult
@@ -246,13 +247,26 @@ def _render_brief(result: ParseResult) -> str:
     return "\n".join(lines)
 
 
-def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = None) -> str:
+def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = None,
+                      overnight_section: str | None = None) -> str:
     """The prose plan-day doc for the steves-desk Trading window. [st-eo0]
 
     Same content contract as the hand-written myDesk/reports/mancini docs:
     bias, actionable forward notes, then the two ladders with majors bolded.
     Renders whatever the ParseResult holds — a hybrid (deterministic-lists)
-    parse yields ladders with commentary marked pending."""
+    parse yields ladders with commentary marked pending.
+
+    Steve's 2026-08-11 refinements:
+    - ``overnight_section`` folds INTO the forward-looking notes rather than
+      standing as its own section further down. What price has already done to a
+      level is forward-looking information — it belongs beside the note it
+      qualifies, not in an appendix he has to scroll to.
+    - Ladders carry Mancini's own callouts for the levels he singles out. The
+      compact price run stays (it is what makes a 46-level ladder scannable) and
+      the annotated subset is listed under it. Earlier versions collapsed every
+      callout to `major`/`minor`; that over-corrected a narrow instruction to
+      drop his RUNNER/position talk, and threw away the level colour with it.
+    """
     try:
         weekday = datetime.strptime(result.date, "%Y-%m-%d").strftime("%A")
     except (ValueError, TypeError):
@@ -278,6 +292,10 @@ def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = No
     if not result.commentary:
         lines.append("_(commentary pending — interpretive leg unavailable; "
                      "ladders below are the deterministic list levels)_")
+    # Overnight interaction lands inside this section, demoted to a sub-head so
+    # it reads as part of the forward picture rather than a separate appendix.
+    if overnight_section:
+        lines += ["", _demote_headings(overnight_section)]
     for kind, title in (("resistance", "Resistance ladder (high→low)"),
                         ("support", "Support ladder (high→low)")):
         lvls = sorted((l for l in result.levels if l.kind == kind),
@@ -286,8 +304,14 @@ def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = No
             continue
         lines += ["", f"## {title}  ·  **bold = major**", ""]
         lines.append(" · ".join(
-            f"**{l.price:g}**" if "major" in l.label.lower() else f"{l.price:g}"
+            f"**{l.price:g}**" if schema.is_major(l.label) else f"{l.price:g}"
             for l in lvls))
+        annotated = [l for l in lvls if schema.callout(l.label)]
+        if annotated:
+            lines += ["", "_Mancini's callouts:_", ""]
+            for l in annotated:
+                marker = f"**{l.price:g}**" if schema.is_major(l.label) else f"{l.price:g}"
+                lines.append(f"- {marker} — {schema.callout(l.label)}")
     extras = [l for l in result.levels if l.kind not in ("resistance", "support")]
     if extras:
         lines += ["", "## Other named levels", ""]
@@ -298,6 +322,18 @@ def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = No
         lines += ["", section]
     lines.append("")
     return "\n".join(lines)
+
+
+def _demote_headings(section: str) -> str:
+    """Push a section's markdown headings down one level. [st-eo0]
+
+    Used to fold the overnight brief into the forward-looking notes: it is
+    authored as a top-level `##` section and becomes a `###` sub-head there.
+    Fenced code is not a concern — these sections carry none."""
+    return "\n".join(
+        ("#" + line) if line.startswith("## ") else line
+        for line in section.splitlines()
+    )
 
 
 def _method_notes_section() -> list[str]:
@@ -358,7 +394,8 @@ def _render_desk_html(doc: Path) -> Path | None:
     return DESK_HTML
 
 
-def _emit_desk_plan(result: ParseResult, extra_sections: list[str] | None = None) -> Path | None:
+def _emit_desk_plan(result: ParseResult, extra_sections: list[str] | None = None,
+                    overnight_section: str | None = None) -> Path | None:
     """Write the plan-day doc and refresh the Trading window's stable title.
 
     Non-fatal by contract (mirrors the chart emit): the parse artifacts are the
@@ -371,7 +408,8 @@ def _emit_desk_plan(result: ParseResult, extra_sections: list[str] | None = None
         return None
     DESK_REPORTS.mkdir(parents=True, exist_ok=True)
     doc = DESK_REPORTS / f"mancini-es-{result.date}.md"
-    doc.write_text(_render_desk_plan(result, extra_sections), encoding="utf-8")
+    doc.write_text(_render_desk_plan(result, extra_sections, overnight_section),
+                   encoding="utf-8")
     logger.info("desk plan doc: %s", doc)
     if DESK_REFRESH.exists():
         proc = subprocess.run(["bash", str(DESK_REFRESH)],
@@ -662,8 +700,8 @@ def main(argv: list[str] | None = None) -> int:
 
             desk_path = _emit_desk_plan(
                 result,
-                extra_sections=[overnight.build_overnight_section(result),
-                                *_method_notes_section()])
+                extra_sections=_method_notes_section(),
+                overnight_section=overnight.build_overnight_section(result))
         except Exception as e:  # noqa: BLE001
             logger.warning("desk publish failed (non-fatal): %s", e)
 

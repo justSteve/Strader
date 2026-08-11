@@ -28,6 +28,7 @@ from typing import Any
 from mancini.parser import ManciniEmail, Level as RegexLevel
 from mancini.pine_emitter import emit as emit_pine_source
 
+from . import schema
 from .schema import ParseResult
 from .validate import split_out_of_band
 
@@ -45,7 +46,8 @@ def _sane_result(result: ParseResult) -> ParseResult:
 
 
 def _is_major(label: str) -> bool:
-    return "major" in (label or "").lower()
+    """Delegates to the shared rule; see schema.is_major. [st-eo0]"""
+    return schema.is_major(label)
 
 
 def key_prices(result: ParseResult) -> set[float]:
