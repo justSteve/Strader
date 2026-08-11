@@ -3,7 +3,7 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
-**Last refreshed**: 2026-08-10 [st-a6zm, st-p3lv, co-hvxye]
+**Last refreshed**: 2026-08-11 [st-a6zm, st-p3lv, st-1qpz, co-hvxye]
 
 > Standing operational snapshot — what is wired up, live, or paused right now.
 > Session history lives in `DaysActivity.md`; work lives in beads; durable
@@ -85,12 +85,19 @@ missing its `leases` table). The working channel is file-convention A2A under
 
 1. **Risk cap unarmed** — `account_balance_usd: null`. Steve's ruling on the
    whole risk table is outstanding.
-2. **Nothing here — this slot held a stale item for four sessions.** It read
-   "`st-i68` — Mancini pre-open cron fails on cron PATH … fires every weekday at
+2. **`bd` writes are BLOCKED** (2026-08-11 03:15) — `refusing to auto-apply 1
+   pending schema migration to a remote-backed database (v64 -> v65)`. Reads and
+   `bd export` still work; closes and updates do not. Exits are
+   `bd migrate --force && bd dolt push` from the **one** designated migrator, or
+   `bd bootstrap` to adopt another clone's schema — and bootstrap replaces the
+   local DB and loses unpushed issues, which prior guidance here says corrupts.
+   Backup at `data/beads-backup-2026-08-11.jsonl` (285 issues, 5 memories).
+   `st-p3lv` is the one close waiting on this; it has passed its acceptance test.
+3. *(This slot held `st-i68` for four sessions, reading "fires every weekday at
    08:15 until fixed" while that job was exiting rc=0 on 08-04 through 08-07.
-   Closed 2026-08-10, along with the gate bug (`st-1qpz`) that was its actual
-   08-10 failure. Both verified green end to end. Left as a marker: an Attention
-   Item nobody re-checks against observable state is worse than an empty list.
+   Closed 2026-08-10 with the gate bug `st-1qpz` that was its actual failure,
+   both verified green end to end. Kept as a marker: an Attention Item nobody
+   re-checks against observable state is worse than an empty list.)*
 3. **`st-08p` blocked externally** — training steps 3–5 need Steve's NotebookLM
    upload and COO's deck import.
 4. **Recognizer is direction-blind upward** — all four setups are downside
