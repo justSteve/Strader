@@ -83,6 +83,14 @@ missing its `leases` table). The working channel is file-convention A2A under
 
 ## Attention Items
 
+0. **REMOVE the Mancini Method-notes section on the next parse** (Steve,
+   2026-08-11). It is deliberately left on today's plan doc only so he can read
+   it once. He does not want the passage on every letter — the terms belong in
+   the **Flashcard engine**, and COO is handing over those details. Removal is
+   two deletions in `runbook/mancini/run.py`: the `*_method_notes_section()`
+   splat in the `--from-blob` desk publish and the `extra_sections=` argument on
+   the `--show` path; then delete `runbook/mancini/method-notes.md` and
+   `_method_notes_section()`. Do this **before** the 08-12 parse publishes.
 1. **Risk cap unarmed** — `account_balance_usd: null`. Steve's ruling on the
    whole risk table is outstanding.
 2. **`bd` writes are BLOCKED** (2026-08-11 03:15) — `refusing to auto-apply 1

@@ -1,8 +1,13 @@
+<!-- TEMPORARY — DELETE ON THE NEXT PARSE (Steve, 2026-08-11).
+     Left on the 08-11 plan doc for one read only. Steve does not want this
+     passage on every letter; the terms go into the Flashcard engine instead
+     (COO is handing over the details). See CurrentStatus.md Attention Item 0
+     for the exact removal steps. -->
+
 ## Method notes — reading Mancini's vocabulary
 
-_Hand-editable. This file is appended verbatim to every ES plan doc; edit it
-directly and the change shows up on the next parse. It defines the letter's own
-terms — it is not day-specific and the parser never rewrites it._
+_One-time section, removed after 2026-08-11. These terms are moving to the
+Flashcard engine._
 
 **Elevator down.** A sharp vertical flush that cuts through several supports with
 ease. Mancini's framing: ES "rallies slowly (stairs up) and sells in a straight
