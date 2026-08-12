@@ -83,24 +83,16 @@ missing its `leases` table). The working channel is file-convention A2A under
 
 ## Attention Items
 
-0. **REMOVE the Mancini Method-notes section on the next parse** (Steve,
-   2026-08-11). It is deliberately left on today's plan doc only so he can read
-   it once. He does not want the passage on every letter — the terms belong in
-   the **Flashcard engine**, and COO is handing over those details. Removal is
-   two deletions in `runbook/mancini/run.py`: the `*_method_notes_section()`
-   splat in the `--from-blob` desk publish and the `extra_sections=` argument on
-   the `--show` path; then delete `runbook/mancini/method-notes.md` and
-   `_method_notes_section()`. Do this **before** the 08-12 parse publishes.
+0. *(Done 2026-08-12 pre-open: method-notes section removed before the parse
+   published — `st-st6h` closed, commit `028341a`.)*
 1. **Risk cap unarmed** — `account_balance_usd: null`. Steve's ruling on the
    whole risk table is outstanding.
-2. **`bd` writes are BLOCKED** (2026-08-11 03:15) — `refusing to auto-apply 1
-   pending schema migration to a remote-backed database (v64 -> v65)`. Reads and
-   `bd export` still work; closes and updates do not. Exits are
-   `bd migrate --force && bd dolt push` from the **one** designated migrator, or
-   `bd bootstrap` to adopt another clone's schema — and bootstrap replaces the
-   local DB and loses unpushed issues, which prior guidance here says corrupts.
-   Backup at `data/beads-backup-2026-08-11.jsonl` (285 issues, 5 memories).
-   `st-p3lv` is the one close waiting on this; it has passed its acceptance test.
+2. *(RESOLVED 2026-08-12: `bd` writes work again — verified by live
+   create/close this morning. The v64→v65 block was repaired COO-side
+   estate-wide (co-ir43p): backup, `migrate --force`, push, write-probe.
+   Strader learned this only via the 08-12 transcript review — the repair was
+   never announced to this repo, which is exactly the notification gap the
+   zgent sync plan (st-aski) addresses. Close `st-p3lv` next session.)*
 3. *(This slot held `st-i68` for four sessions, reading "fires every weekday at
    08:15 until fixed" while that job was exiting rc=0 on 08-04 through 08-07.
    Closed 2026-08-10 with the gate bug `st-1qpz` that was its actual failure,
