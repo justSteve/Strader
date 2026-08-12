@@ -1,0 +1,304 @@
+{
+  "cron_entries": [
+    {
+      "schedule": "30 22 * * *",
+      "command": "/root/projects/COO/factory/cron/pulse-zepos-wrapper.sh",
+      "ultimate_target": "claude --model claude-sonnet-4-6 --print \"/pulse-zepos\" in /root/projects/COO (spawns a Claude session running the pulse-zepos skill: .claude/skills/pulse-zepos/run.sh)",
+      "health": "Ran 2026-08-11 22:30 (/var/moo/logs/pulse-runs/, zepo-pulse.jsonl updated 22:38). Heartbeat checked by COO /tap-in."
+    },
+    {
+      "schedule": "30 6 * * 1-6",
+      "command": "/root/projects/COO/factory/cron/corpus-daily-wrapper.sh",
+      "ultimate_target": "/root/projects/Strader/scripts/corpus_daily.py (Strader venv, T+1 Databento ES+OPRA batch pull, datastream gate, alerts to data/corpus/_health.jsonl). COO owns this cron temporarily.",
+      "health": "HEALTHY — ran today 06:30-06:31 CT, gate line for day 2026-08-11 ok:true (496,011 ES cycles, 1 recovered reconnect)."
+    },
+    {
+      "schedule": "*/5 8-15 * * 1-5",
+      "command": "/root/projects/Strader/scripts/cron/gauge-preopen-wrapper.sh",
+      "ultimate_target": "scripts/mi_gauge.py --live in a dedicated tmux window (launch + respawn, state replay from mi_gauge_live.jsonl); bootstraps the desk via /root/projects/COO/tmuxMOO/bin/steves-desk-session.sh if the session is down. Session window 08:00-15:15 CT.",
+      "health": "Last active 2026-08-11 08:00 log; today's window not yet open at check time (06:53 CT). No gauge process running — correct state pre-08:00."
+    },
+    {
+      "schedule": "15 8 * * 1-5",
+      "command": "/root/projects/Strader/scripts/cron/mancini-preopen-wrapper.sh",
+      "ultimate_target": "PYTHONPATH=repo .venv/bin/python -m runbook.mancini.run --from-blob --prepare-only --clip (fetch letter from Azure blob via pinned az interop binary, clean, deterministic list scrape, alert 'ready to parse'; reloads richer stored parse to clipboard if one exists). Failure alerts via corpus_daily.emit_alert.",
+      "health": "Ran 2026-08-11 08:15. AT RISK today: Schwab refresh token expired 2026-08-12 ~06:37 CT and the re-minted token is defective (no refresh_token) — the overnight interaction brief's ES bar fetch depends on it."
+    },
+    {
+      "schedule": "0 7 / 30 8 / 0 13 / 45 14 * * 1-5 (premarket|open|afternoon|close-watch)",
+      "command": "/root/projects/Strader/scripts/cron/schwab-stages-wrapper.sh <stage>",
+      "ultimate_target": "scripts/corpus_pull_schwab.py --stage <stage> → data/corpus/<day>/schwab.jsonl; failure alerts via corpus_daily.emit_alert",
+      "health": "[ALERT] Schwab token EXPIRED today (health log 10:01Z) and replacement is the 181-byte defective grant. Today's stage pulls will fail until Steve runs scripts/refresh_schwab_token.py."
+    },
+    {
+      "schedule": "25 8 * * 1-5",
+      "command": "/root/projects/Strader/scripts/cron/preopen-heartbeat-wrapper.sh",
+      "ultimate_target": "python -m runbook.risk_state reset (day-start risk reset, st-958) then python -m runbook.heartbeat (runbook #11: did pull/parse/gate run pre-open); rc=2 emits its own infra alert",
+      "health": "Ran 2026-08-11 08:25 (log dir current). Will fire 08:25 today and should flag the Schwab token failure."
+    },
+    {
+      "schedule": "30 7 * * 1-6",
+      "command": "/root/projects/Strader/scripts/cron/corpus-compact-wrapper.sh",
+      "ultimate_target": "scripts/corpus_compact_databento.py — packs databento_*.dbn→.dbn.zst and *.jsonl→.jsonl.gz, removes source after verified compress; only packs days whose manifest shows databento_glbx_es + databento_opra healthy",
+      "health": "Ran 2026-08-11 07:30 (log dir mtime)."
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "command": "/root/projects/Strader/scripts/cron/capture-supervisor-session.sh",
+      "ultimate_target": "→ capture-supervisor-wrapper.sh → (re)launches scripts/corpus_stream_databento.py --streams es,es-mbp1 --until-ct 15:05 in tmux steves-desk:capture. Window 02:50-15:05 CT set in this checked-in shim.",
+      "health": "WORKING AS DESIGNED — today 02:50 CT it found capture dead (capture_dead alert) and relaunched pid 133437 within 4 seconds (capture_restarted, restarts_today=1). Capture process confirmed live now (etime 3:51h)."
+    },
+    {
+      "schedule": "20 8 * * 1-5",
+      "command": "/root/projects/Strader/scripts/cron/level-tracker-wrapper.sh",
+      "ultimate_target": "python -m runbook.mancini.tracker --loop — 1/min re-fetch of letter-window /ES candles, recomputes level touched/held/broken/reclaimed, atomically rewrites data/level_state/current.json; pidfile refuses twins; self-exits 15:15 CT",
+      "health": "Ran 2026-08-11 08:20. Today Schwab-token-dependent: will run but fetch will fail-and-alert until re-auth."
+    },
+    {
+      "schedule": "0 21 * * 1-5",
+      "command": "/root/projects/Strader/scripts/gexbot_hist_nightly.sh",
+      "ultimate_target": ".venv/bin/python scripts/gexbot_hist_backfill.py --ticker SPX --days 3 (idempotent /hist harvest, skips files present locally/on Z:)",
+      "health": "MISSED 2026-08-11 21:00 fire (box down around the 08-11 reboot; last run 08-10 exit 0). --days 3 self-heals tonight."
+    },
+    {
+      "schedule": "15 23 * * *",
+      "command": "/root/projects/DataArchive/scripts/cron/memory-review-daily.sh",
+      "ultimate_target": "python -m memory_review (collect from Claude Monitor + local memory tiers, cluster, build packet, refresh desk page). rc 0/1/2 = healthy/degraded/failed; heartbeat always written.",
+      "health": "Ran 2026-08-11 23:15 (log dir current)."
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "command": "/root/projects/DataArchive/scripts/cron/memory-review-endpoint.sh supervise",
+      "ultimate_target": "python3 -m memory_review serve --host 127.0.0.1 --port 3010 (decision-capture endpoint; pidfile /var/moo/state/memory-review-endpoint.pid)",
+      "health": "HEALTHY — endpoint running 8h30m (pid 1262), survived the 08-11 reboot via this supervisor."
+    },
+    {
+      "schedule": "30 16 * * 5",
+      "command": "/root/projects/DataArchive/scripts/cron/memory-review-weekly.sh",
+      "ultimate_target": "python -m memory_review publish → ensure endpoint up → open /var/moo/desk/desk-memory-review.html (the weekly sitting)",
+      "health": "Weekly; last Friday was 08-07 — not directly checked."
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "command": "/root/projects/Strader/scripts/cron/gexbot-supervisor-session.sh",
+      "ultimate_target": "→ capture-supervisor-wrapper.sh → scripts/corpus_poll_gexbot.py --start-ct 08:30 --until-ct 15:05 (10-endpoint GexBot collector, venue=cash w/ NYSE holiday table, stale at 300s, tmux window 'gexbot', state data/corpus/_gexbot_health.json)",
+      "health": "Log dir current through today. Idle now pre-08:30 — correct per window."
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "command": "/root/projects/Strader/scripts/cron/gexbot-orderflow-1s-supervisor.sh",
+      "ultimate_target": "→ capture-supervisor-wrapper.sh → scripts/corpus_poll_gexbot_orderflow_1s.py --start-ct 08:30 --until-ct 15:05 (LIVE 1 Hz orderflow leg, separate process/state/window 'gexbot-of1s' by design)",
+      "health": "Log dir current. Idle pre-08:30 — correct."
+    },
+    {
+      "schedule": "15 23 * * *",
+      "command": "/root/projects/COO/factory/scripts/beads-remote-push.sh",
+      "ultimate_target": "bd/dolt push of refs/dolt/data to git origin, with the dolt sql-server stall handled (stop idle server + one retry); heartbeat /var/moo/state/beads-remote-push.json",
+      "health": "Log written 2026-08-12 06:48 (session-close path also invokes it) — active."
+    },
+    {
+      "schedule": "40 4 * * 0",
+      "command": "/root/projects/COO/factory/scripts/beads-restore-drill.sh",
+      "ultimate_target": "bd bootstrap restore of refs/dolt/data into a throwaway tmpdir + issue-count comparison vs live store (tolerance 25); heartbeat /var/moo/state/beads-restore-drill.json",
+      "health": "Log mtime 2026-08-11 03:26; heartbeat read by COO tap-in with 9-day threshold."
+    },
+    {
+      "schedule": "16 8 * * 1-5",
+      "command": "/root/projects/Strader/scripts/cron/premarket-vp-wrapper.sh",
+      "ultimate_target": "scripts/premarket_volume_profile.py → market/orderflow/anchored_profile.py (anchored on prior day's RTH open, Schwab ETH bars sole source) → /var/moo/desk Trading-window page via COO desk-register.sh; failure = keep last-good, exit 2",
+      "health": "AT RISK today — hard dependency on the dead Schwab token; expect last-good page + alert."
+    }
+  ],
+  "skills_to_code": [
+    {
+      "skill": "Strader:drill-coach",
+      "code_paths": [
+        "/root/projects/Strader/scripts/drill_coach.sh",
+        "/root/projects/Strader/scripts/drill_bridge.py",
+        "/root/projects/Strader/scripts/orderflow_drill.py",
+        "/root/projects/Strader/market/orderflow/recognizer.py"
+      ]
+    },
+    {
+      "skill": "Strader:mancini-parse",
+      "code_paths": [
+        "/root/projects/Strader/runbook/mancini/fetch.py",
+        "/root/projects/Strader/runbook/mancini/clean.py",
+        "/root/projects/Strader/runbook/mancini/run.py (python -m runbook.mancini.run)",
+        "/root/projects/Strader/runbook/mancini/extraction-contract.md (the extraction contract, read-not-executed)"
+      ]
+    },
+    {
+      "skill": "Strader:tap-in",
+      "code_paths": [
+        "/root/projects/Strader/scripts/surface_liveness.sh",
+        "bd (ready queue via bd propername --ready)"
+      ]
+    },
+    {
+      "skill": "Strader:handoff",
+      "code_paths": [
+        "bd (bd propername --ready)",
+        "DaysActivity.md / CurrentStatus.md writes — no scripts"
+      ]
+    },
+    {
+      "skill": "Strader:daysactivity-format",
+      "code_paths": [
+        "(conventions only — no code)"
+      ]
+    },
+    {
+      "skill": "Strader:strader/{daily-pnl-summary,entry-signal-evaluation,greeks-analysis,position-sizing,risk-limit-enforcement}",
+      "code_paths": [
+        "(no code paths — references/*.md domain docs only)"
+      ]
+    },
+    {
+      "skill": "COO:ab-test-runner",
+      "code_paths": [
+        "/root/projects/COO/evals/ab-testing/runner.sh"
+      ]
+    },
+    {
+      "skill": "COO:run-evals",
+      "code_paths": [
+        "/root/projects/COO/evals/skill-evals/run-skill-evals.sh",
+        "/root/projects/COO/evals/skill-evals/trigger-evals.js (+ per-skill *-evals.js)"
+      ]
+    },
+    {
+      "skill": "COO:pulse-zepos",
+      "code_paths": [
+        "/root/projects/COO/.claude/skills/pulse-zepos/run.sh",
+        "/root/projects/COO/.claude/skills/pulse-zepos/lib/zepo-bead-file.sh",
+        "/var/moo/logs/zepo-pulse.jsonl + /var/moo/state/zepo-cursors.json (state)"
+      ]
+    },
+    {
+      "skill": "COO:tap-in",
+      "code_paths": [
+        "/root/projects/COO/.claude/skills/tap-in/gather.sh",
+        "/root/projects/COO/.claude/skills/tap-in/session-open.sh",
+        "/root/projects/COO/tmuxMOO/bin/desk-register.sh",
+        "/root/projects/COO/tmuxMOO/bin/steves-desk-session.sh"
+      ]
+    },
+    {
+      "skill": "COO:handoff",
+      "code_paths": [
+        "/root/projects/COO/factory/scripts/beads-remote-push.sh"
+      ]
+    },
+    {
+      "skill": "COO:init-zepos",
+      "code_paths": [
+        "/var/moo/state/zepo-cursors.json (state file only)"
+      ]
+    },
+    {
+      "skill": "COO:{brainstorming,writing-plans,executing-plans,health-check,daily-housekeeping,gc-oracle,xstate,upstream-sync,open-brain-companion,daysactivity-format}",
+      "code_paths": [
+        "(no direct code invocations found in SKILL.md — procedural/convention skills)"
+      ]
+    }
+  ],
+  "supervisors": [
+    {
+      "name": "capture-supervisor-wrapper.sh (via capture-supervisor-session.sh, cron */2)",
+      "manages": "scripts/corpus_stream_databento.py ES trades + MBP-1 live capture in tmux steves-desk:capture, window 02:50-15:05 CT. Process-not-window identity, staleness detection, restart, alerts to data/corpus/_health.jsonl. Proven this morning: relaunched dead capture at 02:50 CT."
+    },
+    {
+      "name": "gexbot-supervisor-session.sh (thin env shim over capture-supervisor-wrapper.sh, cron */2)",
+      "manages": "scripts/corpus_poll_gexbot.py 10-endpoint collector, 08:30-15:05 CT, venue=cash (NYSE holidays), stale 300s, tmux window 'gexbot', state _gexbot_health.json"
+    },
+    {
+      "name": "gexbot-orderflow-1s-supervisor.sh (thin env shim, cron */2)",
+      "manages": "scripts/corpus_poll_gexbot_orderflow_1s.py 1 Hz orderflow leg — deliberately a separate process/window/state (_gexbot_of1s_health.json) from the main collector"
+    },
+    {
+      "name": "gauge-preopen-wrapper.sh (cron */5 8-15)",
+      "manages": "scripts/mi_gauge.py --live in a dedicated tmux window; launch + respawn with state replay; reaps stale 'gauge' windows; bootstraps the desk via COO steves-desk-session.sh when tmux is down"
+    },
+    {
+      "name": "memory-review-endpoint.sh supervise (DataArchive, cron */5)",
+      "manages": "python -m memory_review serve on 127.0.0.1:3010 — restart-if-not-listening, pidfile + heartbeat; carried the endpoint through the 08-11 reboot"
+    },
+    {
+      "name": "drill_coach.sh start (skill-owned, NOT cron)",
+      "manages": "scripts/drill_bridge.py (port 7788) — idempotent start/stop/status with pidfile data/drill-bridge/bridge.pid. Session-scoped by design; not running now, which is fine off-drill."
+    },
+    {
+      "name": "UNSUPERVISED: orderflow_sentinel.py",
+      "manages": "NONE — the gap. Running right now in tmux window 'sentinel' (pid 148773, started by hand ~05:10 CT today), heartbeating to /var/moo/logs/orderflow-sentinel-2026-08-12.log. No cron entry, no wrapper: grep of scripts/cron/ finds no reference.",
+      "gap": "Confirmed st-2yuw: it died with the 08-11 reboot and only exists today because someone restarted it by hand. It is the only session-critical live watcher with zero restart path — the exact pattern the gexbot supervisors were built to end (st-p3lv incident). Candidate for a fourth thin shim over capture-supervisor-wrapper.sh."
+    },
+    {
+      "name": "UNSUPERVISED (by design/accepted): orderflow_monitor_up.sh and live-footprint-up.sh stacks",
+      "manages": "Hand-run idempotent tmux launchers for orderflow_monitor.py ('of-monitor' window) and the 3-pane footprint stack (bridge/capture/feed). Only the capture pane overlaps supervised coverage; the monitor and feed panes have no respawn.",
+      "gap": "No cron respawn — a reboot mid-session silently kills the monitor and footprint feed until a human notices."
+    },
+    {
+      "name": "UNSUPERVISED (by design): dolt sql-server (bd-spawned) and the moocity tmux server itself",
+      "manages": "dolt sql-server is spawned on demand by bd and deliberately not supervised (beads-remote-push.sh stops an idle one when it stalls a push). The tmux server has no supervisor — its 2026-08-05 death is why supervision moved to cron.",
+      "gap": "Accepted: cron-hosted supervisors are the mitigation; anything living ONLY in tmux dies with the server."
+    }
+  ],
+  "pipelines": [
+    {
+      "name": "Mancini parse (runbook.mancini.run)",
+      "chain": "entries: /mancini-parse skill (full, in-session) | mancini-preopen-wrapper --prepare-only (cron 08:15) → runbook.datastream.gate → fetch.py (Azure blob, az interop) → clean.py → listlevels.py deterministic scrape → parse/schema → validate.py (verbatim-price + list-parity) → store.py (parsed/<day>.json, last-good, commentary) → overnight.py brief → chart.py Pine emit (runbook/mancini/charts/) → desk publish via COO desk-html.sh → /tmp/desk-mancini-latest-es-plan.html + myDesk/trading/trading-desk-refresh.sh → payload_emitter.py → Windows clipboard. Downstream consumer: runbook.mancini.tracker (level-tracker cron) → data/level_state/current.json"
+    },
+    {
+      "name": "Corpus daily batch (T+1)",
+      "chain": "corpus-daily-wrapper.sh (COO cron 06:30) → scripts/corpus_daily.py → Databento ES front-month + SPXW OPRA pulls (corpus_pull_databento*.py) → data/corpus/<day>/ + manifest → datastream gate → alerts to data/corpus/_health.jsonl; then corpus-compact-wrapper (07:30) → corpus_compact_databento.py packs the healthy day"
+    },
+    {
+      "name": "GexBot collection",
+      "chain": "gexbot-supervisor-session.sh → corpus_poll_gexbot.py (1 cycle/min, 10 endpoints) and gexbot-orderflow-1s-supervisor.sh → corpus_poll_gexbot_orderflow_1s.py (1 Hz) → data/corpus/<day>/ ; nightly gexbot_hist_nightly.sh → gexbot_hist_backfill.py /hist harvest; consumers: orderflow_sentinel.py (level-proximity alerts → orderflow_alerts.jsonl), gexbot_distill.py, gex_now.py"
+    },
+    {
+      "name": "Live footprint stack",
+      "chain": "live-footprint-up.sh → [drill_bridge.py + corpus_stream_databento.py + live_footprint_feed.py] in one tmux window → live_footprint_page.py browser page; capture pane is the one that matters (never backfillable)"
+    },
+    {
+      "name": "Drill tooling",
+      "chain": "orderflow_drill.py (builds day's replay drill from corpus + market/orderflow/recognizer.py four-beat setups, orderflow_drill_template.html) → browser page ↔ drill_bridge.py (port 7788) ↔ drill_coach.sh verbs (drill-coach skill session); transcript data/drill-bridge/state-<date>.jsonl"
+    },
+    {
+      "name": "Premarket volume profile",
+      "chain": "premarket-vp-wrapper.sh (08:16) → premarket_volume_profile.py → market/orderflow/anchored_profile.py (Schwab ETH bars anchored at prior RTH open) → /var/moo/desk page + COO desk-register.sh Trading-window registration"
+    },
+    {
+      "name": "Live parity check (written, NOT installed)",
+      "chain": "live-parity-wrapper.sh (suggested 16:10, deliberately awaiting human crontab install) → live_parity_check.py → replays yesterday's tape through the same StackDriver/live_drive loop and diffs against the live run log"
+    },
+    {
+      "name": "Memory review (DataArchive)",
+      "chain": "memory-review-daily.sh → python -m memory_review (collect CM + memory tiers → cluster → packet → desk page); memory-review-endpoint.sh supervise → memory_review serve :3010 capture endpoint; memory-review-weekly.sh → publish + open desk-memory-review.html"
+    },
+    {
+      "name": "Zepo pulse (COO)",
+      "chain": "pulse-zepos-wrapper.sh (22:30) → claude --print /pulse-zepos → pulse-zepos skill run.sh → per-zepo pulse across the enterprise repos → /var/moo/logs/zepo-pulse.jsonl + heartbeat consumed by COO tap-in"
+    },
+    {
+      "name": "Beads durability (COO)",
+      "chain": "beads-remote-push.sh (23:15 + session close) → refs/dolt/data on git origin + heartbeat; beads-restore-drill.sh (Sun 04:40) → bd bootstrap into tmpdir → count comparison → heartbeat; both heartbeats asserted by tap-in gather.sh"
+    }
+  ],
+  "other_entrypoints": [
+    "/root/projects/Strader/scripts/run.sh — Steve's gated runner for reviewed live-API scripts (the only sanctioned execution path for non-reader Schwab code)",
+    "/root/projects/Strader/broker_schwab/readers/{quote.py,chain.py,history.py} — auto-allowed read-only live market data via .venv/bin/python3",
+    "/root/projects/Strader/scripts/refresh_schwab_token.py — interactive OAuth re-mint, Steve-run only (needed TODAY: token expired + defective replacement)",
+    "/root/projects/COO/tmuxMOO/bin/desk-invoke.sh, desk-html.sh, desk-register.sh, steves-desk-session.sh — the steves-desk surface; cross-repo invoked by absolute path per the shared-executable-space convention (mancini run.py, premarket VP, gauge bootstrap all call into it)",
+    "/root/projects/Strader/scripts/cron/live-parity-wrapper.sh — complete but deliberately NOT in crontab; a human installs the line by hand",
+    "/root/projects/Strader/scripts/orderflow_monitor_up.sh and scripts/live-footprint-up.sh — idempotent hand-run tmux launchers (no cron)",
+    "/root/projects/Strader/scripts/drill_coach.sh — bridge lifecycle + coach verbs, invoked by the drill-coach skill or by hand",
+    "/root/projects/Strader/scripts/surface_liveness.sh — tap-in's observe-the-surfaces step",
+    "tools/local_chart.py — chart eyeballing (the TV MCP replacement per memory)",
+    "Ad-hoc analysis CLIs run by hand: scripts/gex_now.py, gex_series.py, day_browser.py, replay_day.py, session_review.py, es_volume_profile.py, orderflow_drill.py --out, market_profile_drill.py",
+    "python -m memory_review status (DataArchive) — operator health check for the memory pipeline",
+    "Bridge drops: HTTP POSTs to drill_bridge.py :7788 and memory_review serve :3010 are runtime entry points into agent-visible state"
+  ],
+  "summary": "22 crontab lines resolve to 17 distinct jobs across Strader, COO, and DataArchive. Strader's live-data tier is supervised by one shared engine — capture-supervisor-wrapper.sh — worn by three thin cron shims (ES capture 02:50-15:05, GexBot 10-endpoint and 1 Hz legs 08:30-15:05) plus the separate mi_gauge respawner; all restart via cron precisely because tmux itself is unsupervised. The engine proved itself this morning (capture found dead 02:50, relaunched in 4s). Two findings: (1) [GAP] orderflow_sentinel.py is the only session-critical live watcher with NO supervisor — it died with the 08-11 reboot (st-2yuw) and runs today only because it was restarted by hand at ~05:10; it is an obvious fourth shim over the shared wrapper. (2) [ALERT] the Schwab refresh token expired this morning and its replacement is the defective 181-byte grant — schwab-stages, level-tracker, premarket-VP, and the Mancini overnight brief all fail today until Steve runs scripts/refresh_schwab_token.py. Also: gexbot_hist_nightly missed its 08-11 fire (reboot; self-heals via --days 3), and live-parity-wrapper.sh is finished but deliberately awaiting hand-install. Skills are mostly procedural; the code-bearing ones are mancini-parse (the full runbook.mancini.run chain ending at desk + clipboard), drill-coach (bridge lifecycle), and COO's tap-in/pulse-zepos/handoff (gather.sh, run.sh, beads-remote-push.sh)."
+}

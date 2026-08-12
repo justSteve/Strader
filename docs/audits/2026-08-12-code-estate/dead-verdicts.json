@@ -1,0 +1,1507 @@
+[
+  {
+    "path": "Strader/scripts/_chain_es_backfill.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos for '_chain_es_backfill' (excl .venv/.git/__pycache__/node_modules/data): only hit is COO/archive/DaysActivity-2026-05-23.md. Not referenced by corpus_backfill_databento.py (the chain script references the backfill, not the reverse). Absent from crontab -l, both repos' .claude/ (skills, hooks, settings allowlists), and all cron wrappers."
+  },
+  {
+    "path": "Strader/scripts/acuity_run2.py",
+    "verdict": "ambiguous",
+    "evidence": "One live-file reference, but descriptive only: scripts/speak_replay.py:110 'Derivation matches ``scripts/acuity_run2.py``' — a parity citation, not an invocation. Its outputs data/measurement/acuity-run2-{days,confirmations}.jsonl last written Jul 30. No cron, skill, settings, or test wiring; other hits are archives/bead backups and its own writeup docs/measurement/recognizer-acuity-run2.md."
+  },
+  {
+    "path": "Strader/scripts/corpus_backfill_databento.py",
+    "verdict": "alive-via",
+    "evidence": "CurrentStatus.md:27 — 'historical OPRA is an ad hoc fetch now via `corpus_backfill_databento.py --opra`' (current operational doctrine); plus scripts/measurement/premium_trajectory.py:353 runtime error message instructing 'corpus_backfill_databento.py --opra before rerunning', and scripts/corpus_stream_databento.py:36 docstring naming it as the on-demand path."
+  },
+  {
+    "path": "Strader/scripts/corpus_poll.py",
+    "verdict": "ambiguous",
+    "evidence": "Functionally dead — not in crontab, supervisors (gexbot-supervisor-session.sh and gexbot-orderflow-1s-supervisor.sh run corpus_poll_gexbot*), skills, or settings — but one live-file mention remains: market/corpus/schwab_stream.py:7 docstring 'extracted from scripts/corpus_poll.py (orchestrator)'. That is historical provenance, not an invocation; all other hits are archives and .beads backup jsonls."
+  },
+  {
+    "path": "Strader/scripts/corpus_pull_gexbot.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: hits only in .beads/issues.jsonl.stale-20260612.bak, .beads/backup-pre-v65-2026-08-11.jsonl, COO/archive/DaysActivity-2026-05-22.md, and the file itself. Not in crontab, .claude/ of either repo, or any cron/tmux wrapper. Live GexBot writer is corpus_poll_gexbot.py via cron gexbot-supervisor-session.sh."
+  },
+  {
+    "path": "Strader/scripts/cron/live-parity-wrapper.sh",
+    "verdict": "ambiguous",
+    "evidence": "Every probe empty except archive/DaysActivity-2026-08-10.md: verified NOT in crontab -l (full listing checked), no other repo reference, no settings/skill hook. Gray because it was built 2026-08-09 [st-x2mp] specifically to await a human-installs-the-cron-line step that has not happened — dead by probe, pending-install by design."
+  },
+  {
+    "path": "Strader/scripts/day_browser.py",
+    "verdict": "alive-via",
+    "evidence": "tests/scripts/test_day_browser.py — a live pytest test targets it, so the test suite (python3 -m pytest, auto-allowed and run at quality gates) keeps it exercised."
+  },
+  {
+    "path": "Strader/scripts/eod_view_schwab.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos for 'eod_view_schwab': single hit in COO/archive/DaysActivity-2026-05-22.md (the file does not even self-reference). Absent from crontab, both .claude/ trees, cron wrappers, and current beads. Untouched since May 22 (mtime confirmed)."
+  },
+  {
+    "path": "Strader/scripts/es_volume_profile.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: only the file itself and .beads/backup-pre-v65-2026-08-11.jsonl. Not in crontab (premarket-vp-wrapper.sh is the live VP path), not in .claude/ of either repo, no desk output matching in /var/moo/desk."
+  },
+  {
+    "path": "Strader/scripts/figures/foundation09_paradox.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: only the file itself and COO/archive/DaysActivity-2026-08-02.md. No crontab, skills, settings, or doc references; the foundation program it served is retired (2026-07-18)."
+  },
+  {
+    "path": "Strader/scripts/gex_now.py",
+    "verdict": "ambiguous",
+    "evidence": "Only live-tree reference is scripts/gex_series.py:6 docstring ('Bridges the one-shot `gex_now.py` read...') — and gex_series.py is itself a dead-candidate in this batch. All other hits are .beads backups and COO archives (05-20, 05-22). No crontab/skills/settings references."
+  },
+  {
+    "path": "Strader/scripts/gex_series.py",
+    "verdict": "ambiguous",
+    "evidence": "One live-file mention, descriptive only: market/corpus/paths.py:14 comment '(see gex_series.py date rollover logic)' — pattern citation, not an invocation. Its output data/gex_series/ holds a single stale file SPX_2026-05-20.jsonl (mtime May 20). No crontab, skills, or settings references; other hits are beads backups and COO archives."
+  },
+  {
+    "path": "Strader/scripts/gexbot_distill.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: only the file itself, .beads backup jsonls, and COO/archive/DaysActivity-2026-05-22.md. Not in crontab, either .claude/ tree, or any wrapper; live distillation lives in market/ingest/gexbot.py."
+  },
+  {
+    "path": "Strader/scripts/gexbot_hist_migrate.py",
+    "verdict": "alive-via",
+    "evidence": "scripts/gexbot_hist_backfill.py:8 docstring names it as the current archive mover ('/mnt/z/Harvest/gexbot-hist, where gexbot_hist_migrate.py [st-me3z] moves...'), and gexbot_hist_backfill.py runs nightly via crontab line '0 21 * * 1-5 scripts/gexbot_hist_nightly.sh' — migrate is the manual archiving companion of a live cron pipeline."
+  },
+  {
+    "path": "Strader/scripts/gexbot_probe.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos for 'gexbot_probe': hits only in .beads/issues.jsonl.stale-20260612.bak, .beads/backup-pre-v65-2026-08-11.jsonl (closed beads st-rks/st-ox9x), and COO/archive/DaysActivity-2026-05-22.md — no live code, doc, knowledge, skill, settings, crontab, or wrapper reference; the file (mtime May 21) does not even self-reference. The 'documented diagnostic' claim has no surviving documentation outside closed-bead archives."
+  },
+  {
+    "path": "Strader/scripts/hello_databento.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: only the file itself, .beads backups, and COO archives (05-20, 07-01). Not in crontab, skills, settings, or wrappers. Auto-memory project_databento_live_collection.md:15 mentions hello_databento.py:14 only to warn its cost comment is wrong — a caution about its content, not a usage."
+  },
+  {
+    "path": "Strader/scripts/hello_schwab.py",
+    "verdict": "alive-via",
+    "evidence": "README_EXCEL.md:8,59,81 — live checked-in doc requires it as the auth prerequisite ('run `hello_schwab.py` first', 'Token not found → Run hello_schwab.py first to authenticate') for the Excel pipeline whose scripts (scripts/poll_to_excel.py) still exist."
+  },
+  {
+    "path": "Strader/scripts/lexicon_render.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: only the file itself, archive/DaysActivity-2026-07-28.md, and .beads/backup-pre-v65 jsonl. Not in crontab, skills, settings, or wrappers; no lexicon desk page found in /var/moo/desk/."
+  },
+  {
+    "path": "Strader/scripts/measurement/absorption_calibrate.py",
+    "verdict": "alive-via",
+    "evidence": "knowledge/channel-family-taxonomy.md:60 — live knowledge bundle cites 'scripts/measurement/absorption_calibrate.py calibrates absorption [floors]' as the provenance of live thresholds; also cited in docs/audits/2026-08-04-auditor-report.md and the audit package (MBP-1 used-by absorption_calibrate)."
+  },
+  {
+    "path": "Strader/scripts/measurement/build_eyeball_checklist.py",
+    "verdict": "alive-via",
+    "evidence": ".claude/settings.local.json:6 — permission allowlist entry 'Bash(.venv/bin/python scripts/measurement/build_eyeball_checklist.py)' keeps it a pre-approved on-demand command."
+  },
+  {
+    "path": "Strader/scripts/measurement/day_type_classifier.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos for 'day_type_classifier' (only self + COO/archive/DaysActivity-2026-05-25.md) and for its output 'day_types' across all .py/.sh (zero consumers). data/measurement/day_types.jsonl mtime May 24 — stale. Not in crontab, skills, settings, tests, or wrappers."
+  },
+  {
+    "path": "Strader/scripts/measurement/detect_v_days.py",
+    "verdict": "alive-via",
+    "evidence": "Its output data/measurement/v_days.jsonl is the declared input of scripts/measurement/build_eyeball_checklist.py:29 (V_DAYS_PATH), which is itself allowlisted in .claude/settings.local.json:6; docs/measurement/post-entry-tape-study.md:405 also lists 'detect_v_days.py → V-day corpus with trough timestamps' as the current pipeline."
+  },
+  {
+    "path": "Strader/scripts/measurement/expected_move.py",
+    "verdict": "alive-via",
+    "evidence": "scripts/measurement/iv_pin_study.py:40,356-434 loads its output (EXPECTED_MOVE_PATH = data/measurement/expected_move.jsonl, load_expected_moves()) — a live in-repo consumer, contradicting 'no found consumer'; runbook/datastream/gate.py:92 also lists expected_move among the OPRA-consuming measurement scripts. Output file itself is stale (May 24)."
+  },
+  {
+    "path": "Strader/scripts/measurement/fly_replay.py",
+    "verdict": "alive-via",
+    "evidence": "market/measurement/fly.py:4 docstring names it as the current single-day CLI of the tested engine ('the single-day CLI (scripts/measurement/fly_replay.py) and the corpus batch (...fly_replay_batch.py)'); the engine is exercised by tests/market/measurement/test_fly_replay.py (imports market.measurement.fly); runbook/datastream/gate.py:91 lists fly_replay in the OPRA consumer registry."
+  },
+  {
+    "path": "Strader/scripts/measurement/fly_replay_batch.py",
+    "verdict": "alive-via",
+    "evidence": "market/measurement/fly.py:4 docstring names it as the current corpus-batch CLI of the tested fly engine; its output data/measurement/fly_batch.jsonl is present (Jun 9). No scheduler, but it is a declared front-end of live, tested code rather than an orphan."
+  },
+  {
+    "path": "Strader/scripts/measurement/greek_snapshot_study.py",
+    "verdict": "ambiguous",
+    "evidence": "Only non-archive reference is a comment in live runbook/datastream/gate.py:91-93 naming it a databento_opra.jsonl consumer that 'still needs' OPRA and 'should fail loudly' — declarative intent in live code, but no invoker. Crontab, .claude skills/settings allowlists (both repos), tmux (windows: capture/sentinel/Trading), and imports all empty; COO hit is archive/DaysActivity-2026-05-25.md only."
+  },
+  {
+    "path": "Strader/scripts/measurement/internals_calibrate.py",
+    "verdict": "alive-via",
+    "evidence": "market/signals/internals_config.py:7 cites it as the calibration source ('scripts/measurement/internals_calibrate.py over the schwab_internals corpus stream') and that config module is imported by live production code market/internals/gauge.py:35 (tested by tests/market/internals/test_gauge.py). Documented recalibration path — dormant-by-design, not dead."
+  },
+  {
+    "path": "Strader/scripts/measurement/iv_pin_study.py",
+    "verdict": "ambiguous",
+    "evidence": "Same live-code comment as greek_snapshot: runbook/datastream/gate.py:91-93 lists it as an OPRA consumer that still needs the stream. No invoker: cron/skills/allowlists/tmux empty; output data/measurement/iv_pin.jsonl stale (May 24 16:00) with no consumer found (iv_pin grep hits only gate.py comment, knowledge/channel-family-taxonomy.md citation, audit doc, beads backup)."
+  },
+  {
+    "path": "Strader/scripts/measurement/legprofiler_study.py",
+    "verdict": "ambiguous",
+    "evidence": "The settings-allowlist probe is NOT empty: .claude/settings.local.json:25 contains 'Bash(.venv/bin/python3 scripts/measurement/legprofiler_study.py --sample 3)' — a permission remnant from the concluded study, not an invoker. Other refs are the delivered findings doc (docs/measurement/leg-profiler-findings.md) and the Aug-4 audit docs. No cron/skill/tmux/import."
+  },
+  {
+    "path": "Strader/scripts/measurement/morning_flush_continuation.py",
+    "verdict": "alive-via",
+    "evidence": "Real code import from a script outside the candidate list: scripts/measurement/decision_aligned_study.py:76 'from morning_flush_continuation import auc, load_internals, minute_bars' (plus parity read of its output morning_flush_continuation.json at line 80). Caveat: decision_aligned_study is itself a completed Aug-4 study in the counter-dictum program TABLED 8/10 — alive in code, frozen by program status."
+  },
+  {
+    "path": "Strader/scripts/measurement/morning_flush_forward_stats.py",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow candidate morning_flush_study.py, the morning-flush-anatomy.md doc, beads backup, and COO archive DaysActivity-2026-08-05.md. No cron/skill/allowlist/tmux; outputs (morning_flush_forward_stats*.json) stale Aug 4; program tabled 8/10."
+  },
+  {
+    "path": "Strader/scripts/measurement/morning_flush_study.py",
+    "verdict": "alive-via",
+    "evidence": "Its output data/measurement/morning_flush_study.json is read as STUDY input by non-candidate scripts/measurement/decision_aligned_study.py:79, and the script is cited in the curated knowledge bundle (knowledge/channel-family-taxonomy.md). Same caveat as continuation: the consuming study is itself part of the tabled counter-dictum program, so this is anchored-but-frozen rather than running."
+  },
+  {
+    "path": "Strader/scripts/measurement/morning_flush_vix_depth.py",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow candidates morning_flush_vvix.py and morning_flush_continuation.py plus tabled-program docs/audits (morning-flush-continuation.md, 2026-08-04 audit package) and COO archive. No cron/skill/allowlist/tmux; output morning_flush_vix_depth.json stale Aug 3."
+  },
+  {
+    "path": "Strader/scripts/measurement/morning_flush_vvix.py",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow candidate morning_flush_continuation.py plus tabled-program docs/audits and COO archive DaysActivity-2026-08-04.md. No cron/skill/allowlist/tmux; output morning_flush_vvix.json stale Aug 3."
+  },
+  {
+    "path": "Strader/scripts/measurement/mp_day_scan.py",
+    "verdict": "alive-via",
+    "evidence": "docs/mp-drill-operation.md:47 documents it as the day-type nominator for the drill deck, and the live deck file docs/drills/mp-deck.json:2 names it as the label heuristic ('heuristic nominates (scripts/measurement/mp_day_scan.py), hand-review ratifies') — active drill infrastructure with a documented manual rerun path when the deck expands. No automated invoker, which matches its design."
+  },
+  {
+    "path": "Strader/scripts/measurement/orderflow_lead.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Searched basename across Strader+COO (excl .venv/.git/__pycache__/node_modules/data): only its own delivered report docs/measurement/orderflow-lead-2026-08-06.md and COO archive/DaysActivity-2026-08-06.md. Crontab, .claude skills and settings allowlists (both repos), tmux windows all empty; output orderflow-decode-stats.json stale (Aug 6)."
+  },
+  {
+    "path": "Strader/scripts/measurement/residual_gate.py",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow candidate morning_flush_continuation.py and the tabled-program doc docs/measurement/morning-flush-continuation.md (plus beads backup, COO archive DaysActivity-2026-08-05.md). No cron/skill/allowlist/tmux/live import."
+  },
+  {
+    "path": "Strader/scripts/measurement/retro_gamma_cut.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Basename grep across both repos: only its own report docs/measurement/retro-gamma-cut-2026-08-06.md and COO archive/DaysActivity-2026-08-06.md. Crontab, skills, settings allowlists, tmux all empty; output retro-gamma-cut-joined.jsonl stale (Aug 6). Delivered 'directional not decision-grade' [st-trbn]."
+  },
+  {
+    "path": "Strader/scripts/measurement/scare_dip_catalog.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Basename grep: only delivered docs (docs/measurement/post-entry-tape-study.md, docs/measurement/recognition-library.md), COO May-26 archives/briefings, beads backup. Crontab, skills, allowlists, tmux, imports all empty; hardcoded V-day cohort ends 2026-05-21 and its tape_profiles inputs were last written May 25."
+  },
+  {
+    "path": "Strader/scripts/measurement/tape_reconstruction.py",
+    "verdict": "alive-via",
+    "evidence": "Its output directory is a live data dependency: scripts/measurement/premium_trajectory.py:34 'PROFILES_DIR = MEASUREMENT_DIR / \"tape_profiles\"', and premium_trajectory is actively maintained and running (commit acb6413 'fix(measurement): premium_trajectory must not hide dropped days', output data/measurement/premium_trajectories.json mtime Aug 11 14:46). The producer is dormant but its product is consumed by live code."
+  },
+  {
+    "path": "Strader/scripts/measurement/trough_time_volume_analysis.py",
+    "verdict": "ambiguous",
+    "evidence": "Only non-archive references are the live-code comment runbook/datastream/gate.py:91-93 (named as an OPRA consumer that still needs the stream) and concluded docs (greek-discovery-plan.md, post-entry-tape-study.md). No invoker: cron/skills/allowlists/tmux/imports empty."
+  },
+  {
+    "path": "Strader/scripts/moves_sweep.py",
+    "verdict": "ambiguous",
+    "evidence": "Script name appears only in archive/DaysActivity-2026-07-28.md and no cron/skill/allowlist/tmux entry exists, BUT its output store data/measurement/moves/{atoms,moves}.jsonl (Jul 28) is read by scripts/figures/foundation09_paradox.py:47,61-62 — which is itself unreferenced anywhere else and belongs to the retired foundation-doc series. Alive only via a probably-dead consumer."
+  },
+  {
+    "path": "Strader/scripts/orderflow_edge_tests.py",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow candidate scripts/orderflow_trainer_build.py and COO archive/DaysActivity-2026-08-08.md. No cron/skill/allowlist/tmux; output edge-tests-raw.json frozen Aug 8. Round delivered/retired [st-mvvf]."
+  },
+  {
+    "path": "Strader/scripts/orderflow_edge_tests_r3.py",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow candidate orderflow_trainer_build.py, which reads its frozen output data/derived/acuity-sweep/edge-tests-r3-raw.json (Aug 8) as event source; otherwise only COO archive/DaysActivity-2026-08-08.md. No cron/skill/allowlist/tmux."
+  },
+  {
+    "path": "Strader/scripts/orderflow_edge_tests_r4.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Basename grep across both repos: sole reference is COO archive/DaysActivity-2026-08-08.md (it imports hist_sweep itself; nothing imports it). Crontab, skills, settings allowlists, tmux all empty; output edge-tests-r4-raw.json frozen Aug 8; two-signal approach retired [st-a2cj]."
+  },
+  {
+    "path": "Strader/scripts/orderflow_hist_sweep.py",
+    "verdict": "ambiguous",
+    "evidence": "Imported only by fellow candidates: orderflow_edge_tests.py, orderflow_edge_tests_r3.py, orderflow_edge_tests_r4.py, orderflow_trainer_build.py (plus COO archive). No cron/skill/allowlist/tmux. Shared helper whose every consumer is itself a dormant completed study."
+  },
+  {
+    "path": "Strader/scripts/orderflow_monitor.py",
+    "verdict": "ambiguous",
+    "evidence": "Detector imported (importlib) by fellow candidate scripts/orderflow_hist_sweep.py:45, and docs/gexbot/orderflow-monitor.md is an operational runbook for launching it. Not running: tmux 'sentinel' window is orderflow_sentinel.py (a different script, writing orderflow_alerts.jsonl through Aug 11); monitor's own output data/derived/orderflow-events/ last wrote 2026-08-07.jsonl; not in crontab; gexbot-orderflow-1s-supervisor.sh launches corpus_poll_gexbot_orderflow_1s.py, not the monitor."
+  },
+  {
+    "path": "Strader/scripts/orderflow_monitor_up.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced as the launch command in the live runbook docs/gexbot/orderflow-monitor.md (plus COO session briefings Aug 8-9). Not in crontab; the monitor it launches has been down since Aug 7; tmux windows at census (capture/sentinel/Trading) do not include it. Alive only as a documented manual start path."
+  },
+  {
+    "path": "Strader/scripts/orderflow_trainer_build.py",
+    "verdict": "ambiguous",
+    "evidence": "No invoker: basename grep hits only .beads/backup-pre-v65-2026-08-11.jsonl and COO archive/DaysActivity-2026-08-08.md; no cron/skill/allowlist/tmux. But its deliverable /var/moo/desk/desk-two-signal-trainer.html (Aug 8, 5.3MB) persists as a standing drill surface, and it is the only consumer that would reread the frozen r3 output — 'rebuild any time' on-demand tool for a program tabled 8/10."
+  },
+  {
+    "path": "Strader/scripts/poll_to_excel.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Basename grep across both repos: only README_EXCEL.md (its own doc), COO docs/superpowers/specs/2026-04-13-strader-v2-hydration-design.md (April spec), stale beads backups, and COO archive/DaysActivity-2026-05-22.md. Crontab, .claude skills, settings allowlists, tmux all empty; xlwings/Excel dependency cannot run in this WSL environment; delivery pattern superseded by desk-html convention."
+  },
+  {
+    "path": "Strader/scripts/probe_databento_access.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Searched both repos for basename (only self, .beads/local-events.jsonl bead st-4mi4 text, and archive/DaysActivity — all records, not wiring), crontab (absent), Strader/.claude + COO/.claude/tmuxMOO/factory/tools/scripts/cron (zero hits), no importer, no test, no output artifact. Bead st-4mi4 itself concluded the probe 'cannot answer entitlement' — the question is settled."
+  },
+  {
+    "path": "Strader/scripts/probe_databento_live.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Basename grep across both repos (excl. archive/.beads) matches only the file itself; crontab, .claude (both repos), tmux wrappers, tools/ all empty; no importer, no test. Live collection is corpus_stream_databento.py under capture-supervisor-session.sh cron, which does not reference it."
+  },
+  {
+    "path": "Strader/scripts/score_recognizer.py",
+    "verdict": "ambiguous",
+    "evidence": "Every reference is prose, not invocation: scripts/acuity_run2.py:11 (docstring: 'Run 1 (score_recognizer.py, st-3vu)'), market/orderflow/anchors.py:58 (comment), validation_batch_st3vu.sh:header (itself a dead-candidate), docs/measurement/recognizer-acuity-*.md. No cron, no .claude, no tmux, no test imports it. Gray case: cited only in comments/docs and by a fellow dead-candidate, but its design intent is manual rerun as the corpus grows."
+  },
+  {
+    "path": "Strader/scripts/session_review.py",
+    "verdict": "alive-via",
+    "evidence": "docs/orderflow-drill-operation.md:36 and :54 list '.venv/bin/python scripts/session_review.py --date <YYYY-MM-DD>' as the standing full-review command in the active drill-operation runbook (drill program is live via the drill-coach skill). Also cited as pattern source in runbook/mancini/fetch.py:5 and scripts/orderflow_drill_template.html:381. No cron/skill automation — operator-invoked per runbook."
+  },
+  {
+    "path": "Strader/scripts/speak_replay.py",
+    "verdict": "alive-via",
+    "evidence": "tests/scripts/test_speak_replay.py loads and executes it (lines 18-22 importlib load of scripts/speak_replay.py; asserts on speak_replay.load/main). tests/ is in pytest testpaths, so it runs at every quality gate. No runtime wiring (crontab, .claude, tmux all empty) — kept alive only by its test."
+  },
+  {
+    "path": "Strader/scripts/stream_to_excel.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Only references anywhere: README_EXCEL.md:36-42 (stale doc requiring Windows/macOS Excel + xlwings, unrunnable in this WSL env) and COO/docs/superpowers/specs/2026-04-13-strader-v2-hydration-design.md (April spec). No importer, no test, no crontab entry, no .claude/tmux/tools hit, no output artifacts. Both refs are historical documents, not wiring."
+  },
+  {
+    "path": "Strader/scripts/validation_batch_st3vu.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "References outside itself: docs/measurement/recognizer-acuity-2026-07-06.md (the July run report) and COO DaysActivity archive only. No crontab, no .claude (either repo), no tmux wrapper, no tools/ hit. Its own header defers the durable role to score_recognizer.py; the batch was a one-shot executed 2026-07-06."
+  },
+  {
+    "path": "Strader/market/entities/chain.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/entities/test_chain.py:4 'from market.entities.chain import Chain, strike_key' and tests/market/test_ingest.py:5 — collected by pytest (testpaths includes tests/). Runtime consumers (market/resolve.py:2, ingest/schwab.py:12, indicators/gex.py:4, gex_calc.py:15) are all manual-only, so alive solely via the test gate."
+  },
+  {
+    "path": "Strader/market/entities/gex_profile.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/entities/test_gex_profile.py:3 and tests/market/indicators/test_gex_calc.py:7 import GexProfile; collected by pytest. No cron/skill/tmux wiring; live GEX is the GexBot corpus stream as claimed — alive only via tests."
+  },
+  {
+    "path": "Strader/market/entities/instrument.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/entities/test_instrument.py:3 'from market.entities.instrument import Contract'; also strader/tests/test_singleton.py:9 (strader/tests is in pytest testpaths), tests/market/entities/test_chain.py:3, test_spread.py:3, test_position.py:4. Exercised at every pytest gate; no runtime wiring."
+  },
+  {
+    "path": "Strader/market/entities/position.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/entities/test_position.py:6 'from market.entities.position import Position' — collected by pytest. No other consumer anywhere (grep of both repos): runtime-dead but test-kept."
+  },
+  {
+    "path": "Strader/market/entities/session.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/entities/test_session.py:4, tests/market/indicators/test_gex.py:6, test_registry.py:3, tests/market/present/test_regime.py:3, tests/market/test_ingest_session.py:4 all import market.entities.session — collected by pytest. Runtime consumers (present/regime.py, ingest/mancini.py, indicators/gex.py) unwired as claimed."
+  },
+  {
+    "path": "Strader/market/entities/spread.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/entities/test_spread.py:4, test_position.py:5, tests/market/test_resolve.py:5 import ButterflyTemplate/ButterflyInstance — collected by pytest. Confirmed market/measurement/fly.py does not import it; runtime consumers (resolve.py, position.py) are unwired."
+  },
+  {
+    "path": "Strader/market/indicators/__init__.py",
+    "verdict": "alive-via",
+    "evidence": "Executed whenever market.indicators.* is imported, which happens in collected tests: tests/market/indicators/test_gex.py:8, test_gex_calc.py:9, test_registry.py:5. No runtime wiring found (crontab, .claude, tmux all empty)."
+  },
+  {
+    "path": "Strader/market/indicators/gex.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/indicators/test_gex.py:8 'from market.indicators.gex import gex_regime' — collected by pytest. Script consumers gex_now.py/gex_series.py confirmed absent from crontab, .claude, tmux wrappers; no Aug outputs found."
+  },
+  {
+    "path": "Strader/market/indicators/gex_calc.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/indicators/test_gex_calc.py:9 'from market.indicators.gex_calc import compute_gex' — collected by pytest. Also imported by manual scripts gex_now.py:31 and gex_series.py:59, neither wired into cron/skill/tmux."
+  },
+  {
+    "path": "Strader/market/indicators/registry.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/indicators/test_registry.py:5 'from market.indicators.registry import indicator, run_indicators, _REGISTRY' — a dedicated test collected by pytest. Only other consumer is indicators/gex.py:6 (itself test-kept only)."
+  },
+  {
+    "path": "Strader/market/ingest/gexbot.py",
+    "verdict": "ambiguous",
+    "evidence": "No test imports it (unique among the ingest modules) and no cron/.claude/tmux wiring. Consumers: scripts/gexbot_distill.py:20 and scripts/gexbot_probe.py (manual), plus a string entry in strader/feeds/__init__.py:26 ('ingest_gexbot': 'market.ingest.gexbot'). Gray signal: /var/moo/desk/desk-gexbot-distiller-replay.html has mtime Aug 5 13:46 — the GexBot reactivation day — suggesting a recent manual gexbot_distill run, but provenance of that page could not be tied to the script by grep."
+  },
+  {
+    "path": "Strader/market/ingest/mancini.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/test_ingest_session.py:3 'from market.ingest import session_from_mancini' (re-exported at market/ingest/__init__.py:9) and tests/market/indicators/test_gex.py:5 — collected by pytest. Confirmed the live Mancini path (runbook/mancini/ + mancini-preopen-wrapper.sh cron + /mancini-parse skill) never imports it."
+  },
+  {
+    "path": "Strader/market/ingest/schwab.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/test_ingest.py:4, tests/market/test_resolve.py:4, tests/market/indicators/test_gex_calc.py:8 import chain_from_schwab (re-export at market/ingest/__init__.py:8) — collected by pytest. Live Schwab path (corpus/schwab_stream.py via schwab-stages cron) bypasses it as claimed."
+  },
+  {
+    "path": "Strader/market/measurement/__init__.py",
+    "verdict": "alive-via",
+    "evidence": "Executed by collected tests tests/market/measurement/test_fly_replay.py:9 ('from market.measurement import fly as fr') and test_legprofiler.py:14 ('from market.measurement import legprofiler as lp'); also scripts/measurement/legprofiler_study.py:31. No runtime wiring."
+  },
+  {
+    "path": "Strader/market/measurement/fly.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/measurement/test_fly_replay.py:9 imports it — collected by pytest at every quality gate. Script consumers fly_replay.py:29 / fly_replay_batch.py:33 confirmed absent from crontab, .claude, tmux wrappers."
+  },
+  {
+    "path": "Strader/market/measurement/legprofiler.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/measurement/test_legprofiler.py:14 imports it — collected by pytest. Only other consumer scripts/measurement/legprofiler_study.py:31 (on-demand); no cron/skill/tmux wiring, firewalled from live chain as claimed."
+  },
+  {
+    "path": "Strader/market/orderflow/moves.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/orderflow/test_moves.py:5 'from market.orderflow.moves import (grade_atoms, one_minute_atoms, ...)' — collected by pytest. Script consumers scripts/moves_sweep.py:24 and scripts/figures/foundation09_paradox.py:41 confirmed unwired (no cron/.claude/tmux hits)."
+  },
+  {
+    "path": "Strader/market/pricing/__init__.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/pricing/test_black_scholes.py:12 'from market.pricing.black_scholes import greeks, implied_vol, price' executes the package __init__ (which re-exports black_scholes) — collected by pytest. Also imported by scripts/measurement/iv_pin_study.py:31 (manual study). No runtime wiring."
+  },
+  {
+    "path": "Strader/market/pricing/black_scholes.py",
+    "verdict": "alive-via",
+    "evidence": "scripts/measurement/iv_pin_study.py:31 `from market.pricing.black_scholes import implied_vol` AND scripts/measurement/greek_snapshot_study.py:23 `from black_scholes import greeks, implied_vol` (a second study consumer the candidate evidence missed); re-exported by market/pricing/__init__.py:6; tests/market/pricing/test_black_scholes.py exercised by the pytest gate."
+  },
+  {
+    "path": "Strader/market/resolve.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/test_resolve.py:6 `from market.resolve import resolve_butterfly, ResolutionError` — exercised on every `python3 -m pytest` quality-gate run. No runtime consumer found (grepped resolve_butterfly/ResolutionError/market.resolve across both repos: only the test, market/resolve.py itself, and design/research docs). Test-only liveness."
+  },
+  {
+    "path": "Strader/daemon/strader-session.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Searched both repos for 'strader-session': only self-references within daemon/ and COO ecc design docs/archives (ecc/design-pass-3-domain-factory.md, DESIGN-IMPLEMENTATION-REVIEW.md, _archive/domain-factory). Not in crontab -l. No hits in either .claude/ tree. /usr/local/bin has no zgent/strader binary. tmux -L moocity shows only session 'steves-desk' (3 windows), not the gtuser layout this script builds. The desk-strader-session-*.html hit in COO/myDesk/StevesDocs.json is an unrelated Claude-session review page."
+  },
+  {
+    "path": "Strader/daemon/strader-watchers.sh",
+    "verdict": "ambiguous",
+    "evidence": "Only executable reference is Strader/daemon/strader-session.sh:46 `bash \"$(dirname \"$0\")/strader-watchers.sh\" &` — itself a confirmed-dead candidate. Other hits are COO ecc design docs only. Its dependency /usr/local/bin/zgent-invoke is not installed, and its watched dir /var/moo/strader/ does not exist. Ambiguous only because its sole caller is another dead-candidate; functionally it cannot run."
+  },
+  {
+    "path": "Strader/daemon/zgent-invoke.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by daemon/strader-watchers.sh:6 (INVOKE=/usr/local/bin/zgent-invoke, itself dead-candidate) and daemon/strader-schedules.cron (an uninstalled cron file in the same dead daemon/ dir — none of its lines appear in crontab -l), plus COO ecc archive/materializer code that generates copies of it. Install target /usr/local/bin/zgent-invoke absent (ls verified). Ambiguous per the referenced-only-by-dead-candidates rule."
+  },
+  {
+    "path": "Strader/present/driver.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Confirmed broken: `ls present/` shows __init__.py, driver.sh, regime.py, signals.py, speech.py — no cli.py, so its `python -m present.cli` calls fail. Searched both repos + /var/moo + both .claude trees for 'driver.sh'/'present.cli'/'present/driver': only the May-17 plan doc, COO May-17 archives, and /var/moo ops-trail entries from May 17 and Jul 25 (a read-only `head` inspection). Not in crontab, no skill/hook/settings reference, no tmux wrapper."
+  },
+  {
+    "path": "Strader/present/regime.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/present/test_regime.py:6 `from present.regime import format_regime` — runs under the pytest gate. Also named in COO/docs/superpowers/specs/2026-06-29-strader2-greenfield-plan.md:61 as carry-forward inventory (doc, not execution). No runtime caller; its driver.sh entry point is confirmed broken. Test-only liveness."
+  },
+  {
+    "path": "Strader/present/signals.py",
+    "verdict": "alive-via",
+    "evidence": "tests/market/present/test_signals.py:4 `from present.signals import format_signals` — runs under the pytest gate. present/speech.py:3 docstring names it as the eye-side twin (speech.py IS live via scripts/speak_replay.py:42, but the reference is docstring-only). No runtime caller. Test-only liveness."
+  },
+  {
+    "path": "Strader/strader/entities/playbook.py",
+    "verdict": "alive-via",
+    "evidence": "Imported by strader/entities/__init__.py:3, strader/evaluate/playbook_evaluator.py:22, strader/evaluate/day_classifier.py:41, and four test files incl. strader/tests/test_yaml.py:15 (CONDITIONS_PATH — validates the live conditions.yaml vocabulary) and test_playbook.py:7. Also cited in COO/myDesk/reports/gexbot-reactivation-orderflow-brief.md as 'built and idle... reconnecting is wiring, not building'. Test-exercised, no live surface."
+  },
+  {
+    "path": "Strader/strader/evaluate/__init__.py",
+    "verdict": "alive-via",
+    "evidence": "strader/tests/test_playbook_evaluator.py:8 `from strader.evaluate import DayContext, PlaybookEvaluator` and strader/tests/test_day_classifier.py:6 `from strader.evaluate import (...)` — exercised by the pytest gate. No importer outside strader/ package and its tests (grep both repos)."
+  },
+  {
+    "path": "Strader/strader/evaluate/day_classifier.py",
+    "verdict": "alive-via",
+    "evidence": "strader/evaluate/__init__.py:13 re-export + strader/tests/test_day_classifier.py (pytest gate). Additionally COO/myDesk/reports/gexbot-forward-collection-plan.md:27 flags `day_classifier.gex_sign` as 'the regime discriminator four of six playbooks key on (wired, dark since 07-03)' — a live reactivation plan, not just an archive. Dormant-but-planned, not dead."
+  },
+  {
+    "path": "Strader/strader/evaluate/playbook_evaluator.py",
+    "verdict": "alive-via",
+    "evidence": "Imported by strader/evaluate/day_classifier.py:42 and strader/evaluate/__init__.py:8, tested by strader/tests/test_playbook_evaluator.py (pytest gate). No live DayContext constructor outside tests — dormant, but test-alive."
+  },
+  {
+    "path": "Strader/strader/feeds/__init__.py",
+    "verdict": "ambiguous",
+    "evidence": "Only references are strader/__init__.py:5 (docstring) and strader/__init__.py:17 `__all__ = [\"config\", \"feeds\"]` — a name listing, not an import; no `import strader.feeds` / `from strader.feeds` anywhere in either repo (grepped strader.feeds, feeds.available, import feeds), and no test imports it (the 'Phase-1 smoke test' its code mentions does not exist in tests/). Ambiguous because the live strader/__init__.py advertises it in __all__; every executable probe is empty."
+  },
+  {
+    "path": "Strader/mancini/codegen.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped mancini.codegen|mancini/codegen and `-m mancini` invocations across both repos, crontab -l, both .claude trees (skills incl. mancini-parse), /var/moo: hits only in Strader/archive/DaysActivity-2026-05-19.md and COO spec docs (2026-06-29-trading-day-runbook-design.md:327, 2026-07-16-trading-day-stage-plan.md). Its output dir mancini/archive/ has newest entry 2026-05-21. Live pipeline is runbook/mancini/run.py (cron mancini-preopen-wrapper.sh + /mancini-parse skill), which imports only mancini.parser and mancini.pine_emitter."
+  },
+  {
+    "path": "Strader/mancini/compositor.py",
+    "verdict": "ambiguous",
+    "evidence": "Sole importer is mancini/codegen.py:14 `from .compositor import compose_frame, FrameConfig` — codegen itself confirmed dead. No other hits outside May archives and COO greenfield specs. Ambiguous per the referenced-only-by-a-dead-candidate rule; dies with codegen."
+  },
+  {
+    "path": "Strader/mancini/gallery.py",
+    "verdict": "ambiguous",
+    "evidence": "Sole importer is mancini/codegen.py:15 `from .gallery import generate_gallery` (codegen confirmed dead). No cron/skill/script references; mancini/archive/ output untouched since 2026-05-21. Referenced only by a dead candidate."
+  },
+  {
+    "path": "Strader/mancini/persist.py",
+    "verdict": "ambiguous",
+    "evidence": "Sole importer is mancini/codegen.py:10 `from .persist import save, load` (codegen confirmed dead); verified replay.py, post_mortem.py, compositor.py, gallery.py and runbook/ do not import it — runbook persists via runbook/mancini/parsed/<day>.json (fresh: 2026-08-12 files present). Referenced only by a dead candidate."
+  },
+  {
+    "path": "Strader/mancini/post_mortem.py",
+    "verdict": "ambiguous",
+    "evidence": "Sole importer is mancini/codegen.py:13 (codegen confirmed dead). One forward-looking doc reference: COO/docs/superpowers/specs/2026-07-16-trading-day-stage-plan.md:94 lists '[auto] Letter scoring (mancini/post_mortem.py)' as a planned stage — a spec, not wiring. Referenced only by a dead candidate plus an unimplemented plan."
+  },
+  {
+    "path": "Strader/mancini/replay.py",
+    "verdict": "ambiguous",
+    "evidence": "Sole importer is mancini/codegen.py:12 `from .replay import render_replay` (codegen confirmed dead); verified all other 'replay' hits are the unrelated market/orderflow replay engine and scripts/speak_replay.py (which imports present.speech, not mancini.replay). Referenced only by a dead candidate."
+  },
+  {
+    "path": "COO/factory/apply-superpowers.sh",
+    "verdict": "ambiguous",
+    "evidence": "No automated invoker (crontab clean, no script/skill/hook calls it; last actual execution 2026-04-28 per /var/moo/logs/ops-trail.jsonl:10572). But COO/conventions/zgent-superpowers.md:34,37,69 is a live operating convention that instructs running it ('Re-apply: factory/apply-superpowers.sh --all'), and factory/factory.env:163 documents it. Ambiguous: dead by execution record, alive as the documented procedure of a current convention."
+  },
+  {
+    "path": "COO/factory/cron/install-zepo-pulse-logrotate.sh",
+    "verdict": "alive-via",
+    "evidence": "Its installed artifact is active: /etc/logrotate.d/zepo-pulse exists on the box and line 1 reads '# /etc/logrotate.d/zepo-pulse — installed by factory/cron/install-zepo-pulse-logrotate.sh'. The script is the documented reinstall path for a live system config (zepo-pulse.jsonl still written by the crontab'd pulse-zepos-wrapper.sh). One-shot installer, applied 2026-05-13 (ops-trail:20622) — dormant-normal, not dead."
+  },
+  {
+    "path": "COO/factory/harness/scripts/weekly-spot-check.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Not in crontab -l (the README's suggested '0 8 * * 1' lines were never installed). Searched both repos + /var/moo: only factory/harness/README.md:63-72 (docs), docs/reviews/zgent-zepo-review-2026-06-12.md:227 (R5 recommendation to *restart* the cadence — confirming it is not running), and its own April-29 creation in ops-trail. No script, skill, hook, or cron invokes it; never executed since creation per ops-trail."
+  },
+  {
+    "path": "COO/factory/harness/tests/test-aggregation.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Searched both repos, crontab, .claude trees, /var/moo: no CI/cron/runner (harness run-all.sh/run-suite.sh run scenarios, not tests/). References: April-28 archive DaysActivity only; last execution 2026-04-28 per ops-trail.jsonl:11693. Tests active lib code (lib/json-helpers.sh) but nothing runs it."
+  },
+  {
+    "path": "COO/factory/harness/tests/test-auto-bead.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Searched both repos, crontab, .claude trees, /var/moo: no runner of any kind. References: archive/DaysActivity-2026-04-29.md only; last execution 2026-04-29 per ops-trail.jsonl:12938."
+  },
+  {
+    "path": "COO/factory/harness/tests/test-evaluate.sh",
+    "verdict": "ambiguous",
+    "evidence": "No automated runner (crontab clean, no CI), doc references only (myDesk/deliverables/internal-testing-regime-draft.md, automux-tier1-design.md, April archive). BUT /var/moo/logs/ops-trail.jsonl:42960 shows a manual run TODAY: 2026-08-12T11:56 'bash factory/harness/tests/test-evaluate.sh' (session 7953540b) — plausibly this very dead-code audit probing it, but it is a same-day execution record I cannot attribute, so not confirmed-dead."
+  },
+  {
+    "path": "COO/factory/harness/tests/test-json-helpers.sh",
+    "verdict": "ambiguous",
+    "evidence": "No runner: run-all.sh/run-suite.sh and .claude/commands/test-zgent.md never invoke it; absent from crontab and all settings. Only non-archive ref is COO/myDesk/deliverables/internal-testing-regime-draft.md:377 (April 27 draft, manual 'bash .../test-json-helpers.sh' command) — a stale draft doc, not an invoker."
+  },
+  {
+    "path": "COO/factory/harness/tests/test-preconditions.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos for basename: hits only DaysActivity-2026-04-28/29 archives. Not in run-all.sh, run-suite.sh, /test-zgent command, crontab, any .claude settings/skills/hooks, or tmux wrappers."
+  },
+  {
+    "path": "COO/factory/harness/tests/test-tmux-helpers.sh",
+    "verdict": "ambiguous",
+    "evidence": "No runner anywhere (same probes as test-json-helpers). Referenced only by internal-testing-regime-draft.md:291,375 (April draft, manual commands pointing at gtOps paths) and an April spec doc — docs, not invokers."
+  },
+  {
+    "path": "COO/factory/hydrate-all-zepos.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/zepo-entity-type.md:24 — 'Hydrated via factory/hydrate-zepo.sh (generalized) or factory/hydrate-all-zepos.sh (batch)' — active convention names it as the batch hydration procedure tool."
+  },
+  {
+    "path": "COO/factory/hydrate-moocity.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grep hits: April/May archives, beads backup jsonl, and conventions/log.md:146 which is a historical log entry ('unfixed, reported instead'), not a procedure. Not in crontab, any settings, skills, or tmux wrappers."
+  },
+  {
+    "path": "COO/factory/mempalace/hooks/mempal_precompact_hook.sh",
+    "verdict": "ambiguous",
+    "evidence": "Absent from every settings.json hooks block (user /root/.claude/settings.json, COO, Strader) and crontab. Referenced only by dead-candidate mempalace-install.sh, the mempalace README, and April spike docs."
+  },
+  {
+    "path": "COO/factory/mempalace/hooks/mempal_save_hook.sh",
+    "verdict": "ambiguous",
+    "evidence": "Same as precompact hook: no settings.json hooks entry anywhere, no crontab; referenced only by dead-candidate mempalace-install.sh plus README and April spike docs."
+  },
+  {
+    "path": "COO/factory/mempalace/mempalace-courier-pack.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/zgent-hydration-pipeline.md:54 and mempalace-wings.md:71 (both Status: Active) give it as the procedure command; also cited in COO/myDesk/reports/2026-08-12-knowledge-capture-triage.md (written today)."
+  },
+  {
+    "path": "COO/factory/mempalace/mempalace-courier-receive.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/zgent-hydration-pipeline.md:73 and mempalace-wings.md:72 (both Status: Active) give it as the receive-side procedure command."
+  },
+  {
+    "path": "COO/factory/mempalace/mempalace-mine-safe.sh",
+    "verdict": "alive-via",
+    "evidence": "Invoked by mempalace-courier-receive.sh:49 and mempalace-mine-zgent.sh:52 (MINE_SAFE=\"$SCRIPT_DIR/mempalace-mine-safe.sh\"), both of which are kept alive by the Active hydration-pipeline/wings conventions."
+  },
+  {
+    "path": "COO/factory/mempalace/mempalace-mine-zgent.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/zgent-hydration-pipeline.md:76 ('mined via mempalace-mine-zgent.sh (M2)') and mempalace-wings.md:81, both Status: Active."
+  },
+  {
+    "path": "COO/factory/post-build/mempalace-install.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "grep 'mempalace' in post-build.sh: zero hits, so post-build never calls it; the hooks it installs appear in no settings.json (user/COO/Strader); not in crontab or any skill/command. Remaining refs are its own README, logrotate-mempalace config, April 20 archives, and a beads backup jsonl."
+  },
+  {
+    "path": "COO/factory/rehydrate-moocity.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grep both repos for basename: only DaysActivity-2026-04-27 and -05-07 archives (the file itself doesn't even self-reference). Not in crontab, settings, conventions, skills, or tmux wrappers."
+  },
+  {
+    "path": "COO/factory/scripts/apply-ritual-allow-rules.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/zgent-elevation-pipeline.md:52 (Status: Active) — 'bash factory/scripts/apply-ritual-allow-rules.sh <repo>  # add missing floor rules' is a step in the elevation procedure."
+  },
+  {
+    "path": "COO/factory/scripts/audit-skill-prefixes.py",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/zgent-elevation-pipeline.md:53 references it directly ('python3 factory/scripts/audit-skill-prefixes.py <repo>  # must report no ritual findings'), independent of apply-ritual-allow-rules.sh."
+  },
+  {
+    "path": "COO/factory/scripts/backfill-propernames.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/bead-propername.md:83 cites it as the standing idempotent tool ('never overwrites'); also ecc/catalog/rules/proper-name-presentation.md:39 cites it as the pattern. Convention reference, not just the completed July run."
+  },
+  {
+    "path": "COO/factory/scripts/backup-beads-store.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/dolt-sync-schema-preflight.md:65 — 'Back the store up first: bash factory/scripts/backup-beads-store.sh <repo>' — mandated step of an active runbook (reconciled 2026-07-29); its outputs exist under /var/moo/backups/beads-stores/ (2026-07-25 runs)."
+  },
+  {
+    "path": "COO/factory/scripts/check-dolt-schema-skew.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/dolt-sync-schema-preflight.md:38 — 'bash /root/projects/COO/factory/scripts/check-dolt-schema-skew.sh --deep' — runbook reconciled 2026-07-29 with note 'GC trigger removed; the check stands on its own'; also covered by COO/tests/test-dolt-schema-skew-guard.sh."
+  },
+  {
+    "path": "COO/factory/scripts/generate-manifest.sh",
+    "verdict": "ambiguous",
+    "evidence": "Only non-archive reference is a comment in verify-manifest.sh:8 ('files that changed since last generate-manifest.sh run'); verify-manifest.sh itself survives only via the observable-truths.md doc. factory/manifests/ is populated with its outputs, but no invoker, cron, skill, or settings entry exists."
+  },
+  {
+    "path": "COO/factory/scripts/install-bashrc-snippets.sh",
+    "verdict": "alive-via",
+    "evidence": "Its deployed outputs are live: /root/.bashrc.d/steve-prompt.sh (mtime 2026-07-29) and strader-reauth.sh (2026-07-29), sourced by /root/.bashrc:189; the source templates factory/templates/bashrc.d/*.sh name it as their installer. Recent mtimes show it ran two weeks ago."
+  },
+  {
+    "path": "COO/factory/scripts/install-boot-event-recorder.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/docs/runbooks/boot-event-log.md:96-98 documents it as the ongoing install/refresh/--status/--uninstall procedure for the enabled record-boot-event.service."
+  },
+  {
+    "path": "COO/factory/scripts/install-cm-backup-timer.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/cm-database-backup-restore.md:27 lists it as the installer for the active claude-monitor-backup.timer ('| Installer | factory/scripts/install-cm-backup-timer.sh |')."
+  },
+  {
+    "path": "COO/factory/scripts/install-wsl-binfmt-guard.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/wsl-interop-loss-desk-nav-browser-recovery.md:47 and :63 cite it as the idempotent installer in the recovery procedure for the enabled wsl-binfmt-guard.service."
+  },
+  {
+    "path": "COO/factory/scripts/pipe_pane_log.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grep both repos: only DaysActivity-2026-05-09 archive and myDesk/reports/forkdoc-lifecycle/scripts-lifecycle.md (the survey report that flagged it). Not in crontab, any settings/skills/hooks, or tmux wrappers; no recent outputs found."
+  },
+  {
+    "path": "COO/factory/scripts/verify-manifest.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/observable-truths.md:48 and :64 — OT-7's on-demand verification is 'factory/scripts/verify-manifest.sh against factory/manifests/', and factory/manifests/ is populated with per-zgent manifests it checks."
+  },
+  {
+    "path": "COO/factory/scripts/wait_for_text.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped basename across Strader+COO (excl .venv/.git/__pycache__/node_modules/data): only hits are May DaysActivity archives and myDesk/reports/forkdoc-lifecycle/scripts-lifecycle.md (a co-9us review record, not a caller). crontab -l clean; no hits in either repo's .claude/ (settings, skills, hooks); no tmux wrapper references; the harness's tmux-helpers.sh does not reference it."
+  },
+  {
+    "path": "COO/factory/validate-runtime-image.sh",
+    "verdict": "ambiguous",
+    "evidence": "No automated invoker (crontab clean, no script/skill/hook calls it, unlike validate-factory-image.sh), but it is a documented manual runbook step in a current convention: COO/conventions/runtime-image.md:142 'Validate with validate-runtime-image.sh' and listed in the file table at runtime-image.md:156; also listed as factory tooling in COO/CLAUDE.md:96. Kept by active docs only — gray case."
+  },
+  {
+    "path": "COO/ecc/__init__.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped 'from ecc'/'import ecc'/'ecc.dspy'/sys.path-ecc across both repos: zero hits outside ecc/, and zero lowercase-ecc package imports even inside ecc/ — the dspy code imports 'from ECC.dspy_prompts...' (uppercase), and /root/projects/COO/ECC does not exist on this case-sensitive FS, so even that chain never touches ecc/__init__.py. crontab and .claude/ clean."
+  },
+  {
+    "path": "COO/ecc/beads-cop/beads-cop.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Basename grep across both repos: only hit is the file itself. crontab -l clean; no hits in COO/.claude or Strader/.claude (settings, hooks, skills); no tmux wrapper references; no recent output files under /var/moo or data/."
+  },
+  {
+    "path": "COO/ecc/beads-cop/session-probe.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Basename grep across both repos: only hit is the file itself — not even beads-cop.sh references it. crontab, both .claude/ trees, tmux wrappers all clean."
+  },
+  {
+    "path": "COO/ecc/beads-cop/zgent-error-watch.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Basename grep across both repos: only hit is the file itself. crontab, both .claude/ trees, tmux wrappers all clean; no Loki-side caller found in either repo."
+  },
+  {
+    "path": "COO/ecc/dspy_prompts/__init__.py",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only implicitly by the 'from ECC.dspy_prompts.src...' import chain in run.py and the tests — themselves dead-candidates — and that chain is case-broken (no ECC/ dir exists), so the marker is currently unreachable. Kept only by dead-candidate siblings."
+  },
+  {
+    "path": "COO/ecc/dspy_prompts/src/__init__.py",
+    "verdict": "ambiguous",
+    "evidence": "Same as dspy_prompts/__init__.py: reachable only via the case-broken 'ECC.dspy_prompts.src' import path used by run.py and tests, all of which are dead-candidates with no external invoker."
+  },
+  {
+    "path": "COO/ecc/dspy_prompts/src/config.py",
+    "verdict": "ambiguous",
+    "evidence": "No cron/skill/hook/script invokes the pipeline (all probed clean), and importers (run.py, tests) are dead-candidates whose 'ECC.' import path cannot resolve on this box. But mtime 2026-08-09 04:11 confirms the co-uma maintenance touch, and COO/docs/reviews/gtops-discard-manifest-2026-08-09.md plus .claude/rules/completeness-sweeps.md:20 document deliberate retention as an API-key consumer."
+  },
+  {
+    "path": "COO/ecc/dspy_prompts/src/feedback_collector.py",
+    "verdict": "ambiguous",
+    "evidence": "Sole reference in either repo is /root/projects/COO/ecc/dspy_prompts/src/run.py:33 ('from ECC.dspy_prompts.src.feedback_collector import FeedbackCollector') — run.py is itself a dead-candidate, and the import path is case-broken."
+  },
+  {
+    "path": "COO/ecc/dspy_prompts/src/prompt_compiler.py",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by run.py:31 and tests/test_prompt_compiler.py — both dead-candidates with no automated runner; import path 'ECC.' cannot resolve against ecc/ on this case-sensitive FS."
+  },
+  {
+    "path": "COO/ecc/dspy_prompts/src/quality_gate.py",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by run.py:32 and tests/test_quality_gate.py — both dead-candidates; no CI/cron/skill runs either, and the 'ECC.' import path is case-broken."
+  },
+  {
+    "path": "COO/ecc/dspy_prompts/src/run.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grep across both repos: mentions only in DaysActivity archives, .beads backup jsonl, and the gtops-discard-manifest review doc — no caller. crontab -l, both .claude/ trees, tmux wrappers clean; optimized/ outputs untouched since 2026-04-18. Additionally its own imports ('from ECC.dspy_prompts...', run.py:30-33) cannot resolve — no ECC/ directory exists — so it would crash if invoked."
+  },
+  {
+    "path": "COO/ecc/dspy_prompts/src/spec_generator.py",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by run.py:30, tests/test_spec_generator.py, and its own stale output optimized/spec-generator.json (mtime 2026-04-18) — all dead-candidates or artifacts; import path case-broken."
+  },
+  {
+    "path": "COO/ecc/dspy_prompts/tests/__init__.py",
+    "verdict": "ambiguous",
+    "evidence": "Marker reachable only via pytest collection of the three test files, themselves dead-candidates with no automated runner."
+  },
+  {
+    "path": "COO/ecc/dspy_prompts/tests/test_prompt_compiler.py",
+    "verdict": "confirmed-dead",
+    "evidence": "No CI/cron/skill/hook runs it (crontab and both .claude/ trees probed clean); no external references. Its import 'from ECC.dspy_prompts.src.prompt_compiler' (line 11) cannot resolve — /root/projects/COO/ECC does not exist — so it fails at collection if run."
+  },
+  {
+    "path": "COO/ecc/dspy_prompts/tests/test_quality_gate.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Same probes as test_prompt_compiler.py, all empty: no runner anywhere, no external references, and the uppercase 'ECC.' import path is unresolvable on this filesystem."
+  },
+  {
+    "path": "COO/ecc/dspy_prompts/tests/test_spec_generator.py",
+    "verdict": "ambiguous",
+    "evidence": "No automated runner (crontab, .claude/, CI all clean) and its import at line 15 ('from ECC.dspy_prompts.src.spec_generator') is case-broken — but it was edited in the 2026-08-09 co-uma API-key migration (per DaysActivity-2026-08-09.md and the discard manifest), a documented intent that it keep passing. Maintained-but-unrunnable is a gray case."
+  },
+  {
+    "path": "COO/ecc/hooks/perm-audit-hook.sh",
+    "verdict": "ambiguous",
+    "evidence": "The wired copy is COO/.claude/settings.json:55 -> /root/projects/COO/.claude/hooks/scripts/perm-audit/perm-audit-hook.sh; nothing invokes the ecc/hooks/ path (grep for the ecc path in settings/skills/crontab: empty). The ecc copy is only the byte-identical source of a live deployed hook — deleting it breaks nothing but loses the deployed copy's provenance/source-of-truth."
+  },
+  {
+    "path": "COO/ecc/hooks/perm-audit-report.sh",
+    "verdict": "ambiguous",
+    "evidence": "Only other reference is its byte-identical deployed twin at COO/.claude/hooks/scripts/perm-audit/perm-audit-report.sh; no cron/skill/settings entry points at the ecc/ path. Source-of-a-live-copy gray case, same as perm-audit-hook.sh."
+  },
+  {
+    "path": "COO/ecc/hooks/tests/test-perm-audit.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Basename grep across both repos matched only the two copies themselves (ecc/hooks/tests/ and .claude/hooks/scripts/perm-audit/tests/); no CI, cron, skill, or hook runs either copy; crontab -l clean."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/ecc-cli-entry.js",
+    "verdict": "ambiguous",
+    "evidence": "References: materializer's own package.json (main/bin 'ecc-materialize'/scripts 'materialize', lines 6-13) and ecc/crud/bun.lock:32 as a file: dependency bin — but COO/CLAUDE.md:105 rules ecc/crud NON-OPERATIVE and CLAUDE.md:103 rules the materializer ASPIRATIONAL (co-zk7p). No external invoker in crontab, .claude/, or tmux wrappers; gitignored build output last rebuilt Jun 12."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/ecc-data-loader.js",
+    "verdict": "ambiguous",
+    "evidence": "Imported (in compiled form) only by dist/ecc-cli-entry.js — itself a dead-candidate; the crud repo imports materializer/dist/ecc-types.js, not this file. No other reference in either repo."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/ecc-entity-resolver.js",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only via dist/ecc-cli-entry.js's compiled import chain (source refs: src/ecc-cli-entry.ts, integration test) — ecc-cli-entry.js is itself a dead-candidate; no external invoker found."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/ecc-file-writer.js",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only via dist/ecc-cli-entry.js's compiled import chain — a dead-candidate; no cron/skill/hook/tmux reference, no recent output files under /var/moo or data/."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/ecc-types.js",
+    "verdict": "ambiguous",
+    "evidence": "Compiles to an empty runtime module (`export {}`); zero runtime importers in dist/. Its only inbound references are type-only imports at COO/ecc/crud/src/types/artifact-types.ts:76 and :97 (`from 'materializer/dist/ecc-types.js'`) — and crud is declared NON-OPERATIVE, reference only, in COO/CLAUDE.md's ecc status table. Also regenerated by `npm run build` (CLAUDE.md Key Commands). Kept 'alive' only by a non-operative subsystem plus the documented rebuild path."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/eccx-types.js",
+    "verdict": "confirmed-dead",
+    "evidence": "Compiles to empty `export {}`. Searched: grep for 'eccx-types' across Strader and COO (excl .venv/.git/__pycache__/node_modules/data) — zero hits outside materializer itself; grep dist/*.js and dist/templates/*.js for \"eccx-types.js'\" — no importer; crontab, both .claude/ trees, /var/moo — empty. Will be re-emitted by `npm run build` but nothing consumes it."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/session-types.js",
+    "verdict": "confirmed-dead",
+    "evidence": "Compiles to empty `export {}`. Searched: grep 'session-types' across both repos — only materializer-internal hits plus _archive and prose docs; no runtime importer in dist/ (grep \"session-types.js'\" empty); crontab, .claude/ trees, /var/moo — empty."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/templates/index.js",
+    "verdict": "alive-via",
+    "evidence": "On the runtime import chain of the documented CLI: materializer/package.json \"materialize\": \"node dist/ecc-cli-entry.js\" → ecc-cli-entry.js:13 imports ./ecc-file-writer.js → ecc-file-writer.js:9 imports './templates/index.js'. COO/CLAUDE.md Key Commands documents `npm run materialize`. Dormant (dist mtime 2026-06-12, no automated invocation) but formally wired."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/templates/template-agent.js",
+    "verdict": "alive-via",
+    "evidence": "Re-exported by dist/templates/index.js:6, which is imported by ecc-file-writer.js:9 on the `npm run materialize` runtime chain (package.json + COO/CLAUDE.md Key Commands)."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/templates/template-command.js",
+    "verdict": "alive-via",
+    "evidence": "Re-exported by dist/templates/index.js:8 on the `npm run materialize` runtime chain (ecc-cli-entry.js:13 → ecc-file-writer.js:9 → templates/index.js)."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/templates/template-context.js",
+    "verdict": "alive-via",
+    "evidence": "Re-exported by dist/templates/index.js:11 on the `npm run materialize` runtime chain (ecc-cli-entry.js:13 → ecc-file-writer.js:9 → templates/index.js)."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/templates/template-hooks-json.js",
+    "verdict": "alive-via",
+    "evidence": "Re-exported by dist/templates/index.js:12 on the `npm run materialize` runtime chain (ecc-cli-entry.js:13 → ecc-file-writer.js:9 → templates/index.js)."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/templates/template-rule.js",
+    "verdict": "alive-via",
+    "evidence": "Re-exported by dist/templates/index.js:10 on the `npm run materialize` runtime chain (ecc-cli-entry.js:13 → ecc-file-writer.js:9 → templates/index.js)."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/templates/template-settings-json.js",
+    "verdict": "alive-via",
+    "evidence": "Re-exported by dist/templates/index.js:13 on the `npm run materialize` runtime chain (ecc-cli-entry.js:13 → ecc-file-writer.js:9 → templates/index.js)."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/templates/template-skill.js",
+    "verdict": "alive-via",
+    "evidence": "Re-exported by dist/templates/index.js:9 on the `npm run materialize` runtime chain (ecc-cli-entry.js:13 → ecc-file-writer.js:9 → templates/index.js)."
+  },
+  {
+    "path": "COO/ecc/materializer/dist/templates/template-subagent.js",
+    "verdict": "alive-via",
+    "evidence": "Re-exported by dist/templates/index.js:7 on the `npm run materialize` runtime chain (ecc-cli-entry.js:13 → ecc-file-writer.js:9 → templates/index.js)."
+  },
+  {
+    "path": "COO/ecc/materializer/tests/contract/claude-load.test.sh",
+    "verdict": "alive-via",
+    "evidence": "Wired twice: materializer/package.json \"test:contract\": \"bash tests/contract/claude-load.test.sh\", and invoked by tests/run-all-tests.sh:51-52 — which is `npm run test:all`, a command COO/CLAUDE.md Key Commands documents explicitly. Manual-only, no CI, but formally on the documented test path."
+  },
+  {
+    "path": "COO/ecc/materializer/tests/helpers/test-helpers.sh",
+    "verdict": "alive-via",
+    "evidence": "Sourced by tests/contract/claude-load.test.sh (only sourcer found by grep -rln 'test-helpers.sh' materializer/tests/), which itself is wired via package.json test:contract and run-all-tests.sh:51 — the CLAUDE.md-documented `npm run test:all` path."
+  },
+  {
+    "path": "COO/ecc/materializer/tests/run-all-tests.sh",
+    "verdict": "alive-via",
+    "evidence": "materializer/package.json \"test:all\": \"bash tests/run-all-tests.sh\", and COO/CLAUDE.md Key Commands explicitly lists `npm run test:all` for the materializer. No cron/CI runs it — manual documented path only."
+  },
+  {
+    "path": "COO/ecc/materializer/tests/run-fast-tests.sh",
+    "verdict": "alive-via",
+    "evidence": "materializer/package.json \"test\": \"bash tests/run-fast-tests.sh\" — i.e. the default `npm run test`, which COO/CLAUDE.md Key Commands documents. Manual documented path; no automated runner."
+  },
+  {
+    "path": "COO/ecc/materializer/tests/walkthrough.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Searched: grep 'walkthrough.sh' across Strader and COO (excl standard dirs) — zero hits outside the file itself (only unrelated prose 'walkthroughs' in plans-layout.md and a deprecated factory pack template); not in materializer/package.json scripts; crontab, both .claude/ trees, /var/moo, tmux wrappers — all empty."
+  },
+  {
+    "path": "COO/ecc/scripts/compliance-suite.sh",
+    "verdict": "ambiguous",
+    "evidence": "Every executable probe empty (crontab, .claude/ skills/hooks/settings in both repos, COO/certification/ — zero hits, /var/moo only beads backups/audit logs), but its one inbound reference is an unimplemented checkbox: COO/ecc/design-functional-test-harness.md:114 '[ ] Integration with compliance-suite.sh'. It is also the sole caller keeping two other candidates (optimize-rules.py, hydrate.mjs) referenced, so its disposition decides theirs."
+  },
+  {
+    "path": "COO/ecc/scripts/hydrate-strader.mjs",
+    "verdict": "confirmed-dead",
+    "evidence": "Searched: grep 'hydrate-strader' across Strader and COO including .claude/, certification/, factory/, bin/, tools/ — zero hits outside the file itself (compliance-suite.sh calls hydrate.mjs, not this); crontab empty; /var/moo hits are only beads-store backups and audit logs; not in any tmux wrapper. Zepo hydration today runs via factory/hydrate-zepo.sh."
+  },
+  {
+    "path": "COO/ecc/scripts/hydrate.mjs",
+    "verdict": "ambiguous",
+    "evidence": "Only inbound reference is fellow dead-candidate compliance-suite.sh (HYDRATE=\"$SCRIPT_DIR/hydrate.mjs\" at line 32, validation step at line 7/98). All other probes empty: no cron, no .claude/ reference in either repo, factory/ hydration scripts never mention it, /var/moo clean."
+  },
+  {
+    "path": "COO/ecc/scripts/optimize-rules.py",
+    "verdict": "ambiguous",
+    "evidence": "Only executable caller is fellow dead-candidate compliance-suite.sh (OPTIMIZE_RULES at line 31, audit step lines 93/144). COO/.claude/rules/completeness-sweeps.md:21 cites it, but only as the historical anecdote of a grep miss — not an invocation. Deliberately maintained 2026-08-09 under co-uma, whose own close note records: NON-OPERATIVE, dspy not installed so it cannot execute, nothing outside ecc/ imports it. No cron, no skill, /var/moo hits are backups/audit only."
+  },
+  {
+    "path": "COO/ecc/smoke-test.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Searched: grep 'smoke-test.sh' across Strader and COO (excl _archive) — zero inbound references; crontab, both .claude/ trees, tmux wrappers — empty; output probe: /tmp/ecc-smoke-test does not exist (never run, or not since last tmp clean); /var/moo hits limited to beads backups/audit logs."
+  },
+  {
+    "path": "COO/ecc/test-complete-pipeline.js",
+    "verdict": "confirmed-dead",
+    "evidence": "No executable probe hit: crontab, both .claude/ trees, package.json scripts, tmux wrappers, /var/moo (backups/audit only) — all empty. The only mentions anywhere are two historical result documents: ecc/PIPELINE-TEST-RESULTS.md:232,239 and ecc/DESIGN-IMPLEMENTATION-REVIEW.md:333 — records of past runs of the intent-parser/resolver stack now in _archive (NON-OPERATIVE per COO/CLAUDE.md), not invocations."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/session-boot.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Runtime probes all empty: `systemctl status moo-session-boot` → 'Unit moo-session-boot.service could not be found'; /etc/systemd/system contains only record-boot-event.service (whose comment references moo-session-boot only to say it is deliberately NOT ordered after it); no @reboot or other crontab entry; its log target /var/moo/boot.log does not exist, i.e. it has never run on this box. Only inbound refs are its own uninstalled unit file (tmuxMOO/config/moo-session-boot.service:10) and the never-run installer (config/install-boot-service.sh), plus prose in conventions/zgent-design-language.md:433 ('exists, not integrated into full startup')."
+  },
+  {
+    "path": "COO/tmuxMOO/src/session-manager.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow dead-candidate session-boot.sh (bin/session-boot.sh:27 MANAGER=.../src/session-manager.sh) and the never-run install-boot-service.sh:28; its registry input ecc-sessions.json does not exist anywhere under COO or /var/moo (find returned nothing); no cron, no .claude/ reference, /var/moo hits are backups/audit logs only. Dead if session-boot.sh is dead; it is also a self-standing CLI (`session-manager.sh create/promote/status`) that docs still describe, so manual use remains conceivable."
+  },
+  {
+    "path": "COO/tmuxMOO/config/install-boot-service.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Searched: repo-wide grep both repos (excl .venv/.git/__pycache__/node_modules/data) — only self and factory/systemd/record-boot-event.service comment saying it is deliberately NOT ordered after moo-session-boot; `systemctl status moo-session-boot` = 'Unit moo-session-boot.service could not be found'; /etc/systemd/system has no moo unit; crontab -l has no tmuxMOO entries; no .claude reference in either repo."
+  },
+  {
+    "path": "COO/tmuxMOO/lib/moo-wrap.py",
+    "verdict": "ambiguous",
+    "evidence": "Repo-wide grep for 'moo-wrap': only consumers are COO/tmuxMOO/bin/desk-questions.sh and COO/tmuxMOO/bin/desk-render.sh — both themselves dead-candidates in this list. No crontab, .claude, live tmux-keybinding, or PATH reference."
+  },
+  {
+    "path": "COO/tmuxMOO/lib/session-builder.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Searched both repos: only invoker is COO/tmuxMOO/src/session-manager.sh:316-317, whose own invocation chain (session-boot.sh via moo-session-boot.service) dead-ends — systemd reports the unit not found. Spec YAML headers and conventions/zepo-prompts/tmux-insights.md mention it descriptively only. No crontab entry, no .claude reference, no PATH copy, live moocity server built by steves-desk-session.sh instead."
+  },
+  {
+    "path": "COO/tmuxMOO/lib/spec-loader.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Repo-wide grep for 'spec-loader' across both repos (excl standard dirs): zero references outside the file itself — not even session-builder.sh names it. No crontab, .claude, tmux, or systemd reference."
+  },
+  {
+    "path": "COO/tmuxMOO/lib/hook-wirer.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Repo-wide grep for 'hook-wirer' across both repos: zero references outside the file itself. No crontab, .claude, live tmux hooks (show-hooks -g clean), or PATH reference."
+  },
+  {
+    "path": "COO/tmuxMOO/lib/keybinding-installer.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Only reference outside itself is a descriptive sentence in COO/conventions/zgent-design-language.md:298; no invoker anywhere, no crontab/.claude entry, and `tmux -L moocity list-keys` shows only help-table.txt and desk-trigger.sh bindings — nothing installed by this script."
+  },
+  {
+    "path": "COO/tmuxMOO/lib/theme-applicator.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Repo-wide grep for 'theme-applicator' across both repos: zero references outside the file itself. No crontab, .claude, or live tmux reference."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/dashboard.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "References are all non-executing: session-manager.sh:284 (itself dead-ended at the missing moo-session-boot.service), an '@see' comment in ecc/materializer/src/session-types.ts:17, a TODO checklist line in ecc/dspy_prompts/src/prompt_compiler.py:109, and a comment in zgent-session-spec/claude-monitor.yaml. Targets gc-root; live socket has only steves-desk. No crontab/.claude/keybinding reference."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-content.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Repo-wide grep for 'desk-content': only hit outside itself is desk-invoke.sh:24, which is merely the tmp filename string '/tmp/desk-content-invoke.rendered' — desk-invoke.sh never executes desk-content.sh. No crontab, .claude, keybinding, or PATH reference."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-help.sh",
+    "verdict": "ambiguous",
+    "evidence": "Only wiring is zgent-session-spec/mydesk.yaml:32 ('?' popup binding), a spec consumed only by session-builder.sh — itself a dead-candidate in this list whose invocation chain dead-ends at the missing moo-session-boot.service. Live `tmux -L moocity list-keys` has no desk-help binding."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-item-filter.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Repo-wide grep for 'desk-item-filter' across both repos: zero references outside the file itself (verified desk-invoke.sh does not call it). No crontab, .claude, keybinding, or PATH reference."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-layout.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Only reference outside docs is COO/.claude/commands/plans-layout.md:81, which is an explicit negative instruction ('Do NOT modify desk-layout.sh') and not an invocation — plans-layout.sh is the script that command runs. No crontab, keybinding, or invoker anywhere."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-materialize.sh",
+    "verdict": "ambiguous",
+    "evidence": "Three callers exist but all are Gas City-era: /usr/local/bin/gt-reset (deployed copy of session-create.sh, still on PATH, line 6 'Delegates desk window creation to desk-materialize.sh', creates SESSION=gc-root), on-attach.sh:10, and myDesk/bin/desk:40. gc-root does not exist on the live socket and Gas City is ruled deprecated, but gt-reset remains manually runnable from PATH — gray case."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-nav.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by zgent-session-spec/mydesk.yaml:30-31 popup bindings (spec consumed only by dead-candidate session-builder.sh) and design docs; live moocity list-keys has no desk-nav binding; live navigator is desk-viewer.sh (steves-desk-session.sh:22)."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-pager.sh",
+    "verdict": "ambiguous",
+    "evidence": "Only code reference is COO/tmuxMOO/bin/desk-questions.sh — itself a dead-candidate in this list (its own external references are zero) — plus 2026-03-29 design docs. No crontab/.claude/keybinding reference."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-qa.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Repo-wide grep for 'desk-qa': only hits are docs/superpowers/specs/2026-03-29-attention-loop-redesign/{plan,spec}.md (historical design docs). No code reference, crontab, .claude, keybinding, or PATH entry."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-questions.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Repo-wide grep for 'desk-questions' across both repos: zero references outside the file itself. No crontab, .claude, live keybinding, or PATH reference."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-render.sh",
+    "verdict": "ambiguous",
+    "evidence": "Callers are desk-content.sh (dead-candidate in this list) and myDesk/machines/adapters/plan-adapter.js — myDesk's machines layer has no active invoker (myDesk/bin/desk is gc-root/desk-materialize era, not on PATH), plus 2026-03-29 design docs. Live delivery chain is steves-desk-session.sh → desk-viewer.sh → desk-html.sh, which never touches it."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-reset.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced by canvas/moo.conf:317 ('bind R run-shell ... desk-reset.sh') and test/test-desk-integration.sh:51,322 — but moo.conf is loaded only by /usr/local/bin/gt-reset (Gas City gc-root machinery, manually runnable from PATH), and the live moocity server's list-keys has NO R/desk-reset binding, confirming moo.conf is not loaded today."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-shell.sh",
+    "verdict": "ambiguous",
+    "evidence": "Sole caller is desk-materialize.sh:84 ('source $BIN/desk-shell.sh') — itself a dead-candidate in this list reachable only via the Gas City gt-reset chain. No other reference in either repo, crontab, .claude, or live keybindings."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/desk-view.sh",
+    "verdict": "ambiguous",
+    "evidence": "Repo-wide grep for 'desk-view.sh': sole caller is COO/tmuxMOO/bin/desk-nav.sh — itself a dead-candidate in this list (wired only through the unbuilt mydesk.yaml spec). Live navigator desk-viewer.sh does not call it."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/exec.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grep for 'exec.sh' (and 'tmuxMOO/bin/exec.sh') across both repos excluding backups/archives/transcripts: zero references outside the file itself. Not in crontab, either repo's .claude, live tmux keybindings, or /usr/local/bin."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/hourly-activity-summary.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Repo-wide grep for 'hourly-activity-summary': zero references outside the file itself. No crontab entry (full crontab -l reviewed — all entries are Strader/COO-factory/DataArchive wrappers, none tmuxMOO). Writes no output files to check (prints to stdout)."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/log-rotate.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "No crontab entry; only reference is myDesk/reports/digest-2026-03-16.html (a March report snapshot); and its LOGDIR target /root/projects/COO/logs does not exist ('No such file or directory'), so nothing is being rotated and nothing is growing unbounded there either."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/nav-browser.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "References are: providers/{beads,conventions,plans}.sh headers (the provider dir exists solely for it, no external callers of providers either), conventions/prep-the-endpoint.md:41 — explicitly a preserved 'Original context' historical note whose 2026-07-01 directive replaced the tool — and conventions/wsl-interop runbook whose actual subject is desk-viewer.sh open_in_browser. No crontab, .claude, live keybinding (list-keys shows only desk-trigger.sh/help-table), or PATH reference; live delivery is desk-html.sh per current convention."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/navigator.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced by four things, all gray or dead: myDesk/tmux-bridge.js:220 (tmux-bridge.js itself has zero callers in either repo), zgent-session-spec/mydesk.yaml:37 (mydesk.yaml consumed only by src/session-manager.sh, whose boot service systemctl reports not-found), bin/on-attach.sh:48 (dead — see below), and bin/desk-materialize.sh:68 — which IS reachable from session-create.sh via the deployed /usr/local/bin/gt-reset (see session-create verdict). Its deskd dependency is unbootstrapped: /tmp/desk absent, no process. Ambiguous because it is one manual `gt-reset` away from executing."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/on-attach.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Sole reference is canvas/moo.conf:329 (attach hook), and moo.conf is provably unloaded: active chain is ~/.tmux.conf -> tmuxMOO/tmux/tmux.conf, read in full (43 lines, no source/run-shell of moo.conf). Also searched: crontab (absent), both repos' .claude/ (absent), systemd units (absent), live moocity panes and ps (absent)."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/plan-deposit.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grep of both repos (excl .venv/.git/__pycache__/node_modules/data) finds only self-references; no caller anywhere. Not in crontab, not in either .claude/ (skills/hooks/commands/settings), not in active tmux.conf, no running process, no fresh outputs (myDesk plan dirs untouched by it)."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/plan-normalize.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by two fellow dead-candidates: bin/plan-deposit.sh:18 and test/test-plan-normalize.sh:6 (plus 2026-03-29 spec docs). No independent invoker in crontab, .claude/, tmux config, or processes — but the rubric's dead-candidate-only-referrer case applies, so ambiguous rather than confirmed."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/plugin-sync.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Its install target $HOME/.tmux/plugins does not exist (ls empty), and the active tmux.conf (read in full) loads no plugins and no tpm — so even past output is absent and future output could not load. Only references are its own manifest config/plugins.yaml. Not in crontab, .claude/, or any caller in either repo. Stronger than dormant: the setup was never materialized on this box."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/session-create.sh",
+    "verdict": "alive-via",
+    "evidence": "Deployed on PATH as /usr/local/bin/gt-reset (verified: header reads 'session-create.sh — Create gc-root tmux session', mtime Apr 18), and re-deployed by COO/factory/build-factory-image.sh:505-507, which is invoked via the live command COO/.claude/commands/reimage.md:69. Caveat: the gc-root session it creates is absent from the live socket, so this is alive-by-deployment, not alive-by-use."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/surface-publish.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "All non-self grep hits point at the OTHER copy: zgent-subsystems/tests/test-integration.sh:19 and test-surface.sh:13 source zgent-subsystems/surface/surface-publish.sh, and docs/dspy test fixtures name the path as string data only. The tmuxMOO copy has zero callers; not in crontab, .claude/, tmux config; /var/moo/surface does not exist (only /var/moo/desk)."
+  },
+  {
+    "path": "COO/tmuxMOO/bin/welcome.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Sole reference is zgent-session-spec/mydesk.yaml:47; mydesk.yaml itself has zero consumers except src/session-manager.sh (boot service moo-session-boot: systemctl 'not-found', unit absent from /etc/systemd/system) and historical spec docs. Not in crontab, .claude/, active tmux.conf, or live panes."
+  },
+  {
+    "path": "COO/tmuxMOO/canvas/scripts/beads.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Invoked only as 'bash ~/.moo/scripts/beads.sh' from moo.conf:201 — moo.conf is not sourced by the active chain (verified by reading tmux/tmux.conf in full) AND ~/.moo does not exist. Crontab, .claude/, systemd, live panes: all empty."
+  },
+  {
+    "path": "COO/tmuxMOO/canvas/scripts/help-contextual.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Referenced only via '~/.moo/scripts/help-contextual.sh' at moo.conf:152,155; moo.conf unloaded (active tmux.conf read in full) and ~/.moo absent. No crontab/.claude/systemd/process references."
+  },
+  {
+    "path": "COO/tmuxMOO/canvas/scripts/info.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Referenced only via '~/.moo/scripts/info.sh' at moo.conf:196; moo.conf unloaded and ~/.moo absent. No crontab/.claude/systemd/process references."
+  },
+  {
+    "path": "COO/tmuxMOO/canvas/scripts/look.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Referenced only via '~/.moo/scripts/look.sh' at moo.conf:160; moo.conf unloaded and ~/.moo absent. No crontab/.claude/systemd/process references."
+  },
+  {
+    "path": "COO/tmuxMOO/canvas/scripts/welcome-content.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Sole caller is canvas/scripts/welcome.sh:12, which invokes it as 'bash ~/.moo/scripts/welcome-content.sh' — ~/.moo does not exist, and the caller itself only fires from unloaded moo.conf. Double-proof of inertness beyond the dead-candidate-referrer rule."
+  },
+  {
+    "path": "COO/tmuxMOO/canvas/scripts/welcome.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "No reference to it anywhere outside its own header and its callee — even moo.conf does not invoke it (grep of both repos). Not in crontab, .claude/, active tmux.conf, systemd, or processes; ~/.moo deploy target absent."
+  },
+  {
+    "path": "COO/tmuxMOO/providers/beads.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Sole consumer is bin/nav-browser.sh (provider contract, tmuxMOO/providers/<name>.sh), and nav-browser.sh itself has zero invokers: grep of both repos finds only self-references, it is absent from crontab, both .claude/ dirs, the active tmux.conf, live panes, and ps. Other hits are archived DaysActivity-2026-05-07.md only."
+  },
+  {
+    "path": "COO/tmuxMOO/providers/conventions.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Same chain: only consumer is bin/nav-browser.sh, which has no invoker anywhere (grep both repos, crontab, .claude/, tmux config, processes all empty); remaining hits are self and archived DaysActivity."
+  },
+  {
+    "path": "COO/tmuxMOO/providers/plans.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Same chain: only consumer is bin/nav-browser.sh (no invokers anywhere — grep both repos, crontab, .claude/, active tmux.conf, live panes, ps); remaining hits self + archived DaysActivity."
+  },
+  {
+    "path": "COO/tmuxMOO/src/surface.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Only executable reference is bin/dashboard.sh:158, which send-keys into session gc-root (absent from live socket); dashboard.sh's own caller is src/session-manager.sh:284, whose boot service moo-session-boot is 'not-found' in systemd. Remaining hits are dspy test fixtures using the path as string data. No process, no crontab/.claude entry, and its feed dir /var/moo/surface does not exist."
+  },
+  {
+    "path": "COO/tmuxMOO/src/tmux_controller.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Zero grep hits for basename or import path in either repo (excl .venv/.git/__pycache__/node_modules/data) — not even self-documentation matches elsewhere. Absent from crontab, both .claude/ dirs, tmux config, systemd, and ps."
+  },
+  {
+    "path": "COO/tmuxMOO/src/vscode_bridge.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Zero references anywhere in either repo (basename and module-path grep both empty), no crontab/.claude/systemd/tmux/process trace, and no VSCode extension artifacts found."
+  },
+  {
+    "path": "COO/tmuxMOO/src/vscode_log_monitor.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Sole launcher is bin/dashboard.sh:154 targeting absent session gc-root, behind the not-found moo-session-boot service (same inert chain as surface.py). Only other hit is a docstring cross-reference in surface.py. No process, no crontab/.claude entry, no recent outputs."
+  },
+  {
+    "path": "COO/tmuxMOO/test/test-desk-integration.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "No runner: absent from crontab, both .claude/ dirs, any CI/harness script in either repo; only non-self reference is the 2026-03-30 active-dispatch spec doc. It exercises desk-reset.sh/deskd (/tmp/desk absent) against gc-root, which does not exist on the live socket."
+  },
+  {
+    "path": "COO/tmuxMOO/test/test-plan-normalize.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grep finds only its own header — no runner, harness, crontab, or .claude/ reference in either repo. Its subject plan-normalize.sh is itself only referenced by dead candidates."
+  },
+  {
+    "path": "COO/tmuxMOO/tests/test-desk-viewer.sh",
+    "verdict": "ambiguous",
+    "evidence": "No automated invoker (crontab, .claude/, systemd, harness greps all empty; non-self references only in archived DaysActivity 2026-05-09/05-17) — but its subject is live: bin/steves-desk-session.sh runs desk-viewer.sh and is referenced by the active Strader cron wrapper scripts/cron/gauge-preopen-wrapper.sh:41, and the steves-desk session it smoke-tests is up right now. A valid manual smoke test with no runner: dormant, not dead."
+  },
+  {
+    "path": "COO/myDesk/bin/archive-reports.sh",
+    "verdict": "ambiguous",
+    "evidence": "No runtime invoker anywhere: crontab -l has no myDesk entry (the cron line at CONVENTIONS.md:127 was never installed); not in Strader/.claude or COO/.claude; not in tmuxMOO wrappers; output probe shows it never ran effectively — myDesk/reports/archive/manifest.json is 3 bytes, mtime Apr 23. But COO/myDesk/CONVENTIONS.md:112-127 names it as the standing archival procedure and reports/mancini still receives daily files (mancini-es-2026-08-12.md, Aug 12) — doc-alive, runtime-dead."
+  },
+  {
+    "path": "COO/myDesk/bin/render-md-pane.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped basename across Strader+COO (excl .venv/.git/__pycache__/node_modules/data): only hits are its own file and COO/archive/DaysActivity-2026-05-23.md (historical log calling it 'now somewhat redundant'). Absent from crontab -l, both repos' .claude dirs, tmuxMOO bin scripts, and moo.conf keybindings. desk-html.sh path renders via render-md.py instead."
+  },
+  {
+    "path": "COO/myDesk/desk.js",
+    "verdict": "ambiguous",
+    "evidence": "Launch wiring exists — COO/myDesk/bin/desk:57 (exec bun run desk.js), tmuxMOO/bin/session-create.sh:33, tmuxMOO/bin/desk-reset.sh:21 — but none of those launchers has a live trigger: not in crontab, not in either .claude; desk-reset.sh's only trigger is moo.conf:317 'bind R', and the live moocity server's config_files is /root/.tmux.conf only (moo.conf not loaded); only session is steves-desk (no gc-root), /tmp/desk absent."
+  },
+  {
+    "path": "COO/myDesk/hub-router.js",
+    "verdict": "ambiguous",
+    "evidence": "Sole runtime consumer is desk.js:6 require('./hub-router') — desk.js is itself a dormant candidate with no live trigger. Also required by test/hub-router.test.js (dormant test). No crontab/.claude/tmux hits."
+  },
+  {
+    "path": "COO/myDesk/lib/backfill-questions.js",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped 'backfill-questions' across Strader+COO (excl .venv/.git/__pycache__/node_modules/data): only hits are its own header (lines 2-3, self-described 'One-time migration'). Absent from crontab -l, both .claude dirs, tmuxMOO wrappers, package.json scripts. No test requires it."
+  },
+  {
+    "path": "COO/myDesk/machines/adapters/maint-adapter.js",
+    "verdict": "ambiguous",
+    "evidence": "Sole runtime consumer is desk.js:13 require — desk.js is a dormant candidate with no live launcher trigger (see desk.js verdict). No crontab/.claude/tmux hits otherwise."
+  },
+  {
+    "path": "COO/myDesk/machines/adapters/plan-adapter.js",
+    "verdict": "ambiguous",
+    "evidence": "Sole inbound runtime consumer is desk.js:10 require — desk.js is a dormant candidate. Its own reference to tmuxMOO/bin/desk-render.sh is outbound, not keeping-alive. test/plan-adapter.test.js requires it (dormant test)."
+  },
+  {
+    "path": "COO/myDesk/machines/adapters/report-adapter.js",
+    "verdict": "ambiguous",
+    "evidence": "Sole runtime consumer is desk.js:11 require — desk.js is a dormant candidate with no live trigger. No other hits."
+  },
+  {
+    "path": "COO/myDesk/machines/adapters/zgent-adapter.js",
+    "verdict": "ambiguous",
+    "evidence": "Sole runtime consumer is desk.js:12 require — desk.js is a dormant candidate with no live trigger. No other hits."
+  },
+  {
+    "path": "COO/myDesk/machines/attention-loop.js",
+    "verdict": "ambiguous",
+    "evidence": "Parent's 'desk.js does not require it' is wrong in effect: machines/item-registry.js:16 does require('./attention-loop'), and desk.js:8 requires item-registry — so it is live code in the dormant desk stack, same class as the other machines, not uniquely dead. Referenced only by item-registry.js (itself a dormant candidate) and its own test."
+  },
+  {
+    "path": "COO/myDesk/machines/cm-logger.js",
+    "verdict": "ambiguous",
+    "evidence": "Sole runtime consumer is desk.js:14 require — desk.js is a dormant candidate with no live trigger. test/cm-logger.test.js requires it (dormant test)."
+  },
+  {
+    "path": "COO/myDesk/machines/desk-mode.js",
+    "verdict": "ambiguous",
+    "evidence": "Sole runtime consumer is desk.js:7 require — desk.js is a dormant candidate with no live trigger."
+  },
+  {
+    "path": "COO/myDesk/machines/item-registry.js",
+    "verdict": "ambiguous",
+    "evidence": "Sole runtime consumer is desk.js:8 require — desk.js is a dormant candidate with no live trigger."
+  },
+  {
+    "path": "COO/myDesk/machines/jump-station.js",
+    "verdict": "ambiguous",
+    "evidence": "Sole runtime consumer is desk.js:9 require — desk.js is a dormant candidate with no live trigger."
+  },
+  {
+    "path": "COO/myDesk/tmux-bridge.js",
+    "verdict": "ambiguous",
+    "evidence": "Runtime consumers are desk.js:15 require and test/status-line.test.js:3 — both dormant candidates. Its own calls out to tmuxMOO/bin/navigator.sh are outbound. No crontab/.claude hits."
+  },
+  {
+    "path": "COO/myDesk/test/attention-loop.test.js",
+    "verdict": "ambiguous",
+    "evidence": "Requires only machines/attention-loop.js (ambiguous candidate). Only harness is package.json \"test\": \"bun test\" — nothing invokes it: crontab -l has no test entry, no CI config in COO/myDesk, no .claude hook in either repo runs myDesk tests."
+  },
+  {
+    "path": "COO/myDesk/test/cm-logger.test.js",
+    "verdict": "ambiguous",
+    "evidence": "Requires only machines/cm-logger.js (dormant candidate); harness is package.json 'bun test' with no CI/cron/.claude invoker (crontab checked, both .claude dirs grepped empty)."
+  },
+  {
+    "path": "COO/myDesk/test/desk-mode.test.js",
+    "verdict": "ambiguous",
+    "evidence": "Requires only machines/desk-mode.js (dormant candidate); 'bun test' harness has no CI/cron/.claude invoker."
+  },
+  {
+    "path": "COO/myDesk/test/desk.test.js",
+    "verdict": "ambiguous",
+    "evidence": "Requires createDeskRuntime from ../desk (desk.js:3 of the test) — the dormant candidate; 'bun test' harness has no CI/cron/.claude invoker."
+  },
+  {
+    "path": "COO/myDesk/test/hub-integration.test.js",
+    "verdict": "ambiguous",
+    "evidence": "Requires createDeskRuntime from ../desk (line 3) — the dormant desk stack; 'bun test' harness has no CI/cron/.claude invoker. tmuxMOO/test/test-desk-integration.sh is a separate script and also has no live invoker."
+  },
+  {
+    "path": "COO/myDesk/test/hub-router.test.js",
+    "verdict": "ambiguous",
+    "evidence": "Requires only hub-router.js (dormant candidate); 'bun test' harness has no CI/cron/.claude invoker."
+  },
+  {
+    "path": "COO/myDesk/test/item-registry.test.js",
+    "verdict": "ambiguous",
+    "evidence": "Requires only machines/item-registry.js (dormant candidate); 'bun test' harness has no CI/cron/.claude invoker."
+  },
+  {
+    "path": "COO/myDesk/test/jump-station.test.js",
+    "verdict": "ambiguous",
+    "evidence": "Requires only machines/jump-station.js (dormant candidate); 'bun test' harness has no CI/cron/.claude invoker."
+  },
+  {
+    "path": "COO/myDesk/test/plan-adapter.test.js",
+    "verdict": "ambiguous",
+    "evidence": "Requires only machines/adapters/plan-adapter.js (dormant candidate); 'bun test' harness has no CI/cron/.claude invoker."
+  },
+  {
+    "path": "COO/myDesk/test/status-line.test.js",
+    "verdict": "ambiguous",
+    "evidence": "Parent's 'no matching status-line.js source' guess corrected: it requires formatHubStatusLine/formatHubKeys from ../tmux-bridge (line 3), a dormant candidate — not desk.js-embedded logic and not an orphan of a deleted file. Same unrun 'bun test' harness; the only status-line.sh on disk (COO/.gc/system/packs/gastown/) is unrelated."
+  },
+  {
+    "path": "COO/myDesk/test/tmux-bridge.test.js",
+    "verdict": "ambiguous",
+    "evidence": "Picked up by COO/myDesk/package.json \"test\": \"bun test\" (bun globs test/), and its subject tmux-bridge.js is live-wired in-repo (myDesk/desk.js:15 require('./tmux-bridge'); test/status-line.test.js:3 require('../tmux-bridge')). But no CI in COO (.github/workflows exists only in Strader), no crontab entry, and deskd/desk.js is not running in tmux -L moocity panes or ps — the test is alive only if myDesk itself is."
+  },
+  {
+    "path": "COO/zgent-subsystems/cli/zgent-cli.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/factory/build-factory-image.sh:487 names it explicitly: chmod +x \"$SUBSYSTEMS_DST\"/cli/zgent-cli.sh after cp -r to /opt/zgent-subsystems (deployed copy exists, Apr 18). No runtime invocation found anywhere else (crontab, .claude, tmux, ps all empty) — alive only via the factory image build, as the candidate stated."
+  },
+  {
+    "path": "COO/zgent-subsystems/commands/commands.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow dead-candidate tests/test-commands.sh:13 (source .../commands/commands.sh). The claimed factory-validator consumer is disproven: validate-runtime-image.sh:146 references /opt/zgent-templates/commands (a template dir, unrelated file). Otherwise only the anonymous cp -r at build-factory-image.sh:484. Crontab/.claude/tmux/ps: empty."
+  },
+  {
+    "path": "COO/zgent-subsystems/comms/mail.sh",
+    "verdict": "ambiguous",
+    "evidence": "No executable consumer (sourced only by fellow candidates tests/test-cli.sh:17 and tests/test-integration.sh:18; /var/moo/mail empty since Apr 18; crontab/.claude/tmux empty) — but COO/tmuxMOO/INTER-ZGENT-COMMS.md:183,303 cites it as current 'Source of truth' / 'Status: Built' for Tier-1 bead-backed mail, and open bug bead co-gkz targets it."
+  },
+  {
+    "path": "COO/zgent-subsystems/comms/narrative.sh",
+    "verdict": "ambiguous",
+    "evidence": "Sourced only by fellow candidates tests/test-cli.sh:16 and tests/test-integration.sh:17; /var/moo/feeds untouched since Apr 18; crontab/.claude/tmux/ps empty — but COO/tmuxMOO/INTER-ZGENT-COMMS.md:93,244 cites it as 'Status: Built. Implementation: zgent-subsystems/comms/narrative.sh' (ratified doc, source-of-truth claim)."
+  },
+  {
+    "path": "COO/zgent-subsystems/factory/scaffold-moo.sh",
+    "verdict": "alive-via",
+    "evidence": "EXECUTED by COO/factory/build-factory-image.sh:494-495: `bash \"$SUBSYSTEMS_DST/factory/scaffold-moo.sh\" /var/moo` (also chmod'd by name at :486). A real invocation path in the factory build, not just a copy."
+  },
+  {
+    "path": "COO/zgent-subsystems/health/check-zgent.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/factory/build-factory-image.sh:485 chmod +x's it by name into the factory image; also sourced by fellow candidates patrol.sh:11 and zgent-cli.sh:113. No runtime invocation on this box (crontab, .claude, tmux, ps empty) — alive only via the image build."
+  },
+  {
+    "path": "COO/zgent-subsystems/health/heartbeat.sh",
+    "verdict": "ambiguous",
+    "evidence": "Sourced only by fellow dead-candidates: patrol.sh:10, check-zgent.sh:46, zgent-cli.sh:112 (plus tests). Confirmed all skill/'heartbeat' hits elsewhere are the different file .claude/skills/pulse-zepos/lib/zepo-heartbeat.sh (pulse-zepos/run.sh:17, tap-in/gather.sh:60). Crontab/tmux/ps: empty."
+  },
+  {
+    "path": "COO/zgent-subsystems/health/patrol.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/factory/build-factory-image.sh:485 chmod +x's it by name into /opt/zgent-subsystems. Confirmed NO crontab entry (full crontab -l reviewed — the designed 30-second supervisor is unwired) and not in tmux/ps — alive only via the image build."
+  },
+  {
+    "path": "COO/zgent-subsystems/lib/common.sh",
+    "verdict": "ambiguous",
+    "evidence": "Sourced only by fellow dead-candidates (patrol.sh:7, log-reap.sh:6, check-zgent.sh:43, zgent-cli.sh:109, tests/*). Confirmed untracked: `git check-ignore -v` → .gitignore:31 `lib/` matches zgent-subsystems/lib/common.sh; git ls-files empty. Note: the cp -r at build-factory-image.sh:484 still deploys it from the working tree, so the untracked file IS in /opt/zgent-subsystems/lib/."
+  },
+  {
+    "path": "COO/zgent-subsystems/lifecycle/lifecycle.sh",
+    "verdict": "ambiguous",
+    "evidence": "Sourced only by fellow candidates patrol.sh:9, check-zgent.sh:45, zgent-cli.sh:111 (plus tests). The live boot log is explicitly written elsewhere: factory/scripts/record-boot-event.sh:7 disclaims it ('lifecycle.sh has no boot...'); docs/runbooks/boot-event-log.md:12 repeats the disclaimer. Crontab/.claude/tmux: empty."
+  },
+  {
+    "path": "COO/zgent-subsystems/logging/log-reap.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/factory/build-factory-image.sh:486 chmod +x's it by name into the factory image. Confirmed no crontab entry, and /var/moo/logs shows no reaper ran (ops-trail.jsonl 10.5MB, multi-month rotated files) — alive only via the image build."
+  },
+  {
+    "path": "COO/zgent-subsystems/logging/otel-env.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Searched: grep both repos (excl .venv/.git/__pycache__/node_modules/data) for 'otel-env'/'otel' — only hit is deferred bead co-jpq text in .beads/backup-pre-v65-push jsonl claiming 'every zgent's .bashrc sources otel-env.sh', which is FALSE on this box (grep /root/.bashrc, .profile, .bash_profile, /etc/bash.bashrc, /etc/profile, /etc/profile.d/*: zero hits); crontab -l: nothing; .claude skills/hooks/settings in both repos + ~/.claude incl. tap-in/gather.sh: nothing; not even the zgent-subsystems tests reference it; deployed copy at /opt/zgent-subsystems/logging/otel-env.sh is sourced by nothing."
+  },
+  {
+    "path": "COO/zgent-subsystems/logging/zgent-log.sh",
+    "verdict": "ambiguous",
+    "evidence": "Sourced only by fellow dead-candidates (patrol.sh:8, check-zgent.sh:44, zgent-cli.sh:110, tests) — but COO/tmuxMOO/INTER-ZGENT-COMMS.md:77,299-300 cites it as the current operational-logging implementation ('ZgentTransport → zgent-log.sh'). Live /var/moo/logs traffic confirmed to come from cron wrappers instead. Crontab/.claude/tmux: empty."
+  },
+  {
+    "path": "COO/zgent-subsystems/presence/presence.sh",
+    "verdict": "ambiguous",
+    "evidence": "Sourced only by fellow dead-candidates tests/test-cli.sh:15 and tests/test-integration.sh:16. /var/moo/presence empty, dir mtime Apr 18 03:52. No other grep hits in either repo, no crontab/.claude/tmux/ps traces."
+  },
+  {
+    "path": "COO/zgent-subsystems/surface/surface-publish.sh",
+    "verdict": "ambiguous",
+    "evidence": "Sourced only by fellow dead-candidate tests/test-integration.sh:19; INTER-ZGENT-COMMS.md:121 lists it in an as-built table. Caution for the reaper: a DIFFERENT same-named live-path file exists at COO/tmuxMOO/bin/surface-publish.sh — basename greps hit that one, not this. /var/moo/surface empty, mtime Apr 18. Crontab/.claude/tmux/ps: empty for this path."
+  },
+  {
+    "path": "COO/zgent-subsystems/tests/run-all.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Searched: every 'run-all.sh' grep hit in both repos resolves to the different file factory/harness/run-all.sh (COO/CLAUDE.md:155, .claude/commands/test-zgent.md:3,13,34 allowed-tools, archives) — zero references to zgent-subsystems/tests/run-all.sh anywhere; crontab -l: nothing; .claude skills/hooks/settings both repos + ~/.claude: nothing; tmux -L moocity panes and ps: nothing. It is a consumer of the test-*.sh files, consumed by nothing."
+  },
+  {
+    "path": "COO/zgent-subsystems/tests/test-cli.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow dead-candidate tests/run-all.sh:13 (glob `test-*.sh`). No CI, no crontab, no .claude allowlist entry, no tmux/ps trace."
+  },
+  {
+    "path": "COO/zgent-subsystems/tests/test-commands.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow dead-candidate tests/run-all.sh:13 glob. No CI/crontab/.claude/tmux references."
+  },
+  {
+    "path": "COO/zgent-subsystems/tests/test-common.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow dead-candidate tests/run-all.sh:13 glob; its subject lib/common.sh is confirmed gitignored (.gitignore:31). No CI/crontab/.claude/tmux references."
+  },
+  {
+    "path": "COO/zgent-subsystems/tests/test-comms.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow dead-candidate tests/run-all.sh:13 glob. No CI/crontab/.claude/tmux references."
+  },
+  {
+    "path": "COO/zgent-subsystems/tests/test-health.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow dead-candidate tests/run-all.sh:13 glob. No CI/crontab/.claude/tmux references."
+  },
+  {
+    "path": "COO/zgent-subsystems/tests/test-integration.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow dead-candidate tests/run-all.sh:13 glob. No CI/crontab/.claude/tmux references."
+  },
+  {
+    "path": "COO/zgent-subsystems/tests/test-lifecycle.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow dead-candidate tests/run-all.sh:13 glob. No CI/crontab/.claude/tmux references."
+  },
+  {
+    "path": "COO/zgent-subsystems/tests/test-logging.sh",
+    "verdict": "ambiguous",
+    "evidence": "Referenced only by fellow dead-candidate tests/run-all.sh:13 glob. No CI/crontab/.claude/tmux references."
+  },
+  {
+    "path": "COO/zgent-subsystems/tests/test-presence.sh",
+    "verdict": "ambiguous",
+    "evidence": "Only reference is the test-*.sh glob in sibling zgent-subsystems/tests/run-all.sh, which is itself uninvoked (COO/CLAUDE.md:155 references factory/harness/run-all.sh, a different file). Subsystem output dir /var/moo/presence/ is empty with mtime Apr 18. Gray case: kept discoverable only by an equally dormant runner in the same dir; /opt/zgent-subsystems deployed copy exists per CLAUDE.md:107-108."
+  },
+  {
+    "path": "COO/zgent-subsystems/tests/test-surface.sh",
+    "verdict": "ambiguous",
+    "evidence": "Same as test-presence.sh: only reference is the uninvoked sibling run-all.sh glob; /var/moo/surface/ is empty (mtime Apr 18); no cron/skill/settings/tmux reference in either repo."
+  },
+  {
+    "path": "COO/.claude/hooks/scripts/perm-audit/perm-audit-report.sh",
+    "verdict": "ambiguous",
+    "evidence": "No invoker anywhere: greps of both repos hit only its own usage header and a duplicate copy at COO/ecc/hooks/perm-audit-report.sh (itself unreferenced); not in crontab, settings, skills, or runbooks. BUT its input log /var/moo/audit/permission-prompts.jsonl is actively written (mtime 2026-08-12 06:40) by the wired perm-audit-hook.sh (settings.json:55), and this script is the only read side of that live data."
+  },
+  {
+    "path": "COO/.claude/hooks/scripts/perm-audit/tests/test-perm-audit.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos for 'test-perm-audit': zero hits outside its own directory (not even spec/plan docs). Not in crontab, settings.json allowlists, skills, or any runner (no runner script exists in perm-audit/tests/). Subject hook perm-audit-hook.sh is live-wired, but nothing invokes this test."
+  },
+  {
+    "path": "COO/.claude/hooks/scripts/session-start-bd-prime.sh",
+    "verdict": "ambiguous",
+    "evidence": "Not wired: settings.json SessionStart runs only session-start.sh (line 102), and session-start.sh contains no 'bd prime' or bd-prime reference. Sole live reference is .claude/hooks/tests/test-session-start-gate.sh:20 (BD_PRIME_SCRIPT=...) — itself a dead-candidate on this list. Referenced only by another dead-candidate: test-session-start-gate.sh."
+  },
+  {
+    "path": "COO/.claude/hooks/scripts/tmux-first-gate.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Not in settings.json PreToolUse Bash block (bash-guard, bead-gate, bd-close-gate only); only grep hits are 2026-03-29 spec/plan docs and itself. Deliberate decommission recorded: bead close in .beads/thread-report.html (COO-staging-6t7) states 'tmux-first-gate.sh removed from settings.json PreToolUse'. Not in crontab, skills, or Strader."
+  },
+  {
+    "path": "COO/.claude/hooks/tests/test-bash-guard.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: only hits are docs/superpowers/specs/2026-03-23-enforcement-hooks-design.md (build-time spec) and itself; bash-guard.sh does not cite it; no runner exists in .claude/hooks/tests/ (ls: five test files, no run-all); not in crontab, settings, skills. Subject hook bash-guard.sh is live-wired (settings.json:80) — deleting the test loses the only coverage, but nothing invokes it."
+  },
+  {
+    "path": "COO/.claude/hooks/tests/test-bead-gate.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Same probes as test-bash-guard.sh: only hits are the 2026-03-23 spec doc and itself; bead-gate.sh (live-wired, settings.json:85) does not cite it; no runner, cron, skill, or settings reference in either repo."
+  },
+  {
+    "path": "COO/.claude/hooks/tests/test-repo-guard.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Only hits are the 2026-03-23 spec doc and itself; repo-guard.sh (live-wired, settings.json:70) does not cite it; no runner/cron/skill/settings reference in either repo."
+  },
+  {
+    "path": "COO/.claude/hooks/tests/test-session-start-gate.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Only hits are docs/superpowers/plans/2026-05-07-zepo-pulse-coo-owned-implementation.md:442 and itself; no runner/cron/skill/settings reference. Additionally it is the sole live referent of dead-candidate session-start-bd-prime.sh (line 20), so its assertions target an unwired script."
+  },
+  {
+    "path": "COO/.claude/hooks/tests/test-write-guard.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Only hits are the 2026-03-23 spec doc and itself; write-guard.sh (live-wired, settings.json:65) does not cite it; no runner/cron/skill/settings reference in either repo."
+  },
+  {
+    "path": "COO/.claude/skills/init-zepos/lib/zepo-init.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "grep 'zepo-init|lib/' against init-zepos/SKILL.md returns nothing — the skill never sources or mentions its lib. All other hits: docs/superpowers/plans/2026-05-07-zepo-pulse-coo-owned-implementation.md and archive/DaysActivity-2026-05-07.md (historical). Not in crontab, settings, or Strader."
+  },
+  {
+    "path": "COO/bin/coo-remote.sh",
+    "verdict": "alive-via",
+    "evidence": "COO/conventions/remote-control-surface.md:42-53 documents it as the operator entry point (start/status/logs/attach/stop/restart, plus the ~/.bashrc.d alias recipe) — a live convention doc, and /var/moo/logs/remote-control/ exists (Jul 16). Manual operator tool, not cron-driven."
+  },
+  {
+    "path": "COO/infra/azure/email-ingress/deploy.sh",
+    "verdict": "alive-via",
+    "evidence": "infra/azure/email-ingress/README.md:26,43-46,144 — the runbook's documented deploy AND update path for live infra: 'Update: edit main.bicep/params, rerun deploy.sh (deployments are idempotent)'. No automation invokes it, by design."
+  },
+  {
+    "path": "COO/infra/azure/email-ingress/scripts/backfill-gmail.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: only hits are its own docstring/usage lines. email-ingress/README.md contains no 'backfill' mention; not in crontab, skills, settings. Docstring itself declares it one-time (run once, then revoke the Google grant)."
+  },
+  {
+    "path": "COO/notebooks/daily/generate-2026-04-25.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: no hits outside notebooks/daily/ and April day-archives. Directory frozen since Apr 26 (all mtimes 2026-04-26); no later dated notebooks ever generated; render-html.py does not reference it."
+  },
+  {
+    "path": "COO/notebooks/daily/render-html.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos for 'render-html': no hits outside notebooks/daily/ and April day-archives; generate-2026-04-25.py does not invoke it; no cron/skill/settings reference; directory untouched since 2026-04-26."
+  },
+  {
+    "path": "COO/tools/mempalace/export-cm-conversations.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: hits are its own usage line and historical bead records in .beads/backup-pre-v65-push-2026-08-11.jsonl (co-ta0m notes). Not in crontab, skills, settings; the export it performed completed 2026-07."
+  },
+  {
+    "path": "COO/tools/mempalace/probe-chroma-read.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: only hit outside its own file is the closed co-ta0m bead's historical notes ('Tooling versioned at tools/mempalace/{probe-chroma-read,purge-old-corpus}.py'). co-ta0m closed 2026-08-09; purge complete. No cron/skill/settings reference."
+  },
+  {
+    "path": "COO/tools/mempalace/purge-old-corpus.py",
+    "verdict": "confirmed-dead",
+    "evidence": "Same probes as probe-chroma-read.py: only reference is the closed co-ta0m bead history; the destructive migration it performed finished 2026-07-21. No cron/skill/settings/runner reference in either repo."
+  },
+  {
+    "path": "COO/tests/test-boot-event.sh",
+    "verdict": "alive-via",
+    "evidence": "docs/runbooks/boot-event-log.md:99 — 'bash tests/test-boot-event.sh # 23 tests, no Windows needed' in the live boot-event runbook; also cited by the installed subject factory/scripts/record-boot-event.sh:47 ('Tests: tests/test-boot-event.sh') and :559 ('tests/test-boot-event.sh depends on this')."
+  },
+  {
+    "path": "COO/tests/test-dolt-schema-skew-guard.sh",
+    "verdict": "alive-via",
+    "evidence": "factory/scripts/check-dolt-schema-skew.sh:35 (live, fleet-critical guard) cites 'tests/test-dolt-schema-skew-guard.sh' in its header; bead co-h69 close (2026-07-29) records it being run as an acceptance gate ('tests/test-dolt-schema-skew-guard.sh still passes 13/13'). Manual-only, but referenced and recently exercised."
+  },
+  {
+    "path": "COO/tests/test-install-bd-guard.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: only hits are its own header/usage lines; subject factory/scripts/install-bd.sh contains no 'test' or 'tests/' reference; no runner in COO/tests/, no crontab/skill/settings/runbook reference. Subject is live, but nothing points at this test."
+  },
+  {
+    "path": "COO/tests/test-pulse-run-bypass.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: only hits are docs/superpowers/plans/2026-05-07-zepo-pulse-coo-owned-implementation.md (build-time plan) and itself; subjects session-start.sh and .claude/hooks/lib/session-start-gate.sh contain no 'tests/' reference; no runner/cron/skill/settings reference. Subject is live (nightly 22:30 pulse), test is unreachable from anything."
+  },
+  {
+    "path": "COO/tests/test-zepo-bead-file.sh",
+    "verdict": "confirmed-dead",
+    "evidence": "Grepped both repos: only hits are the same 2026-05-07 plan doc (lines 51, 807, 955) and itself; subject .claude/skills/pulse-zepos/lib/zepo-bead-file.sh contains no 'tests/' reference; no runner/cron/skill/settings reference. Subject is cron-live nightly; test invoked by nothing."
+  },
+  {
+    "path": "COO/tests/test-zepo-cursors.sh",
+    "verdict": "alive-via",
+    "evidence": "Executed 2026-08-09 (3 days ago): /var/moo/logs/ops-trail.jsonl entry ts 2026-08-09T08:57:21Z, session 24e72c2e, cwd /root/projects/COO — `for f in tests/test-zepo-heartbeat.sh tests/test-zepo-cursors.sh tests/test-zepo-bead-file.sh tests/test-zepo-categorical.sh tests/test-pulse-run-bypass.sh; do ... bash \"$f\" ...` — the zepo test suite was regression-run while fixing test-zepo-sync-status.sh (committed same session). No automated invocation exists (crontab runs only factory/cron/pulse-zepos-wrapper.sh, which does not reference tests/; no CI, no Makefile, no glob runner, no .claude hooks/skills/settings reference in either repo; only static code reference is the historical plan doc docs/superpowers/plans/2026-05-07-zepo-pulse-coo-owned-implementation.md), but the suite is actively used ad-hoc as the safety net for the live nightly zepo lib. Dormant-but-alive: manual/agent-run test, in active use as recently as 2026-08-09 (also 2026-06-29, 2026-06-12)."
+  },
+  {
+    "path": "COO/tests/test-zepo-categorical.sh",
+    "verdict": "alive-via",
+    "evidence": "Same 2026-08-09T08:57Z ops-trail.jsonl invocation as test-zepo-cursors.sh (session 24e72c2e ran the full zepo suite including tests/test-zepo-categorical.sh), plus a full-suite loop run 2026-06-29T23:45Z. Same probe results otherwise: no crontab reference (only pulse-zepos-wrapper.sh scheduled, no tests/ inside it), no CI/Makefile/glob runner, no .claude hooks/skills/settings references in Strader or COO, no tmux wrapper; only static reference is the 2026-05-07 implementation plan doc. Alive via recurring ad-hoc regression runs whenever the nightly zepo lib is touched — dormant between lib changes, not dead."
+  }
+]

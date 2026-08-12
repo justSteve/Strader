@@ -1,0 +1,401 @@
+[
+  {
+    "lens": "coverage",
+    "summary": "Strader's test suite (801 passing, GitHub CI on every push) is real but has an inverted coverage profile: the dead May-era entity/GEX stratum is thoroughly pinned while several trading-day-critical live paths have no anchor at all. Worst confirmed gaps: the live==replay parity check exists but never runs (wrapper not in crontab); orderflow_sentinel.py has no test, no supervisor, and is invisible to surface_liveness.sh; the 1 Hz GexBot poller inherits its session gate by convention only; market/corpus/writer.py and gexbot_stream.py — the append path for irreplaceable tape — have zero direct tests; corpus_pull_internals.py remains untested despite a prior silent-success bug (st-kzhe). A structural seam: CI deliberately excludes tests/market/corpus (except test_paths), internals, indicators, measurement, and gex_context suites, so the live-capture and destructive-compaction tests run only when an agent remembers local pytest. On the enterprise side the census's 9-vs-~290 reality holds exactly: COO/tests has 9 files, no runner, no CI, and the Steve-facing desk delivery chain (desk-html.sh, desk-register.sh, trading-desk-refresh.sh, corpus-daily-wrapper.sh) is effectively untested despite being the Mancini/datastream morning path. Meanwhile a meaningful fraction of green tests pin nothing live: the superseded entity/indicator stratum, the unwired present layer, and the hobbled fork's orders surface.",
+    "findings": [
+      {
+        "title": "Live==replay parity check never executes",
+        "description": "scripts/live_parity_check.py (the st-d5f AC#4 acceptance check for the trading-day footprint surface) is complete, and scripts/cron/live-parity-wrapper.sh self-documents 'NOT YET INSTALLED IN CRON'. Confirmed: `crontab -l | grep -i parity` returns nothing. Parity drift between the live feeder and replay — the exact seam run_log.py's docstring names three risks for — would currently go unnoticed indefinitely. Minimum anchor: install the one 16:10 cron line, plus a heartbeat-staleness assertion in tap-in/surface_liveness that the parity log is <2 sessions old.",
+        "materiality": "critical",
+        "evidence": [
+          "crontab has no parity entry (verified 2026-08-12)",
+          "/root/projects/Strader/scripts/cron/live-parity-wrapper.sh self-documents NOT YET INSTALLED",
+          "tests/market/orderflow/test_run_log.py pins the log format but not the check ever running"
+        ]
+      },
+      {
+        "title": "orderflow_sentinel.py: no tests, no supervisor, invisible to surface_liveness",
+        "description": "The live level-proximity alerter over the 1 Hz feed has zero test references (grep of tests/ confirms), no cron supervisor (died with the 08-11 reboot, hand-restarted 05:10 today), and `grep sentinel scripts/surface_liveness.sh` returns nothing — so tap-in cannot see whether it is running, recreating the 2026-08-05 GEXBot blindness surface_liveness was built to prevent. Minimum anchors: (1) add its process pattern to surface_liveness.sh with a test asserting every supervised collector name appears in the pattern list; (2) a fixture-driven contract test: feed N synthetic 1 Hz records, assert the expected approach/relocation alert JSONL; (3) fourth thin shim over capture-supervisor-wrapper.sh.",
+        "materiality": "critical",
+        "evidence": [
+          "grep -rln orderflow_sentinel /root/projects/Strader/tests/ → empty",
+          "grep sentinel /root/projects/Strader/scripts/surface_liveness.sh → empty",
+          "wiring map: died on 08-11 reboot (st-2yuw), only alive today via hand restart"
+        ]
+      },
+      {
+        "title": "Corpus write spine untested: writer.py and gexbot_stream.py",
+        "description": "market/corpus/writer.py is the append+manifest path for ALL three corpus streams (irreplaceable tape) and market/corpus/gexbot_stream.py is the 10-endpoint collector core behind both cron supervisors — grep of tests/ finds zero references to either. A corruption or manifest-update regression here loses unrecoverable data while every collector test stays green (they pin window logic, not the write). Minimum anchors: writer — tmpdir round-trip test (append_record → read back → manifest cycle count and last-write fields correct, append-only invariant held); gexbot_stream — one golden-fixture cycle with mocked httpx asserting record shape, per-endpoint error capture, and that an empty/error body is recorded as an error not success.",
+        "materiality": "critical",
+        "evidence": [
+          "grep -rln writer /root/projects/Strader/tests/market/corpus/ → empty",
+          "grep -rln gexbot_stream /root/projects/Strader/tests/ → empty",
+          "writer.py docstring: append-only, history is the value — no test enforces it"
+        ]
+      },
+      {
+        "title": "1 Hz GexBot poller has no test anchor; session gate is inherited by convention only",
+        "description": "scripts/corpus_poll_gexbot_orderflow_1s.py (2 days old, trading-day-critical, burns vendor quota ~60x faster than the main collector on a stuck loop) has zero test references — tests/scripts/test_gexbot_collect_window.py pins only corpus_poll_gexbot.py. The st-p3lv incident class (unsupervised weekend quota burn) is guarded on the 60s leg but unguarded on the 1s leg. Minimum anchor: parametrize test_gexbot_collect_window over both pollers' window/gate functions, or refactor the gate into shared code the existing test already covers.",
+        "materiality": "high",
+        "evidence": [
+          "grep -rln 'orderflow_1s|of1s' /root/projects/Strader/tests/ → empty",
+          "st-p3lv history: exactly this failure class already burned quota once on the sibling collector"
+        ]
+      },
+      {
+        "title": "corpus_pull_internals.py still untested despite a prior silent-success bug",
+        "description": "The internals puller silently recorded empty Schwab responses as success until 2026-08-04 (st-kzhe) — the canonical silent-failure class — and still has no test (grep confirms). It feeds internals_config calibration and the MI gauge's replay contract. Minimum anchor: one regression test with a mocked client returning an empty candle set, asserting the run is recorded as failure/alert, not success — literally pinning the st-kzhe fix.",
+        "materiality": "high",
+        "evidence": [
+          "grep -rln corpus_pull_internals /root/projects/Strader/tests/ → empty",
+          "st-kzhe: empty responses recorded as success until 2026-08-04"
+        ]
+      },
+      {
+        "title": "CI deliberately excludes the feed-critical corpus suites",
+        "description": "Contrary to the census claim that nothing automated runs pytest, .github/workflows/ci.yml runs on every push (and standing commit-and-push authority means pushes happen each session). But its pytest line names tests/market/corpus/test_paths.py explicitly to SKIP the rest of that directory — so test_stream_databento.py (the live tick collector), test_schwab_stream.py, and test_compact_databento.py (the source-DELETING compaction) run only when an agent remembers local pytest. Also excluded: internals, indicators, measurement, present, test_gex_context, test_tpo, docs/lexicon. The most dangerous suites are precisely the excluded ones. Minimum anchor: pin the databento/schwab dev deps (the stated blocker, [st-cir]/[st-fixci]) or add a mocked-import shim so the corpus suites join CI; failing that, a local pre-push hook running the excluded suites.",
+        "materiality": "high",
+        "evidence": [
+          "/root/projects/Strader/.github/workflows/ci.yml: 'pytest strader/tests tests/runbook tests/market/corpus/test_paths.py tests/scripts tests/market/entities tests/market/orderflow tests/test_alerts.py'",
+          "ci.yml comment: feed-touching WIP suites intentionally omitted until deps pinned"
+        ]
+      },
+      {
+        "title": "Schwab gate surfaces untested: broker_schwab/client.py factory and scripts/run.sh",
+        "description": "The gate-key refusal in broker_schwab/client.py — the single choke point for live Schwab access and a stated hard boundary — is verified only by convention; no test asserts create_client raises without ~/.schwab_gate_key or that the hobbled lib's removed methods stay removed from Strader's side. scripts/run.sh, the sole sanctioned human execution path (including token refresh recovery), is May-era with zero tests. Minimum anchors: a pure unit test monkeypatching the gate-key path to assert factory refusal; an import-time assertion test that client objects lack place_order/get_account (re-verifying the DEFENSE NOTE hobble on any fork sync); a bash test that run.sh rejects an unlisted script.",
+        "materiality": "high",
+        "evidence": [
+          "census: client.py 'gate behavior verified only by convention'",
+          "grep of tests/ shows run.sh referenced only incidentally in test_schwab_stages.py",
+          "lib/schwab-py hobble guarded only by the fork's own client_test.py, re-verified manually on merges"
+        ]
+      },
+      {
+        "title": "Mancini Pine output path has no direct test; preopen cron wrappers untested",
+        "description": "mancini/pine_emitter.py emits the Pine v6 source that reaches Steve's chart, tested only indirectly via tests/runbook/test_chart.py (grep confirms no direct test); a Pine syntax regression surfaces on-chart at 08:15 with zero retry margin. The mancini-preopen, level-tracker, and premarket-vp cron wrappers have no tests, while sibling wrappers (capture-supervisor, gauge-preopen) already have a working stub-runner test pattern. Minimum anchors: a golden-file test — fixture ParseResult → exact Pine source; reuse the existing wrapper-test pattern for premarket-vp's last-good/exit-2 behavior (the one whose stale-page failure mode is 'looks current').",
+        "materiality": "medium",
+        "evidence": [
+          "grep -rln pine_emitter tests/ → only tests/runbook/test_chart.py (indirect bridge)",
+          "tests/scripts/test_capture_supervisor_wrapper.py and test_gauge_preopen_wrapper.py prove the wrapper-test pattern is cheap here"
+        ]
+      },
+      {
+        "title": "Alert delivery leg has no liveness verification",
+        "description": "strader/alerts.py is the meltdown-alert path to Steve's phone (Pushover/Twilio) invoked by the Mancini tracker, preopen crons, and flush_watcher. tests/test_alerts.py fully mocks the network, and backend config lives in .env the agent cannot read — so a misconfigured backend is only discoverable at real send time, i.e., during a meltdown. Minimum anchor: a scheduled (weekly) self-test that sends one real 'alert-path OK' push and journals the delivery result, with the heartbeat asserted at tap-in — a liveness probe, not a unit test.",
+        "materiality": "medium",
+        "evidence": [
+          "census: 'network is fully mocked, so live delivery has no automated verification' and 'no periodic self-test of the push path found'",
+          "st-mk56: the whole point of this leg is no-Claude-in-the-path guaranteed delivery"
+        ]
+      },
+      {
+        "title": "COO: 9 tests vs ~290 active files, no runner, desk delivery chain untested",
+        "description": "Confirmed: COO/tests contains exactly 9 files, all orphaned from automation (one CLAUDE.md line is the only wiring). Zero tests cover the paths Strader depends on every trading morning: corpus-daily-wrapper.sh (the datastream gate entry point, hardcoded cross-repo paths), desk-html.sh (sole renderer of every Steve-facing page), desk-register.sh (failures swallowed with a warning), trading-desk-refresh.sh (documented silent-skip of browser re-render under cron — a failure Steve already hit), and steves-desk-session.sh (open adopt-gap st-b9pf, live at census). tmuxMOO's only test (test-desk-viewer.sh) is never run, and its live dependency lib/moo-theme.sh is not even in git. Hook layer: beads-first-gate.sh and bd-close-gate.sh have no tests despite an Aug logic change; the tested hooks have no runner. Minimum anchors: COO/tests/run-all.sh wired into the nightly pulse or tap-in; a fixture-md → rendered-HTML smoke test for desk-html.sh; a bash contract test that corpus-daily-wrapper.sh resolves the Strader venv/script paths it hardcodes; un-gitignore tmuxMOO/lib/.",
+        "materiality": "high",
+        "evidence": [
+          "ls /root/projects/COO/tests/ → exactly 9 files",
+          "COO/tests area summary: only wiring is a manual CLAUDE.md instruction",
+          "trading-desk-refresh.sh documents its own silent cron-PATH skip; st-b9pf adopt gap confirmed live at census"
+        ]
+      },
+      {
+        "title": "Green tests that pin nothing live (inverted coverage)",
+        "description": "A visible slice of the 801 passing tests anchors superseded or unwired code: the May-17 entity/indicator stratum (test_position, test_chain, test_spread, test_gex, test_gex_calc, test_gex_profile, test_registry, test_resolve, test_ingest, test_ingest_session) pins a parallel typed-ingest architecture the corpus/orderflow design replaced — and the GEX math tests are frozen at May 17 while GexBot went live in August, so they may pin a shape the live feed no longer has. The present-layer tests (test_regime, test_signals) pin an unwired rendering path; lib/schwab-py's orders/ suite tests order-construction code the hobble makes unexecutable. Inversely, market/orderflow/regime.py is tested but wired to no live surface — a test guarding a feature nobody gets. These greens create false confidence in `801 passed` as a health signal. Minimum action: this is a deletion/decision list, not a test-writing list — retire the dead stratum with its tests, or explicitly mark them as legacy-pinned.",
+        "materiality": "medium",
+        "evidence": [
+          "census market area: May-17 entity stratum 'kept alive only by its own tests'",
+          "tests area: 'GEX indicator tests frozen at May 17 while GexBot went live in August'",
+          "market/orderflow/regime.py wired_by: nothing-found (tests only)"
+        ]
+      },
+      {
+        "title": "Copy-mirrored and frozen calibration constants have no drift guard",
+        "description": "continuation_meter.py mirrors decision_aligned_study's AGE_BUCKETS/SESSION_BUCKETS by copy, not import — no test asserts the two stay equal, so producer/consumer drift is silent. internals_config MIGauge scales are frozen at the 2026-07-23 31-session seed with no recalibration cadence or staleness assertion; orderflow_config thresholds were recalibrated 08-06 from the 1 Hz archive with no test tying config to archive. Minimum anchor: a one-assert test importing both modules and comparing the bucket constants; a dated 'calibration age' assertion (xfail-style warning after N sessions) on internals_config. Note the continuation meter sits inside the TABLED counter-dictum program — confirm standing before investing beyond the drift assert.",
+        "materiality": "low",
+        "evidence": [
+          "census: meter 'mirrors bucket edges by copy, not import — a drift hazard'",
+          "internals_config: 'calibration constants frozen 2026-07-23; no recalibration process found'"
+        ]
+      }
+    ],
+    "recommendations": [
+      "Install the live-parity cron line (scripts/cron/live-parity-wrapper.sh, suggested 16:10) — the single cheapest risk reduction in the audit — and add a parity-log freshness assertion to surface_liveness.sh.",
+      "Give orderflow_sentinel.py the standard treatment in one bead: fourth thin shim over capture-supervisor-wrapper.sh, its pattern added to surface_liveness.sh, and a fixture-driven alert-emission contract test; add a meta-test asserting every supervised process name appears in surface_liveness patterns so the next watcher can't be forgotten.",
+      "Write the two corpus-spine unit tests: writer.py tmpdir append/manifest round-trip (append-only invariant), and gexbot_stream.py golden-fixture cycle with mocked httpx asserting empty/error bodies are never recorded as success — same class as the st-kzhe regression test corpus_pull_internals.py still needs.",
+      "Extend test_gexbot_collect_window.py to cover (or share code with) the 1 Hz poller's session gate — the st-p3lv quota-burn guard currently protects only one of the two paid collectors.",
+      "Close the CI seam: pin the databento/schwab dev deps so tests/market/corpus (live streamer, schwab stream, destructive compaction) run in CI, not only on remembered local pytest.",
+      "Anchor the Schwab gate: unit test that broker_schwab.client.create_client refuses without the gate key, plus an assertion that client objects lack the hobbled order/account methods — making the DEFENSE NOTE machine-checked on every fork sync.",
+      "Add a golden-file test for pine_emitter.py (fixture ParseResult → exact Pine v6 source) and a premarket-vp wrapper test reusing the existing stub-runner pattern for its last-good/exit-2 behavior.",
+      "Add a weekly real-delivery self-test for strader/alerts.py (one journaled 'alert-path OK' push, heartbeat asserted at tap-in) — the meltdown-alert leg should never be first exercised during a meltdown.",
+      "COO (delegate via bead, cross-repo): create tests/run-all.sh wired into the nightly pulse; smoke-test desk-html.sh and a path-resolution contract test for corpus-daily-wrapper.sh; un-gitignore tmuxMOO/lib/ so moo-theme.sh survives a re-clone; test the untested hook gates (beads-first-gate, bd-close-gate).",
+      "File a decision bead on the May-17 entity/indicator stratum: delete it with its tests or mark it legacy — 801-green currently overstates live-path coverage, and the stale GEX tests may actively mislead now that GexBot is live."
+    ]
+  },
+  {
+    "lens": "fragility",
+    "summary": "The estate's defects are not random: seven classes recur across both repos, and each has a structural predictor visible in the code before the incident. The dominant classes are (1) hand-written constants/claims encoding external state that then drifts (cancelled OPRA default st-13pi, false RTH-only belief st-a6zm, gate requiring a halted stream st-7av4), (2) success reported without verifying the artifact (defective Schwab grant st-r1b5, empty internals recorded as success st-kzhe, zepo sync failures dropped co-sxvqv), (3) session-scoped processes with no restart path (orderflow_sentinel st-2yuw, the 08-05 tmux death st-p3lv), (4) guards built around hand-maintained enumerations that rot as the population grows (datastream gate's three corrections in five days: st-jc8p, st-mmh9, st-7av4; conftest surface list; surface_liveness patterns), (5) copy-mirrored duplicates drifting (meter bucket edges copied not imported; two Mancini fetchers; two desk renderers; mock vs real Schwab client), (6) cross-repo contracts held only by absolute paths and comments (run.py → COO desk scripts; COO corpus cron → Strader venv; st-b9pf desk adopt gap; gitignored moo-theme.sh), and (7) verification machinery that exists but nothing runs (live-parity wrapper self-documenting NOT YET INSTALLED, no automated pytest runner in either repo, residual_gate imported by nothing). The mechanical fixes are the same few patterns applied repeatedly: verify-the-artifact instead of trust-the-return, derive enumerations from registries instead of hand lists, import constants instead of mirroring them, thin shims over the proven capture-supervisor engine, and a wiring meta-test that fails when a checked-in guard has no invoker.",
+    "findings": [
+      {
+        "title": "Stale defaults and claims encoding external state that drifted",
+        "description": "Constants, defaults, and doctrine lines written at one moment encode facts about external resources (vendor subscriptions, stream availability, session windows) with no machine check tying them to the resource. When the external state changes, the code keeps asserting the old world. Instances: corpus_stream_databento defaulted to the cancelled OPRA stream (st-13pi, fixed 08-11 'default to the streams we actually hold'); the datastream gate kept requiring databento_opra after the daily OPRA import was halted (st-7av4, 08-07); the GexBot collection window was 'built on an unchecked belief' that the feed was 24h when it is RTH-only (st-a6zm/co-hvxye, 08-10) — and the false claim recurred in CurrentStatus after a revert; surface_liveness read the pre-open GEX collector DOWN as a fault until the RTH-only row was added (st-42mn); corpus_pull_databento_es_mbp1's docstring still calls MBP-1 'the ONE approved metered purchase' — stale since the st-btu ruling; COO's weekly export died at 'a W: gate that outlived its own patch' (co-syfmi); pulse-zepos-wrapper pins model claude-sonnet-4-6 as a literal; the meltdown brief carried the vacated PDT rule (co-vzdsk). Structural predictor: a literal (stream name, window time, path letter, model id) or prose claim about an external system, with no startup assertion or probe that would fail when the external fact changes. Mechanical prevention: defaults derived from what the account/manifest actually holds (the st-13pi fix is the template — enumerate entitlements at connect and refuse unknown defaults); a claims register where each externally-dependent constant carries a probe (the datastream gate and surface_liveness rows are the natural homes); doctrine lines that assert dates ('as of 2026-08-10, RTH-only per vendor') so staleness is at least visible.",
+        "evidence": [
+          "Strader git: 2026-08-11 fix(stream): default to the streams we actually hold, not cancelled OPRA [st-13pi]",
+          "Strader git: 2026-08-07 fix(gate): stop requiring databento_opra — the daily import is halted [st-7av4]",
+          "Strader git: 2026-08-10 fix(corpus): the GEX feed IS RTH-only — window 07:30 was built on an unchecked belief [st-a6zm, co-hvxye]; same day: CurrentStatus carried the false RTH claim again after the revert",
+          "Strader git: 2026-08-06 fix(liveness): GEX collector row says RTH-only, so pre-open DOWN reads as normal [st-42mn]",
+          "Census: corpus_pull_databento_es_mbp1.py docstring stale since st-btu; COO git 2026-07-30 fix(backup): weekly WSL export died at a W: gate that outlived its own patch [co-syfmi]; pulse-zepos-wrapper.sh model literal"
+        ],
+        "materiality": "HIGH — this class has produced at least five fixes in six weeks, two on trading-day-critical capture paths; the OPRA default (st-13pi) risked the never-backfillable live tape."
+      },
+      {
+        "title": "Silent success: return codes trusted, artifacts unverified, failures swallowed",
+        "description": "Code reports success because the call returned, not because the artifact it was supposed to produce exists and is well-formed. Instances: refresh_schwab_token reported success on a 181-byte defective grant with no refresh_token — fixed only 08-12 (st-r1b5), and the defective grant then took down four trading-day feeds; corpus_pull_internals recorded empty Schwab responses as successful captures until 08-04 (st-kzhe — the fix retitled the principle: 'capture verification is an artifact property'); COO's nightly zepo-sync dropped merge/push failures 'on a polluted status channel' until 08-09 (co-sxvqv); premium_trajectory silently hid dropped days (st-n3q2, 08-11); trading-desk-refresh.sh documents that all its failures are non-fatal by design, and its browser re-render silently skips under cron — the exact stale-Mancini-page failure Steve already hit (st-qx4); desk-register.sh failures are swallowed by callers as warnings, so a broken registry is just a missing NAV entry; the gexbot poller crashed on its first errored cycle because error COUNTS were passed to a list-extending manifest call (st-p3lv). Structural predictor: shell wrappers with '|| true'-shaped tolerance, success paths that never stat/parse the output artifact, and status conveyed through channels (stdout, shared variables) that other writes can pollute. Mechanical prevention: the st-kzhe pattern generalized — every collector/refresh ends by validating the artifact it claims to have produced (size, schema, key fields) and only then writes its heartbeat; truthful heartbeats (beads-remote-push.sh already does this) as the norm; regression tests on the failure path specifically (COO/tests/test-zepo-sync-status.sh exists for exactly this — but see the unwired-guards finding).",
+        "evidence": [
+          "Strader git: 2026-08-12 fix: reject a defective Schwab grant instead of reporting success [st-r1b5]",
+          "Strader git: 2026-08-04 fix(corpus): capture verification is an artifact property + record corrections [st-kzhe]",
+          "COO git: 2026-08-09 fix(zepo-pulse): stop dropping sync failures on a polluted status channel [co-sxvqv]",
+          "Strader git: 2026-08-11 fix(measurement): premium_trajectory must not hide dropped days [st-n3q2]",
+          "Census: COO/myDesk/trading/trading-desk-refresh.sh — 'all failures are non-fatal by design, so breakage is invisible'; desk-register.sh callers swallow failures; st-p3lv manifest crash"
+        ],
+        "materiality": "HIGH — the st-r1b5 instance is live TODAY: the silently-accepted defective grant has schwab-stages, level-tracker, premarket-VP, and the Mancini overnight brief failing until Steve re-auths."
+      },
+      {
+        "title": "Unsupervised long-running processes and session-scoped state that dies with reboot/tmux",
+        "description": "Anything whose liveness depends on a tmux session, a hand launch, or /tmp does not survive the box, and the estate has relearned this repeatedly. Instances: orderflow_sentinel died with the 08-11 reboot and runs today only because someone hand-restarted it at ~05:10 (st-2yuw) — it is the only session-critical live watcher with zero restart path; the 08-05 tmux server death killed a tmux-hosted supervisor together with its supervisee, which is why all supervision moved to cron (st-p3lv); before its in-process session gate, the gexbot poller ran unsupervised weekends burning paid quota (st-p3lv); orderflow_monitor and the live-footprint feed panes have no respawn; continuation_meter is a hand-launched desk pane with no supervisor; /tmp/desk-live-footprint.html is a bookmark contract cleared on every reboot; gexbot_hist_nightly missed its 08-11 fire because the box was down and cron (unlike systemd Persistent timers) skips missed windows — same class as beads-restore-drill's noted skip risk. Structural predictor: a process launched by hand or by a session script, whose only home is a tmux window; any output contract under /tmp; any cron job on a box that powers off. Mechanical prevention: the proven pattern already exists in-repo — capture-supervisor-wrapper.sh with process-identity checks, worn as thin cron shims; orderflow_sentinel needs the fourth shim (explicitly proposed in the wiring census); systemd timers with Persistent=true for anything that must not skip missed windows (backup-claude-monitor already does this correctly); durable paths instead of /tmp for bookmark contracts.",
+        "evidence": [
+          "Census wiring: 'UNSUPERVISED: orderflow_sentinel.py … died with the 08-11 reboot (st-2yuw) … the exact pattern the gexbot supervisors were built to end (st-p3lv)'",
+          "Strader git: 2026-08-05 fix(liveness): surface the tmux server itself — one death read as five faults [st-p3lv]; 2026-08-05 feat(capture): install capture supervision [st-6qx4, st-btu]",
+          "Strader git: 2026-08-07 fix(footprint): guard duplicate capture on the PROCESS, not the window name [st-sgr1]",
+          "Census: gexbot_hist_nightly MISSED 08-11 fire (box down); live_footprint_page.py /tmp output cleared on reboot; continuation_meter 'no supervisor — a dead meter pane goes unnoticed'"
+        ],
+        "materiality": "HIGH — the supervisor engine proved itself this morning (capture relaunched in 4s at 02:50), while the unsupervised sentinel needed a human; the gap is one thin shim away from closed."
+      },
+      {
+        "title": "Guards built on hand-maintained enumerations that rot as the population grows",
+        "description": "Several safety gates work by checking membership in a hand-written list, and every new member of the guarded population silently escapes until someone remembers to extend the list. The datastream gate needed three semantic corrections in five days because its coverage questions aged: freshness-as-recency failed every Monday (st-jc8p, 08-10), recovered reconnects read as coverage holes (st-mmh9, 08-12), and it required a stream that had been halted (st-7av4). Other rotting enumerations: tests/conftest.py's live-surface guard list must be manually extended for every new desk page/clipboard channel or tests can clobber Steve's morning payload again (its own documented failure mode, st-0x9); surface_liveness.sh's process-name patterns must track every new collector — a watcher it doesn't list is invisible at tap-in, recreating the 2026-08-05 GEXBot blindness it was built to prevent (open question: does it know orderflow_sentinel?); test_corpus_env_routing's CORPUS_SCRIPTS list — a fourth corpus script escapes the credential-routing guard; the 1 Hz gexbot poller inherits the session gate 'by convention, not shared code'; market_calendar's hand-maintained holiday tables age out annually; the lexicon xfails wait on st-g9y rulings that may never land. Structural predictor: a guard whose body contains a literal list of names/paths/streams, where the population it guards is defined elsewhere (a scripts/ directory, a crontab, a set of collectors). Mechanical prevention: registry-derivation — collectors register themselves (a small manifest each collector writes) and gate/liveness/conftest read the registry; where that's heavy, a meta-test that diffs the enumeration against the population (glob scripts/corpus_** and assert each appears in CORPUS_SCRIPTS, the gate's stream list, and surface_liveness) so adding a collector without registering it fails CI.",
+        "evidence": [
+          "Strader git: 2026-08-10 fix(gate): freshness is coverage, not recency — the gate failed every Monday [st-jc8p]; 2026-08-12 fix(gate): recovered reconnects on a covered day are a warning, not a hole [st-mmh9]; 2026-08-07 [st-7av4]",
+          "Census: tests/conftest.py risk — 'any new live surface must be added here or tests can clobber Steve's morning payload again — the exact failure it was written for'",
+          "Census: surface_liveness.sh risk — 'a watcher it doesn't list is invisible at tap-in, recreating the exact 2026-08-05 GEXBot failure it was built to prevent'",
+          "Census: test_corpus_env_routing — 'if a fourth corpus script appears it must be added to CORPUS_SCRIPTS or it escapes the guard'; corpus_poll_gexbot_orderflow_1s session gate 'inherited by convention, not shared code'"
+        ],
+        "materiality": "HIGH — the gate is the thing that decides whether the corpus day is trusted at the open; three corrections in five days shows its question-rot rate exceeds its review cadence."
+      },
+      {
+        "title": "Duplicate implementations and copy-mirrored constants drifting apart",
+        "description": "The same fact or behavior exists in two files joined only by a comment, and the copies diverge. Confirmed instances: continuation_meter.py line 112 says its bucket edges 'mirror decision_aligned_study.AGE_BUCKETS/SESSION_BUCKETS' — literal tuples copied, not imported (verified in both files), so a study recalibration silently de-syncs the live meter; two parallel Mancini blob fetchers (COO read-latest.sh vs Strader fetch.py) can drift on blob-selection/CR-stripping; two desk renderers (render-md.py python-markdown vs desk-html.sh marked) for one desk style; the perm-audit hook exists as byte-identical unlinked copies in COO/ecc and COO/.claude/hooks, only one live; orderflow_monitor vs orderflow_sentinel overlap with no canonical-watcher ruling; broker_schwab/mock/client.py frozen May 22 while the real client and hobbled lib evolved through July; runbook/mancini schema.py vs extraction-contract.md — 'two sources of truth for one JSON shape'; capture-claude-sessions.sh executes from an out-of-repo copy at C:\\tools; bead-gate.sh vs beads-first-gate.sh — two gates enforcing one doctrine. Structural predictor: the words 'mirror', 'keep in sync', or 'same as' in a comment; a file that names its twin; a mock/fixture whose real counterpart has newer commits. Mechanical prevention: import the constant (make the meter import the study's tuples — one-line fix); for cross-language/cross-repo twins, a contract test that diffs the two (hash the C:\\tools copy against the repo copy at tap-in; run both Mancini fetchers against one fixture blob and diff outputs); for overlapping tools, an explicit canonical ruling recorded as a bead and the loser deleted.",
+        "evidence": [
+          "Verified: scripts/desk/continuation_meter.py:112-118 copies AGE_BUCKETS/SESSION_BUCKETS from scripts/measurement/decision_aligned_study.py:95 with only a 'mirror' comment",
+          "Census: read-latest.sh vs runbook/mancini/fetch.py — 'two parallel fetch implementations can drift on blob-selection logic'",
+          "Census: perm-audit hook 'exists in two unlinked copies, one live' (COO/ecc vs COO/.claude/hooks); render-md.py header documents deliberate divergence from desk-html.sh",
+          "Census: broker_schwab/mock/client.py 'untouched since May 22 while client.py and the hobbled lib evolved through July'; 'a canonical-watcher ruling is overdue — orderflow_monitor vs orderflow_sentinel'"
+        ],
+        "materiality": "MEDIUM — no confirmed live incident yet from this class, but the meter/study pair feeds live trading commentary and the drift is mechanical, not hypothetical."
+      },
+      {
+        "title": "Cross-repo contracts held by absolute paths, comments, and gitignored files",
+        "description": "Strader↔COO coupling is real and trading-day-critical, but the contracts are enforced by nothing. Instances: runbook/mancini/run.py hardcodes three COO absolute paths (verified lines 52-59: DESK_REPORTS, DESK_REFRESH, DESK_HTML_SCRIPT) — a COO reorg silently breaks Strader's morning desk publish; COO's corpus-daily-wrapper.sh 'temporarily' (since 2026-07-01, never handed back) owns Strader's datastream-gate cron with hardcoded Strader repo/venv fallback paths — a venv rebuild breaks the gate from the other repo; the st-b9pf adopt gap is a two-repo contract failure: Strader's capture supervisor bootstraps a minimal steves-desk after socket death, COO's steves-desk-session.sh exits on 'session exists', so 7 of 8 desk windows and all keybindings stay missing (confirmed live at census, Mancini NAV verification failed on it 08-12); the live-footprint-up.sh ↔ capture-supervisor window-name guard was a comment-level contract until st-sgr1 moved it to process identity; tmuxMOO/lib/moo-theme.sh — a live dependency of the running desk viewer — is swallowed by a blanket lib/ gitignore and exists nowhere in version control, as does zgent-subsystems/lib/common.sh. Structural predictor: an absolute /root/projects/<other-repo>/ path in code; a tmux session/window name two scripts must agree on; a sourced lib matched by a broad gitignore rule. Mechanical prevention: a cross-repo contract test on the consumer side (Strader's test_run.py already exercises the desk-html call path — extend it to assert the three COO paths exist and are executable, failing loudly at test time instead of silently at 08:15); adopt-into-existing-session behavior in steves-desk-session.sh (the st-b9pf fix, needs COO delegation); .gitignore carve-outs for tmuxMOO/lib/ and zgent-subsystems/lib/; and closing the corpus-cron handback so scheduler and script live in one repo.",
+        "evidence": [
+          "Verified: runbook/mancini/run.py:52,53,59 hardcode /root/projects/COO/{myDesk/reports/mancini, myDesk/trading/trading-desk-refresh.sh, tmuxMOO/bin/desk-html.sh}",
+          "Census: COO/factory/cron/corpus-daily-wrapper.sh — 'COO owns this cron TEMPORARILY (Steve 2026-07-01) — ownership handback never happened … hardcodes Strader repo/venv fallback paths'",
+          "Census: steves-desk-session.sh — 'ADOPT GAP st-b9pf (open, P2) … Mancini NAV verification failed on the missing Trading window 2026-08-12; System/Beads/Specs/Plans/Reviews/Logs/AdHoc absent'",
+          "Census: tmuxMOO/lib/moo-theme.sh 'NOT IN GIT — COO/.gitignore line 31 swallows the directory'; zgent-subsystems/lib/common.sh untracked; st-sgr1 (comment-contract → process identity)"
+        ],
+        "materiality": "HIGH — the Mancini morning publish, the datastream gate, and the desk surface all cross this seam daily; st-b9pf is a confirmed live breakage at census time."
+      },
+      {
+        "title": "Built-but-never-wired verification: the check exists, nothing runs it",
+        "description": "The estate repeatedly finishes the hard part (writing the guard) and skips the trivial part (invoking it), so guards accumulate as decoration. Instances: live-parity-wrapper.sh — the live==replay acceptance check for the trading surface (st-d5f AC#4) — self-documents 'NOT YET INSTALLED IN CRON' and is confirmed absent from the crontab (verified: zero parity lines), so parity drift goes unmeasured; nothing automated runs Strader's 801-test pytest suite (no cron, hook, or CI on the repo's trading-day paths per the tests census) and COO/tests has no runner at all — test-zepo-sync-status.sh, the regression guard for the silent-sync-failure incident, is itself never invoked (the irony is complete: a silent guard against silent failures); residual_gate's audit prescription is imported by nothing; orderflow/regime.py — the flush-alert read Steve personally drove on 08-05 — is built and tested but wired into no live surface; orderflow_alert_fmt.py was built two days ago and the sentinel started without it; score_meter_journal.py has no cron, so 'the meter has never graded a live minute' recurs any week nobody remembers; flush_watcher isn't running, so the shadow journal its calibration needs isn't accumulating; check-dolt-schema-skew.sh lost its only invoker when Gas City was suspended, so nightly beads pushes run without the preflight; graduate-memory.py's automatic trigger was designed but never wired. Structural predictor: a guard whose activation requires a second, hand-performed step (crontab install, pipe insertion, import, runner script) recorded nowhere machine-checkable; 'definition of done' ending at the commit. Mechanical prevention: a wiring meta-test — for every scripts/cron/*.sh, assert it appears in the live crontab or in an explicit deferred-list with a bead ID (this single test catches live-parity, and its COO twin catches check-dolt-schema-skew); a tests/run-all.sh wired into the nightly pulse or session ritual for both repos; and making 'wired' a close-condition on the bead that authorized the guard.",
+        "evidence": [
+          "Verified: crontab has zero 'parity' entries; scripts/cron/live-parity-wrapper.sh header reads 'NOT YET INSTALLED IN CRON. Add the line above by hand'",
+          "Census (Strader/tests): 'nothing automated runs the suite: no cron, hook, or CI invokes pytest'",
+          "Census (COO/tests): 'entirely orphaned from automation … test-zepo-sync-status.sh guards the failure-visibility path of the nightly sync — still has no automated invocation'",
+          "Census: residual_gate 'imported by nothing, so it enforces nothing'; regime.py 'wired into no live surface'; orderflow_alert_fmt 'the live sentinel started today without it'; check-dolt-schema-skew 'lost its only invoker when Gas City was suspended'"
+        ],
+        "materiality": "HIGH — this class multiplies every other class: the silent-success and stale-default defects above would have been caught earlier by guards that already exist in the tree but never execute."
+      },
+      {
+        "title": "Single-credential choke point with human-in-loop renewal checked once daily",
+        "description": "The Schwab refresh token is a seven-day-expiry credential renewed only by an interactive human ritual, and at least six trading-day surfaces hang off it (schwab-stages x4, level-tracker, premarket-VP, mi_gauge, corpus internals, Mancini overnight brief) with no offline fallback. Incident history: the 2026-07-08 silent feed death motivated the token-age assessor (st-e2f); today (08-12) the token expired at ~06:37 CT and the replacement was a defective grant the refresh script had accepted as success (st-r1b5) — the health check runs only on the 06:30 daily cron, so 'a token that goes defective intra-day isn't caught until next morning' (census, st-r1b5 confirmed this shape). The token clock is anchored on creation_timestamp written by the schwab-py fork — a fork-side metadata change breaks the clock silently, and the fork was last synced against upstream mid-2024/early-2025. Structural predictor: many consumers, one credential, renewal outside automation, freshness asserted on a daily cadence against a failure mode that is intra-day. Mechanical prevention: token-health assertion at point of use (every consumer already routes through strader/schwab_token.py — have the assessor run in each cron wrapper, not just the 06:30 pull, so the 08:15/08:16/08:20 chain alerts at fire time); grant validation at mint time (the st-r1b5 fix — keep it under test); corpus-fallback rendering for surfaces that can degrade gracefully (the 08-11 st-6gs3 'corpus fallback source' commit is the template for premarket-VP-class pages).",
+        "evidence": [
+          "Census wiring: '[ALERT] Schwab refresh token expired 2026-08-12 ~06:37 CT and the re-minted token is defective (no refresh_token)' — schwab-stages, level-tracker, premarket-VP, Mancini brief all AT RISK",
+          "Strader git: 2026-08-12 fix: reject a defective Schwab grant instead of reporting success [st-r1b5]; census schwab_token_health risk: 'cadence is the 06:30 daily cron only — a token that goes defective intra-day isn't caught until next morning'",
+          "Census: strader/schwab_token.py 'anchored on creation_timestamp not mtime — any schwab-py fork change to token metadata would break the clock silently'; fork 'last synced mid-2024/early-2025'",
+          "Strader git: 2026-08-11 feat(desk): corpus fallback source + publish today's VP page [st-6gs3] — the graceful-degradation template"
+        ],
+        "materiality": "HIGH — realized today; the blast radius is most of the pre-open chain, and the only mitigation cadence (daily) is slower than the failure mode (intra-day)."
+      }
+    ],
+    "recommendations": [
+      "Install the fourth supervisor shim: orderflow_sentinel.py under capture-supervisor-wrapper.sh via a thin cron shim, exactly like the two GexBot legs — the pattern is proven (capture relaunched in 4s this morning) and the gap is confirmed (st-2yuw reboot death).",
+      "Add a wiring meta-test in each repo: every scripts/cron/*.sh (and each checked-in guard like residual_gate, test-zepo-sync-status.sh) must appear in the live crontab, a runner, or an explicit deferred-list carrying a bead ID. This one test catches live-parity-wrapper, check-dolt-schema-skew, and future never-wired guards; then install the live-parity cron line itself — the census's cheapest risk reduction.",
+      "Wire an automated test runner: Strader pytest (801 tests, ~62s) into a nightly cron or the pre-open chain, and a COO tests/run-all.sh into the 22:30 pulse cadence, so incident-derived regression guards actually execute.",
+      "Convert hand-enumerated guard lists to registry-derived checks: a small collector registry (or a glob-diff meta-test) that the datastream gate, surface_liveness.sh, tests/conftest.py surface list, and CORPUS_SCRIPTS all read, so adding a collector or desk surface without registering it fails tests instead of silently escaping the guards.",
+      "Kill the copy-mirrors: make continuation_meter.py import AGE_BUCKETS/SESSION_BUCKETS from decision_aligned_study (one line); add a fixture-diff test across the two Mancini fetchers; pick the canonical perm-audit home and desk renderer; issue the orderflow_monitor-vs-sentinel canonical ruling and delete the loser.",
+      "Harden the cross-repo seam: extend Strader's test_run.py to assert the three hardcoded COO paths exist and are executable; fix steves-desk-session.sh to adopt an existing session (st-b9pf, needs COO delegation); carve tmuxMOO/lib/ and zgent-subsystems/lib/ out of the gitignore and commit moo-theme.sh/common.sh; complete the corpus-daily cron handback to Strader.",
+      "Move Schwab token health to point-of-use: run the strader/schwab_token.py assessor inside every Schwab-dependent cron wrapper (not just the 06:30 pull) so intra-day grant death alerts at the next fire, and extend the st-6gs3 corpus-fallback pattern to every degradable Schwab-fed surface.",
+      "Adopt 'artifact-property verification' (the st-kzhe principle) as the standing pattern for every collector and credential mint: success = the output artifact exists, parses, and carries the required fields — only then write the heartbeat; audit remaining collectors (writer.py, gexbot_stream.py, corpus_pull_internals.py have no direct tests) against it."
+    ]
+  },
+  {
+    "lens": "contracts",
+    "summary": "Strader and COO are coupled at ~14 cross-repo seams, almost all pinned by nothing stronger than hardcoded absolute paths and comments. The load-bearing cluster is the morning desk-delivery chain (run.py -> COO desk-html.sh / trading-desk-refresh.sh / desk-register.sh -> /tmp and /var/moo pages), which has already broken live twice (stale Mancini page st-qx4; missing Trading window st-b9pf, confirmed broken at census on 2026-08-12). The one real contract test that exists (test_run.py's live desk-html exercise) is skipif-guarded so it silently skips in exactly the environments where the contract is broken. Other seams -- COO's temporary ownership of Strader's datastream-gate cron, the strader-reauth template naming Strader script paths, duplicate Mancini blob fetchers, the ritual-bundle hydration flow, /var/moo heartbeat files read by COO tap-in, and A2A memos that went unread for weeks -- share the same pattern: the contract lives in two authors' heads and a comment, and the cheapest pins (an unskippable existence/interface test on the consumer side, a shared constants manifest, adopt-into-existing-session behavior, one crontab line moved home) are each under an hour of work.",
+    "findings": [
+      {
+        "title": "desk-html.sh rendering contract: the one contract test skips exactly when the contract breaks",
+        "description": "Strader's Mancini pipeline hardcodes DESK_HTML_SCRIPT=/root/projects/COO/tmuxMOO/bin/desk-html.sh (run.py:59) and depends on its interface: args <src.md> <out.html>, exit 3 reserved for 'marked not on PATH' (desk-html.sh:34,60) so callers can distinguish environment from failure, and the /tmp/desk-<slug>.html output mapping 'affirmed as contract by COO' only in a run.py comment (line 56). What pins it: tests/runbook/test_run.py:273 exercises the real script -- but under @skipif(marked missing or script absent), so on any box where COO moved/renamed the script or marked fell off PATH, the test greens by skipping. The stubbed exit-3 test (line 307) pins Strader's handling, not COO's behavior. How it broke: the marked-missing-under-cron case is the exact st-qx4 stale-page incident; exit 3 was added in response. Cheapest pin: in Strader, an unskippable test that asserts DESK_HTML_SCRIPT exists and that its header still documents exit 3 for marked-missing (a 5-line grep test); in COO, a test of desk-html.sh's exit-code table (COO owns the behavior). A one-line CONTRACT_VERSION comment in desk-html.sh that run.py asserts would catch interface changes at test time instead of at 08:15 CT.",
+        "materiality": "HIGH -- trading-day-critical Mancini delivery; contract already broke once (st-qx4) and the existing test is structurally blind to the break it should catch",
+        "evidence": [
+          "/root/projects/Strader/runbook/mancini/run.py:49-59,336-370 (hardcoded path, exit-3 handling, contract comment)",
+          "/root/projects/COO/tmuxMOO/bin/desk-html.sh:34,59-90 (exit-3 semantics, marked dependency)",
+          "/root/projects/Strader/tests/runbook/test_run.py:273-313 (skipif-guarded live test + exit-3 stub)"
+        ]
+      },
+      {
+        "title": "trading-desk-refresh.sh: non-fatal-by-design browser re-render still silently skips under cron",
+        "description": "run.py:52-53 hardcodes DESK_REPORTS=/root/projects/COO/myDesk/reports/mancini (Strader writes into COO's tree) and DESK_REFRESH=/root/projects/COO/myDesk/trading/trading-desk-refresh.sh. The COO script's own comments (lines 30-39) document the contract's known hole: marked lives in the Windows npm install, absent from a minimal cron PATH, so the browser page re-render is SKIPPED and 'the tmux CONTENT pane and Steve's parked browser tab disagree silently' -- the exact stale-Mancini-page failure Steve reported (A2A st-qx4, co-wp0db). All failures are non-fatal by design, so breakage is invisible to the caller. What pins it today: nothing -- run.py only warns on nonzero rc (line 398), and the skip path exits 0. Cheapest pin: producer-side freshness check in Strader -- after invoking DESK_REFRESH, assert the output page's mtime advanced and emit a corpus_daily.emit_alert if not (runtime pin, ~10 lines); COO-side, make the skip print a machine-readable token Strader can grep. This converts the silent-skip into the loud failure Steve already asked for.",
+        "materiality": "HIGH -- the seam behind Steve's exact complaint; broke live, fix was a comment, no mechanical guard exists",
+        "evidence": [
+          "/root/projects/Strader/runbook/mancini/run.py:52-53,385-398",
+          "/root/projects/COO/myDesk/trading/trading-desk-refresh.sh:30-39 (documented silent skip)"
+        ]
+      },
+      {
+        "title": "steves-desk session/window layout: two-author tmux contract with a live, confirmed adopt gap (st-b9pf)",
+        "description": "Three parties create or assume the 'steves-desk' session on socket moocity: COO's steves-desk-session.sh (8 windows + NAV/CONTENT splits + digit keybindings), Strader's gauge-preopen-wrapper.sh (DESK_BOOTSTRAP default hardcodes the COO script path, line 85), and Strader's capture-supervisor-wrapper.sh (creates a minimal session with just its capture window when none exists, line 236). The contract's shape: session name, window names ('capture', 'gexbot', 'gauge', 'Trading', ...), and socket-global keybindings -- window-name coordination between live-footprint-up.sh and the supervisor is enforced only by comments. How it broke: after socket death the supervisor's minimal bootstrap wins the race, steves-desk-session.sh sees 'session exists' and exits, and 7 of 8 windows plus keybindings never come back -- confirmed live at census (Mancini NAV verification failed 2026-08-12, open bead st-b9pf P2). Cheapest pin: adopt-into-existing-session behavior in COO's steves-desk-session.sh (add missing windows instead of exiting) -- the fix is COO's, needing cross-repo delegation via bead; plus a shared window-name manifest (one sourced .sh or JSON of window names) that both Strader scripts and the COO builder read, with a Strader test asserting its own two scripts agree with it.",
+        "materiality": "HIGH -- broken right now in the live session; every desk surface Strader publishes lands in windows that stop existing after any socket death",
+        "evidence": [
+          "/root/projects/Strader/scripts/cron/gauge-preopen-wrapper.sh:41,85",
+          "/root/projects/Strader/scripts/cron/capture-supervisor-wrapper.sh:105,236-251",
+          "census: st-b9pf adopt gap, live session has only capture/sentinel/Trading at census time"
+        ]
+      },
+      {
+        "title": "corpus-daily-wrapper.sh: COO 'temporarily' owns Strader's datastream-gate cron, 13 months of temporary and counting",
+        "description": "The 06:30 cron entry point for Strader's T+1 corpus pull and datastream gate lives in COO's crontab and repo (COO/factory/cron/corpus-daily-wrapper.sh), hardcoding STRADER_REPO=/root/projects/Strader, the Strader venv python, and the script name scripts/corpus_daily.py. Header says 'COO owns this cron TEMPORARILY (Steve, 2026-07-01)' -- no handback ever happened. What pins it: runtime FATAL checks (venv/repo existence, lines 53,61) and Strader's 08:25 heartbeat noticing a missing gate line -- both detect breakage after the fact; nothing detects a Strader-side rename (corpus_daily.py, venv rebuild) at change time. Near-miss class: any Strader refactor of scripts/ silently kills the gate until 08:25 next trading day. Cheapest pin: move the one crontab line into Strader's crontab beside its 8 sibling wrappers (the ownership handback, ~15 minutes), retiring the seam entirely; failing that, a Strader test that reads the COO wrapper and asserts every path it references exists (consumer-owns-the-check, since renames happen in Strader).",
+        "materiality": "HIGH -- trading-day-critical gate with its scheduler in the other author's repo; drift is one refactor away and detection is next-morning at best",
+        "evidence": [
+          "/root/projects/COO/factory/cron/corpus-daily-wrapper.sh:4-7,31,53,61",
+          "census wiring: crontab 30 6 * * 1-6, heartbeat as sole cross-check"
+        ]
+      },
+      {
+        "title": "desk-register.sh / StevesDocs.json: registry writes from Strader cron with swallowed failures and zero tests",
+        "description": "Strader's premarket VP cron (premarket_volume_profile.py:55-57) hardcodes DESK_TRADING=/root/projects/COO/myDesk/trading and DESK_REGISTER=/root/projects/COO/tmuxMOO/bin/desk-register.sh; the COO script mutates COO/myDesk/StevesDocs.json (desk-register.sh:19) with inline-python JSON edits and descriptive-basename enforcement. Callers swallow failures with a warning, so a broken registry surfaces only as silently missing NAV entries in a window that (per st-b9pf) may itself be missing. What pins it: nothing -- desk-register.sh has no tests in either repo, and the JSON schema of StevesDocs.json exists only in the script's inline python. Cheapest pin: a COO-side test of desk-register.sh (register into a temp manifest, assert schema round-trip -- the manifest format is COO's to own); Strader-side, check the script's exit code in the VP wrapper and route nonzero into the existing emit_alert path instead of a log warning.",
+        "materiality": "MEDIUM -- failure is a missing NAV entry, not lost data, but it compounds the adopt-gap into a fully invisible desk",
+        "evidence": [
+          "/root/projects/Strader/scripts/premarket_volume_profile.py:55-57",
+          "/root/projects/COO/tmuxMOO/bin/desk-register.sh:2,19,35-53"
+        ]
+      },
+      {
+        "title": "strader-reauth.sh template: COO shell snippet hardcodes Strader script names on the token-recovery path",
+        "description": "COO's factory template (factory/templates/bashrc.d/strader-reauth.sh:15-16) constructs ${repo}/scripts/refresh_schwab_token.py and ${repo}/scripts/schwab_token_health.py -- Strader-owned filenames baked into COO-owned recovery tooling that surfaces the Schwab re-auth reminder in Steve's shell. It also encodes Strader's re-auth policy (silent until expiry day, per Strader memory) -- a policy+path coupling with no pin: only a runtime 'repo not found' guard. Why it matters today: the Schwab token expired this morning with a defective replacement grant; this snippet is part of how Steve finds out. A Strader rename of either script breaks the reminder exactly when it is needed, silently. Cheapest pin: a Strader test that reads the COO template and asserts the two filenames it references exist in scripts/ (consumer-side contract test, ~8 lines) -- Strader is where the renames happen, so Strader's suite should be what goes red.",
+        "materiality": "HIGH -- sits on the recovery path of the single failure (token death) that took down five feeds today; break would be invisible until the next expiry",
+        "evidence": [
+          "/root/projects/COO/factory/templates/bashrc.d/strader-reauth.sh:15-20",
+          "census: token expired 2026-08-12 ~06:37 CT with defective 181-byte grant"
+        ]
+      },
+      {
+        "title": "Two Mancini blob fetchers: COO read-latest.sh and Strader fetch.py can drift on selection logic",
+        "description": "The same Azure storage account (stradermailh27ssjitr7spy, container mancini) is read by two independent implementations: Strader's runbook/mancini/fetch.py (the cron/skill path, tested) and COO's infra/azure/email-ingress/scripts/read-latest.sh (allow-listed with exact Mancini args in Strader/.claude/settings.local.json:37 and documented in session_review.py). Blob-selection rules -- newest-blob choice, content-match filter (-m tradecompanion.substack.com), CR-stripping -- are duplicated, not shared; a divergence means the review path and the trading path can quietly read different letters. What pins it: nothing; no shared fixture, no cross-reference beyond comments. Near-miss class: COO's email-ingress deploy.sh is already flagged as an unexercised recovery path for this same infra. Cheapest pin: declare fetch.py canonical and mark read-latest.sh reference-only in its header; or a Strader test with a small fixture container listing asserting both implementations pick the same blob. The declaration is cheaper and probably sufficient.",
+        "materiality": "MEDIUM -- both paths currently work; the cost is a wrong-letter parse on a morning when someone reaches for the backup fetcher",
+        "evidence": [
+          "/root/projects/Strader/runbook/mancini/fetch.py (canonical, tested via tests/runbook/test_fetch.py)",
+          "/root/projects/COO/infra/azure/email-ingress/scripts/read-latest.sh",
+          "/root/projects/Strader/.claude/settings.local.json:37 (exact-args allowlist entry)"
+        ]
+      },
+      {
+        "title": "okf graduation flow: the capture-to-curate contract is asserted in both CLAUDE.mds but the tool shows no Strader awareness",
+        "description": "Both repos' CLAUDE.md name COO's tools/okf/graduate-memory.py as the mechanism that graduates auto-memory into the git-tracked knowledge bundle, and Strader's CLAUDE.md builds its whole memory doctrine on that flow (capture -> curate, knowledge/log.md append-only, bead-cited writes). But a grep of graduate-memory.py for 'Strader'/'strader' returns nothing -- whether it can even target Strader's auto-memory dir (~/.claude/projects/-root-projects-Strader/memory/) and knowledge/ tree is unverified from the tool itself, and the census notes it has no tests, no automation, and a designed-but-never-wired trigger. The contract (memory dir layout in, typed concept files + append-only log out, Steve's edits authoritative) exists only as prose. Cheapest pin: a COO-side test running graduate-memory.py --dry-run against a fixture memory dir shaped like Strader's, asserting it emits into a knowledge/ layout and never rewrites existing log lines (the append-only invariant is the one that must not break, since Steve's hand edits are authoritative).",
+        "materiality": "MEDIUM -- no live breakage yet because the flow barely runs; the risk is a first real run that overwrites Steve's authoritative edits with no test ever having pinned append-only",
+        "evidence": [
+          "/root/projects/COO/tools/okf/graduate-memory.py (grep for Strader: no hits)",
+          "Strader CLAUDE.md memory section (names the tool and the append-only log invariant)",
+          "census: 'no tests and no automation... trigger designed but never wired'"
+        ]
+      },
+      {
+        "title": "Beads substrate: shared bd binary + shared dolt server, with the schema-skew preflight unwired",
+        "description": "Both repos ride one bd binary and box-shared Dolt machinery: the convention (local Dolt DB, refs/dolt/data on each git remote, .beads/issues.jsonl as passive export) is identical by construction, so a bad bd swap skews schema across every store at once. COO's install-bd.sh is the sanctioned swap path (rule-mandated, tested by COO/tests/test-install-bd-guard.sh -- but no runner ever executes COO/tests), and its paired preflight check-dolt-schema-skew.sh lost its only invoker when Gas City was suspended, so nightly beads-remote-push.sh runs without the schema check. beads-remote-push.sh also conditionally kills the shared dolt sql-server on stall -- correct per its zero-connections guard, but a regression there stalls Strader's bd too. How it nearly broke: the beads-recovery incident (resolved 2026-06-09) established that bd bootstrap corrupts and issues.jsonl-in-git is the true source -- doctrine that gc's dolt recover still contradicts while the 104MB gc binary remains on PATH. Cheapest pin: re-wire check-dolt-schema-skew.sh as a preflight inside beads-remote-push.sh (both are COO's, one-line call), and a COO tests/run-all.sh on the pulse cadence so the install-bd guard test actually runs.",
+        "materiality": "MEDIUM-HIGH -- substrate-wide blast radius (all work authorization on the box) but low event frequency; every guard exists, none is wired",
+        "evidence": [
+          "/root/projects/COO/factory/scripts/install-bd.sh + COO/tests/test-install-bd-guard.sh (no runner)",
+          "/root/projects/COO/factory/scripts/beads-remote-push.sh (dolt server kill path)",
+          "census: check-dolt-schema-skew.sh lost its only invoker; COO/tests entirely orphaned from automation"
+        ]
+      },
+      {
+        "title": "Ritual-bundle hydration: template-vs-installed drift guarded only by an on-demand certify check",
+        "description": "COO distributes session machinery into Strader's .claude/ via hydrate-zepo.sh and factory/templates (session-start.sh hook, settings permission bundle). The contract: installed copies must match templates; check-ritual-bundle.sh exists precisely because the bundle 'was missing fleet-wide (co-eejv)' -- but it runs only during /certify, and Strader's certification is still pending, so nothing periodically verifies Strader's installed hook against the template. Adjacent hazard: COO/ecc's two hydrate scripts would overwrite Strader's hand-maintained .claude/ with a 4-month-old profile if casually run (census). Same drift class as C:\\tools capture-claude-sessions.sh: the executed copy is not the versioned copy. Cheapest pin: a version stamp in the template header that hydrate copies through, plus a check-ritual-bundle invocation added to the nightly pulse or COO tap-in (all COO-side, no Strader change); Strader-side, one tap-in line diffing its installed session-start.sh against the template path.",
+        "materiality": "MEDIUM -- drift accumulates invisibly and surfaces as inexplicable session-ritual behavior differences between zgents; the ecc-hydrate overwrite scenario is low-probability, high-annoyance",
+        "evidence": [
+          "/root/projects/COO/factory/scripts/check-ritual-bundle.sh:2-29 (co-eejv history, template doctrine)",
+          "/root/projects/COO/factory/hydrate-zepo.sh",
+          "census: ecc hydrate scripts would overwrite Strader's .claude with 4-month-old profile"
+        ]
+      },
+      {
+        "title": "Desk page path contract split: /tmp/desk-<slug>.html bookmarks vs /var/moo/desk/desk-<slug>.html convention",
+        "description": "Two output-path conventions coexist for the same Steve-facing surface. Older, comment-pinned contract: /tmp/desk-<slug>.html ('COO affirmed the mapping as contract', run.py:56) -- used by the Mancini plan page and live_footprint_page.py, and /tmp is cleared on reboot so every bookmarked page must be regenerated each session. Newer convention (Strader CLAUDE.md tmux section): desk-html.sh -> /var/moo/desk/desk-<slug>.html, which survives reboots; Strader's own allowlist shows both forms for the same documents (settings.local.json:53-60 has the same doc rendered to both roots). Steve's browser bookmarks are the real consumer, and nothing records which path a given page canonically lives at. How it nearly broke: reboot-cleared /tmp pages are a standing regenerate-or-404 hazard the census flags for live_footprint_page. Cheapest pin: pick /var/moo/desk as canonical (it already is, per CLAUDE.md), migrate the two /tmp holdouts (mancini plan, live footprint), and add the slug->path mapping to StevesDocs.json so the registry, not folklore, is the lookup.",
+        "materiality": "MEDIUM -- each individual 404 is minor, but this is a bookmarked-surface contract held together by comments in two repos, and it churns every reboot",
+        "evidence": [
+          "/root/projects/Strader/runbook/mancini/run.py:56 (contract comment for /tmp mapping)",
+          "/root/projects/Strader/.claude/settings.local.json:53-60 (same docs to both roots)",
+          "Strader CLAUDE.md tmux section (/var/moo/desk convention)"
+        ]
+      },
+      {
+        "title": "/var/moo heartbeat and log surfaces: schemaless JSON contract between Strader writers and COO tap-in reader",
+        "description": "COO's tap-in gather.sh asserts heartbeats written by jobs in three repos (/var/moo/state/beads-remote-push.json, beads-restore-drill.json with a 9-day threshold, zepo-pulse heartbeat, CM backup), and Strader writes session logs and alert journals under /var/moo/logs (orderflow-sentinel-<date>.log, pulse runs). The contract is filename + JSON key shape + freshness threshold, defined nowhere -- each writer and the reader agree by copy. A writer renaming a heartbeat file or key converts a real failure into permanent 'stale heartbeat' noise or, worse, permanent green. Supporting evidence of neglect: log-reap.sh was designed and never wired, and /var/moo/logs grows unbounded (census). Cheapest pin: a tiny heartbeats.d convention -- one schema comment block in gather.sh listing expected files/keys/thresholds, plus a COO test feeding gather.sh a fixture /var/moo/state and asserting it flags stale and missing distinctly. Cheap because gather.sh already centralizes the read side.",
+        "materiality": "MEDIUM -- the heartbeat mesh is what notices everything else dying; a silent contract break here blinds the noticing layer itself",
+        "evidence": [
+          "/root/projects/COO/.claude/skills/tap-in/gather.sh (heartbeat assertions)",
+          "/var/moo/state, /var/moo/logs (verified present)",
+          "census: log-reap.sh never wired, unbounded /var/moo/logs"
+        ]
+      },
+      {
+        "title": "A2A memo convention: the only working cross-zgent channel has no delivery receipt and already failed silently for weeks",
+        "description": "Cross-repo coordination runs on markdown memos in each repo's docs/a2a/ (self-contained per Strader's memory rule, bead-referenced). Strader's own 2026-08-12 zgent-sync-plan states the failure plainly: the channel 'failed silently for weeks' with round-trips of '19 days / never', and proposes the missing mechanics -- an inbox.md append in the target repo, an ack-or-serviced receipt, and hooks that error 'use docs/a2a/' on cross-repo writes outside the channel. The Anki pipeline handoff (a2a memo 2026-08-11 coo-to-strader) and the personal-projects roster memo both traveled this seam. What pins it today: nothing -- delivery is 'the other agent happens to read the directory'. Cheapest pin: implement the plan's own steps 5-6 -- the inbox.md append convention plus a tap-in line in each repo counting unacked inbound memos (a stat both tap-ins can compute from ls + grep, no new infra). The plan already exists; the pin is executing it and measuring the round-trip count it defines.",
+        "materiality": "MEDIUM-HIGH -- every other finding's cross-repo fix travels over this channel; while it has no receipt, contract repairs themselves get lost the same way the memos did",
+        "evidence": [
+          "/root/projects/Strader/docs/plans/2026-08-12-zgent-sync-plan.md:64,143-151,211-221",
+          "/root/projects/Strader/docs/a2a/2026-07-25-strader-to-coo-personal-projects-roster.md",
+          "census: a2a memo 2026-08-11 coo-to-strader-anki-pipeline-state"
+        ]
+      },
+      {
+        "title": "Anki deck tooling: COO-owned importer exercised from Strader via exact-args allowlist, TSV format unpinned on the producer side",
+        "description": "Strader's training pipeline produces TSV decks (docs/training/decks/*.tsv) consumed by COO's tools/anki/deck-import.sh and deck-validate.sh, pre-approved as exact-argument allowlist entries in Strader/.claude/settings.local.json:84-86 -- meaning every new deck or renamed file requires a fresh permission grant, and the TSV column contract lives only in COO's validator. Environment-fragile by census (requires AnkiConnect/Anki running). No breakage yet; the near-miss class is a Strader-side deck-format change that deck-validate rejects at import time on Steve's machine rather than at authoring time. Cheapest pin: a Strader test that runs COO's deck-validate.sh over every TSV in docs/training/decks/ (the validator is the schema; running it in the producer's suite closes the loop without duplicating the format), plus generalizing the allowlist entries to the decks directory.",
+        "materiality": "LOW -- training tooling, not trading-day; the pin is nearly free because the validator already exists",
+        "evidence": [
+          "/root/projects/Strader/.claude/settings.local.json:84-86",
+          "/root/projects/COO/tools/anki/deck-import.sh, deck-validate.sh",
+          "/root/projects/Strader/docs/training/training-package-pipeline.md (census reference)"
+        ]
+      },
+      {
+        "title": "moo-theme.sh: a live dependency of Strader's desk delivery exists only outside version control",
+        "description": "COO/tmuxMOO/lib/moo-theme.sh is sourced by desk-viewer.sh (running live in the steves-desk Trading NAV that displays Strader's Mancini and VP pages) but the entire tmuxMOO/lib/ directory is swallowed by COO/.gitignore line 31 ('lib/') -- no history, no backup, would not survive a re-clone or repave. Strader depends on it transitively through every desk NAV pane. The contract break mode is total and permanent: a repave (COO's own factory pipeline) rebuilds from git and the desk viewer silently degrades. Same untracked-shared-lib class as zgent-subsystems/lib/common.sh (census). Cheapest pin: a one-line gitignore carve-out (!tmuxMOO/lib/) and a commit -- COO-side, five minutes, zero design work. Named here because Strader should send the bead: it is Strader's morning surface that degrades.",
+        "materiality": "MEDIUM-HIGH -- probability tied to repave/re-clone events (which the factory exists to perform); impact is silent visual degradation of every Steve-facing desk pane, unrecoverable from git",
+        "evidence": [
+          "COO/.gitignore:31 (blanket lib/ per census)",
+          "/root/projects/COO/tmuxMOO/bin/desk-viewer.sh (sources moo-theme.sh, live at census)",
+          "census: tmuxMOO/lib exists nowhere in version control"
+        ]
+      }
+    ],
+    "recommendations": [
+      "Adopt one rule for every seam: the consumer's test suite pins the producer's interface. Strader already proves the pattern works (test_run.py stubs desk-html exit codes); extend it with unskippable existence/interface assertions for all five COO paths Strader hardcodes (desk-html.sh, trading-desk-refresh.sh, desk-register.sh, steves-desk-session.sh, strader-reauth template's script names) -- one small tests/contracts/test_coo_seams.py, under an hour, catches every rename-class break at pytest time.",
+      "Fix the two live breaks first: (1) file the COO bead for adopt-into-existing-session behavior in steves-desk-session.sh (st-b9pf is open and confirmed broken at census); (2) add a freshness check after DESK_REFRESH in run.py so the marked-under-cron silent skip alerts instead of leaving Steve a stale page -- the st-qx4 failure mode is still fully reachable today.",
+      "Execute the ownership handback: move the corpus-daily cron line from COO's crontab into Strader's scripts/cron/ beside its eight siblings. This deletes the highest-materiality cross-repo scheduler seam outright instead of pinning it, and honors the 'temporary' marker from 2026-07-01.",
+      "Create a shared window-name/desk-slug manifest (one sourced constants file, lives in Strader since Strader has more writers) read by capture-supervisor-wrapper.sh, live-footprint-up.sh, gauge-preopen-wrapper.sh, and referenced by the COO session builder -- replacing the comment-only tmux window contract with a mechanical one, and fold the /tmp-vs-/var/moo desk path decision into it (canonical: /var/moo/desk).",
+      "COO-side quick wins Strader should bead over: carve tmuxMOO/lib/ out of the gitignore and commit moo-theme.sh; re-wire check-dolt-schema-skew.sh as a preflight in beads-remote-push.sh; add a COO tests/run-all.sh to the nightly pulse so the orphaned guard tests (install-bd, zepo-sync silent-failure regression) actually run.",
+      "Implement the A2A receipt mechanics from Strader's own 2026-08-12 zgent-sync-plan (inbox.md append + tap-in unacked-memo count) before relying on the channel to carry the contract-repair beads above -- otherwise the fixes travel over the seam that already failed silently for weeks.",
+      "Add a version stamp to COO's factory hook/settings templates that hydrate-zepo.sh copies through, and one tap-in line in each zgent diffing installed copy vs template -- turning ritual-bundle drift from a certify-time discovery into a daily mechanical check."
+    ]
+  }
+]
