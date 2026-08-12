@@ -211,6 +211,63 @@ def test_a_stop_outside_the_slack_fails():
     assert not res.ok
 
 
+# --- recovered reconnects [st-mmh9] ------------------------------------------
+# On 2026-08-12 the gate halted the morning Mancini parse over a single
+# "reconnect #1: ... (possible gap)" entry on a day with 267k cycles and a last
+# write past the close. A recovered reconnect bounds its possible gap at the
+# heartbeat timeout (seconds), so failing a verifiably covered day over one
+# asks the wrong question — and a gate that fails on immaterial grounds trains
+# its operator to bypass it. Leniency is narrow: reconnect-shaped entries only,
+# at most MAX_RECOVERED_RECONNECTS of them, and only when the day is covered.
+
+RECONNECT = ("reconnect #1: BentoError: Gateway timeout: 40 second(s) "
+             "since last message (possible gap)")
+
+
+def test_a_recovered_reconnect_on_a_covered_day_passes():
+    """The 2026-08-12 case: one heartbeat lapse, full coverage — not a hole."""
+    res = gate.evaluate(_manifest(es_errors=[RECONNECT]), now=NOW)
+    assert res.ok, res.reasons
+    assert res.checked["databento_glbx_es"]["recovered_reconnects"] == 1
+
+
+def test_a_reconnect_on_an_uncovered_day_still_fails():
+    """A feed that reconnected and then died mid-session gets no leniency."""
+    res = gate.evaluate(_manifest(es_end="10:00", es_errors=[RECONNECT]),
+                        now=NOW)
+    assert not res.ok
+    assert any("error" in r for r in res.reasons)
+
+
+def test_a_non_reconnect_error_stays_fatal_even_when_covered():
+    res = gate.evaluate(_manifest(es_errors=["disk full: write failed"]),
+                        now=NOW)
+    assert not res.ok
+
+
+def test_a_mixed_error_list_stays_fatal():
+    """One real error among the reconnects must not ride through on them."""
+    res = gate.evaluate(_manifest(es_errors=[RECONNECT, "disk full"]), now=NOW)
+    assert not res.ok
+
+
+def test_a_flapping_feed_stays_fatal():
+    """More reconnects than the ceiling is a feed whose day needs a human."""
+    errs = [f"reconnect #{i}: BentoError: Gateway timeout: 40 second(s) "
+            f"since last message (possible gap)" for i in range(1, 5)]
+    assert len(errs) > gate.MAX_RECOVERED_RECONNECTS
+    res = gate.evaluate(_manifest(es_errors=errs), now=NOW)
+    assert not res.ok
+
+
+def test_a_reconnect_with_no_date_stays_fatal():
+    """No data-day means coverage is unverifiable, so no leniency applies."""
+    m = _manifest(es_errors=[RECONNECT])
+    del m["date"]
+    res = gate.evaluate(m, now=NOW, max_age_hours=36)
+    assert not res.ok
+
+
 # --- fallback when the manifest cannot say which day it is -------------------
 
 def test_a_manifest_with_no_date_falls_back_to_wall_clock_age():

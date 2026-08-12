@@ -20,8 +20,26 @@ Health criteria (pilot v1):
   * manifest exists and parses
   * each required stream is present
   * each required stream has cycles > 0
-  * each required stream has an empty errors list
+  * each required stream has an empty errors list — EXCEPT recovered
+    reconnects on a fully-covered day (see below)
   * each required stream's last write COVERS the data-day (see below)
+
+Recovered reconnects are a warning, not a hole [st-mmh9]
+--------------------------------------------------------
+The collector logs ``reconnect #N: ... (possible gap)`` when its heartbeat
+lapses and it re-subscribes (corpus_stream_databento.py). That entry records a
+possible gap bounded by the heartbeat timeout — tens of seconds — after which
+the stream demonstrably kept collecting. On 2026-08-12 the gate halted the
+morning Mancini parse over exactly one such entry on a day with 267k cycles
+and a last write past the close. Failing the day over that asks the wrong
+question, and (per the coverage fix below) a gate that fails on immaterial
+grounds trains its operator to bypass it.
+
+So: when every error is reconnect-shaped, there are at most
+``MAX_RECOVERED_RECONNECTS`` of them, and the stream verifiably covered its
+day, the errors demote to ``recovered_reconnects`` in ``checked`` instead of
+failing the gate. Any other error string, an uncovered day, or a flapping feed
+(more reconnects than the ceiling) stays fatal.
 
 Freshness is coverage, not recency [st-jc8p]
 -------------------------------------------
@@ -86,6 +104,19 @@ DEFAULT_MAX_AGE_HOURS = 36.0
 #: 15:00 close, so it clears this comfortably; the slack absorbs a final commit
 #: that lands a few minutes early without excusing a feed that died at lunchtime.
 DEFAULT_CLOSE_SLACK_MIN = 10.0
+
+#: Most reconnect-shaped errors a covered day may carry and still pass. Each one
+#: bounds a possible gap at the heartbeat timeout (seconds); more than this
+#: suggests a flapping feed whose day deserves a human look. [st-mmh9]
+MAX_RECOVERED_RECONNECTS = 3
+
+
+def _is_reconnect_error(err: Any) -> bool:
+    """True for the collector's heartbeat-lapse entries, e.g.
+    ``reconnect #1: BentoError: Gateway timeout: 40 second(s) since last
+    message (possible gap)``. The ``reconnect #`` prefix is the stable contract
+    with corpus_stream_databento.py's error logging."""
+    return isinstance(err, str) and err.startswith("reconnect #")
 
 
 @dataclass
@@ -167,20 +198,28 @@ def evaluate(
         if last_dt is not None:
             age_hours = (now - last_dt).total_seconds() / 3600.0
 
+        covers_day = (None if last_dt is None or deadline is None
+                      else last_dt >= deadline)
         checked[name] = {
             "present": True,
             "cycles": cycles,
             "errors": len(errors),
             "last_pull_utc": last_pull,
             "age_hours": round(age_hours, 2) if age_hours is not None else None,
-            "covers_day": (None if last_dt is None or deadline is None
-                           else last_dt >= deadline),
+            "covers_day": covers_day,
         }
 
         if cycles <= 0:
             reasons.append(f"stream '{name}' has no cycles (cycles={cycles})")
         if errors:
-            reasons.append(f"stream '{name}' reported {len(errors)} error(s)")
+            # Recovered reconnects on a verifiably covered day demote to a
+            # warning; anything else in the list stays fatal. [st-mmh9]
+            if (covers_day is True and cycles > 0
+                    and len(errors) <= MAX_RECOVERED_RECONNECTS
+                    and all(_is_reconnect_error(e) for e in errors)):
+                checked[name]["recovered_reconnects"] = len(errors)
+            else:
+                reasons.append(f"stream '{name}' reported {len(errors)} error(s)")
         if last_dt is None:
             reasons.append(
                 f"stream '{name}' has missing/invalid last_pull_utc {last_pull!r}"
