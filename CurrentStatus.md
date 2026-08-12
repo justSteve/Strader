@@ -3,7 +3,7 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
-**Last refreshed**: 2026-08-11 [st-a6zm, st-p3lv, st-1qpz, co-hvxye]
+**Last refreshed**: 2026-08-12 [st-aski, st-nujt, st-mmh9, st-flv4]
 
 > Standing operational snapshot — what is wired up, live, or paused right now.
 > Session history lives in `DaysActivity.md`; work lives in beads; durable
@@ -92,7 +92,19 @@ missing its `leases` table). The working channel is file-convention A2A under
    estate-wide (co-ir43p): backup, `migrate --force`, push, write-probe.
    Strader learned this only via the 08-12 transcript review — the repair was
    never announced to this repo, which is exactly the notification gap the
-   zgent sync plan (st-aski) addresses. Close `st-p3lv` next session.)*
+   zgent sync plan (st-aski) addresses. `st-p3lv` closed same morning.)*
+2b. **Two plans on Steve's desk awaiting his decisions** (2026-08-12): the
+   **Zgent Sync Plan** (`st-aski`, `docs/plans/2026-08-12-zgent-sync-plan.md`)
+   — four decisions incl. ratify-or-retire COO's standing push authority and
+   the Strategy-3-vs-singleton contradiction; and the **Code Estate Plan**
+   (`st-nujt`, `docs/plans/2026-08-12-code-estate-plan.md`) — Gas City final
+   deletion (104MB binary not in git), May-17 test stratum, COO delegation
+   bundle. Both A2A memos to COO are staged and gated on his ratification.
+   Related live state: the datastream gate now demotes recovered reconnects on
+   a covered day (`st-mmh9`); steves-desk has only the hand-rebuilt Trading
+   window — the other seven desk windows remain absent until the adopt fix
+   (`st-b9pf`, COO's script). Schwab token re-authed 05:06, healthy to
+   2026-08-19 (`st-6akd` closed).
 3. *(This slot held `st-i68` for four sessions, reading "fires every weekday at
    08:15 until fixed" while that job was exiting rc=0 on 08-04 through 08-07.
    Closed 2026-08-10 with the gate bug `st-1qpz` that was its actual failure,
