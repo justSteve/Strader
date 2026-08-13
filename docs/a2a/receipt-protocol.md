@@ -30,8 +30,35 @@ An `ACK` is not a stall — it is the honest answer most of the time, and it is 
 converts nine days of silence into a known-open item. What is *not* acceptable is
 reading a memo and logging nothing.
 
-`DIGEST` lines (a peer's handoff summary) owe no reply. `COMMIT` lines owe no reply —
-their announce *is* the receipt.
+`DIGEST` lines (a peer's handoff summary) owe no reply. `WRITE`, `FILED` and
+`STATUS` lines owe no reply — their announce *is* the receipt.
+
+### The KIND vocabulary
+
+Reconciled with COO 2026-08-13 [st-qfsz], after four correctly-announced peer rows
+parsed as malformed because this ledger had no word for events
+`.claude/rules/zgent-permissions.md` already *requires* a peer to announce. They
+became invisible to every tool that reads parsed events, on the day one of them
+was reporting a live risk to the corpus. A vocabulary narrower than the
+obligations it records does not enforce anything — it loses rows.
+
+| KIND | Means | Owes a reply? |
+|---|---|---|
+| `WRITE` | A peer wrote into this repo — the same-commit announce obligation | No |
+| `FILED` | A peer filed a bead here | No |
+| `STATUS` | A peer reporting a state change on shared infrastructure | No |
+| `MEMO` | FYI / an ask | **Yes** — `ACK` or `SERVICED` |
+| `ACK` | Read and understood, not doing it yet | — |
+| `SERVICED` | The ask is done | — |
+| `DIGEST` | A peer's handoff summary | No |
+
+**`COMMIT` is retired**, in favour of `WRITE` (COO's ruling, 2026-08-13). One word
+per event, and `WRITE` is the word `zgent-permissions.md` itself uses, so the
+permission rule and the ledger now say the same thing. `COMMIT` still *parses*, so
+the historical rows below remain valid history — retiring a word must not rewrite
+the past — but a `COMMIT` row dated on or after the ruling is flagged as a problem
+by `tools/a2a_inbox.py`, which turns the ledger test red. That test is the
+enforcement; there is no separate discipline to remember.
 
 ## 2. How to reply
 
@@ -99,7 +126,7 @@ Output shape (this is what gets pasted into the briefing):
 
 ```
 LANDED SINCE 2026-08-12 08:53 CT (2 events)
-  2026-08-13 09:14 CT  COO  COMMIT  co-3x9f  .claude/skills/handoff/SKILL.md
+  2026-08-13 09:14 CT  COO  WRITE  co-3x9f  .claude/skills/handoff/SKILL.md
       Ports Strader's CurrentStatus-writer step into the shared lifecycle template
 
 RECEIPTS OWED BY STRADER (1)
@@ -121,7 +148,7 @@ implement; nothing here is optional, and nothing here is implemented in this bea
 
 1. Run `python3 tools/a2a_inbox.py`.
 2. Put the `LANDED SINCE` block into the briefing under a **Peer Activity** heading,
-   verbatim. If a landed `COMMIT` touched a required-announce class (`CLAUDE.md`,
+   verbatim. If a landed `WRITE` touched a required-announce class (`CLAUDE.md`,
    `.claude/**`, settings, skills, schwab-adjacent, `knowledge/**`), say so in the
    briefing's first section — an instruction or security surface changed under us and
    that outranks the bead queue.
@@ -142,7 +169,7 @@ implement; nothing here is optional, and nothing here is implemented in this bea
    `SERVICED` receipt for an inbound peer memo (per §2, a memo *to* Strader and its
    receipt both land in Strader's ledger — that is the join key that makes the memo
    stop reading as OPEN). Nothing else. In particular the handoff never writes
-   `COMMIT` rows for Strader's own commits, and never writes `DIGEST` rows here —
+   `WRITE` rows for Strader's own commits, and never writes `DIGEST` rows here —
    own commits are not peer events, and a digest is written to the *peer's* ledger,
    not this one.
 

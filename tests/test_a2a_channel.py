@@ -74,6 +74,47 @@ def test_malformed_rows_are_reported_not_swallowed(tmp_path):
     assert len(problems) == 3
 
 
+def test_retired_kind_still_parses_on_historical_rows(tmp_path):
+    """Retiring a word must not rewrite history. [st-qfsz]
+
+    COMMIT was the vocabulary before 2026-08-13. Rows written under it are
+    valid history and must keep parsing, or the ledger loses its own past the
+    day the vocabulary changes.
+    """
+    p = tmp_path / "inbox.md"
+    p.write_text(
+        _ledger("| 2026-08-11 09:00 CT | COO | COMMIT | co-y | ref | CLAUDE.md | old vocabulary |\n"),
+        encoding="utf-8")
+    events, problems = a2a.parse_inbox(p)
+    assert problems == []
+    assert [e.kind for e in events] == ["COMMIT"]
+
+
+def test_retired_kind_is_flagged_on_new_rows_but_the_event_is_kept(tmp_path):
+    """The enforcement, and the thing it must not do. [st-qfsz]
+
+    A COMMIT dated after the ruling is a problem — that is what turns the suite
+    red the first time anyone writes the retired word. But the row is STILL
+    recorded, because losing an event to a vocabulary complaint is exactly the
+    failure this reconciliation came from: four correctly-announced COO rows
+    went invisible on the day one reported a live risk to the corpus.
+    """
+    p = tmp_path / "inbox.md"
+    p.write_text(
+        _ledger("| 2026-08-14 09:00 CT | COO | COMMIT | co-y | ref | CLAUDE.md | new row |\n"),
+        encoding="utf-8")
+    events, problems = a2a.parse_inbox(p)
+    assert len(problems) == 1 and "retired" in problems[0] and "WRITE" in problems[0]
+    assert [e.kind for e in events] == ["COMMIT"]   # flagged, not swallowed
+
+
+@pytest.mark.parametrize("kind", sorted(a2a.WRITABLE_KINDS))
+def test_every_writable_kind_parses(kind):
+    """No word a peer is told to use may be rejected by the parser. [st-qfsz]"""
+    assert kind in a2a.KINDS
+    assert kind not in a2a.RETIRED_KINDS
+
+
 # --- receipts -------------------------------------------------------------
 
 
