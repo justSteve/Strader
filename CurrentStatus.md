@@ -3,7 +3,7 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
-**Last refreshed**: 2026-08-12 [st-aski, st-nujt, st-mmh9, st-flv4]
+**Last refreshed**: 2026-08-13 [st-aski, st-ad6p, st-g0or, st-75z0, st-pfrz, st-4ld0]
 
 > Standing operational snapshot — what is wired up, live, or paused right now.
 > Session history lives in `DaysActivity.md`; work lives in beads; durable
@@ -23,7 +23,8 @@ summative pass.
 |---------|-------|
 | TradingView MCP | **Removed.** No `.mcp.json`. Chart state comes from screenshots; Pine scripts are pasted by Steve by hand. |
 | GEXBot | **ACTIVE — QUANT tier ($350/mo, one-month commitment) since 2026-08-05 PM** (State AM, upgraded same day; pause ran 07-03→08-05). Live **10-endpoint** collection in tmux `steves-desk:gex`: the full State package — {gamma,delta,vanna,charm} × {`_zero`,`_one`}, 87 strikes each — plus `classic/gex_zero/majors` and the **orderflow leg, which went live 2026-08-06 with 37 fields** (it was auto-skipping on entitlement before the upgrade; no code change was needed). 0DTE legs are requested first so a truncated cycle keeps what the fly window trades. Feed is **RTH-only** — collector DOWN outside 08:30–15:00 CT is normal. Now measured rather than asserted: on 2026-08-07 `spot_at_gamma_zero` sat frozen at one value from midnight, took its first new value at **08:30:02 CT**, updated on a ~76s cadence to **15:00:33 CT**, then went flat; Saturday 2026-08-08 never moved once across 1153 polls. The collector is gated to that window (`corpus_poll_gexbot.py`, restored 2026-08-10) and cron `*/2` restarts it inside the window via `scripts/cron/gexbot-supervisor-session.sh` [st-a6zm, st-p3lv]. **Consumer warning — `gexbot.jsonl` files dated 2026-08-09 or earlier are ~70% duplicate rows**: the collector polled around the clock, and a frozen feed returns the last RTH value unchanged, so an overnight row is not stale-but-plausible data, it is a verbatim repeat. 2026-08-07 holds 352 in-session rows against 783 repeats. Filter by timestamp — and never count, average, or weight these rows without deduplicating first. [co-hvxye] **A dedicated live 1 Hz orderflow leg runs beside the 60s collector since 2026-08-10** [st-ipn0]: `corpus_poll_gexbot_orderflow_1s.py` polls `/SPX/orderflow/orderflow` alone at ≥1.1s spacing (the vendor's stated per-metric ceiling), same 08:30–15:05 CT gate, writes flat rows to `data/corpus/<date>/gexbot_orderflow_1s.jsonl` (~1.3s native feed cadence, consecutive duplicates skipped), supervised by cron `*/2` via `scripts/cron/gexbot-orderflow-1s-supervisor.sh` in tmux window `gexbot-of1s`. This is the real-time spike-train read the 60s cycle cannot see; nightly `/hist` remains the archival 1s source. Program brief: `docs/a2a/2026-08-05-gexbot-quant-month-program.md`. Month-end sweep + downgrade decision ~Sep 1. |
-| Schwab API | `lib/schwab-py` on the `hobbled-readonly` fork — account/order/transaction methods physically removed. Only `broker_schwab/readers/{quote,chain}.py` are auto-allowed. |
+| Schwab API | `lib/schwab-py` on the `hobbled-readonly` fork — account/order/transaction methods physically removed. Only `broker_schwab/readers/{quote,chain}.py` are auto-allowed. **The `schwab-gate.sh` PreToolUse hook was DORMANT from May until 2026-08-13** — it read the bare `.command` key where the payload nests at `.tool_input.command`, so all five gates returned allow without inspecting anything. Fixed and installed with Steve's approval [st-ad6p]: reads the nested key, **fails closed** on any other shape, and gate 3 now blocks by *import reachability* (any `.py` importing `schwab` or `broker_schwab`, readers excepted) rather than by the old blanket ban on `scripts/` — 65 `.py` files live there and only 11 reach the API. Pinned by `tests/test_schwab_gate_hook.py`. **Correction carried into `CLAUDE.md` and the rule file the same day:** the permissions layer never gated interpreters — `python3`, `bash`, `curl`, `echo` are all auto-allowed; only `sh`, `source`, `touch` are absent. Through the dormant period the structural fork was the *only* live protection. |
+| Entitlements | **`config/entitlements.yaml` is the single home** for subscription/tier/price state [st-g0or], probed by `scripts/entitlements_probe.py` (local files only, no vendor API). Splits **PROBED** (re-derived each run) from **DATED** (asserted, stamped, aged; `NEVER` renders as NEVER, not as a guess). Bundle docs and COO's conventions point at it — **never restate figures anywhere else**. Read by tap-in step 4d. Open items only Steve can close are listed by the probe every run: Databento's actual billed amount, **Schwab market-data rights (real-time vs delayed — unrecorded, so no agent should call reader quotes real-time)**, TradingView tier, LuxAlgo, and the Mancini newsletter. |
 | Databento | **CME Standard live GLBX verified 2026-08-03.** ES trades + MBP-1 capture the session window 02:50–15:05 CT via `scripts/live-footprint-up.sh` (tmux `steves-desk:footprint`), now supervised. **GLBX historical is $0.00 on the Futures plan** (measured 2026-08-05, `--estimate-only`; OPRA control $6.07/2h), so an uncaptured GLBX session is **recoverable, not gone** — the old "quotes are NEVER backfilled" premise is false for GLBX and holds only for OPRA. **Daily OPRA import HALTED 2026-08-07** (`st-7av4`, Steve's call): historical OPRA is an ad hoc fetch now via `corpus_backfill_databento.py --opra`. The datastream gate no longer requires the stream; the six measurement scripts that read `databento_opra.jsonl` must each fail loudly on a day without it. Historical corpus is tape-only — no GEX history before 2026-08-05. |
 | Mancini | Pre-open cron wired and working, verified rc=0 end to end on 2026-08-10. The `st-i68` PATH bug and the `st-1qpz` gate bug are both fixed and closed. |
 | Market internals | `scripts/mi_gauge.py`, captured on the 5-minute session cron. Single-sourced from Schwab — no cross-check exists (`st-jwtn`). |
@@ -76,10 +77,28 @@ No autonomous orders, ever.
 
 ## Comms
 
-`gc mail` is dead from Strader in both directions — two COO-side defects (city
-resolution walks up from cwd and Strader is out-of-tree; the moocity store is
-missing its `leases` table). The working channel is file-convention A2A under
-`docs/a2a/`.
+`gc mail` is dead from Strader in both directions. As of 2026-08-13 it no longer
+fails *quietly*: the `gc-mail-stub.sh` PreToolUse hook **blocks** a `gc`
+invocation and points at `docs/a2a/`. The binary still resolves at
+`/usr/local/bin/gc`, which is why a stub was needed rather than relying on
+command-not-found.
+
+The working channel is A2A under `docs/a2a/`, and it now has a bell and a
+receipt [st-75z0]:
+
+- **`docs/a2a/inbox.md`** — append-only ledger, one line per peer event
+  (`COMMIT`/`MEMO`/`ACK`/`SERVICED`/`DIGEST`). Every peer commit into this repo
+  appends a line **in the same commit** — mandatory for `CLAUDE.md`, `.claude/**`,
+  settings, skills, Schwab-adjacent paths, `knowledge/**`, and peer `st-` bead
+  actions. A commit without its line is a protocol violation regardless of
+  authorization; the next session appends the missing line itself and files a bead.
+- **`docs/a2a/receipt-protocol.md`** — every memo gets an ack-or-serviced reply
+  within one session of the recipient's next tap-in. OPEN and STALE are computed
+  mechanically by `tools/a2a_inbox.py`; skills call the tool rather than eyeball
+  the ledger. Tap-in reads it (step 4c), handoff pays it (step 8a).
+- **COO's inbox does not exist yet** — Phase 2 item 5 on COO's side. Until it
+  ships, Strader's outbound digest is parked verbatim in the DaysActivity entry
+  and declared undelivered. Strader does not create it; writes stay in-repo.
 
 ## Attention Items
 
@@ -93,18 +112,32 @@ missing its `leases` table). The working channel is file-convention A2A under
    Strader learned this only via the 08-12 transcript review — the repair was
    never announced to this repo, which is exactly the notification gap the
    zgent sync plan (st-aski) addresses. `st-p3lv` closed same morning.)*
-2b. **Two plans on Steve's desk awaiting his decisions** (2026-08-12): the
-   **Zgent Sync Plan** (`st-aski`, `docs/plans/2026-08-12-zgent-sync-plan.md`)
-   — four decisions incl. ratify-or-retire COO's standing push authority and
-   the Strategy-3-vs-singleton contradiction; and the **Code Estate Plan**
-   (`st-nujt`, `docs/plans/2026-08-12-code-estate-plan.md`) — Gas City final
-   deletion (104MB binary not in git), May-17 test stratum, COO delegation
-   bundle. Both A2A memos to COO are staged and gated on his ratification.
-   Related live state: the datastream gate now demotes recovered reconnects on
-   a covered day (`st-mmh9`); steves-desk has only the hand-rebuilt Trading
-   window — the other seven desk windows remain absent until the adopt fix
-   (`st-b9pf`, COO's script). Schwab token re-authed 05:06, healthy to
-   2026-08-19 (`st-6akd` closed).
+2b. *(RESOLVED 2026-08-13: the **Zgent Sync Plan** was ratified. Decision 1 —
+   COO's standing push authority **ratified with two gates** (read owner's canon
+   first; announce in `docs/a2a/inbox.md` in the same commit), written into
+   `.claude/rules/zgent-permissions.md`. Decision 3 — contract canonical at
+   `/root/projects/COO/conventions/enterprise-contract.md`. Decision 4 — plan
+   ratified and delegated to COO. Strader's half shipped the same day:
+   st-zc38, st-g0or, st-75z0, st-pfrz, st-4ld0 all closed. Decision 2 —
+   Strategy 3 is a **rewrite, deferred to the next session** at Steve's
+   direction; `CLAUDE.md` deliberately untouched, tracked as `st-mfpm`.)*
+2c. **Two P1 gaps carved out of today's security work.** **`st-fsf3`** — this
+   repo has **no bash-guard hook at all** and `Bash(rm *)` / `Bash(mv *)` are
+   auto-allowed; the only PreToolUse hooks are the Schwab gate and the `gc`
+   stub. COO runs five gates through a shared library. Steve closed the parent
+   `st-z3y5` against his in-flight backup-strategy review, which covers the
+   backup half but not this enforcement half. **`st-9we4`** — the contract embed
+   and tap-in drift check are BLOCKED on COO publishing the canonical file;
+   path confirmed, file unwritten, and deliberately no placeholder.
+2d. **Code Estate Plan correction** (`st-nujt`): the census claim of a
+   "committed virtualenv (1,338 files)" in COO is **retracted** — zero `.venv`
+   files are tracked in COO's history and the tree is already gitignored. The
+   census counted working-tree rather than tracked files; corrected tracked
+   counts are **Strader 781 / COO 1,449**. Every COO file count in that plan is
+   unverified pending recount. Decision 3 of that plan is withdrawn.
+   Related live state: steves-desk has only the hand-rebuilt Trading window —
+   the other seven remain absent until the adopt fix (`st-b9pf`, COO's script).
+   Schwab token healthy to **2026-08-19** (`st-6akd` closed).
 3. *(This slot held `st-i68` for four sessions, reading "fires every weekday at
    08:15 until fixed" while that job was exiting rc=0 on 08-04 through 08-07.
    Closed 2026-08-10 with the gate bug `st-1qpz` that was its actual failure,

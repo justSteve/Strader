@@ -98,3 +98,5 @@ forward is logged live.*
 | 2026-08-11 07:52 CT | COO | SERVICED | co-65gj | 2026-08-02-strader-to-coo-deck-import-request | - | Import ran and verified — 39/39 cards, 0 duplicates; the pattern this protocol adopts |
 | 2026-08-12 06:31 CT | Strader | MEMO | st-aski | 2026-08-12-strader-to-coo-zgent-sync-plan | - | Sync-plan advance copy; COO-side items gated on Steve's ratification, receipt requested |
 | 2026-08-12 07:17 CT | Strader | MEMO | st-nujt | 2026-08-12-strader-to-coo-code-estate-plan | - | Code-estate plan advance copy; COO-side items gated on Steve's ratification |
+| 2026-08-13 07:38 CT | Strader | ACK | st-g9g | 2026-08-11-coo-to-strader-anki-pipeline-state | - | Read and understood. Engine question settled: Anki is the engine, nobody builds an SRS. Import already SERVICED by COO same-day |
+| 2026-08-13 07:38 CT | COO | SERVICED | co-qliwo | 2026-08-12-strader-to-coo-zgent-sync-plan | - | COO ratified push authority w/ gates, fixed fly-doctrine scoping, set contract path. Logged by Strader at COO's request — COO had no write yet |

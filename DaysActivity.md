@@ -1,38 +1,71 @@
-# DaysActivity - 2026-08-12
+# DaysActivity - 2026-08-13
 
-## 08:53 - Session Handoff [Mancini Parse · Two Ultracode Plans · Live Session Support]
+## 07:40 - Session Handoff [Sync Plan Implementation, Schwab Gate, EOD Flush Research]
 
-**Summary**: Ran the full morning Mancini parse (plan-day 08-12, 66 levels, 11 commentary items, clipboard delivered) around two mid-parse obstacles — the st-st6h method-notes removal landed before publish, and a datastream-gate halt on a recovered reconnect was fixed by changing the gate's question (st-mmh9, never `--no-gate`). Then two Steve-directed ultracode effort: the **Zgent Sync Plan** (st-aski — 24-agent review of all 38 Strader+COO transcripts since 08-02; diagnosis: knowledge lands where the conversation happened, Steve is the routing layer; plan: single-home-per-fact, peer inbox, A2A receipts, peer-sync rituals) and the **Code Estate Plan** (st-nujt — 32-agent census of ~730 authored files; seven recurring defect classes, 103 confirmed-dead files, 9-vs-290 COO test ratio; plan: census-populated registry, wiring meta-test, Tier-1 anchors, retirement protocol). Both delivered rendered to the desk with staged A2A memos gated on Steve's ratification. Live session: 08:32 regime read (Carmine/Mancini/GEX convergence on the 7794-7820 / 7743-7726 balance), captured Steve's bearish-via-long-premium correction to memory, shipped `level_interaction_read.py` (st-flv4) and armed a self-paced footprint monitoring loop — Steve rescinded the loop at 08:53 in favor of this handoff.
+**Summary**: Steve ratified the Zgent Sync Plan and its Phase 0–3 Strader half shipped via a five-agent fan-out; separately, a dormant Schwab gate and a false permissions claim were found, verified, and fixed with his approval, and three sessions of EOD-flush research produced a testable flush-anticipation hypothesis plus two corrections to the agent's own earlier work.
 
 **Open Work**:
-- Steve decisions pending on both plans (see CurrentStatus Attention Item 2b) — COO A2A memos staged, not yet actionable by COO
-- st-zc38 fly-doctrine backport into the canonical bundle concept — flagged "today" in the sync plan
-- Estate Phase-0 beads filed and ranked: st-hrwe (parity cron), st-swkk (sentinel hardening), st-bpzd (corpus spine tests), st-uawp (1s gate share), st-1idb (seam tests), st-tbxk (CI seam), st-wwnv (Schwab gate checks), st-sl1f (dead tranche 1)
-- Sync-plan beads: st-g0or (entitlements registry), st-4ld0 (peer-sync rituals), st-75z0 (inbox+receipts), st-pfrz (monitor registry)
-- st-flv4 open: reader shipped and pushed, test anchor pending; monitoring loop rescinded
-- st-b9pf: steves-desk has only the hand-rebuilt Trading window; seven windows absent until COO's adopt fix
+- **st-fsf3** (P1) — no bash-guard hook and `Bash(rm *)` auto-allowed. Carved out of st-z3y5 when Steve closed that against his backup-strategy review; this half is enforcement, not backup, and the review will not reach it. Coordinate the pattern shape with COO rather than inventing a second dialect.
+- **st-9we4** — enterprise contract embed + tap-in drift check. BLOCKED on COO publishing `/root/projects/COO/conventions/enterprise-contract.md`; path is confirmed and stable but the file is unwritten. Deliberately not embedding a placeholder — an embed that diverges on day one teaches everyone to ignore the drift check.
+- **st-mfpm** — rewrite Strategy 3 in CLAUDE.md to match the singleton directive. Steve: "rewrite existing strat at next session." CLAUDE.md deliberately untouched today. Doctrine content goes to Steve before it lands.
+- **st-9i7a** / **st-vl3c** — backtest the flush-anticipation signal and the three footprint constructs across 275 days of ES tape. Trade-tape only, no new data pulls needed. The deciding number is the false-positive rate on days that did *not* flush.
+- **st-rc36**, **st-76sy** — corrections ledger and peer bead visibility; both filed today, neither started.
+- **st-x2kd** — home the SPX-only overrule outside the TABLED counter-dictum concept. Confirm with Steve it is still standing before promoting it.
 
 **Tried**:
-- Gate halt on `reconnect #1 ... (possible gap)` → rejected `--no-gate` per the st-1qpz/08-07 precedent; demoted recovered reconnects on a covered day instead (≤3, reconnect-shaped only, coverage verified), seven tests pinning the policy → 106 runbook tests green, pipeline passed
-- Workflow `args` parameter never reached the script (`GROUPS.map` on undefined, 0 agents, 14ms) → inlined the group constants into the script and resumed with the same run ID → clean
-- `$VIX.X` through the quote reader → rejected symbol; VIX left unreported rather than guessed
-- Fabricated bead IDs in the first sync-plan draft (wrote st-oy2q etc. before creating them) → caught before publish; created the real beads first and corrected the doc
+- Diagonal/stacked footprint imbalances as a flush lead → **failed**. Base rate 0–2 per bar; only rises *at* the break. 8/11's stacked-6 reading lands 14:50, five minutes after the 14:45 flush. Worse, it misleads: 8/12's 14:47 and 14:48 bars each carry 3 *buy* imbalances and the 14:50 flush bar prints a buy imbalance at the bar high.
+- Capped-high absorption as a flush lead → **half-failed**. Textbook on 8/12 (7774.75 re-tested three times with positive buy spend, never exceeded) but *absent* on 8/11, where price abandoned the high — zero volume at the 7756.50 cap for four bars before the flush. Opposite pictures, same setup.
+- Sticky-strike per-leg IV to reprice the 8/11 fly → **failed**, error +1.01 to +1.73 on a structure worth under 2.00. Schwab's deep-ITM 0DTE IVs are unusable (7760P prints 19–21% against ~11% ATM). Replaced by solving one flat vol against the *quoted fly mark* and moving only spot and clock.
+- First size-guard implementation → **silently passed a 2MB test file**. Parsed `git diff --cached --raw` with fields off by one, so the source SHA landed in the all-zeros check and every newly-added file was skipped. Rewritten to ask git for the staged blob size by path.
+- First schwab-gate fix draft read `.tool_input.command // .command` → **killed by its own control test**. A fallback reads both shapes, so nothing proves which is authoritative and a later regression passes a green suite. Now nested-only, failing closed on unrecognised shapes.
+- Gate 3's first rewrite matched the runner path after any whitespace → **blocked its own commit twice**. A gate that blocks writing *about* the runner trains everyone to route around it. Tightened to command position or explicit interpreter invocation.
 
 **Files Changed**:
-runbook/mancini/run.py
-runbook/mancini/method-notes.md (deleted)
-runbook/datastream/gate.py
-tests/runbook/test_gate.py
+CLAUDE.md
+.claude/rules/schwab-api-gate.md
+.claude/rules/zgent-permissions.md
+.claude/rules/no-env-prefix-commands.md
+.claude/hooks/scripts/schwab-gate.sh
+.claude/hooks/scripts/gc-mail-stub.sh
+.claude/settings.json
+.claude/skills/tap-in/SKILL.md
+.claude/skills/handoff/SKILL.md
+config/entitlements.yaml
+strader/entitlements.py
+scripts/entitlements_probe.py
+scripts/surface_liveness.sh
+tools/a2a_inbox.py
+tools/precommit_size_guard.sh
+tests/test_schwab_gate_hook.py
+tests/test_a2a_channel.py
+tests/scripts/test_entitlements_probe.py
+knowledge/directional-gex-butterflies.md
+knowledge/buying-movement-delta-first.md
+knowledge/entitlements-registry.md
 knowledge/databento-live-collection.md
+knowledge/counter-dictum-program.md
+knowledge/index.md
 knowledge/log.md
-CurrentStatus.md
+docs/a2a/inbox.md
+docs/a2a/receipt-protocol.md
+docs/a2a/2026-08-11-coo-to-strader-anki-pipeline-state.md
+docs/a2a/2026-08-12-strader-to-coo-code-estate-plan.md
 docs/plans/2026-08-12-zgent-sync-plan.md
 docs/plans/2026-08-12-code-estate-plan.md
-docs/a2a/2026-08-12-strader-to-coo-zgent-sync-plan.md
-docs/a2a/2026-08-12-strader-to-coo-code-estate-plan.md
-docs/audits/2026-08-12-code-estate/ (census.json, wiring.json, dead-verdicts.json, lens-analyses.json)
-scripts/level_interaction_read.py
-runbook/mancini/commentary/2026-08-12.jsonl
-DaysActivity.md
+docs/live-monitoring-registry.md
+docs/reviews/2026-08-11-late-day-flush-fp-review.md
+docs/reviews/2026-08-12-eod-flush-effort-vs-effect.md
+docs/reviews/2026-08-13-flush-anticipation-signal.md
+docs/gexbot/README.md
+docs/gexbot/canonical/metrics_math.md
+runbook/mancini/parsed/2026-08-13.json
+.gitignore
+
+**Peer Digest (UNDELIVERED — COO inbox absent)**:
+- `knowledge/directional-gex-butterflies.md` is current again and carries the scope note both sides agreed: the runner-for-the-pin stands, the ban is on reasoning about the trade *through* its expiry payoff. Canon beat the newer document — worth remembering next disagreement. [st-zc38, f0f0173]
+- Entitlement/tier/price state now has ONE home: `config/entitlements.yaml`, probed by `scripts/entitlements_probe.py`. COO's gexbot convention already points at it. Do not restate figures anywhere else — point. [st-g0or, f0f0173]
+- `.claude/rules/zgent-permissions.md` rewritten for Steve's ratified decision 1: COO's standing push authority recorded, gated on read-canon-first plus an `docs/a2a/inbox.md` line in the same commit. Carve-outs: the grant does NOT cover the Schwab gate, the hard boundaries, or credential material. [st-75z0, f0f0173]
+- `schwab-gate.sh` was dormant since May (bare `.command` key) — fixed and installed today. If COO writes into Strader's harness, note the gate is now genuinely enforcing where it was not. `tests/test_schwab_gate_hook.py` pins it, including COO's control case. [st-ad6p]
+- Strader's code-estate census claim of a "committed virtualenv (1,338 files)" in COO is RETRACTED — zero `.venv` files tracked in COO's history, already gitignored. The census counted working-tree rather than tracked files; corrected tracked counts Strader 781 / COO 1,449. Every COO count in that plan is unverified pending recount. [st-nujt]
 
 ---

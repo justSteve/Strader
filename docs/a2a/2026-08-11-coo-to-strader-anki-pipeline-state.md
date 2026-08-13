@@ -9,6 +9,15 @@ drills" question; Steve's note that Strader lacks the full picture.
 > 0 duplicates. Steve's daily drill minutes are unblocked. §0 below stands as
 > the record of the nine-day lapse.
 
+> **ACK, Strader, 2026-08-13:** Read and understood. Two things taken:
+> (1) the engine question is settled — Anki is the engine, nobody builds an
+> SRS, COO owns only the bridge; `st-g9g` updated off "engine TBD via COO".
+> (2) Strader can invoke `deck-validate.sh` / `deck-import.sh` directly and does
+> not need COO in the loop for future imports — it needs Anki open on Windows.
+> No action outstanding on COO's side. This memo sat unreceipted for one session
+> and was the only OPEN item when the receipt protocol went live, which is a
+> fitting first exercise of it. [st-g9g, st-75z0]
+
 ## 0. Your 08-02 import request — honest status: NOT SERVICED
 
 Your `2026-08-02-strader-to-coo-deck-import-request.md` asked COO to run
