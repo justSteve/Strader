@@ -5,8 +5,13 @@ Bead: st-z96i · built 2026-08-13 from the ES trade tape (Databento) for
 
 **Scope Steve set:** find footprint data that *anticipates* the 10-point flush in
 the last 30 minutes. Recovery explicitly out of scope. The instrument is a 0DTE
-long put single, not a fly — so the read has to fire *before* the break and
-survive being wrong for a minute.
+long put single, not a fly — so the read has to fire *before* the break.
+
+> **Superseded framing (Steve, 2026-08-13).** This page originally said the read
+> also had to "survive being wrong for a minute." Steve's answer — *or just take
+> profit at an arbitrary point* — is correct and is measured in **Fixed-target
+> exit** below. Surviving the drawdown is only required if you are reaching for
+> the whole flush. At a 2-point target the drawdown has not happened yet.
 
 > **Read this first.** Three fires across two days. The thresholds *and* the time
 > filter were chosen after seeing which fires worked. That is fitting a curve to
@@ -70,6 +75,57 @@ who cuts fast:
 A 2-point stop — which is a natural instinct — kills the 8/12 trade before it
 pays. That single fact is the most useful thing on this page, because it is the
 one that would have cost real money.
+
+---
+
+## Fixed-target exit — the drawdown is a function of how greedy you are
+
+MAE over 20 minutes is the wrong number if you are out in three. The number that
+matters is **heat before target**: the worst adverse move between entry and the
+moment the target prints. Measured at 5-second resolution off the tick tape:
+
+| target | fires hit | median time to hit | **worst heat before it printed** |
+|---|---|---|---|
+| 1.5 pts | **3 / 3** | **2m 04s** | **+1.00** |
+| 2.0 pts | **3 / 3** | **2m 45s** | **+1.00** |
+| 3.0 pts | 3 / 3 | 5m 05s | +2.50 |
+| 4.0 pts | 3 / 3 | 5m 36s | +2.50 |
+| 5.0 pts | 3 / 3 | 5m 47s | +2.50 |
+| 7.0 pts | 3 / 3 | 9m 17s | +2.50 |
+
+**The break is between 2 and 3 points.** The +2.50 heat that drove the whole stop
+discussion is entirely an 8/12 phenomenon, and on 8/12 it happens *after* the
+2-point target has already filled — that trade was out in 2m 45s having never
+been more than a point offside. Reaching for the third point is what buys the
+drawdown:
+
+| 8/12, fired 14:40:00 | time to hit | heat before target |
+|---|---|---|
+| 2.0 pts | **2m 45s** | **+1.00** |
+| 3.0 pts | 10m 37s | +2.50 |
+
+Same signal, same day. One point of extra greed costs eight minutes of holding
+and 1.5 points of additional drawdown.
+
+### What that is worth as a put, using real quotes
+
+The 14:45 chain snapshot exists on both days, so this does not have to be
+assumed. On 8/12 at 14:45:03, SPX 7751.26:
+
+| | strike | bid / ask | mark | delta | spread |
+|---|---|---|---|---|---|
+| 8/12 | 7750P | 1.45 / 1.55 | 1.50 | −0.410 | **0.10** |
+| 8/11 | 7730P | 3.60 / 3.80 | 3.70 | −0.498 | 0.20 |
+
+A 2-point SPX move on a 0.41-delta put is ~0.82 of option value before gamma,
+which rises as price falls. Call it 1.50 → roughly 2.3, so **~+0.70/contract
+(~$70)** on a three-minute hold, before slippage.
+
+**And note the friction difference.** That put quotes 0.10 wide on a 1.50 mark —
+about 3% of premium. The 8/11 butterfly at the same hour quoted **1.60 wide on a
+1.90 mark**, 42% below mid to exit. At the close, singles win the friction fight
+against flies by an order of magnitude. That is a structural argument for the
+instrument, independent of whether this particular signal survives testing.
 
 ---
 
