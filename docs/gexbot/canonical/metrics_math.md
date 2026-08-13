@@ -141,7 +141,10 @@ for the measurement framework.
    - OI is the gold standard (T+1, OCC tallies)
    - Volume is the intraday proxy when volume > OI
    - Orderflow classification is GexBot's edge — they monitor market-maker reaction to infer unmatched inventory
-   The State tier we subscribe to runs at level 3 (orderflow classification).
+   Our subscription reaches level 3 (orderflow classification). *Which* tier that is —
+   and whether it still carries the orderflow endpoint — is in `config/entitlements.yaml`;
+   probe it (`.venv/bin/python3 scripts/entitlements_probe.py`) rather than recalling it.
+   This line said "the State tier we subscribe to" for a week after the Quant upgrade [st-g0or].
 
 2. **GEX formula:** `100 × 𝛄 × OI × share_price² × 1%` per strike. Sign is positive for customer-long, negative for customer-short.
 

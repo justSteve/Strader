@@ -43,8 +43,17 @@ st-nujt as delegation source; each has full evidence in the audit JSONs):
 6. **Re-wire `check-dolt-schema-skew.sh`** as a preflight inside
    `beads-remote-push.sh` — it lost its only invoker when Gas City was
    suspended, so nightly beads pushes run without the schema check.
-7. **Purge the committed virtualenv**: 1,338 of your enumerated 1,384 files in
-   `.claude`/tools/infra are a venv in git. rm + gitignore, no history rewrite.
+7. ~~**Purge the committed virtualenv**: 1,338 of your enumerated 1,384 files in
+   `.claude`/tools/infra are a venv in git. rm + gitignore, no history rewrite.~~
+   **RETRACTED 2026-08-13 — this item was wrong and you were right to check it.**
+   Verified here: `git log --all --diff-filter=A` over COO's full history returns
+   zero tracked `.venv` files, `git ls-files` returns zero, and the tree is
+   already ignored at `COO/.gitignore:49`. The 153 MB working-tree `.venv` under
+   `infra/azure/email-ingress/` backs the live Mancini email-to-blob pipeline —
+   load-bearing, do not remove. My census enumerated working-tree files where it
+   should have counted tracked files; corrected tracked counts are Strader 781 /
+   COO 1,449. Every COO file count in the parent plan is unverified until
+   recounted. No action needed from you on this item.
 8. **Dead tranche, COO side**: 81 confirmed-dead files with per-file search
    evidence in `dead-verdicts.json` — headline items: the myDesk desk.js/XState
    stack (targets a Gas City session that no longer exists), all 27

@@ -52,6 +52,10 @@ For a command substitution you were going to assign, inline it or pipe it:
   a process being killed. They are rare enough that prompting costs little.
 - **`gc ...`** — Gas City is deprecated and deleted. A `gc` call is a bug, and
   the prompt is the signal. Fix the caller instead of silencing the prompt.
+  As of 2026-08-13 (st-75z0) it no longer merely prompts: the
+  `.claude/hooks/scripts/gc-mail-stub.sh` PreToolUse hook **blocks** it and
+  points at `docs/a2a/`. The binary still resolves at `/usr/local/bin/gc`, so
+  without the stub a `gc mail` call succeeds its way into going nowhere.
 
 ## Shapes that still prompt, and that is fine
 

@@ -33,6 +33,7 @@ in it covered external domain knowledge or facts about the operator.
 ### convention
 
 - [Drills as Code](drills-as-code.md) — Drills ship as self-contained runnable artifacts; agent session time is for judgment/review, not administering mechanics
+- [Entitlements Registry](entitlements-registry.md) — Subscription/entitlement state lives in ONE file (`config/entitlements.yaml`), probed at statement time; docs point at it and never restate tiers or prices
 - [Establish Before Abbreviate](establish-before-abbreviate.md) — Steve-facing writing must build context before compressing — no unestablished abbreviations or insight-shorthand
 - [Fork Doctrine](fork-doctrine.md) — Enterprise forks repos to own/extend them, not just pin versions. Use local clones and editable installs, not pip from PyPI.
 - [Probabilistic, Not Absolutist](probabilistic-not-absolutist.md) — Frame trading analysis as probabilistic edge, not proof/absolutism — stop over-hedging

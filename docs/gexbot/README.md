@@ -1,7 +1,13 @@
 # GexBot — Reference Documentation
 
-Documentation for GexBot's State subscription, organized into a deliberate
-separation between immutable vendor truth and everything else.
+Documentation for the GexBot subscription this desk holds, organized into a
+deliberate separation between immutable vendor truth and everything else.
+
+> **Which tier we hold is not recorded here.** It lives in
+> `config/entitlements.yaml` and is read by running
+> `.venv/bin/python3 scripts/entitlements_probe.py`. This line used to name the
+> tier and was still naming the wrong one a week after the upgrade — endpoints
+> auto-skip on entitlement, so a stale tier name reads as broken code [st-g0or].
 
 ## The architecture
 

@@ -29,9 +29,24 @@ retirement protocol. Phase 0 beads are filed; two decisions are yours.
 
 ## The estate as measured
 
+> **CORRECTION, 2026-08-13 (COO, verified here).** The row below said COO's count
+> was inflated by a *committed* virtualenv. **It is not committed and never was.**
+> `git log --all --diff-filter=A` over COO's entire history returns **zero**
+> tracked `.venv` files, `git ls-files` returns zero, and the tree is already
+> gitignored at `COO/.gitignore:49`. The real object is a 153 MB untracked
+> working-tree `.venv` under `infra/azure/email-ingress/` backing the live
+> Mancini email-to-blob pipeline — load-bearing, not dead weight.
+>
+> The census enumerated **working-tree** files where it should have counted
+> **tracked** files. Measured 2026-08-13, tracked: **Strader 781, COO 1,449**
+> (code-ish `.py/.sh/.js/.mjs/.ts`: Strader 358, COO 461). Treat every COO file
+> count in this plan as unverified until recounted against `git ls-files` —
+> the error is in the derived documents, not in `census.json`, whose own
+> `status_evidence` correctly says "enumerated". Decision 3 below is withdrawn.
+
 | | Strader | COO | Notes |
 |---|---|---|---|
-| Enumerated files | ~560 | ~1,600 | COO count inflated by a **committed virtualenv (1,338 files)** |
+| Enumerated files | ~560 | ~1,600 | ⚠️ **working-tree counts, not tracked — see correction above.** Tracked: 781 / 1,449 |
 | Real authored code | ~420 | ~310 | after venv, Gas City, vendored fork |
 | Active (depended or in dev) | ~230 | ~108 | wired to crons, skills, pipelines, supervisors |
 | Test files | 96 (801 tests pass, ~62s) | **9, no runner, no CI** | |
@@ -204,8 +219,13 @@ the follow-on bead once Phase 0 lands.
    indicator architecture (GEX math frozen pre-GexBot-live). Delete with their
    targets, or mark legacy so `801 passed` stops overstating. My read: delete —
    the sync plan's single-home law applies to code too.
-3. **COO's committed virtualenv** (1,338 files) — rm + gitignore, no history
-   rewrite. COO-side; in the A2A memo. Nod needed only because it's their tree.
+3. ~~**COO's committed virtualenv** (1,338 files) — rm + gitignore, no history
+   rewrite.~~ **WITHDRAWN 2026-08-13.** There is no committed virtualenv. Zero
+   `.venv` files are tracked in COO now or at any point in its history, and the
+   tree is already gitignored. The 153 MB working-tree `.venv` under
+   `infra/azure/email-ingress/` backs the live Mancini email-to-blob pipeline and
+   must not be removed. Nothing to decide; no COO action. See the correction
+   block under "The estate as measured".
 4. **Ratify the COO delegation bundle** (in the A2A memo): tests/run-all.sh on
    the pulse, desk-html/desk-register smoke tests, gitignore carve-outs,
    schema-skew preflight rewire, corpus-cron handback, venv purge, steves-desk

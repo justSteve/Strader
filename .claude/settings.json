@@ -6,6 +6,10 @@
           {
             "command": "/root/projects/Strader/.claude/hooks/scripts/schwab-gate.sh",
             "type": "command"
+          },
+          {
+            "command": "/root/projects/Strader/.claude/hooks/scripts/gc-mail-stub.sh",
+            "type": "command"
           }
         ],
         "matcher": "Bash"

@@ -277,10 +277,14 @@ Ordered by §1: entry-and-stop codification leads, signal hunting follows.
 
 ## 8. Time box
 
-The GexBot Quant tier is a one-month commitment from 2026-08-05; the
-downgrade decision lands ~Sep 1 and should be informed by what this program
-finds. `/hist` is a rolling 90-day window, so archive days age out permanently —
-overlap only grows forward.
+The program runs inside a paid GexBot window that is a **one-month commitment**, and
+the downgrade-or-renew decision at the end of it should be informed by what this
+program finds. Which tier, what it costs, and the exact review date are in
+`config/entitlements.yaml` — read them with
+`.venv/bin/python3 scripts/entitlements_probe.py` rather than from this paragraph
+(st-g0or). What matters here is the shape: `/hist` is a rolling 90-day window, so
+archive days age out permanently once the window closes — overlap only grows forward,
+and nothing collected during the paid month can be recovered after it.
 
 ## 9. Where the work lives
 

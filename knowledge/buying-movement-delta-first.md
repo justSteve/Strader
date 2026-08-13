@@ -14,6 +14,13 @@ Steve's litmus across both vehicles is **delta, not theta** — he selects and m
 - **Singles (short hold):** buy cheap optionality, capture a fast directional move, exit on the repricing. Traded as a futures proxy — see [[singles-as-futures-proxy]].
 - **Flies:** he does NOT enter ATM even at a perceived pin. He waits for the **V-shaped dump-and-return** to enter cheap, takes a 3- or 5-lot, scales risk off into the repricing, and **leaves a runner for the pin** — so a fly runner CAN ride toward expiration. Still "buying movement": cheap far from the body, rich near it.
 
+The runner is a residual, not the thesis, and it is **not** a license to reason
+from expiry. Breakevens, "you need +N to break even", dead zones, and
+settlement-payoff tables are banned for flies — he evaluates on the mark, where a
+far-OTM fly carries positive delta and pays from the first favourable tick. See
+[Directional GEX Butterflies](directional-gex-butterflies.md), §2 of the
+2026-08-12 additions. [st-zc38]
+
 Both model [[carmine-rosato]]'s order-flow + supply/demand-zone style; targets = LuxAlgo confluence.
 
 **Why:** I first assumed flies wanted price to pin at center (positive-GEX mean-revert) — wrong. Then I overstated that flies are also ~15-min holds — also wrong; that short-hold discipline is the *singles* play. Flies = V-dump entry, scale out, runner to pin. Common thread is delta, not theta.

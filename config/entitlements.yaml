@@ -1,0 +1,272 @@
+# Entitlements registry — WHAT we are entitled to. Never HOW to authenticate. [st-g0or, st-aski]
+#
+# ONE file. Every subscription, plan, tier, and data entitlement this desk runs
+# on lives here and nowhere else. Bundle docs, CurrentStatus, and A2A memos
+# POINT at this file; they do not restate its figures. A restated figure is a
+# figure that goes stale silently — that is the failure this file exists to end.
+#
+# WHY THIS EXISTS. Four of the costliest incidents in the ten days to 2026-08-12
+# were subscription/entitlement gaps that only Steve could close, because the
+# facts lived only in his head and in a billing portal no agent can read:
+#
+#   1. Databento OPRA -> Futures plan swap (~2026-08-04). The knowledge bundle
+#      still asserted "OPRA ... Live data: Active" a week later, arguing the
+#      exact opposite of the collector it described.
+#   2. The GexBot resub (2026-08-05). A morning spent telling Steve "we have no
+#      GEX" while the collector wrote to the corpus in the next tmux window.
+#   3. The State -> Quant tier reveal (2026-08-05 PM). A full night of 1DTE and
+#      orderflow legs silently uncollected — the code was already correct and
+#      was auto-skipping on entitlement. "We should have been working all night."
+#   4. The OPRA cancellation both agents still assumed active on 2026-08-11.
+#
+# THE TWO KINDS OF ENTRY — the whole point of the file:
+#
+#   probed:  verifiable NOW by running something. The probe re-derives these
+#            every time it runs, from LOCAL state files only. A green probed
+#            line proves the DATA IS LANDING. It does not prove the contract is
+#            paid — a cancelled plan keeps delivering until the period ends.
+#
+#   dated:   asserted by Steve from a billing portal or vendor page, carrying
+#            the date it was last confirmed and by whom. NEVER present a dated
+#            fact as current truth. It is what someone saw on a day. State it
+#            with its date, every time: "as of 2026-08-05, Steve reported ...".
+#
+# HARD RULE — NO CREDENTIALS. Nothing that authenticates anything ever goes in
+# this file: no keys, no tokens, no token-file paths, no account numbers, no
+# login hints. It records what we are entitled to, never how to get in.
+# `.claude/rules/schwab-api-gate.md` governs and outranks any convenience
+# argument, and a test in tests/scripts/test_entitlements_probe.py enforces it.
+# The probe reads local JSON state files and corpus directory listings — it
+# calls no vendor API, so it needs nothing to authenticate with.
+#
+# HOW TO UPDATE. Steve edits this file (or tells an agent to) the same turn a
+# subscription changes, and moves `confirmed_on` forward whenever he re-checks a
+# portal — re-confirming an unchanged fact is still an update, because the DATE
+# is the load-bearing part. Agents may add `probed` entries freely; agents may
+# NOT invent or advance a `dated` fact without Steve saying it.
+#
+# Authored in the block-YAML subset strader/_yaml.py parses (no flow maps, no
+# block scalars, no `- key:` sequences), so nothing here needs PyYAML installed.
+#
+# READ IT WITH:  .venv/bin/python3 scripts/entitlements_probe.py
+
+meta:
+  version: 1
+  bead: st-g0or
+  plan: docs/plans/2026-08-12-zgent-sync-plan.md
+  probe: scripts/entitlements_probe.py
+  # Default staleness horizon for a dated assertion, in days. Past this the
+  # probe stops calling the line merely dated and starts calling it AGED.
+  dated_stale_after_days: 30
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROBED — measured at statement time, from local state only.
+#
+#   kind: json_file     read a JSON state file, surface named fields, age it
+#   kind: corpus_stream look for a per-day file under data/corpus/<date>/
+#   kind: path_present  look for a directory and report its newest child
+#
+# `expect: present` (default) or `expect: absent` — an absent-expected stream
+# that REAPPEARS is an alarm, not a relief: something is spending money again.
+# ─────────────────────────────────────────────────────────────────────────────
+probed:
+
+  schwab_token:
+    label: Schwab token
+    vendor: Schwab
+    what: OAuth refresh credential behind the read-only reader scripts. 7-day refresh wall.
+    kind: json_file
+    path: data/corpus/_schwab_token_health.json
+    # Written EVERY run by scripts/schwab_token_health.py, which corpus_daily.py
+    # invokes unconditionally — so a stale heartbeat means the CHECKER stopped,
+    # which is its own alarm, separate from the token's own health.
+    status_field: status
+    ok_values: [ok]
+    fields: [message, days_left, reauth_by_iso]
+    checked_at_field: checked_at
+    stale_after_hours: 30
+    recovery: scripts/refresh_schwab_token.py (interactive OAuth, Steve runs it)
+
+  databento_glbx_capture:
+    label: Databento GLBX live
+    vendor: Databento
+    what: ES trades + MBP-1 streaming off the CME/Futures plan — the live entitlement we hold.
+    kind: json_file
+    path: data/corpus/_capture_health.json
+    status_field: status
+    ok_values: [ok, idle]
+    fields: [message, in_window]
+    checked_at_field: checked_at
+    stale_after_hours: 30
+    note: idle outside 02:50-15:05 CT is the correct state, not a fault.
+
+  databento_glbx_es_stream:
+    label: ES tape landing
+    vendor: Databento
+    what: Direct evidence the GLBX live entitlement is delivering — a trades file per session day.
+    kind: corpus_stream
+    filename: databento_glbx_es.jsonl
+    expect: present
+    expect_within_days: 4
+
+  databento_opra_stream:
+    label: OPRA tape
+    vendor: Databento
+    what: Daily OPRA import — HALTED 2026-08-07 (st-7av4). Absence is the correct state.
+    kind: corpus_stream
+    filename: databento_opra.jsonl
+    expect: absent
+    expect_within_days: 4
+    note: A reappearing OPRA file means someone restarted a usage-billed pull. Ask before it runs again.
+
+  gexbot_state_package:
+    label: GexBot poll (60s)
+    vendor: GexBot
+    what: 10-endpoint State-package collection — evidence the subscription is live and keyed.
+    kind: json_file
+    path: data/corpus/_gexbot_health.json
+    status_field: status
+    ok_values: [ok, idle]
+    fields: [message, in_window]
+    checked_at_field: checked_at
+    stale_after_hours: 30
+    note: Feed is RTH-only. idle outside 08:30-15:05 CT weekdays is correct.
+
+  gexbot_orderflow_1s:
+    label: GexBot orderflow 1Hz
+    vendor: GexBot
+    what: The Orderflow endpoint. Direct observable of the QUANT tier — on State it auto-skips on entitlement.
+    kind: json_file
+    path: data/corpus/_gexbot_of1s_health.json
+    status_field: status
+    ok_values: [ok, idle]
+    fields: [message, in_window]
+    checked_at_field: checked_at
+    stale_after_hours: 30
+    note: If this goes permanently quiet inside RTH, suspect the tier before the code — that is exactly how the State/Quant night was lost.
+
+  gexbot_hist_archive:
+    label: GexBot /hist archive
+    vendor: GexBot
+    what: Quant-only historical endpoint, rolling 90-day window. Days age out permanently once the tier drops.
+    kind: path_present
+    path: data/corpus/gexbot-hist
+    expect: present
+    # Staleness is measured on the newest harvested DAY, not the directory mtime —
+    # a manifest rewrite freshens the folder while the archive itself falls behind.
+    # 4 days tolerates a weekend plus the T+1 harvest lag.
+    expect_within_days: 4
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DATED — Steve's assertions, each stamped with when and from where.
+#
+# Required on every entry: state, what, source, and both confirmed_on and
+# confirmed_by (which may be null). `confirmed_on: null` means NEVER CONFIRMED —
+# the probe lists it under NEEDS STEVE, which is the honest answer and a better
+# one than a plausible guess. `review_by` is a hard calendar date the probe
+# alarms on (renewals, downgrade decisions). `needs_steve` is one open question
+# inside an otherwise dated entry. `evidence` names probed ids that corroborate
+# without proving.
+# ─────────────────────────────────────────────────────────────────────────────
+dated:
+
+  databento_plan:
+    label: Databento — CME/Futures plan (GLBX.MDP3)
+    vendor: Databento
+    state: active
+    what: Live GLBX streaming entitlement (ES trades + MBP-1). GLBX historical measured $0.00 on this plan (2026-08-05, --estimate-only), so an uncaptured GLBX session is recoverable rather than lost.
+    cost: unconfirmed
+    cost_note: A pre-purchase estimate in the 2026-07-03 Phase-B spec was $179/mo + non-pro CME license, ~$190 all-in. That is an ESTIMATE from a planning doc, never a billing-portal reading.
+    confirmed_on: "2026-08-04"
+    confirmed_by: Steve
+    source: Databento billing portal
+    bead: st-7av4
+    evidence: [databento_glbx_capture, databento_glbx_es_stream]
+    needs_steve: What does the CME/Futures plan actually bill per month, and on what day does it renew? No portal figure has ever been written down — only a July planning estimate.
+    note: Replaced the cancelled OPRA plan in the same swap. Live capture verified 2026-08-03. confirmed_on is the ~08-04 swap date recorded in st-7av4, not a timestamp Steve read off the portal — treat it as approximate.
+
+  databento_opra:
+    label: Databento — OPRA Equity Options plan
+    vendor: Databento
+    state: cancelled
+    what: No live OPRA entitlement since the swap. Historical OPRA is ad hoc and USAGE-BILLED via corpus_backfill_databento.py --opra — measured $6.07 per 2 session-hours (2026-08-05 control run). Pull it only when a specific question warrants the spend.
+    cost: usage-billed when pulled
+    cost_note: Was $199/mo flat while the plan was live. That figure is history — never quote it as a current cost.
+    confirmed_on: "2026-08-04"
+    confirmed_by: Steve
+    source: Databento billing portal
+    bead: st-7av4
+    evidence: [databento_opra_stream]
+    note: Daily import halted 2026-08-07. Both agents were still assuming this sub active on 2026-08-11 — the incident this registry exists to prevent. confirmed_on is the ~08-04 cancellation recorded in st-7av4; treat it as approximate.
+
+  gexbot_tier:
+    label: GexBot — QUANT tier
+    vendor: GexBot
+    state: active
+    what: Superset tier. Every Classic/State/Orderflow endpoint plus four Quant-exclusives — /hist (rolling 90 days), the WebSocket feed (NOT wired), /tickers/quant, and /options/{ticker}/expiries. The orderflow entitlement arrives bundled with Quant by design, not as a separate purchase.
+    cost: $350/mo
+    cost_note: One-month commitment taken 2026-08-05 PM. Downgrade-or-renew decision lands ~2026-09-01 and should be informed by what the Quant month found.
+    confirmed_on: "2026-08-05"
+    confirmed_by: Steve
+    source: GexBot account page
+    review_by: "2026-08-29"
+    bead: st-nriv
+    evidence: [gexbot_state_package, gexbot_orderflow_1s, gexbot_hist_archive]
+    note: confirmed_on is the 2026-08-05 upgrade itself, not a later portal re-check. Held STATE tier the morning of 2026-08-05 and QUANT from that afternoon; the gap cost a night of uncollected 1DTE and orderflow legs. Anything in the tree still calling this a State subscription is stale — docs/gexbot/README.md still did as of 2026-08-13.
+
+  gexbot_continuity:
+    label: GexBot — subscription continuity
+    vendor: GexBot
+    state: unbroken
+    what: Not a separate product — the continuity record, because a gap in the sub is a permanent hole in the archive. Paused 2026-07-03 through 2026-08-05, unbroken since. No GEX history exists before 2026-08-05, and /hist only reaches back 90 rolling days from whenever we ask.
+    cost: n/a
+    confirmed_on: "2026-08-05"
+    confirmed_by: Steve
+    source: GexBot account page
+    bead: st-a6zm
+
+  schwab_access:
+    label: Schwab — API access and data rights
+    vendor: Schwab
+    state: working, terms unrecorded
+    what: Brokerage-linked developer API, no subscription fee. This desk runs it through the hobbled-readonly fork — account, order, and transaction methods are physically removed from lib/schwab-py, and only broker_schwab/readers/{quote,chain}.py are auto-allowed.
+    cost: $0 (no subscription fee)
+    confirmed_on: null
+    confirmed_by: null
+    source: Schwab developer portal + the account market-data agreements page
+    evidence: [schwab_token]
+    needs_steve: What market-data rights does the account carry — real-time or delayed index and options quotes, and pro or non-pro classification? Nothing in this repo records it, so no agent should claim reader quotes are real-time.
+    note: The credential is probed and healthy; that proves the plumbing works, not what the data rights are. State reads working-but-unrecorded rather than active precisely so nobody takes it for a confirmed contract.
+
+  tradingview:
+    label: TradingView — plan tier
+    vendor: TradingView
+    state: unconfirmed
+    what: Steve's charts run here and the LuxAlgo suite loads on top of it, so the plan tier bounds indicators per chart, alerts, and intraday resolutions. Never recorded.
+    cost: unconfirmed
+    confirmed_on: null
+    confirmed_by: null
+    source: TradingView account billing page
+    note: The TradingView MCP was removed and there is no automated chart interface, so nothing in the codebase can observe this. Steve-only.
+
+  luxalgo:
+    label: LuxAlgo — indicator suite
+    vendor: LuxAlgo
+    state: unconfirmed
+    what: Price Action Concepts and Ultimate ORB are named as primary tools in CLAUDE.md and in the Strategy 2 playbook, which makes an expired sub a silent strategy outage. Plan tier and renewal date never recorded.
+    cost: unconfirmed
+    confirmed_on: null
+    confirmed_by: null
+    source: LuxAlgo account page
+    note: Steve-only. Flagged because a lapse here breaks a documented strategy with no error message anywhere.
+
+  mancini_newsletter:
+    label: Mancini / TradeCompanion — newsletter
+    vendor: TradeCompanion (Substack)
+    state: unconfirmed
+    what: The 08:15 CT pre-open cron parses this letter every session day and publishes its levels. A lapsed sub degrades to a paywall stub, which the parser sees as a bad letter rather than as a billing fact.
+    cost: unconfirmed
+    confirmed_on: null
+    confirmed_by: null
+    source: Substack subscription settings
+    note: Steve-only. The parse pipeline is healthy — that says nothing about the subscription behind it.

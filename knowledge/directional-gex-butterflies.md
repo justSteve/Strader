@@ -46,3 +46,75 @@ Steve's corrections, verbatim (claude-monitor record):
 - Steve's SPX parlance: "one level" ≈ 10 SPX points.
 - Bet-structure doctrine: he EXPECTS a ~10-pt (one-level) EOD reversion off a late flush but won't pay up to bet exactly that — he prefers the cheaper fly pinned ~20 pts away (2 levels), accepting full-loss risk, and takes early profit if only the expected 10-pt move materializes. The expected move is his profit-taking trigger, not his pin.
 - He claims this reversion expectation holds "even on a trend day" — UNVERIFIED and contradicts classic profile teaching (trend days tend to close at the extreme). Measurement bead st-r1p filed to test it against the corpus; until measured, challenge trend-day reversion entries.
+
+---
+
+**2026-08-12 — the error recurred live; specifics backported from COO [st-zc38, co-y3fdk]:**
+
+The 08-05 block above did not hold, because it was in the wrong repo. On
+2026-08-11 the live trading session ran in COO, whose `CLAUDE.md` contained the
+words "butterfly", "fly", and "flies" exactly zero times — and Steve had to issue
+the correction three more times in one afternoon. Post-mortem:
+`/root/projects/COO/myDesk/reports/2026-08-12-fly-strategy-memory-failure.md`.
+COO now carries its own gate plus `/root/projects/COO/.claude/rules/fly-doctrine.md`.
+**This concept stays canonical; the two must read identically, so a change on
+either side updates both.**
+
+Why the form is *prohibitions* and not a description: standard option theory is
+dense, default, and internally self-consistent — a long butterfly *is* a neutral,
+positive-theta, pinning structure. Steve's method is a narrow, deliberate
+exception that uses the same instrument for the opposite purpose, so a merely
+descriptive note ("he trades them directionally, far OTM") does not block the
+default reasoning path; under time pressure the textbook reasserts and the note
+reads as compatible colour commentary. That is observed, not theorised — on
+2026-08-11 COO wrote the correct mechanism in its own notes at 13:08 and argued
+the opposite at 14:02, in the same session. Only an explicit ban survives.
+
+**1. Centering standard — never at or near spot.** If price is X, his candidate
+centers are roughly **X±12 or further**, in the direction of the move he expects.
+**Five points from spot is still ATM** and still worthless to him — his standard,
+stated twice on 08-11 after the "correction" was to halve the distance. His live
+order that day: `7760/7745/7730 PUT @1.70` — body 7745, 15-point wings, body
+roughly **19 points** from spot (~7726). Body above spot, expected move up, and
+it paid as SPX ticked up. Every structure proposed to him in the preceding
+forty-five minutes was 0–5 points from spot.
+
+**2. Never reason from expiry.** Banned: breakevens · "you need +N just to break
+even" · "dead zone" · settlement-value tables · payoff-at-stall-point. He
+evaluates on the **mark**, not at settlement: marked continuously, a far-OTM fly
+carries positive delta and pays from the first favourable tick.
+
+> *Scope note — reconciling with the pin runner.* COO's rule states flatly that
+> he "does not hold to expiry." Canon here is narrower and canon wins: he leaves
+> a **runner for the pin**, and a fly runner CAN ride toward expiration — see
+> [Buying Movement — Delta-First](buying-movement-delta-first.md) and CLAUDE.md's
+> "The Play." What is banned is *evaluating or advising the trade with expiry
+> math*, not a claim that no contract ever survives to the close. Risk comes off
+> into the repricing; the runner is a residual, never the thesis.
+
+**3. Correct frame — dollars per SPX point, and when to take profit.** On
+2026-08-11 he was up **$150 on $340 risked while SPX moved 1.6 points**
+(7722.91 → 7724.48) — roughly **$95 per SPX point** — across the exact range COO
+was simultaneously describing as a dead zone in which he had been paid nothing.
+
+**4. Never claim orderflow can't help a fly.** Delta bursts, absorption, and
+stall detection are the **exit-timing** signal this strategy runs on — knowing
+when to take profit is the whole skill. The 2026-08-08 scalp-proxy redirect
+scopes what the *measurement program* targets; it says nothing about what the
+instruments are good for, and reading it the other way is what produced the wrong
+claim to Steve at 14:02 on 08-11.
+
+**5. Price what he named.** If he gives a structure, price that structure. Do not
+substitute one you think is better, and do not "improve" the strikes.
+
+**Additional banned phrases** (extending the 08-05 list): "fits the gamma box" ·
+"fully contains the zone / settlement anywhere in the band pays" · "centered on
+spot rather than needing a move" · "get centered and time becomes your ally."
+
+Steve's corrections, verbatim (2026-08-11 session `8d15a359`):
+- 13:21 — "but i don't take atm flys. I'm in them to reap delta or not in them.
+  the point is late day fly where large price moves in my favor."
+- 13:26 — "omg - you are still looking at atm flies. worthless - just stop"
+- 14:08 — "they start paying from the first positive tick. you just have to know
+  to take profit. you are displaying a distinct lack of understanding of my strat.
+  distinct and persistant."
