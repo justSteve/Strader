@@ -188,6 +188,46 @@ td:first-child, th:first-child { text-align:left; }
    surface and two templates would drift. So the difference is a class on
    <body>, not a fork: .live hides what only a finished tape can support. */
 body.live .drill-only { display:none !important; }
+
+/* Live surface: the chart IS the page. [st-hugc]
+   Everything hidden below exists to interrogate a FINISHED tape — scrub to an
+   arbitrary point, arm a level and jump to its first visit, switch row density,
+   read the keyboard legend. Live there is only one point of interest (the right
+   edge) and it arrives on its own. Steve keeps the bar-to-bar arrows, Cells and
+   ?; the header and readouts are not hidden but relocated into #livehud. */
+body.live #seek,
+body.live #lvl-label,
+body.live #arm,
+body.live #chips,
+body.live #rows-label,
+body.live #tbl,
+body.live > .hint { display:none !important; }
+
+body.live { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+body.live #stage { flex:1; min-height:0; margin:0; }
+body.live #ctlblock { flex:none; }
+
+/* The floating readout frame. Sized to its content, not the viewport — Steve:
+   "that frame only needs to be as wide as those current line width" — and
+   draggable because a cell stack can land under it in the top-left. */
+#livehud { position:absolute; top:10px; left:10px; z-index:30; width:max-content;
+  max-width:calc(100% - 72px); padding:6px 10px 7px; border-radius:6px;
+  border:1px solid var(--axis); background:color-mix(in srgb, var(--surface-1) 88%, transparent);
+  backdrop-filter:blur(3px); box-shadow:0 2px 10px rgba(0,0,0,.35);
+  cursor:grab; user-select:none; }
+#livehud.dragging { cursor:grabbing; box-shadow:0 4px 16px rgba(0,0,0,.5); }
+#livehud header { padding:0 0 3px; gap:6px 12px; }
+#livehud header h1 { font-size:13px; }
+#livehud .readouts { padding:0; gap:14px; flex-wrap:wrap; }
+#livehud .hudfoot { font-size:10px; color:var(--muted); padding-top:3px; }
+
+/* Mancini levels, drawn like the TV chart's price lines (tools/local_chart.py
+   _price_lines_js: 1px dashed + title). Deliberately lighter than .lvl-line so
+   an armed level still reads as the dominant mark. [st-hugc] */
+.mlvl-line { position:absolute; left:0; right:56px; border-top:1px dashed var(--muted);
+  opacity:.5; z-index:4; pointer-events:none; }
+.mlvl-tag { position:absolute; right:60px; transform:translateY(-100%); font-size:9px;
+  color:var(--muted); opacity:.8; z-index:4; pointer-events:none; letter-spacing:.03em; }
 /* The bar the tape is still writing [st-e91l]. Must never be mistaken for a
    closed bar: dashed edge, dimmed, and its footer says so. */
 .col.dev { opacity:.72; border-right:1px dashed var(--axis);
@@ -215,12 +255,12 @@ body.live .drill-only { display:none !important; }
     <option value="judgment">3 · Judgment</option>
   </select></label>
   <input type="range" id="seek" min="0" value="0">
-  <label>Level <input type="text" id="lvlinput" size="7" placeholder="price"></label>
+  <label id="lvl-label">Level <input type="text" id="lvlinput" size="7" placeholder="price"></label>
   <button id="arm">Arm level</button>
   <span id="chips"></span>
   <label class="drill-only" title="The skill ladder — scenarios in concentration order (docs/drills/skill-ladder.md)">Ladder
     <select id="scenario"><option value="">scenario ▾</option></select></label>
-  <label>Rows <select id="zoom">
+  <label id="rows-label">Rows <select id="zoom">
     <option value="9">Compact</option><option value="13" selected>Medium</option>
     <option value="16">Large</option>
   </select></label>
@@ -251,6 +291,7 @@ body.live .drill-only { display:none !important; }
 <div id="beatrail" class="drill-only"></div>
 <div id="stage"><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
   <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
+  <div id="livehud"></div>
 </div>
 <p class="hint">Space = play/pause · ←/→ = step · Ctrl+←/→ = speed down/up · Click a level chip to arm it AND jump to its first visit · <b>?</b> explains the screen ·
 Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button>
@@ -353,6 +394,59 @@ const LIVE = !!(DATA.meta && DATA.meta.source === "live");
 if (LIVE) {
   document.body.classList.add("live");
   document.querySelector("header h1").textContent = "Live Footprint";
+  buildLiveHud();
+}
+// Float the header + readouts inside the chart. [st-hugc]
+//
+// These nodes are MOVED, never copied. Every updater downstream writes through
+// #meta and the ro-* ids; a duplicated frame would mean two DOM trees claiming
+// the same ids, the updaters silently feeding whichever came first, and a HUD
+// that drifts from the chart it sits on. Moving keeps exactly one of each.
+function buildLiveHud() {
+  const hud = document.getElementById("livehud");
+  const hdr = document.querySelector("body > header");
+  const ros = document.querySelector("#ctlblock > .readouts");
+  if (!hud || !hdr || !ros) return;
+  hud.appendChild(hdr);
+  hud.appendChild(ros);
+  // The bridge dot rides along rather than dying with the hint line it lived
+  // in. A live surface with no connectivity feedback is how st-h510 served
+  // yesterday's bars for 21 hours behind a page that looked current.
+  const dot = document.getElementById("bridge-dot");
+  if (dot) {
+    const foot = document.createElement("div");
+    foot.className = "hudfoot";
+    foot.append("feed: ", dot);
+    hud.appendChild(foot);
+  }
+  makeDraggable(hud, document.getElementById("stage"));
+}
+function makeDraggable(el, bounds) {
+  let dx = 0, dy = 0, on = false;
+  el.addEventListener("mousedown", e => {
+    // Let the controls inside the frame keep working — drag only from chrome.
+    if (e.target.closest("button,select,input,a")) return;
+    const r = el.getBoundingClientRect(), b = bounds.getBoundingClientRect();
+    dx = e.clientX - r.left; dy = e.clientY - r.top;
+    on = true; el.classList.add("dragging");
+    e.preventDefault();
+    const move = ev => {
+      if (!on) return;
+      const nb = bounds.getBoundingClientRect();
+      // Clamp inside the chart: a frame dragged off-canvas is unrecoverable
+      // without a reload, and reloading a live page costs the session's scroll.
+      const x = Math.min(Math.max(ev.clientX - nb.left - dx, 0), Math.max(0, nb.width - el.offsetWidth));
+      const y = Math.min(Math.max(ev.clientY - nb.top - dy, 0), Math.max(0, nb.height - el.offsetHeight));
+      el.style.left = x + "px"; el.style.top = y + "px";
+    };
+    const up = () => {
+      on = false; el.classList.remove("dragging");
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  });
 }
 let liveFollow = true;   // auto-advance to the newest bar as it lands
 // Declared HERE, not beside renderDeveloping() far below, because repaintAll()
@@ -471,12 +565,38 @@ function drawAxis() {
   drawLevelLine();
 }
 function drawLevelLine() {
-  document.querySelectorAll(".lvl-line,.lvl-tag").forEach(e => e.remove());
-  if (level == null || viewHi == null || level > viewHi || level < viewLo) return;
+  document.querySelectorAll(".lvl-line,.lvl-tag,.mlvl-line,.mlvl-tag").forEach(e => e.remove());
+  if (viewHi == null) return;
+  drawManciniLevels();
+  if (level == null || level > viewHi || level < viewLo) return;
   const ln = document.createElement("div"); ln.className = "lvl-line"; ln.style.top = yFor(level) + "px";
   const tag = document.createElement("div"); tag.className = "lvl-tag"; tag.style.top = yFor(level) + "px";
   tag.textContent = fmtPrice(level);
   stage.appendChild(ln); stage.appendChild(tag);
+}
+// Mancini's levels as drawn lines rather than clickable chips. [st-hugc]
+//
+// Same payload the chips read (DATA.mancini_candidates), same y-mapping the
+// cells use, and the TV chart's visual convention from local_chart.py's
+// _price_lines_js: a 1px dashed line with a title at the axis. Live only —
+// Steve owns the drill page's UI and asked for this on the live surface.
+// Making it appear on both is the LIVE test below and nothing else.
+function drawManciniLevels() {
+  if (!LIVE) return;
+  const levels = (DATA.mancini_candidates || []);
+  if (!levels.length) return;
+  // Deduplicate against the armed level so a Mancini price that is also armed
+  // does not paint a faint line under its own heavy one.
+  for (const p of levels) {
+    if (p > viewHi || p < viewLo) continue;
+    if (level != null && Math.abs(p - level) < TICK / 2) continue;
+    const ln = document.createElement("div");
+    ln.className = "mlvl-line"; ln.style.top = yFor(p) + "px";
+    const tg = document.createElement("div");
+    tg.className = "mlvl-tag"; tg.style.top = yFor(p) + "px";
+    tg.textContent = "M " + fmtPrice(p);
+    stage.appendChild(ln); stage.appendChild(tg);
+  }
 }
 
 function renderColumn(b, i) {
