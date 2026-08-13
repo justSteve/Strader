@@ -39,7 +39,22 @@ HANDOFF_RE = re.compile(r"^## (\d{2}):(\d{2}) - Session Handoff")
 ARCHIVE_RE = re.compile(r"^DaysActivity-(\d{4}-\d{2}-\d{2})\.md$")
 
 FIELDS = ("when", "actor", "kind", "bead", "ref", "paths", "why")
-KINDS = {"COMMIT", "MEMO", "ACK", "SERVICED", "DIGEST"}
+# WRITE and FILED were added 2026-08-13 [st-qfsz]. They are not new concepts —
+# .claude/rules/zgent-permissions.md already REQUIRES an announce line for "any
+# st- bead filed, claimed, or closed by a peer" and for peer commits into this
+# repo. The vocabulary here simply had no word for either, so three correctly
+# announced COO rows parsed as malformed and went invisible to tooling on the
+# day one of them was reporting a live double-write risk to the corpus.
+# WRITE  = a peer wrote into this repo (COMMIT is the same event; WRITE is the
+#          spelling COO uses, and rejecting a peer over spelling loses the event)
+# FILED  = a peer filed a bead here
+# STATUS added the same evening, after a fourth row landed mid-fix reporting the
+# systemd cutover. Accepting it is not endorsement of ad-hoc vocabulary — COO has
+# been asked for its authoritative KIND list so this reconciles in ONE change
+# rather than one word at a time. Until then, rejecting a row loses the event,
+# and this ledger exists so events are not lost. [st-qfsz]
+# STATUS = a peer reporting the state of a shared system
+KINDS = {"COMMIT", "WRITE", "MEMO", "ACK", "SERVICED", "DIGEST", "FILED", "STATUS"}
 
 
 class Event:

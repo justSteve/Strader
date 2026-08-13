@@ -232,6 +232,12 @@ body.live #ctlblock { display:none !important; }
 /* Mancini levels, drawn like the TV chart's price lines (tools/local_chart.py
    _price_lines_js: 1px dashed + title). Deliberately lighter than .lvl-line so
    an armed level still reads as the dominant mark. [st-hugc] */
+/* Day-mismatch banner [st-h510] — above everything, including the help card. */
+#daymismatch { position:fixed; left:0; right:0; top:0; z-index:100; padding:10px 16px;
+  background:var(--critical); color:#fff; font-size:13px; line-height:1.45;
+  text-align:center; box-shadow:0 2px 12px rgba(0,0,0,.5); }
+#daymismatch b { color:#fff; }
+
 .mlvl-line { position:absolute; left:0; right:56px; border-top:1px dashed var(--muted);
   opacity:.5; z-index:4; pointer-events:none; }
 .mlvl-tag { position:absolute; right:60px; transform:translateY(-100%); font-size:9px;
@@ -393,6 +399,11 @@ let cellMode = "delta";      // delta | vol | pair — what the cell text shows
 // [st-re1o]
 const bars = DATA.bars;
 const LIVE = !!(DATA.meta && DATA.meta.source === "live");
+// The day this page was RENDERED for, captured before anything can overwrite
+// it. The bridge's day is compared against this and never assigned over it.
+// [st-h510]
+const PAGE_DAY = DATA.meta && DATA.meta.date;
+let dayMismatch = false;
 // Mode gate [st-o216]. Set BEFORE any render so the live page never paints a
 // drill control and then yanks it. Everything hidden here needs a finished
 // tape: playback (a live bar only arrives after it closed, so there is nothing
@@ -1552,10 +1563,23 @@ async function pollBars() {
     const r = await fetch(`${BRIDGE}/bars?since=${bars.length}`);
     const d = await r.json();
     liveErrs = 0;
-    if (d.meta && d.meta.bar_n) {
-      DATA.meta.bar_n = d.meta.bar_n;
-      if (d.meta.day) DATA.meta.date = d.meta.day;
+    // DAY GUARD [st-h510]. This block used to read
+    //     if (d.meta.day) DATA.meta.date = d.meta.day;
+    // — the page ADOPTED whatever day the bridge claimed. That single
+    // assignment is what made the 2026-08-13 failure invisible: the page
+    // rendered itself for the 13th, then silently rewrote its own header back
+    // to the 12th on the first poll and painted 394 stale bars under it. The
+    // page and the bridge agreed, because the page had surrendered.
+    //
+    // Compare now, never assign. A disagreement is the alarm, not something to
+    // reconcile away — the tape cannot be from a different day than the chart.
+    if (d.meta && d.meta.day && PAGE_DAY && d.meta.day !== PAGE_DAY) {
+      showDayMismatch(d.meta.day);
+      setTimeout(pollBars, 2000);   // keep polling: a feeder restarted on the
+      return;                       // right day should clear this by itself
     }
+    if (dayMismatch) clearDayMismatch();
+    if (d.meta && d.meta.bar_n) DATA.meta.bar_n = d.meta.bar_n;
     // End-of-session emissions (engine flush + the day's profile levels).
     // Served on every response, so a page opened after the close still gets
     // them; they belong to no bar, so they live beside the array. [st-b0n9]
@@ -1577,6 +1601,26 @@ async function pollBars() {
     if (++liveErrs === 3) setDot("feed stalled");
   }
   setTimeout(pollBars, 2000);
+}
+// Day-mismatch banner [st-h510]. Deliberately obnoxious and deliberately NOT
+// dismissable: the whole failure it guards against was a surface that looked
+// fine. A dismissable warning on a chart you read for hours is a warning that
+// gets dismissed once and never seen again.
+function showDayMismatch(bridgeDay) {
+  if (dayMismatch) return;
+  dayMismatch = true;
+  const el = document.createElement("div");
+  el.id = "daymismatch";
+  el.innerHTML = `<b>STALE FEED — NOT TODAY'S TAPE</b><br>`
+    + `This page is drawn for <b>${PAGE_DAY}</b>; the bridge is serving `
+    + `<b>${bridgeDay}</b>. Bars are being refused. Restart the live stack.`;
+  document.body.appendChild(el);
+  setDot("DAY MISMATCH");
+}
+function clearDayMismatch() {
+  dayMismatch = false;
+  const el = document.getElementById("daymismatch");
+  if (el) el.remove();
 }
 // ── the developing bar [st-e91l] ─────────────────────────────────────────
 // The bar the tape is CURRENTLY writing, pushed ~1/s by the feeder. A volume

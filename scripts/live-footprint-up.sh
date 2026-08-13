@@ -54,8 +54,28 @@ PYTHONPATH="$REPO" "$PY" "$REPO/scripts/live_footprint_page.py" || exit $?
 $TM has-session -t "$SESSION" 2>/dev/null || $TM new-session -d -s "$SESSION" -n System
 
 if $TM list-windows -t "$SESSION" -F '#W' 2>/dev/null | grep -qx "$WINDOW"; then
-    echo "window '$WINDOW' already exists — attach and check it rather than"
-    echo "starting a second capture against the same corpus file:"
+    # "The window exists" is not "the stack is healthy". [st-h510]
+    #
+    # On 2026-08-13 this branch exited 0 against a stack that had been pinned to
+    # the PREVIOUS day for 21 hours — a green report over a dead renderer. The
+    # bridge is the honest witness: it serves the feeder's own day on /bars, so
+    # ask it what day it thinks it is rather than trusting the window name.
+    BRIDGE_DAY="$(curl -s --max-time 3 'http://127.0.0.1:7788/bars?since=0' 2>/dev/null \
+        | "$PY" -c 'import json,sys
+try: print(json.load(sys.stdin).get("meta",{}).get("day","") or "")
+except Exception: print("")' 2>/dev/null)"
+    TODAY_CT="$(TZ=America/Chicago date +%F)"
+    if [[ -n "$BRIDGE_DAY" && "$BRIDGE_DAY" != "$TODAY_CT" ]]; then
+        echo "STALE STACK — window '$WINDOW' exists but the bridge is serving" >&2
+        echo "  $BRIDGE_DAY, and today is $TODAY_CT." >&2
+        echo "The renderer is following a file that can no longer grow. Kill the" >&2
+        echo "render panes and re-run this script. Do NOT touch the capture pane." >&2
+        echo "  tmux -L $SOCK attach -t $SESSION:$WINDOW" >&2
+        exit 3
+    fi
+    echo "window '$WINDOW' already exists${BRIDGE_DAY:+ (bridge day $BRIDGE_DAY, current)}"
+    echo "— attach and check it rather than starting a second capture against"
+    echo "the same corpus file:"
     echo "  tmux -L $SOCK attach -t $SESSION:$WINDOW"
     exit 0
 fi

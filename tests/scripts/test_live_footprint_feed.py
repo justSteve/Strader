@@ -14,7 +14,7 @@ import gzip
 import importlib.util
 import json
 import sys
-from datetime import datetime, timedelta
+from datetime import date as _date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -167,6 +167,46 @@ def test_compacted_day_is_read_and_not_followed(tmp_path):
     p = tmp_path / "databento_glbx_es.jsonl.gz"
     p.write_bytes(gzip.compress(raw))
     got = list(feed.tail_rows(p, follow=True))  # follow=True must be overridden
+    assert len(got) == len(rows)
+
+
+def test_idle_tail_raises_when_the_ct_date_rolls_past_the_pinned_day(tmp_path, monkeypatch):
+    """The 2026-08-13 failure, pinned. [st-h510]
+
+    A followed file that stops growing across midnight must fail loudly. The
+    real incident ran 21.5 hours in this exact state: the feeder followed the
+    previous day's finished file, produced nothing, and the bridge kept serving
+    that day's bars behind a page showing the current date.
+    """
+    rows = _synthetic_rows(10)
+    p = _write_day(tmp_path, rows)
+    pinned = _date(2026, 8, 12)
+    monkeypatch.setattr(feed, "central_date", lambda: _date(2026, 8, 13))
+
+    it = feed.tail_rows(p, follow=True, poll_s=0.01, pinned_day=pinned)
+    got = []
+    with pytest.raises(feed.DayRolledOver) as e:
+        for r in it:
+            got.append(r)
+    # The tape it already had is delivered first — the guard fires on IDLE, not
+    # on open, so a real session's bars are never dropped by it.
+    assert len(got) == len(rows)
+    assert "2026-08-12" in str(e.value) and "2026-08-13" in str(e.value)
+
+
+def test_pinned_day_guard_is_silent_while_the_date_still_matches(tmp_path, monkeypatch):
+    """The control case: same idle file, same guard, date unchanged -> no raise.
+
+    Without this, a guard that raised unconditionally would pass the test above
+    and take the live surface down every session.
+    """
+    rows = _synthetic_rows(10)
+    p = _write_day(tmp_path, rows)
+    same = _date(2026, 8, 13)
+    monkeypatch.setattr(feed, "central_date", lambda: same)
+    # stop_after_idle_s gives the loop a way out that is NOT the rollover guard
+    got = list(feed.tail_rows(p, follow=True, poll_s=0.01,
+                              stop_after_idle_s=0.05, pinned_day=same))
     assert len(got) == len(rows)
 
 

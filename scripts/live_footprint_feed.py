@@ -74,13 +74,27 @@ DEFAULT_BRIDGE = "http://127.0.0.1:7788"
 # Row source
 # --------------------------------------------------------------------------
 
+class DayRolledOver(RuntimeError):
+    """The CT date advanced past the day this feeder was pinned to. [st-h510]"""
+
+
 def tail_rows(path: Path, *, follow: bool, poll_s: float = 0.5,
-              stop_after_idle_s: float | None = None):
+              stop_after_idle_s: float | None = None,
+              pinned_day: _date | None = None):
     """Yield parsed JSON rows from ``path``, optionally following appends.
 
     Waits for the file to appear (the streamer may not have written yet) and
     tolerates partial trailing lines: a row still being written is left in the
     buffer until its newline lands.
+
+    ``pinned_day`` makes the follow loop fail loudly at the date boundary
+    instead of quietly following a dead file [st-h510]. On 2026-08-13 this
+    process ran 21.5 hours pinned to the previous day: the corpus file it was
+    following stopped growing at that day's close, so it produced nothing while
+    the bridge kept serving the previous session's bars behind a page that had
+    re-rendered itself with today's date. Nothing on screen disagreed. An
+    exception here is strictly better than that silence — a dead renderer is
+    obvious, a renderer confidently showing the wrong day is not.
     """
     buf = ""
     fh = None
@@ -123,6 +137,14 @@ def tail_rows(path: Path, *, follow: bool, poll_s: float = 0.5,
 
             if not follow:
                 return
+            # Checked only when the tape is IDLE, which is the one state that
+            # can persist across midnight. A day still printing is a day still
+            # live, whatever the wall clock says. [st-h510]
+            if pinned_day is not None and central_date() != pinned_day:
+                raise DayRolledOver(
+                    f"CT date is {central_date()} but this feeder is pinned to "
+                    f"{pinned_day}; {path} cannot grow again. Restart the stack "
+                    f"for the new day rather than leaving this one running.")
             now = time.monotonic()
             idle_since = idle_since or now
             if stop_after_idle_s is not None and now - idle_since >= stop_after_idle_s:
@@ -407,8 +429,11 @@ def main() -> int:
                 "(dry-run)" if args.dry_run else args.bridge,
                 len(live_anchors.anchors), len(mancini))
 
+    # Pin only when following TODAY. An explicit --date is a deliberate replay
+    # of a past day and must not trip the rollover guard. [st-h510]
     rows = tail_rows(path, follow=not args.catch_up_only,
-                     stop_after_idle_s=args.idle_stop)
+                     stop_after_idle_s=args.idle_stop,
+                     pinned_day=None if args.date else day)
     trades = ordered_trades(rows, reorder_lag_s=args.reorder_lag)
 
     # Tee every trade so each closed bar can reclaim its own slice for the
