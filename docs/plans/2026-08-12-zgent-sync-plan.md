@@ -113,6 +113,23 @@ Each is proved by a specific failure above; each shapes what follows.
 5. **Mechanism over exhortation.** "Consult the bundle" failed four times as a
    norm. Every fix below is a numbered skill step, a probed file, or a diff
    check — not a rule asking agents to remember.
+6. **When copies disagree, canon wins — not the newer one.** *(Added 2026-08-13,
+   from the st-zc38 backport.)* COO's fly rule was written 08-12 from a live
+   incident, with high confidence, and it over-broadened against canon four
+   months older — flatly banning the pin runner Steve has documented since
+   2026-04-26. The newer document was the wrong one. Recency feels authoritative
+   in the moment precisely because the incident is vivid, so the tie-break has to
+   be structural: **the single home wins on its own subject, regardless of
+   timestamps**, and a peer who thinks canon is wrong raises it rather than
+   overwriting it. Both agents proved this works on 08-13 — COO verified the
+   conflict against two commit hashes, took it to Steve, and changed its copies
+   rather than arguing from recency.
+7. **Being right is not being the authorizer.** *(Added 2026-08-13, from COO's
+   refusal.)* COO declined to widen its own write scope on Strader's say-so even
+   though Strader was substantively correct and acting in good faith — the
+   ratification existed only in a peer message and an uncommitted working tree.
+   A peer cannot widen a peer's write scope, and evidence has to be in history to
+   be checkable. Both agents hold this in both directions.
 
 ---
 

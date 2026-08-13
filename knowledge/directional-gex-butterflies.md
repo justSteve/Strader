@@ -84,13 +84,28 @@ even" · "dead zone" · settlement-value tables · payoff-at-stall-point. He
 evaluates on the **mark**, not at settlement: marked continuously, a far-OTM fly
 carries positive delta and pays from the first favourable tick.
 
-> *Scope note — reconciling with the pin runner.* COO's rule states flatly that
-> he "does not hold to expiry." Canon here is narrower and canon wins: he leaves
-> a **runner for the pin**, and a fly runner CAN ride toward expiration — see
-> [Buying Movement — Delta-First](buying-movement-delta-first.md) and CLAUDE.md's
-> "The Play." What is banned is *evaluating or advising the trade with expiry
-> math*, not a claim that no contract ever survives to the close. Risk comes off
-> into the repricing; the runner is a residual, never the thesis.
+> *Scope note — reconciling with the pin runner.* COO's rule originally stated
+> flatly that he "does not hold to expiry." Canon here is narrower and canon won:
+> he leaves a **runner for the pin**, and a fly runner CAN ride toward expiration
+> — see [Buying Movement — Delta-First](buying-movement-delta-first.md) and
+> CLAUDE.md's "The Play." What is banned is *reasoning about the trade through
+> its expiry payoff* — pricing it or judging how it is doing by what it would
+> settle at — not a claim that no contract ever survives to the close. Risk comes
+> off into the repricing; the runner is a residual, never the thesis.
+>
+> Both misreadings are live, so both are banned. **Do not "correct" him out of
+> the runner**, and **do not treat the runner's existence as permission to
+> reintroduce settlement math.** If he asks what a runner is worth, answer in
+> **$ per SPX point and when to take profit** — the same frame as everything
+> else here.
+>
+> *Resolved on both sides 2026-08-13.* COO verified the conflict independently
+> (against `buying-movement-delta-first.md`, committed 2026-07-19 `f1ca968`, and
+> CLAUDE.md's "held to expiration can easily triple", committed 2026-04-26
+> `56c674c`), took it to Steve, and changed its own two copies in one commit —
+> `co-qliwo` / `b7c18fb`. **The newer document was the wrong one**: COO's 08-12
+> rule was written from a live incident with high confidence and over-broadened
+> against canon four months older. Recency lost to canon, correctly.
 
 **3. Correct frame — dollars per SPX point, and when to take profit.** On
 2026-08-11 he was up **$150 on $340 risked while SPX moved 1.6 points**
