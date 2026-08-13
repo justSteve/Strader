@@ -4,8 +4,10 @@ The agent CANNOT execute code that touches the live Schwab API. This is enforced
 
 ## Enforcement layers
 
-1. **Permissions deny list** (primary) — `python3`, `bash`, `sh`, `source`, `curl`, `touch`, `echo` are NOT in the allow list. Any command using these prompts Steve for approval. `schwab_gate_key` and `tokens/schwab*` patterns are hard-denied.
-2. **PreToolUse hook** (secondary) — `schwab-gate.sh` catches schwab imports in `.py` files and inline `-c` commands as belt-and-suspenders.
+1. **Permissions deny list** — the hard denies hold: `schwab_gate_key`, `tokens/schwab*`, and the `.env` patterns are denied outright, and deny beats allow. But this layer does **not** gate interpreters. *(Corrected 2026-08-13, st-ad6p — this line previously claimed `python3`, `bash`, `sh`, `source`, `curl`, `touch`, `echo` are "NOT in the allow list" and that "any command using these prompts Steve." Measured false: `python3`, `bash`, `curl`, and `echo` are all auto-allowed via `Bash(<cmd> *)`. Only `sh`, `source`, and `touch` are genuinely absent.)* Treat the interpreter allow-list as wide open and rely on layer 2 for Schwab reach.
+2. **PreToolUse hook** (PRIMARY as of 2026-08-13, st-ad6p) — `schwab-gate.sh` blocks a `.py` that imports `schwab` **or** `broker_schwab` (the two readers excepted), inline `-c` schwab, `python -m schwab`, writes to `tokens/`, and `scripts/run.sh`. It gates by what the code *reaches*, not by which directory it lives in — the old blanket ban on `scripts/` was written when that directory was Schwab code and now catches 65 files of which only 11 touch the API.
+
+   It reads the command from `.tool_input.command` and **fails closed** on any other payload shape. This is load-bearing: from May to 2026-08-13 it read the bare `.command`, found nothing, and allowed everything, silently. Behaviour is pinned by `tests/test_schwab_gate_hook.py`, whose control case asserts that a command hidden at the top level is *refused* rather than acted on — run it before touching this hook.
 3. **Gate key** — `~/.schwab_gate_key` is required by the client factory. Agent cannot create it (touch is not allowed).
 4. **Credentials isolation** — `.env` is denied for Read and grep patterns targeting credentials are denied.
 
