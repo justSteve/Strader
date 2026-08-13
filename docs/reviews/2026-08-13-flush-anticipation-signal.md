@@ -146,6 +146,69 @@ sample.
 
 ---
 
+## Does the footprint itself foreshadow? Tested, and mostly no.
+
+Steve's crux: forget exits, can the **footprint chart** see it coming. That means
+the cell-level object — every price level of every bar split into bid volume and
+ask volume — not bar aggregates. Three constructs tested, ES tick 0.25,
+imbalance ratio 3:1.
+
+### 1. Diagonal and stacked imbalances — do not lead
+
+Sell-imbalance counts per 1-min bar in the fifteen minutes before each break sit
+at a base rate of 0–2 and only rise **at** the break:
+
+| | 8/11 | 8/12 |
+|---|---|---|
+| 14:35–14:44 (8/11) / 14:35–14:49 (8/12) | 0–4, no trend | 0–2, no trend |
+| flush bar | 14:45 → 4 | 14:50 → 4 |
+| bar after acceleration | 14:50 → **8, stacked 6** | 14:54 → 2 |
+
+The big stacked reading on 8/11 arrives at 14:50 — **five minutes after** the
+flush began. That is confirmation, not anticipation.
+
+Worse, it points the wrong way immediately beforehand. On 8/12 the 14:47 and
+14:48 bars each carry **3 buy imbalances**, and the 14:50 flush bar itself prints
+**a buy imbalance at the bar high** — the textbook reversal-up tell, on the bar
+that dropped 4.5 points.
+
+### 2. Capped-high absorption — works on one day, absent on the other
+
+Tracking the unbeaten swing high and the buy volume spent in its top two ticks:
+
+**8/12 — textbook.** Cap set 7774.75 at 14:38, then re-tested with positive buy
+spend at 14:45 (+36), 14:48 (+74), 14:49 (+26) — three tests over twelve minutes,
+buyers paying each time, high never exceeded. Then it broke.
+
+**8/11 — the opposite.** Cap set 7756.50 at 14:38. After 14:40 price stopped
+reaching it entirely: 14:41, 14:42, 14:43, 14:44 all print **zero volume at the
+cap**. The high was not absorbed, it was abandoned — five bars of drift away from
+it before the flush.
+
+Same setup, opposite footprint pictures. There is no single cell-level read
+covering both.
+
+### 3. Bar-level delta concentration — present on both, but it isn't footprint
+
+The burst-plus-limp-drift pattern earlier on this page does appear on both days,
+3–9 minutes ahead. But it is a bar statistic computed from aggressor data — what
+a cumulative-delta reader sees, not what a footprint-cell reader sees. Calling it
+a footprint signal would be a category error.
+
+### The methodological problem, stated plainly
+
+**Three constructs have now been tried against the same two days.** Every extra
+construct raises the chance one of them fits by accident, and nothing here is
+out-of-sample. This exercise can generate candidates — it has produced three —
+and it can rule *nothing* in.
+
+The honest answer to "can the footprint foreshadow this move" is that two days
+cannot settle it in either direction. It is an empirical question, the corpus can
+answer it, and until then the diagonal-imbalance result above is the only firm
+finding: **on these two days it did not lead, and once it actively misled.**
+
+---
+
 ## What would kill it or confirm it
 
 The signal uses **only the trade tape** — delta, volume, print size. No book, no
