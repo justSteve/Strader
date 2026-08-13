@@ -205,7 +205,9 @@ body.live > .hint { display:none !important; }
 
 body.live { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
 body.live #stage { flex:1; min-height:0; margin:0; }
-body.live #ctlblock { flex:none; }
+/* Emptied by buildLiveHud — every child is moved into the floating frame, so
+   the chart owns the full viewport with nothing stacked above it. */
+body.live #ctlblock { display:none !important; }
 
 /* The floating readout frame. Sized to its content, not the viewport — Steve:
    "that frame only needs to be as wide as those current line width" — and
@@ -219,7 +221,13 @@ body.live #ctlblock { flex:none; }
 #livehud header { padding:0 0 3px; gap:6px 12px; }
 #livehud header h1 { font-size:13px; }
 #livehud .readouts { padding:0; gap:14px; flex-wrap:wrap; }
-#livehud .hudfoot { font-size:10px; color:var(--muted); padding-top:3px; }
+#livehud .controls { padding:4px 0 0; gap:6px; }
+#livehud #emrow { padding:4px 0 0; }
+/* The feed indicator sits in the top line, where the static word "LIVE" used
+   to. That word was baked at render from meta.source and would still have read
+   LIVE against a dead feed — which is exactly how st-h510 hid for 21 hours.
+   One liveness statement on the panel, and it is the one that can be wrong. */
+#livehud #bridge-dot { font-size:11px; }
 
 /* Mancini levels, drawn like the TV chart's price lines (tools/local_chart.py
    _price_lines_js: 1px dashed + title). Deliberately lighter than .lvl-line so
@@ -404,20 +412,22 @@ if (LIVE) {
 // that drifts from the chart it sits on. Moving keeps exactly one of each.
 function buildLiveHud() {
   const hud = document.getElementById("livehud");
-  const hdr = document.querySelector("body > header");
-  const ros = document.querySelector("#ctlblock > .readouts");
-  if (!hud || !hdr || !ros) return;
-  hud.appendChild(hdr);
-  hud.appendChild(ros);
-  // The bridge dot rides along rather than dying with the hint line it lived
-  // in. A live surface with no connectivity feedback is how st-h510 served
-  // yesterday's bars for 21 hours behind a page that looked current.
+  if (!hud) return;
+  // Order is the reading order Steve gave: identity, then the numbers, then
+  // the controls that act on them, then expected move.
+  for (const sel of ["body > header", "#ctlblock > .readouts",
+                     "#ctlblock > .controls", "#emrow", "#empanel"]) {
+    const node = document.querySelector(sel);
+    if (node) hud.appendChild(node);
+  }
+  // The bridge dot goes in the TOP line, replacing the static " · LIVE" that
+  // refreshMeta used to append. Two liveness claims on one panel is one too
+  // many, and the static one was the liar — baked from meta.source at render,
+  // it reads LIVE against a dead feed. This one reflects the actual bridge.
   const dot = document.getElementById("bridge-dot");
-  if (dot) {
-    const foot = document.createElement("div");
-    foot.className = "hudfoot";
-    foot.append("feed: ", dot);
-    hud.appendChild(foot);
+  const meta = document.getElementById("meta");
+  if (dot && meta && meta.parentNode) {
+    meta.parentNode.appendChild(dot);
   }
   makeDraggable(hud, document.getElementById("stage"));
 }
@@ -466,7 +476,12 @@ function refreshMeta() {
   const contracts = DATA.meta.contracts || bars.reduce((a, b) => a + b.v, 0);
   $("meta").textContent = `${DATA.meta.symbol} · ${DATA.meta.date} · `
     + `N=${DATA.meta.bar_n} contracts/bar · ${bars.length} bars · `
-    + `${contracts.toLocaleString()} contracts` + (LIVE ? " · LIVE" : "");
+    // No " · LIVE" suffix. It was static — baked from meta.source at render —
+    // so it kept asserting LIVE while the feed sat 21 hours stale (st-h510).
+    // The bridge dot beside this line carries the claim now, because it is the
+    // one that can go false. Appended to the header, not to #meta, so this
+    // textContent write cannot wipe it.
+    + `${contracts.toLocaleString()} contracts`;
   $("seek").max = Math.max(0, bars.length - 1);
 }
 refreshMeta();
