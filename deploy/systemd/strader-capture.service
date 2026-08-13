@@ -1,0 +1,65 @@
+[Unit]
+# Databento live tape — ES trades + ES MBP-1 depth. [st-pgfe]
+#
+# REPLACES the tmux container, not the supervision. Before this unit, the
+# collector ran as a foreground child of a tmux pane's shell, relaunched by a
+# */2 cron poll. Measured ancestry 2026-08-13:
+#
+#     775145  corpus_stream_databento.py --streams es,es-mbp1 --until-ct 15:05
+#     133436  tmux -L moocity new-session -d -s steves-desk -n capture ...
+#          1  (init)
+#
+# Three things that container cost us: up to 2 minutes of missing tape per crash
+# (cron poll interval), a shared single point of failure in the tmux server, and
+# a data feed that an accidental kill-pane could end. Steve, 2026-08-13: "it
+# seems strange to have a dataset ingestion dependant on a tmux window."
+#
+# WHAT IS DELIBERATELY UNCHANGED. The 02:50-15:05 CT window is Steve's ruling
+# (st-btu, 2026-08-05) and is ported verbatim from
+# scripts/cron/capture-supervisor-session.sh. It is not re-decided here. Live
+# capture covers the session; the uncovered hours are a next-day pull, which is
+# free for GLBX under the plan we hold live (verify with entitlements_probe.py —
+# never recall it, per knowledge/databento-live-collection.md).
+#
+# WHY Restart=on-failure AND NOT always. Measured in corpus_stream_databento.py:
+# when --until-ct has already passed the streamer prints "[ALERT] until-ct
+# already passed. Nothing to do." and returns **0**. A normal window close is
+# also 0. Under Restart=always either would spin the unit until StartLimitBurst
+# tripped. on-failure restarts a genuine crash within seconds and leaves a clean
+# window-close alone — which is exactly the old wrapper's "not relaunching; the
+# next tick starts the new day's run" rule, expressed by the supervisor instead
+# of hand-coded.
+Description=Strader Databento live capture (ES trades + MBP-1 depth)
+Documentation=https://github.com/justSteve/Strader
+After=network-online.target
+Wants=network-online.target
+
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=exec
+WorkingDirectory=/root/projects/Strader
+Environment=PYTHONPATH=/root/projects/Strader
+ExecStart=/root/projects/Strader/.venv/bin/python \
+    /root/projects/Strader/scripts/corpus_stream_databento.py \
+    --streams es,es-mbp1 --until-ct 15:05 --now
+
+# A crash is the case worth restarting. RestartSec is short because the gap is
+# lost tape: MBP-1 depth has no working backfill (st-xxo0), so every second down
+# is a hole nothing refills.
+Restart=on-failure
+RestartSec=2s
+
+# journald replaces tmux scrollback as the output surface:
+#     journalctl -fu strader-capture
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strader-capture
+
+# The tape is the point. Do not let a supervisor stop kill a write mid-record.
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

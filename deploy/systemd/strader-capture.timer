@@ -1,0 +1,24 @@
+[Unit]
+# Starts the session's capture at 02:50 CT, weekdays. [st-pgfe]
+#
+# The window is Steve's ruling (st-btu) ported verbatim from
+# capture-supervisor-session.sh: STRADER_CAPTURE_START_CT=02:50,
+# UNTIL_CT=15:05. There is no stop timer — the streamer self-terminates at
+# --until-ct 15:05 and exits 0, which Restart=on-failure correctly leaves alone.
+#
+# systemd 255 resolves the timezone natively; verified:
+#     systemd-analyze calendar "Mon..Fri 02:50 America/Chicago"
+#     Next elapse: Fri 2026-08-14 02:50:00 CDT
+# This matters because CT is what the trading day is measured in and the box
+# has been bitten by clock assumptions before (docs/runbooks/boot-event-log.md).
+Description=Start Strader Databento capture at 02:50 CT on weekdays
+
+[Timer]
+OnCalendar=Mon..Fri 02:50 America/Chicago
+# If the box was asleep or rebuilt across the start time, still start — a late
+# capture beats no capture, and the streamer refuses cleanly if 15:05 has passed.
+Persistent=true
+Unit=strader-capture.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Start Strader GexBot 60s poll at 08:30 CT on weekdays
+
+[Timer]
+OnCalendar=Mon..Fri 08:30 America/Chicago
+Persistent=true
+Unit=strader-gexbot.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,26 @@
+[Unit]
+# GexBot 60s poll. [st-pgfe] Container change only — see strader-capture.service for the
+# full rationale. Window 08:30-15:05 CT, ported verbatim from
+# scripts/cron/gexbot-supervisor-session.sh (STRADER_CAPTURE_START_CT/UNTIL_CT).
+Description=Strader GexBot 60s poll
+After=network-online.target
+Wants=network-online.target
+
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=exec
+WorkingDirectory=/root/projects/Strader
+Environment=PYTHONPATH=/root/projects/Strader
+ExecStart=/root/projects/Strader/.venv/bin/python /root/projects/Strader/scripts/corpus_poll_gexbot.py --start-ct 08:30 --until-ct 15:05
+Restart=on-failure
+RestartSec=2s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strader-gexbot
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
