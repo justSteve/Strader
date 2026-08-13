@@ -77,3 +77,8 @@ runbook/mancini/charts/
 
 # runtime logs (cron wrappers writing in-repo; canonical log home is /var/moo/logs)
 logs/
+
+# Stale beads DB exports — superseded point-in-time snapshots.
+# The live DB is covered by the weekly WSL-image backup; do not re-add. [st-z3y5]
+.beads/*.bak
+.beads/backup-pre-*.jsonl
