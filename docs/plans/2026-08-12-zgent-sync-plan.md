@@ -4,6 +4,25 @@
 session transcripts 2026-08-02 → 08-12 plus both agents' full persistent-context
 surfaces. Companion memo to COO: `docs/a2a/2026-08-12-strader-to-coo-zgent-sync-plan.md`.*
 
+---
+
+> ## RATIFIED — Steve, 2026-08-13
+>
+> Approved for implementation. How the four decisions resolved:
+>
+> | # | Decision | Resolution |
+> |---|---|---|
+> | 1 | COO's standing push-to-Strader authority | **Ratified with the gate.** COO holds standing authority to commit into Strader; every such write must read the owner's canon first and announce itself with an `docs/a2a/inbox.md` line in the same commit. `.claude/rules/zgent-permissions.md` rewritten to match — st-75z0. |
+> | 2 | Strategy 3 vs the singleton directive | **Rewrite, not removal — deferred to the next session** (Steve, 08-13: *"rewrite existing strat at next session"*). CLAUDE.md deliberately untouched on 08-13. Filed as **st-mfpm**; the doctrine content goes to Steve for review before it lands. |
+> | 3 | Contract home | **Proposal stands.** Canonical in COO `conventions/`, verbatim embed in both CLAUDE.mds, tap-in drift check. |
+> | 4 | Ratify this plan | **Yes.** This plan is the delegation authority for COO's half, per its own rules. |
+>
+> Implementation began 08-13 with a four-way subagent fan-out across st-zc38,
+> st-g0or, st-75z0, st-pfrz; st-4ld0 (the ritual layer) sequenced after, because
+> three of the others land files its skill steps must read.
+
+---
+
 **The short version.** The transcripts show one failure shape behind nearly every
 incident of the last ten days: knowledge lands in whichever repo the conversation
 happened in, neither agent's session rituals read the other's surfaces, and you are
