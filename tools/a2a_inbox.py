@@ -39,22 +39,38 @@ HANDOFF_RE = re.compile(r"^## (\d{2}):(\d{2}) - Session Handoff")
 ARCHIVE_RE = re.compile(r"^DaysActivity-(\d{4}-\d{2}-\d{2})\.md$")
 
 FIELDS = ("when", "actor", "kind", "bead", "ref", "paths", "why")
-# WRITE and FILED were added 2026-08-13 [st-qfsz]. They are not new concepts —
-# .claude/rules/zgent-permissions.md already REQUIRES an announce line for "any
-# st- bead filed, claimed, or closed by a peer" and for peer commits into this
-# repo. The vocabulary here simply had no word for either, so three correctly
-# announced COO rows parsed as malformed and went invisible to tooling on the
-# day one of them was reporting a live double-write risk to the corpus.
-# WRITE  = a peer wrote into this repo (COMMIT is the same event; WRITE is the
-#          spelling COO uses, and rejecting a peer over spelling loses the event)
-# FILED  = a peer filed a bead here
-# STATUS added the same evening, after a fourth row landed mid-fix reporting the
-# systemd cutover. Accepting it is not endorsement of ad-hoc vocabulary — COO has
-# been asked for its authoritative KIND list so this reconciles in ONE change
-# rather than one word at a time. Until then, rejecting a row loses the event,
-# and this ledger exists so events are not lost. [st-qfsz]
-# STATUS = a peer reporting the state of a shared system
-KINDS = {"COMMIT", "WRITE", "MEMO", "ACK", "SERVICED", "DIGEST", "FILED", "STATUS"}
+# The ledger vocabulary, reconciled with COO 2026-08-13 [st-qfsz].
+#
+# WHY IT NEEDED RECONCILING: on 08-13 four correctly-announced COO rows parsed as
+# malformed, because this set had no word for events .claude/rules/zgent-
+# permissions.md already REQUIRES a peer to announce. They went invisible to
+# every tool that reads parsed events — on the day one of them was reporting a
+# live risk to the corpus. A vocabulary narrower than the obligations it records
+# does not enforce anything; it just loses rows.
+#
+#   WRITE     a peer wrote into this repo (the same-commit announce obligation)
+#   FILED     a peer filed a bead here
+#   STATUS    a peer reporting a state change on shared infrastructure
+#   SERVICED  a request completed
+#   ACK       read and understood, not doing it yet
+#   MEMO      FYI, no action owed
+#   DIGEST    a peer's handoff summary; owes no reply
+#
+# COMMIT is RETIRED in favour of WRITE (COO's ruling, 2026-08-13). One word per
+# event, and WRITE is the word zgent-permissions.md itself uses, so the
+# permission rule and the ledger vocabulary now say the same thing. It stays
+# READABLE so the historical rows above it still parse — retiring a word must
+# not rewrite history — but it is refused for new rows.
+WRITABLE_KINDS = {"WRITE", "MEMO", "ACK", "SERVICED", "DIGEST", "FILED", "STATUS"}
+RETIRED_KINDS = {"COMMIT": "WRITE"}
+KINDS = WRITABLE_KINDS | set(RETIRED_KINDS)
+# Retirement is enforced by DATE, not by deletion. This tool only reads, so the
+# parse is the only place a rule can bite: a retired KIND dated on or after the
+# ruling is a problem, the same rows dated before it are clean history. That
+# makes test_real_inbox_has_no_malformed_lines the enforcement mechanism — the
+# suite goes red the first time anyone writes a retired word, which is the only
+# kind of rule that survives nobody remembering it.
+RETIRED_FROM = datetime(2026, 8, 13, 18, 0)
 
 
 class Event:
@@ -107,6 +123,13 @@ def parse_inbox(path: Path) -> tuple[list[Event], list[str]]:
         if cells[2] not in KINDS:
             problems.append(f"line {lineno}: unknown KIND {cells[2]!r}")
             continue
+        if cells[2] in RETIRED_KINDS and when >= RETIRED_FROM:
+            # Flagged but still recorded: the event is real and belongs in the
+            # ledger whatever it was called. Losing a row to a vocabulary
+            # complaint is the failure this whole reconciliation came from.
+            problems.append(
+                f"line {lineno}: KIND {cells[2]!r} is retired — use "
+                f"{RETIRED_KINDS[cells[2]]!r}")
         events.append(Event(lineno, when, cells))
 
     events.sort(key=lambda e: e.when)
