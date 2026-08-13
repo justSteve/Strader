@@ -138,8 +138,18 @@ implement; nothing here is optional, and nothing here is implemented in this bea
 2. Write the peer digest: 3–5 lines of "what changed that the other agent needs" into
    the **peer's** `docs/a2a/inbox.md` as `DIGEST` lines (Phase 3, item 10) once COO's
    inbox exists.
-3. Nothing about the handoff writes to Strader's own inbox — its own commits are not
-   peer events.
+3. The handoff writes **exactly one** kind of row to Strader's own inbox: an `ACK` or
+   `SERVICED` receipt for an inbound peer memo (per §2, a memo *to* Strader and its
+   receipt both land in Strader's ledger — that is the join key that makes the memo
+   stop reading as OPEN). Nothing else. In particular the handoff never writes
+   `COMMIT` rows for Strader's own commits, and never writes `DIGEST` rows here —
+   own commits are not peer events, and a digest is written to the *peer's* ledger,
+   not this one.
+
+   *Corrected 2026-08-13 (st-4ld0).* This item previously read "Nothing about the
+   handoff writes to Strader's own inbox," which contradicted §2 and would have made
+   every inbound memo permanently OPEN — the receipt would have had nowhere to land.
+   The ban was always meant to cover self-announcement, not receipts.
 
 ## 5. When the protocol is inconvenient
 
