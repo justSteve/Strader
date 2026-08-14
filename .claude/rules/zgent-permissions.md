@@ -6,10 +6,53 @@ Strader is a Consumer tier zgent — it consumes intel from service providers an
 
 ## Filesystem
 - READ any file under the enterprise root directory tree
-- WRITE only within this repository's directory, with one exception: delivering
-  an A2A memo and its `inbox.md` line into a peer's `docs/a2a/` (the announce
-  channel — see "Inbound" below). Nothing else in a peer's tree, ever
-- NEVER read or write outside the enterprise root
+- WRITE only within this repository's directory, with two exceptions: the A2A
+  channel and the zgent-bridge, both below. Nothing else in a peer's tree, ever
+- NEVER read or write outside the enterprise root, except the sanctioned
+  bridge path named below
+
+### Exception 1 — the A2A channel
+
+Delivering an A2A memo and its `inbox.md` line into a peer's `docs/a2a/` (see
+"Inbound" below).
+
+### Exception 2 — the zgent-bridge [Steve, 2026-08-14; layout co-pzefw]
+
+`/mnt/c/Users/steve/zgent-bridge/` — the durable cross-surface message channel.
+It sits outside the enterprise root deliberately: it is the one path Claude
+Desktop can reach, and it is kept out of every git tree because a Windows tool
+writing into a WSL repo can leave `Zone.Identifier` files in `.git/refs/` that
+break `git push`. Protocol: `/root/projects/COO/conventions/zgent-bridge.md`.
+
+Strader is a full participant and owns `st/`. The rule is the same one sentence
+every participant follows: **write to theirs, read mine, archive into mine.**
+
+| Path | Strader may |
+|---|---|
+| `st/inbox/` | read; move files out of it into `st/_archive/` after acting on them |
+| `st/_archive/` | write — this is Strader's read-marker and nobody else's |
+| `co/inbox/`, `cd/inbox/`, any `<agent>/inbox/` | write a message addressed to that agent |
+| `README.md`, `desktop-standing-instructions.md` | read |
+| the bridge **root** | read only. Those loose files are Steve's scratch drop, not a channel |
+| `_archive/` (top level) | read only. Frozen pre-2026-08-14 history |
+| another agent's `_archive/` | **never.** Archiving is the recipient's act; writing into someone else's archive forges a read-marker |
+| `notebooklm/` | read only |
+
+Filenames are `<YYYYMMDDTHHMMSS>__st__<topic-slug>.<ext>` — Strader's sender
+code is `st`, and the recipient is the folder, never the filename.
+
+**Transactional traffic only** — work orders, handoffs, briefs, decisions.
+Status and chatter are ambient and do not belong here. And note the standing
+preference: for COO↔Strader specifically, `docs/a2a/` is still the better
+channel, because both repos share a git remote and that traffic can be
+versioned, backed up and reviewed in a diff. The bridge exists to cross the
+Windows boundary. Do not migrate WSL-to-WSL traffic onto it.
+
+**The enforcement layer is coarser than this table.** `settings.json` grants
+`additionalDirectories` at whole-directory granularity, so the substrate permits
+the entire bridge; the scoping above is prose-enforced, exactly like the
+cross-repo discipline in "Inbound". Do not read the settings grant as permission
+to write anywhere under the bridge.
 
 ## GitHub
 - READ any repository under the same GitHub owner as this repo's origin

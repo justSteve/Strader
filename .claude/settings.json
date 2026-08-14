@@ -148,7 +148,8 @@
       "Bash(*schwab*.env*)"
     ],
     "additionalDirectories": [
-      "/var/moo"
+      "/var/moo",
+      "/mnt/c/Users/steve/zgent-bridge"
     ]
   }
 }
