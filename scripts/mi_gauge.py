@@ -46,17 +46,62 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # its own no-respawn window and the gauge's self-exit on the same number.
 SESSION_END_DEFAULT = "15:15"
 
+# Live poll set [st-9573]. $ADD and $VOLD are NOT feeds — they are SPREADS that
+# thinkorswim computes on its own platform: $ADD = $ADVN − $DECN (advancing
+# minus declining NYSE issues), $VOLD = $UVOL − $DVOL. Schwab *registers* the
+# spread symbols and returns a correct description for them, but serves 0.0
+# intraday, which is why they were written off as "not served intraday on
+# either Schwab surface". The COMPONENTS are live. Measured 2026-08-13 19:49 CT:
+# $ADVN 1771 · $DECN 981 · $UVOL 7.00B · $DVOL 3.37B → $ADD +790, $VOLD +3.63B.
+#
+# Ask for the components; never re-add "$ADD"/"$VOLD" here expecting a value.
+POLL_SYMBOLS = ["$TICK", "$ADVN", "$DECN", "$UVOL", "$DVOL"]
+
 BAR = {"climax": "█", "lean": "▒", "neutral": "·"}
 
 
-def render(r) -> str:
+def quote_prices(payload: dict) -> dict[str, float]:
+    """{symbol: lastPrice} for whatever the quotes payload actually carried.
+
+    Missing symbols are simply absent rather than zero: a breadth leg that did
+    not arrive must not read as "zero advancers", which is a real market state.
+    """
+    out: dict[str, float] = {}
+    for sym, body in (payload or {}).items():
+        px = ((body or {}).get("quote") or {}).get("lastPrice")
+        if isinstance(px, (int, float)):
+            out[sym] = px
+    return out
+
+
+def breadth(prices: dict[str, float]) -> dict[str, float]:
+    """Compute $ADD and $VOLD from their components; omit either if a leg is
+    missing. Both are day-cumulative statistics, not tick data — the value at a
+    minute's close is the minute's value, and slope across minutes is what
+    downstream consumers want."""
+    out: dict[str, float] = {}
+    if "$ADVN" in prices and "$DECN" in prices:
+        out["add"] = prices["$ADVN"] - prices["$DECN"]
+        out["advn"] = prices["$ADVN"]
+        out["decn"] = prices["$DECN"]
+    if "$UVOL" in prices and "$DVOL" in prices:
+        out["vold"] = prices["$UVOL"] - prices["$DVOL"]
+    return out
+
+
+def render(r, b: dict | None = None) -> str:
     mag = min(20, abs(r.score) // 5)
     side = ("+" if r.score >= 0 else "-") * 0
     bar = BAR[r.band] * mag
     lane = f"{bar:>20}|" if r.score < 0 else f"{'':>20}|{bar}"
-    return (f"{r.timestamp.strftime('%H:%M')}  {r.score:+4d} {lane:<41} "
+    line = (f"{r.timestamp.strftime('%H:%M')}  {r.score:+4d} {lane:<41} "
             f"{r.driver:<18} wick {r.tick_high:+5d}/{r.tick_low:+5d}  "
             f"cum {r.cum_tick:+7d}")
+    if b and "add" in b:
+        line += f"  ADD {b['add']:+6.0f}"
+        if "vold" in b:
+            line += f"  VOLD {b['vold'] / 1e9:+5.2f}B"
+    return line
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +148,8 @@ def stop_reason(now: datetime, capture_day: _date,
     return None
 
 
-def append_capture(path: Path, m: TickMinute, day: _date | None = None) -> bool:
+def append_capture(path: Path, m: TickMinute, day: _date | None = None,
+                   extra: dict | None = None) -> bool:
     """Append one processed minute; returns True if written. Flushed +
     fsync-free line write; a kill mid-write can only truncate the FINAL line,
     which restore tolerates.
@@ -116,6 +162,15 @@ def append_capture(path: Path, m: TickMinute, day: _date | None = None) -> bool:
     if day is not None and m.ts.date() != day:
         return False
     rec = {"ts": m.ts.isoformat(), "high": m.high, "low": m.low, "close": m.close}
+    if extra:
+        # Additive only. restore_state() reads ts/high/low/close and ignores
+        # everything else, so extra keys are invisible to the spine rebuild —
+        # which is what makes this safe to add to a file a live daemon is
+        # already appending to, and keeps old capture files readable.
+        # NEVER let `extra` shadow those four; the spine is not negotiable.
+        for k, v in extra.items():
+            if k not in ("ts", "high", "low", "close"):
+                rec[k] = v
     with path.open("a") as fh:
         fh.write(json.dumps(rec) + "\n")
     return True
@@ -224,8 +279,11 @@ def live(poll_s: int, capture: Path | None,
     g = MIGauge()
     cur_min: datetime | None = None
     hi = lo = last = None
-    print(f"# MI gauge live — sampling $TICK quotes every {poll_s}s; "
-          "synthetic minutes (sampled wicks understate true extremes)")
+    cur_b: dict = {}
+    print(f"# MI gauge live — sampling {' '.join(POLL_SYMBOLS)} quotes every "
+          f"{poll_s}s; synthetic minutes (sampled wicks understate true "
+          "extremes). Breadth is computed: $ADD = $ADVN−$DECN, "
+          "$VOLD = $UVOL−$DVOL [st-9573]")
 
     restored_ts: datetime | None = None
     if capture is not None:
@@ -252,20 +310,36 @@ def live(poll_s: int, capture: Path | None,
         print(f"# exits at {session_end.strftime('%H:%M')} CT "
               "(--session-end none to run until killed)", flush=True)
 
-    def commit_minute(ts, h, l, c_):
+    def commit_minute(ts, h, l, c_, b=None):
         """Process one completed synthetic minute, unless it duplicates a
-        restored one (fast crash+respawn inside the same minute)."""
+        restored one (fast crash+respawn inside the same minute).
+
+        Persists the SCORED READ alongside the raw candle, not just the candle
+        [architecture step 0]. The gauge computed score/band/driver every minute
+        and threw them away at the pane; a downstream watcher wanting band
+        transitions as event triggers had to recompute them, and any consumer
+        that did would silently disagree with what Steve actually saw. These
+        fields are derived — restore_state recomputes them from the candle — so
+        writing them costs nothing and changes no behaviour here."""
         if restored_ts is not None and ts <= restored_ts:
             return
         read = g.process(TickMinute(ts=ts, high=int(h), low=int(l), close=int(c_)))
         if capture is not None:
             m = TickMinute(ts=ts, high=int(h), low=int(l), close=int(c_))
-            if not append_capture(capture, m, day=capture_day):
+            extra: dict = {}
+            if b:
+                extra.update(b)
+            if read is not None:
+                extra.update({"score": read.score, "band": read.band,
+                              "driver": read.driver, "bucket": read.bucket,
+                              "instant": read.instant, "cum": read.cum,
+                              "cum_tick": read.cum_tick})
+            if not append_capture(capture, m, day=capture_day, extra=extra):
                 print(f"  [guard] refused to write a {ts.date()} minute into "
                       f"the {capture_day} capture file", file=sys.stderr,
                       flush=True)
         if read is not None:
-            print(render(read), flush=True)
+            print(render(read, b), flush=True)
 
     while True:
         now = datetime.now(tz=CENTRAL)
@@ -277,7 +351,7 @@ def live(poll_s: int, capture: Path | None,
             # are closing out; anything past the boundary is not ours to write.
             if cur_min is not None and cur_min.date() == capture_day and (
                     session_end is None or cur_min.time() < session_end):
-                commit_minute(cur_min, hi, lo, last)
+                commit_minute(cur_min, hi, lo, last, cur_b)
             if reason == "rollover":
                 print(f"# day rolled over ({capture_day} → {now.date()}) — "
                       "exiting; a fresh launch owns the new day's capture.",
@@ -289,18 +363,24 @@ def live(poll_s: int, capture: Path | None,
             return 0
 
         try:
-            r = c.get_quotes(["$TICK"])
-            q = r.json().get("$TICK", {}).get("quote", {}) if r.status_code == 200 else {}
-            px = q.get("lastPrice")
+            r = c.get_quotes(POLL_SYMBOLS)
+            prices = quote_prices(r.json()) if r.status_code == 200 else {}
+            px = prices.get("$TICK")
+            b = breadth(prices)
         except Exception as e:  # noqa: BLE001 — keep the pane alive
             print(f"  poll error: {e}", file=sys.stderr)
-            px = None
+            px, b = None, {}
+        # Breadth is carried independently of $TICK: one poll can return breadth
+        # and no tick or the reverse, and the last good breadth of the minute is
+        # the minute's value. Never overwrite a good reading with an empty one.
+        if b:
+            cur_b = b
         if px is not None:
             minute = now.replace(second=0, microsecond=0)
             if cur_min is None:
                 cur_min, hi, lo, last = minute, px, px, px
             elif minute > cur_min:
-                commit_minute(cur_min, hi, lo, last)
+                commit_minute(cur_min, hi, lo, last, cur_b)
                 cur_min, hi, lo, last = minute, px, px, px
             else:
                 hi, lo, last = max(hi, px), min(lo, px), px
