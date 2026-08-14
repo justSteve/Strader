@@ -51,11 +51,37 @@ def _price_renderings(price: float) -> list[str]:
     return [r for r in renderings if r]
 
 
+# Zone shorthand, e.g. "7725-30" — Mancini's way of naming a two-edged level.
+# listlevels._expand_zone already reads both edges out of it; this regex lets
+# the validator see the same thing. [st-f3at]
+_ZONE_RE = re.compile(r"(?<!\d)(\d{3,5})-(\d{1,4})(?!\d)")
+
+
+def _zone_edges(source: str) -> set[float]:
+    """Every price written in the source as an edge of a zone shorthand.
+
+    "7725-30" names 7725 AND 7730, but only the first is a standalone digit run,
+    so ``_appears_in_source`` alone would call the second a hallucination. It is
+    not — the letter said it, in Mancini's shorthand. Expansion is deliberately
+    identical to ``listlevels._expand_zone`` (suffix replaces the base's trailing
+    digits); anything else and the deterministic scrape and this check would
+    disagree about what the letter contains, which is the deadlock this fixes.
+    """
+    edges: set[float] = set()
+    for base, suffix in _ZONE_RE.findall(source):
+        if len(suffix) >= len(base):
+            continue  # not a zone: "2026-2027", a date range, an em-dash span
+        edges.add(float(base))
+        edges.add(float(base[: len(base) - len(suffix)] + suffix))
+    return edges
+
+
 def _appears_in_source(price: float, source: str) -> bool:
     """True if any rendering of ``price`` appears as a standalone number.
 
     Word boundaries prevent 581 matching inside 5812. Commas and decimals are
-    handled by checking the literal rendering with boundary-aware regex.
+    handled by checking the literal rendering with boundary-aware regex. A price
+    also counts as written when it is an edge of a zone shorthand ("7725-30").
     """
     for rendering in _price_renderings(price):
         # Escape regex metacharacters in the rendering (the "." and ",").
@@ -65,7 +91,7 @@ def _appears_in_source(price: float, source: str) -> bool:
         # itself (already in `pat`).
         if re.search(rf"(?<!\d){pat}(?!\d)", source):
             return True
-    return False
+    return price in _zone_edges(source)
 
 
 def check(raw_text: str, result: ParseResult) -> ValidationResult:
