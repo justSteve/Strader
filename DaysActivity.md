@@ -1,5 +1,33 @@
 # DaysActivity - 2026-08-13
 
+## 20:12 - Session Handoff [Obvious Doctrine, MBP-1 Backfill Gate, CLAUDE.md Refocus Package]
+
+**Summary**: Steve issued two Obvious-catalog corrections that are now in memory (act on already-scoped work instead of asking — a chronic pattern, dozens deep, not a second offense; and every bead reference needs plain-words context — a ProperName alone is still a bare pointer); the stale MBP-1 backfill gate was rewritten registry-derived and closed the same day COO filed it; COO's ledger-KINDS reconciliation was committed; and the CLAUDE.md-refocus review package is rendered on Steve's desk awaiting his markup.
+
+**Open Work**:
+- **st-ylqw** (in_progress) — CLAUDE.md refocus review package at `desk-claudemd-refocus-review.html`. On Steve's go, land in order: `knowledge/orb-playbook.md` + `knowledge/selective-range-scalping.md` (with index/log entries), then `.claude/rules/fly-doctrine.md`, then the CLAUDE.md replacement (417→~200 lines), then the A2A scope memo to COO. Verification found a SECOND hole beyond the bead's ORB one: Strategy 3 scalp mechanics also had no knowledge home (`pac-order-blocks` covers fly centering only) — draft included.
+- **st-qfsz** — collectors cutover verified this session: cron supervisors gone from crontab, all three timers active+enabled (re-enabled 17:59:30 CT, after tap-in caught them dead at 16:52). Stays open ONLY for the tape-resume verification at tomorrow's 02:50 capture window; close after that is seen.
+- **st-uwz9** (Allowlist Fossil Prune) — filed from the YOLO survey (st-k326, closed): prune ~86 fossil one-shot rules in `settings.local.json`; the auto-mode defaultMode question is Steve's. Survey's load-bearing finding: the Schwab gate (deny rules + PreToolUse hook) survives every permission mode including bypassPermissions.
+- **st-h510 / st-hugc** — footprint rollover work still uncommitted in the tree (4 files), predates this session; steered around, not clobbered.
+- Next focus per Steve: GexBot Orderflow dataset comprehension, guided by Freddy (`docs/gexbot/community/freddy_orderflow_series.md`).
+
+**Files Changed**:
+tools/a2a_inbox.py
+scripts/corpus_daily.py
+strader/entitlements.py
+config/entitlements.yaml
+tests/scripts/test_corpus_daily_mbp1_window.py
+CurrentStatus.md
+DaysActivity.md
+
+**Peer Digest (UNDELIVERED — COO inbox absent)**:
+- st-xxo0 (COO-filed 08-13) CLOSED same day: MBP-1 backfill is registry-authorized — the July date list is gone, authorization derives from `dated.databento_plan` at run time, refuses with reason when the plan is not `active` or the registry is unreadable, and a gap now raises an `mbp1_gap` alert plus an "ES MBP-1 depth landing" probe line. [a011873]
+- Ledger KINDS reconciliation committed per COO's ruling: COMMIT retired in favour of WRITE, readable for history; the 16:48 cutover STATUS row now counts in parsed events. [514508f, st-qfsz]
+- st-ylqw scope package is on Steve's desk and includes the cross-repo half: COO applies the same strategy-mechanics cut to its own CLAUDE.md after Steve ratifies. The A2A memo follows ratification — do not start from this digest line.
+- Collector timers verified active+enabled 17:59:30 CT; st-qfsz stays open only for tomorrow's 02:50 tape-resume verification.
+
+---
+
 ## 07:40 - Session Handoff [Sync Plan Implementation, Schwab Gate, EOD Flush Research]
 
 **Summary**: Steve ratified the Zgent Sync Plan and its Phase 0–3 Strader half shipped via a five-agent fan-out; separately, a dormant Schwab gate and a false permissions claim were found, verified, and fixed with his approval, and three sessions of EOD-flush research produced a testable flush-anticipation hypothesis plus two corrections to the agent's own earlier work.
