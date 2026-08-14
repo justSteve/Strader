@@ -52,6 +52,14 @@ class LevelInteraction:
     price: float
     kind: str                      # support | resistance
     major: bool
+    # Mancini's own words about the level, carried through from Level. [st-ui8m]
+    # `major` above is a boolean derived from the same field and is NOT a
+    # substitute: it answers "is this a major?" and throws away "nice shelf of
+    # lows from noon Thursday to midnight Friday", which is the part Steve reads
+    # the plan for. Without these two the callout dies here, before tracker.py
+    # ever sees it, and no amount of fixing build_state alone recovers it.
+    label: str = ""
+    source_quote: str = ""
     state: str = "untouched"       # untouched | tested-held | broken | reclaimed
     touches: int = 0
     defenses: int = 0              # touched-and-held closes
@@ -141,6 +149,7 @@ def compute_interactions(levels: Sequence[Level], candles: Sequence[dict],
         it = LevelInteraction(
             price=lv.price, kind=lv.kind,
             major=schema.is_major(lv.label),
+            label=lv.label, source_quote=lv.source_quote,
         )
         is_sup = lv.kind == "support"
         for c in candles:
