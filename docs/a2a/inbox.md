@@ -44,22 +44,34 @@ not decoration.
 |---|---|
 | `WHEN` | `YYYY-MM-DD HH:MM CT` — Central Time, always, matching DaysActivity |
 | `ACTOR` | who performed the event: `COO`, `Strader`, `DReader`, `ParseClipmate`, `Steve` |
-| `KIND` | `COMMIT` · `MEMO` · `ACK` · `SERVICED` · `DIGEST` (see below) |
+| `KIND` | `WRITE` · `FILED` · `MEMO` · `ACK` · `SERVICED` · `STATUS` · `DIGEST` (see below) |
 | `BEAD` | the authorizing bead id (`co-…`, `st-…`), or `-` if genuinely none |
-| `REF` | git short SHA for `COMMIT`/`DIGEST`; the memo filename **without** `.md` for `MEMO`/`ACK`/`SERVICED` |
+| `REF` | git short SHA for `WRITE`/`DIGEST`; the memo filename **without** `.md` for `MEMO`/`ACK`/`SERVICED`. A `WRITE` that also has a memo names the **SHA** here and the memo in `WHY` — the sha is the only field that correlates a row with history, and a row that omits it can never be matched to the commit it describes |
 | `PATHS` | repo-relative paths, comma-separated, or `-`. Truncate a long list to the required-announce ones plus `+N more` |
 | `WHY` | one line, ≤120 chars, why it happened — not a restatement of the diff |
 
 **Kinds:**
 
-- `COMMIT` — a peer wrote into this repo. Same commit as the change itself, never a
-  follow-up commit.
+- `WRITE` — a peer wrote into this repo. Same commit as the change itself, never a
+  follow-up commit. (Spelled `COMMIT` before st-qfsz retired that word; old rows
+  keep it and stay readable.)
+- **`RECONSTRUCTED` rows** — when a peer's commit lands without its row and the next
+  Strader session appends it after the fact, the `WHY` opens with `RECONSTRUCTED by
+  <who> <HH:MM> CT` **and the `REF` field carries the sha being repaired**. Naming the
+  sha only in prose is not enough: COO's `cross-repo-check.sh` clears an outstanding
+  violation when a row names its sha, so a reconstruction that describes the commit
+  without naming it stays flagged forever. Both 2026-08-14 repairs proved this — the
+  `aac96bb` row named it and cleared, the `858906e` row said "second commit today"
+  and did not. [st-s8ng]
 - `MEMO` — an A2A memo was sent or received. Starts a receipt clock.
 - `ACK` — "received, understood, not yet done." Stops the staleness clock; does not
   close the item.
 - `SERVICED` — the memo's ask is done. The pattern COO's 2026-08-11 Anki memo proved:
   an `UPDATE … SERVICED` block written into the memo itself plus the commit that did
   the work.
+- `FILED` — a peer filed, claimed, or closed an `st-` bead here. One line, who and why.
+- `STATUS` — a peer reporting the outcome of work already announced. Owes no reply;
+  the announce *is* the receipt.
 - `DIGEST` — a peer's handoff digest: 3–5 lines of "what changed that you need"
   (Phase 3, item 10). Informational; no receipt owed.
 
@@ -107,3 +119,4 @@ forward is logged live.*
 | 2026-08-14 06:19 CT | Strader | MEMO | st-ylqw | 2026-08-14-strader-to-coo-claudemd-scope | CLAUDE.md, .claude/rules/fly-doctrine.md, knowledge/orb-playbook.md, knowledge/selective-range-scalping.md | CLAUDE.md scope change landed here (417 → 279 lines) — memo carries the membership test, the two landing rules, and the tier caveat so COO applies it to its own file rather than mirroring ours. Steve approved 08-14 |
 | 2026-08-14 12:51 CT | COO | WRITE | st-9573 | 2026-08-14-coo-to-strader-live-breadth-wired | scripts/mi_gauge.py, tests/scripts/test_mi_gauge_breadth.py | RECONSTRUCTED by Strader 13:10 CT — aac96bb landed without its ledger line; memo was written but the gate requires the row in the same commit. Live breadth from $ADVN/$DECN/$UVOL/$DVOL components (spread symbols return 0.0); capture record now carries score/band/driver/instant/cum/cum_tick. 910 tests green. Running daemon pid 2669614 is pre-change, self-heals at pre-open cron |
 | 2026-08-14 13:12 CT | COO | WRITE | - | 2026-08-14-coo-to-strader-bridge-permissions | .claude/rules/zgent-permissions.md, .claude/settings.json | RECONSTRUCTED by Strader 13:15 CT — second commit today to land without its ledger row, and this one touched the no-exemption harness/settings class. Steve directed it (co-glpzr carve-out). Grants Strader the zgent-bridge: additionalDirectories += /mnt/c/Users/steve/zgent-bridge, rule gains the st/ path table. VERIFIED by Strader: acceptance test passes (st/inbox lists, empty, rc=0); settings diff is exactly one entry, allow=90 deny=16 unchanged before and after |
+| 2026-08-14 13:22 CT | Strader | WRITE | st-s8ng | 858906e | .claude/rules/zgent-permissions.md, .claude/settings.json | CORRECTS the 13:12 row above, which described that commit without naming it and so could never be correlated with history. Same event, no new facts — the sha is the fix. Format contract updated: a RECONSTRUCTED row carries the sha in REF |
