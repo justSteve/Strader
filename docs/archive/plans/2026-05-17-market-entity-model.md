@@ -1,5 +1,10 @@
 # Market Entity Model Implementation Plan
 
+> **ARCHIVED 2026-08-14 — DELIVERED.** The entity model landed: `market/entities/` exists alongside a full `market/` package (corpus, indicators, ingest, internals, measurement, orderflow, pricing, signals). Design spec archived beside this plan.
+>
+> **Its 63 checkboxes are all unticked and always were** — same failure as the renderer plan. 89 days on the desk reading as 63 open tasks against shipped code.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the foundational typed entity and indicator layer for Strader's trading tooling, replacing ad-hoc raw JSON navigation with composable, testable, backtestable Python code.

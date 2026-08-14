@@ -1,5 +1,10 @@
 # Code Estate Plan — catalog, test, review, retire
 
+> **STATUS 2026-08-14 — LIVE, but its headline counts are unverified.** The committed-virtualenv claim is already retracted in the body below (and independently re-measured today: `git ls-files` returns **0** tracked venv files in COO). The retraction is correct, but the counts that were derived from the same working-tree-vs-tracked mistake — the summary table's "real authored code" figures — have not been recomputed. Treat every COO number here as unverified until they are.
+>
+> Its A2A memo has been awaiting a receipt from COO for 3 sessions (2026-08-12 `strader-to-coo-code-estate-plan`). That receipt is the gate on re-measuring.
+
+
 *st-nujt · 2026-08-12 · Strader, from a 32-agent census of every authored code
 file in both repos: per-file records, an invocation map built from ground truth,
 adversarial verification of every dead-code candidate, and three analysis lenses

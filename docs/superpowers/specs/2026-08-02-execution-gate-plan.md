@@ -1,5 +1,8 @@
 # Execution Gate — Strader Authors, Steve Alone Executes
 
+> **STATUS 2026-08-14 — OPEN, partially overtaken.** Tracked by st-5ey, moved out of `in_progress` back to `open` in this review (12 days untouched). Note the premise has shifted underneath it: the Schwab hard gate now exists in two enforced layers (the hobbled `lib/schwab-py` fork and the `schwab-gate.sh` PreToolUse hook), so "Strader authors, Steve executes" is already mechanically true for Schwab. Re-scope against `.claude/rules/schwab-api-gate.md` before building anything here.
+
+
 **Bead:** Steve Holds The Key (st-5ey) · depends on Coded Counter Wisdom (st-ug5)
 **Date:** 2026-08-02 · **Status:** plan for Steve's review
 

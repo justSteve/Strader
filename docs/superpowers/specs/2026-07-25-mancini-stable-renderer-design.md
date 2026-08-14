@@ -1,6 +1,6 @@
 # Mancini Stable Renderer — Design
 
-**Bead:** st-3c4 (Stable Renderer Design) · **Date:** 2026-07-25 · **Status:** approved by Steve 2026-07-25
+**Bead:** st-3c4 (Stable Renderer Design) · **Date:** 2026-07-25 · **Status:** SHIPPED — implemented as `runbook/mancini/payload_emitter.py`, which cites this spec. Verified live 2026-08-14: the Daily Payload loaded to Steve's clipboard at 09:22 CT. Kept on the desk as the design of record for working code, not as pending work. (Approved by Steve 2026-07-25.)
 
 ## Problem
 

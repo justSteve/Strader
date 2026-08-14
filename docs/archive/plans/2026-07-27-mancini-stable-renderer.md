@@ -1,5 +1,10 @@
 # Mancini Stable Renderer Implementation Plan
 
+> **ARCHIVED 2026-08-14 — DELIVERED.** The stable renderer shipped: `runbook/mancini/payload_emitter.py` builds the Daily Payload, `run.py` pushes it to Steve's clipboard as the last step of every interpretive parse (st-5rc, st-llor), and it did exactly that this morning at 09:22 CT — 1005 bytes, 66 levels.
+>
+> **Its 41 checkboxes are all unticked and always were.** Nobody maintained them while the work shipped anyway, so read the checkbox state as noise, not as progress. That mismatch is why this plan sat on Steve's desk looking like 41 open tasks.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** One permanent "Mancini Forecast" Pine v6 script fed by a daily text payload pushed to the Windows clipboard — replacing per-day Pine script generation (parallel-run during migration).

@@ -1,5 +1,8 @@
 # FootPrint Replay Drills Implementation Plan
 
+> **STATUS 2026-08-14 — NOT STARTED, and its 36 checkboxes have never been ticked.** Tracked by bead st-055, which this review moved out of `in_progress` (where it had sat 20 days untouched) back to `open`. `docs/drills/replay-week-workflow.md` exists; the replay capability this plan describes does not. Live, not stale — but not underway.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replay each day of an imported DataBento RTH week through the production classifier/recognizer stack as-if-live, with every emission recorded per day in an append-only measured record that Steve reviews — from his seat, on the same FootPrint surface — with 20/20 hindsight annotations.

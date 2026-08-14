@@ -1,5 +1,8 @@
 # Market Entity Model — Design Spec
 
+> **ARCHIVED 2026-08-14 — IMPLEMENTED.** See `market/entities/`. No code cites this path, so it is archived rather than kept on the desk; the implementation plan is archived beside it.
+
+
 **Bead:** co-movy
 **Date:** 2026-05-17
 **Status:** Draft — awaiting review

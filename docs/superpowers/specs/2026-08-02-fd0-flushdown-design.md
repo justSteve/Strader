@@ -1,5 +1,8 @@
 # FD0 — Bare-Bones Flush-Down Harness
 
+> **STATUS 2026-08-14 — OPEN, adjacent to tabled work.** Tracked by st-apzt, moved out of `in_progress` back to `open` in this review (11 days untouched). It is not itself named in the tabled counter-dictum charter, but it is stop-and-entry design, which is the class Steve TABLED on 2026-08-10. Confirm with him before resuming.
+
+
 **Bead:** Cut And Await (st-apzt) · child of Coded Counter Wisdom (st-ug5)
 **Date:** 2026-08-02, pre-export window · **Target:** Monday 2026-08-03 open
 **Go/no-go:** Steve's call Monday morning. If any checklist line fails, NO-GO.

@@ -1,6 +1,6 @@
 # Orderflow Signal Layer — Design of Record
 
-**Bead:** st-l5o · **Date:** 2026-07-03 · **Status:** Design of record — Steve's review ongoing; amendments expected (Phase A/B timing clarification approved 2026-07-03)
+**Bead:** st-l5o · **Date:** 2026-07-03 · **Status:** IMPLEMENTED, review never formally concluded. `market/signals/orderflow.py`, `market/signals/orderflow_config.py` and `market/entities/footprint.py` all cite this spec, so it is the design of record for shipped code. The 2026-07-03 line below said "Steve's review ongoing; amendments expected" and stood unchanged for 42 days — read that as never closed out, not as an open action. Current orderflow focus is comprehension of GexBot's dataset (st-ygy1); the counter-dictum programme that would have amended this is TABLED (Steve, 2026-08-10). (Phase A/B timing clarification approved 2026-07-03.)
 **Companion research:** `docs/research/2026-07-03-orderflow-primitives-research.md` (Q1–Q3 deep dive with sources; also the learning document for the primitives and setup signatures)
 
 ---

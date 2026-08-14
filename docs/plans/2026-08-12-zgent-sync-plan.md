@@ -1,5 +1,8 @@
 # Zgent Sync Plan — one shared understanding for Strader and COO
 
+> **STATUS 2026-08-14 — RATIFIED AND LARGELY EXECUTED.** Landed since ratification: Phase 0 doctrine reconciliation (st-zc38), the entitlements registry (st-g0or), this repo's A2A ledger and receipt protocol (st-75z0), and COO's standing write authority written into `.claude/rules/zgent-permissions.md` with both gates. The ledger is in daily use — two peer commits were caught and repaired against it today (st-s8ng).
+
+
 *st-aski · 2026-08-12 · Strader, from a 24-agent review of all 38 Strader + COO
 session transcripts 2026-08-02 → 08-12 plus both agents' full persistent-context
 surfaces. Companion memo to COO: `docs/a2a/2026-08-12-strader-to-coo-zgent-sync-plan.md`.*
