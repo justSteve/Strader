@@ -157,6 +157,19 @@ def entries(registry: dict, section: str) -> list[dict]:
     return [dict(e) for e in section_data]
 
 
+def dated_state(entry_id: str, registry_path: str | Path | None = None) -> str | None:
+    """The ``state:`` Steve last asserted for one dated entry, or None when the
+    entry is not in the registry. Propagates the load error when the registry
+    itself is missing or unparseable — a caller gating work on an entitlement
+    must fail loudly there, never read the failure as "not held". [st-xxo0]
+    """
+    for entry in entries(load_registry(registry_path), "dated"):
+        if str(entry.get("id")) == entry_id:
+            state = entry.get("state")
+            return None if state is None else str(state)
+    return None
+
+
 def _iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 

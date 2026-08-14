@@ -109,6 +109,15 @@ probed:
     expect: present
     expect_within_days: 4
 
+  databento_glbx_es_mbp1_stream:
+    label: ES MBP-1 depth landing
+    vendor: Databento
+    what: MBP-1 depth file per session day — live capture healed by registry-authorized T+1 backfill (st-xxo0). Staleness here means depth stopped landing AND the backfill did not heal it.
+    kind: corpus_stream
+    filename: databento_glbx_es_mbp1.jsonl
+    expect: present
+    expect_within_days: 4
+
   databento_opra_stream:
     label: OPRA tape
     vendor: Databento

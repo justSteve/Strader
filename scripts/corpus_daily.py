@@ -57,6 +57,7 @@ from market.corpus.paths import (  # noqa: E402
     most_recent_session_day,
 )
 from runbook.datastream import gate  # noqa: E402
+from strader import entitlements  # noqa: E402
 
 logger = logging.getLogger("corpus_daily")
 
@@ -78,22 +79,33 @@ STREAM_WINDOWS = {
     "databento_glbx_es": ("08:30", "15:00"),
     "databento_opra": ("13:00", "15:00"),
 }
-# Pre-approved MBP-1 sessions (st-ve6): Steve approved daily T+1 MBP-1 pulls
-# for exactly these dates (replay-drill fidelity incl. absorption, st-055).
-# Bounded by design — a day outside this set is never pulled and no spend
-# occurs. Extend ONLY with explicit Steve approval; ~$1/day metered, ~4GB/day.
+# MBP-1 backfill authorization is derived from the entitlements registry at run
+# time, not from a date list (st-xxo0; supersedes the st-ve6 July pre-approval).
+# While the registry's dated `databento_plan` entry says the CME/Futures plan
+# (GLBX.MDP3) is held live, a historical GLBX pull is flat-rate — measured
+# $0.0000 for a full session day (2026-08-05, --estimate-only) — so the per-day
+# spend approval the old date list encoded has nothing to approve. If the
+# registry ever stops saying `active`, a pull is usage-billed again and this
+# refuses, saying why, until Steve rules. A missing or unparseable registry also
+# refuses: fail closed, never guess an entitlement.
 # Not gate-required: a failed MBP-1 pull warns but never fails the datastream gate.
 MBP1_STREAM = "databento_glbx_es_mbp1"
 MBP1_SCRIPT = "corpus_pull_databento_es_mbp1.py"
-MBP1_APPROVED_DAYS = frozenset({
-    _date(2026, 7, 27), _date(2026, 7, 28), _date(2026, 7, 29),
-    _date(2026, 7, 30), _date(2026, 7, 31),
-})
+MBP1_PLAN_ID = "databento_plan"
 
 
-def mbp1_approved(day: _date) -> bool:
-    """True only for sessions Steve explicitly pre-approved for MBP-1 spend."""
-    return day in MBP1_APPROVED_DAYS
+def mbp1_authorization(registry_path: str | None = None) -> tuple[bool, str]:
+    """(authorized, reason) for an MBP-1 backfill, per the entitlements registry."""
+    try:
+        state = entitlements.dated_state(MBP1_PLAN_ID, registry_path)
+    except Exception as exc:  # noqa: BLE001 — any load failure means "cannot verify"
+        return False, (f"entitlements registry unreadable ({exc}) — refusing "
+                       "MBP-1 backfill rather than guessing the plan state")
+    if state == "active":
+        return True, ("GLBX.MDP3 held live (registry: databento_plan=active) — "
+                      "historical GLBX is flat-rate, no per-pull spend")
+    return False, (f"GLBX plan not held live (registry: databento_plan={state!r}) — "
+                   "a historical MBP-1 pull would be usage-billed; needs Steve's spend ruling")
 
 
 SCHWAB_PULL = "corpus_pull_schwab.py"
@@ -256,21 +268,29 @@ def main(argv: list[str] | None = None) -> int:
         if rc != 0:
             pull_failed = True
 
-    # --- MBP-1 (pre-approved sessions only, not gate-required) [st-ve6] -------
-    if mbp1_approved(day):
-        if not args.force and stream_healthy_in_manifest(day, MBP1_STREAM):
-            logger.info("skip %s: already healthy in manifest for %s", MBP1_STREAM, day)
-        elif args.dry_run:
-            logger.info("[dry-run] would pull %s (pre-approved session %s)",
-                        MBP1_STREAM, day)
-        else:
-            rc, _ = run_pull(MBP1_SCRIPT, day,
-                             ["--start-ct", "08:30", "--end-ct", "15:00"])
-            if rc != 0:
-                logger.warning("MBP-1 pull failed rc=%s (pre-approved day %s; "
-                               "not gate-blocking — re-run manually: "
-                               ".venv/bin/python scripts/%s --date %s)",
-                               rc, day, MBP1_SCRIPT, day.isoformat())
+    # --- MBP-1 (registry-authorized, not gate-required) [st-xxo0] -------------
+    mbp1_ok, mbp1_reason = mbp1_authorization()
+    if not mbp1_ok:
+        logger.warning("MBP-1 backfill refused for %s: %s", day, mbp1_reason)
+    elif not args.force and stream_healthy_in_manifest(day, MBP1_STREAM):
+        logger.info("skip %s: already healthy in manifest for %s", MBP1_STREAM, day)
+    elif args.dry_run:
+        logger.info("[dry-run] would pull %s (%s)", MBP1_STREAM, mbp1_reason)
+    else:
+        logger.info("%s: %s", MBP1_STREAM, mbp1_reason)
+        rc, _ = run_pull(MBP1_SCRIPT, day,
+                         ["--start-ct", "08:30", "--end-ct", "15:00"])
+        if rc != 0 or not stream_healthy_in_manifest(day, MBP1_STREAM):
+            # Live capture is the only other source of MBP-1 depth; a day that
+            # is still unhealthy after the backfill attempt is a durable gap,
+            # so it alerts instead of rotting as a log line. Non-gate-blocking.
+            emit_alert(
+                "mbp1_gap",
+                f"MBP-1 depth missing for {day} after backfill attempt "
+                f"(rc={rc}) — re-run manually: "
+                f".venv/bin/python scripts/{MBP1_SCRIPT} --date {day.isoformat()}",
+                {"day": day.isoformat(), "returncode": rc},
+            )
 
     # --- Internals snapshot (not gate-required) [st-3fr] ----------------------
     # Schwab minute history for $TICK/$TRIN/$ADD/$VOLD is a rolling ~47-day
