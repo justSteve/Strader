@@ -42,6 +42,23 @@ symbols could ever reach it.
 5. **Re-traverse after every capability unlock** — a new subscription, a symbol
    that starts serving, a widened corpus window, a new pull. The verdicts go
    stale; the families do not.
+6. **Build real-time pattern recognition — never day-classification gates or
+   pre-drop filters.** A study may not condition on "is today a V-day?" or
+   "is a drop coming?" before measuring. Those gates encode the answer into the
+   sample and the result comes back confirming the gate. Recognition has to run
+   forward on the tape, on the same information a live session has.
+
+   *Provenance and correction, 2026-08-14 [st-54w7]:* this arrives from COO's
+   `feedback_strader-no-predrop-filter` (handed over as co-318bf) with its
+   original wording **corrected**. It was never a claim that Steve takes every
+   late-day drop — his words, *"i don't take every anything"* — and the late-day
+   dump-and-recover regime has thinned, with large moves increasingly arriving
+   in morning hours. So the late-day window is **a thing to measure, not a thing
+   to assume**, and a study that presupposes it has committed the very error this
+   rule names. What survives from the original is only the study-design kernel,
+   which is why it lands here as a sixth procedure step rather than as its own
+   card. See [[selective-range-scalping]] and [[drills-as-code]] for the
+   neighbouring canon that grew in this area meanwhile.
 
 ## The ten families — verdicts as of 2026-08-04
 

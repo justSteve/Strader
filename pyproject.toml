@@ -23,7 +23,14 @@ feeds = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["strader*"]
+# The root-level infra packages ship with the install too, not just to pytest.
+# Before this, `include` was `strader*` alone while pytest reached the rest via
+# `pythonpath = ["."]` below — so tests imported `runbook.*` happily and every
+# RUNTIME caller had to prefix `PYTHONPATH=.`, which is why that prefix survived
+# at ~10 call sites including every mancini command. Additive: existing
+# PYTHONPATH callers keep working, the prefix is just no longer required.
+# [st-54w7, handed over from co-hhb80]
+include = ["strader*", "market*", "broker_schwab*", "runbook*"]
 
 [tool.pytest.ini_options]
 # Repo root on sys.path so tests can import both `strader.*` and the carried
