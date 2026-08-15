@@ -43,6 +43,7 @@ in it covered external domain knowledge or facts about the operator.
 
 ### decision
 
+- [Orderflow Mastery — the directive, and who owns it](orderflow-mastery-ownership.md) — `decision`, 2026-08-15: the 08-06 directive and its steers, kept here; ownership returned from COO to Strader by Steve's ruling (COO co-u58u2). Start here before resuming any orderflow work
 - [The Counter-Dictum Program](counter-dictum-program.md) — **⚠ TABLED 2026-08-10 — UNDER CONSTRUCTION, DO NOT APPLY.** Draft charter for the orderflow/execution effort, parked by Steve. Do not cite it or design against it; its §5 measured numbers stand as measurement history only. Current focus is understanding GexBot's Orderflow dataset, guided by Freddy
 - [Checkpoint Loop Discontinued](checkpoint-loop-discontinued.md) — The 30-min /checkpoint auto-save loop is discontinued (2026-07-13) — do not start it at session start
 - [Databento Live Collection](databento-live-collection.md) — Databento forward-collection mode is LIVE tick stream (chosen over T+1 batch), via scripts/corpus_stream_databento.py
