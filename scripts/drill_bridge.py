@@ -99,6 +99,11 @@ class BridgeState:
         self._final: list[dict] = []   # end-of-stream emissions [st-b0n9]
         self._developing: dict | None = None  # the bar still forming [st-e91l]
         self._profile: dict | None = None     # the anchored aggressor profile [st-n0qm.4]
+        # Sentinel alerts [st-n0qm.9]: append-only like bars, index == id − 1.
+        # The sentinel posts each alert best-effort as it writes it to
+        # orderflow_alerts.jsonl (which stays the durable record); the page
+        # polls /alerts?since=N and paints SPX rows at strike + basis.
+        self._alerts: list[dict] = []
         self._events = 0
         self.started = datetime.now(timezone.utc).isoformat(timespec="seconds")
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -165,6 +170,21 @@ class BridgeState:
             raise ValueError("developing must be an object")
         with self._lock:
             if meta:
+                # A new session day on a bridge that outlived the last one
+                # [st-n0qm.9]: the feeder restarts at the CT midnight and posts
+                # the new day's bars from index 0 with a fresh meta. Without
+                # this reset Tuesday appended onto Monday, and a page loading
+                # fresh got both days as one tape. Everything the day owns
+                # goes: bars, final, developing, profile, alerts.
+                old_day = self._bar_meta.get("day") if self._bar_meta else None
+                new_day = meta.get("day")
+                if old_day and new_day and new_day != old_day:
+                    self._append({"channel": "bars", "kind": "day_reset",
+                                  "from": old_day, "to": new_day,
+                                  "dropped_bars": len(self._bars),
+                                  "dropped_alerts": len(self._alerts)})
+                    self._bars, self._final, self._alerts = [], [], []
+                    self._developing = self._profile = None
                 self._bar_meta = meta
             if final:
                 self._final = final
@@ -195,6 +215,25 @@ class BridgeState:
                     "developing": self._developing,
                     "profile": self._profile}
 
+    def add_alert(self, alert: dict) -> dict:
+        """Append one sentinel alert; returns it with its ``id`` (1-based). The
+        shape of the alert is the sentinel's (Strader's schema bead owns it);
+        the bridge adds only ``id`` and ``received_utc``. [st-n0qm.9]"""
+        if not isinstance(alert, dict) or not alert:
+            raise ValueError("alert must be a non-empty object")
+        with self._lock:
+            rec = {**alert, "id": len(self._alerts) + 1,
+                   "received_utc": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+            self._alerts.append(rec)
+            self._append({"channel": "alerts", **rec})
+            return rec
+
+    def alerts_since(self, n: int) -> dict:
+        with self._lock:
+            start = max(0, min(n, len(self._alerts)))
+            return {"alerts": self._alerts[start:], "total": len(self._alerts),
+                    "day": self._bar_meta.get("day") if self._bar_meta else None}
+
     def commands_since(self, last_id: int) -> list[dict]:
         with self._lock:
             return [c for c in self._commands if c["id"] > last_id]
@@ -214,7 +253,7 @@ class BridgeState:
         with self._lock:
             return {"ok": True, "started": self.started,
                     "events": self._events, "queued": len(self._commands),
-                    "bars": len(self._bars),
+                    "bars": len(self._bars), "alerts": len(self._alerts),
                     "log": str(self._log_path),
                     "page": str(PAGE_PATH), "page_present": PAGE_PATH.exists()}
 
@@ -339,6 +378,9 @@ class _Handler(BaseHTTPRequestHandler):
                 cmds = STATE.commands_since(since)
                 self._send(200, {"commands": cmds,
                                  "last": cmds[-1]["id"] if cmds else since})
+            elif route == "/alerts":
+                since = int(parse_qs(url.query).get("since", ["0"])[0])
+                self._send(200, STATE.alerts_since(since))
             elif route == "/bars":
                 since = int(parse_qs(url.query).get("since", ["0"])[0])
                 self._send(200, STATE.bars_since(since))
@@ -365,6 +407,9 @@ class _Handler(BaseHTTPRequestHandler):
                                        payload.get("developing"),
                                        payload.get("profile"))
                 self._send(200, {"ok": True, "total": total})
+            elif route == "/alerts":
+                rec = STATE.add_alert(payload)
+                self._send(200, {"ok": True, "id": rec["id"]})
             elif route == "/coach":
                 cmd = STATE.add_coach(payload)
                 self._send(200, {"ok": True, "id": cmd["id"]})

@@ -212,3 +212,50 @@ def test_profile_slot_is_replaced_not_appended_and_served_at_the_tip(state):
     assert r["profile"]["n"] == 25 and r["developing"] is None
     with pytest.raises(ValueError):
         state.add_bars([], None, None, None, ["not", "an", "object"])
+
+
+def test_alerts_append_with_ids_and_poll_incrementally(state):
+    """[st-n0qm.9] Sentinel alerts ride their own append-only channel; the
+    bridge adds id + received_utc and nothing else — the shape is the
+    sentinel's."""
+    a1 = state.add_alert({"kind": "approach", "strike": 7805, "ts_row": "2026-08-14T13:30:04Z"})
+    a2 = state.add_alert({"kind": "contested", "strike": 7800})
+    assert (a1["id"], a2["id"]) == (1, 2) and "received_utc" in a1
+    assert a1["kind"] == "approach" and a1["strike"] == 7805
+    r = state.alerts_since(0)
+    assert [a["id"] for a in r["alerts"]] == [1, 2] and r["total"] == 2
+    r = state.alerts_since(2)
+    assert r["alerts"] == [] and r["total"] == 2
+    assert state.alerts_since(99)["alerts"] == []
+    with pytest.raises(ValueError):
+        state.add_alert({})
+    with pytest.raises(ValueError):
+        state.add_alert(["nope"])
+    log = state.log_path.read_text().splitlines()
+    assert any('"channel":"alerts"' in l and '"kind":"approach"' in l for l in log)
+
+
+def test_a_new_session_day_resets_everything_the_day_owns(state):
+    """[st-n0qm.9] The bridge outlives the day; the feeder does not. When a
+    /bars push carries meta.day different from the held day, bars, final,
+    developing, profile and alerts all reset — Tuesday never appends onto
+    Monday. Same-day meta (a feeder restart mid-day) resets nothing."""
+    state.add_bars([{"o": 1}, {"o": 2}], {"day": "2026-08-17", "bar_n": 2000},
+                   [{"type": "Level"}], {"v": 5}, {"v": 1, "n": 9})
+    state.add_alert({"kind": "approach", "strike": 7805})
+    # same day, meta re-posted (feeder restarted): keep it all
+    state.add_bars([{"o": 3}], {"day": "2026-08-17", "bar_n": 2000})
+    r = state.bars_since(0)
+    assert r["total"] == 3 and r["final"] and r["profile"]
+    assert state.alerts_since(0)["total"] == 1
+    # new day: everything goes, the new push is index 0
+    state.add_bars([{"o": 10}], {"day": "2026-08-18", "bar_n": 2000})
+    r = state.bars_since(0)
+    assert r["total"] == 1 and r["bars"][0]["i"] == 0 and r["bars"][0]["o"] == 10
+    assert r["final"] == [] and r["developing"] is None and r["profile"] is None
+    assert r["meta"]["day"] == "2026-08-18"
+    a = state.alerts_since(0)
+    assert a["total"] == 0 and a["day"] == "2026-08-18"
+    log = state.log_path.read_text().splitlines()
+    assert any('"kind":"day_reset"' in l and '"dropped_bars":3' in l
+               and '"dropped_alerts":1' in l for l in log)

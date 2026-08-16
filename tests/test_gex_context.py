@@ -63,7 +63,7 @@ def test_stamps_bar_with_nearest_prior_poll(tmp_path):
     p = _write(tmp_path, [_poll(T0), _poll(T0 + timedelta(seconds=60))])
     ctx = GexContext(p)
     assert ctx.refresh() == 2
-    g = ctx.for_bar(FakeBar(T0 + timedelta(seconds=90), 7700, 7705, 7695))
+    g = ctx.for_bar(FakeBar(T0 + timedelta(seconds=90), 7700, 7705, 7695), basis=0.0)
     assert g is not None
     assert g["age_s"] == 30.0          # the 60s poll, not the 0s one
     assert g["flip"] == 7690.0
@@ -96,12 +96,36 @@ def test_negative_net_gex_reads_as_trending_regime(tmp_path):
 
 
 def test_touch_reports_majors_inside_the_bar_range(tmp_path):
+    # Levels are SPX; the bar is ES. With basis 0 the fixture is same-domain.
+    p = _write(tmp_path, [_poll(T0, flip=7700.0, pos=7704.0, neg=7500.0)])
+    ctx = GexContext(p)
+    ctx.refresh()
+    g = ctx.for_bar(FakeBar(T0, 7702, 7706, 7698), basis=0.0)
+    assert "flip" in g["touch"] and "pos" in g["touch"]
+    assert "neg" not in g["touch"]
+    assert g["basis"] == 0.0 and g["dflip"] == 2.0
+
+
+def test_touch_and_dflip_convert_spx_levels_through_the_basis(tmp_path):
+    # SPX flip 7700 with a +20 basis sits at ES 7720: inside a 7718..7724 bar,
+    # outside a 7698..7706 one — the unconverted compare would say the reverse.
+    p = _write(tmp_path, [_poll(T0, flip=7700.0, pos=7704.0, neg=7500.0)])
+    ctx = GexContext(p)
+    ctx.refresh()
+    g = ctx.for_bar(FakeBar(T0, 7722, 7724, 7718), basis=20.0)
+    assert "flip" in g["touch"] and "pos" in g["touch"]
+    assert g["dflip"] == 2.0 and g["basis"] == 20.0
+    g2 = ctx.for_bar(FakeBar(T0, 7702, 7706, 7698), basis=20.0)
+    assert g2["touch"] == [] and g2["dflip"] == -18.0
+
+
+def test_no_basis_means_unknown_not_mixed_units(tmp_path):
     p = _write(tmp_path, [_poll(T0, flip=7700.0, pos=7704.0, neg=7500.0)])
     ctx = GexContext(p)
     ctx.refresh()
     g = ctx.for_bar(FakeBar(T0, 7702, 7706, 7698))
-    assert "flip" in g["touch"] and "pos" in g["touch"]
-    assert "neg" not in g["touch"]
+    assert g["basis"] is None and g["touch"] == [] and g["dflip"] is None
+    assert g["flip"] == 7700.0  # levels stay SPX on the wire
 
 
 def test_malformed_lines_are_skipped_not_fatal(tmp_path):

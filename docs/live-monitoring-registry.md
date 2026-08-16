@@ -78,6 +78,20 @@ mtimes, `crontab -l`, and `tmux -L moocity` were the instruments.
 > draws them as dots. `live-footprint-up.sh` is unit-aware and becomes a viewer
 > when the units are active. The table below is kept as the record of what this
 > registry found on 08-13.
+>
+> **Phase 3, 2026-08-16 [st-n0qm.8, st-n0qm.9].** The sentinel now also POSTs
+> each alert to the bridge (`--bridge`, default `http://127.0.0.1:7788`, best-
+> effort, off under `--replay`); the bridge keeps them as an append-only
+> `alerts` channel (`POST /alerts`, `GET /alerts?since=N`) and resets every
+> day-owned slot when a `/bars` push carries a new `meta.day`. The page polls
+> `/alerts` each tick and draws each SPX level on the ES axis at
+> `strike + basis`, the basis being the `bs` every closed bar now carries
+> (`market/orderflow/basis.py`: 1 Hz vendor spot vs the bar close, median of
+> ten; measured 08-14 within 0.7 pt of Schwab's in-session basis). `s` toggles
+> the rows; the HUD strip carries the newest sentence and the basis. Row 4's
+> "orderflow_alert_fmt.py never in the pipe" is half-resolved: the page has a
+> JS twin of `fmt()`; the tmux pipe stays unwired by Steve's page-over-tmux
+> ruling (08:26 CT).
 
 | Surface | Question | Writes | Started by | State |
 |---|---|---|---|---|

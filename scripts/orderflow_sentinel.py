@@ -44,6 +44,8 @@ import json
 import os
 import sys
 import time
+import urllib.error
+import urllib.request
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
@@ -166,6 +168,36 @@ _LOG = DailyLog()
 #: The live SentinelState, set by main()/replay_file so _emit can count alerts
 #: for the health file without threading it through LevelWatch.
 _STATE = None
+#: Bridge base URL, or None (replay, --bridge off) [st-n0qm.9]. Set by main().
+_BRIDGE: str | None = None
+_BRIDGE_TIMEOUT_S = 1.5
+_bridge_failures = 0
+
+
+def _post_alert(alert: dict) -> bool:
+    """Best-effort POST of one alert to the bridge's /alerts so the footprint
+    page can paint it [st-n0qm.9]. Never raises and never blocks the watch
+    loop for more than the short timeout: the durable record is
+    orderflow_alerts.jsonl, written before this is called; the bridge is a
+    display. Failures are logged on the first and then every 50th so a dead
+    bridge is visible in the sentinel log without flooding it."""
+    global _bridge_failures
+    if not _BRIDGE:
+        return False
+    body = json.dumps(alert).encode()
+    req = urllib.request.Request(f"{_BRIDGE}/alerts", data=body,
+                                 headers={"Content-Type": "application/json"},
+                                 method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=_BRIDGE_TIMEOUT_S) as r:
+            r.read()
+        _bridge_failures = 0
+        return True
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        _bridge_failures += 1
+        if _bridge_failures == 1 or _bridge_failures % 50 == 0:
+            _LOG.write(f"[{utc_now_iso()}] bridge post failed ({_bridge_failures}x): {e}")
+        return False
 
 
 def _strike(x: float) -> int:
@@ -194,6 +226,7 @@ def _emit(alert: dict) -> None:
     _LOG.write(json.dumps(alert))
     if _STATE is not None:
         _STATE.note_alert(alert["ts_alert_utc"])
+    _post_alert(alert)
 
 
 class LevelWatch:
@@ -503,6 +536,11 @@ def main() -> int:
     ap.add_argument("--log-dir", type=Path, default=None,
                     help="Mirror stdout to <dir>/<CT date>.log, rolling daily. "
                          "The systemd unit passes /var/moo/logs/orderflow-sentinel")
+    ap.add_argument("--bridge", default=os.environ.get("STRADER_BRIDGE", "http://127.0.0.1:7788"),
+                    help="drill bridge base URL to POST alerts to for the "
+                         "footprint page [st-n0qm.9]; 'off' disables (default "
+                         "$STRADER_BRIDGE or http://127.0.0.1:7788; always off "
+                         "under --replay)")
     ap.add_argument("--replay", type=Path, default=None, metavar="FEED_FILE",
                     help="Run every row of FEED_FILE from byte 0 through fresh "
                          "watches, print the health summary (rows, skips, "
@@ -511,9 +549,11 @@ def main() -> int:
                          "the live alerts file.")
     args = ap.parse_args()
 
-    global _feed_path, _alerts_path, _health_path, _LOG, _STATE
+    global _feed_path, _alerts_path, _health_path, _LOG, _STATE, _BRIDGE
     if args.log_dir:
         _LOG = DailyLog(args.log_dir)
+    if not args.replay and args.bridge and args.bridge.lower() != "off":
+        _BRIDGE = args.bridge.rstrip("/")
     if args.feed:
         _feed_path = lambda: args.feed  # noqa: E731
     if args.alerts:

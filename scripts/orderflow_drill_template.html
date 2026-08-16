@@ -237,6 +237,24 @@ body.live #prod-dots { display:inline-flex; }
 #prod-dots .pd.bad { background:var(--critical); }
 #prod-dots .pd-l { font-size:10px; color:var(--muted); margin-right:2px; }
 #cue-chip.off { color:var(--muted); text-decoration:line-through; }
+/* sentinel rows [st-n0qm.9]: a GexBot level the sentinel spoke about, drawn on
+   the ES axis at strike + basis from the bar it fired on to the right edge.
+   Solid, thin, amber — distinct from the armed level (dashed red) and Mancini
+   (dashed grey). The tag sits at the line's start so the eye reads WHEN and
+   WHERE together. */
+.sen-line { position:absolute; right:56px; border-top:1.5px solid var(--cue); z-index:5; opacity:.9; pointer-events:none; }
+.sen-line.sen-contested, .sen-line.sen-zone { border-top-color:var(--cue-pivot); }
+.sen-line.sen-relocation, .sen-line.sen-resolved, .sen-line.sen-zone_dissolved { border-top-color:var(--ink-2); border-top-style:dotted; }
+.sen-tag { position:absolute; transform:translateY(-100%); font-size:10px; line-height:1.2; white-space:nowrap;
+  color:var(--cue); background:var(--surface-1); padding:0 4px; z-index:6; cursor:help; }
+.sen-tag.sen-contested, .sen-tag.sen-zone { color:var(--cue-pivot); }
+.sen-tag.sen-relocation, .sen-tag.sen-resolved, .sen-tag.sen-zone_dissolved { color:var(--ink-2); }
+.sen-mark { position:absolute; transform:translate(-50%,-50%); font-size:9px; line-height:1; color:var(--cue); z-index:6; pointer-events:none; }
+.sen-mark.sen-contested, .sen-mark.sen-zone { color:var(--cue-pivot); }
+#sen-strip { cursor:pointer; }
+#sen-strip.off { color:var(--muted); text-decoration:line-through; }
+#sen-strip .sen-txt { color:var(--ink-2); }
+#livehud #sen-strip { font-size:11px; margin-left:8px; }
 .em-chip.churn { border-color:var(--grid); color:var(--muted); opacity:.7; }
 .em-chip.churn .em-k { color:var(--muted); }
 #emrow .em-churn-tag { color:var(--muted); font-style:italic; font-size:11px; }
@@ -381,7 +399,8 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
 · <button id="candles" title="Open the same tape as 1-minute candles in a second window, synced to this minute">Candles ↗</button>
 · coach: <span id="bridge-dot">—</span>
 · <span id="prod-dots" title="producers: tape · 1 Hz gex · sentinel · footprint feed"></span>
-· <span id="cue-chip" title="Cell cues: cells the stack spoke about flash, then keep an edge mark. Press x or click to toggle.">cues ⚑</span></p>
+· <span id="cue-chip" title="Cell cues: cells the stack spoke about flash, then keep an edge mark. Press x or click to toggle.">cues ⚑</span>
+· <span id="sen-strip" title="Sentinel: GexBot level alerts drawn on the ES axis at strike + live basis. Press s or click to toggle.">sent <span class="sen-txt">—</span></span></p>
 <div id="help"><div class="card">
   <h2>What am I looking at?</h2>
   <p>This is one full trading day replayed as <b>volume bars</b>: every column is exactly the same number of contracts changing hands (shown in the header), <b>not</b> the same amount of time. When columns arrive fast, the market is busy; when they crawl, it's quiet. Each column's <b>footer</b> carries the bar's real duration as its colored fill height — tall fill = slow bar, short fill = urgent tape. That height is on a <b>fixed absolute scale — full = 120s</b>, the same on every day you drill, so heights are comparable across days and you can learn what a given pace looks like.</p>
@@ -521,6 +540,10 @@ function buildLiveHud() {
     if (pd) meta.parentNode.appendChild(pd);
     const cc = document.getElementById("cue-chip");
     if (cc) meta.parentNode.appendChild(cc);
+    // The sentinel strip: the newest alert as a sentence, and the basis that
+    // put its row on the ES axis. Same line — it is the same question. [st-n0qm.9]
+    const ss = document.getElementById("sen-strip");
+    if (ss) meta.parentNode.appendChild(ss);
   }
   makeDraggable(hud, document.getElementById("stage"));
 }
@@ -955,6 +978,7 @@ function drawLevelLine() {
   document.querySelectorAll(".lvl-line,.lvl-tag,.mlvl-line,.mlvl-tag").forEach(e => e.remove());
   if (viewHi == null) return;
   drawManciniLevels();
+  drawSentinelRows();   // same y-mapping, same repaint path [st-n0qm.9]
   if (level == null || level > viewHi || level < viewLo) return;
   const ln = document.createElement("div"); ln.className = "lvl-line"; ln.style.top = yFor(level) + "px";
   const tag = document.createElement("div"); tag.className = "lvl-tag"; tag.style.top = yFor(level) + "px";
@@ -1869,6 +1893,7 @@ document.addEventListener("keydown", e => {
   if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
   if (e.code === "KeyX") toggleCues();
   if (e.code === "KeyV") toggleVp();
+  if (e.code === "KeyS") toggleSentinel();
   if (e.code === "ArrowRight") stepUser();
   if (e.code === "ArrowLeft") seekTo(idx - 1);
 });
@@ -1989,6 +2014,9 @@ async function pollBars() {
     }
     renderDeveloping();   // after any append, so it lands right of the newest
     if (profileMoved) renderProfile();   // ~100 rows; cheap enough to redraw on every move
+    // Sentinel alerts AFTER the bars: a row's ES price is strike + the basis
+    // the newest bar carries, so the bars must land first. [st-n0qm.9]
+    if (await pollAlerts() || fresh.length) drawSentinelRows();
   } catch {
     if (++liveErrs === 3) setDot("feed stalled");
   }
@@ -2033,6 +2061,169 @@ async function pollProducers() {
   setTimeout(pollProducers, PROD_POLL_MS);
 }
 if (LIVE) setTimeout(pollProducers, 800);
+// ── sentinel rows [st-n0qm.9, Watcher V2 Phase 3] ───────────────────────
+// WHAT: the orderflow sentinel watches GexBot's SPX major-gamma levels and
+// writes an alert when price approaches one, when a level is contested or
+// relocates. Those alerts are SPX-domain; this chart is ES. Every closed bar
+// carries `bs` — the live SPX→ES basis (market/orderflow/basis.py; measured
+// 08-14: median +20.75, p95 deviation 0.70 pt) — so a level lands on the ES
+// axis at strike + basis, and an approach shows as a labelled row within one
+// poll of the sentinel writing it. Steve, 2026-08-16 08:26 CT: web page over
+// tmux for anything at the FP chart's level — this is the sentinel's surface.
+//
+// HOW: GET /alerts?since=N each poll (after the bars). One row per LEVEL at
+// its newest known SPX value, from the bar the newest alert fired on to the
+// right edge; a small mark on each earlier alert's bar; the newest sentence in
+// the HUD strip beside the basis. No basis on any recent bar → no rows, and
+// the strip says so rather than drawing 20 points wrong. `s` toggles.
+const SENT_KEEP_MARKS = 30, SENT_BASIS_BACK = 40;
+let sentAlerts = [], sentSeen = 0, sentOn = localStorage.getItem("oflow-sent-on") !== "0";
+const SEN_NAMES = { z_mlgamma: "mLG", z_msgamma: "mSG", zero_gamma: "flip", major_positive: "+major",
+                    major_negative: "−major", one_major_positive: "1D +major", one_major_negative: "1D −major" };
+const senShort = a => SEN_NAMES[a.level] || a.name || a.level || "?";
+// The SPX price an alert is ABOUT — approach: the level; relocation/resolved:
+// where it went; zone: its middle; contested: the leading contender.
+function senSpx(a) {
+  if (isNum(a.value)) return a.value;
+  if (isNum(a.new)) return a.new;
+  if (isNum(a.settled)) return a.settled;
+  if (isNum(a.low) && isNum(a.high)) return (a.low + a.high) / 2;
+  if (Array.isArray(a.contenders) && a.contenders.length && isNum(a.contenders[0].value)) return a.contenders[0].value;
+  return null;
+}
+// JS twin of scripts/orderflow_alert_fmt.py — one sentence per alert.
+function senSentence(a) {
+  const k = a.kind || "?", name = a.name || a.level || "";
+  if (k === "approach") return `${a.strike} ${name} — approach from ${a.side === "from_below" ? "below" : "above"}, spot ${a.spot} (${a.distance_pts} pts)`;
+  if (k === "zone") return `${a.strike_low}-${a.strike_high} ${name} — ZONE declared (recurring contest), spot ${a.spot}`;
+  if (k === "zone_dissolved") return `${a.strike} ${name} — zone dissolved, settled here, spot ${a.spot}`;
+  if (k === "contested") return `${name} contested: ${(a.contenders || []).map(c => `${c.strike} (${Math.round((c.share || 0) * 100)}%)`).join(" vs ")}, spot ${a.spot}`;
+  if (k === "resolved" || k === "relocation") return `${a.strike} ${name} — ${k} (was ${isNum(a.old) ? Math.round(a.old) : "?"}), spot ${a.spot}`;
+  return JSON.stringify(a);
+}
+// The basis the newest bars carry; null until a bar has one.
+function basisNow() {
+  for (let i = bars.length - 1, n = 0; i >= 0 && n < SENT_BASIS_BACK; i--, n++) {
+    const bs = bars[i] && bars[i].bs;
+    if (bs && isNum(bs.pts)) return bs;
+  }
+  return null;
+}
+// Which bar was the tape on when the sentinel spoke? ts_row is the vendor
+// second the alert judged (UTC); bars carry CT offsets — Date compares fine.
+// The bar whose [t0, t1) holds it; else the last bar closed before it; else
+// the tip. Cached on the alert: bars only append.
+function senBarFor(a) {
+  if (isNum(a._bar) && a._bar < bars.length && bars[a._bar]) return a._bar;
+  const iso = a.ts_row || a.ts_alert_utc; if (!iso) return null;
+  const t = Date.parse(iso); if (!isFinite(t)) return null;
+  let last = null;
+  for (let i = bars.length - 1; i >= 0; i--) {
+    const b = bars[i], t0 = Date.parse(b.t0), t1 = Date.parse(b.t1);
+    if (t0 <= t && t < t1) { a._bar = i; return i; }
+    if (t1 <= t) { last = last == null ? i : Math.max(last, i); break; }   // walking back: first t1<=t is the newest such
+  }
+  if (last != null) { a._bar = last; return last; }
+  return bars.length ? bars.length - 1 : null;      // before the first bar closed: the tip, uncached
+}
+// x of column i's left edge inside #cols (columns are right-aligned, newest at
+// idx). Off-screen to the left → 0, and the caller says "earlier".
+function senColX(i) {
+  const cols = $("cols"); if (!cols) return { x: 0, on: false };
+  const first = Math.max(0, idx - KEEP_COLS + 1);
+  if (i == null || i < first) return { x: 0, on: false };
+  const w = cols.clientWidth || 0;
+  return { x: Math.max(0, w - (idx - i + 1) * COL_W), on: true };
+}
+function senStripText(text, cls) {
+  const el = $("sen-strip"); if (!el) return;
+  const t = el.querySelector(".sen-txt"); if (t) t.textContent = text;
+  el.classList.toggle("off", !sentOn);
+  if (cls != null) el.dataset.state = cls;
+}
+function toggleSentinel() {
+  sentOn = !sentOn;
+  localStorage.setItem("oflow-sent-on", sentOn ? "1" : "0");
+  showCaption(sentOn ? "Sentinel rows on (s hides them)" : "Sentinel rows hidden (s shows them)");
+  repaintAll();
+}
+{ const el = $("sen-strip"); if (el) el.onclick = toggleSentinel; }
+
+function drawSentinelRows() {
+  document.querySelectorAll(".sen-line,.sen-tag,.sen-mark").forEach(e => e.remove());
+  if (!LIVE) return;
+  const el = $("sen-strip"); if (el) el.classList.toggle("off", !sentOn);
+  if (!sentAlerts.length) { senStripText("—", "empty"); return; }
+  const newest = sentAlerts[sentAlerts.length - 1];
+  const bs = basisNow();
+  const when = (newest.ts_row || newest.ts_alert_utc || "").slice(11, 19);
+  if (!bs) {
+    senStripText(`${when} ${senSentence(newest)} · no basis yet — rows need bs on a bar`, "nobasis");
+    return;
+  }
+  senStripText(`${when} ${senSentence(newest)} · basis ${bs.pts >= 0 ? "+" : ""}${bs.pts} (n${bs.n})`, "ok");
+  if (!sentOn || viewHi == null || !stage.clientHeight) return;
+  const cols = $("cols"); if (!cols) return;
+  const colsRect = cols.offsetLeft || 0;
+  // one row per level: newest alert per level key
+  const byLevel = new Map();
+  for (const a of sentAlerts) if (a.level && senSpx(a) != null) byLevel.set(a.level, a);
+  for (const [lvl, a] of byLevel) {
+    const es = senSpx(a) + bs.pts;
+    if (es > viewHi || es < viewLo) continue;
+    const y = yFor(es);
+    const bi = senBarFor(a);
+    const { x, on } = senColX(bi);
+    const kind = a.kind || "approach";
+    const ln = document.createElement("div");
+    ln.className = `sen-line sen-${kind}`; ln.dataset.level = lvl; ln.dataset.es = es.toFixed(2);
+    ln.style.top = y + "px"; ln.style.left = (colsRect + x) + "px";
+    const tg = document.createElement("div");
+    tg.className = `sen-tag sen-${kind}`; tg.dataset.level = lvl;
+    tg.style.top = y + "px"; tg.style.left = (colsRect + x + 2) + "px";
+    tg.textContent = `⚑ ${senShort(a)} ${a.strike ?? Math.round(senSpx(a))} · ${kind}${on ? "" : " (earlier)"} · ES ${fmtPrice(Math.round(es / TICK) * TICK)}`;
+    tg.title = `${senSentence(a)}\nSPX ${senSpx(a)} + basis ${bs.pts} = ES ${es.toFixed(2)} · ${a.ts_row || a.ts_alert_utc || ""}`;
+    stage.appendChild(ln); stage.appendChild(tg);
+  }
+  // marks on the bars earlier alerts fired on (the newest per level already has the tag)
+  const tagged = new Set([...byLevel.values()]);
+  for (const a of sentAlerts.slice(-SENT_KEEP_MARKS)) {
+    if (tagged.has(a) || senSpx(a) == null) continue;
+    const es = senSpx(a) + bs.pts;
+    if (es > viewHi || es < viewLo) continue;
+    const bi = senBarFor(a);
+    const { x, on } = senColX(bi);
+    if (!on) continue;
+    const m = document.createElement("div");
+    m.className = `sen-mark sen-${a.kind || "approach"}`; m.dataset.level = a.level || "";
+    m.style.top = yFor(es) + "px"; m.style.left = (colsRect + x + COL_W / 2) + "px";
+    m.textContent = "⚑"; m.title = senSentence(a);
+    stage.appendChild(m);
+  }
+}
+// Returns true when something new arrived (or the bridge reset and we refetched).
+async function pollAlerts() {
+  if (!LIVE) return false;
+  try {
+    const r = await fetch(`${BRIDGE}/alerts?since=${sentSeen}`);
+    const d = await r.json();
+    if (!d || !isNum(d.total)) return false;
+    if (d.total < sentSeen) {           // bridge restarted or a new day: start over
+      sentAlerts = []; sentSeen = 0;
+      const r2 = await fetch(`${BRIDGE}/alerts?since=0`);
+      const d2 = await r2.json();
+      for (const a of (d2.alerts || [])) sentAlerts.push(a);
+      sentSeen = d2.total || sentAlerts.length;
+      return true;
+    }
+    const fresh = d.alerts || [];
+    if (!fresh.length) return false;
+    for (const a of fresh) sentAlerts.push(a);
+    sentSeen = d.total;
+    return true;
+  } catch { return false; }
+}
+
 // Day-mismatch banner [st-h510]. Deliberately obnoxious and deliberately NOT
 // dismissable: the whole failure it guards against was a surface that looked
 // fine. A dismissable warning on a chart you read for hours is a warning that

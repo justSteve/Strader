@@ -14,7 +14,7 @@ import gzip
 import importlib.util
 import json
 import sys
-from datetime import date as _date, datetime, timedelta
+from datetime import date as _date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -455,3 +455,68 @@ def test_waiting_for_a_missing_file_also_raises_when_the_day_rolls(tmp_path, mon
     gen = feed.tail_rows(missing, follow=True, poll_s=0.001, pinned_day=_date(2026, 8, 16))
     with pytest.raises(feed.DayRolledOver):
         next(gen)
+
+
+# --- live basis on the wire [st-n0qm.8] --------------------------------------
+
+def test_closed_bars_carry_the_basis_and_gex_converts_through_it(tmp_path):
+    """The feeder samples the basis on every closed bar, stamps `bs`, and hands
+    the estimate to GexContext so `touch`/`dflip` are in ES terms."""
+    from market.orderflow.basis import BasisEstimator
+    from market.orderflow.gex_context import GexContext
+
+    driver, pending, it = _drive_fixture(tmp_path)
+    # 1 Hz rows: vendor spot a flat 20 points under the tape for the whole
+    # fixture window (rows start at 08:30 CT and run 60 s of wall time).
+    t_utc = T0.astimezone(timezone.utc)
+    rows = []
+    for i in range(0, 90):
+        ts = t_utc + timedelta(seconds=i)
+        rows.append(json.dumps({"ts_pull_utc": (ts + timedelta(seconds=1)).isoformat().replace("+00:00", "Z"),
+                                "timestamp": int(ts.timestamp()), "ticker": "SPX",
+                                "spot": 7480.0, "z_mlgamma": 7506.0, "z_msgamma": 7499.0,
+                                "agg_dex": 400.0}))
+    p1s = tmp_path / "gexbot_orderflow_1s.jsonl"
+    p1s.write_text("".join(r + "\n" for r in rows), encoding="utf-8")
+    # one majors poll before the fixture starts, flip at SPX 7480 (= ES ~7500)
+    pg = tmp_path / "gexbot.jsonl"
+    pg.write_text(json.dumps({
+        "ts_pull_utc": (t_utc - timedelta(seconds=5)).isoformat().replace("+00:00", "Z"),
+        "stream": "gexbot",
+        "data": {"summary": {"spot_at_gamma_zero": 7480.0, "major_positive": 7530.0,
+                             "major_negative": 7430.0, "major_long_gamma": 7532.0,
+                             "major_short_gamma": 7428.0, "one_major_positive": 7570.0,
+                             "one_major_negative": 7400.0},
+                 "responses": {"/SPX/classic/gex_zero/majors": {
+                     "zero_gamma": 7480.0, "net_gex_oi": 1.5e9, "net_gex_vol": 7e8,
+                     "spot": 7480.0}}},
+        "errors": []}) + "\n", encoding="utf-8")
+
+    pubs: list = []
+    feed.drive_and_publish(it, driver, pending, _RecRunLog(),
+                           lambda b, m, f: pubs.extend(b), meta={"day": "x"},
+                           gex=GexContext(pg, max_age_s=10_000),
+                           basis=BasisEstimator(p1s), push_every_n=1)
+    bars = [b for b in pubs if "t0" in b]
+    assert bars, "fixture produced no closed bars"
+    with_bs = [b for b in bars if "bs" in b]
+    assert with_bs, "no bar carried a basis"
+    b = with_bs[-1]
+    import statistics
+    # the fixture tape trends, the fake spot is flat: the estimate is the median
+    # of close − spot over the last ten closed bars, exactly
+    expect = round(statistics.median([x["c"] - 7480.0 for x in bars[-10:]]), 2)
+    assert b["bs"]["n"] == min(10, len(bars)) and b["bs"]["pts"] == expect
+    # gex on the same bar converted through that basis: flip SPX 7480 → ES ≈ 7500
+    assert b["gex"]["basis"] == b["bs"]["pts"]
+    assert b["gex"]["dflip"] == round(b["c"] - (7480.0 + b["bs"]["pts"]), 2)
+    assert b["gex"]["flip"] == 7480.0, "levels stay SPX on the wire"
+
+
+def test_bar_payload_omits_bs_when_unknown(tmp_path):
+    from market.orderflow.bars import FootprintBar  # noqa: F401 — shape guard only
+    bars = list(build_bars(iter(read_corpus_day(_write_day(tmp_path, _synthetic_rows(300)))), n=100))
+    p = feed.bar_payload(bars[0], [], bs={"pts": None, "n": 0, "age_s": None})
+    assert "bs" not in p
+    p2 = feed.bar_payload(bars[0], [], bs={"pts": 20.75, "n": 10, "age_s": 0.4})
+    assert p2["bs"] == {"pts": 20.75, "n": 10, "age_s": 0.4}

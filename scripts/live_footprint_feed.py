@@ -55,7 +55,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from market.corpus.paths import CORPUS_ROOT, central_date, gexbot_path, resolve_existing  # noqa: E402
+from market.corpus.paths import (  # noqa: E402
+    CORPUS_ROOT, central_date, gexbot_orderflow_1s_path, gexbot_path, resolve_existing)
+from market.orderflow.basis import BasisEstimator  # noqa: E402
 from market.orderflow.anchored_profile import (  # noqa: E402
     RTH_OPEN_CT, SplitAccumulator, anchor_utc, profile_payload,
 )
@@ -260,7 +262,8 @@ def take_bar_trades(bar, buf: list) -> list:
 
 
 def bar_payload(bar, trades: list, events: list[dict] | None = None,
-                *, include_steps: bool = True, gex: dict | None = None) -> dict:
+                *, include_steps: bool = True, gex: dict | None = None,
+                bs: dict | None = None) -> dict:
     """Serialise a FootprintBar into the exact column shape the page renders.
 
     Key-for-key identical to orderflow_drill.bars_payload's per-bar dict —
@@ -283,6 +286,11 @@ def bar_payload(bar, trades: list, events: list[dict] | None = None,
     [st-8ywx]. The key is OMITTED rather than sent as null when there is no
     context — the feed is RTH-only and can be down, and an absent key reads as
     "not known" where ``"gex": null`` on every pre-open bar reads as a fault.
+
+    ``bs`` is the live SPX→ES basis estimate ``{pts, n, age_s}`` when the bar
+    closed [st-n0qm.8] — same omit-when-unknown rule as ``gex``. It rides on
+    every bar so a page or a hindsight replay reads the basis that was current
+    at that bar, not the newest one.
     """
     payload = {
         "t0": bar.start_ts.isoformat(), "t1": bar.end_ts.isoformat(),
@@ -297,6 +305,8 @@ def bar_payload(bar, trades: list, events: list[dict] | None = None,
     }
     if gex:
         payload["gex"] = gex
+    if bs and bs.get("pts") is not None:
+        payload["bs"] = bs
     return payload
 
 
@@ -445,6 +455,9 @@ def main() -> int:
     # the reader resolves an absent or dead feed to None per bar, so a session
     # that starts pre-open picks GEX up mid-morning without a restart.
     gex = None if args.no_gex else GexContext(gexbot_path(day))
+    # Live SPX→ES basis from the 1 Hz vendor spot [st-n0qm.8]; same flag —
+    # both are GexBot, and without GexBot there is nothing SPX to convert.
+    basis = None if args.no_gex else BasisEstimator(gexbot_orderflow_1s_path(day))
 
     meta = {"day": day.isoformat(), "bar_n": args.bar_n, "tick": TICK,
             "source": "live", "started": datetime.now().isoformat(timespec="seconds"),
@@ -584,7 +597,8 @@ def main() -> int:
 
     _install_stop_handler()
     drive_and_publish(live_drive(_closed_bars(), driver, live_anchors),
-                      driver, pending_trades, runlog, _publish, meta=meta, gex=gex)
+                      driver, pending_trades, runlog, _publish, meta=meta, gex=gex,
+                      basis=basis)
     return 0
 
 
@@ -634,7 +648,7 @@ def _install_stop_handler() -> None:
 
 
 def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
-                      *, meta: dict | None = None, gex=None,
+                      *, meta: dict | None = None, gex=None, basis=None,
                       push_every_s: float = 1.0, push_every_n: int = 25) -> dict:
     """Consume (bar_i, bar, bar_trades, events) from `drive_iter`, publish bars
     in coalesced batches, and — WHATEVER ends the stream — flush the engine and
@@ -662,11 +676,18 @@ def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
             # Stamp AFTER the engine has judged the bar: the context is recorded
             # alongside recognition, never an input to it. Stage 1 changes no
             # recognition behaviour, and this ordering is what enforces that.
+            # Basis first: the bar's own close paired with the vendor spot of
+            # that second is the sample, and the estimate it yields is what
+            # converts this bar's SPX levels [st-n0qm.8].
+            bs = None
+            if basis is not None:
+                basis.refresh()
+                bs = basis.sample(bar)
             gex_ctx = None
             if gex is not None:
                 gex.refresh()
-                gex_ctx = gex.for_bar(bar)
-            batch.append(bar_payload(bar, bar_trades, events, gex=gex_ctx))
+                gex_ctx = gex.for_bar(bar, basis=bs["pts"] if bs else None)
+            batch.append(bar_payload(bar, bar_trades, events, gex=gex_ctx, bs=bs))
             now = time.monotonic()
             # Push promptly — a bar the page has not seen is a bar Steve is not
             # watching — but coalesce the catch-up burst so a full day does not

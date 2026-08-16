@@ -68,6 +68,12 @@ def gexbot_path(d: date | None = None) -> Path:
     return day_dir(d) / "gexbot.jsonl"
 
 
+def gexbot_orderflow_1s_path(d: date | None = None) -> Path:
+    """The 1 Hz orderflow file the sentinel watches and the basis estimator
+    reads [st-n0qm.8]."""
+    return day_dir(d) / "gexbot_orderflow_1s.jsonl"
+
+
 def databento_path(d: date | None = None) -> Path:
     return day_dir(d) / "databento_opra.jsonl"
 

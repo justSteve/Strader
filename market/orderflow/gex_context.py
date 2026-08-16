@@ -163,15 +163,24 @@ class GexContext:
         age = (when - best["ts"]).total_seconds()
         return None if age > self.max_age_s else best
 
-    def for_bar(self, bar) -> dict | None:
+    def for_bar(self, bar, basis: float | None = None) -> dict | None:
         """Gamma context for one closed footprint bar, or None.
 
         Keys are short because this rides on every bar over the bridge:
-          spot/flip/pos/neg  — dealer book at the poll
+          spot/flip/pos/neg  — dealer book at the poll (SPX domain, as published)
           regime             — 'pos' | 'neg' | None, from net GEX sign
-          dflip              — bar close minus the flip; sign says which side
-          touch              — majors the bar's own range covered
+          basis              — the SPX→ES basis used below (ES ≈ SPX + basis)
+          dflip              — bar close minus (flip + basis); sign says which side
+          touch              — majors the bar's own range covered, in ES terms
           age_s              — how old the poll was when the bar closed
+
+        ``basis`` is the live estimate from ``market.orderflow.basis`` [st-n0qm.8].
+        The levels stay SPX on the wire — the page and the sentinel need them
+        as strikes — and only the two comparisons convert. Until 2026-08-16 both
+        compared SPX to ES unconverted, ~20 points off: ``touch`` never fired on
+        a real level and ``dflip`` carried the basis inside it. With no basis
+        the honest answer is "unknown": ``touch`` is empty and ``dflip`` None,
+        never the mixed-unit number.
         """
         try:
             rec = self.poll_at(getattr(bar, "end_ts", None))
@@ -188,15 +197,17 @@ class GexContext:
                 net = rec["net_gex_vol"]
             regime = None if net is None else ("pos" if net > 0 else "neg")
 
+            b = _f(basis)
             touch = []
-            if hi is not None and lo is not None:
+            if b is not None and hi is not None and lo is not None:
                 for name in ("pos", "neg", "flip", "long_gamma", "short_gamma"):
                     lvl = rec.get(name)
-                    if lvl is not None and lo <= lvl <= hi:
+                    if lvl is not None and lo <= lvl + b <= hi:
                         touch.append(name)
 
-            dflip = (round(close - rec["flip"], 2)
-                     if close is not None and rec["flip"] is not None else None)
+            dflip = (round(close - (rec["flip"] + b), 2)
+                     if b is not None and close is not None
+                     and rec["flip"] is not None else None)
 
             return {
                 "ts": rec["ts"].isoformat().replace("+00:00", "Z"),
@@ -207,6 +218,7 @@ class GexContext:
                 "one_pos": rec["one_pos"], "one_neg": rec["one_neg"],
                 "regime": regime,
                 "net_gex_oi": rec["net_gex_oi"],
+                "basis": b,
                 "dflip": dflip,
                 "touch": touch,
             }

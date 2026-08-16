@@ -232,3 +232,58 @@ def test_replay_alerts_carry_the_row_time(tmp_path, monkeypatch):
     assert first["ts_row"].startswith("2026-08-14T13:3")
     assert first["ts_alert_utc"] != first["ts_row"]
     assert h["last_alert_utc"] == json.loads(alerts.read_text().splitlines()[-1])["ts_alert_utc"]
+
+
+# --- alerts reach the bridge [st-n0qm.9] --------------------------------------
+
+def test_emit_posts_the_alert_to_the_bridge_best_effort(tmp_path, monkeypatch):
+    """The durable write happens first; the bridge POST is a display and can
+    fail without touching the alert, the file, or the loop."""
+    import http.server
+    import threading
+
+    got: list[dict] = []
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            n = int(self.headers.get("Content-Length") or 0)
+            got.append(json.loads(self.rfile.read(n)))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"ok":true,"id":1}')
+
+        def log_message(self, *a):  # quiet
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        alerts = tmp_path / "orderflow_alerts.jsonl"
+        monkeypatch.setattr(ofs, "_alerts_path", lambda: alerts)
+        monkeypatch.setattr(ofs, "_BRIDGE", f"http://127.0.0.1:{srv.server_port}")
+        monkeypatch.setattr(ofs, "_STATE", None)
+        ofs._emit({"kind": "approach", "level": "z_mlgamma", "value": 7804.46})
+        assert len(got) == 1 and got[0]["strike"] == 7805 and got[0]["kind"] == "approach"
+        assert alerts.read_text().count("\n") == 1
+    finally:
+        srv.shutdown()
+
+
+def test_emit_survives_a_dead_bridge_and_logs_sparsely(tmp_path, monkeypatch):
+    lines: list[str] = []
+    monkeypatch.setattr(ofs, "_LOG", type("L", (), {"write": lambda self, s: lines.append(s)})())
+    monkeypatch.setattr(ofs, "_alerts_path", lambda: tmp_path / "a.jsonl")
+    monkeypatch.setattr(ofs, "_BRIDGE", "http://127.0.0.1:9")   # discard port: refused
+    monkeypatch.setattr(ofs, "_STATE", None)
+    monkeypatch.setattr(ofs, "_bridge_failures", 0)
+    for _ in range(3):
+        ofs._emit({"kind": "approach", "level": "z_mlgamma", "value": 7804.46})
+    assert (tmp_path / "a.jsonl").read_text().count("\n") == 3, "the file never waits on the bridge"
+    fails = [l for l in lines if "bridge post failed" in l]
+    assert len(fails) == 1 and "(1x)" in fails[0], "first failure logged, then quiet until the 50th"
+
+
+def test_bridge_is_off_when_unset(monkeypatch):
+    monkeypatch.setattr(ofs, "_BRIDGE", None)
+    assert ofs._post_alert({"kind": "approach"}) is False
