@@ -10,11 +10,16 @@
   --muted:#898781; --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
   --buy:#2a78d6; --sell:#e34948; --mid:#f0efec;
   --good:#0ca30c; --critical:#d03b3b;
+  /* Cell-cue tokens [st-n0qm.2]: deliberately OFF the blue↔red axis the cells
+     wear, so a cue never reads as aggression. Amber = structure (stack, sweep),
+     violet = pivot; setup anchors reuse --good like the setup evmark. */
+  --cue:#b8860b; --cue-pivot:#7c4dff;
 }
 @media (prefers-color-scheme: dark) { :root {
   --surface-1:#1a1a19; --page:#0d0d0d; --ink:#ffffff; --ink-2:#c3c2b7;
   --muted:#898781; --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
   --buy:#3987e5; --sell:#e66767; --mid:#383835;
+  --cue:#f0c040; --cue-pivot:#b39dff;
 }}
 * { box-sizing:border-box; }
 body { margin:0; background:var(--page); color:var(--ink);
@@ -169,6 +174,36 @@ td:first-child, th:first-child { text-align:left; }
    about the record) but it stops competing for the eye with the bars that mean
    something. Hollow, muted, half-opacity. [st-hnl7] */
 .col .evmark.churn { border-top-color:var(--muted); opacity:.4; }
+/* Cell cues [st-n0qm.2, Watcher V2 Phase 1]. The evmark says "this BAR spoke";
+   the cue says WHICH CELLS it spoke about — a stack's prices, a sweep's range,
+   the pivot a divergence measured against, a setup's anchor row. Steve,
+   2026-08-16: "a brief flash or glow that draws the eye which transitions to a
+   inobtrusive visual element that remains visible."
+   Persistent mark = per-role inset edge rule (composed by JS into ONE
+   box-shadow so several roles stack) plus a small corner glyph so the type
+   survives when colour is muted. NOT `outline` — .cell.poc owns the outline
+   and both must show. The flash animates box-shadow + brightness on the cell
+   itself; while it runs it overrides the persistent inline shadow, and when
+   the class is removed (JS-timed, so jsdom can observe it) the mark remains. */
+.col .cell.cue { cursor:pointer; }
+.col .cell.cue::before { content:attr(data-glyph); position:absolute; top:0; right:1px;
+  font-size:7px; line-height:1; color:var(--cue-ink, var(--cue)); pointer-events:none; }
+.col .cell.cue.cue-pivot::before { color:var(--cue-pivot); }
+.col .cell.cue.cue-anchor::before, .col .cell.cue.cue-flush::before,
+.col .cell.cue.cue-confirm::before { color:var(--good); }
+@keyframes cue-flash {
+  0%   { box-shadow:0 0 0 0 var(--cue-flash, var(--cue)), inset 0 0 0 2px var(--cue-flash, var(--cue)); filter:brightness(1.35); }
+  100% { box-shadow:0 0 0 7px transparent, inset 0 0 0 0 transparent; filter:none; }
+}
+.col .cell.cue-new { animation:cue-flash 900ms cubic-bezier(.2,.7,.2,1) 1 both; z-index:4; }
+.col .cell.cue-new.cue-pivot { --cue-flash:var(--cue-pivot); }
+@media (prefers-reduced-motion: reduce) { .col .cell.cue-new { animation:none; } }
+/* Closing churn dims cues like it dims the evmark — the record stays honest,
+   it just stops competing for the eye. */
+.col .cell.cue.churn { opacity:.55; }
+.col .cell.cue.churn::before { opacity:.7; }
+#cue-chip { cursor:pointer; }
+#cue-chip.off { color:var(--muted); text-decoration:line-through; }
 .em-chip.churn { border-color:var(--grid); color:var(--muted); opacity:.7; }
 .em-chip.churn .em-k { color:var(--muted); }
 #emrow .em-churn-tag { color:var(--muted); font-style:italic; font-size:11px; }
@@ -310,7 +345,8 @@ body.live #ctlblock { display:none !important; }
 <p class="hint">Space = play/pause · ←/→ = step · Ctrl+←/→ = speed down/up · Click a level chip to arm it AND jump to its first visit · <b>?</b> explains the screen ·
 Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button>
 · <button id="candles" title="Open the same tape as 1-minute candles in a second window, synced to this minute">Candles ↗</button>
-· coach: <span id="bridge-dot">—</span></p>
+· coach: <span id="bridge-dot">—</span>
+· <span id="cue-chip" title="Cell cues: cells the stack spoke about flash, then keep an edge mark. Press x or click to toggle.">cues ⚑</span></p>
 <div id="help"><div class="card">
   <h2>What am I looking at?</h2>
   <p>This is one full trading day replayed as <b>volume bars</b>: every column is exactly the same number of contracts changing hands (shown in the header), <b>not</b> the same amount of time. When columns arrive fast, the market is busy; when they crawl, it's quiet. Each column's <b>footer</b> carries the bar's real duration as its colored fill height — tall fill = slow bar, short fill = urgent tape. That height is on a <b>fixed absolute scale — full = 120s</b>, the same on every day you drill, so heights are comparable across days and you can learn what a given pace looks like.</p>
@@ -321,6 +357,7 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
     <li>The number is the cell's <b>net delta</b> (buy-aggressor minus sell-aggressor volume). Hover any cell for the full breakdown. Switch the Cells menu to see totals or the raw bid×ask pair.</li>
     <li>The <b>outlined cell</b> is the bar's POC — the price where the most volume traded.</li>
     <li>A <b>dashed empty cell</b> is real: price jumped across that level without a single trade (a micro low-volume node).</li>
+    <li>A cell that <b>flashes amber</b> then keeps a thin edge rule and a corner glyph is one the stack <b>spoke about</b>: left rule ▮ = imbalance stack price, right rule ◢ = swept price, violet top rule ◆ = the pivot a divergence measured against, green bottom rule ▬ = a setup's anchor. Hover names it; click opens what the stack said. Press <b>x</b> to hide or show all cues.</li>
   </ul>
   <h4>The Phase ladder (start at 0, earn your way up)</h4>
   <ul>
@@ -381,6 +418,9 @@ const RESET_TICKS = 12;      // must first be ≥ 3 pts away to re-arm
 const JUDGE_BARS = 10;       // bars the tape gets to answer
 const JUDGE_TICKS = 16;      // 4 pts beyond/away decides accept/reject
 const KEEP_COLS = 48;        // DOM columns kept (virtualization)
+// LIVE poll cadence. Was 2000 in two literals; 1000 matches the feeder's 1 s
+// developing push so a cue lands within a second of its bar closing. [st-n0qm.2]
+const POLL_MS = 1000;
 // prices print without trailing zeros: 7511, 7511.5, 7511.25
 const fmtPrice = p => (+p.toFixed(2)).toString();
 const COL_W = 58, FOOT_H = 72;
@@ -539,6 +579,193 @@ let drillLog = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
 
 // ── stage geometry: price window follows recent bars ────────────────────
 const stage = $("stage"), strip = $("colstrip"), yaxis = $("yaxis");
+
+// ── cell cues [st-n0qm.2, Watcher V2 Phase 1] ─────────────────────────────
+// WHAT: when a bar's emissions name prices, the cells at those prices flash,
+// then keep a small persistent mark. The evmark (above) says a bar spoke; this
+// says which cells it spoke about. Steve, 2026-08-16: "a brief flash or glow
+// that draws the eye which transitions to a inobtrusive visual element that
+// remains visible."
+//
+// HOW, and the three rules that keep it honest:
+//   1. State lives OUTSIDE the DOM. setCol() replaces column nodes and
+//      repaintAll() rebuilds every visible column on zoom/resize/cell-mode, so
+//      a class on a node would not survive. cueIndex is the truth; renderColumn
+//      re-applies it every time.
+//   2. One resolver, both surfaces. resolveTargets() maps an emission to cells
+//      from the fields it ALREADY carries (plan §3.1) — no engine change. When
+//      the emission schema lands `targets` (Phase 3) the resolver prefers it and
+//      keeps this derivation as the fallback for old run logs and replays.
+//   3. Flash only what just happened. A since=0 backfill of a whole day, or a
+//      seek back through a replay, paints markers and never flashes. In LIVE
+//      the gate is "page was at the tip AND ≤ CUE_FLASH_MAX_FRESH bars arrived";
+//      in replay it is "playing".
+const CUE_FLASH_MS = 900;            // matches @keyframes cue-flash
+const CUE_FLASH_MAX_FRESH = 3;       // more than this in one poll = a backfill, not an event
+const CUE_BACK_BARS = 40;            // pivot back-search span (ENGAGEMENT_WINDOW_BARS)
+// role → how it draws. edge: which side of the cell carries the rule (l/r/t/b);
+// tone: colour token; glyph: the corner mark that survives muted colour.
+const CUE_ROLE = {
+  stack:     { edge: "l", w: 3, tone: "--cue",       glyph: "▮", label: "imbalance stack price" },
+  stack_vs:  { edge: "l", w: 1, tone: "--cue",       glyph: "▯", label: "opposite side of the stack" },
+  sweep:     { edge: "r", w: 3, tone: "--cue",       glyph: "◢", label: "swept price" },
+  sweep_end: { edge: "r", w: 3, tone: "--cue",       glyph: "◣", label: "where the sweep ended" },
+  pivot:     { edge: "t", w: 2, tone: "--cue-pivot", glyph: "◆", label: "pivot the divergence measured against" },
+  anchor:    { edge: "b", w: 2, tone: "--good",      glyph: "▬", label: "setup anchor row" },
+  absorb:    { edge: "t", w: 2, tone: "--cue",       glyph: "▲", label: "absorption price" },
+};
+const cueIndex = new Map();          // barIdx -> [{tk, role, type, src}]  (src = bar that emitted)
+const cueSeen  = new Map();          // "src:type:tk:role" -> first-seen ms (flash clock)
+let cuesOn = true;
+const tkOf = p => Math.round(p / TICK);
+const cueKey = t => `${t.src}:${t.type}:${t.tk}:${t.role}`;
+const isNum = v => typeof v === "number" && isFinite(v);
+const reducedMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+// Which bar does a price belong to? Emissions are attached to the bar the
+// engine judged, but a divergence's pivot is usually an EARLIER bar and a
+// sweep can start in bar i-1 (measured, plan §3.1). Walk back a bounded window
+// for the last bar whose range contains the price; default to i.
+function cueBarFor(price, i, back) {
+  for (let j = i; j >= 0 && j > i - back; j--) {
+    const b = bars[j];
+    if (b && isNum(b.l) && isNum(b.h) && price >= b.l - TICK / 2 && price <= b.h + TICK / 2) return j;
+  }
+  return i;
+}
+// One emission → the cells it names. Every field access guarded (a live
+// payload can be sparse); a resolver that throws would take the column with it.
+function resolveTargets(e, i) {
+  const out = [];
+  const add = (price, role, bar) => {
+    if (!isNum(price)) return;
+    out.push({ tk: tkOf(price), role, type: e.type, src: i, bar: bar == null ? i : bar });
+  };
+  if (Array.isArray(e.targets)) {                       // Phase 3 schema wins
+    for (const t of e.targets) {
+      if (!t) continue;
+      const bar = t.bar_i != null ? t.bar_i : (t.bar_hint === "search_back" ? cueBarFor(t.price, i, CUE_BACK_BARS) : i);
+      if (t.kind === "band" && isNum(t.lo) && isNum(t.hi)) {
+        for (let tk = tkOf(t.lo); tk <= tkOf(t.hi); tk++) add(tk * TICK, t.role || "sweep", bar);
+      } else add(t.price, t.role || "stack", bar);
+    }
+    return out;
+  }
+  switch (e.type) {
+    case "ImbalanceStack":                              // exact: every price is a traded cell
+      for (const p of (e.prices || [])) add(p, "stack");
+      break;
+    case "SweepPrint": {                                // range; may have started in i-1
+      if (!isNum(e.start_price) || !isNum(e.end_price)) break;
+      const lo = Math.min(e.start_price, e.end_price), hi = Math.max(e.start_price, e.end_price);
+      const b = bars[i];
+      const bar = (b && isNum(b.l) && isNum(b.h) && (lo < b.l - TICK / 2 || hi > b.h + TICK / 2))
+        ? cueBarFor(e.start_price, i, 2) : i;
+      for (let tk = tkOf(lo); tk <= tkOf(hi); tk++) add(tk * TICK, tk === tkOf(e.end_price) ? "sweep_end" : "sweep", bar);
+      break;
+    }
+    case "DeltaDivergence":                             // one cell, usually an earlier bar
+      add(e.price_extreme, "pivot", cueBarFor(e.price_extreme, i, CUE_BACK_BARS));
+      break;
+    case "SetupRecognition":                            // anchor row on the emitting bar
+      add(e.anchor_price, "anchor");
+      break;
+    case "AbsorptionRead":
+      add(e.price, "absorb");
+      break;
+    default: break;                                     // Level etc. — no cell
+  }
+  return out;
+}
+// Index bar i's emissions into cueIndex (possibly onto earlier bars) and
+// repaint any OTHER visible column it touched. `fresh` stamps the flash clock.
+function indexCues(i, fresh) {
+  const b = bars[i];
+  if (!b || !Array.isArray(b.ev) || !b.ev.length) return;
+  const touched = new Set();
+  const now = performance.now();
+  for (const e of b.ev) {
+    let targets;
+    try { targets = resolveTargets(e, i); } catch (err) { console.warn("cue resolver", err); continue; }
+    for (const t of targets) {
+      const list = cueIndex.get(t.bar) || [];
+      if (list.some(x => x.tk === t.tk && x.role === t.role && x.src === t.src && x.type === t.type)) continue;
+      list.push(t);
+      cueIndex.set(t.bar, list);
+      if (fresh && !reducedMotion) cueSeen.set(cueKey(t), now);
+      if (t.bar !== i) touched.add(t.bar);
+    }
+  }
+  // Earlier bars already on screen: repaint in place. Never append — setCol
+  // would tack a stale column onto the right edge if the node were absent.
+  for (const j of touched) {
+    if (strip.querySelector(`.col[data-i="${j}"]`)) setCol(j, renderColumn(bars[j], j));
+  }
+}
+// Replay: a bar completing while playing IS the fresh arrival.
+function markCuesFresh(i) {
+  const now = performance.now();
+  for (const [bar, list] of cueIndex) for (const t of list) if (t.src === i) cueSeen.set(cueKey(t), now);
+}
+// Paint bar i's cues onto a freshly built column. Called from renderColumn.
+function applyCues(col, b, i) {
+  if (!cuesOn || b !== bars[i]) return;               // the developing column is never bars[i]
+  const list = cueIndex.get(i);
+  if (!list || !list.length) return;
+  const byTk = new Map();
+  for (const t of list) { const arr = byTk.get(t.tk) || []; arr.push(t); byTk.set(t.tk, arr); }
+  const churn = inChurn(b);
+  const now = performance.now();
+  for (const [tk, ts] of byTk) {
+    const cell = col.querySelector(`.cell[data-tk="${tk}"]`);
+    if (!cell) continue;                                // clipped by the view window
+    const shadows = [], seenRoles = new Set(), lines = [];
+    let glyph = "", pivot = false, newest = -Infinity;
+    for (const t of ts) {
+      const r = CUE_ROLE[t.role] || CUE_ROLE.stack;
+      cell.classList.add("cue-" + t.role);
+      if (t.role === "pivot") pivot = true;
+      if (!seenRoles.has(r.edge)) {
+        seenRoles.add(r.edge);
+        const o = r.edge === "l" ? `${r.w}px 0` : r.edge === "r" ? `-${r.w}px 0`
+                : r.edge === "t" ? `0 ${r.w}px` : `0 -${r.w}px`;
+        shadows.push(`inset ${o} 0 0 var(${r.tone})`);
+      }
+      if (!glyph) glyph = r.glyph;
+      const src = bars[t.src];
+      lines.push(`⚑ ${EM_LABEL[t.type] || t.type} · ${r.label}` + (t.src !== i ? ` (bar ${t.src + 1})` : ""));
+      const seen = cueSeen.get(cueKey(t));
+      if (seen != null) newest = Math.max(newest, seen);
+    }
+    cell.classList.add("cue");
+    if (pivot) cell.classList.add("cue-pivot");
+    if (churn) cell.classList.add("churn");
+    cell.dataset.glyph = glyph + (ts.length > 3 ? ts.length : "");
+    cell.style.boxShadow = shadows.join(", ");
+    cell.title = (cell.title ? cell.title + "\n" : "") + lines.join("\n");
+    const src = ts[0].src;
+    cell.onclick = () => { emPinned = true; emPinnedIdx = src; openEmPanel(src); };
+    // Flash: only if this cue was stamped fresh and the flash has time left.
+    // A mid-flash repaint continues the animation from where it was rather than
+    // restarting it (negative animation-delay); removal is JS-timed.
+    const age = now - newest;
+    if (isFinite(age) && age < CUE_FLASH_MS) {
+      cell.classList.add("cue-new");
+      cell.style.animationDelay = `-${Math.round(age)}ms`;
+      setTimeout(() => cell.classList.remove("cue-new"), CUE_FLASH_MS - age + 20);
+    }
+  }
+}
+function toggleCues() {
+  cuesOn = !cuesOn;
+  const chip = $("cue-chip"); if (chip) chip.classList.toggle("off", !cuesOn);
+  showCaption(cuesOn ? "Cell cues on (x hides them)" : "Cell cues hidden (x shows them)");
+  repaintAll();
+}
+{ const chip = $("cue-chip"); if (chip) chip.onclick = toggleCues; }
+// Replay: the whole tape is embedded, so index it once at boot — markers, no
+// flash. LIVE starts empty and indexes as bars arrive (pollBars).
+for (let i = 0; i < bars.length; i++) indexCues(i, false);
 // Fill the viewport below the controls, reserving room for the hint line only
 // (the pace strip now lives inside the footers); no fixed cap — a portrait
 // monitor gets all its vertical real estate. The stage is also user-resizable
@@ -638,6 +865,7 @@ function renderColumn(b, i) {
     if (y - cellH / 2 < 0 || y + cellH / 2 > stage.clientHeight - FOOT_H) continue;
     const cell = document.createElement("div");
     cell.style.top = (y - cellH / 2) + "px"; cell.style.height = (cellH - 1) + "px";
+    cell.dataset.tk = tk;   // addressable by price: the cue layer finds cells by tick [st-n0qm.2]
     const c = byTick.get(tk);
     if (!c) {
       // real microstructure: zero contracts traded here inside the bar —
@@ -701,6 +929,7 @@ function renderColumn(b, i) {
     m.onclick = () => { if (!LIVE) seekTo(i); emPinned = true; emPinnedIdx = i; openEmPanel(i); };
     col.appendChild(m);
   }
+  applyCues(col, b, i);   // cell cues, from cueIndex — never from b.ev directly [st-n0qm.2]
   return col;
 }
 function repaintAll() {
@@ -764,6 +993,7 @@ function finishBar(i) {
   // everything that happens the moment a bar COMPLETES — shared by instant
   // step and progressive playback
   const b = bars[i];
+  if (!LIVE && playing) markCuesFresh(i);   // replay flashes only while playing [st-n0qm.2]
   setCol(i, renderColumn(b, i));
   cvd += b.d;
   repaintReadouts(); appendBarRow(b, i);
@@ -1502,6 +1732,7 @@ document.addEventListener("keydown", e => {
     return;
   }
   if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
+  if (e.code === "KeyX") toggleCues();
   if (e.code === "ArrowRight") stepUser();
   if (e.code === "ArrowLeft") seekTo(idx - 1);
 });
@@ -1575,7 +1806,7 @@ async function pollBars() {
     // reconcile away — the tape cannot be from a different day than the chart.
     if (d.meta && d.meta.day && PAGE_DAY && d.meta.day !== PAGE_DAY) {
       showDayMismatch(d.meta.day);
-      setTimeout(pollBars, 2000);   // keep polling: a feeder restarted on the
+      setTimeout(pollBars, POLL_MS); // keep polling: a feeder restarted on the
       return;                       // right day should clear this by itself
     }
     if (dayMismatch) clearDayMismatch();
@@ -1588,7 +1819,13 @@ async function pollBars() {
     const fresh = d.bars || [];
     if (fresh.length) {
       const wasAtTip = idx >= bars.length - 1;
+      const firstNew = bars.length;
       for (const b of fresh) bars.push(b);
+      // Cue index BEFORE the columns render (step → finishBar → renderColumn
+      // reads it). Flash only what just happened: a since=0 backfill of the
+      // whole day must paint markers, not a light show. [st-n0qm.2]
+      const flash = wasAtTip && fresh.length <= CUE_FLASH_MAX_FRESH;
+      for (let k = 0; k < fresh.length; k++) indexCues(firstNew + k, flash);
       refreshMeta();
       // Catch up instantly rather than animating: a bar only reaches us after
       // it has closed, so replaying each at its own duration would fall further
@@ -1600,7 +1837,7 @@ async function pollBars() {
   } catch {
     if (++liveErrs === 3) setDot("feed stalled");
   }
-  setTimeout(pollBars, 2000);
+  setTimeout(pollBars, POLL_MS);
 }
 // Day-mismatch banner [st-h510]. Deliberately obnoxious and deliberately NOT
 // dismissable: the whole failure it guards against was a surface that looked
