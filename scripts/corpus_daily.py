@@ -136,17 +136,39 @@ def resolve_target_day(explicit: str | None) -> _date:
 def stream_healthy_in_manifest(day: _date, stream: str) -> bool:
     """True if the day's manifest already records this stream with cycles>0 and
     no errors — the idempotency guard against re-pulling on a cron retry."""
+    st = _stream_state(day, stream)
+    return bool(st) and (st.get("cycles", 0) or 0) > 0 and not (st.get("errors") or [])
+
+
+def stream_has_rows_in_manifest(day: _date, stream: str) -> tuple[bool, list[str]]:
+    """(True, errors) when the manifest records this stream with cycles>0 —
+    healthy or not. [st-n0qm, Watcher V2 plan Risk 15]
+
+    A stream that captured rows live is not a MISSING stream: appending the
+    whole session batch onto it writes a second copy of every print, and the
+    prior-day profile seed (Phase 2) then reads a doubled tape. Measured
+    2026-08-11: the live capture recorded a normal reconnect note in `errors`,
+    the healthy-check said "unhealthy", the batch appended 08:30-15:00 CT and
+    the day closed at 496,011 cycles against ~260k on its neighbours. A
+    reconnect is a gap, and a gap wants a windowed pull — never a full-session
+    append. `--force` remains the way to do that on purpose.
+    """
+    st = _stream_state(day, stream)
+    if not st:
+        return False, []
+    return (st.get("cycles", 0) or 0) > 0, list(st.get("errors") or [])
+
+
+def _stream_state(day: _date, stream: str) -> dict | None:
     path = manifest_path(day)
     if not path.exists():
-        return False
+        return None
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        return False
+        return None
     st = (manifest.get("streams") or {}).get(stream)
-    if not st:
-        return False
-    return (st.get("cycles", 0) or 0) > 0 and not (st.get("errors") or [])
+    return st if isinstance(st, dict) else None
 
 
 def run_pull(script: str, day: _date, extra: list[str] | None = None,
@@ -259,6 +281,17 @@ def main(argv: list[str] | None = None) -> int:
         if not args.force and stream_healthy_in_manifest(day, stream):
             logger.info("skip %s: already healthy in manifest for %s", stream, day)
             continue
+        if not args.force:
+            has_rows, errs = stream_has_rows_in_manifest(day, stream)
+            if has_rows:
+                # Rows exist (live capture) but the stream carries error notes.
+                # Do NOT append the session batch on top of a live tape [Risk 15];
+                # say what the errors were so a real gap gets a windowed pull.
+                logger.warning("skip %s: %s already holds rows for %s (errors: %s) — "
+                               "a batch append would double the tape; use --force with "
+                               "--start-ct/--end-ct to fill a specific gap",
+                               stream, stream, day, "; ".join(errs) or "-")
+                continue
         if args.dry_run:
             logger.info("[dry-run] would pull %s via %s (window %s-%s CT)",
                         stream, script, window[1], window[3])

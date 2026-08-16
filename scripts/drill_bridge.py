@@ -62,7 +62,9 @@ logger = logging.getLogger("drill_bridge")
 PORT = int(os.environ.get("DRILL_BRIDGE_PORT", "7788"))
 REPO = Path(__file__).resolve().parent.parent
 LOG_DIR = REPO / "data" / "drill-bridge"
-CORPUS_ROOT = REPO / "data" / "corpus"
+# Same override market/corpus/paths.py honours [Phase 4]; the bridge does not
+# import market/ (dependency-light on purpose), so it reads the variable itself.
+CORPUS_ROOT = Path(os.environ.get("STRADER_CORPUS_ROOT") or (REPO / "data" / "corpus"))
 # The rendered LIVE page. Same path live_footprint_page.py writes and the
 # desktop bookmark reads — one file, three ways in.
 PAGE_PATH = Path(os.environ.get("DRILL_BRIDGE_PAGE", "/tmp/desk-live-footprint.html"))

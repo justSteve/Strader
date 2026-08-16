@@ -16,13 +16,20 @@ it lines up with the cash session boundary at 15:00 CT.
 """
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 CENTRAL = ZoneInfo("America/Chicago")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-CORPUS_ROOT = PROJECT_ROOT / "data" / "corpus"
+# STRADER_CORPUS_ROOT relocates the whole corpus tree — a replay box, a
+# harvest copy on Z:, a test fixture — without touching every consumer
+# [Watcher V2 plan §2 seam (e), Phase 4]. Every path helper below derives from
+# this one name; scripts/drill_bridge.py (dependency-light, no market import)
+# reads the same variable itself. Read once at import: a process pins one
+# corpus for its life, which is the behaviour a feeder or a sentinel wants.
+CORPUS_ROOT = Path(os.environ.get("STRADER_CORPUS_ROOT") or (PROJECT_ROOT / "data" / "corpus"))
 
 
 def central_date(now: datetime | None = None) -> date:

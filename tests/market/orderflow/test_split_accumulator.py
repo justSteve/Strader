@@ -56,17 +56,27 @@ def test_profile_equals_sum_of_cells_including_partial(trades):
     assert sum(acc.nones.values()) == nv
 
 
-def test_build_split_profile_default_halves_none_and_matches_accumulator(trades):
-    """The batch builder delegates to the accumulator; its default keeps the
-    historical halving so the premarket page's total still equals the traded
-    total. With ES (N == 0 on the fixture) the two policies agree exactly."""
+def test_build_split_profile_default_is_separate_and_matches_accumulator(trades):
+    """The batch builder delegates to the accumulator and, since the Aggressor
+    None Policy decision (Phase 4), defaults to ``separate`` like the live
+    panel — one policy across the estate. ``halve`` stays opt-in. With ES
+    (N == 0 on the fixture) the two policies agree exactly."""
     acc = SplitAccumulator(1)
     for t in trades:
         acc.add(t)
     batch = build_split_profile(trades)
-    assert batch == acc.snapshot(none_policy="halve")
+    assert batch == acc.snapshot(none_policy="separate")
+    assert batch == build_split_profile(trades, none_policy="separate")
     if sum(acc.nones.values()) == 0:
-        assert batch == acc.snapshot(none_policy="separate")
+        assert batch == acc.snapshot(none_policy="halve")
+
+
+def test_default_policy_never_invents_an_aggressor():
+    t0 = datetime(2026, 8, 14, 8, 30, tzinfo=timezone.utc)
+    prof = build_split_profile([_t(t0, 7800.0, 10, "B"), _t(t0, 7800.0, 3, "N")])
+    assert prof.buy_volumes == (10,) and prof.sell_volumes == (0,)   # the N print is not a seller
+    assert build_split_profile([_t(t0, 7800.0, 10, "B"), _t(t0, 7800.0, 3, "N")],
+                               none_policy="halve").sell_volumes == (2,)   # opt-in: 3 → 1 buy + 2 sell
 
 
 def _t(ts, price, size, side):

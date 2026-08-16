@@ -36,3 +36,21 @@ def test_never_returns_today():
     # batch is not yet complete, so gating on it would be a false halt.
     now = _ct("2026-07-01T23:59")
     assert most_recent_session_day(now) < now.date()
+
+
+def test_corpus_root_honours_the_env_override(tmp_path, monkeypatch):
+    """STRADER_CORPUS_ROOT relocates the corpus tree for every helper (Phase 4
+    seam). Read at import, so exercise it through a fresh import."""
+    import importlib
+    import sys
+    monkeypatch.setenv("STRADER_CORPUS_ROOT", str(tmp_path / "corpus-elsewhere"))
+    sys.modules.pop("market.corpus.paths", None)
+    try:
+        mod = importlib.import_module("market.corpus.paths")
+        assert mod.CORPUS_ROOT == tmp_path / "corpus-elsewhere"
+        assert mod.gexbot_orderflow_1s_path(date(2026, 8, 14)) == \
+            tmp_path / "corpus-elsewhere" / "2026-08-14" / "gexbot_orderflow_1s.jsonl"
+    finally:
+        monkeypatch.delenv("STRADER_CORPUS_ROOT")
+        sys.modules.pop("market.corpus.paths", None)
+        importlib.import_module("market.corpus.paths")     # restore the real one for later tests

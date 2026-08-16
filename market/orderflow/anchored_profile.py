@@ -130,9 +130,9 @@ class SplitAccumulator:
     ``build_split_profile``, mirroring ``ProfileAccumulator``. [st-n0qm.4]
 
     One trade at a time, per-tick buckets by default, buy / sell / none kept
-    apart. ``none`` is NOT halved into the sides here (that is the
-    ``none_policy="halve"`` behaviour ``build_split_profile`` keeps for its
-    existing callers): kept separate, the invariant the live footprint page
+    apart. ``none`` is NOT halved into the sides here (``none_policy="halve"``
+    remains an opt-in on ``snapshot``/``build_split_profile`` for a caller that
+    needs total == traded): kept separate, the invariant the live footprint page
     rests on holds exactly — for every price P,
         buys[P] + sells[P] == Σ over closed bars of cells[P].bid + cells[P].ask
     because ``build_bars`` also keeps N out of cells (NONE_SIDE_POLICY).
@@ -209,7 +209,7 @@ class SplitAccumulator:
 
 def build_split_profile(trades: Iterable[Trade],
                         bucket_ticks: int = 1,
-                        none_policy: str = "halve") -> SplitProfile:
+                        none_policy: str = "separate") -> SplitProfile:
     """Histogram real prints into buckets, keeping the aggressor sides apart.
 
     Default bucket is ONE tick — the native resolution of the instrument. The
@@ -217,12 +217,14 @@ def build_split_profile(trades: Iterable[Trade],
     fine buckets honestly; real prints can.
 
     Delegates to ``SplitAccumulator`` (one histogram implementation, batch and
-    live). ``none_policy`` defaults to ``halve`` — unknown-aggressor prints
-    split evenly so the histogram total equals the traded total, the behaviour
-    the premarket page and its tests were built on. On ES this is a no-op —
-    Databento classifies every print. The live footprint panel uses
-    ``separate`` (see SplitAccumulator). Unifying the estate on one policy is a
-    Phase 4 decision bead.
+    live). ``none_policy`` defaults to ``separate`` — the estate's one policy
+    since the Aggressor None Policy decision (Watcher V2 Phase 4, 2026-08-16):
+    an unknown-aggressor print is shown as what it is, never split into a
+    buyer and a seller nobody observed — Steve asked for bars "color coded to
+    indicate the aggressor side of the trade", and half-red-half-blue is a
+    side that was not indicated. ``halve`` stays available for a caller that
+    needs the histogram total to equal the traded total. On ES both agree
+    exactly — Databento classifies every print (0 N-side of 258k on 08-11).
     """
     acc = SplitAccumulator(bucket_ticks)
     for t in trades:

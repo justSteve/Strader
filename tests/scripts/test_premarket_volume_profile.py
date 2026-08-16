@@ -78,12 +78,18 @@ class TestSplitProfile:
     def test_native_bucket_is_one_tick(self):
         assert build_split_profile(_trades(), bucket_ticks=1).bucket_pts == 0.25
 
-    def test_unknown_aggressor_is_split_without_losing_contracts(self):
+    def test_unknown_aggressor_is_not_invented_into_a_side(self):
+        """Aggressor None Policy (Watcher V2 Phase 4, 2026-08-16): the estate's
+        one policy is ``separate`` — an N print is neither buyer nor seller in
+        the histogram; ``halve`` is opt-in for a caller that needs total ==
+        traded. On ES the two agree exactly (Databento classifies every print).
+        Before this ruling the default halved and this test asserted total 7."""
         odd = [Trade(ts=TS, symbol="ESU6", instrument_id=1, price=7750.0,
                      size=7, side="N")]
         prof = build_split_profile(odd, bucket_ticks=1)
-        assert prof.total == 7                      # nothing dropped
-        assert prof.buy_volumes[0] + prof.sell_volumes[0] == 7
+        assert prof.buy_volumes == (0,) and prof.sell_volumes == (0,) and prof.total == 0
+        hal = build_split_profile(odd, bucket_ticks=1, none_policy="halve")
+        assert hal.total == 7 and hal.buy_volumes[0] + hal.sell_volumes[0] == 7
 
     def test_as_volume_profile_round_trips_into_the_value_area(self):
         prof = build_split_profile(_trades(), bucket_ticks=1)

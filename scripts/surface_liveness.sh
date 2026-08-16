@@ -68,19 +68,48 @@ else
 fi
 
 probe "ES capture"        "corpus_stream_databento.py"  "trades + MBP-1"
-probe "drill bridge"      "drill_bridge.py"             "127.0.0.1:7788"
-probe "footprint feeder"  "live_footprint_feed.py"      "tails today's ES JSONL"
-probe "GEX collector"     "corpus_poll_gexbot.py"       "SPX GEX -> corpus · the FEED is RTH-only (measured: first tick 08:30:02, last 15:00:33), so the collector is gated 08:30-15:05 CT weekdays, NYSE holidays off. DOWN outside that is NORMAL. Cron */2 restarts it — DOWN *inside* the window means the supervisor is failing too [st-p3lv]"
+probe "drill bridge"      "drill_bridge.py"             "127.0.0.1:7788 · systemd strader-drill-bridge.service since 2026-08-16 (st-n0qm.3); serves the page + /health/producers + /alerts"
+probe "footprint feeder"  "live_footprint_feed.py"      "tails today's ES JSONL · systemd strader-footprint-feed.service, PartOf the bridge (st-n0qm.3); DayRolledOver = restart into the new day"
+probe "GEX collector"     "corpus_poll_gexbot.py"       "SPX GEX -> corpus · the FEED is RTH-only (measured: first tick 08:30:02, last 15:00:33), so the collector is gated 08:30-15:05 CT weekdays, NYSE holidays off. DOWN outside that is NORMAL. systemd strader-gexbot.timer starts it 08:30 CT (st-pgfe, 2026-08-13; the */2 cron shim is gone) — DOWN *inside* the window means the unit is failing [st-p3lv]"
 # The 1 Hz leg is a SEPARATE process from the collector above on purpose (own
 # cadence, own quota economics, own supervisor) — and it had no row here for its
 # first three live days. It was up, and this script could not have said so either
 # way, which is the 2026-08-05 GEXBot blindness this file exists to end. [st-pfrz]
-probe "GEX 1Hz orderflow" "corpus_poll_gexbot_orderflow_1s.py" "SPX orderflow at ~1 Hz -> corpus · same measured RTH gate as the collector above (08:30-15:05 CT weekdays, NYSE holidays off), so DOWN outside that is NORMAL. Cron */2 restarts it — DOWN *inside* the window means the supervisor is failing too [st-ipn0]"
-# UNSUPERVISED, and the only live surface here that is. Nothing restarts it, so a
-# DOWN row is actionable at any hour rather than explained by a window. [st-2yuw]
-probe "OF sentinel"       "orderflow_sentinel.py"       "level-proximity alerts off the 1 Hz feed -> orderflow_alerts.jsonl · HAND-LAUNCHED, no cron shim (st-2yuw): unlike every collector above, nothing restarts this. It died with the 08-11 reboot and stayed down until a human noticed. DOWN is ALWAYS actionable [st-igim]"
+probe "GEX 1Hz orderflow" "corpus_poll_gexbot_orderflow_1s.py" "SPX orderflow at ~1 Hz -> corpus · same measured RTH gate as the collector above (08:30-15:05 CT weekdays, NYSE holidays off), so DOWN outside that is NORMAL. systemd strader-gexbot-orderflow-1s.timer starts it 08:30 CT (st-pgfe, 2026-08-13; the */2 cron shim is gone) — DOWN *inside* the window means the unit is failing [st-ipn0]"
+# Supervised since 2026-08-16 06:20 CT (strader-orderflow-sentinel.service,
+# st-2yuw / co-03ojd.7). Before that it was the only unsupervised live surface
+# here: it died with the 08-11 reboot and again in the 08-15 OOM reset and stayed
+# down until a human noticed. Still: no window explains a DOWN — it runs all day.
+probe "OF sentinel"       "orderflow_sentinel.py"       "level-proximity alerts off the 1 Hz feed -> orderflow_alerts.jsonl + bridge /alerts (st-n0qm.9) · systemd strader-orderflow-sentinel.service; DOWN is ALWAYS actionable [st-igim]"
 probe "MI gauge"          "mi_gauge"                    "cron-driven, usually DOWN between ticks"
 probe "GEX hist backfill" "gexbot_hist_backfill.py"     "nightly /hist harvest, cron 21:00 CT weekdays (st-mx42) — it runs for a few minutes after the close, so DOWN is NORMAL almost all day and this row is a permanent fixture, not a temporary one. The 'delete when the paid window completes' instruction this row used to carry pointed at st-ox9x, CANCELLED 2026-08-10; the surviving loose end is st-kr4a (files named .json.gz are plain JSON)"
+
+# Producer HEALTH FILES [st-n0qm.3, Phase 2b/4]: each live producer writes its
+# own heartbeat JSON; the bridge's /health/producers and the page's HUD dots
+# read the same files. A process row can say UP while its loop is wedged; the
+# health file's AGE is what says the loop is turning. Budgets match the bridge.
+printf '\n'
+hstat() {           # hstat <label> <path> <fresh_s> [why-absent-is-normal]
+    local label="$1" path="$2" fresh="$3" note="${4:-}"
+    if [[ ! -f "$path" ]]; then
+        printf '%-22s %-8s %-10s %s\n' "$label" "ABSENT" "-" "$(basename "$path")${note:+ · $note}"
+        return
+    fi
+    local age state status
+    age=$(( $(date +%s) - $(date -r "$path" +%s) ))
+    status="$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('status') or d.get('state') or '-')" "$path" 2>/dev/null || echo '-')"
+    # idle/quiet is a collector saying "outside my window" — neutral, like the
+    # page's dots, not stale: stale is a producer that should be moving and is not.
+    if   [[ "$status" == idle || "$status" == quiet ]]; then state="IDLE"
+    elif (( age <= fresh ));     then state="FRESH"
+    elif (( age <= fresh * 3 )); then state="AGING"
+    else                              state="STALE"; fi
+    printf '%-22s %-8s %-10s %s\n' "$label" "$state" "${age}s" "$(basename "$path") · status $status · budget ${fresh}s"
+}
+hstat "tape health"     "$REPO/data/corpus/_capture_health.json"     180 "capture writes it while streaming; absent = never streamed on this box"
+hstat "1Hz gex health"  "$REPO/data/corpus/_gexbot_of1s_health.json" 180 "written by the 1 Hz leg; idle/quiet outside 08:30-15:05 CT is normal"
+hstat "sentinel health" "$DAY_DIR/_sentinel_health.json"             90  "every 60 s while the sentinel runs (Phase 0)"
+hstat "feed health"     "$DAY_DIR/_footprint_health.json"            90  "every push and every 30 s while waiting (Phase 2b)"
 
 printf '\n'
 fsize "ES tape"      "$DAY_DIR/databento_glbx_es.jsonl"
