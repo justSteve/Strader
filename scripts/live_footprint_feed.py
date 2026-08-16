@@ -56,7 +56,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from market.corpus.paths import CORPUS_ROOT, central_date, gexbot_path, resolve_existing  # noqa: E402
+from market.orderflow.anchored_profile import (  # noqa: E402
+    RTH_OPEN_CT, SplitAccumulator, anchor_utc, profile_payload,
+)
 from market.orderflow.anchors import LiveAnchors, mancini_levels_for  # noqa: E402
+from market.orderflow.tradesource import iter_trades  # noqa: E402
+from strader.market_calendar import prior_trading_day  # noqa: E402
 from market.orderflow.gex_context import GexContext                # noqa: E402
 from market.orderflow.bars import build_bars                    # noqa: E402
 from market.orderflow.fill import bar_fill_steps                # noqa: E402
@@ -329,9 +334,9 @@ def developing_payload(pending: list, bar_n: int) -> dict | None:
 
 def post_bars(bridge: str, bars: list[dict], meta: dict | None = None,
               final: list[dict] | None = None, developing: dict | None = None,
-              *, timeout: float = 5.0) -> int | None:
+              *, profile: dict | None = None, timeout: float = 5.0) -> int | None:
     body = json.dumps({"bars": bars, "meta": meta, "final": final,
-                       "developing": developing}).encode()
+                       "developing": developing, "profile": profile}).encode()
     req = urllib.request.Request(f"{bridge}/bars", data=body,
                                  headers={"Content-Type": "application/json"},
                                  method="POST")
@@ -379,6 +384,14 @@ def main() -> int:
                     help="seconds between pushes of the DEVELOPING (still "
                          "forming) bar; 0 disables and the page shows closed "
                          "bars only, as it did before [st-e91l]")
+    ap.add_argument("--vp-anchor", default="prior-rth",
+                    help="Anchored aggressor volume profile [st-n0qm.4]: "
+                         "'prior-rth' (default — the prior trading day's 08:30 CT "
+                         "open, Steve's ruling 2026-07-24/08-11), 'prior-globex' "
+                         "(prior day 17:00 CT; the tick corpus has no prints "
+                         "15:05→02:50 CT so this degenerates to the 02:50 first "
+                         "print and the page banners the hole), an ISO datetime, "
+                         "or 'off'")
     ap.add_argument("--no-gex", action="store_true",
                     help="do not stamp bars with GexBot dealer positioning "
                          "[st-8ywx]; the stamp is already a no-op when the "
@@ -454,6 +467,39 @@ def main() -> int:
                 "(dry-run)" if args.dry_run else args.bridge,
                 len(live_anchors.anchors), len(mancini))
 
+    # ── anchored aggressor volume profile [st-n0qm.4] ─────────────────────
+    # A second VIEW of the same tape the cells show: pre-seeded from the prior
+    # day's file through the shared trade source, then fed every trade the tee
+    # releases — so profile[P] == Σ cells[P] by construction (invariant test in
+    # tests/market/orderflow/test_split_accumulator.py). Pushed with the 1 s
+    # developing tick and each closed batch on the bridge's `profile` slot.
+    vp, vp_anchor_ts, vp_label = None, None, None
+    if args.vp_anchor and args.vp_anchor != "off" and not args.dry_run:
+        vp_anchor_ts, vp_label = resolve_vp_anchor(args.vp_anchor, day)
+        vp = SplitAccumulator(1)
+        try:
+            n_seed = 0
+            for t in iter_trades(prior_trading_day(day), start_ts=vp_anchor_ts):
+                vp.add(t)
+                n_seed += 1
+            vp.mark_seeded()
+            logger.info("profile pre-seeded from %s: %d prints since %s (%s)",
+                        prior_trading_day(day), n_seed, vp_anchor_ts.isoformat(), vp_label)
+        except FileNotFoundError:
+            vp.mark_seeded()
+            logger.warning("profile: no corpus file for %s — prior-day layer empty; "
+                           "today's prints still accrete from the anchor rule",
+                           prior_trading_day(day))
+        post_bars(args.bridge, [], None, None, None,
+                  profile=profile_payload(vp, anchor=vp_label, anchor_ts=vp_anchor_ts,
+                                          session_day=day.isoformat()))
+
+    def _vp_payload():
+        if vp is None:
+            return None
+        return profile_payload(vp, anchor=vp_label, anchor_ts=vp_anchor_ts,
+                               session_day=day.isoformat())
+
     # Pin only when following TODAY. An explicit --date is a deliberate replay
     # of a past day and must not trip the rollover guard. [st-h510]
     rows = tail_rows(path, follow=not args.catch_up_only,
@@ -506,13 +552,15 @@ def main() -> int:
         nonlocal last_dev
         for t in it:
             pending_trades.append(t)
+            if vp is not None:
+                vp.add(t)   # the profile sees exactly what build_bars sees, before it does
             if dev_on:
                 now = time.monotonic()
                 if now - last_dev >= args.developing_interval:
                     last_dev = now
                     payload = developing_payload(pending_trades, args.bar_n)
                     if payload is not None:
-                        post_bars(args.bridge, [], None, None, payload)
+                        post_bars(args.bridge, [], None, None, payload, profile=_vp_payload())
                         _beat(developing_t=payload.get("t0"))
             yield t
 
@@ -529,7 +577,7 @@ def main() -> int:
             for e in final or ():
                 logger.info("final: %s", e)
         else:
-            post_bars(args.bridge, batch, meta_, final)
+            post_bars(args.bridge, batch, meta_, final, profile=_vp_payload())
             _beat(sent=feed_health["sent"] + len(batch),
                   last_bar_t1=(batch[-1].get("t1") if batch else feed_health["last_bar_t1"]),
                   final=len(final or ()) or feed_health["final"])
@@ -538,6 +586,24 @@ def main() -> int:
     drive_and_publish(live_drive(_closed_bars(), driver, live_anchors),
                       driver, pending_trades, runlog, _publish, meta=meta, gex=gex)
     return 0
+
+
+def resolve_vp_anchor(spec: str, day: _date):
+    """`--vp-anchor` → (anchor UTC datetime, label). [st-n0qm.4]
+    prior-rth: prior trading day 08:30 CT (RTH_OPEN_CT). prior-globex: prior
+    trading day 17:00 CT — accepted, but the tick corpus has no prints
+    15:05→02:50 CT, so the page banners the hole. Anything else: ISO datetime
+    (naive = CT)."""
+    from datetime import time as _time
+    from zoneinfo import ZoneInfo
+    if spec == "prior-rth":
+        return anchor_utc(prior_trading_day(day), RTH_OPEN_CT), "prior-rth"
+    if spec == "prior-globex":
+        return anchor_utc(prior_trading_day(day), _time(17, 0)), "prior-globex"
+    dt = datetime.fromisoformat(spec)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("America/Chicago"))
+    return dt, f"iso:{dt.isoformat()}"
 
 
 def write_feed_health(path: Path, payload: dict) -> None:

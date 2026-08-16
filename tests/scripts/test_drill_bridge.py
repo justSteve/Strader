@@ -195,3 +195,20 @@ def test_producers_health_reports_age_and_freshness(monkeypatch, tmp_path):
     assert p["feed"]["present"] and not p["feed"]["fresh"] and p["feed"]["age_s"] > 900
     assert p["gex_1s"]["present"] is False and p["gex_1s"]["fresh"] is False
     assert h["day"] == "2026-08-17"
+
+
+def test_profile_slot_is_replaced_not_appended_and_served_at_the_tip(state):
+    """[st-n0qm.4] The anchored profile rides its own slot: replaced on every
+    push, served on every /bars (including since >= total), never retired by
+    closed bars — unlike `developing`, which a closed bar supersedes."""
+    state.add_bars([], None, None, None, {"v": 1, "n": 10, "buy": [1], "sell": [2]})
+    state.add_bars([{"o": 1}], None, None, {"v": 900}, {"v": 1, "n": 25, "buy": [3], "sell": [4]})
+    r = state.bars_since(99)
+    assert r["bars"] == [] and r["total"] == 1
+    assert r["profile"] == {"v": 1, "n": 25, "buy": [3], "sell": [4]}
+    assert r["developing"] == {"v": 900}
+    state.add_bars([{"o": 2}])            # a bar push without a profile keeps the last profile
+    r = state.bars_since(0)
+    assert r["profile"]["n"] == 25 and r["developing"] is None
+    with pytest.raises(ValueError):
+        state.add_bars([], None, None, None, ["not", "an", "object"])

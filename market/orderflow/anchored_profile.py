@@ -119,49 +119,156 @@ class SplitProfile:
         )
 
 
+# A gap between consecutive prints longer than this is a HOLE in the tape —
+# the tick corpus captures 02:50–15:05 CT, so the evening session is absent
+# by construction and the profile must say so rather than read as an LVN.
+HOLE_MIN_S = 30 * 60
+
+
+class SplitAccumulator:
+    """Streaming aggressor-split histogram — the live form of
+    ``build_split_profile``, mirroring ``ProfileAccumulator``. [st-n0qm.4]
+
+    One trade at a time, per-tick buckets by default, buy / sell / none kept
+    apart. ``none`` is NOT halved into the sides here (that is the
+    ``none_policy="halve"`` behaviour ``build_split_profile`` keeps for its
+    existing callers): kept separate, the invariant the live footprint page
+    rests on holds exactly — for every price P,
+        buys[P] + sells[P] == Σ over closed bars of cells[P].bid + cells[P].ask
+    because ``build_bars`` also keeps N out of cells (NONE_SIDE_POLICY).
+
+    ``mark_seeded()`` snapshots the histogram at a boundary (the end of the
+    prior-day pre-seed) so a renderer can draw the prior day faint and today
+    on top; ``holes`` records gaps in the tape longer than HOLE_MIN_S.
+    """
+
+    __slots__ = ("bucket", "buys", "sells", "nones", "n", "symbol",
+                 "first_ts", "last_ts", "seeded", "holes")
+
+    def __init__(self, bucket_ticks: int = 1) -> None:
+        self.bucket = bucket_ticks * TICK
+        self.buys: dict[int, int] = {}
+        self.sells: dict[int, int] = {}
+        self.nones: dict[int, int] = {}
+        self.n = 0
+        self.symbol: str | None = None
+        self.first_ts: datetime | None = None
+        self.last_ts: datetime | None = None
+        self.seeded: dict | None = None
+        self.holes: list[tuple[datetime, datetime]] = []
+
+    def add(self, t: Trade) -> None:
+        k = int(t.price // self.bucket)   # floor: same bucket rule as before (and as ProfileAccumulator)
+        if t.side == "B":
+            self.buys[k] = self.buys.get(k, 0) + t.size
+        elif t.side == "A":
+            self.sells[k] = self.sells.get(k, 0) + t.size
+        else:
+            self.nones[k] = self.nones.get(k, 0) + t.size
+        if self.n == 0:
+            self.symbol, self.first_ts = t.symbol, t.ts
+        elif self.last_ts is not None and (t.ts - self.last_ts).total_seconds() >= HOLE_MIN_S:
+            self.holes.append((self.last_ts, t.ts))
+        self.last_ts = t.ts
+        self.n += 1
+
+    def mark_seeded(self) -> None:
+        """Snapshot the histogram at the pre-seed boundary."""
+        self.seeded = {"n": self.n, "through_ts": self.last_ts,
+                       "buys": dict(self.buys), "sells": dict(self.sells)}
+
+    def keys(self) -> range:
+        ks = [k for d in (self.buys, self.sells, self.nones) for k in d]
+        if not ks:
+            return range(0)
+        return range(min(ks), max(ks) + 1)
+
+    def snapshot(self, none_policy: str = "separate") -> SplitProfile:
+        """Materialise a ``SplitProfile``. ``none_policy``: ``separate`` leaves
+        N out of the sides (SplitProfile.total then excludes it); ``halve``
+        splits it evenly, matching ``build_split_profile``'s historical total."""
+        if not self.n:
+            raise ValueError("cannot build a profile from zero trades")
+        keys = self.keys()
+        buys, sells = [], []
+        for k in keys:
+            b, s_ = self.buys.get(k, 0), self.sells.get(k, 0)
+            if none_policy == "halve":
+                nn = self.nones.get(k, 0)
+                half = int(nn / 2)
+                b, s_ = b + half, s_ + (nn - half)
+            buys.append(b)
+            sells.append(s_)
+        return SplitProfile(
+            symbol=self.symbol or "", start_ts=self.first_ts, end_ts=self.last_ts,
+            bucket_pts=self.bucket,
+            prices=tuple(round(k * self.bucket, 4) for k in keys),
+            buy_volumes=tuple(buys), sell_volumes=tuple(sells),
+        )
+
+
 def build_split_profile(trades: Iterable[Trade],
-                        bucket_ticks: int = 1) -> SplitProfile:
+                        bucket_ticks: int = 1,
+                        none_policy: str = "halve") -> SplitProfile:
     """Histogram real prints into buckets, keeping the aggressor sides apart.
 
     Default bucket is ONE tick — the native resolution of the instrument. The
     bar path defaults coarser (4 ticks) because a smeared bar cannot support
     fine buckets honestly; real prints can.
 
-    Unknown-aggressor prints ('N') are counted in the total by splitting them
-    evenly, so the histogram total always equals the traded total. On ES this
-    is a no-op — Databento classifies every print.
+    Delegates to ``SplitAccumulator`` (one histogram implementation, batch and
+    live). ``none_policy`` defaults to ``halve`` — unknown-aggressor prints
+    split evenly so the histogram total equals the traded total, the behaviour
+    the premarket page and its tests were built on. On ES this is a no-op —
+    Databento classifies every print. The live footprint panel uses
+    ``separate`` (see SplitAccumulator). Unifying the estate on one policy is a
+    Phase 4 decision bead.
     """
-    bucket = bucket_ticks * TICK
-    buys: dict[int, int] = {}
-    sells: dict[int, int] = {}
-    symbol: str | None = None
-    first_ts = last_ts = None
-    n = 0
+    acc = SplitAccumulator(bucket_ticks)
     for t in trades:
-        k = int(t.price // bucket)
-        if t.side == "B":
-            buys[k] = buys.get(k, 0) + t.size
-        elif t.side == "A":
-            sells[k] = sells.get(k, 0) + t.size
-        else:
-            half = t.size / 2
-            buys[k] = buys.get(k, 0) + int(half)
-            sells[k] = sells.get(k, 0) + t.size - int(half)
-        if n == 0:
-            symbol, first_ts = t.symbol, t.ts
-        last_ts = t.ts
-        n += 1
-    if not n:
-        raise ValueError("cannot build a profile from zero trades")
-    lo, hi = min(min(buys or {0: 0}), min(sells or {0: 0})), \
-             max(max(buys or {0: 0}), max(sells or {0: 0}))
-    keys = range(lo, hi + 1)
-    return SplitProfile(
-        symbol=symbol, start_ts=first_ts, end_ts=last_ts, bucket_pts=bucket,
-        prices=tuple(round(k * bucket, 4) for k in keys),
-        buy_volumes=tuple(buys.get(k, 0) for k in keys),
-        sell_volumes=tuple(sells.get(k, 0) for k in keys),
-    )
+        acc.add(t)
+    return acc.snapshot(none_policy=none_policy)
+
+
+def profile_payload(acc: SplitAccumulator, *, anchor: str, anchor_ts: datetime,
+                    session_day: str, hvn_min: float = 0.70, lvn_max: float = 0.30) -> dict:
+    """The wire form of a live profile — what the feeder posts to the bridge's
+    ``profile`` slot and the page draws. Arrays run from ``lo_tick`` up one
+    bucket at a time so the page can address a row by tick without a lookup.
+    ``seeded`` carries the prior-day layer; ``hole`` the tape gaps; ``va`` and
+    the node lists come from the collapsed profile so POC/VA/HVN/LVN agree with
+    every other profile on the desk. Empty accumulator → ``n: 0`` and no arrays.
+    """
+    out = {"v": 1, "anchor": anchor, "anchor_ts": anchor_ts.isoformat(),
+           "session_day": session_day, "bucket": acc.bucket, "n": acc.n,
+           "first_ts": acc.first_ts.isoformat() if acc.first_ts else None,
+           "last_ts": acc.last_ts.isoformat() if acc.last_ts else None,
+           "hole": [[a.isoformat(), b.isoformat()] for a, b in acc.holes]}
+    if not acc.n:
+        return out
+    keys = acc.keys()
+    lo = keys.start
+    out["lo_tick"] = lo
+    out["buy"] = [acc.buys.get(k, 0) for k in keys]
+    out["sell"] = [acc.sells.get(k, 0) for k in keys]
+    out["none"] = [acc.nones.get(k, 0) for k in keys]
+    if acc.seeded:
+        out["seeded"] = {"n": acc.seeded["n"],
+                         "through_ts": acc.seeded["through_ts"].isoformat() if acc.seeded["through_ts"] else None,
+                         "buy": [acc.seeded["buys"].get(k, 0) for k in keys],
+                         "sell": [acc.seeded["sells"].get(k, 0) for k in keys]}
+    vp = acc.snapshot().as_volume_profile()
+    if vp.total > 0:
+        va = value_area(vp)
+        out["va"] = {"poc": va.poc, "vah": va.vah, "val": va.val}
+        from market.orderflow.profile import _local_extrema
+        poc_vol = max(vp.volumes)
+        maxima, minima = _local_extrema(vp.volumes)
+        out["hvn"] = [vp.prices[i] for i in maxima
+                      if vp.prices[i] != vp.poc_price and vp.volumes[i] >= hvn_min * poc_vol]
+        out["lvn"] = [vp.prices[i] for i in minima
+                      if 0 < vp.volumes[i] <= lvn_max * poc_vol]
+    return out
 
 
 def anchor_utc(session_day, open_ct: time = RTH_OPEN_CT) -> datetime:

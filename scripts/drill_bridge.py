@@ -14,7 +14,7 @@ Endpoints (all JSON; POST bodies are sent as text/plain so file:// pages make
   POST /coach                      <- {type: say|arm|jump|pause|play, ...}
   GET  /commands?since=<id>        -> {commands: [...], last: <id>} (drill poll)
   POST /bars                       <- {bars: [...], meta: {...}, final: [...]} from the feeder
-  GET  /bars?since=<n>             -> {bars: [...], total, meta, final} (live footprint)
+  GET  /bars?since=<n>             -> {bars: [...], total, meta, final, developing, profile}
   GET  /                           -> the LIVE page itself (text/html) [st-n0qm.3]
   GET  /health/producers           -> ages of the producer health files (tape,
                                       1 Hz feed, sentinel, footprint feed) for the HUD dots
@@ -98,6 +98,7 @@ class BridgeState:
         self._bar_meta: dict = {}
         self._final: list[dict] = []   # end-of-stream emissions [st-b0n9]
         self._developing: dict | None = None  # the bar still forming [st-e91l]
+        self._profile: dict | None = None     # the anchored aggressor profile [st-n0qm.4]
         self._events = 0
         self.started = datetime.now(timezone.utc).isoformat(timespec="seconds")
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -129,7 +130,8 @@ class BridgeState:
 
     def add_bars(self, bars: list[dict], meta: dict | None = None,
                  final: list[dict] | None = None,
-                 developing: dict | None = None) -> int:
+                 developing: dict | None = None,
+                 profile: dict | None = None) -> int:
         """Append closed footprint bars from the live feeder. [st-re1o]
 
         Returns the new total. ``meta`` (bar size, tick, anchors, session day)
@@ -147,7 +149,14 @@ class BridgeState:
         single slot rather than a list is what keeps it from ever being mistaken
         for history: there is nothing here to accumulate, seek through or
         replay.
+
+        ``profile`` is the anchored aggressor volume profile [st-n0qm.4]: like
+        ``developing``, a single REPLACED slot (a profile is a state, not a
+        history), served on every /bars response and never retired by bars —
+        it outlives the day's last bar because it IS the day.
         """
+        if profile is not None and not isinstance(profile, dict):
+            raise ValueError("profile must be an object")
         if not isinstance(bars, list):
             raise ValueError("bars must be a list")
         if final is not None and not isinstance(final, list):
@@ -169,6 +178,8 @@ class BridgeState:
                 self._developing = None
             if developing is not None:
                 self._developing = developing
+            if profile is not None:
+                self._profile = profile
             total = len(self._bars)
             if bars or final:
                 self._append({"channel": "bars", "kind": "bar_push",
@@ -181,7 +192,8 @@ class BridgeState:
             start = max(0, min(n, len(self._bars)))
             return {"bars": self._bars[start:], "total": len(self._bars),
                     "meta": self._bar_meta, "final": self._final,
-                    "developing": self._developing}
+                    "developing": self._developing,
+                    "profile": self._profile}
 
     def commands_since(self, last_id: int) -> list[dict]:
         with self._lock:
@@ -350,7 +362,8 @@ class _Handler(BaseHTTPRequestHandler):
                 total = STATE.add_bars(payload.get("bars") or [],
                                        payload.get("meta"),
                                        payload.get("final"),
-                                       payload.get("developing"))
+                                       payload.get("developing"),
+                                       payload.get("profile"))
                 self._send(200, {"ok": True, "total": total})
             elif route == "/coach":
                 cmd = STATE.add_coach(payload)

@@ -203,6 +203,30 @@ td:first-child, th:first-child { text-align:left; }
 .col .cell.cue.churn { opacity:.55; }
 .col .cell.cue.churn::before { opacity:.7; }
 #cue-chip { cursor:pointer; }
+/* Anchored aggressor volume profile panel [st-n0qm.4]. Left of the columns,
+   one row per price sharing the cells' yFor — a VP row and the cell at that
+   price sit on the same pixel row, so the developing cell filling and the VP
+   row growing are the same event seen twice. Sell-aggressor volume grows from
+   the left in --sell, buy-aggressor stacks after it in --buy; the prior day's
+   layer is faint under today's. LIVE only. */
+#vp { position:absolute; left:0; top:0; bottom:0; width:0; overflow:hidden; display:none;
+  border-right:1px solid var(--grid); background:var(--surface-1); }
+body.live.vp-on #vp { display:block; }
+#vp .vphdr { position:absolute; left:4px; right:4px; top:2px; font-size:9px; line-height:1.2; color:var(--muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; z-index:2; pointer-events:none; }
+#vp .vprow { position:absolute; left:2px; right:2px; display:flex; align-items:stretch; }
+#vp .vprow .seg { height:100%; }
+#vp .vprow .ss { background:var(--sell); opacity:.45; }
+#vp .vprow .st { background:var(--sell); }
+#vp .vprow .bs { background:var(--buy); opacity:.45; }
+#vp .vprow .bt { background:var(--buy); }
+#vp .vprow.va { background:color-mix(in srgb, var(--mid) 70%, transparent); }
+#vp .vprow.poc { outline:2px solid var(--ink-2); outline-offset:-2px; }
+#vp .vprow.hvn::after, #vp .vprow.lvn::after { content:""; position:absolute; right:0; top:50%;
+  width:5px; height:2px; transform:translateY(-50%); background:var(--ink-2); }
+#vp .vprow.lvn::after { background:var(--muted); width:3px; }
+#vp .vphole { position:absolute; left:4px; right:4px; bottom:2px; font-size:9px; color:var(--cue);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 /* Producer health dots [st-n0qm.3]: one per health file the bridge reads —
    green fresh, amber ageing, red stale/absent. LIVE only. */
 #prod-dots { display:none; gap:5px; align-items:center; }
@@ -348,7 +372,7 @@ body.live #ctlblock { display:none !important; }
 <div id="scendeck" class="drill-only"></div>
 <div id="anatomy" class="drill-only"></div>
 <div id="beatrail" class="drill-only"></div>
-<div id="stage"><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
+<div id="stage"><div id="vp"></div><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
   <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
   <div id="livehud"></div>
 </div>
@@ -369,6 +393,7 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
     <li>The <b>outlined cell</b> is the bar's POC — the price where the most volume traded.</li>
     <li>A <b>dashed empty cell</b> is real: price jumped across that level without a single trade (a micro low-volume node).</li>
     <li>A cell that <b>flashes amber</b> then keeps a thin edge rule and a corner glyph is one the stack <b>spoke about</b>: left rule ▮ = imbalance stack price, right rule ◢ = swept price, violet top rule ◆ = the pivot a divergence measured against, green bottom rule ▬ = a setup's anchor. Hover names it; click opens what the stack said. Press <b>x</b> to hide or show all cues.</li>
+    <li>Live only: the panel <b>left of the columns</b> is the day's <b>volume profile anchored at the prior day's 08:30 CT open</b> — one row per price on the same rows as the cells; red grows from the left for sell-aggressor volume, blue stacks after it for buy-aggressor; faint = the prior day, solid = since today's open. Outlined row = POC, tinted band = value area, right-edge ticks = HVN/LVN. A "hole" note means the tape has no prints in that window (the capture runs 02:50–15:05 CT). Press <b>v</b> to hide or show it.</li>
   </ul>
   <h4>The Phase ladder (start at 0, earn your way up)</h4>
   <ul>
@@ -783,6 +808,98 @@ function toggleCues() {
 // Replay: the whole tape is embedded, so index it once at boot — markers, no
 // flash. LIVE starts empty and indexes as bars arrive (pollBars).
 for (let i = 0; i < bars.length; i++) indexCues(i, false);
+
+// ── anchored aggressor volume profile [st-n0qm.4] ─────────────────────────
+// Steve, 2026-08-16: "a Volume Profile Chart that is anchored on the prior
+// day's opening trade and is live-updated until EOD. The bars should be color
+// coded to indicate the aggressor side of the trade." The feeder builds it from
+// the SAME trade stream the cells come from (profile[P] == Σ cells[P] by
+// construction) and posts it on the bridge's `profile` slot; this draws it as a
+// panel of price rows to the LEFT of the columns, on the cells' own yFor. Key
+// `v` toggles it. Nothing here in replay — the drill payload carries no profile.
+const VP_W = 132;                                  // panel width, px
+let PROFILE = null;                                // last payload from the bridge
+let vpOn = LIVE && localStorage.getItem("oflow-vp-on") !== "0";
+const fmtK = n => n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e5 ? 0 : 1) + "k" : String(n);
+const fmtCT = iso => { const m = /T(\d{2}):(\d{2})/.exec(iso || ""); return m ? `${m[1]}:${m[2]}` : "?"; };
+const fmtDow = iso => { const d = new Date(iso); return isNaN(d) ? "" : ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]; };
+function applyVpLayout() {
+  const on = LIVE && vpOn && PROFILE && PROFILE.n > 0;
+  document.body.classList.toggle("vp-on", !!on);
+  const vp = $("vp"), cols = $("cols");
+  if (vp) vp.style.width = on ? VP_W + "px" : "0px";
+  if (cols) cols.style.left = on ? VP_W + "px" : "0px";
+}
+function renderProfile() {
+  const vp = $("vp"); if (!vp) return;
+  applyVpLayout();
+  vp.innerHTML = "";
+  if (!(LIVE && vpOn && PROFILE && PROFILE.n > 0) || viewHi == null) return;
+  const P = PROFILE, bucket = P.bucket || TICK, lo = P.lo_tick;
+  const n = P.buy.length;
+  const seeded = P.seeded || null;
+  // scale to the visible rows only, like the columns scale to visible bars
+  let vmax = 1;
+  const rows = [];
+  for (let i = 0; i < n; i++) {
+    const price = (lo + i) * bucket;
+    const y = yFor(price);
+    if (y - cellH / 2 < 0 || y + cellH / 2 > stage.clientHeight - FOOT_H) continue;
+    const buy = P.buy[i] || 0, sell = P.sell[i] || 0;
+    if (!buy && !sell) continue;
+    vmax = Math.max(vmax, buy + sell);
+    rows.push([i, price, y, buy, sell]);
+  }
+  const usable = VP_W - 10;
+  const poc = P.va && P.va.poc, vah = P.va && P.va.vah, val = P.va && P.va.val;
+  const hvn = new Set((P.hvn || []).map(p => Math.round(p / bucket)));
+  const lvn = new Set((P.lvn || []).map(p => Math.round(p / bucket)));
+  for (const [i, price, y, buy, sell] of rows) {
+    const row = document.createElement("div");
+    const tk = lo + i;
+    row.className = "vprow"; row.dataset.tk = tk;
+    row.style.top = (y - cellH / 2) + "px"; row.style.height = (cellH - 1) + "px";
+    if (poc != null && Math.abs(price - poc) < bucket / 2) row.classList.add("poc");
+    else if (vah != null && val != null && price >= val - bucket / 2 && price <= vah + bucket / 2) row.classList.add("va");
+    if (hvn.has(tk)) row.classList.add("hvn");
+    if (lvn.has(tk)) row.classList.add("lvn");
+    const ss = seeded ? (seeded.sell[i] || 0) : 0, bs = seeded ? (seeded.buy[i] || 0) : 0;
+    const w = v => Math.round(usable * v / vmax) + "px";
+    for (const [cls, v] of [["ss", ss], ["st", sell - ss], ["bs", bs], ["bt", buy - bs]]) {
+      if (v <= 0) continue;
+      const seg = document.createElement("span");
+      seg.className = "seg " + cls; seg.style.width = w(v);
+      row.appendChild(seg);
+    }
+    const d = buy - sell;
+    row.title = `${fmtPrice(price)}  sell-aggr ${sell} | buy-aggr ${buy}  (Δ ${d >= 0 ? "+" : ""}${d}, vol ${buy + sell})`
+      + (seeded ? `\n  prior day: sell ${ss} | buy ${bs}` : "")
+      + (row.classList.contains("poc") ? "\n  POC" : row.classList.contains("va") ? "\n  value area" : "")
+      + (hvn.has(tk) ? "\n  HVN" : lvn.has(tk) ? "\n  LVN" : "");
+    vp.appendChild(row);
+  }
+  const hdr = document.createElement("div");
+  hdr.className = "vphdr";
+  const anchorTxt = P.anchor === "prior-rth" ? `${fmtDow(P.anchor_ts)} 08:30 CT` : P.anchor === "prior-globex" ? `${fmtDow(P.anchor_ts)} 17:00 CT` : (P.anchor || "?");
+  hdr.textContent = `VP · anchor ${anchorTxt} · ${fmtK(P.n)} prints`;
+  hdr.title = `anchored aggressor volume profile — anchor ${P.anchor_ts}, ${P.n} prints from ${P.first_ts} to ${P.last_ts}`
+    + (P.va ? `\nPOC ${fmtPrice(P.va.poc)} · VAH ${fmtPrice(P.va.vah)} · VAL ${fmtPrice(P.va.val)}` : "")
+    + `\nsell-aggressor from the left (red), buy-aggressor stacked (blue); faint = prior day, solid = since today's open\nv toggles this panel`;
+  vp.appendChild(hdr);
+  if (P.hole && P.hole.length) {
+    const h = document.createElement("div");
+    h.className = "vphole";
+    h.textContent = P.hole.map(([a, b]) => `hole ${fmtCT(a)}→${fmtCT(b)} CT`).join(" · ");
+    h.title = "no prints in the tape between these times (the tick capture runs 02:50–15:05 CT); the evening session is absent, not quiet";
+    vp.appendChild(h);
+  }
+}
+function toggleVp() {
+  vpOn = !vpOn;
+  localStorage.setItem("oflow-vp-on", vpOn ? "1" : "0");
+  showCaption(vpOn ? "Volume profile on (v hides it)" : "Volume profile hidden (v shows it)");
+  repaintAll();
+}
 // Fill the viewport below the controls, reserving room for the hint line only
 // (the pace strip now lives inside the footers); no fixed cap — a portrait
 // monitor gets all its vertical real estate. The stage is also user-resizable
@@ -953,6 +1070,7 @@ function repaintAll() {
   updateView(); drawAxis(); strip.innerHTML = "";
   for (let i = Math.max(0, idx - KEEP_COLS + 1); i <= idx; i++) strip.appendChild(renderColumn(bars[i], i));
   renderDeveloping();   // wiped with the strip, so put it back [st-e91l]
+  renderProfile();      // same rows as the cells, so it follows every repaint [st-n0qm.4]
 }
 const fmtClock = iso => iso.slice(11, 19);
 
@@ -1750,6 +1868,7 @@ document.addEventListener("keydown", e => {
   }
   if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
   if (e.code === "KeyX") toggleCues();
+  if (e.code === "KeyV") toggleVp();
   if (e.code === "ArrowRight") stepUser();
   if (e.code === "ArrowLeft") seekTo(idx - 1);
 });
@@ -1846,6 +1965,11 @@ async function pollBars() {
     // them; they belong to no bar, so they live beside the array. [st-b0n9]
     if (d.final && d.final.length !== FINAL.length) { FINAL = d.final; renderEmissions(); }
     DEV = d.developing || null;    // null once its closed version lands [st-e91l]
+    // The anchored profile rides every response; redraw only when it moved
+    // (its print count is monotonic) or the view will be repainted anyway.
+    const prevN = PROFILE ? PROFILE.n : -1;
+    if (d.profile) PROFILE = d.profile;
+    const profileMoved = !!d.profile && d.profile.n !== prevN;
     const fresh = d.bars || [];
     if (fresh.length) {
       const wasAtTip = idx >= bars.length - 1;
@@ -1864,6 +1988,7 @@ async function pollBars() {
       setDot(`live · ${bars.length} bars`);
     }
     renderDeveloping();   // after any append, so it lands right of the newest
+    if (profileMoved) renderProfile();   // ~100 rows; cheap enough to redraw on every move
   } catch {
     if (++liveErrs === 3) setDot("feed stalled");
   }

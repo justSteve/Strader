@@ -119,6 +119,16 @@ def next_trading_day(d: date) -> date:
     return d
 
 
+def prior_trading_day(d: date) -> date:
+    """Last trading day strictly before `d` — the session an anchored profile
+    starts from ("the prior day's opening trade", Watcher V2 Phase 2). Skips
+    weekends and, where the year is known, holidays. [st-n0qm.4]"""
+    d -= timedelta(days=1)
+    while not is_trading_day(d):
+        d -= timedelta(days=1)
+    return d
+
+
 def parse_hm(s: str) -> time:
     """Parse an ``HH:MM`` clock string. Raises ValueError on anything else."""
     h, m = (int(x) for x in s.split(":"))
