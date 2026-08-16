@@ -58,9 +58,11 @@ bar and rendered nowhere (feed:487-491).
 :335-359), two `LevelWatch` machines on `z_mlgamma`/`z_msgamma` (:38), six alert kinds appended to
 `data/corpus/<day>/orderflow_alerts.jsonl` via `_emit` (:116-128; `ts_alert_utc` is wall clock :126). SPX
 domain; no path to the page (0 refs in feed/bridge/template). Day rollover resets only `path, offset`
-(:337-338), so `LevelWatch` state carries across days — measured first-minute alerts on 08-12 (13:31:01Z) and 08-14
-(13:30:04Z); 08-13's first alert is a `zone_dissolved` at 13:59:38Z, so that day does not reproduce it
-(verifier, from `orderflow_alerts.jsonl`). Zero `LevelWatch` tests. Also measured this session: the 1 Hz file's first rows per day
+(:337-338), so `LevelWatch` state carries across days. **Measured against replay with fresh watches (Phase 0,
+`--replay`):** 08-12's opening alerts (contested 13:30:42Z, relocation 13:31:01Z) are reproduced exactly by
+fresh watches — genuine open-of-day ladder contests, not carry-over; 08-13's first alert is at 13:59:38Z; only
+08-14's `approach` at 13:30:04Z — four seconds after the open, before the identity window could hold
+MIN_ROWS — is the carry-over artifact. Zero `LevelWatch` tests. Also measured this session: the 1 Hz file's first rows per day
 are not market rows — 08-14 row 1 has vendor `timestamp` 1786651199 = 08-13T19:59:59Z (prior close snapshot,
 pulled 13:30:02Z) and row 2 is a zeroed reset (`z_mlgamma 7535`, `agg_dex 0`); 08-13 row 1 is the zeroed reset
 (`z_mlgamma 7495`, `agg_dex 0`).
@@ -427,7 +429,7 @@ the whole of V2.
 | 8 | Repaint cost: 48 columns + ~400 VP rows at a 1 s poll. | jsdom: 300 polls of a 08-14 fixture, `performance.now()` per `pollBars`; budget 16 ms; diff-render VP rows if over; revert poll to 2000 ms if still over. |
 | 9 | Pre-seed time at feeder start (~228k trades), and a `.jsonl.gz` prior day once compaction resumes (08-10..14 are plain today, `ls`). | `time .venv/bin/python -c "from market.orderflow.replay import read_corpus_day; from datetime import date; read_corpus_day(date(2026,8,14))"`; if > 30 s, seed in a thread and banner "seeding"; `.gz` fixture in the accumulator test (`open_corpus_text`, `replay.py:27`). |
 | 10 | Holiday: `prior_trading_day` correctness. | `python -c` around Labor Day 2026-09-07 for 09-08 → 09-04. |
-| 11 | Sentinel stale/zero-row skip thresholds may drop real rows. | The sentinel has no replay mode (argparse `:297-316` defines only `--band --rearm --move --poll --heartbeat --feed --alerts --log-dir`, and `--feed` starts at EOF, `:329`). Phase 0 builds a fixture runner (`tests/scripts/test_orderflow_sentinel.py`, or `--feed` against a copied file with the offset forced to 0) and counts skipped rows per day over 08-10..14; expect ≤ 2/day; alert counts unchanged after row 2. |
+| 11 | ~~Sentinel stale/zero-row skip thresholds may drop real rows.~~ **Resolved 2026-08-16 (Phase 0):** `--replay` over 08-10..14 skipped 0 / 0 / 0 / 1 (reset) / 2 (stale + reset) rows — exactly the three measured vendor rows, nothing else. | Was: the sentinel has no replay mode (argparse `:297-316` defines only `--band --rearm --move --poll --heartbeat --feed --alerts --log-dir`, and `--feed` starts at EOF, `:329`). Phase 0 builds a fixture runner (`tests/scripts/test_orderflow_sentinel.py`, or `--feed` against a copied file with the offset forced to 0) and counts skipped rows per day over 08-10..14; expect ≤ 2/day; alert counts unchanged after row 2. |
 | 12 | jsdom availability for the three page checks. | `bash tools/nodecheck.sh tools/page_boot_check.mjs /tmp/desk-live-footprint.html --expect-empty`; if absent, the checks are a documented manual step until a JS runtime convention lands. |
 | 13 | Feeder unit vs `up.sh` both launching a feeder. | `pgrep -fc live_footprint_feed` == 1 after running both; `up.sh` `systemctl is-active` guard. |
 | 14 | systemd units on WSL after a Windows reboot. | Measured yes for `strader-capture.timer` (fired Fri 02:50); confirm `journalctl -u strader-footprint-feed --since today` on the first weekday after Phase 2b. |

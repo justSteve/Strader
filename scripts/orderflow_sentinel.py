@@ -20,14 +20,32 @@ distinguishable from a dead one.
 Reads the feed file incrementally by byte offset; survives day rollover by
 recomputing the path when the date changes. Off-session there are simply no
 new rows — the sentinel idles at the poll interval, harmlessly.
+
+Day boundary and vendor first rows [st-n0qm.1, plan §5 Phase 0]: at rollover the
+LevelWatch machines are REBUILT — the old code reset only the path and offset,
+so day 1's identity window judged day 2's first rows and fired spurious
+first-minute alerts (measured 08-12 13:31:01Z, 08-14 13:30:04Z). The vendor's
+first rows of a day are also not market rows: 08-14 row 1 carried a
+`timestamp` of 08-13T19:59:59Z (prior close snapshot, pulled 13:30:02Z) and
+row 2 a zeroed reset (`z_mlgamma == z_msgamma == 7535`, `agg_dex == 0`);
+08-13 row 1 was the zeroed reset. `row_verdict` skips both shapes and counts
+them, and the health file reports the counts so a skip rule that starts eating
+real rows is visible (Risk 11).
+
+Health: `data/corpus/<day>/_sentinel_health.json` every HEALTH_INTERVAL_S,
+self-reported — rows seen, rows skipped by reason, last row's pull time, last
+alert, watch state. A live-but-frozen sentinel is then distinguishable from a
+dead one by anyone reading the file, not only by tailing the log.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from collections import deque
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -39,6 +57,9 @@ LEVELS = ("z_mlgamma", "z_msgamma")
 LEVEL_NAMES = {"z_mlgamma": "major long gamma", "z_msgamma": "major short gamma"}
 REARM_ROWS = 15            # re-arm needs SUSTAINED distance, not one flapped row
 APPROACH_COOLDOWN_S = 120  # a repeat approach inside this window is not news
+STALE_ROW_S = 120          # vendor `timestamp` older than this vs ts_pull_utc:
+                           # a prior-session snapshot, not a market row
+HEALTH_INTERVAL_S = 60     # _sentinel_health.json cadence
 
 
 def _feed_path() -> Path:
@@ -47,6 +68,43 @@ def _feed_path() -> Path:
 
 def _alerts_path() -> Path:
     return CORPUS_ROOT / central_date().isoformat() / "orderflow_alerts.jsonl"
+
+
+def _health_path() -> Path:
+    return CORPUS_ROOT / central_date().isoformat() / "_sentinel_health.json"
+
+
+def _pull_epoch(ts_pull_utc) -> float | None:
+    """`2026-08-14T13:30:02Z` -> epoch seconds; None when unparseable."""
+    if not isinstance(ts_pull_utc, str):
+        return None
+    try:
+        return datetime.fromisoformat(ts_pull_utc.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def row_verdict(row: dict) -> str | None:
+    """None when the row is a market row the watches should see; otherwise the
+    reason it is skipped: ``anomaly`` (collector-marked), ``reset`` (vendor
+    zeroed reset — both major-gamma levels equal and aggregate DEX exactly 0;
+    measured 08-13 row 1 and 08-14 row 2) or ``stale`` (vendor timestamp more
+    than STALE_ROW_S behind the pull time — the prior-close snapshot the vendor
+    hands out as row 1; measured 08-14 row 1, 17.5 h old).
+
+    Order matters: a stale row that is also zeroed reads as ``reset``; neither
+    reaches a watch, and the counters are what Risk 11 measures.
+    """
+    if "anomaly" in row:
+        return "anomaly"
+    ml, ms = row.get("z_mlgamma"), row.get("z_msgamma")
+    if ml is not None and ml == ms and row.get("agg_dex") == 0:
+        return "reset"
+    ts = row.get("timestamp")
+    pull = _pull_epoch(row.get("ts_pull_utc"))
+    if isinstance(ts, (int, float)) and pull is not None and pull - ts > STALE_ROW_S:
+        return "stale"
+    return None
 
 
 class DailyLog:
@@ -105,6 +163,9 @@ class DailyLog:
 #: Replaced in main() when --log-dir is given. Module-level so _emit can reach
 #: it without threading a handle through LevelWatch.
 _LOG = DailyLog()
+#: The live SentinelState, set by main()/replay_file so _emit can count alerts
+#: for the health file without threading it through LevelWatch.
+_STATE = None
 
 
 def _strike(x: float) -> int:
@@ -124,8 +185,15 @@ def _emit(alert: dict) -> None:
     for c in alert.get("contenders", []):
         c["strike"] = _strike(c["value"])
     alert["ts_alert_utc"] = utc_now_iso()
+    if _STATE is not None and _STATE.last_row_pull_utc:
+        # The row that fired it — wall clock says when the sentinel spoke,
+        # ts_row says which second of the tape it was speaking about (the two
+        # differ by the poll interval live and by hours in --replay).
+        alert["ts_row"] = _STATE.last_row_pull_utc
     append_jsonl(_alerts_path(), alert)
     _LOG.write(json.dumps(alert))
+    if _STATE is not None:
+        _STATE.note_alert(alert["ts_alert_utc"])
 
 
 class LevelWatch:
@@ -292,6 +360,124 @@ class LevelWatch:
         self.prev_dist = dist
 
 
+class SentinelState:
+    """Everything the loop carries across rows: the watches, the day they
+    belong to, and the counters the health file reports. `feed_row` is the
+    unit a test drives — no file, no clock, no sleep."""
+
+    def __init__(self, band: float, rearm: float, move: float,
+                 levels: tuple[str, ...] = LEVELS) -> None:
+        self.band, self.rearm, self.move, self.levels = band, rearm, move, levels
+        self.day: str | None = None
+        self.watches: dict[str, LevelWatch] = {}
+        self.rows = 0
+        self.rows_today = 0
+        self.skipped: dict[str, int] = {}
+        self.last_row_pull_utc: str | None = None
+        self.last_alert_utc: str | None = None
+        self.alerts_today = 0
+        self.rollovers = 0
+        self._new_watches()
+
+    def _new_watches(self) -> None:
+        self.watches = {k: LevelWatch(k, self.band, self.rearm, self.move)
+                        for k in self.levels}
+
+    def rollover(self, day: str) -> None:
+        """A new CT day: fresh watches, fresh per-day counters. The identity
+        window of yesterday's ladder must never judge today's first rows."""
+        first = self.day is None
+        self.day = day
+        self._new_watches()
+        self.rows_today = 0
+        self.skipped = {}
+        self.alerts_today = 0
+        if not first:
+            self.rollovers += 1
+
+    def feed_row(self, row: dict) -> str | None:
+        """Route one feed row. Returns the skip reason, or None when the row
+        reached the watches."""
+        verdict = row_verdict(row)
+        if verdict is not None:
+            self.skipped[verdict] = self.skipped.get(verdict, 0) + 1
+            return verdict
+        self.rows += 1
+        self.rows_today += 1
+        pull = row.get("ts_pull_utc")
+        if isinstance(pull, str):
+            self.last_row_pull_utc = pull
+        spot = row.get("spot")
+        for key, w in self.watches.items():
+            w.update(row.get(key), spot)
+        return None
+
+    def note_alert(self, ts_utc: str) -> None:
+        self.alerts_today += 1
+        self.last_alert_utc = ts_utc
+
+    def health(self, *, path: Path | None, offset: int) -> dict:
+        return {
+            "written_utc": utc_now_iso(),
+            "pid": os.getpid(),
+            "day": self.day,
+            "feed": str(path) if path is not None else None,
+            "feed_offset": offset,
+            "rows": self.rows,
+            "rows_today": self.rows_today,
+            "skipped": dict(self.skipped),
+            "last_row_pull_utc": self.last_row_pull_utc,
+            "alerts_today": self.alerts_today,
+            "last_alert_utc": self.last_alert_utc,
+            "rollovers": self.rollovers,
+            "watches": {k: {"value": w.value, "armed": w.armed,
+                            "contested": w.contested,
+                            "zone": list(w.zone) if w.zone else None}
+                        for k, w in self.watches.items()},
+        }
+
+
+def write_health(path: Path, payload: dict) -> None:
+    """Atomic replace so a reader never sees a torn file. Failure to write is
+    logged, never fatal — the watcher's job is to keep watching."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(payload, indent=1) + "\n", encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError as e:
+        _LOG.write(f"[sentinel] health file unavailable ({e})")
+
+
+def _iter_complete_lines(path: Path, offset: int):
+    """Yield (row, new_offset) for each complete JSON line past `offset`. A
+    partial trailing write is left for the next pass; undecodable lines are
+    skipped but their bytes are consumed."""
+    with path.open() as f:
+        f.seek(offset)
+        for line in f:
+            if not line.endswith("\n"):
+                break
+            offset += len(line.encode())
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            yield row, offset
+
+
+def replay_file(path: Path, state: SentinelState, day: str | None = None) -> dict:
+    """Drive every row of `path` through `state` from byte 0 (the fixture and
+    Risk-11 runner — the live loop starts at EOF). Returns the health dict."""
+    global _STATE
+    _STATE = state
+    state.rollover(day or path.parent.name)
+    offset = 0
+    for row, offset in _iter_complete_lines(path, 0):
+        state.feed_row(row)
+    return state.health(path=path, offset=offset)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Orderflow level-proximity sentinel")
     ap.add_argument("--band", type=float, default=2.5,
@@ -311,57 +497,79 @@ def main() -> int:
                     help="Override feed path (testing)")
     ap.add_argument("--alerts", type=Path, default=None,
                     help="Override alerts path (testing)")
+    ap.add_argument("--health", type=Path, default=None,
+                    help="Override health file path (default "
+                         "data/corpus/<day>/_sentinel_health.json)")
     ap.add_argument("--log-dir", type=Path, default=None,
                     help="Mirror stdout to <dir>/<CT date>.log, rolling daily. "
                          "The systemd unit passes /var/moo/logs/orderflow-sentinel")
+    ap.add_argument("--replay", type=Path, default=None, metavar="FEED_FILE",
+                    help="Run every row of FEED_FILE from byte 0 through fresh "
+                         "watches, print the health summary (rows, skips, "
+                         "alerts) and exit. Alerts go to --alerts (default: a "
+                         "sibling orderflow_alerts.replay.jsonl). Never touches "
+                         "the live alerts file.")
     args = ap.parse_args()
 
-    global _feed_path, _alerts_path, _LOG
+    global _feed_path, _alerts_path, _health_path, _LOG, _STATE
     if args.log_dir:
         _LOG = DailyLog(args.log_dir)
     if args.feed:
         _feed_path = lambda: args.feed  # noqa: E731
     if args.alerts:
         _alerts_path = lambda: args.alerts  # noqa: E731
+    if args.health:
+        _health_path = lambda: args.health  # noqa: E731
 
-    watches = {k: LevelWatch(k, args.band, args.rearm, args.move) for k in LEVELS}
+    if args.replay:
+        if not args.alerts:
+            _alerts_path = lambda: args.replay.with_name(  # noqa: E731
+                "orderflow_alerts.replay.jsonl")
+        state = SentinelState(args.band, args.rearm, args.move)
+        summary = replay_file(args.replay, state)
+        summary["alerts_path"] = str(_alerts_path())
+        print(json.dumps(summary, indent=1))
+        return 0
+
+    state = SentinelState(args.band, args.rearm, args.move)
+    _STATE = state
     path = _feed_path()
+    state.rollover(central_date().isoformat())
     offset = path.stat().st_size if path.exists() else 0  # start at NOW, not history
     last_beat = time.monotonic()
-    rows = 0
+    last_health = 0.0
 
     _LOG.write(f"sentinel up — watching {path} (band {args.band}, "
                f"rearm {args.rearm}, move {args.move})")
     while True:
         current = _feed_path()
-        if current != path:  # day rollover
+        if current != path:  # day rollover: new file, new watches, new counters
             path, offset = current, 0
+            state.rollover(central_date().isoformat())
+            _LOG.write(f"day rollover — watching {path}; watches rebuilt")
         if path.exists():
             size = path.stat().st_size
             if size < offset:  # truncated/rotated defensively
                 offset = 0
             if size > offset:
-                with path.open() as f:
-                    f.seek(offset)
-                    for line in f:
-                        if not line.endswith("\n"):
-                            break  # partial write — re-read whole next pass
-                        offset += len(line.encode())
-                        try:
-                            row = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        if "anomaly" in row:
-                            continue
-                        rows += 1
-                        spot = row.get("spot")
-                        for key, w in watches.items():
-                            w.update(row.get(key), spot)
-        if time.monotonic() - last_beat >= args.heartbeat:
-            state = {k: {"value": w.value, "armed": w.armed}
-                     for k, w in watches.items()}
-            _LOG.write(f"heartbeat {utc_now_iso()} rows={rows} {json.dumps(state)}")
-            last_beat = time.monotonic()
+                for row, offset in _iter_complete_lines(path, offset):
+                    reason = state.feed_row(row)
+                    if reason in ("reset", "stale"):
+                        _LOG.write(f"skipped {reason} row: ts={row.get('timestamp')} "
+                                   f"pull={row.get('ts_pull_utc')} "
+                                   f"z_mlgamma={row.get('z_mlgamma')} "
+                                   f"z_msgamma={row.get('z_msgamma')} "
+                                   f"agg_dex={row.get('agg_dex')}")
+        now_m = time.monotonic()
+        if now_m - last_beat >= args.heartbeat:
+            st = {k: {"value": w.value, "armed": w.armed}
+                  for k, w in state.watches.items()}
+            _LOG.write(f"heartbeat {utc_now_iso()} rows={state.rows} "
+                       f"skipped={json.dumps(state.skipped)} {json.dumps(st)}")
+            last_beat = now_m
+        if now_m - last_health >= HEALTH_INTERVAL_S:
+            write_health(_health_path(), state.health(path=path, offset=offset))
+            last_health = now_m
         time.sleep(args.poll)
 
 

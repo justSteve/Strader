@@ -44,6 +44,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import signal
 import sys
 import time
 import urllib.error
@@ -73,6 +74,19 @@ DEFAULT_BRIDGE = "http://127.0.0.1:7788"
 # --------------------------------------------------------------------------
 # Row source
 # --------------------------------------------------------------------------
+
+class StopFeed(Exception):
+    """Raised from the SIGTERM handler so the drive loop's `finally` runs.
+
+    Before 2026-08-16 the end-of-stream block — `driver.finish`, the run-log
+    `end` record, the `final` push that puts the session's profile levels on
+    the page — sat AFTER the for-loop, so it ran only when the tape ended by
+    itself. On every live day the process was instead killed (reboot, OOM, a
+    hand `kill`, tomorrow a `systemctl stop`) and `final` never landed: run
+    logs 08-12/13/14 carry no `end` record. A SIGTERM now raises this, the
+    loop finalises, and the process exits 0. [st-n0qm.1, plan §1]
+    """
+
 
 class DayRolledOver(RuntimeError):
     """The CT date advanced past the day this feeder was pinned to. [st-h510]"""
@@ -466,11 +480,6 @@ def main() -> int:
                         post_bars(args.bridge, [], None, None, payload)
             yield t
 
-    sent = 0
-    batch: list[dict] = []
-    last_push = time.monotonic()
-    first = True
-    n_ev = 0
     # The drive order (observe the bar into the developing range, THEN judge
     # it) lives in parity.live_drive so the parity checker replays through the
     # identical loop rather than a copy of it. [st-x2mp]
@@ -478,52 +487,106 @@ def main() -> int:
         for bar in build_bars(_tee(trades), n=args.bar_n):
             yield bar, take_bar_trades(bar, pending_trades)
 
-    for bar_i, bar, bar_trades, events in live_drive(_closed_bars(), driver, live_anchors):
-        n_ev += len(events)
-        runlog.on_bar(bar_i, bar, events)
-        # Stamp AFTER the engine has judged the bar: the context is recorded
-        # alongside recognition, never an input to it. Stage 1 changes no
-        # recognition behaviour, and this ordering is what enforces that.
-        gex_ctx = None
-        if gex is not None:
-            gex.refresh()
-            gex_ctx = gex.for_bar(bar)
-        batch.append(bar_payload(bar, bar_trades, events, gex=gex_ctx))
-        now = time.monotonic()
-        # Push promptly — a bar the page has not seen is a bar Steve is not
-        # watching — but coalesce the catch-up burst so a full day does not
-        # become hundreds of round trips.
-        if len(batch) >= 25 or now - last_push >= 1.0:
-            if args.dry_run:
-                _log_batch(batch, sent)
-            else:
-                post_bars(args.bridge, batch, meta if first else None)
-            sent += len(batch)
-            first = False
-            batch = []
-            last_push = now
-
-    # End of stream: engine flush + the session's profile levels. These belong
-    # to no bar, so they ride the separate `final` channel rather than being
-    # smuggled onto the last one. [st-b0n9]
-    final = driver.finish(pending_trades)
-    n_ev += len(final)
-    runlog.on_final(final)
-    runlog.close()
-
-    if batch or final:
+    def _publish(batch: list[dict], meta_: dict | None, final: list | None) -> None:
         if args.dry_run:
-            _log_batch(batch, sent)
-            for e in final:
+            _log_batch(batch, 0)
+            for e in final or ():
                 logger.info("final: %s", e)
         else:
-            post_bars(args.bridge, batch, meta if first else None, final or None)
-        sent += len(batch)
+            post_bars(args.bridge, batch, meta_, final)
 
-    logger.info("done — %d bars, %d emissions (%d end-of-stream)%s",
-                sent, n_ev, len(final),
-                f"; run log {runlog.path}" if runlog.live else "")
+    _install_stop_handler()
+    drive_and_publish(live_drive(_closed_bars(), driver, live_anchors),
+                      driver, pending_trades, runlog, _publish, meta=meta, gex=gex)
     return 0
+
+
+def _install_stop_handler() -> None:
+    """SIGTERM → StopFeed, so systemd stop / restart finalises the session
+    instead of dropping it mid-bar. Only from the main thread (signal's rule);
+    a test that calls drive_and_publish directly never needs this."""
+    def _on_term(signum, _frame):
+        raise StopFeed(f"signal {signum}")
+    try:
+        signal.signal(signal.SIGTERM, _on_term)
+    except ValueError:  # not the main thread
+        pass
+
+
+def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
+                      *, meta: dict | None = None, gex=None,
+                      push_every_s: float = 1.0, push_every_n: int = 25) -> dict:
+    """Consume (bar_i, bar, bar_trades, events) from `drive_iter`, publish bars
+    in coalesced batches, and — WHATEVER ends the stream — flush the engine and
+    publish `final`. `publish(batch, meta_or_None, final_or_None)`.
+
+    Ends: the tape finishing (catch-up), `--idle-stop`, StopFeed (SIGTERM) and
+    KeyboardInterrupt all finalise and return; DayRolledOver finalises and
+    re-raises so the exit is non-zero and the unit's Restart=on-failure brings
+    up the new day. Any other exception finalises and re-raises too — a crash
+    still leaves `final` and the run-log `end` behind it.
+
+    Returns a summary dict {sent, n_ev, final, stopped_by}.
+    """
+    sent = 0
+    batch: list[dict] = []
+    last_push = time.monotonic()
+    first = True
+    n_ev = 0
+    stopped_by = "end-of-stream"
+    final: list = []
+    try:
+        for bar_i, bar, bar_trades, events in drive_iter:
+            n_ev += len(events)
+            runlog.on_bar(bar_i, bar, events)
+            # Stamp AFTER the engine has judged the bar: the context is recorded
+            # alongside recognition, never an input to it. Stage 1 changes no
+            # recognition behaviour, and this ordering is what enforces that.
+            gex_ctx = None
+            if gex is not None:
+                gex.refresh()
+                gex_ctx = gex.for_bar(bar)
+            batch.append(bar_payload(bar, bar_trades, events, gex=gex_ctx))
+            now = time.monotonic()
+            # Push promptly — a bar the page has not seen is a bar Steve is not
+            # watching — but coalesce the catch-up burst so a full day does not
+            # become hundreds of round trips.
+            if len(batch) >= push_every_n or now - last_push >= push_every_s:
+                publish(batch, meta if first else None, None)
+                sent += len(batch)
+                first = False
+                batch = []
+                last_push = now
+    except (StopFeed, KeyboardInterrupt) as e:
+        stopped_by = type(e).__name__
+        logger.info("stopping (%s) — finalising the session", e or stopped_by)
+    except DayRolledOver:
+        stopped_by = "DayRolledOver"
+        raise
+    except Exception:
+        stopped_by = "error"
+        raise
+    finally:
+        # End of stream: engine flush + the session's profile levels. These
+        # belong to no bar, so they ride the separate `final` channel rather
+        # than being smuggled onto the last one. [st-b0n9]
+        try:
+            final = driver.finish(pending_trades)
+        except Exception:  # noqa: BLE001 — a finish error must not eat the run log
+            logger.exception("driver.finish failed; publishing without final")
+            final = []
+        n_ev += len(final)
+        try:
+            runlog.on_final(final)
+        finally:
+            runlog.close()
+        if batch or final:
+            publish(batch, meta if first else None, final or None)
+            sent += len(batch)
+        logger.info("done (%s) — %d bars, %d emissions (%d end-of-stream)%s",
+                    stopped_by, sent, n_ev, len(final),
+                    f"; run log {runlog.path}" if getattr(runlog, "live", False) else "")
+    return {"sent": sent, "n_ev": n_ev, "final": final, "stopped_by": stopped_by}
 
 
 def _log_batch(batch: list[dict], sent: int) -> None:

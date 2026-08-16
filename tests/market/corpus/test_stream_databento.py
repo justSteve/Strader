@@ -40,13 +40,15 @@ D = date(2026, 6, 8)
 
 class FakeTrade:
     """Stand-in for the typed Trade entity the streamer consumes."""
-    def __init__(self, symbol, instrument_id, price, size, side, minute=0):
+    def __init__(self, symbol, instrument_id, price, size, side, minute=0,
+                 sequence=None):
         self.ts = datetime(2026, 6, 8, 13, minute, 0, tzinfo=CENTRAL)
         self.symbol = symbol
         self.instrument_id = instrument_id
         self.price = price
         self.size = size
         self.side = side
+        self.sequence = sequence
 
 
 class FakeQuote:
@@ -121,7 +123,8 @@ def _read_rows(path: Path):
 def test_writes_corpus_rows_matching_batch_schema(corpus_tmp):
     spec = streamer.default_specs("trades")["opra"]
     trades = [
-        FakeTrade("SPXW  260608C05500000", 101, 2.35, 4, "B", minute=1),
+        FakeTrade("SPXW  260608C05500000", 101, 2.35, 4, "B", minute=1,
+                  sequence=29785284),
         FakeTrade("SPXW  260608P05400000", 102, 1.10, 2, "A", minute=2),
         FakeTrade("SPXW  260608C05600000", 103, 0.55, 9, "N", minute=3),
     ]
@@ -144,7 +147,10 @@ def test_writes_corpus_rows_matching_batch_schema(corpus_tmp):
     assert r["data"]["size"] == 4
     assert r["data"]["side"] == "B"
     assert r["data"]["action"] == "T"
-    assert r["data"]["sequence"] is None
+    # The venue sequence rides through verbatim — the dedup key needs it
+    # [st-n0qm.1]; a source without one still writes None (row 2).
+    assert r["data"]["sequence"] == 29785284
+    assert rows[1]["data"]["sequence"] is None
 
     manifest = json.loads(paths.manifest_path(D).read_text())
     assert manifest["streams"]["databento_opra"]["cycles"] == 3

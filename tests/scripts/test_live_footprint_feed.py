@@ -334,3 +334,111 @@ def test_driver_finish_on_an_empty_stream_does_not_raise():
     from market.orderflow.parity import StackDriver
 
     assert StackDriver(anchors=_anchors()).finish([]) == []
+
+
+# --- drive_and_publish: `final` lands however the stream ends [st-n0qm.1] ---
+
+class _RecRunLog:
+    path = None
+    live = False
+
+    def __init__(self):
+        self.bars, self.final, self.closed = [], None, False
+
+    def on_bar(self, bar_i, bar, events):
+        self.bars.append(bar_i)
+
+    def on_final(self, final):
+        self.final = final
+
+    def close(self, **k):
+        self.closed = True
+
+
+def _drive_fixture(tmp_path, n_rows=600, n=100):
+    from market.orderflow.parity import StackDriver, live_drive
+
+    trades = read_corpus_day(_write_day(tmp_path, _even_rows(n_rows, size=5)))
+    driver = StackDriver(anchors=_anchors())
+    pending: list = []
+
+    def tee(it):
+        for t in it:
+            pending.append(t)
+            yield t
+
+    def closed():
+        for bar in build_bars(tee(iter(trades)), n=n):
+            yield bar, feed.take_bar_trades(bar, pending)
+
+    return driver, pending, live_drive(closed(), driver, None)
+
+
+def test_drive_and_publish_finalises_on_a_clean_end(tmp_path):
+    driver, pending, it = _drive_fixture(tmp_path)
+    runlog, pubs = _RecRunLog(), []
+    out = feed.drive_and_publish(it, driver, pending, runlog,
+                                 lambda b, m, f: pubs.append((len(b), m is not None, f)),
+                                 meta={"day": "x"}, push_every_n=2)
+    assert out["stopped_by"] == "end-of-stream"
+    assert runlog.closed and runlog.final is not None
+    assert pubs[0][1] is True, "meta rides on the first push"
+    assert pubs[-1][2], "the last publish carries final"
+    assert any(e["type"] == "Level" for e in pubs[-1][2])
+    assert sum(p[0] for p in pubs) == len(runlog.bars) == out["sent"]
+
+
+def test_drive_and_publish_finalises_when_the_stream_is_killed_mid_day(tmp_path):
+    """The whole Phase-0 point: a SIGTERM (StopFeed) three bars in must still
+    flush the engine, write the run-log end, and push `final` — the profile
+    levels reach the page even when the process, not the tape, ended the day."""
+    driver, pending, it = _drive_fixture(tmp_path)
+
+    def killed():
+        for i, item in enumerate(it):
+            if i == 3:
+                raise feed.StopFeed("signal 15")
+            yield item
+
+    runlog, pubs = _RecRunLog(), []
+    out = feed.drive_and_publish(killed(), driver, pending, runlog,
+                                 lambda b, m, f: pubs.append((len(b), m is not None, f)),
+                                 push_every_n=1)
+    assert out["stopped_by"] == "StopFeed"
+    assert runlog.closed and runlog.final is not None
+    assert len(runlog.bars) == 3
+    assert pubs[-1][2] is not None and any(e["type"] == "Level" for e in pubs[-1][2])
+    assert all(e["bar_i"] is None for e in pubs[-1][2])
+
+
+def test_drive_and_publish_finalises_then_reraises_day_rollover(tmp_path):
+    """Midnight: finalise the old day, then let the exception out so the exit
+    is non-zero and the unit's Restart=on-failure starts the new day."""
+    driver, pending, it = _drive_fixture(tmp_path)
+
+    def rolled():
+        for i, item in enumerate(it):
+            if i == 2:
+                raise feed.DayRolledOver("CT date moved")
+            yield item
+
+    runlog, pubs = _RecRunLog(), []
+    with pytest.raises(feed.DayRolledOver):
+        feed.drive_and_publish(rolled(), driver, pending, runlog,
+                               lambda b, m, f: pubs.append((len(b), m is not None, f)),
+                               push_every_n=1)
+    assert runlog.closed and runlog.final is not None
+    assert pubs[-1][2] is not None, "final published before the re-raise"
+
+
+def test_drive_and_publish_survives_a_finish_error(tmp_path):
+    """driver.finish blowing up must not eat the run log or the batch."""
+    driver, pending, it = _drive_fixture(tmp_path)
+    driver.finish = lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom"))
+    runlog, pubs = _RecRunLog(), []
+    out = feed.drive_and_publish(it, driver, pending, runlog,
+                                 lambda b, m, f: pubs.append((len(b), m is not None, f)),
+                                 push_every_n=1000)
+    assert runlog.closed and runlog.final == []
+    assert out["final"] == [] and pubs and pubs[-1][2] is None
+    assert pubs[-1][0] == len(runlog.bars), "the coalesced batch still shipped"

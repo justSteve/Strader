@@ -390,7 +390,12 @@ class StreamWorker(threading.Thread):
                 "size": trade.size,
                 "side": trade.side,
                 "action": "T",
-                "sequence": None,
+                # The venue sequence the Trade already carries (ingest/databento.py
+                # trade_from_databento). It was written as None until 2026-08-16,
+                # which collapsed replay.dedup_key to ts_event alone and dropped
+                # distinct prints sharing a nanosecond — 3.42 % of 08-14 volume
+                # [st-n0qm.1, plan §1]. Batch rows carry the same int.
+                "sequence": getattr(trade, "sequence", None),
                 "flags": None,
             },
         }
