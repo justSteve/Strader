@@ -442,3 +442,16 @@ def test_drive_and_publish_survives_a_finish_error(tmp_path):
     assert runlog.closed and runlog.final == []
     assert out["final"] == [] and pubs and pubs[-1][2] is None
     assert pubs[-1][0] == len(runlog.bars), "the coalesced batch still shipped"
+
+
+def test_waiting_for_a_missing_file_also_raises_when_the_day_rolls(tmp_path, monkeypatch):
+    """A feeder under a unit can start on a day with no corpus file at all
+    (weekend, or before capture opens). The wait-for-file branch must honour
+    the pinned day too, or it waits forever for a file that will never exist
+    while the calendar moves on. [st-n0qm.3]"""
+    missing = tmp_path / "databento_glbx_es.jsonl"
+    days = iter([_date(2026, 8, 16)] * 3 + [_date(2026, 8, 17)] * 50)
+    monkeypatch.setattr(feed, "central_date", lambda: next(days))
+    gen = feed.tail_rows(missing, follow=True, poll_s=0.001, pinned_day=_date(2026, 8, 16))
+    with pytest.raises(feed.DayRolledOver):
+        next(gen)

@@ -37,6 +37,7 @@ while [[ $# -gt 0 ]]; do
         --with-mbp1)  STREAMS="es,es-mbp1" ;;
         --until)      UNTIL_CT="$2"; shift ;;
         --start)      START_CT="$2"; shift ;;
+        --tmux)       STRADER_FP_FORCE_TMUX=1 ;;
         *) echo "unknown arg: $1" >&2; exit 2 ;;
     esac
     shift
@@ -44,6 +45,29 @@ done
 
 command -v tmux >/dev/null || { echo "FATAL: tmux not found" >&2; exit 2; }
 [[ -x "$PY" ]] || { echo "FATAL: venv python missing: $PY" >&2; exit 2; }
+
+# Unit-aware [st-n0qm.3]. Since 2026-08-16 the bridge and feeder run under
+# systemd (deploy/systemd/strader-drill-bridge.service + strader-footprint-feed.service,
+# installed by deploy/install.sh) and come back on their own after a reboot.
+# When they are up, this script must not start a second bridge on :7788 or a
+# second feeder posting the same day twice — it becomes the viewer: say where
+# the page is and how to watch the processes, and exit. Pass --tmux to force
+# the old hand-launched stack (only sensible with the units stopped).
+FORCE_TMUX="${STRADER_FP_FORCE_TMUX:-0}"
+if [[ "$FORCE_TMUX" != "1" ]] && systemctl is-active --quiet strader-drill-bridge.service 2>/dev/null; then
+    FEED_STATE="$(systemctl is-active strader-footprint-feed.service 2>/dev/null || echo unknown)"
+    cat <<EOT
+live footprint stack runs under systemd — nothing to launch.
+  bridge  strader-drill-bridge.service    active
+  feeder  strader-footprint-feed.service  $FEED_STATE
+  page    http://127.0.0.1:7788/            (desktop)
+          https://mydesk-1.tail89f676.ts.net/footprint/   (tailnet — iPad/phone)
+          file://wsl.localhost/Zgent/tmp/desk-live-footprint.html  (bookmark, still rendered)
+  watch   journalctl -fu strader-footprint-feed      journalctl -fu strader-drill-bridge
+  control systemctl restart strader-drill-bridge     (PartOf= restarts the feeder too)
+EOT
+    exit 0
+fi
 
 TM="tmux -L $SOCK"
 

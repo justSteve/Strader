@@ -1,0 +1,46 @@
+[Unit]
+# Live footprint feeder — tails today's Databento tape, builds the volume bars,
+# runs the recognizers, pushes bars + emissions to the bridge. [st-n0qm.3]
+#
+# Was pane 2 of the hand-launched tmux window; same history as the bridge.
+# Bound to the bridge (PartOf=): stopping or restarting the bridge restarts the
+# feeder, which re-posts the whole day from the corpus — the bridge holds bars
+# in memory only, so a bridge restart without a feeder restart would serve an
+# empty tape behind a page that thinks it has 300 bars.
+#
+# ExecStartPre renders the day's page (Mancini levels, PAGE_DAY) so a restart
+# at the day boundary produces tomorrow's page. `-` prefix: a render failure
+# (a bad Mancini parse) must not stop the tape from being charted — the
+# previous page keeps working against the new day only until the day guard
+# fires, which is loud, and that is preferable to no chart at all.
+#
+# Restart=on-failure and NOT always: SIGTERM finalises the session and exits 0
+# (drive_and_publish, Phase 0), which is a stop, not a crash. DayRolledOver
+# exits non-zero at the CT midnight → restart → ExecStartPre renders the new
+# day → the feeder waits for the new day's file (tail_rows honours the pinned
+# day while waiting, st-n0qm.3). A crash restarts in RestartSec.
+Description=Strader live footprint feeder (corpus tail → bars + emissions → bridge)
+Documentation=https://github.com/justSteve/Strader
+PartOf=strader-drill-bridge.service
+After=strader-drill-bridge.service network-online.target
+Wants=strader-drill-bridge.service
+
+StartLimitIntervalSec=600
+StartLimitBurst=10
+
+[Service]
+Type=exec
+WorkingDirectory=/root/projects/Strader
+Environment=PYTHONPATH=/root/projects/Strader
+ExecStartPre=-/root/projects/Strader/.venv/bin/python /root/projects/Strader/scripts/live_footprint_page.py
+ExecStart=/root/projects/Strader/.venv/bin/python /root/projects/Strader/scripts/live_footprint_feed.py
+Restart=on-failure
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strader-footprint-feed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

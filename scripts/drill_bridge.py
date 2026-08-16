@@ -15,6 +15,20 @@ Endpoints (all JSON; POST bodies are sent as text/plain so file:// pages make
   GET  /commands?since=<id>        -> {commands: [...], last: <id>} (drill poll)
   POST /bars                       <- {bars: [...], meta: {...}, final: [...]} from the feeder
   GET  /bars?since=<n>             -> {bars: [...], total, meta, final} (live footprint)
+  GET  /                           -> the LIVE page itself (text/html) [st-n0qm.3]
+  GET  /health/producers           -> ages of the producer health files (tape,
+                                      1 Hz feed, sentinel, footprint feed) for the HUD dots
+
+Serving the page [st-n0qm.3]: the page used to exist only as a file:// bookmark
+on the desktop. Steve, 2026-08-16: "any instrument at the level of the FP chart
+will favor a web page for output over the tmux" — and he reads from an iPad
+over the tailnet, where file:// is not reachable. The bridge now serves the
+rendered page (DRILL_BRIDGE_PAGE, default /tmp/desk-live-footprint.html — the
+same file the bookmark points at) so `tailscale serve --set-path /footprint
+http://127.0.0.1:7788` publishes it at https://mydesk-1.tail89f676.ts.net/footprint/.
+Every route tolerates that `/footprint` prefix, and the page derives its bridge
+address from its own URL, so one HTML file works from file://, from
+http://127.0.0.1:7788/ and from the tailnet path alike.
 
 The bar channel [st-re1o] carries a LIVE session into the same surface the
 replay drills use. ``since`` is a count, not an id: a page asks for everything
@@ -46,7 +60,25 @@ from urllib.parse import parse_qs, urlparse
 logger = logging.getLogger("drill_bridge")
 
 PORT = int(os.environ.get("DRILL_BRIDGE_PORT", "7788"))
-LOG_DIR = Path(__file__).resolve().parent.parent / "data" / "drill-bridge"
+REPO = Path(__file__).resolve().parent.parent
+LOG_DIR = REPO / "data" / "drill-bridge"
+CORPUS_ROOT = REPO / "data" / "corpus"
+# The rendered LIVE page. Same path live_footprint_page.py writes and the
+# desktop bookmark reads — one file, three ways in.
+PAGE_PATH = Path(os.environ.get("DRILL_BRIDGE_PAGE", "/tmp/desk-live-footprint.html"))
+# Path prefix a reverse proxy may leave on the request (tailscale serve
+# --set-path /footprint). Stripped before routing; the page derives its bridge
+# URL from its own location so it asks under the same prefix.
+PATH_PREFIXES = ("/footprint",)
+# Producer health files the HUD dots read [st-n0qm.3]. Per-day files live under
+# data/corpus/<CT day>/; the collector assessors write day-independent files at
+# the corpus root. `fresh_s` is the age past which the dot goes red.
+PRODUCERS = {
+    "tape":     {"file": "_capture_health.json",     "per_day": False, "fresh_s": 180},
+    "gex_1s":   {"file": "_gexbot_of1s_health.json", "per_day": False, "fresh_s": 180},
+    "sentinel": {"file": "_sentinel_health.json",    "per_day": True,  "fresh_s": 90},
+    "feed":     {"file": "_footprint_health.json",   "per_day": True,  "fresh_s": 90},
+}
 
 COACH_TYPES = {"say", "arm", "jump", "pause", "play"}
 
@@ -171,7 +203,52 @@ class BridgeState:
             return {"ok": True, "started": self.started,
                     "events": self._events, "queued": len(self._commands),
                     "bars": len(self._bars),
-                    "log": str(self._log_path)}
+                    "log": str(self._log_path),
+                    "page": str(PAGE_PATH), "page_present": PAGE_PATH.exists()}
+
+
+def _central_day() -> str:
+    try:
+        from market.corpus.paths import central_date  # noqa: WPS433 — optional dep
+        return central_date().isoformat()
+    except Exception:  # noqa: BLE001 — the bridge must serve without the package
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("America/Chicago")).date().isoformat()
+
+
+def producers_health(now: datetime | None = None, corpus_root: Path | None = None) -> dict:
+    """Age of each producer's health file, and whether it is fresh. Read-only,
+    dependency-free: a dot that lies is worse than no dot, so this reports what
+    is ON DISK and lets the page draw the verdict. `status` is passed through
+    when the file carries one (the collector assessors do)."""
+    now = now or datetime.now(timezone.utc)
+    corpus_root = corpus_root or CORPUS_ROOT   # resolved at call time (tests repoint the module global)
+    day = _central_day()
+    out = {"day": day, "checked_utc": now.isoformat(timespec="seconds"), "producers": {}}
+    for name, spec in PRODUCERS.items():
+        path = (corpus_root / day / spec["file"]) if spec["per_day"] else (corpus_root / spec["file"])
+        row = {"path": str(path), "present": path.exists(), "age_s": None,
+               "fresh": False, "fresh_s": spec["fresh_s"], "status": None}
+        if path.exists():
+            try:
+                mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+                row["age_s"] = round((now - mtime).total_seconds(), 1)
+                row["fresh"] = row["age_s"] <= spec["fresh_s"]
+                try:
+                    body = json.loads(path.read_text(encoding="utf-8"))
+                    row["status"] = body.get("status")
+                    if name == "sentinel":
+                        row["rows_today"] = body.get("rows_today")
+                        row["last_row_pull_utc"] = body.get("last_row_pull_utc")
+                    if name == "feed":
+                        row["sent"] = body.get("sent")
+                        row["last_bar_t1"] = body.get("last_bar_t1")
+                except (ValueError, OSError):
+                    row["status"] = "unreadable"
+            except OSError:
+                pass
+        out["producers"][name] = row
+    return out
 
 
 STATE = BridgeState()
@@ -206,21 +283,54 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
+    def _send_page(self) -> None:
+        if not PAGE_PATH.exists():
+            self._send(503, {"error": f"live page not rendered yet: {PAGE_PATH}",
+                             "hint": "scripts/live_footprint_page.py writes it; the feed unit renders it at start"})
+            return
+        body = PAGE_PATH.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")   # the page is regenerated daily
+        self.end_headers()
+        self.wfile.write(body)
+
+    @staticmethod
+    def _route(path: str) -> str:
+        """Strip a reverse-proxy prefix so /footprint/bars routes as /bars."""
+        for pre in PATH_PREFIXES:
+            if path == pre or path.startswith(pre + "/"):
+                return path[len(pre):] or "/"
+        return path
+
     # ── routes ──────────────────────────────────────────────────────────────
     def do_GET(self):
         url = urlparse(self.path)
         try:
-            if url.path == "/health":
+            route = self._route(url.path)
+            if url.path in PATH_PREFIXES:
+                # /footprint → /footprint/ so the page's relative bridge URL
+                # (its own directory) is the prefix, not the origin root.
+                self.send_response(302)
+                self.send_header("Location", url.path + "/")
+                self.end_headers()
+                return
+            if route in ("/", "/index.html"):
+                self._send_page()
+            elif route == "/health/producers":
+                self._send(200, producers_health())
+            elif route == "/health":
                 self._send(200, STATE.stats())
-            elif url.path == "/commands":
+            elif route == "/commands":
                 since = int(parse_qs(url.query).get("since", ["0"])[0])
                 cmds = STATE.commands_since(since)
                 self._send(200, {"commands": cmds,
                                  "last": cmds[-1]["id"] if cmds else since})
-            elif url.path == "/bars":
+            elif route == "/bars":
                 since = int(parse_qs(url.query).get("since", ["0"])[0])
                 self._send(200, STATE.bars_since(since))
-            elif url.path == "/state/tail":
+            elif route == "/state/tail":
                 n = int(parse_qs(url.query).get("n", ["50"])[0])
                 self._send(200, {"events": STATE.tail(n)})
             else:
@@ -232,16 +342,17 @@ class _Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         try:
             payload = self._body()
-            if url.path == "/state":
+            route = self._route(url.path)
+            if route == "/state":
                 STATE.add_state(payload)
                 self._send(200, {"ok": True})
-            elif url.path == "/bars":
+            elif route == "/bars":
                 total = STATE.add_bars(payload.get("bars") or [],
                                        payload.get("meta"),
                                        payload.get("final"),
                                        payload.get("developing"))
                 self._send(200, {"ok": True, "total": total})
-            elif url.path == "/coach":
+            elif route == "/coach":
                 cmd = STATE.add_coach(payload)
                 self._send(200, {"ok": True, "id": cmd["id"]})
             else:
@@ -254,7 +365,8 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     server = ThreadingHTTPServer(("127.0.0.1", PORT), _Handler)
-    logger.info("drill bridge on http://127.0.0.1:%d — log %s", PORT, STATE.log_path)
+    logger.info("drill bridge on http://127.0.0.1:%d — log %s — page %s%s", PORT, STATE.log_path,
+                PAGE_PATH, "" if PAGE_PATH.exists() else " (not rendered yet)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

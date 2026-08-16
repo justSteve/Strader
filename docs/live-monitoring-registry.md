@@ -65,6 +65,20 @@ mtimes, `crontab -l`, and `tmux -L moocity` were the instruments.
 
 ### 2.2 Live but UNSUPERVISED (nothing restarts these)
 
+> **Superseded 2026-08-16 [st-n0qm.1, st-n0qm.3 — Watcher V2 Phases 0/2b].** Every row
+> in this table now runs under systemd, same container as the collectors:
+> `strader-orderflow-sentinel.service` (06:20 CT, co-03ojd.7; day-boundary reset +
+> `_sentinel_health.json` every 60 s since Phase 0), `strader-drill-bridge.service`
+> and `strader-footprint-feed.service` (`PartOf=` the bridge; the feeder renders
+> the day's page at start and heartbeats `_footprint_health.json`). Install/refresh
+> with `bash deploy/install.sh`; watch with `journalctl -fu <unit>`. The bridge
+> serves the page at `http://127.0.0.1:7788/` and on the tailnet at
+> `https://mydesk-1.tail89f676.ts.net/footprint/` (`tailscale serve --set-path`);
+> `GET /health/producers` reports every producer's health-file age and the page
+> draws them as dots. `live-footprint-up.sh` is unit-aware and becomes a viewer
+> when the units are active. The table below is kept as the record of what this
+> registry found on 08-13.
+
 | Surface | Question | Writes | Started by | State |
 |---|---|---|---|---|
 | `orderflow_sentinel.py` | level-proximity alerts | `orderflow_alerts.jsonl`, `/var/moo/logs/orderflow-sentinel/<CT date>.log` (rolls daily since 2026-08-16) | **systemd** `strader-orderflow-sentinel.service` (enabled + started 2026-08-16, st-2yuw / COO co-03ojd.7); before that by hand into `steves-desk:sentinel` | **LIVE** — pid 148773, up 23h10m, `tee`-ing to a log still named `2026-08-12` |

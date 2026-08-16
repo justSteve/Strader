@@ -1,0 +1,42 @@
+[Unit]
+# Drill bridge — the HTTP channel between the live footprint page and the
+# feeder (and the coach). [st-n0qm.3, Watcher V2 Phase 2b]
+#
+# Before this unit the bridge was pane 0 of a hand-launched tmux window
+# (scripts/live-footprint-up.sh) with no restart path: it died in the 08-15
+# OOM reset and stayed down. Steve, 2026-08-16: "coming back after restart is a
+# yes." Same container as the collectors and the sentinel [st-pgfe].
+#
+# It also SERVES the page now (GET / → /tmp/desk-live-footprint.html), which is
+# what puts the chart on the tailnet for the iPad:
+#     tailscale serve --bg --set-path /footprint http://127.0.0.1:7788
+# Steve, 2026-08-16: "any instrument at the level of the FP chart will favor a
+# web page for output over the tmux."
+#
+# Restart=always: the bridge holds no state worth protecting (bars are
+# rebuilt by the feeder from the corpus) and a bridge that is down is a chart
+# that is blank, so any exit is a reason to come back.
+Description=Strader drill bridge (live footprint page + bar channel on 127.0.0.1:7788)
+Documentation=https://github.com/justSteve/Strader
+After=network-online.target
+Wants=network-online.target
+
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=exec
+WorkingDirectory=/root/projects/Strader
+Environment=PYTHONPATH=/root/projects/Strader
+Environment=DRILL_BRIDGE_PAGE=/tmp/desk-live-footprint.html
+ExecStart=/root/projects/Strader/.venv/bin/python /root/projects/Strader/scripts/drill_bridge.py
+Restart=always
+RestartSec=3s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strader-drill-bridge
+KillSignal=SIGINT
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

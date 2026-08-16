@@ -203,6 +203,15 @@ td:first-child, th:first-child { text-align:left; }
 .col .cell.cue.churn { opacity:.55; }
 .col .cell.cue.churn::before { opacity:.7; }
 #cue-chip { cursor:pointer; }
+/* Producer health dots [st-n0qm.3]: one per health file the bridge reads —
+   green fresh, amber ageing, red stale/absent. LIVE only. */
+#prod-dots { display:none; gap:5px; align-items:center; }
+body.live #prod-dots { display:inline-flex; }
+#prod-dots .pd { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--muted); cursor:help; }
+#prod-dots .pd.ok { background:var(--good); }
+#prod-dots .pd.warn { background:var(--cue); }
+#prod-dots .pd.bad { background:var(--critical); }
+#prod-dots .pd-l { font-size:10px; color:var(--muted); margin-right:2px; }
 #cue-chip.off { color:var(--muted); text-decoration:line-through; }
 .em-chip.churn { border-color:var(--grid); color:var(--muted); opacity:.7; }
 .em-chip.churn .em-k { color:var(--muted); }
@@ -263,6 +272,7 @@ body.live #ctlblock { display:none !important; }
    LIVE against a dead feed — which is exactly how st-h510 hid for 21 hours.
    One liveness statement on the panel, and it is the one that can be wrong. */
 #livehud #bridge-dot { font-size:11px; }
+#livehud #prod-dots, #livehud #cue-chip { font-size:11px; margin-left:8px; }
 
 /* Mancini levels, drawn like the TV chart's price lines (tools/local_chart.py
    _price_lines_js: 1px dashed + title). Deliberately lighter than .lvl-line so
@@ -346,6 +356,7 @@ body.live #ctlblock { display:none !important; }
 Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button>
 · <button id="candles" title="Open the same tape as 1-minute candles in a second window, synced to this minute">Candles ↗</button>
 · coach: <span id="bridge-dot">—</span>
+· <span id="prod-dots" title="producers: tape · 1 Hz gex · sentinel · footprint feed"></span>
 · <span id="cue-chip" title="Cell cues: cells the stack spoke about flash, then keep an edge mark. Press x or click to toggle.">cues ⚑</span></p>
 <div id="help"><div class="card">
   <h2>What am I looking at?</h2>
@@ -479,6 +490,12 @@ function buildLiveHud() {
   const meta = document.getElementById("meta");
   if (dot && meta && meta.parentNode) {
     meta.parentNode.appendChild(dot);
+    // Producer dots ride beside it: same top line, same "is it alive" question,
+    // one per process behind the chart. [st-n0qm.3]
+    const pd = document.getElementById("prod-dots");
+    if (pd) meta.parentNode.appendChild(pd);
+    const cc = document.getElementById("cue-chip");
+    if (cc) meta.parentNode.appendChild(cc);
   }
   makeDraggable(hud, document.getElementById("stage"));
 }
@@ -1745,7 +1762,20 @@ window.addEventListener("resize", () => {
 // POST bodies go as text/plain so a file:// page makes "simple" CORS
 // requests (no preflight). All bridge failures are swallowed — the drill
 // must work fully offline.
-const BRIDGE = "http://127.0.0.1:7788";
+// The bridge address is derived from where the page was loaded FROM [st-n0qm.3]:
+// served by the bridge itself (http://127.0.0.1:7788/ or the tailnet path
+// https://mydesk-1.tail89f676.ts.net/footprint/) → same origin, same directory,
+// so every fetch rides the same route the page came in on; opened as the
+// file:// bookmark → the local bridge. One HTML file, three ways in.
+// The "directory" of the page URL: `/footprint/` and `/footprint` (tailscale
+// serve strips the prefix and answers the bare form) both mean the /footprint
+// mount; `/index.html` and `/` mean the origin root.
+const _pageDir = location.pathname.endsWith("/") ? location.pathname.slice(0, -1)
+               : /\.[a-z0-9]+$/i.test(location.pathname) ? location.pathname.replace(/\/[^/]*$/, "")
+               : location.pathname;
+const BRIDGE = (location.protocol === "http:" || location.protocol === "https:")
+  ? location.origin + _pageDir
+  : "http://127.0.0.1:7788";
 let bridgeUp = false, lastCmdId = 0, lastStateSent = 0;
 
 function snapshot(kind, extra) {
@@ -1839,6 +1869,45 @@ async function pollBars() {
   }
   setTimeout(pollBars, POLL_MS);
 }
+// ── producer health dots [st-n0qm.3] ─────────────────────────────────────
+// Four dots from GET /health/producers: tape capture, 1 Hz GexBot leg,
+// sentinel, footprint feed. Colour is the AGE of each producer's own health
+// file against its freshness budget — the bridge reports what is on disk and
+// draws no verdict of its own. Polled every 15 s; a dead bridge greys them all.
+const PROD_ORDER = [["tape", "tape"], ["gex_1s", "1Hz"], ["sentinel", "sent"], ["feed", "feed"]];
+const PROD_POLL_MS = 15000;
+function renderProducerDots(h) {
+  const el = $("prod-dots"); if (!el) return;
+  el.innerHTML = "";
+  for (const [key, label] of PROD_ORDER) {
+    const p = h && h.producers && h.producers[key];
+    const dot = document.createElement("span");
+    let cls = "pd", why = "no data";
+    if (p) {
+      if (!p.present) { cls += " bad"; why = `no health file (${p.path})`; }
+      // A collector that says idle/quiet is CORRECT outside its window (weekend,
+      // pre-open): neutral, not red — red is for a producer that should be moving.
+      else if (p.status === "idle" || p.status === "quiet") { why = `${p.status} — venue closed / outside window`; }
+      else if (p.fresh) { cls += " ok"; why = `${p.age_s}s old`; }
+      else if (p.age_s <= p.fresh_s * 3) { cls += " warn"; why = `${p.age_s}s old (budget ${p.fresh_s}s)`; }
+      else { cls += " bad"; why = `${p.age_s}s old — stale (budget ${p.fresh_s}s)`; }
+      if (p.status) why += ` · status ${p.status}`;
+    }
+    dot.className = cls;
+    dot.title = `${key}: ${why}`;
+    const l = document.createElement("span"); l.className = "pd-l"; l.textContent = label;
+    el.appendChild(l); el.appendChild(dot);
+  }
+}
+async function pollProducers() {
+  if (!LIVE) return;
+  try {
+    const r = await fetch(`${BRIDGE}/health/producers`);
+    renderProducerDots(await r.json());
+  } catch { renderProducerDots(null); }
+  setTimeout(pollProducers, PROD_POLL_MS);
+}
+if (LIVE) setTimeout(pollProducers, 800);
 // Day-mismatch banner [st-h510]. Deliberately obnoxious and deliberately NOT
 // dismissable: the whole failure it guards against was a surface that looked
 // fine. A dismissable warning on a chart you read for hours is a warning that

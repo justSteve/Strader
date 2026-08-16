@@ -44,6 +44,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import signal
 import sys
 import time
@@ -54,7 +55,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from market.corpus.paths import central_date, gexbot_path, resolve_existing  # noqa: E402
+from market.corpus.paths import CORPUS_ROOT, central_date, gexbot_path, resolve_existing  # noqa: E402
 from market.orderflow.anchors import LiveAnchors, mancini_levels_for  # noqa: E402
 from market.orderflow.gex_context import GexContext                # noqa: E402
 from market.orderflow.bars import build_bars                    # noqa: E402
@@ -131,6 +132,16 @@ def tail_rows(path: Path, *, follow: bool, poll_s: float = 0.5,
                 elif not follow:
                     return
                 else:
+                    # Waiting for a file that has not appeared is the same idle
+                    # state as following one that stopped growing: under a unit
+                    # the feeder is started at any hour, and a Sunday start
+                    # pinned to Sunday must roll to Monday rather than wait for
+                    # a file that will never exist. [st-n0qm.3]
+                    if pinned_day is not None and central_date() != pinned_day:
+                        raise DayRolledOver(
+                            f"CT date is {central_date()} but this feeder is pinned to "
+                            f"{pinned_day}; {path} never appeared and now never will. "
+                            f"Restart for the new day.")
                     time.sleep(poll_s)
                     continue
 
@@ -466,6 +477,30 @@ def main() -> int:
     # run ends.
     dev_on = args.developing_interval > 0 and not args.catch_up_only and not args.dry_run
     last_dev = 0.0
+    health_path = CORPUS_ROOT / day.isoformat() / "_footprint_health.json"
+    feed_health = {"day": day.isoformat(), "pid": os.getpid(), "sent": 0,
+                   "last_bar_t1": None, "developing_t": None, "final": 0}
+
+    def _beat(**kw) -> None:
+        if args.dry_run:
+            return
+        feed_health.update(kw)
+        feed_health["written_utc"] = datetime.now().astimezone().isoformat(timespec="seconds")
+        write_feed_health(health_path, feed_health)
+
+    # Heartbeat while WAITING too: under the unit the feeder is up all night
+    # waiting for the day's file, and a health file that only moves on a push
+    # would read "dead" for every quiet hour. A daemon thread beats every 30 s
+    # with whatever the counters say; the push path beats immediately.
+    if not args.dry_run:
+        import threading
+
+        def _pulse() -> None:
+            while True:
+                time.sleep(30)
+                _beat(state="following" if feed_health["sent"] or feed_health["developing_t"] else "waiting")
+        threading.Thread(target=_pulse, name="feed-health", daemon=True).start()
+        _beat(state="waiting")
 
     def _tee(it):
         nonlocal last_dev
@@ -478,6 +513,7 @@ def main() -> int:
                     payload = developing_payload(pending_trades, args.bar_n)
                     if payload is not None:
                         post_bars(args.bridge, [], None, None, payload)
+                        _beat(developing_t=payload.get("t0"))
             yield t
 
     # The drive order (observe the bar into the developing range, THEN judge
@@ -494,11 +530,29 @@ def main() -> int:
                 logger.info("final: %s", e)
         else:
             post_bars(args.bridge, batch, meta_, final)
+            _beat(sent=feed_health["sent"] + len(batch),
+                  last_bar_t1=(batch[-1].get("t1") if batch else feed_health["last_bar_t1"]),
+                  final=len(final or ()) or feed_health["final"])
 
     _install_stop_handler()
     drive_and_publish(live_drive(_closed_bars(), driver, live_anchors),
                       driver, pending_trades, runlog, _publish, meta=meta, gex=gex)
     return 0
+
+
+def write_feed_health(path: Path, payload: dict) -> None:
+    """The feeder's own liveness evidence — data/corpus/<day>/_footprint_health.json,
+    rewritten atomically on every push (closed-bar batch or developing tick).
+    The bridge's /health/producers reads its age; the page draws the dot.
+    Never fatal: a chart that stops because its heartbeat could not be written
+    would be the wrong trade. [st-n0qm.3]"""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError as e:
+        logger.warning("feed health file unavailable (%s)", e)
 
 
 def _install_stop_handler() -> None:

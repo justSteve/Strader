@@ -96,3 +96,102 @@ def test_bars_carry_their_emissions_through_the_bridge(state):
     got = state.bars_since(0)["bars"]
     assert got[0]["ev"] == ev
     assert got[0]["i"] == 0
+
+
+# ── page serving, prefix routing, producer health [st-n0qm.3] ─────────────────
+
+def _serve(monkeypatch, tmp_path, page_body=None):
+    """Spin the real handler on an ephemeral port with PAGE_PATH/CORPUS_ROOT
+    pointed at tmp_path. Returns (base_url, shutdown)."""
+    import threading
+    from http.server import ThreadingHTTPServer
+    import drill_bridge as db
+    page = tmp_path / "live.html"
+    if page_body is not None:
+        page.write_text(page_body, encoding="utf-8")
+    monkeypatch.setattr(db, "PAGE_PATH", page)
+    monkeypatch.setattr(db, "CORPUS_ROOT", tmp_path / "corpus")
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), db._Handler)
+    t = threading.Thread(target=srv.serve_forever, daemon=True)
+    t.start()
+    return f"http://127.0.0.1:{srv.server_address[1]}", srv.shutdown
+
+
+def _get(url, allow_redirects=True):
+    import urllib.request
+    import urllib.error
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *a, **k):
+            return None
+    opener = urllib.request.build_opener() if allow_redirects else urllib.request.build_opener(_NoRedirect)
+    try:
+        with opener.open(url, timeout=5) as r:
+            return r.status, dict(r.headers), r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers), e.read()
+
+
+def test_root_serves_the_rendered_page(monkeypatch, tmp_path):
+    base, stop = _serve(monkeypatch, tmp_path, "<!doctype html><title>Live Footprint</title>")
+    try:
+        code, hdrs, body = _get(base + "/")
+        assert code == 200 and hdrs["Content-Type"].startswith("text/html")
+        assert b"Live Footprint" in body
+        assert hdrs.get("Cache-Control") == "no-store"
+    finally:
+        stop()
+
+
+def test_root_is_503_until_the_page_is_rendered(monkeypatch, tmp_path):
+    base, stop = _serve(monkeypatch, tmp_path, None)
+    try:
+        code, _, body = _get(base + "/")
+        assert code == 503 and b"not rendered" in body
+    finally:
+        stop()
+
+
+def test_footprint_prefix_routes_like_root(monkeypatch, tmp_path):
+    """tailscale serve --set-path /footprint may leave the prefix on the
+    request; every route must answer under it, and the bare prefix must
+    redirect to the slash form so the page's own-directory bridge URL is the
+    prefix, not the origin root."""
+    base, stop = _serve(monkeypatch, tmp_path, "<title>x</title>")
+    try:
+        code, hdrs, _ = _get(base + "/footprint", allow_redirects=False)
+        assert code == 302 and hdrs["Location"] == "/footprint/"
+        code, hdrs, body = _get(base + "/footprint/")
+        assert code == 200 and b"<title>x</title>" in body
+        code, _, body = _get(base + "/footprint/bars?since=0")
+        assert code == 200 and "bars" in json.loads(body)
+        code, _, body = _get(base + "/footprint/health")
+        assert code == 200 and json.loads(body)["ok"] is True
+        code, _, body = _get(base + "/footprint/health/producers")
+        assert code == 200 and "producers" in json.loads(body)
+    finally:
+        stop()
+
+
+def test_producers_health_reports_age_and_freshness(monkeypatch, tmp_path):
+    import os
+    import time
+    import drill_bridge as db
+    from datetime import datetime, timezone
+    corpus = tmp_path / "corpus"
+    monkeypatch.setattr(db, "CORPUS_ROOT", corpus)
+    monkeypatch.setattr(db, "_central_day", lambda: "2026-08-17")
+    day = corpus / "2026-08-17"
+    day.mkdir(parents=True)
+    (day / "_sentinel_health.json").write_text(json.dumps({"rows_today": 5, "last_row_pull_utc": "x"}))
+    (corpus / "_capture_health.json").write_text(json.dumps({"status": "ok"}))
+    old = day / "_footprint_health.json"
+    old.write_text(json.dumps({"sent": 12}))
+    stale = time.time() - 1000
+    os.utime(old, (stale, stale))
+    h = db.producers_health(now=datetime.now(timezone.utc))
+    p = h["producers"]
+    assert p["sentinel"]["present"] and p["sentinel"]["fresh"] and p["sentinel"]["rows_today"] == 5
+    assert p["tape"]["present"] and p["tape"]["status"] == "ok"
+    assert p["feed"]["present"] and not p["feed"]["fresh"] and p["feed"]["age_s"] > 900
+    assert p["gex_1s"]["present"] is False and p["gex_1s"]["fresh"] is False
+    assert h["day"] == "2026-08-17"
