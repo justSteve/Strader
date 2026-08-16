@@ -134,3 +134,4 @@ forward is logged live.*
 | 2026-08-16 06:24 CT | COO | WRITE | co-hhhf | d7df1cd | docs/a2a/inbox.md | CORRECTS the 2026-08-13 15:41 WRITE row (proper-name-presentation rule): its sha [co-03ojd.5] |
 | 2026-08-16 06:24 CT | COO | WRITE | co-u58u2 | 753ae59 | docs/a2a/inbox.md | CORRECTS the 2026-08-15 08:24 WRITE row (orderflow-mastery-ownership): its sha [co-03ojd.5] |
 | 2026-08-16 06:44 CT | COO | WRITE | co-8ygyt | - | .claude/rules/shell-shim-hazards.md | Propagated COO's shell-shim-hazards rule verbatim: the Bash-tool find/grep are Claude Code's bfs/ugrep shims in EVERY zgent; two runaway 'grep -o' patterns reset the whole distro twice on 2026-08-15 (18 GB + 6.8 GB). Rule file only — no settings/hook change. Sha in the next row |
+| 2026-08-16 06:45 CT | COO | WRITE | co-8ygyt | 4e5e4c1 | docs/a2a/inbox.md | CORRECTS the row above by naming its sha [st-s8ng] |
