@@ -259,3 +259,22 @@ def test_a_new_session_day_resets_everything_the_day_owns(state):
     log = state.log_path.read_text().splitlines()
     assert any('"kind":"day_reset"' in l and '"dropped_bars":3' in l
                and '"dropped_alerts":1' in l for l in log)
+
+
+def test_alerts_seed_from_the_days_durable_file_at_start(state, tmp_path):
+    """[st-n0qm.9] orderflow_alerts.jsonl is the record; the bridge is a
+    display. At start it loads the day's file so a restart or a late-opened
+    page still shows the morning's rows; a non-empty channel is left alone."""
+    f = tmp_path / "orderflow_alerts.jsonl"
+    f.write_text('{"kind":"approach","strike":7805,"ts_alert_utc":"2026-08-14T13:30:04Z"}\n'
+                 'not json\n\n'
+                 '{"kind":"contested","strike":7800,"ts_alert_utc":"2026-08-14T13:31:12Z"}\n',
+                 encoding="utf-8")
+    assert state.seed_alerts(f) == 2
+    r = state.alerts_since(0)
+    assert [a["id"] for a in r["alerts"]] == [1, 2] and all(a["seeded"] for a in r["alerts"])
+    assert r["alerts"][0]["received_utc"] == "2026-08-14T13:30:04Z"
+    assert state.seed_alerts(f) == 0, "a second seed onto a non-empty channel is a no-op"
+    live = state.add_alert({"kind": "approach", "strike": 7810})
+    assert live["id"] == 3 and "seeded" not in live
+    assert state.seed_alerts(tmp_path / "missing.jsonl") == 0

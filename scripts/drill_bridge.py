@@ -230,6 +230,45 @@ class BridgeState:
             self._append({"channel": "alerts", **rec})
             return rec
 
+    def seed_alerts(self, path: Path) -> int:
+        """Load the day's durable ``orderflow_alerts.jsonl`` into the alerts
+        channel at bridge start [st-n0qm.9]. The sentinel posts live alerts
+        best-effort and never re-posts, so without this a bridge restart — or a
+        page opened at 10:00 — would show none of the morning's rows although
+        the file has them all. Returns how many were loaded; never raises.
+        Only meaningful before any live alert has arrived (ids must stay
+        monotonic in arrival order), so a non-empty channel is left alone."""
+        try:
+            if not path.exists():
+                return 0
+            with self._lock:
+                if self._alerts:
+                    return 0
+            n = 0
+            for line in path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    a = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(a, dict) and a:
+                    with self._lock:
+                        rec = {**a, "id": len(self._alerts) + 1,
+                               "received_utc": a.get("ts_alert_utc")
+                               or datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                               "seeded": True}
+                        self._alerts.append(rec)
+                    n += 1
+            if n:
+                self._append({"channel": "alerts", "kind": "alerts_seeded",
+                              "n": n, "from": str(path)})
+            return n
+        except OSError as e:
+            logger.warning("alerts seed: could not read %s (%s)", path, e)
+            return 0
+
     def alerts_since(self, n: int) -> dict:
         with self._lock:
             start = max(0, min(n, len(self._alerts)))
@@ -425,8 +464,9 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     server = ThreadingHTTPServer(("127.0.0.1", PORT), _Handler)
-    logger.info("drill bridge on http://127.0.0.1:%d — log %s — page %s%s", PORT, STATE.log_path,
-                PAGE_PATH, "" if PAGE_PATH.exists() else " (not rendered yet)")
+    seeded = STATE.seed_alerts(CORPUS_ROOT / _central_day() / "orderflow_alerts.jsonl")
+    logger.info("drill bridge on http://127.0.0.1:%d — log %s — page %s%s — %d alert(s) seeded from today's file",
+                PORT, STATE.log_path, PAGE_PATH, "" if PAGE_PATH.exists() else " (not rendered yet)", seeded)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
