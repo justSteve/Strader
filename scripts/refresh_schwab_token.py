@@ -106,20 +106,26 @@ def _backup(token_path: Path) -> Path | None:
     return bak
 
 
-def _prune_backups(token_path: Path, keep: int = KEEP_BACKUPS) -> None:
-    """Keep the newest ``keep`` timestamped backups; drop the rest.
+def _prune_copies(token_path: Path, kind: str, keep: int = KEEP_BACKUPS) -> None:
+    """Keep the newest ``keep`` copies of one ``kind`` (``bak`` / ``new`` /
+    ``rejected``); drop the rest.
 
     The stamp is lexically sortable (UTC ``%Y%m%dT%H%M%SZ``), so name order is
     time order — no stat calls, and no dependence on mtimes that a copy or a
-    restore would have rewritten.
+    restore would have rewritten. The glob is anchored on ``.<kind>-`` so it can
+    never reach the live token or a sibling of another kind.
     """
-    pattern = token_path.name + ".bak-*"
-    olds = sorted(token_path.parent.glob(pattern))
+    olds = sorted(token_path.parent.glob(f"{token_path.name}.{kind}-*"))
     for stale in olds[:-keep] if len(olds) > keep else []:
         try:
             stale.unlink()
         except OSError:
             pass  # a backup we cannot prune is not worth failing a re-auth over
+
+
+def _prune_backups(token_path: Path, keep: int = KEEP_BACKUPS) -> None:
+    """Keep the newest ``keep`` timestamped backups; drop the rest."""
+    _prune_copies(token_path, "bak", keep)
 
 
 def _restore(bak: Path | None, token_path: Path) -> None:
@@ -128,13 +134,63 @@ def _restore(bak: Path | None, token_path: Path) -> None:
 
 
 def _stash(token_path: Path, suffix: str) -> Path | None:
-    """Copy the current token aside for the operator. None if the copy fails."""
-    dest = token_path.with_suffix(token_path.suffix + suffix)
+    """Copy the current token aside for the operator, under a TIMESTAMPED name.
+    None if the copy fails.
+
+    Timestamped for the same reason ``_backup`` is (st-r1b5): a bare ``.new`` or
+    ``.rejected`` is a single slot, so a second failure silently destroys the
+    evidence from the first.
+
+    It also stops the copy reading as an atomic-write temp. The 2026-08-15
+    enterprise audit (sweep J finding F10, co-03ojd.7) found a three-month-old
+    ``schwab_token.json.new`` holding a full 140-char refresh token and
+    classified it as "a leftover from an atomic-write path (`.new` → rename)",
+    recommending the writer ``rm -f`` its temp on every path. It is not a temp —
+    it is the rescue copy this function makes when the post-mint verify call
+    fails, and deleting it on the failure path would remove the operator's only
+    copy of a grant that is probably fine. The name was the misleading part, so
+    the name is what changed; the superseded copies are swept on the SUCCESS
+    path instead (``_sweep_rescues``).
+    """
+    if not token_path.exists():
+        return None
+    kind = suffix.lstrip(".")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    dest = token_path.with_suffix(f"{token_path.suffix}.{kind}-{stamp}")
+    dup = 1
+    while dest.exists():
+        dest = token_path.with_suffix(f"{token_path.suffix}.{kind}-{stamp}.{dup}")
+        dup += 1
     try:
         shutil.copy2(token_path, dest)
-        return dest
     except OSError:
         return None
+    _prune_copies(token_path, kind)
+    return dest
+
+
+def _sweep_rescues(token_path: Path) -> list[Path]:
+    """Remove verify-failure rescue copies once a re-auth has SUCCEEDED.
+
+    A ``.new`` rescue holds the grant from an earlier attempt whose probe call
+    failed. The moment a later run mints a grant that passes both the shape gate
+    and the live call, every such copy is superseded by definition — an older
+    credential nobody tracks, sitting at 0600 in the tokens directory for
+    months. Rejected copies are deliberately NOT swept: those are forensic
+    evidence of a defective mint (st-r1b5), and they are few and small.
+    """
+    removed: list[Path] = []
+    stale = sorted(token_path.parent.glob(f"{token_path.name}.new-*"))
+    legacy = token_path.with_suffix(token_path.suffix + ".new")  # pre-2026-08-16 name
+    if legacy.exists():
+        stale.append(legacy)
+    for path in stale:
+        try:
+            path.unlink()
+            removed.append(path)
+        except OSError:
+            pass  # a copy we cannot remove is not worth failing a good re-auth
+    return removed
 
 
 def _grant_gate(token_path: Path):
@@ -302,10 +358,17 @@ def main() -> int:
               file=sys.stderr)
         return 4
 
+    # Both gates passed, so any rescue copy from an earlier verify failure is a
+    # superseded credential. Sweep it here — the success path is the only place
+    # where "this copy is definitely stale" is a fact rather than a guess.
+    swept = _sweep_rescues(token_path)
+
     print(f"✓ New token written to {token_path}")
     print(f"✓ Grant is complete — refresh token present, "
           f"{health.days_left:.1f}d to the wall")
     print(f"✓ Live API call to marketdata/v1 get_market_hours returned 200")
+    for path in swept:
+        print(f"  (removed superseded rescue copy {path.name})")
     if bak:
         print(f"  (backup retained at {bak.name} — pruned to the last "
               f"{KEEP_BACKUPS})")
