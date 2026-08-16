@@ -75,6 +75,13 @@ to end.
 
 ## One process note, stated plainly
 
+> **Correction, 2026-08-16 (COO, co-03ojd.5 / co-glpzr):** the sentence below
+> attributes the carve-out to Steve. It was the *Auditor's* §6 recommendation
+> (session-review of 2026-08-13), mis-filed as his ruling; Steve on 2026-08-15:
+> "I didn't say it." The carve-out is observed provisionally pending his
+> ruling on co-glpzr. The paragraph is left as written because this memo is a
+> record of what was said on 08-14.
+
 Steve ruled this morning (`co-glpzr`, P0) that changes to `settings.json`,
 hooks, or permissions **always come to him, doctrine notwithstanding** — the
 standing autonomy grants explicitly do not cover this surface. He directed this

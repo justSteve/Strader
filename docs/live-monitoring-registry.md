@@ -67,7 +67,7 @@ mtimes, `crontab -l`, and `tmux -L moocity` were the instruments.
 
 | Surface | Question | Writes | Started by | State |
 |---|---|---|---|---|
-| `orderflow_sentinel.py` | level-proximity alerts | `orderflow_alerts.jsonl`, `/var/moo/logs/orderflow-sentinel-2026-08-12.log` | **by hand** into `steves-desk:sentinel` | **LIVE** — pid 148773, up 23h10m, `tee`-ing to a log still named `2026-08-12` |
+| `orderflow_sentinel.py` | level-proximity alerts | `orderflow_alerts.jsonl`, `/var/moo/logs/orderflow-sentinel/<CT date>.log` (rolls daily since 2026-08-16) | **systemd** `strader-orderflow-sentinel.service` (enabled + started 2026-08-16, st-2yuw / COO co-03ojd.7); before that by hand into `steves-desk:sentinel` | **LIVE** — pid 148773, up 23h10m, `tee`-ing to a log still named `2026-08-12` |
 | `drill_bridge.py` | browser ↔ agent channel :7788 | HTTP only | `live-footprint-up.sh` / drill-coach skill | **LIVE** — pid 327027, up 16h47m |
 | `live_footprint_feed.py` | live volume bars | POSTs to the bridge | `live-footprint-up.sh` | **LIVE** — pid 327054 |
 | `live_footprint_page.py` | the page itself | `/tmp/desk-live-footprint.html` | `live-footprint-up.sh` (regenerated each bring-up) | output path is cleared by every reboot — a bookmark contract that must be re-rendered |

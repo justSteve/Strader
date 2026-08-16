@@ -256,11 +256,15 @@ never overwrite. Check for drift at session start with
 > from beads' own template, predates the knowledge bundle, and its blanket ban
 > never matched practice.
 
-**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
+**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` was a passive export (retired on this box 2026-06-12 — see `.beads/issues.jsonl.stale-20260612.bak`; the store is Dolt-only now). See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
 
 ## Session Completion
 
-Steve granted standing commit-and-push authority 2026-08-02: commit and push
+Steve granted standing commit-and-push authority 2026-08-02 (COO session
+32137903, 2026-08-02T15:22Z, his words: "it's time to stop asking confirmations
+on commits. You haven't once screwed a GitHub-based operation - you have liberty
+and one blocker - if you think risk exists, and you think i'll also think risk
+justifies the attention cost, raise your voice."): commit and push
 without asking; raise a commit for discussion only when there is real risk and
 the interruption is warranted. The beads gate is unchanged. Work is NOT
 complete until `git push` succeeds.

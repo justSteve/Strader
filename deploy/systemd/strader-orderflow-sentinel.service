@@ -1,0 +1,31 @@
+[Unit]
+# Orderflow sentinel — the live watcher of the trader loop (st-igim). It had no
+# supervisor: a host reboot on 08-11 and the WSL OOM reset on 08-15 both took it
+# down silently, and it stayed down until a human noticed [st-2yuw; COO audit
+# co-03ojd.7, sweep J F7]. Same container as the three collectors [st-pgfe].
+# Runs all day (it idles on a quiet feed and heartbeats every 10 min); the
+# collectors gate their own market windows. --log-dir rolls the log at the CT
+# day boundary (sweep J F11) — the old hand launch tee'd into a file named for
+# its start date.
+Description=Strader orderflow sentinel (level-proximity alerts on the 1 Hz feed)
+After=network-online.target
+Wants=network-online.target
+
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=exec
+WorkingDirectory=/root/projects/Strader
+Environment=PYTHONPATH=/root/projects/Strader
+ExecStart=/root/projects/Strader/.venv/bin/python /root/projects/Strader/scripts/orderflow_sentinel.py --log-dir /var/moo/logs/orderflow-sentinel
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strader-orderflow-sentinel
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

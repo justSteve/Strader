@@ -49,6 +49,64 @@ def _alerts_path() -> Path:
     return CORPUS_ROOT / central_date().isoformat() / "orderflow_alerts.jsonl"
 
 
+class DailyLog:
+    """Mirror every printed line to ``<dir>/<central date>.log``, rolling at the
+    CT day boundary — the same boundary the feed path already turns on.
+
+    Why this exists [co-03ojd.7, enterprise-audit sweep J finding F11]: the
+    sentinel used to be hand-launched under a `tee` to a filename pinned at
+    launch time, so four days of content accumulated under
+    `/var/moo/logs/orderflow-sentinel-2026-08-12.log`. Every other per-job log
+    in `/var/moo/logs` rolls daily (`corpus-daily/2026-08-15.log`), so looking
+    for the sentinel's activity on 08-13 or 08-14 by filename returned nothing
+    and the newest file read as four days stale. It looked like absence while
+    the process was in fact running and its `rows=` counter advancing — the
+    inverse of the head-ed-listing trap in COO's `completeness-sweeps.md`.
+
+    Stdout is written unconditionally: journald, the tmux sentinel window and
+    the harness Monitor all read it, and the file is an addition to that, not a
+    replacement for it. A file that cannot be opened degrades to stdout-only
+    rather than killing a watcher whose whole job is to still be there.
+    """
+
+    def __init__(self, directory: Path | None = None) -> None:
+        self.dir = directory
+        self._day: str | None = None
+        self._fh = None
+
+    def write(self, line: str) -> None:
+        print(line, flush=True)
+        if self.dir is None:
+            return
+        day = central_date().isoformat()
+        if day != self._day:
+            self._close()
+            try:
+                self.dir.mkdir(parents=True, exist_ok=True)
+                self._fh = (self.dir / f"{day}.log").open("a", encoding="utf-8")
+            except OSError as e:
+                print(f"[sentinel] log file unavailable ({e}); stdout only",
+                      file=sys.stderr, flush=True)
+                self.dir = None
+                return
+            self._day = day
+        self._fh.write(line + "\n")
+        self._fh.flush()
+
+    def _close(self) -> None:
+        if self._fh is not None:
+            try:
+                self._fh.close()
+            except OSError:
+                pass
+            self._fh = None
+
+
+#: Replaced in main() when --log-dir is given. Module-level so _emit can reach
+#: it without threading a handle through LevelWatch.
+_LOG = DailyLog()
+
+
 def _strike(x: float) -> int:
     """Nearest SPX strike (5-pt grid near the money). Ladder values are
     computed centers (7754.83); Steve trades strikes (7755)."""
@@ -67,7 +125,7 @@ def _emit(alert: dict) -> None:
         c["strike"] = _strike(c["value"])
     alert["ts_alert_utc"] = utc_now_iso()
     append_jsonl(_alerts_path(), alert)
-    print(json.dumps(alert), flush=True)
+    _LOG.write(json.dumps(alert))
 
 
 class LevelWatch:
@@ -253,9 +311,14 @@ def main() -> int:
                     help="Override feed path (testing)")
     ap.add_argument("--alerts", type=Path, default=None,
                     help="Override alerts path (testing)")
+    ap.add_argument("--log-dir", type=Path, default=None,
+                    help="Mirror stdout to <dir>/<CT date>.log, rolling daily. "
+                         "The systemd unit passes /var/moo/logs/orderflow-sentinel")
     args = ap.parse_args()
 
-    global _feed_path, _alerts_path
+    global _feed_path, _alerts_path, _LOG
+    if args.log_dir:
+        _LOG = DailyLog(args.log_dir)
     if args.feed:
         _feed_path = lambda: args.feed  # noqa: E731
     if args.alerts:
@@ -267,8 +330,8 @@ def main() -> int:
     last_beat = time.monotonic()
     rows = 0
 
-    print(f"sentinel up — watching {path} (band {args.band}, rearm {args.rearm}, "
-          f"move {args.move})", flush=True)
+    _LOG.write(f"sentinel up — watching {path} (band {args.band}, "
+               f"rearm {args.rearm}, move {args.move})")
     while True:
         current = _feed_path()
         if current != path:  # day rollover
@@ -297,8 +360,7 @@ def main() -> int:
         if time.monotonic() - last_beat >= args.heartbeat:
             state = {k: {"value": w.value, "armed": w.armed}
                      for k, w in watches.items()}
-            print(f"heartbeat {utc_now_iso()} rows={rows} {json.dumps(state)}",
-                  flush=True)
+            _LOG.write(f"heartbeat {utc_now_iso()} rows={rows} {json.dumps(state)}")
             last_beat = time.monotonic()
         time.sleep(args.poll)
 
