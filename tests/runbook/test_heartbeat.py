@@ -98,7 +98,7 @@ def test_check_capture_missing_state_reports_the_supervisor_itself(monkeypatch, 
     monkeypatch.setattr(heartbeat, "CAPTURE_STATE", tmp_path / "nope.json")
     c = heartbeat.check_capture()
     assert not c["ok"]
-    assert "capture-supervisor-wrapper.sh" in c["reasons"][0]
+    assert "strader-health-assessors.timer" in c["reasons"][0]
 
 
 def test_check_capture_reports_a_bad_verdict(monkeypatch, tmp_path):
@@ -115,7 +115,7 @@ def test_check_capture_detects_a_dead_watcher(monkeypatch, tmp_path):
     _capture_state(tmp_path, monkeypatch, checked_at="2026-07-31T02:00:00Z")
     c = heartbeat.check_capture()
     assert not c["ok"]
-    assert "supervisor itself has stopped" in " ".join(c["reasons"])
+    assert "health writer has stopped" in " ".join(c["reasons"])
 
 
 def test_check_capture_surfaces_overnight_restarts(monkeypatch, tmp_path):

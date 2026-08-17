@@ -106,8 +106,9 @@ hstat() {           # hstat <label> <path> <fresh_s> [why-absent-is-normal]
     else                              state="STALE"; fi
     printf '%-22s %-8s %-10s %s\n' "$label" "$state" "${age}s" "$(basename "$path") · status $status · budget ${fresh}s"
 }
-hstat "tape health"     "$REPO/data/corpus/_capture_health.json"     180 "capture writes it while streaming; absent = never streamed on this box"
-hstat "1Hz gex health"  "$REPO/data/corpus/_gexbot_of1s_health.json" 180 "written by the 1 Hz leg; idle/quiet outside 08:30-15:05 CT is normal"
+hstat "tape health"     "$REPO/data/corpus/_capture_health.json"     180 "written every 2 min by strader-health-assessors.timer (co-03ojd.7); STALE here means the health WRITER stopped, not the tape — check systemctl list-timers strader-health-assessors"
+hstat "gex health"      "$REPO/data/corpus/_gexbot_health.json"      180 "same writer as tape health; idle outside 08:30-15:05 CT is normal"
+hstat "1Hz gex health"  "$REPO/data/corpus/_gexbot_of1s_health.json" 180 "same writer as tape health; idle/quiet outside 08:30-15:05 CT is normal"
 hstat "sentinel health" "$DAY_DIR/_sentinel_health.json"             90  "every 60 s while the sentinel runs (Phase 0)"
 hstat "feed health"     "$DAY_DIR/_footprint_health.json"            90  "every push and every 30 s while waiting (Phase 2b)"
 

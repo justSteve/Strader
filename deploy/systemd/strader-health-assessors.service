@@ -1,0 +1,31 @@
+[Unit]
+# The assessor half of the retired */2 cron supervisors. [co-03ojd.7 J-F1]
+#
+# strader-capture / strader-gexbot / strader-gexbot-orderflow-1s (st-pgfe,
+# 2026-08-13) took over RELAUNCHING the collectors; nothing took over ASSESSING
+# them, so data/corpus/_capture_health.json, _gexbot_health.json and
+# _gexbot_of1s_health.json froze at the cutover and every reader (the 08:25
+# pre-open heartbeat, surface_liveness.sh, drill_bridge.py) saw a permanently
+# stale file. This oneshot runs scripts/health_assessors.sh, which invokes
+# scripts/capture_health.py once per collector with the retired supervisors'
+# exact arguments; strader-health-assessors.timer fires it every 2 minutes.
+#
+# A DEAD/STALE verdict is written to the state file and the health log — that
+# is the readers' business, not this unit's. This unit FAILS only when an
+# assessor itself broke (rc=2), so `systemctl status strader-health-assessors`
+# failing means "the health writer is broken", nothing else.
+Description=Strader collector health assessors (writes the three _*_health.json verdicts)
+Documentation=https://github.com/justSteve/Strader
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/projects/Strader
+Environment=PYTHONPATH=/root/projects/Strader
+ExecStart=/usr/bin/bash /root/projects/Strader/scripts/health_assessors.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strader-health-assessors
+# Three short python runs; if one wedges (a hung /proc read, a locked file),
+# do not let it pile up behind the next tick.
+TimeoutStartSec=90

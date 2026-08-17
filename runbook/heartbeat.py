@@ -52,11 +52,12 @@ from runbook.datastream import gate  # noqa: E402
 PARSED_ROOT = REPO_ROOT / "runbook" / "mancini" / "parsed"
 
 # Live-capture supervisor state [st-6qx4] — written every run by
-# scripts/capture_health.py, which scripts/cron/capture-supervisor-wrapper.sh
-# fires every two minutes.
+# scripts/capture_health.py, which strader-health-assessors.timer fires every
+# two minutes via scripts/health_assessors.sh (the */2 cron supervisor that used
+# to do this is gone since 2026-08-13 — st-pgfe, co-03ojd.7).
 CAPTURE_STATE = CORPUS_ROOT / "_capture_health.json"
-# A state file older than this means the SUPERVISOR stopped, which is a silent
-# failure of the guard itself. Generous against a 2-minute cadence.
+# A state file older than this means the HEALTH WRITER stopped, which is a
+# silent failure of the guard itself. Generous against a 2-minute cadence.
 CAPTURE_STATE_MAX_AGE_MIN = 30.0
 
 
@@ -64,8 +65,11 @@ def check_corpus() -> dict:
     """Datastream gate over the most recent completed session."""
     day = most_recent_session_day()
     result = gate.check(day=day)
+    # Degraded rides in reasons with ok=True: the line reads
+    # "corpus [hard] ok — degraded: ..." — loud, not halting. [co-03ojd.7 J-F3]
+    reasons = list(result.reasons) + [f"degraded: {w}" for w in result.warnings]
     return {"name": "corpus", "hard": True, "ok": result.ok,
-            "day": day.isoformat(), "reasons": list(result.reasons)}
+            "day": day.isoformat(), "reasons": reasons}
 
 
 def check_mancini() -> dict:
@@ -116,8 +120,10 @@ def check_risk() -> dict:
 def check_capture() -> dict:
     """Did the live Databento capture survive the night (soft) [st-6qx4].
 
-    Reports the supervisor's own verdict rather than re-deriving liveness — and
-    reports the supervisor's ABSENCE too. An alert nobody reads is not a guard:
+    Reports the health writer's own verdict rather than re-deriving liveness —
+    and reports the writer's ABSENCE too. The writer is scripts/health_assessors.sh
+    on strader-health-assessors.timer (every 2 min); until 2026-08-13 it was the
+    */2 cron supervisor, which is gone [st-pgfe, co-03ojd.7]. An alert nobody reads is not a guard:
     the health log is durable but unread, so the overnight capture story is
     surfaced here, on the one thing already looked at before every open.
     """
@@ -129,7 +135,8 @@ def check_capture() -> dict:
         return {"name": "capture", "hard": False, "ok": False,
                 "day": today.isoformat(),
                 "reasons": [f"no capture watcher state ({CAPTURE_STATE.name}) — "
-                            "is capture-supervisor-wrapper.sh in cron?"]}
+                            "is strader-health-assessors.timer installed and "
+                            "active? (systemctl list-timers strader-health-assessors)"]}
     try:
         state = json.loads(CAPTURE_STATE.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as e:
@@ -150,7 +157,8 @@ def check_capture() -> dict:
     if age_min is not None and age_min > CAPTURE_STATE_MAX_AGE_MIN:
         ok = False
         reasons.append(f"capture watcher last ran {age_min:.0f} min ago — the "
-                       f"supervisor itself has stopped; liveness is UNKNOWN")
+                       f"health writer has stopped (strader-health-assessors.timer "
+                       f"is not firing); the tape may be fine but liveness is UNKNOWN")
     if not ok and status not in ("ok", "starting", "quiet", "idle"):
         reasons.append(f"{status}: {state.get('message', '')}".strip())
 

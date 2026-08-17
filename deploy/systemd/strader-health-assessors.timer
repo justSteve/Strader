@@ -1,0 +1,23 @@
+[Unit]
+# Every 2 minutes, around the clock. [co-03ojd.7 J-F1]
+#
+# The cadence the readers were built for: surface_liveness.sh and
+# drill_bridge.py treat a _*_health.json older than 180 s as stale, and the
+# 08:25 pre-open heartbeat treats >30 min as "the health writer stopped". The
+# assessor knows each collector's window and calendar (--venue globex / cash,
+# --window-start/--window-end), so outside a session it writes `idle` rather
+# than crying `dead` — running it at 03:00 on a Sunday is cheap and keeps the
+# file's checked_at moving, which is itself the liveness signal for THIS writer.
+#
+# No Persistent=: a missed tick is not worth replaying — the next one is two
+# minutes away and carries the same answer.
+Description=Run the Strader collector health assessors every 2 minutes
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=2min
+AccuracySec=10s
+Unit=strader-health-assessors.service
+
+[Install]
+WantedBy=timers.target
