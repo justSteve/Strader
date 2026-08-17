@@ -34,7 +34,7 @@ bd close <id>                # mark done
 
 Bead prefix: **`st`**. Commit messages cite the authorizing bead. Present beads
 and commits to Steve **name-first**, ID parenthetical
-(`.claude/rules/proper-name-presentation.md`).
+(retired rule; kept in `docs/retired-rules/proper-name-presentation.md`).
 
 ## Session Close Protocol
 

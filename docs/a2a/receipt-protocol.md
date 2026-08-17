@@ -37,7 +37,7 @@ reading a memo and logging nothing.
 
 Reconciled with COO 2026-08-13 [st-qfsz], after four correctly-announced peer rows
 parsed as malformed because this ledger had no word for events
-`.claude/rules/zgent-permissions.md` already *requires* a peer to announce. They
+`.claude/rules/scope-and-permissions.md` (formerly `zgent-permissions.md`) already *requires* a peer to announce. They
 became invisible to every tool that reads parsed events, on the day one of them
 was reporting a live risk to the corpus. A vocabulary narrower than the
 obligations it records does not enforce anything — it loses rows.
