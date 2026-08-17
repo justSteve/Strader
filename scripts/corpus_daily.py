@@ -8,9 +8,12 @@ once per day to keep the corpus fresh enough for the Runbook datastream gate
   1. Resolves the target trading day — the most recent *completed* session
      (default: previous weekday; Databento historical is T+1, so "today" has no
      late-day window until after the cash close). Override with --date.
-  2. Pulls the two gate-required Databento streams (ES front-month + SPXW OPRA)
-     for that day's late-day window, REUSING the verified per-stream scripts
-     (scripts/corpus_pull_databento_es.py / corpus_pull_databento.py). Idempotent:
+  2. Pulls the gate-required Databento stream (ES front-month; the SPXW OPRA
+     pull was DROPPED from the nightly on Steve's "drop", 2026-08-17 — no live
+     OPRA entitlement since the ~08-04 plan swap, and the nightly attempt had
+     exited rc=2 for five sessions; historical OPRA stays ad hoc via
+     corpus_pull_databento.py) for that day's window, REUSING the verified
+     per-stream script (scripts/corpus_pull_databento_es.py). Idempotent:
      a stream already present with cycles>0 and no errors is skipped unless
      --force, so a cron retry never double-appends the append-only JSONL.
   3. Optionally attempts the Schwab pull (--include-schwab). Schwab is NOT
@@ -23,8 +26,8 @@ once per day to keep the corpus fresh enough for the Runbook datastream gate
   5. Emits a structured health record to the corpus health log and exits non-zero
      when unhealthy, so the calling scheduler surfaces the failure.
 
-Cost (2026-07-01 estimate): ES GLBX ~$0.11 / 2h window (metered); OPRA flat-fee
-($0.00 incremental under the current subscription). ~$0.11/day, ~$27/yr.
+Cost: ES GLBX historical is flat-rate under the held CME/Futures plan (measured
+$0.0000 for a session day, 2026-08-05); OPRA is not pulled nightly.
 
 Usage:
     .venv/bin/python scripts/corpus_daily.py                 # most recent weekday
@@ -66,15 +69,18 @@ logger = logging.getLogger("corpus_daily")
 HEALTH_LOG = CORPUS_ROOT / "_health.jsonl"
 
 # The gate-required Databento streams and the script that pulls each.
+# "databento_opra": "corpus_pull_databento.py" was removed 2026-08-17 (Steve:
+# "drop", COO session 246c8647; bead co-03ojd.14) — the gate had already stopped
+# requiring it on 2026-08-07 (runbook/datastream/gate.py), but this dict kept
+# trying the pull, it failed without an entitlement, and the run exited rc=2
+# every night. Re-add the pair here to restore a nightly OPRA pull.
 DATABENTO_PULLS = {
     "databento_glbx_es": "corpus_pull_databento_es.py",
-    "databento_opra": "corpus_pull_databento.py",
 }
 
 # Per-stream CT pull windows. ES trades cover the full cash session for the
-# orderflow layer (st-f05; ~$0.60/day metered GLBX approved 2026-07-04). OPRA
-# stays late-day: flat-fee, but full-RTH option ticks would ~3x storage with
-# no consumer — the butterfly corpus only needs the final two hours.
+# orderflow layer (st-f05). The OPRA window ("13:00", "15:00") is kept for the
+# ad-hoc pull path even though the nightly no longer runs it.
 STREAM_WINDOWS = {
     "databento_glbx_es": ("08:30", "15:00"),
     "databento_opra": ("13:00", "15:00"),
