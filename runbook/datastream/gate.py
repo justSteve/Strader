@@ -69,6 +69,24 @@ answer does not change just because a weekend went by.
 
 ``max_age_hours`` survives only as the fallback for a manifest with no usable
 ``date`` field, where there is no session close to measure against.
+
+Degraded is a third answer, not a softer failure [co-03ojd.7 J-F3]
+------------------------------------------------------------------
+The gate halts only over the REQUIRED streams. But the manifest also records
+every other stream a collector was configured to fill that day — GexBot, the 1
+Hz leg, Schwab, an ad-hoc OPRA pull — and a configured stream that ran and got
+NOTHING (``cycles=0`` with an error list) used to be invisible here: the verdict
+line said HEALTHY, the pre-open heartbeat said ``corpus [hard] ok``, and the
+only record was one manifest field nobody opened. Measured 2026-08-07 → 08-15:
+the SPXW OPRA pull failed 403 on seven consecutive runs, the job exited rc=2
+nightly, and the gate printed HEALTHY every morning.
+
+So ``evaluate`` now also returns ``warnings``: one per present, non-required
+stream that reports ``cycles <= 0`` together with at least one error. ``ok``
+is untouched — the day is still tradable on the required tape — but the caller
+gets a distinct DEGRADED state to print and alert on. It is deliberately not a
+failure: making it one would re-create the always-failing gate the required-
+stream list was pruned to avoid (see DEFAULT_REQUIRED_STREAMS).
 """
 from __future__ import annotations
 
@@ -124,6 +142,20 @@ class GateResult:
     ok: bool
     reasons: list[str] = field(default_factory=list)
     checked: dict[str, Any] = field(default_factory=dict)
+    #: Non-fatal findings about configured-but-empty streams [co-03ojd.7 J-F3].
+    #: ``ok`` may be True while this is non-empty — that is the DEGRADED state.
+    warnings: list[str] = field(default_factory=list)
+
+    @property
+    def degraded(self) -> bool:
+        return self.ok and bool(self.warnings)
+
+    @property
+    def status(self) -> str:
+        """HEALTHY / DEGRADED / UNHEALTHY — the word the callers print."""
+        if not self.ok:
+            return "UNHEALTHY"
+        return "DEGRADED" if self.warnings else "HEALTHY"
 
 
 def _parse_iso(ts: str) -> datetime | None:
@@ -245,7 +277,28 @@ def evaluate(
                 f"could not be checked)"
             )
 
-    return GateResult(ok=not reasons, reasons=reasons, checked=checked)
+    # Configured-but-empty streams outside the required set: a collector ran
+    # against this day and produced nothing but errors. Not fatal (see the
+    # module docstring) but never silent again. [co-03ojd.7 J-F3]
+    warnings: list[str] = []
+    for name, st in streams.items():
+        if name in required_streams or not isinstance(st, dict):
+            continue
+        cycles = st.get("cycles", 0) or 0
+        errors = st.get("errors") or []
+        if cycles <= 0 and errors:
+            first = str(errors[0])
+            if len(first) > 160:
+                first = first[:157] + "..."
+            checked[name] = {"present": True, "cycles": cycles,
+                             "errors": len(errors), "empty_with_errors": True}
+            warnings.append(
+                f"configured stream '{name}' produced nothing: cycles={cycles} "
+                f"with {len(errors)} error(s); first: {first}"
+            )
+
+    return GateResult(ok=not reasons, reasons=reasons, checked=checked,
+                      warnings=warnings)
 
 
 def check(

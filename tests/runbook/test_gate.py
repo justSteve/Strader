@@ -285,3 +285,55 @@ def test_a_manifest_with_an_unparseable_date_falls_back_too():
     m["date"] = "last tuesday"
     res = gate.evaluate(m, now=NOW, max_age_hours=36)
     assert res.ok, res.reasons          # 20h old, inside the fallback ceiling
+
+
+# --- degraded: a configured non-required stream ran and got nothing ----------
+# [co-03ojd.7 J-F3] Measured 2026-08-07 → 08-15: databento_opra recorded
+# cycles=0 with a 403 on seven consecutive runs while the verdict said HEALTHY.
+
+OPRA_403 = ("403 license_not_found_unauthorized: a live data license is required "
+            "to access OPRA.PILLAR data after 2026-08-07T13:30:00Z")
+
+
+def test_configured_stream_with_no_cycles_and_errors_degrades_but_passes():
+    m = _manifest(opra_cycles=0, opra_errors=[OPRA_403])
+    res = gate.evaluate(m, now=NOW)
+    assert res.ok, res.reasons                      # required tape is fine
+    assert res.degraded
+    assert res.status == "DEGRADED"
+    assert len(res.warnings) == 1
+    assert "databento_opra" in res.warnings[0]
+    assert "cycles=0" in res.warnings[0]
+    assert "403" in res.warnings[0]
+    assert res.checked["databento_opra"]["empty_with_errors"] is True
+
+
+def test_healthy_manifest_is_not_degraded():
+    res = gate.evaluate(_manifest(), now=NOW)
+    assert res.ok and not res.degraded and res.warnings == []
+    assert res.status == "HEALTHY"
+
+
+def test_empty_stream_without_errors_is_not_flagged():
+    """cycles=0 and no errors is 'nothing arrived', not 'ran and failed' —
+    the rule is deliberately narrow so it cannot cry on a quiet stream."""
+    res = gate.evaluate(_manifest(opra_cycles=0, opra_errors=[]), now=NOW)
+    assert res.ok and not res.degraded
+
+
+def test_required_stream_failure_is_unhealthy_not_degraded():
+    """A dead REQUIRED stream is still the fatal path; degraded never masks it."""
+    m = _manifest(es_cycles=0, es_errors=["boom"], opra_cycles=0, opra_errors=[OPRA_403])
+    res = gate.evaluate(m, now=NOW)
+    assert not res.ok
+    assert res.status == "UNHEALTHY"
+    assert not res.degraded
+    assert res.warnings                              # still reported alongside
+
+
+def test_degraded_warning_truncates_a_long_error():
+    m = _manifest(opra_cycles=0, opra_errors=["x" * 500])
+    res = gate.evaluate(m, now=NOW)
+    assert res.degraded
+    assert len(res.warnings[0]) < 400
+    assert res.warnings[0].endswith("...")

@@ -388,24 +388,34 @@ def main(argv: list[str] | None = None) -> int:
 
     result = gate.check(day=day, max_age_hours=args.max_age_hours)
     health = {"ts": _utc_now_iso(), "day": day.isoformat(),
-              "ok": result.ok, "reasons": result.reasons, "checked": result.checked}
+              "ok": result.ok, "status": result.status,
+              "reasons": result.reasons, "warnings": result.warnings,
+              "checked": result.checked}
     _append_health({"level": "run", **health})
 
     if args.json:
         print(json.dumps(health, indent=2))
     else:
-        status = "HEALTHY" if result.ok else "UNHEALTHY"
-        print(f"corpus {day} datastream: {status}")
+        print(f"corpus {day} datastream: {result.status}")
         for name, info in result.checked.items():
             print(f"  {name}: {info}")
         for r in result.reasons:
             print(f"  reason: {r}")
+        for w in result.warnings:
+            print(f"  degraded: {w}")
 
     if not result.ok:
         emit_alert("datastream_unhealthy",
                    f"Datastream gate FAILED for {day}: {'; '.join(result.reasons)}",
                    {"day": day.isoformat(), "reasons": result.reasons})
         return 1
+    if result.degraded:
+        # The required tape is fine, so the day proceeds — but a configured
+        # stream ran and got nothing, and that used to vanish into the
+        # manifest. One durable alert per run. [co-03ojd.7 J-F3]
+        emit_alert("datastream_degraded",
+                   f"Datastream DEGRADED for {day}: {'; '.join(result.warnings)}",
+                   {"day": day.isoformat(), "warnings": result.warnings})
     if pull_failed:
         # Streams are healthy overall but at least one pull subprocess errored.
         return 2
