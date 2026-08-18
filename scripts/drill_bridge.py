@@ -18,6 +18,9 @@ Endpoints (all JSON; POST bodies are sent as text/plain so file:// pages make
   GET  /                           -> the LIVE page itself (text/html) [st-n0qm.3]
   GET  /health/producers           -> ages of the producer health files (tape,
                                       1 Hz feed, sentinel, footprint feed) for the HUD dots
+  GET  /days                       -> corpus days with an ES tape, newest first [st-v7a0]
+  GET  /drill-<YYYY-MM-DD>.html    -> that day's DRILL page, rendered on demand and cached
+  GET  /desk-candles-<day>.html    -> the drill's minute-candle companion window
 
 Serving the page [st-n0qm.3]: the page used to exist only as a file:// bookmark
 on the desktop. Steve, 2026-08-16: "any instrument at the level of the FP chart
@@ -42,8 +45,16 @@ and the raw material for coached-session study later. Bars are held in memory
 and logged only as a compact per-push marker; the corpus JSONL is their durable
 record and the feeder can rebuild them from it.
 
+Drill mode [st-v7a0]: the header of every page (live or drill) carries a
+"Drill <day>" picker fed by /days; choosing a day loads drill-<day>.html from
+the same origin, and a drill page carries "Live" back to today. Rendering
+shells out to scripts/orderflow_drill.py (~3 s); the cache lives under
+DRILL_BRIDGE_DRILL_DIR (default /var/moo/desk/drills) and is refreshed when the
+day's ES file is newer than the cached page.
+
 Run:      .venv/bin/python scripts/drill_bridge.py           # port 7788
 Override: DRILL_BRIDGE_PORT=7799 (must match BRIDGE in the drill template)
+          DRILL_BRIDGE_DRILL_DIR=/somewhere (drill cache), DRILL_BRIDGE_DAYS_LIMIT=90
 Stop:     Ctrl-C (or kill; the log is append-only, nothing to corrupt)
 """
 from __future__ import annotations
@@ -51,7 +62,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import subprocess
+import sys
 import threading
+import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -83,6 +98,109 @@ PRODUCERS = {
 }
 
 COACH_TYPES = {"say", "arm", "jump", "pause", "play"}
+
+# ── drill mode [st-v7a0] ────────────────────────────────────────────────────
+# The live page is one day's tape; the drill is a past day's tape with the
+# playback controls. Both come from orderflow_drill_template.html. Until now the
+# drill existed only as a file scripts/orderflow_drill.py wrote to /tmp and a
+# desktop browser opened — unreachable from the /footprint/ page Steve actually
+# has open, and unreachable at all before 02:50 CT when the live page has no
+# bars to show. These routes make any corpus day one click away on the same
+# origin:
+#     GET /days                       days with an ES tape, newest first
+#     GET /drill-<YYYY-MM-DD>.html    the drill for that day (rendered on demand)
+#     GET /desk-candles-<date>.html   its minute-candle companion window
+# Rendering shells out to scripts/orderflow_drill.py (the tested entry point;
+# ~3 s for a full session) so the bridge stays dependency-light. Rendered files
+# are cached under DRILL_DIR and re-rendered when the day's ES file is newer
+# than the cache (a day still being captured grows), rate-limited to once per
+# DRILL_MIN_RERENDER_S per day.
+DRILL_DIR = Path(os.environ.get("DRILL_BRIDGE_DRILL_DIR", "/var/moo/desk/drills"))
+DRILL_SCRIPT = REPO / "scripts" / "orderflow_drill.py"
+DRILL_PYTHON = Path(os.environ.get("DRILL_BRIDGE_PYTHON", sys.executable))
+DRILL_MIN_RERENDER_S = 60.0
+DRILL_RENDER_TIMEOUT_S = 120.0
+DRILL_DAYS_LIMIT = int(os.environ.get("DRILL_BRIDGE_DAYS_LIMIT", "90"))
+_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_ES_NAMES = ("databento_glbx_es.jsonl", "databento_glbx_es.jsonl.gz")
+_drill_locks: dict[str, threading.Lock] = {}
+_drill_locks_guard = threading.Lock()
+
+
+def _es_source(day: str) -> Path | None:
+    """The day's ES tape file, plain or compaction-packed, or None."""
+    for name in _ES_NAMES:
+        p = CORPUS_ROOT / day / name
+        if p.exists():
+            return p
+    return None
+
+
+def corpus_days(limit: int = DRILL_DAYS_LIMIT, corpus_root: Path | None = None) -> list[str]:
+    """Days under the corpus root that hold an ES tape, newest first."""
+    root = corpus_root or CORPUS_ROOT
+    if not root.is_dir():
+        return []
+    out = []
+    for d in root.iterdir():
+        if d.is_dir() and _DAY_RE.match(d.name) and any((d / n).exists() for n in _ES_NAMES):
+            out.append(d.name)
+    out.sort(reverse=True)
+    return out[:limit]
+
+
+def drill_paths(day: str, drill_dir: Path | None = None) -> tuple[Path, Path]:
+    d = drill_dir or DRILL_DIR
+    return d / f"drill-{day}.html", d / f"desk-candles-{day}.html"
+
+
+def _drill_lock(day: str) -> threading.Lock:
+    with _drill_locks_guard:
+        return _drill_locks.setdefault(day, threading.Lock())
+
+
+def ensure_drill(day: str, *, drill_dir: Path | None = None,
+                 render=None, now: float | None = None) -> Path:
+    """Return the rendered drill for ``day``, rendering it if absent or stale.
+
+    Stale = the ES source is newer than the cached page (the day is still being
+    captured), and the cache is older than DRILL_MIN_RERENDER_S. ``render`` is
+    injectable for tests; the default shells out to orderflow_drill.py.
+    Raises FileNotFoundError when the day has no ES tape, RuntimeError when the
+    renderer fails (its stderr tail is the message).
+    """
+    if not _DAY_RE.match(day):
+        raise ValueError(f"not a day: {day!r}")
+    src = _es_source(day)
+    if src is None:
+        raise FileNotFoundError(f"no ES tape for {day} under {CORPUS_ROOT}")
+    html, _candles = drill_paths(day, drill_dir)
+    now = time.time() if now is None else now
+    with _drill_lock(day):
+        if html.exists():
+            age = now - html.stat().st_mtime
+            if src.stat().st_mtime <= html.stat().st_mtime or age < DRILL_MIN_RERENDER_S:
+                return html
+        html.parent.mkdir(parents=True, exist_ok=True)
+        (render or _render_drill)(day, html)
+        if not html.exists():
+            raise RuntimeError(f"renderer produced no file at {html}")
+        return html
+
+
+def _render_drill(day: str, out: Path) -> None:
+    cmd = [str(DRILL_PYTHON), str(DRILL_SCRIPT), "--date", day, "--out", str(out), "--no-open"]
+    t0 = time.monotonic()
+    try:
+        r = subprocess.run(cmd, cwd=str(REPO), capture_output=True, text=True,
+                           timeout=DRILL_RENDER_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"drill render for {day} exceeded {DRILL_RENDER_TIMEOUT_S:.0f}s")
+    if r.returncode != 0:
+        tail = "\n".join((r.stderr or r.stdout or "").strip().splitlines()[-6:])
+        logger.error("drill render for %s failed rc=%d: %s", day, r.returncode, tail)
+        raise RuntimeError(f"drill render for {day} failed (rc={r.returncode}): {tail}")
+    logger.info("drill rendered for %s in %.1fs → %s", day, time.monotonic() - t0, out)
 
 
 class BridgeState:
@@ -388,6 +506,35 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_html(self, body: bytes, cache: str = "no-store") -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", cache)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_drill(self, day: str) -> None:
+        try:
+            html = ensure_drill(day)
+        except FileNotFoundError as e:
+            self._send(404, {"error": str(e), "days": corpus_days(limit=10)})
+            return
+        except ValueError as e:
+            self._send(400, {"error": str(e)})
+            return
+        except RuntimeError as e:
+            self._send(500, {"error": str(e)})
+            return
+        self._send_html(html.read_bytes())
+
+    def _send_candles(self, day: str) -> None:
+        _html, candles = drill_paths(day)
+        if not candles.exists():
+            self._send(404, {"error": f"no candles companion for {day} — open drill-{day}.html first"})
+            return
+        self._send_html(candles.read_bytes())
+
     @staticmethod
     def _route(path: str) -> str:
         """Strip a reverse-proxy prefix so /footprint/bars routes as /bars."""
@@ -410,6 +557,12 @@ class _Handler(BaseHTTPRequestHandler):
                 return
             if route in ("/", "/index.html"):
                 self._send_page()
+            elif route == "/days":
+                self._send(200, {"days": corpus_days(), "live_day": _central_day()})
+            elif route.startswith("/drill-") and route.endswith(".html"):
+                self._send_drill(route[len("/drill-"):-len(".html")])
+            elif route.startswith("/desk-candles-") and route.endswith(".html"):
+                self._send_candles(route[len("/desk-candles-"):-len(".html")])
             elif route == "/health/producers":
                 self._send(200, producers_health())
             elif route == "/health":

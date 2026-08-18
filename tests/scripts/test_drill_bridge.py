@@ -278,3 +278,112 @@ def test_alerts_seed_from_the_days_durable_file_at_start(state, tmp_path):
     live = state.add_alert({"kind": "approach", "strike": 7810})
     assert live["id"] == 3 and "seeded" not in live
     assert state.seed_alerts(tmp_path / "missing.jsonl") == 0
+
+
+# ── drill mode [st-v7a0] ─────────────────────────────────────────────────────
+
+def _corpus_with_days(root, days):
+    for d in days:
+        (root / d).mkdir(parents=True)
+        (root / d / "databento_glbx_es.jsonl").write_text('{"x":1}\n')
+    # a packed day and a day with no ES tape (must not be listed)
+    (root / "2026-07-01").mkdir(parents=True)
+    (root / "2026-07-01" / "databento_glbx_es.jsonl.gz").write_bytes(b"\x1f\x8b")
+    (root / "2026-07-04").mkdir(parents=True)
+    (root / "2026-07-04" / "gexbot.jsonl").write_text("")
+    (root / "notaday").mkdir(parents=True)
+
+
+def test_corpus_days_lists_es_days_newest_first(tmp_path):
+    import drill_bridge as db
+    root = tmp_path / "corpus"
+    _corpus_with_days(root, ["2026-08-17", "2026-08-14", "2026-08-18"])
+    assert db.corpus_days(corpus_root=root) == ["2026-08-18", "2026-08-17", "2026-08-14", "2026-07-01"]
+    assert db.corpus_days(limit=2, corpus_root=root) == ["2026-08-18", "2026-08-17"]
+    assert db.corpus_days(corpus_root=tmp_path / "missing") == []
+
+
+def test_ensure_drill_renders_once_and_rerenders_when_the_tape_grows(monkeypatch, tmp_path):
+    import os
+    import time
+    import drill_bridge as db
+    root = tmp_path / "corpus"
+    _corpus_with_days(root, ["2026-08-17"])
+    monkeypatch.setattr(db, "CORPUS_ROOT", root)
+    ddir = tmp_path / "drills"
+    calls = []
+
+    def fake_render(day, out):
+        calls.append(day)
+        out.write_text(f"<html>drill {day} v{len(calls)}</html>")
+        (out.parent / f"desk-candles-{day}.html").write_text("<html>candles</html>")
+
+    src = root / "2026-08-17" / "databento_glbx_es.jsonl"
+    t = 1_800_000_000
+    os.utime(src, (t, t))
+    p = db.ensure_drill("2026-08-17", drill_dir=ddir, render=fake_render, now=t + 10)
+    assert p == ddir / "drill-2026-08-17.html" and calls == ["2026-08-17"]
+    os.utime(p, (t + 10, t + 10))
+    # source untouched → cache served, no re-render
+    db.ensure_drill("2026-08-17", drill_dir=ddir, render=fake_render, now=t + 20)
+    assert calls == ["2026-08-17"]
+    # source grew (still-capturing day) but the cache is < 60 s old → still cached
+    os.utime(src, (t + 15, t + 15))
+    db.ensure_drill("2026-08-17", drill_dir=ddir, render=fake_render, now=t + 30)
+    assert calls == ["2026-08-17"]
+    # source newer AND cache older than the re-render floor → re-render
+    db.ensure_drill("2026-08-17", drill_dir=ddir, render=fake_render, now=t + 10 + 61)
+    assert calls == ["2026-08-17", "2026-08-17"]
+    assert "v2" in p.read_text()
+    # no tape for the day → FileNotFoundError; garbage → ValueError
+    with pytest.raises(FileNotFoundError):
+        db.ensure_drill("2026-08-19", drill_dir=ddir, render=fake_render)
+    with pytest.raises(ValueError):
+        db.ensure_drill("../etc/passwd", drill_dir=ddir, render=fake_render)
+
+
+def test_ensure_drill_surfaces_a_renderer_failure(monkeypatch, tmp_path):
+    import drill_bridge as db
+    root = tmp_path / "corpus"
+    _corpus_with_days(root, ["2026-08-17"])
+    monkeypatch.setattr(db, "CORPUS_ROOT", root)
+
+    def broken(day, out):
+        raise RuntimeError("drill render for 2026-08-17 failed (rc=1): boom")
+    with pytest.raises(RuntimeError, match="boom"):
+        db.ensure_drill("2026-08-17", drill_dir=tmp_path / "drills", render=broken)
+
+
+def test_drill_routes_serve_days_drill_and_candles_under_the_prefix(monkeypatch, tmp_path):
+    """/days lists the tape days; /drill-<day>.html renders on demand and serves
+    the drill; /desk-candles-<day>.html serves the companion the drill's
+    'Candles ↗' opens beside itself; all under the /footprint mount."""
+    import drill_bridge as db
+    base, stop = _serve(monkeypatch, tmp_path, "<title>x</title>")
+    root = tmp_path / "corpus"
+    _corpus_with_days(root, ["2026-08-17", "2026-08-18"])
+    ddir = tmp_path / "drills"
+    monkeypatch.setattr(db, "DRILL_DIR", ddir)
+
+    def fake_render(day, out):
+        out.write_text(f"<html><title>Orderflow Drill</title>{day}</html>")
+        (out.parent / f"desk-candles-{day}.html").write_text(f"<html>candles {day}</html>")
+    monkeypatch.setattr(db, "_render_drill", fake_render)
+    try:
+        code, _, body = _get(base + "/footprint/days")
+        d = json.loads(body)
+        assert code == 200 and d["days"][:2] == ["2026-08-18", "2026-08-17"] and "live_day" in d
+        code, hdrs, body = _get(base + "/footprint/drill-2026-08-17.html")
+        assert code == 200 and hdrs["Content-Type"].startswith("text/html")
+        assert b"Orderflow Drill" in body and b"2026-08-17" in body
+        code, _, body = _get(base + "/footprint/desk-candles-2026-08-17.html")
+        assert code == 200 and b"candles 2026-08-17" in body
+        # unknown day: 404 with the days on offer; candles before drill: 404
+        code, _, body = _get(base + "/footprint/drill-2026-08-19.html")
+        assert code == 404 and "days" in json.loads(body)
+        code, _, _ = _get(base + "/footprint/desk-candles-2026-08-18.html")
+        assert code == 404
+        code, _, _ = _get(base + "/drill-nope.html")
+        assert code == 400
+    finally:
+        stop()

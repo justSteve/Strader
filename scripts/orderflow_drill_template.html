@@ -27,6 +27,12 @@ body { margin:0; background:var(--page); color:var(--ink);
 header { padding:10px 16px 6px; display:flex; flex-wrap:wrap; gap:10px 18px; align-items:baseline; }
 header h1 { font-size:16px; margin:0; }
 header .meta { color:var(--ink-2); font-size:12px; }
+/* Drill-mode switch [st-v7a0]: pick any corpus day and get its drill from the
+   same origin; a drill page carries the way back to today's live tape. Hidden
+   until the bridge answers /days, so a drill opened from disk loses nothing. */
+#modeswitch { font-size:12px; color:var(--ink-2); }
+#modeswitch select { font-size:12px; }
+#modeswitch a { color:var(--ink-2); margin-left:6px; }
 .legend { display:flex; gap:12px; font-size:12px; color:var(--ink-2); }
 .legend .chip { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:middle; }
 .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:6px 16px; }
@@ -340,6 +346,7 @@ body.live #ctlblock { display:none !important; }
 <header>
   <h1>Orderflow Drill</h1>
   <span class="meta" id="meta"></span>
+  <span id="modeswitch" hidden><label title="Replay a past day's tape with the drill controls (play, speed, ladder, anatomy)">Drill <select id="drillday"><option value="">day ▾</option></select></label><a id="livelink" href="./" title="Back to today's live tape" hidden>Live ↗</a></span>
 </header>
 <div id="ctlblock">
 <div class="controls">
@@ -1921,6 +1928,36 @@ const BRIDGE = (location.protocol === "http:" || location.protocol === "https:")
   ? location.origin + _pageDir
   : "http://127.0.0.1:7788";
 let bridgeUp = false, lastCmdId = 0, lastStateSent = 0;
+
+// ── drill-mode switch [st-v7a0] ──────────────────────────────────────────
+// Steve, 2026-08-18 01:55 CT, on a live page with no bars before the 02:50
+// capture start: "there needs to be a way to enter 'drill mode'." The bridge
+// serves any corpus day's drill at drill-<day>.html (rendered on demand) and
+// lists the days at /days. Absolute against BRIDGE, so it works from the
+// tailscale /footprint mount, from the bare origin, and from a drill opened
+// from disk while the bridge is up. If /days fails the switch stays hidden.
+(async function wireModeSwitch() {
+  const box = $("modeswitch"), sel = $("drillday"), live = $("livelink");
+  if (!box || !sel) return;
+  try {
+    const r = await fetch(`${BRIDGE}/days`);
+    const d = await r.json();
+    const days = (d && d.days) || [];
+    if (!days.length) return;
+    for (const day of days) {
+      const o = document.createElement("option");
+      o.value = day;
+      o.textContent = day + (day === d.live_day ? " (today)" : "");
+      sel.appendChild(o);
+    }
+    if (!LIVE && DATA.meta && DATA.meta.date) sel.value = DATA.meta.date;
+    sel.addEventListener("change", () => {
+      if (sel.value) location.href = `${BRIDGE}/drill-${sel.value}.html`;
+    });
+    if (live) { live.href = `${BRIDGE}/`; live.hidden = LIVE; }
+    box.hidden = false;
+  } catch (e) { /* bridge absent: no switch, nothing else lost */ }
+})();
 
 function snapshot(kind, extra) {
   const b = bars[idx] || bars[0];
