@@ -452,3 +452,21 @@ def test_failed_parse_never_loads_the_clipboard(tmp_path, monkeypatch, _no_clipb
                        "--store-root", str(tmp_path / "c")])
     assert rc == 3
     assert _no_clipboard == []
+
+
+def test_human_surfaces_show_central_time_not_utc():
+    """Steve, 2026-08-18: 'anytime we come across a timestamp written in UTC we
+    need to update it to CT' — the desk header, brief and Pine header render
+    parsed_at in Central; the stored ISO UTC value is untouched."""
+    assert run_mod._ct("2026-08-18T06:28:35.070186+00:00") == "2026-08-18 01:28 CT"
+    assert run_mod._ct("2026-08-18T06:28:35Z") == "2026-08-18 01:28 CT"
+    assert run_mod._ct("") == ""
+    assert run_mod._ct("not-a-time") == "not-a-time"
+    result = _good_outcome().result
+    result.parsed_at = "2026-08-18T06:28:35+00:00"
+    doc = run_mod._render_desk_plan(result)
+    assert "parsed 2026-08-18 01:28 CT" in doc
+    assert "06:28Z" not in doc
+    brief = run_mod._render_brief(result)
+    assert "parsed 2026-08-18 01:28 CT" in brief
+    assert result.parsed_at == "2026-08-18T06:28:35+00:00"

@@ -251,8 +251,29 @@ def _render_brief(result: ParseResult) -> str:
     if not result.commentary:
         lines.append("  (none)")
     lines.append("")
-    lines.append(f"model={result.model} parsed_at={result.parsed_at}")
+    lines.append(f"model={result.model} parsed {_ct(result.parsed_at)}")
     return "\n".join(lines)
+
+
+def _ct(iso_ts: str) -> str:
+    """An ISO timestamp (UTC or offset-aware) as 'YYYY-MM-DD HH:MM CT'.
+
+    Steve, 2026-08-18: "anytime we come across a timestamp written in UTC we
+    need to update it to CT" — every human-facing surface (desk doc header,
+    terminal brief, Pine 'Generated:' line) shows Central. Stored/JSON
+    timestamps stay ISO UTC; only the rendering converts. Unparseable input is
+    returned unchanged rather than dropped."""
+    from zoneinfo import ZoneInfo
+
+    if not iso_ts:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
+    except ValueError:
+        return iso_ts
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(ZoneInfo("America/Chicago")).strftime("%Y-%m-%d %H:%M CT")
 
 
 def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = None,
@@ -284,7 +305,7 @@ def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = No
         f"# Mancini — {result.instrument or 'ES'} — {result.date} ({weekday}) plan",
         "",
         f"> {len(result.levels)} levels · {len(result.commentary)} forward notes · "
-        f"model `{result.model}` · parsed {result.parsed_at[:16]}Z · "
+        f"model `{result.model}` · parsed {_ct(result.parsed_at)} · "
         "prices verbatim from the letter."
         + (f" {header_note}" if header_note else ""),
         "",
@@ -661,7 +682,7 @@ def main(argv: list[str] | None = None) -> int:
         CHARTS_ROOT.mkdir(parents=True, exist_ok=True)
         chart_path = CHARTS_ROOT / f"{result.date or day}.pine"
         chart_path.write_text(
-            chart_mod.emit_pine(result, generated_at=parsed_at), encoding="utf-8"
+            chart_mod.emit_pine(result, generated_at=_ct(parsed_at)), encoding="utf-8"
         )
         logger.info("chart Pine: %s", chart_path)
     except Exception as e:  # noqa: BLE001
