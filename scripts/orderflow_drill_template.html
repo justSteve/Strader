@@ -1262,6 +1262,17 @@ function repaintAll() {
   renderProfile();      // same rows as the cells, so it follows every repaint [st-n0qm.4]
 }
 const fmtClock = iso => iso.slice(11, 19);
+// Sentinel alerts are stamped in UTC ("...Z"); everything Steve reads is CT
+// (Steve, 2026-08-18: "anytime we come across a timestamp written in UTC we
+// need to update it to CT"). Bar times already carry the -05:00/-06:00 offset,
+// so fmtClock's slice is right for them and wrong for alerts — hence this.
+const _ctClock = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Chicago",
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+const fmtUtcAsCT = iso => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return isNaN(d) ? String(iso).slice(11, 19) : _ctClock.format(d);
+};
 // ── session = the cash session [st-fgno] ─────────────────────────────────
 // The tape starts at 02:50 CT (st-btu). Steve, 2026-08-18: "RTH" — every
 // number that carries a session name (Open/AM/Day chips, Session Δ, the bar
@@ -2402,7 +2413,7 @@ function drawSentinelRows() {
   if (!sentAlerts.length) { senStripText("—", "empty"); return; }
   const newest = sentAlerts[sentAlerts.length - 1];
   const bs = basisNow();
-  const when = (newest.ts_row || newest.ts_alert_utc || "").slice(11, 19);
+  const when = fmtUtcAsCT(newest.ts_row || newest.ts_alert_utc);
   if (!bs) {
     senStripText(`${when} ${senSentence(newest)} · no basis yet — rows need bs on a bar`, "nobasis");
     return;
@@ -2428,7 +2439,7 @@ function drawSentinelRows() {
     tg.className = `sen-tag sen-${kind}`; tg.dataset.level = lvl;
     tg.style.top = y + "px"; tg.style.left = (colsRect + x + 2) + "px";
     tg.textContent = `⚑ ${senShort(a)} ${a.strike ?? Math.round(senSpx(a))} · ${kind}${on ? "" : " (earlier)"} · ES ${fmtPrice(Math.round(es / TICK) * TICK)}`;
-    tg.title = `${senSentence(a)}\nSPX ${senSpx(a)} + basis ${bs.pts} = ES ${es.toFixed(2)} · ${a.ts_row || a.ts_alert_utc || ""}`;
+    tg.title = `${senSentence(a)}\nSPX ${senSpx(a)} + basis ${bs.pts} = ES ${es.toFixed(2)} · ${fmtUtcAsCT(a.ts_row || a.ts_alert_utc)} CT`;
     stage.appendChild(ln); stage.appendChild(tg);
   }
   // marks on the bars earlier alerts fired on (the newest per level already has the tag)
