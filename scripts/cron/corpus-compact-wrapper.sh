@@ -44,7 +44,11 @@ LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 # Streams that must be healthy before the day is considered packable. MBP-1 is
 # deliberately NOT required: it exists only for days we pulled it for, and a
 # trades-only day is still complete on its own terms.
-REQUIRED="${STRADER_COMPACT_REQUIRED:-databento_glbx_es,databento_opra}"
+# databento_opra was dropped from the default 2026-08-18 [st-9olq]: the OPRA plan
+# was cancelled 2026-08-04 and its import halted 08-07, and requiring it left
+# every day from 08-06 on unpacked ("skip — missing stream databento_opra" in
+# /var/moo/logs/corpus-compact/, 2.2-4.4 GB a day raw against ~200 MB packed).
+REQUIRED="${STRADER_COMPACT_REQUIRED:-databento_glbx_es}"
 
 {
     echo "=== corpus-compact start $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="

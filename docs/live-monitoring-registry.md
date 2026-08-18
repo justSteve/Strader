@@ -54,7 +54,7 @@ mtimes, `crontab -l`, and `tmux -L moocity` were the instruments.
 
 | Surface | Question | Reads | Writes | Started by | State |
 |---|---|---|---|---|---|
-| `corpus_stream_databento.py` | live ES trades + MBP-1 | Databento live | `data/corpus/<day>/databento_glbx_es*.jsonl` | `strader-capture.timer` 02:50 CT weekdays → `strader-capture.service` (Restart=on-failure), window 02:50–15:05 CT; health verdict by `strader-health-assessors.timer` | **LIVE** (pid 775145, relaunched 02:50 today — `restarts:1`) |
+| `corpus_stream_databento.py` | live ES trades + MBP-1 | Databento live | `data/corpus/<day>/databento_glbx_es*.jsonl` | `strader-capture-early.timer` 00:00, `strader-capture.timer` 02:50, `strader-capture-evening.timer` 15:06 CT weekdays (+ Sun 17:00) [st-9olq] → `strader-capture.service` (Restart=on-failure), window 02:50–15:05 CT; health verdict by `strader-health-assessors.timer` | **LIVE** (pid 775145, relaunched 02:50 today — `restarts:1`) |
 | `corpus_poll_gexbot.py` | 10 GexBot endpoints @60s | GexBot API | `gexbot.jsonl` | `strader-gexbot.timer` 08:30 CT weekdays → `strader-gexbot.service`, 08:30–15:05 CT; health verdict by `strader-health-assessors.timer` (holiday-aware) | DOWN — **normal**, pre-window |
 | `corpus_poll_gexbot_orderflow_1s.py` | orderflow spike train @~1 Hz | GexBot `/SPX/orderflow/orderflow` | `gexbot_orderflow_1s.jsonl` | `strader-gexbot-orderflow-1s.timer` 08:30 CT weekdays → `strader-gexbot-orderflow-1s.service`, same gate | DOWN — **normal**, pre-window (13 MB written 08-12) |
 | `mi_gauge.py --live` | $TICK internals lean | Schwab quote endpoint | `mi_gauge_live.jsonl` | `cron/gauge-preopen-wrapper.sh` `*/5 8-15` | DOWN — normal between ticks |

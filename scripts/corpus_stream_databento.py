@@ -113,9 +113,17 @@ def _load_env() -> None:
 
 
 def _ct_to_dt(d: _date, hhmm: str) -> datetime:
-    """Combine a CT date + HH:MM clock-time into an aware Central datetime."""
-    h, m = (int(x) for x in hhmm.split(":"))
-    return datetime.combine(d, _time(h, m, 0), tzinfo=CENTRAL)
+    """Combine a CT date + HH:MM[:SS] clock-time into an aware Central datetime.
+
+    Seconds are accepted so a window can end at 23:59:59 — the evening capture
+    (st-9olq) runs to the end of the calendar day and the next calendar day's
+    early capture picks up at 00:00, one process per day directory.
+    """
+    parts = [int(x) for x in hhmm.split(":")]
+    if len(parts) == 2:
+        parts.append(0)
+    h, m, sec = parts
+    return datetime.combine(d, _time(h, m, sec), tzinfo=CENTRAL)
 
 
 # --------------------------------------------------------------------------
@@ -613,7 +621,10 @@ def main() -> int:
     else:
         print(f"  window   = {start_dt:%H:%M} → {args.until_ct} CT")
         print(f"  out      = {day_dir(d)}")
-        print("  [metered] Databento Live bills by data volume. Ctrl-C to stop.")
+        # GLBX live is sub-covered on the CME/Futures plan (config/entitlements.yaml,
+        # knowledge/databento-live-collection.md) — this line used to say
+        # "metered … bills by data volume", which was the OPRA-era reading.
+        print("  [plan] GLBX live is covered by the CME/Futures subscription. Ctrl-C to stop.")
 
     # ---- wait for start (no connection, no cost) ------------------------
     if not probe and now_ct < start_dt:

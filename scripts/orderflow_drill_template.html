@@ -1010,7 +1010,7 @@ function renderProfile() {
     const h = document.createElement("div");
     h.className = "vphole";
     h.textContent = P.hole.map(([a, b]) => `hole ${fmtCT(a)}→${fmtCT(b)} CT`).join(" · ");
-    h.title = "no prints in the tape between these times (the tick capture runs 02:50–15:05 CT); the evening session is absent, not quiet";
+    h.title = "no prints in the tape between these times — a hole in the capture, not a quiet market (days before 2026-08-18 were captured 02:50–15:05 CT only; since then the Globex day is captured)";
     vp.appendChild(h);
   }
 }

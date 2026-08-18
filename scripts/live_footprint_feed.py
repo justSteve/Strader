@@ -50,7 +50,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import date as _date, datetime
+from datetime import date as _date, datetime, timedelta as _timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -59,7 +59,7 @@ from market.corpus.paths import (  # noqa: E402
     CORPUS_ROOT, central_date, gexbot_orderflow_1s_path, gexbot_path, resolve_existing)
 from market.orderflow.basis import BasisEstimator  # noqa: E402
 from market.orderflow.anchored_profile import (  # noqa: E402
-    RTH_OPEN_CT, SplitAccumulator, anchor_utc, profile_payload,
+    CENTRAL, RTH_OPEN_CT, SplitAccumulator, anchor_utc, profile_payload,
 )
 from market.orderflow.anchors import LiveAnchors, mancini_levels_for  # noqa: E402
 from market.orderflow.tradesource import iter_trades  # noqa: E402
@@ -526,17 +526,30 @@ def main() -> int:
     if args.vp_anchor and args.vp_anchor != "off" and not args.dry_run:
         vp_anchor_ts, vp_label = resolve_vp_anchor(args.vp_anchor, day)
         vp = SplitAccumulator(1)
-        try:
-            n_seed = 0
-            for t in iter_trades(prior_trading_day(day), start_ts=vp_anchor_ts):
-                vp.add(t)
-                n_seed += 1
-            logger.info("profile pre-seeded from %s: %d prints since %s (%s)",
-                        prior_trading_day(day), n_seed, vp_anchor_ts.isoformat(), vp_label)
-        except FileNotFoundError:
-            logger.warning("profile: no corpus file for %s — prior-day layer empty; "
+        # Every CALENDAR day from the anchor's date to yesterday, not just the
+        # prior trading day [st-9olq]: since 2026-08-18 the capture runs the
+        # Globex day and each calendar day's directory holds its own evening
+        # (15:06→24:00) and early (00:00→02:50) tape — and Sunday's directory
+        # holds the 17:00 reopen that a Monday profile anchored on Friday's
+        # open must include. A day with no file is skipped, not fatal.
+        n_seed, seeded_days, missing = 0, [], []
+        d_ = vp_anchor_ts.astimezone(CENTRAL).date()
+        while d_ < day:
+            try:
+                for t in iter_trades(d_, start_ts=vp_anchor_ts):
+                    vp.add(t)
+                    n_seed += 1
+                seeded_days.append(d_.isoformat())
+            except FileNotFoundError:
+                missing.append(d_.isoformat())
+            d_ += _timedelta(days=1)
+        logger.info("profile pre-seeded from %s: %d prints since %s (%s)%s",
+                    ",".join(seeded_days) or "no day", n_seed, vp_anchor_ts.isoformat(), vp_label,
+                    f" — no corpus file for {','.join(missing)}" if missing else "")
+        if not seeded_days:
+            logger.warning("profile: no corpus file between %s and %s — prior-day layer empty; "
                            "today's prints still accrete from the anchor rule",
-                           prior_trading_day(day))
+                           vp_anchor_ts.astimezone(CENTRAL).date(), day)
         # The faint/solid boundary is TODAY'S 08:30 CT OPEN, not the end of the
         # seed [st-fgno]: everything before it — prior session AND this
         # morning's overnight tape from 02:50 — is the faint layer, and "solid"

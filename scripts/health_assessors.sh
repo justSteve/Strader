@@ -50,9 +50,13 @@ run_one() {  # run_one <label> <capture_health args...>
     if (( rc == 2 )); then worst=2; fi
 }
 
+# ES capture runs the Globex day since 2026-08-18 [st-9olq] (early 00:00-02:50,
+# session 02:50-15:05, evening 15:06-end of day / Fri 16:05); the clock window is
+# the whole day and --venue globex supplies the pause, the maintenance halt, the
+# Friday close and the Sunday reopen.
 run_one "es capture" \
     --streams es,es-mbp1 --stale-secs 600 --grace-secs 180 --venue globex \
-    --window-start 02:50 --window-end 15:05 \
+    --window-start 00:00 --window-end 23:59 \
     --match corpus_stream_databento.py \
     --state "$CORPUS/_capture_health.json"
 

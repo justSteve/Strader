@@ -1,0 +1,37 @@
+[Unit]
+# Evening half of the Globex day — ES trades + MBP-1, 15:06 CT to the end of the
+# calendar day (Friday: 16:05, the CME close). [st-9olq]
+#
+# Sibling of strader-capture.service, which keeps Steve's 02:50–15:05 CT session
+# window exactly as ruled (st-btu). This unit exists because the premarket
+# volume profile had to banner an 11-hour hole every morning: the evening
+# session was never captured, though the plan covers it and the disk holds it.
+# The weekday-dependent stop time lives in scripts/cron/capture-evening.sh; the
+# supervision (Restart=on-failure, SIGINT, journald) is copied from the session
+# unit for the same reasons written there.
+Description=Strader Databento live capture — evening session (15:06 CT → end of day)
+Documentation=https://github.com/justSteve/Strader
+After=network-online.target
+Wants=network-online.target
+
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=exec
+WorkingDirectory=/root/projects/Strader
+Environment=PYTHONPATH=/root/projects/Strader
+ExecStart=/usr/bin/bash /root/projects/Strader/scripts/cron/capture-evening.sh
+
+Restart=on-failure
+RestartSec=2s
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strader-capture-evening
+
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

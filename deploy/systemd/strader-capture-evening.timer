@@ -1,0 +1,19 @@
+[Unit]
+# Starts the evening capture at 15:06 CT Mon–Fri (one minute after the session
+# window closes at 15:05, so two processes never append to one file) and at the
+# Sunday 17:00 CT Globex reopen. [st-9olq]
+#
+# Persistent=true: if the box was down across the start, start late — the
+# streamer refuses cleanly once its stop time has passed. AccuracySec=1s: the
+# default minute of timer slack would eat into the tape for no reason.
+Description=Start Strader evening capture at 15:06 CT weekdays and 17:00 CT Sunday
+
+[Timer]
+OnCalendar=Mon..Fri 15:06 America/Chicago
+OnCalendar=Sun 17:00 America/Chicago
+AccuracySec=1s
+Persistent=true
+Unit=strader-capture-evening.service
+
+[Install]
+WantedBy=timers.target

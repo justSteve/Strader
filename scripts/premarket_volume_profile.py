@@ -14,9 +14,11 @@ therefore describe everything since the last time the cash market opened, which
 is the question a premarket read is actually asking: where has value been built
 since yesterday's bell, and where is price standing relative to it.
 
-Source is Schwab 5-minute extended-hours candles, not the tick corpus — see the
-module docstring of market/orderflow/anchored_profile.py for why (the corpus has
-an ~11h nightly hole that would silently swallow the evening session).
+Default source is the ES tick corpus (real prints, aggressor split). Days
+captured before 2026-08-18 hold 02:50–15:05 CT only, so a window reaching into
+them banners the hole; since then the Globex day is captured (st-9olq) and the
+banner appears only when the tape actually has a silence of 30 min or more.
+Schwab 5-minute candles remain the --source schwab alternative.
 
 Failure contract: on a fetch failure the previously published page is LEFT IN
 PLACE and the script exits non-zero. The page always stamps its own anchor and
@@ -80,21 +82,24 @@ def fetch_bars(start_utc: datetime, end_utc: datetime | None = None) -> list[dic
 def bars_from_corpus(start_utc: datetime) -> list[dict]:
     """Five-minute bars aggregated from the ES tick corpus. Offline fallback.
 
-    Honest but INCOMPLETE: the corpus captures 02:50-15:05 CT, so a profile
-    built this way is missing the 15:05->02:50 evening session entirely. The
-    rendered page says so in a banner — a gap you cannot see is the one that
-    reads as an LVN. Used when Schwab is unavailable (dead token), which
-    otherwise leaves this job with no source at all.
+    Bar-resolution, no aggressor split. Days captured before 2026-08-18 hold
+    only 02:50-15:05 CT (the evening session is missing); since then the
+    Globex day is captured [st-9olq]. Used when Schwab is unavailable (dead
+    token), which otherwise leaves this job with no source at all.
     """
-    from market.corpus.paths import CORPUS_ROOT
+    from market.corpus.paths import CORPUS_ROOT, open_corpus_text, resolve_existing
 
     bars: dict[int, dict] = {}
     day = start_utc.astimezone(CENTRAL).date()
     today = datetime.now(tz=CENTRAL).date()
     while day <= today:
+        # resolve_existing / open_corpus_text: a T+1-packed day is .jsonl.gz, and
+        # testing the raw path skipped it in silence — the exact reader defect
+        # scripts/cron/corpus-compact-wrapper.sh warns about. Bit 2026-08-18:
+        # 08-17 packed at noon, the next run drew Monday as empty. [st-9olq]
         path = CORPUS_ROOT / day.isoformat() / "databento_glbx_es.jsonl"
-        if path.exists():
-            with path.open() as f:
+        if resolve_existing(path) is not None:
+            with open_corpus_text(path) as f:
                 for line in f:
                     try:
                         rec = json.loads(line)
@@ -128,16 +133,17 @@ def trades_from_corpus(start_utc: datetime):
     bar's volume has to be smeared across the prices it touched — and they
     carry no aggressor at all. Prints carry both.
     """
-    from market.corpus.paths import CORPUS_ROOT
+    from market.corpus.paths import CORPUS_ROOT, open_corpus_text, resolve_existing
     from market.entities.trade import Trade
 
     day = start_utc.astimezone(CENTRAL).date()
     today = datetime.now(tz=CENTRAL).date()
     n = 0
     while day <= today:
+        # Packed-day aware, same as bars_from_corpus above. [st-9olq]
         path = CORPUS_ROOT / day.isoformat() / "databento_glbx_es.jsonl"
-        if path.exists():
-            with path.open() as f:
+        if resolve_existing(path) is not None:
+            with open_corpus_text(path) as f:
                 for line in f:
                     try:
                         rec = json.loads(line)
@@ -167,17 +173,30 @@ class _Tally:
     "what was the last price" would be absurd.
     """
 
-    __slots__ = ("n", "last")
+    __slots__ = ("n", "last", "gap")
 
     def __init__(self):
         self.n = 0
         self.last = None
+        self.gap = None          # (start_ts, end_ts, seconds) of the widest silence
 
     def __call__(self, it):
         for t in it:
             self.n += 1
+            if self.last is not None:
+                secs = (t.ts - self.last.ts).total_seconds()
+                if self.gap is None or secs > self.gap[2]:
+                    self.gap = (self.last.ts, t.ts, secs)
             self.last = t
             yield t
+
+
+#: A silence this long inside the window is a hole in the TAPE, not a quiet
+#: market — ES prints many times a minute whenever Globex is open. Before
+#: 2026-08-18 the capture ran 02:50–15:05 CT and every window had an 11 h hole;
+#: since then (st-9olq) the Globex day is captured and the banner appears only
+#: when the tape actually has one (a capture that died, a box that was off).
+HOLE_MIN_SECS = 30 * 60
 
 
 def _ct(ts_ms: int) -> datetime:
@@ -188,29 +207,30 @@ SOURCES = {
     "ticks": ("the ES tick corpus — real prints at native resolution",
               "Every contract sits at the price it actually traded, and the buy/sell "
               "split is Databento's aggressor flag, not an inference. Nothing is "
-              "smeared across a bar's range. The window is INCOMPLETE — see the "
-              "banner above."),
+              "smeared across a bar's range."),
     "schwab": ("Schwab 5-minute extended-hours candles",
                "Each bar's volume is spread across the prices it touched, so this is a "
                "bar-resolution approximation, not a tick-exact profile. The tick corpus "
-               "is not used here — it captures 02:50–15:05 CT only, and would drop the "
-               "evening session silently."),
+               "is not used here."),
     "corpus": ("the ES tick corpus, aggregated to 5-minute bars",
-               "Volume is real prints rather than distributed bar volume, but the window "
-               "is INCOMPLETE — see the banner above."),
+               "Volume is real prints rather than distributed bar volume."),
 }
-# Shown when the profile is corpus-sourced. Loud by design: an invisible hole in
-# a profile reads as a price the market rejected, which is the opposite of true.
-CORPUS_BANNER = (
-    "Fallback source — the 15:05→02:50 CT evening session is MISSING from this "
-    "profile. The tick corpus does not capture it. Treat thin buckets in that "
-    "price region as unmeasured, not as rejected price."
-)
+# Shown when the tape inside the window has a hole (see HOLE_MIN_SECS). Loud by
+# design: an invisible hole in a profile reads as a price the market rejected,
+# which is the opposite of true. Names the actual silence, not a fixed sentence.
+def hole_banner(hole) -> str:
+    a, b, secs = hole
+    a_ct, b_ct = a.astimezone(CENTRAL), b.astimezone(CENTRAL)
+    return (f"No prints from {a_ct:%a %H:%M} to {b_ct:%a %H:%M} CT ({secs / 3600:.1f} h) "
+            f"inside this window — the tape has a hole there (capture down, or a day "
+            f"captured before 2026-08-18, when the window was 02:50–15:05 CT). Treat thin "
+            f"buckets in that price region as unmeasured, not as rejected price.")
 
 
 def render_page(profile, va: ValueArea, last: float, bar_count: int,
                 end_ct: datetime, anchor_ct: datetime, generated_ct: datetime,
-                source: str = "ticks", aggressor: bool = True) -> str:
+                source: str = "ticks", aggressor: bool = True,
+                hole: tuple | None = None) -> str:
     """TradingView-style profile: right-justified bars at tick resolution.
 
     Layout follows TV's price scale — the axis is on the RIGHT and the bars
@@ -335,8 +355,8 @@ def render_page(profile, va: ValueArea, last: float, bar_count: int,
   {profile.total:,} contracts · {profile.bucket_pts:g}-pt buckets ·
   generated {generated_ct:%Y-%m-%d %H:%M CT}
 </div>
-{f'<div class="banner"><b>Incomplete window.</b> {CORPUS_BANNER}</div>'
- if source in ("ticks", "corpus") else ""}
+{f'<div class="banner"><b>Incomplete window.</b> {html.escape(hole_banner(hole))}</div>'
+ if hole else ""}
 <div class="stats">
   <div class="stat"><span>VAH</span><b>{va.vah:g}</b></div>
   <div class="stat"><span>POC</span><b>{va.poc:g}</b></div>
@@ -349,7 +369,7 @@ def render_page(profile, va: ValueArea, last: float, bar_count: int,
 <div class="legend">{legend}<span class="k">hover a row for exact volumes</span></div>
 <p class="note">
   Price is <b>{html.escape(pos)}</b>. Value area holds {va.achieved:.0%} of volume
-  ({va.volume:,} of {va.total:,} contracts). {SOURCES[source][1]}
+  ({va.volume:,} of {va.total:,} contracts). {SOURCES[source][1]}{" The window is INCOMPLETE — see the banner above." if hole else ""}
 </p>
 </div>
 <script>
@@ -440,7 +460,7 @@ def main(argv=None) -> int:
     anchor_ct = start.astimezone(CENTRAL)
     logger.info("anchor: %s (prior RTH open)", anchor_ct.strftime("%a %Y-%m-%d %H:%M CT"))
 
-    source, aggressor = args.source, False
+    source, aggressor, hole = args.source, False, None
     try:
         if source == "ticks":
             # Tally as the generator drains: the profile streams, so the print
@@ -452,6 +472,10 @@ def main(argv=None) -> int:
             va = value_area(profile.as_volume_profile())
             last, end_ct, n = tally.last.price, tally.last.ts, tally.n
             aggressor = True
+            if tally.gap and tally.gap[2] >= HOLE_MIN_SECS:
+                hole = tally.gap
+                logger.warning("tape hole inside the window: %s → %s (%.1f h)",
+                               hole[0].isoformat(), hole[1].isoformat(), hole[2] / 3600)
         else:
             bars = fetch_bars(start) if source == "schwab" else bars_from_corpus(start)
             profile = build_profile_from_bars(bars, symbol=SYMBOL)
@@ -464,7 +488,7 @@ def main(argv=None) -> int:
 
     generated = datetime.now(tz=CENTRAL)
     publish(render_page(profile, va, last, n, end_ct, anchor_ct, generated,
-                        source, aggressor), args.dry_run)
+                        source, aggressor, hole=hole), args.dry_run)
 
     extra = f"   delta {profile.delta:+,}" if aggressor else ""
     print(f"{SYMBOL} anchored VP [{source}] — {n:,} "

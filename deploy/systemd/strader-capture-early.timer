@@ -1,0 +1,15 @@
+[Unit]
+# Starts the early capture at 00:00 CT Mon–Fri; it hands over to
+# strader-capture.timer at 02:50. Persistent so a box that was down at midnight
+# still starts it late; AccuracySec=1s so the handover gap stays a few seconds,
+# never a minute of timer slack. [st-9olq]
+Description=Start Strader early capture at 00:00 CT weekdays
+
+[Timer]
+OnCalendar=Mon..Fri 00:00 America/Chicago
+AccuracySec=1s
+Persistent=true
+Unit=strader-capture-early.service
+
+[Install]
+WantedBy=timers.target

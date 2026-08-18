@@ -7,9 +7,9 @@ day session, the overnight, and the premarket as one distribution.
 
 Why bars and not ticks
 ----------------------
-The ES tick corpus captures 02:50–15:05 CT daily (measured 2026-08-11 across
-08-07, 08-10, 08-11). That leaves an ~11h hole from 15:05 CT to 02:50 CT, and
-the hole contains real volume — the 08-11 Mancini letter cites a low set at
+Until 2026-08-18 the ES tick corpus captured 02:50–15:05 CT daily (measured
+2026-08-11 across 08-07, 08-10, 08-11). That left an ~11h hole from 15:05 CT to
+02:50 CT, and the hole contains real volume — the 08-11 Mancini letter cites a low set at
 12:30am CT, squarely inside it. A profile built from ticks alone would omit the
 evening session without saying so, which is the failure mode a profile must
 never have: a silent hole reads as "nobody traded there", the exact shape of an
@@ -24,6 +24,11 @@ this resolution — but it is an approximation, and the rendered page says so.
 Refining the 02:50–15:05 CT portion with real ticks is a possible upgrade; it
 would mix two volume semantics in one histogram, so it is deliberately not done
 here.
+
+Since 2026-08-18 the capture runs the Globex day (early 00:00–02:50, session
+02:50–15:05, evening 15:06–end of day; st-9olq), so a tick-built profile over a
+window that starts after that date has no hole by construction — the premarket
+page now measures the tape's widest silence and banners only what it finds.
 """
 from __future__ import annotations
 
@@ -120,8 +125,9 @@ class SplitProfile:
 
 
 # A gap between consecutive prints longer than this is a HOLE in the tape —
-# the tick corpus captures 02:50–15:05 CT, so the evening session is absent
-# by construction and the profile must say so rather than read as an LVN.
+# days captured before 2026-08-18 hold 02:50–15:05 CT only, so the evening
+# session is absent there by construction and the profile must say so rather
+# than read as an LVN. Since then the Globex day is captured (st-9olq).
 HOLE_MIN_S = 30 * 60
 
 

@@ -5,7 +5,7 @@ the whole build/render/publish path runs under the API gate.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -45,10 +45,13 @@ def _trades():
 def tick_page():
     prof = build_split_profile(_trades(), bucket_ticks=1)
     va = value_area(prof.as_volume_profile())
+    # A window whose tape has an 11 h silence (the pre-2026-08-18 capture shape).
+    hole = (datetime(2026, 8, 10, 20, 5, tzinfo=timezone.utc),
+            datetime(2026, 8, 11, 7, 50, tzinfo=timezone.utc), 11.75 * 3600)
     page = pvp.render_page(prof, va, 7755.0, len(_trades()), TS,
                            anchor_utc(date(2026, 8, 10)).astimezone(CENTRAL),
                            datetime(2026, 8, 11, 8, 15, tzinfo=CENTRAL),
-                           source="ticks", aggressor=True)
+                           source="ticks", aggressor=True, hole=hole)
     return page, prof, va
 
 
@@ -155,9 +158,29 @@ class TestBarSourceRendering:
         page, _, _ = bar_page
         assert "Incomplete window" not in page
 
-    def test_tick_page_does_carry_the_banner(self, tick_page):
+    def test_tick_page_with_a_hole_carries_the_banner(self, tick_page):
         page, _, _ = tick_page
-        assert "Incomplete window" in page and "MISSING" in page
+        assert "Incomplete window" in page and "15:05" in page and "02:50" in page
+
+    def test_tick_page_without_a_hole_has_no_banner(self):
+        """Since 2026-08-18 the Globex day is captured [st-9olq]: a window whose
+        tape is continuous must not banner a hole it does not have."""
+        prof = build_split_profile(_trades(), bucket_ticks=1)
+        va = value_area(prof.as_volume_profile())
+        page = pvp.render_page(prof, va, 7755.0, len(_trades()), TS,
+                               anchor_utc(date(2026, 8, 10)).astimezone(CENTRAL),
+                               datetime(2026, 8, 11, 8, 15, tzinfo=CENTRAL),
+                               source="ticks", aggressor=True, hole=None)
+        assert "Incomplete window" not in page and "INCOMPLETE" not in page
+
+    def test_tally_measures_the_widest_silence(self):
+        t0 = datetime(2026, 8, 17, 20, 5, tzinfo=timezone.utc)
+        mk = lambda secs: Trade(ts=t0 + timedelta(seconds=secs), symbol="ESU6", instrument_id=1,
+                                price=7750.0, size=1, side="B")
+        tally = pvp._Tally()
+        list(tally([mk(0), mk(10), mk(10 + 3 * 3600), mk(10 + 3 * 3600 + 5)]))
+        assert tally.n == 4 and tally.gap[2] == 3 * 3600
+        assert tally.gap[0] == t0 + timedelta(seconds=10)
 
 
 def _dead(*a, **k):
@@ -198,3 +221,39 @@ class TestSourceContract:
         monkeypatch.setattr(pvp, "publish", lambda page, dry: pages.append(page))
         assert pvp.main(["--date", "2026-08-10", "--bucket-ticks", "4"]) == 0
         assert "1-pt buckets" in pages[0]
+
+
+class TestPackedCorpusDays:
+    """A T+1-packed day is .jsonl.gz. Testing the raw path skipped it in silence
+    and the 2026-08-18 noon run drew Monday as empty (248k prints instead of
+    470k) minutes after 08-17 was packed. [st-9olq]"""
+
+    def _rec(self, ts_utc: datetime, price: float, size: int, side: str) -> str:
+        import json
+        return json.dumps({"provenance": {"ts_event": ts_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ")},
+                           "data": {"symbol": "ESU6", "instrument_id": 1, "price": price,
+                                    "size": size, "side": side}}) + "\n"
+
+    def test_trades_from_corpus_reads_a_packed_day(self, tmp_path, monkeypatch):
+        import gzip
+        import market.corpus.paths as paths
+        monkeypatch.setattr(paths, "CORPUS_ROOT", tmp_path)
+        day = tmp_path / "2026-08-17"; day.mkdir()
+        t = datetime(2026, 8, 17, 14, 0, tzinfo=timezone.utc)
+        with gzip.open(day / "databento_glbx_es.jsonl.gz", "wt", encoding="utf-8") as f:
+            f.write(self._rec(t, 7750.0, 3, "B"))
+            f.write(self._rec(t + timedelta(seconds=1), 7750.25, 2, "A"))
+        # `today` inside the reader is the real today; the walk starts at the anchor day
+        got = list(pvp.trades_from_corpus(datetime(2026, 8, 17, 13, 30, tzinfo=timezone.utc)))
+        assert [(x.price, x.size, x.side) for x in got] == [(7750.0, 3, "B"), (7750.25, 2, "A")]
+
+    def test_bars_from_corpus_reads_a_packed_day(self, tmp_path, monkeypatch):
+        import gzip
+        import market.corpus.paths as paths
+        monkeypatch.setattr(paths, "CORPUS_ROOT", tmp_path)
+        day = tmp_path / "2026-08-17"; day.mkdir()
+        t = datetime(2026, 8, 17, 14, 0, tzinfo=timezone.utc)
+        with gzip.open(day / "databento_glbx_es.jsonl.gz", "wt", encoding="utf-8") as f:
+            f.write(self._rec(t, 7750.0, 3, "B"))
+        bars = pvp.bars_from_corpus(datetime(2026, 8, 17, 13, 30, tzinfo=timezone.utc))
+        assert len(bars) == 1 and bars[0]["volume"] == 3
