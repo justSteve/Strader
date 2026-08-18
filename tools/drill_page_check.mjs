@@ -110,12 +110,69 @@ setTimeout(() => {
   // whole rows is its CONTAINING BLOCK. Anchored to the control strip alone it
   // ended mid-way through the readouts and cut the text. The invariant that
   // has to hold: the rows it overlays are inside the same positioned ancestor.
-  const block = panel.closest("#ctlblock");
-  ok("panel is anchored to the control block", block !== null);
-  ok("the readouts row is inside that block — so the panel can cover it whole",
+  // Since st-fgno that ancestor is the floating frame (#livehud), which
+  // buildHud fills by MOVING the header, readouts, controls, row and panel.
+  const block = panel.closest("#livehud");
+  ok("panel is anchored to the floating frame", block !== null);
+  ok("the readouts row is inside that frame — so the panel can cover it whole",
      !!block && block.contains(d.querySelector(".readouts")));
   ok("the emissions row is inside it too",
      !!block && block.contains(d.getElementById("emrow")));
+
+  // Rollover flicker [st-9olq]. The panel opens UNDER the pointer, so the row
+  // gets mouseleave the moment it appears; the old close-on-leave tore the
+  // panel down 120 ms later, the pointer was back on the chip, mouseenter
+  // re-opened it — a flicker for as long as you held still. The pair must stay
+  // open while the pointer is on either half and close once it has left both.
+  w.eval(`emPinned = false; emPinnedIdx = null; closeEmPanel(); seekTo(${target})`);
+  const chip0 = d.querySelector("#emrow .em-chip");
+  const emrow = d.getElementById("emrow");
+  const fire = (el, type) => el.dispatchEvent(new w.MouseEvent(type, { bubbles: false }));
+  fire(chip0, "mouseenter");                       // hover the chip → panel opens
+  const openedOnHover = panel.style.display === "block";
+  fire(emrow, "mouseleave");                       // the panel now covers the row
+  fire(panel, "mouseenter");                       // …and the pointer is on the panel
+  setTimeout(() => {
+    ok("hovering a chip opens the panel", openedOnHover);
+    ok("panel stays open once it has covered the row (no flicker)",
+       panel.style.display === "block");
+    fire(panel, "mouseleave");                     // pointer leaves the pair
+    setTimeout(() => {
+      ok("leaving the pair closes it", panel.style.display === "none");
+      part2();
+    }, 250);
+  }, 250);
+}, 900);
+
+function part2() {
+  const bars = w.eval("bars");
+  const emitting = [], quiet = [];
+  bars.forEach((b, i) => ((b.ev || []).length ? emitting : quiet).push(i));
+  const target = emitting[Math.floor(emitting.length / 2)];
+  const panel = d.getElementById("empanel");
+
+  // The level picker [st-9olq]: one dropdown, session levels at the top level,
+  // Mancini's letter as an <optgroup> under them; picking arms and jumps, and
+  // the select snaps back to its label.
+  const pick = d.getElementById("lvlpick");
+  ok("level picker is one <select>", !!pick && pick.tagName === "SELECT"
+     && d.querySelectorAll("#chips button, #chips select").length === 1);
+  if (pick) {
+    const top = [...pick.children].filter(c => c.tagName === "OPTION" && c.value);
+    const grp = pick.querySelector("optgroup");
+    ok("session levels sit at the top level", top.length > 0,
+       top.map(o => o.textContent).join(" | "));
+    ok("Mancini levels are the second layer (optgroup)",
+       !grp || (/mancini/i.test(grp.label) && grp.querySelectorAll("option").length > 0),
+       grp ? `${grp.querySelectorAll("option").length} M: level(s)` : "no Mancini levels on this page");
+    const first = top[0] || (grp && grp.querySelector("option"));
+    if (first) {
+      pick.value = first.value; pick.dispatchEvent(new w.Event("change"));
+      ok("picking arms the level", w.eval("level") != null && Math.abs(w.eval("level") - +first.value) < 0.01,
+         `armed ${w.eval("level")} from "${first.textContent}"`);
+      ok("picker snaps back to its label", pick.value === "");
+    }
+  }
 
   // Confidence: an invalidated setup is scored 0.0, meaning not-applicable.
   // Printing "0.00" invites reading it as a measurement. [st-emy5]
@@ -215,4 +272,4 @@ setTimeout(() => {
   }
   console.log("\nall checks clean");
   process.exit(0);
-}, 900);
+}

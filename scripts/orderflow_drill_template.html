@@ -416,7 +416,7 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
   <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
   <div id="livehud"></div>
 </div>
-<p class="hint">Space = play/pause · ←/→ = step · Ctrl+←/→ = speed down/up · Click a level chip to arm it AND jump to its first visit · <b>?</b> explains the screen ·
+<p class="hint">Space = play/pause · ←/→ = step · Ctrl+←/→ = speed down/up · Pick a level (Level ▾) to arm it AND jump to its first visit · <b>?</b> explains the screen ·
 Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button>
 · <button id="candles" title="Open the same tape as 1-minute candles in a second window, synced to this minute">Candles ↗</button>
 · coach: <span id="bridge-dot">—</span>
@@ -453,7 +453,7 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
   <h4>How to run a rep</h4>
   <ol>
     <li>Or start from the <b>Ladder</b> dropdown: scenarios in concentration order (U0 tempo → U1 frames → S2 → S4 → S5 → S3 → S1/S6). Picking one arms its level and drops you on its fixed reference instance.</li>
-    <li>Click a level chip (session levels, or M: chips from Mancini's letter). You'll be dropped ~10 bars before price first visited it.</li>
+    <li>Pick a level from the <b>Level ▾</b> menu (the session's own levels first, then M: levels from Mancini's letter). You'll be dropped ~10 bars before price first visited it.</li>
     <li>Press <b>Space</b> and watch the approach: is the aggression toward the level being rewarded (bars keep moving) or eaten (heavy color, no progress)?</li>
     <li>When price gets within a point, the replay pauses and asks: reject or accept. Answer, watch the tape decide, and your running score builds below.</li>
     <li>Use the visit buttons above the chart to replay other approaches to the same level.</li>
@@ -575,7 +575,7 @@ function makeDraggable(el, bounds) {
   let dx = 0, dy = 0, on = false;
   el.addEventListener("mousedown", e => {
     // Let the controls inside the frame keep working — drag only from chrome.
-    if (e.target.closest("button,select,input,a")) return;
+    if (e.target.closest("button,select,input,a,#empanel")) return;
     const r = el.getBoundingClientRect(), b = bounds.getBoundingClientRect();
     dx = e.clientX - r.left; dy = e.clientY - r.top;
     on = true; el.classList.add("dragging");
@@ -626,36 +626,49 @@ function refreshMeta() {
 }
 refreshMeta();
 
-// level chips: session-derived + optional externally supplied (e.g. Mancini
-// candidates from session_review.py — labeled M:, harvested not parsed)
+// The level picker: ONE dropdown [st-9olq]. The session's own levels (Open,
+// AM Hi/Lo, Day Hi/Lo — session = the cash session, st-fgno) sit at the top
+// level; Mancini's letter (harvested by session_review.py, not parsed) is the
+// second layer, an <optgroup> under them. This was a row of five buttons plus
+// a separate Mancini select — inside the floating frame that row was the
+// widest line and forced the frame to two lines (Steve, 2026-08-18: collapse
+// the chips into a single dropdown, Mancini's as the second layer). Picking
+// arms the level AND jumps to its first visit, exactly as the chips did; the
+// select then snaps back to its label so the frame keeps one width and the
+// same level can be picked again.
 const chipDefs = [["open","Open"],["am_high","AM Hi"],["am_low","AM Lo"],["session_high","Day Hi"],["session_low","Day Lo"]];
-function addChip(label, price) {
-  const b = document.createElement("button");
-  b.textContent = `${label} ${fmtPrice(price)}`;
-  b.title = "Arm this level and jump to its first visit";
-  b.onclick = () => { $("lvlinput").value = fmtPrice(price); armLevel(true); };
-  $("chips").appendChild(b);
-}
-// A LIVE page has no session-derived levels at boot — the session has not
-// happened yet. Skipping absent ones matters more than it looks: fmtPrice does
-// p.toFixed(), so one undefined price throws HERE, at the top of the boot
-// script, and nothing below it ever runs — no bridge, no poller, no bars. The
-// page renders its chrome and sits empty, which reads as a network problem and
-// is not one. [st-re1o]
-for (const [k, label] of chipDefs) {
-  const price = DATA.levels ? DATA.levels[k] : undefined;
-  if (price != null) addChip(label, price);
-}
-const mLvls = DATA.mancini_candidates || [];
-if (mLvls.length) {
+function buildLevelPicker() {
+  const host = $("chips"); if (!host) return;
+  host.innerHTML = "";
+  // A LIVE page has no session-derived levels at boot — the session has not
+  // happened yet. Skipping absent ones matters more than it looks: fmtPrice
+  // does p.toFixed(), so one undefined price throws HERE, at the top of the
+  // boot script, and nothing below it ever runs — no bridge, no poller, no
+  // bars. The page renders its chrome and sits empty, which reads as a network
+  // problem and is not one. [st-re1o]
+  const session = [];
+  for (const [k, label] of chipDefs) {
+    const price = DATA.levels ? DATA.levels[k] : undefined;
+    if (price != null) session.push(`<option value="${price}">${label} ${fmtPrice(price)}</option>`);
+  }
+  const mLvls = DATA.mancini_candidates || [];
+  if (!session.length && !mLvls.length) return;
   const sel = document.createElement("select");
-  sel.title = "Levels harvested from Mancini's letter — pick one to arm it";
-  sel.innerHTML = `<option value="">Mancini ▾</option>` +
-    mLvls.map(p => `<option value="${p}">M: ${fmtPrice(p)}</option>`).join("");
-  sel.onchange = () => { if (!sel.value) return;
-    $("lvlinput").value = sel.value; armLevel(true); };
-  $("chips").appendChild(sel);
+  sel.id = "lvlpick";
+  sel.title = "Arm a level and jump to its first visit — the session's levels, then Mancini's letter";
+  sel.innerHTML = `<option value="">Level ▾</option>` + session.join("")
+    + (mLvls.length
+        ? `<optgroup label="Mancini">` + mLvls.map(p => `<option value="${p}">M: ${fmtPrice(p)}</option>`).join("") + `</optgroup>`
+        : "");
+  sel.onchange = () => {
+    const v = parseFloat(sel.value);
+    sel.value = "";                       // back to the label — one width, re-pickable
+    if (!isFinite(v)) return;
+    $("lvlinput").value = fmtPrice(v); armLevel(true);
+  };
+  host.appendChild(sel);
 }
+buildLevelPicker();
 
 // ── state ────────────────────────────────────────────────────────────────
 let idx = -1;                 // last played bar index
@@ -1610,10 +1623,29 @@ function emTable(ev) {
     + `<tbody>${rows}</tbody></table>`;
 }
 
+// The panel is an overlay that OPENS UNDER THE POINTER — it covers the row
+// whose chip you hovered. So the row gets `mouseleave` the instant the panel
+// appears, and a close scheduled off that event tears the panel down while
+// you are still on it; the pointer is then back on the chip, `mouseenter`
+// fires again, and the panel flickers open/closed for as long as you hold
+// still (Steve, 2026-08-18: "a flicker on the rollover"). One pending-close
+// timer, cancelled by opening and by entering the panel, and the pair
+// (row + panel) closes only when the pointer has left BOTH. [st-9olq]
+let emCloseTimer = null;
+function cancelEmClose() { if (emCloseTimer) { clearTimeout(emCloseTimer); emCloseTimer = null; } }
+function scheduleEmClose() { cancelEmClose(); emCloseTimer = setTimeout(() => { emCloseTimer = null; closeEmPanel(); }, 120); }
+// What the panel last drew, so a repaint that lands the same bar (a pinned
+// panel is re-asserted on every bar the tape advances) does not rewrite the
+// same markup — that reset its scroll and blinked its text.
+let emPanelKey = null;
 function openEmPanel(i) {
   const p = $("empanel"); if (!p) return;
+  cancelEmClose();
   const b = bars[i];
   const ev = (b && b.ev) || [];
+  const key = `${i}:${ev.length}:${FINAL.length}:${emPinned ? 1 : 0}`;
+  if (p.style.display === "block" && emPanelKey === key) return;
+  emPanelKey = key;
   let html = `<h4>Bar ${i + 1}${b ? " · " + fmtClock(b.t1) + " CT" : ""} · `
     + `${ev.length} emission${ev.length === 1 ? "" : "s"}`
     + `<span class="x" title="${emPinned ? "unpin" : "close"}">×</span></h4>`
@@ -1629,7 +1661,8 @@ function openEmPanel(i) {
   p.querySelector(".x").onclick = () => { emPinned = false; emPinnedIdx = null; closeEmPanel(); };
 }
 function closeEmPanel() {
-  const p = $("empanel"); if (p && !emPinned) p.style.display = "none";
+  const p = $("empanel"); if (!p || emPinned) return;
+  p.style.display = "none"; emPanelKey = null;
 }
 
 function renderAnatomyList() {
@@ -2507,9 +2540,13 @@ document.querySelectorAll("#panel button").forEach(btn => {
 
 // Emissions rollover [st-b0n9]: hovering a chip opens the panel over the
 // control strip, leaving the pair closes it, clicking pins it open so the
-// detail survives while the tape keeps advancing.
-$("emrow").addEventListener("mouseleave", () => setTimeout(closeEmPanel, 120));
-$("empanel").addEventListener("mouseleave", closeEmPanel);
+// detail survives while the tape keeps advancing. "Leaving the pair" is one
+// deferred close that entering either half cancels — see openEmPanel for the
+// flicker this replaces. [st-9olq]
+$("emrow").addEventListener("mouseenter", cancelEmClose);
+$("emrow").addEventListener("mouseleave", scheduleEmClose);
+$("empanel").addEventListener("mouseenter", cancelEmClose);
+$("empanel").addEventListener("mouseleave", scheduleEmClose);
 $("emrow").addEventListener("click", () => {
   emPinned = !emPinned; emPinnedIdx = null;
   if (emPinned) openEmPanel(idx); else closeEmPanel();
