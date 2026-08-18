@@ -24,7 +24,15 @@
 * { box-sizing:border-box; }
 body { margin:0; background:var(--page); color:var(--ink);
   font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; }
-header { padding:10px 16px 6px; display:flex; flex-wrap:wrap; gap:10px 18px; align-items:baseline; }
+/* Header and controls are COLUMNS OF ROWS, not one wrapping flex line
+   [st-9olq]. The floating frame is width:max-content, and the max-content of
+   a wrapping flex container is everything on ONE line — so a single wrapping
+   row made the frame as wide as the viewport allowed and a forced break
+   inside it changed nothing about the frame's width. Rows are separate
+   blocks: the frame sizes to the widest row, and Steve's breaks (before the
+   Drill picker, before the Level input) are where one row ends. */
+header { padding:10px 16px 6px; display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+header .hrow { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:baseline; }
 header h1 { font-size:16px; margin:0; }
 header .meta { color:var(--ink-2); font-size:12px; }
 /* Drill-mode switch [st-v7a0]: pick any corpus day and get its drill from the
@@ -35,7 +43,11 @@ header .meta { color:var(--ink-2); font-size:12px; }
 #modeswitch a { color:var(--ink-2); margin-left:6px; }
 .legend { display:flex; gap:12px; font-size:12px; color:var(--ink-2); }
 .legend .chip { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:middle; }
-.controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:6px 16px; }
+.controls { display:flex; flex-direction:column; align-items:flex-start; gap:6px; padding:6px 16px; }
+.controls .crow { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+/* Live keeps four controls (⟨ Bar, Bar ⟩, Cells, ?) — one line, not two. */
+body.live .controls { flex-direction:row; flex-wrap:wrap; }
+body.live .controls .crow { display:contents; }
 button, select, input[type=text] { font:inherit; color:var(--ink); background:var(--surface-1);
   border:1px solid var(--axis); border-radius:6px; padding:4px 10px; cursor:pointer; }
 button:hover { border-color:var(--ink-2); }
@@ -258,6 +270,7 @@ body.live #prod-dots { display:inline-flex; }
 .sen-mark { position:absolute; transform:translate(-50%,-50%); font-size:9px; line-height:1; color:var(--cue); z-index:6; pointer-events:none; }
 .sen-mark.sen-contested, .sen-mark.sen-zone { color:var(--cue-pivot); }
 #sen-strip { cursor:pointer; }
+body:not(.live) #sen-strip { display:none; }   /* drills carry no alerts [st-9olq] */
 #sen-strip.off { color:var(--muted); text-decoration:line-through; }
 #sen-strip .sen-txt { color:var(--ink-2); }
 #livehud #sen-strip { font-size:11px; margin-left:8px; }
@@ -325,11 +338,16 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
   backdrop-filter:blur(3px); box-shadow:0 2px 10px rgba(0,0,0,.35);
   cursor:grab; user-select:none; }
 #livehud.dragging { cursor:grabbing; box-shadow:0 4px 16px rgba(0,0,0,.5); }
-#livehud header { padding:0 0 3px; gap:6px 12px; }
+#livehud header { padding:0 0 3px; gap:3px; }
+#livehud header .hrow { gap:6px 12px; }
 #livehud header h1 { font-size:13px; }
 #livehud .readouts { padding:0; gap:14px; flex-wrap:wrap; }
-#livehud .controls { padding:4px 0 0; gap:6px; }
-#livehud #emrow { padding:4px 0 0; }
+#livehud .controls { padding:4px 0 0; gap:4px; }
+#livehud .controls .crow { gap:6px; }
+/* The emissions row wraps INSIDE the width the other rows set — contain:
+   inline-size takes it out of the frame's intrinsic width, so three long chips
+   on one bar cannot widen the frame and a quiet next bar cannot shrink it. */
+#livehud #emrow { padding:4px 0 0; contain:inline-size; }
 /* The feed indicator sits in the top line, where the static word "LIVE" used
    to. That word was baked at render from meta.source and would still have read
    LIVE against a dead feed — which is exactly how st-h510 hid for 21 hours.
@@ -359,12 +377,13 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
 .col.dev .foot .txt .lbl { font-size:8px; letter-spacing:.06em; opacity:.85; }
 </style></head><body>
 <header>
-  <h1>Orderflow Drill</h1>
-  <span class="meta" id="meta"></span>
-  <span id="modeswitch" hidden><label title="Replay a past day's tape with the drill controls (play, speed, ladder, anatomy)">Drill <select id="drillday"><option value="">day ▾</option></select></label><a id="livelink" href="./" title="Back to today's live tape" hidden>Live ↗</a></span>
+  <div class="hrow"><h1>Orderflow Drill</h1>
+  <span class="meta" id="meta"></span></div>
+  <div class="hrow" id="hrow2"><span id="modeswitch" hidden><label title="Replay a past day's tape with the drill controls (play, speed, ladder, anatomy)">Drill <select id="drillday"><option value="">day ▾</option></select></label><a id="livelink" href="./" title="Back to today's live tape" hidden>Live ↗</a></span></div>
 </header>
 <div id="ctlblock">
 <div class="controls">
+<div class="crow">
   <button id="play" class="primary drill-only">▶ Play</button>
   <button id="back">⟨ Bar</button><button id="fwd">Bar ⟩</button>
   <label class="drill-only">Speed <select id="speed">
@@ -378,6 +397,8 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
     <option value="judgment">3 · Judgment</option>
   </select></label>
   <input type="range" id="seek" min="0" value="0">
+</div>
+<div class="crow">
   <label id="lvl-label">Level <input type="text" id="lvlinput" size="7" placeholder="price"></label>
   <button id="arm">Arm level</button>
   <span id="chips"></span>
@@ -395,6 +416,7 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
   <button id="tbl">Table view</button>
   <button id="anat" class="drill-only" title="Walk the recognizer's four-stage setups on this day">Anatomy</button>
   <button id="helpbtn" title="What am I looking at?">?</button>
+</div>
 </div>
 <div class="readouts">
   <span>Bar <b id="ro-bar">0</b></span>
@@ -556,18 +578,21 @@ function buildHud() {
   // it reads LIVE against a dead feed. This one reflects the actual bridge.
   const dot = document.getElementById("bridge-dot");
   const meta = document.getElementById("meta");
-  if (dot && meta && meta.parentNode) {
-    meta.parentNode.appendChild(dot);
+  // Second header row (Drill picker's line) since st-9olq; the meta's own
+  // parent is the fallback so an older header shape still gets its dots.
+  const row2 = document.getElementById("hrow2") || (meta && meta.parentNode);
+  if (dot && row2) {
+    row2.appendChild(dot);
     // Producer dots ride beside it: same top line, same "is it alive" question,
     // one per process behind the chart. [st-n0qm.3]
     const pd = document.getElementById("prod-dots");
-    if (pd) meta.parentNode.appendChild(pd);
+    if (pd) row2.appendChild(pd);
     const cc = document.getElementById("cue-chip");
-    if (cc) meta.parentNode.appendChild(cc);
+    if (cc) row2.appendChild(cc);
     // The sentinel strip: the newest alert as a sentence, and the basis that
     // put its row on the ES axis. Same line — it is the same question. [st-n0qm.9]
     const ss = document.getElementById("sen-strip");
-    if (ss) meta.parentNode.appendChild(ss);
+    if (ss) row2.appendChild(ss);
   }
   makeDraggable(hud, document.getElementById("stage"));
 }
@@ -2049,7 +2074,7 @@ document.addEventListener("keydown", e => {
   if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
   if (e.code === "KeyX") toggleCues();
   if (e.code === "KeyV") toggleVp();
-  if (e.code === "KeyS") toggleSentinel();
+  if (e.code === "KeyS" && LIVE) toggleSentinel();   // drills carry no alerts [st-9olq]
   if (e.code === "ArrowRight") stepUser();
   if (e.code === "ArrowLeft") seekTo(idx - 1);
 });
