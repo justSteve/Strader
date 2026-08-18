@@ -130,7 +130,8 @@ const colLeft = i => w.eval(`(function(){ const c=$("cols"); const first=Math.ma
   ok("row starts at the firing bar's column", lines()[0] && lines()[0].style.left === colLeft(5) + "px", `${lines()[0] && lines()[0].style.left} vs ${colLeft(5)}px`);
   ok("tag names level, strike, kind and ES price", tags()[0] && /mLG 6380 · approach · ES 6400\.25/.test(tags()[0].textContent), tags()[0] && tags()[0].textContent);
   ok("tooltip carries the arithmetic", tags()[0] && /SPX 6379\.46 \+ basis 20\.75 = ES 6400\.21/.test(tags()[0].title), tags()[0] && tags()[0].title);
-  ok("strip carries the sentence and the basis", /6380 major long gamma — approach from above/.test(stripText()) && /basis \+20\.75 \(n10\)/.test(stripText()), stripText());
+  // basis is in the strip's tooltip since st-9olq (noise on the line, useful on hover)
+  ok("strip carries the sentence; the basis rides its tooltip", /6380 major long gamma — approach from above/.test(stripText()) && /basis \+20\.75 \(n10\)/.test(strip().title || ""), stripText() + " | " + (strip().title || ""));
 
   // 3. a second level, then a relocation of the first
   ALERTS = [A1, A2];

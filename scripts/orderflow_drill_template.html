@@ -38,9 +38,10 @@ header .meta { color:var(--ink-2); font-size:12px; }
 /* Drill-mode switch [st-v7a0]: pick any corpus day and get its drill from the
    same origin; a drill page carries the way back to today's live tape. Hidden
    until the bridge answers /days, so a drill opened from disk loses nothing. */
-#modeswitch { font-size:12px; color:var(--ink-2); }
+#modeswitch { font-size:12px; color:var(--ink-2); display:inline-flex; gap:8px; align-items:center; }
 #modeswitch select { font-size:12px; }
-#modeswitch a { color:var(--ink-2); margin-left:6px; }
+#modeswitch label.mode { display:inline-flex; gap:3px; align-items:center; cursor:pointer; }
+#modeswitch input[type=radio] { margin:0; }
 .legend { display:flex; gap:12px; font-size:12px; color:var(--ink-2); }
 .legend .chip { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:middle; }
 .controls { display:flex; flex-direction:column; align-items:flex-start; gap:6px; padding:6px 16px; }
@@ -150,7 +151,7 @@ td:first-child, th:first-child { text-align:left; }
 #emrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap;
   padding:2px 16px 6px; font-size:12px; color:var(--ink-2);
   font-variant-numeric:tabular-nums; }
-#emrow .em-lbl { color:var(--muted); letter-spacing:.03em; text-transform:uppercase;
+#emrow .em-lbl { color:var(--muted); letter-spacing:.03em;   /* Title Case since st-9olq */
   font-size:10px; font-weight:600; }
 #emrow .em-none { color:var(--muted); font-style:italic; }
 .em-chip { display:inline-flex; gap:6px; align-items:center; cursor:default;
@@ -290,10 +291,36 @@ body.live #prod-dots { display:inline-flex; }
 .sen-mark { position:absolute; transform:translate(-50%,-50%); font-size:9px; line-height:1; color:var(--cue); z-index:6; pointer-events:none; }
 .sen-mark.sen-contested, .sen-mark.sen-zone { color:var(--cue-pivot); }
 #sen-strip { cursor:pointer; }
-body:not(.live) #sen-strip { display:none; }   /* drills carry no alerts [st-9olq] */
+/* ── coach cursor [st-135m] ─────────────────────────────────────────────
+   A drawn pointer the coach puts on a cell (bar + price) through the bridge's
+   coach channel — Steve, 2026-08-18: "a hover would allow you to draw my eye
+   to a specific place on the screen … a cursor would be awesome." It is a page
+   element, not the OS mouse: it works on the iPad, cannot interfere with the
+   real pointer, and glides (transition on top/left) so the eye follows the
+   move. The tip of the arrow is the anchor point. */
+.coach-cursor { position:absolute; width:22px; height:28px; z-index:40; pointer-events:none;
+  transform:translate(-3px,-2px); transition:top .45s ease, left .45s ease;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.55)); }
+.coach-cursor svg { width:100%; height:100%; display:block; }
+.coach-cursor path { fill:#fff; stroke:#111; stroke-width:1.5; }
+.coach-cursor.off { opacity:0; }
+.coach-label { position:absolute; z-index:41; pointer-events:none; max-width:320px;
+  font-size:11px; line-height:1.3; padding:3px 7px; border-radius:4px;
+  color:#111; background:var(--cue); box-shadow:0 1px 3px rgba(0,0,0,.4);
+  transition:top .45s ease, left .45s ease; white-space:normal; }
+.coach-label.edge { background:var(--ink-2); color:#fff; }
+.col .cell.coach-hi { outline:2px solid var(--cue); outline-offset:-1px; z-index:3; }
+@keyframes coach-pulse { 0% { box-shadow:0 0 0 0 var(--cue); } 100% { box-shadow:0 0 0 12px rgba(0,0,0,0); } }
+.col .cell.coach-pulse { animation:coach-pulse 900ms ease-out 2; }
+/* The sentinel line sits on its own row above Emitted (Steve, 2026-08-18) —
+   the sentence only; the basis moved to its tooltip (noise to the operator).
+   Drills carry no alerts, so no row there. [st-9olq] */
+#senrow { padding:4px 0 0; font-size:11px; }
+body:not(.live) #senrow, body:not(.live) #sen-strip { display:none; }
 #sen-strip.off { color:var(--muted); text-decoration:line-through; }
 #sen-strip .sen-txt { color:var(--ink-2); }
-#livehud #sen-strip { font-size:11px; margin-left:8px; }
+#livehud #sen-strip { font-size:11px; margin-left:0; }
+#sen-strip .sen-lbl { color:var(--muted); letter-spacing:.03em; font-size:10px; font-weight:600; margin-right:6px; }
 .em-chip.churn { border-color:var(--grid); color:var(--muted); opacity:.7; }
 .em-chip.churn .em-k { color:var(--muted); }
 #emrow .em-churn-tag { color:var(--muted); font-style:italic; font-size:11px; }
@@ -324,7 +351,6 @@ body.live #seek,
 body.live #lvl-label,
 body.live #arm,
 body.live #chips,
-body.live #rows-label,
 body.live #tbl,
 body.live > .hint { display:none !important; }
 
@@ -359,6 +385,10 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
   cursor:grab; user-select:none; }
 #livehud.dragging { cursor:grabbing; box-shadow:0 4px 16px rgba(0,0,0,.5); }
 #livehud header { padding:0 0 3px; gap:3px; }
+/* No title line (Steve, 2026-08-18: "no actionable info for trader there").
+   #meta stays in the DOM — refreshMeta writes it, page_boot_check reads it —
+   just not shown; the day-mismatch banner still guards the day. [st-9olq] */
+#livehud header .hrow:not(#hrow2) { display:none; }
 #livehud header .hrow { gap:6px 12px; }
 #livehud header h1 { font-size:13px; }
 #livehud .readouts { padding:0; gap:14px; flex-wrap:wrap; }
@@ -399,7 +429,7 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
 <header>
   <div class="hrow"><h1>Orderflow Drill</h1>
   <span class="meta" id="meta"></span></div>
-  <div class="hrow" id="hrow2"><span id="modeswitch" hidden><label title="Replay a past day's tape with the drill controls (play, speed, ladder, anatomy)">Drill <select id="drillday"><option value="">day ▾</option></select></label><a id="livelink" href="./" title="Back to today's live tape" hidden>Live ↗</a></span></div>
+  <div class="hrow" id="hrow2"><span id="modeswitch" hidden><label class="mode" title="Today's live tape"><input type="radio" name="mode" id="mode-live" value="live">Live</label><label class="mode" title="Replay a past day's tape with the drill controls (play, speed, ladder, anatomy)"><input type="radio" name="mode" id="mode-drill" value="drill">Drill</label><select id="drillday" hidden><option value="">day ▾</option></select></span></div>
 </header>
 <div id="ctlblock">
 <div class="controls">
@@ -424,7 +454,7 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
   <span id="chips"></span>
   <label class="drill-only" title="The skill ladder — scenarios in concentration order (docs/drills/skill-ladder.md)">Ladder
     <select id="scenario"><option value="">scenario ▾</option></select></label>
-  <label id="rows-label">Rows <select id="zoom">
+  <label id="rows-label" title="Cell size">Size <select id="zoom">
     <option value="9">Compact</option><option value="13" selected>Medium</option>
     <option value="16">Large</option>
   </select></label>
@@ -444,7 +474,6 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
   <span>Last <b id="ro-price">–</b></span>
   <span>Bar Δ <b id="ro-delta">–</b></span>
   <span>Session Δ (sum of bars) <b id="ro-cvd">–</b></span>
-  <span>Bar took <b id="ro-dur">–</b></span>
   <span class="drill-only">Score <b id="ro-score">0/0</b></span>
 </div>
 <div id="emrow"></div>
@@ -464,7 +493,7 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
 · coach: <span id="bridge-dot">—</span>
 · <span id="prod-dots" title="producers: tape · 1 Hz gex · sentinel · footprint feed"></span>
 · <span id="cue-chip" title="Cell cues: cells the stack spoke about flash, then keep an edge mark. Press x or click to toggle.">cues ⚑</span>
-· <span id="sen-strip" title="Sentinel: GexBot level alerts drawn on the ES axis at strike + live basis. Press s or click to toggle.">sent <span class="sen-txt">—</span></span></p>
+· <span id="sen-strip" title="Sentinel: GexBot level alerts drawn on the ES axis at strike + live basis. Press s or click to toggle."><span class="sen-lbl">Sentinel</span><span class="sen-txt">—</span></span></p>
 <div id="help"><div class="card">
   <h2>What am I looking at?</h2>
   <p>This is one full trading day replayed as <b>volume bars</b>: every column is exactly the same number of contracts changing hands (shown in the header), <b>not</b> the same amount of time. When columns arrive fast, the market is busy; when they crawl, it's quiet. Each column's <b>footer</b> carries the bar's real duration as its colored fill height — tall fill = slow bar, short fill = urgent tape. That height is on a <b>fixed absolute scale — full = 120s</b>, the same on every day you drill, so heights are comparable across days and you can learn what a given pace looks like.</p>
@@ -611,8 +640,14 @@ function buildHud() {
     if (cc) row2.appendChild(cc);
     // The sentinel strip: the newest alert as a sentence, and the basis that
     // put its row on the ES axis. Same line — it is the same question. [st-n0qm.9]
+    // The sentinel line: its own row directly above Emitted, not the header
+    // line — the sentence is a level event, read beside the emissions. [st-9olq]
     const ss = document.getElementById("sen-strip");
-    if (ss) row2.appendChild(ss);
+    const emrow = document.getElementById("emrow");
+    if (ss && emrow && emrow.parentNode === hud) {
+      const sr = document.createElement("div"); sr.id = "senrow"; sr.appendChild(ss);
+      hud.insertBefore(sr, emrow);
+    } else if (ss) row2.appendChild(ss);
   }
   makeDraggable(hud, document.getElementById("stage"));
 }
@@ -620,7 +655,7 @@ function makeDraggable(el, bounds) {
   let dx = 0, dy = 0, on = false;
   el.addEventListener("mousedown", e => {
     // Let the controls inside the frame keep working — drag only from chrome.
-    if (e.target.closest("button,select,input,a,#empanel")) return;
+    if (e.target.closest("button,select,input,a,label,#empanel")) return;
     const r = el.getBoundingClientRect(), b = bounds.getBoundingClientRect();
     dx = e.clientX - r.left; dy = e.clientY - r.top;
     on = true; el.classList.add("dragging");
@@ -1322,10 +1357,12 @@ function repaintReadouts() {
       : idx >= f ? `${idx - f + 1}/${rthCount()}` : `pre-open ${idx - f}`;
     $("ro-bar").title = f == null ? "no cash-session bar yet; count is pre-open bars so far"
       : idx >= f ? "bar n of the cash session's N so far (08:30 CT →)" : "bars before the 08:30 CT open (negative = still to come)"; }
-  $("ro-time").textContent = b ? fmtClock(b.t1) + " CT" : "–";
+  // month-day joins the clock (Steve, 2026-08-18: the title line went, the
+  // date moves here; no year). [st-9olq]
+  $("ro-time").textContent = b ? `${b.t1.slice(5, 10)} ${fmtClock(b.t1)} CT` : "–";
   $("ro-price").textContent = b ? fmtPrice(b.c) : "–";
   const set = (id, v) => { const el = $(id); el.textContent = (v >= 0 ? "+" : "") + v; el.className = v >= 0 ? "pos" : "neg"; };
-  if (b) { set("ro-delta", b.d); set("ro-cvd", cvd); $("ro-dur").textContent = b.dur.toFixed(1) + "s"; }
+  if (b) { set("ro-delta", b.d); set("ro-cvd", cvd); const du = $("ro-dur"); if (du) du.textContent = b.dur.toFixed(1) + "s"; }
   const judged = drillLog.filter(e => e.verdict === "correct" || e.verdict === "wrong");
   $("ro-score").textContent = `${judged.filter(e => e.verdict === "correct").length}/${judged.length}`;
   $("seek").value = Math.max(idx, 0);
@@ -1640,7 +1677,7 @@ function renderEmissions() {
   const ev = (b && b.ev) || [];
   const lbl = document.createElement("span");
   lbl.className = "em-lbl";
-  lbl.textContent = "emitted";
+  lbl.textContent = "Emitted";
   row.appendChild(lbl);
   if (!ev.length) {
     const none = document.createElement("span");
@@ -2156,9 +2193,24 @@ let bridgeUp = false, lastCmdId = 0, lastStateSent = 0;
 // lists the days at /days. Absolute against BRIDGE, so it works from the
 // tailscale /footprint mount, from the bare origin, and from a drill opened
 // from disk while the bridge is up. If /days fails the switch stays hidden.
+// Since st-9olq the switch is a Live/Drill radio pair; the day picker shows
+// only while Drill is selected (Steve, 2026-08-18). On a live page Drill
+// reveals the picker and picking a day navigates; on a drill page Live
+// navigates back to today's tape.
 (async function wireModeSwitch() {
-  const box = $("modeswitch"), sel = $("drillday"), live = $("livelink");
+  const box = $("modeswitch"), sel = $("drillday");
+  const rLive = $("mode-live"), rDrill = $("mode-drill");
   if (!box || !sel) return;
+  const showPicker = on => { sel.hidden = !on; };
+  if (rLive && rDrill) {
+    (LIVE ? rLive : rDrill).checked = true;
+    showPicker(!LIVE);
+    rDrill.addEventListener("change", () => { if (rDrill.checked) showPicker(true); });
+    rLive.addEventListener("change", () => {
+      if (!rLive.checked) return;
+      if (LIVE) showPicker(false); else location.href = `${BRIDGE}/`;
+    });
+  }
   try {
     const r = await fetch(`${BRIDGE}/days`);
     const d = await r.json();
@@ -2174,7 +2226,6 @@ let bridgeUp = false, lastCmdId = 0, lastStateSent = 0;
     sel.addEventListener("change", () => {
       if (sel.value) location.href = `${BRIDGE}/drill-${sel.value}.html`;
     });
-    if (live) { live.href = `${BRIDGE}/`; live.hidden = LIVE; }
     box.hidden = false;
   } catch (e) { /* bridge absent: no switch, nothing else lost */ }
 })();
@@ -2392,11 +2443,15 @@ function senColX(i) {
   const w = cols.clientWidth || 0;
   return { x: Math.max(0, w - (idx - i + 1) * COL_W), on: true };
 }
-function senStripText(text, cls) {
+function senStripText(text, cls, tip) {
   const el = $("sen-strip"); if (!el) return;
   const t = el.querySelector(".sen-txt"); if (t) t.textContent = text;
   el.classList.toggle("off", !sentOn);
   if (cls != null) el.dataset.state = cls;
+  // The basis rides in the tooltip, not the line: it places the row on the
+  // ES axis but is not something the operator trades on. [st-9olq]
+  el.title = "Sentinel: GexBot level alerts drawn on the ES axis at strike + live basis. Press s or click to toggle."
+    + (tip ? "\n" + tip : "");
 }
 function toggleSentinel() {
   sentOn = !sentOn;
@@ -2418,7 +2473,7 @@ function drawSentinelRows() {
     senStripText(`${when} ${senSentence(newest)} · no basis yet — rows need bs on a bar`, "nobasis");
     return;
   }
-  senStripText(`${when} ${senSentence(newest)} · basis ${bs.pts >= 0 ? "+" : ""}${bs.pts} (n${bs.n})`, "ok");
+  senStripText(`${when} ${senSentence(newest)}`, "ok", `basis ${bs.pts >= 0 ? "+" : ""}${bs.pts} (n${bs.n})`);
   if (!sentOn || viewHi == null || !stage.clientHeight) return;
   const cols = $("cols"); if (!cols) return;
   const colsRect = cols.offsetLeft || 0;
