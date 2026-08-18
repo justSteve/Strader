@@ -310,6 +310,7 @@ def test_ensure_drill_renders_once_and_rerenders_when_the_tape_grows(monkeypatch
     root = tmp_path / "corpus"
     _corpus_with_days(root, ["2026-08-17"])
     monkeypatch.setattr(db, "CORPUS_ROOT", root)
+    monkeypatch.setattr(db, "DRILL_TEMPLATE", tmp_path / "no-template.html")
     ddir = tmp_path / "drills"
     calls = []
 
@@ -335,6 +336,16 @@ def test_ensure_drill_renders_once_and_rerenders_when_the_tape_grows(monkeypatch
     db.ensure_drill("2026-08-17", drill_dir=ddir, render=fake_render, now=t + 10 + 61)
     assert calls == ["2026-08-17", "2026-08-17"]
     assert "v2" in p.read_text()
+    # the template changed after the cache was built → re-render even though
+    # the tape did not move (a template fix must reach already-rendered days)
+    os.utime(p, (t + 200, t + 200)); os.utime(src, (t + 15, t + 15))
+    tpl = tmp_path / "tpl.html"; tpl.write_text("<html>"); os.utime(tpl, (t + 300, t + 300))
+    monkeypatch.setattr(db, "DRILL_TEMPLATE", tpl)
+    db.ensure_drill("2026-08-17", drill_dir=ddir, render=fake_render, now=t + 210)
+    assert calls == ["2026-08-17"] * 3
+    os.utime(p, (t + 400, t + 400))
+    db.ensure_drill("2026-08-17", drill_dir=ddir, render=fake_render, now=t + 410)
+    assert calls == ["2026-08-17"] * 3
     # no tape for the day → FileNotFoundError; garbage → ValueError
     with pytest.raises(FileNotFoundError):
         db.ensure_drill("2026-08-19", drill_dir=ddir, render=fake_render)

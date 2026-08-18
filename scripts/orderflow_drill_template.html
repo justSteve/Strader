@@ -2399,9 +2399,24 @@ $("emrow").addEventListener("click", () => {
   if (emPinned) openEmPanel(idx); else closeEmPanel();
 });
 
-// boot: show the first bar, paused
+// boot: a drill opens on the first bar at or after the 08:30 CT cash open,
+// paused; live opens empty. [st-v7a0 follow-up, Steve 2026-08-18 02:10 CT]
+// The tape starts at 02:50 CT (st-btu), and overnight volume bars take many
+// minutes each (bar 0 on 2026-08-17: 863 s) — a drill that booted on bar 0
+// looked dead at 1× ("Play" fills one bar over 14 real minutes) and its footer
+// read 03:04, which is not the session anyone drills. The overnight bars are
+// still there: ⟨ Bar and the slider walk back into them.
 $("anat").onclick = () => { const w = $("anatomy"); w.style.display = w.style.display === "flex" ? "none" : "flex"; };
 buildScenarioSelect();
 renderAnatomyList();
-seekTo(0); repaintLog();
+const RTH_OPEN_CT = "08:30:00";
+function firstRthIdx() {
+  const i = bars.findIndex(b => fmtClock(b.t1) >= RTH_OPEN_CT);
+  return i < 0 ? 0 : i;
+}
+const bootIdx = LIVE ? 0 : firstRthIdx();
+seekTo(bootIdx); repaintLog();
+if (!LIVE && bootIdx > 0) {
+  showCaption(`Starting at the ${RTH_OPEN_CT.slice(0, 5)} CT cash open — ${bootIdx} overnight bar${bootIdx === 1 ? "" : "s"} behind you (⟨ Bar or the slider to see them). Play runs at real pace: an overnight bar can take 10+ minutes.`);
+}
 </script></body></html>

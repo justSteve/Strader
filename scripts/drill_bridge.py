@@ -117,6 +117,9 @@ COACH_TYPES = {"say", "arm", "jump", "pause", "play"}
 # DRILL_MIN_RERENDER_S per day.
 DRILL_DIR = Path(os.environ.get("DRILL_BRIDGE_DRILL_DIR", "/var/moo/desk/drills"))
 DRILL_SCRIPT = REPO / "scripts" / "orderflow_drill.py"
+# A cached drill is also stale when the page template it was baked from has
+# changed since — otherwise a template fix reaches new days only.
+DRILL_TEMPLATE = REPO / "scripts" / "orderflow_drill_template.html"
 DRILL_PYTHON = Path(os.environ.get("DRILL_BRIDGE_PYTHON", sys.executable))
 DRILL_MIN_RERENDER_S = 60.0
 DRILL_RENDER_TIMEOUT_S = 120.0
@@ -164,8 +167,10 @@ def ensure_drill(day: str, *, drill_dir: Path | None = None,
     """Return the rendered drill for ``day``, rendering it if absent or stale.
 
     Stale = the ES source is newer than the cached page (the day is still being
-    captured), and the cache is older than DRILL_MIN_RERENDER_S. ``render`` is
-    injectable for tests; the default shells out to orderflow_drill.py.
+    captured) and the cache is older than DRILL_MIN_RERENDER_S — or the page
+    template is newer than the cached page (a template fix must reach every
+    day, not only days not yet rendered). ``render`` is injectable for tests;
+    the default shells out to orderflow_drill.py.
     Raises FileNotFoundError when the day has no ES tape, RuntimeError when the
     renderer fails (its stderr tail is the message).
     """
@@ -178,8 +183,10 @@ def ensure_drill(day: str, *, drill_dir: Path | None = None,
     now = time.time() if now is None else now
     with _drill_lock(day):
         if html.exists():
-            age = now - html.stat().st_mtime
-            if src.stat().st_mtime <= html.stat().st_mtime or age < DRILL_MIN_RERENDER_S:
+            built = html.stat().st_mtime
+            age = now - built
+            template_newer = DRILL_TEMPLATE.exists() and DRILL_TEMPLATE.stat().st_mtime > built
+            if not template_newer and (src.stat().st_mtime <= built or age < DRILL_MIN_RERENDER_S):
                 return html
         html.parent.mkdir(parents=True, exist_ok=True)
         (render or _render_drill)(day, html)
