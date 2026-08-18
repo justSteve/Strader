@@ -520,3 +520,40 @@ def test_bar_payload_omits_bs_when_unknown(tmp_path):
     assert "bs" not in p
     p2 = feed.bar_payload(bars[0], [], bs={"pts": 20.75, "n": 10, "age_s": 0.4})
     assert p2["bs"] == {"pts": 20.75, "n": 10, "age_s": 0.4}
+
+
+def test_announce_day_is_a_meta_only_push_that_resets_the_bridge_day(monkeypatch):
+    """[st-f4at] The feeder announces its day at startup, before any bar.
+    Its push must be meta-only (no bars, no developing) so the bridge's
+    day_reset fires and yesterday's tape stops being served under today's
+    page; a failed push is a warning, never an exception."""
+    import scripts.live_footprint_feed as feed
+    sent = []
+
+    def fake_post(bridge, bars, meta=None, final=None, developing=None, *, profile=None, timeout=5.0):
+        sent.append({"bridge": bridge, "bars": bars, "meta": meta,
+                     "final": final, "developing": developing, "profile": profile})
+        return 0
+    monkeypatch.setattr(feed, "post_bars", fake_post)
+    meta = {"day": "2026-08-18", "bar_n": 2000}
+    assert feed.announce_day("http://b", meta) == 0
+    assert sent == [{"bridge": "http://b", "bars": [], "meta": meta,
+                     "final": None, "developing": None, "profile": None}]
+
+    # bridge unreachable: None, no raise
+    monkeypatch.setattr(feed, "post_bars", lambda *a, **k: None)
+    assert feed.announce_day("http://b", meta) is None
+
+
+def test_bridge_state_accepts_a_meta_only_push_as_a_day_reset(tmp_path):
+    """The contract the announce relies on, from the bridge's side: meta with
+    an empty bars list and a new day drops the old day's developing bar and
+    serves the new day with zero bars."""
+    from scripts.drill_bridge import BridgeState
+    st = BridgeState(tmp_path)
+    st.add_bars([{"o": 1}], {"day": "2026-08-17", "bar_n": 2000},
+                None, {"o": 9, "t0": "2026-08-17T15:04:03"}, None)
+    st.add_bars([], {"day": "2026-08-18", "bar_n": 2000})
+    r = st.bars_since(0)
+    assert r["total"] == 0 and r["meta"]["day"] == "2026-08-18"
+    assert r["developing"] is None

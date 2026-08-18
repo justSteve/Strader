@@ -360,6 +360,24 @@ def post_bars(bridge: str, bars: list[dict], meta: dict | None = None,
         return None
 
 
+def announce_day(bridge: str, meta: dict) -> int | None:
+    """Tell the bridge which day this feeder serves, before any bar exists.
+
+    A meta-only /bars push. On a day change the bridge resets bars, final,
+    developing, profile and alerts (drill_bridge.BridgeState.add_bars); on the
+    same day it is a no-op. Returns the bridge's bar total, or None if the
+    bridge was unreachable — like every push, never fatal.
+    """
+    total = post_bars(bridge, [], meta, None, None)
+    if total is None:
+        logger.warning("day announce to %s failed — bridge will learn the day "
+                       "from the first bar instead", bridge)
+    else:
+        logger.info("day announced to bridge: %s (bridge holds %d bar(s))",
+                    meta.get("day"), total)
+    return total
+
+
 class _NullRunLog:
     """No-op stand-in so the main loop never branches on whether logging is on.
     A branch per bar is a branch that can be wrong; an object that does nothing
@@ -463,6 +481,20 @@ def main() -> int:
             "source": "live", "started": datetime.now().isoformat(timespec="seconds"),
             "mancini": mancini,
             "gex": bool(gex is not None and gexbot_path(day).exists())}
+
+    # ANNOUNCE THE DAY BEFORE THE FIRST BAR [st-f4at, st-h510 follow-up].
+    # meta used to reach the bridge only with the first closed-bar batch. Under
+    # the unit the feeder starts at CT midnight and the first bar of the day
+    # cannot close before capture starts at 02:50 (and takes minutes to fill
+    # after that), so for the first hours of every day the bridge kept serving
+    # YESTERDAY's meta, bars, and a developing bar frozen at 15:04 — and a page
+    # drawn for today read that as STALE FEED and told Steve to restart the
+    # stack (2026-08-18 01:38 CT). A meta-only push is exactly the bridge's
+    # day_reset trigger [st-n0qm.9]: it drops everything the old day owned and
+    # the page sees today's day with zero bars, which is the truth. Same-day
+    # meta (a mid-day restart) resets nothing, so this is safe to send always.
+    if not args.dry_run:
+        announce_day(args.bridge, meta)
 
     # The diffable record of what this run emitted [st-x2mp]. Written for real
     # and catch-up runs alike (the mode is in the header, so the checker can
