@@ -218,7 +218,8 @@ def render_page(profile, va: ValueArea, last: float, bar_count: int,
     column the way it does on a chart. Each row splits buy-aggressor from
     sell-aggressor volume when the source carries it.
 
-    Self-contained: no external assets, desk pages must render with no network.
+    Self-contained: no external assets (one inline script for label thinning
+    and the draggable frame), desk pages must render with no network.
     """
     prices = profile.prices
     buys = getattr(profile, "buy_volumes", None)
@@ -275,45 +276,61 @@ def render_page(profile, va: ValueArea, last: float, bar_count: int,
  @media (prefers-color-scheme: dark) {{ :root {{ --ink:#e8eaed; --dim:#9aa0a6;
           --line:#2c3036; --bg:#15171a; --flat:#4a5568;
           --vaTint:rgba(120,160,220,.10); --poc:#d9992b; --here:#e06c78; }} }}
- body {{ margin:0; padding:22px 26px; background:var(--bg); color:var(--ink);
+ /* The profile IS the page [st-9olq]: it fills the viewport top to bottom and
+    every row takes an equal share of the height, so a 400-row profile fits a
+    900 px window at ~2 px a row instead of scrolling. Everything that used to
+    sit above it lives in a floating frame at the top-left, over the empty
+    left side of the histogram (bars grow leftward from the axis on the
+    right), sized to its own content and draggable — the treatment Steve
+    gave the live footprint page. */
+ html, body {{ height:100%; }}
+ body {{ margin:0; background:var(--bg); color:var(--ink); overflow:hidden;
         font:14px/1.5 ui-sans-serif,-apple-system,Segoe UI,Roboto,sans-serif; }}
- h1 {{ font-size:19px; margin:0 0 2px; }}
- .sub {{ color:var(--dim); font-size:12.5px; margin-bottom:16px; }}
- .stats {{ display:flex; gap:24px; flex-wrap:wrap; margin:0 0 8px;
-           padding:13px 15px; border:1px solid var(--line); border-radius:8px; }}
- .stat b {{ display:block; font:600 19px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; }}
+ .prof {{ position:absolute; inset:0; display:flex; flex-direction:column; padding:4px 0; }}
+ .r {{ flex:1 1 0; min-height:0; display:flex; align-items:stretch; }}
+ .r .bars {{ flex:1; display:flex; justify-content:flex-end; align-items:stretch; min-width:200px; }}
+ .r .bars i {{ display:block; height:100%; }}
+ .r .px {{ width:58px; flex:none; display:flex; align-items:center; justify-content:flex-end;
+           padding-left:8px; color:var(--dim); font:10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+           overflow:visible; white-space:nowrap; }}
+ .r .px.thin {{ visibility:hidden; }}   /* thinned by the script when rows are tight */
+ .r.va {{ background:var(--vaTint); }}
+ .r.poc {{ background:var(--vaTint); box-shadow:inset 0 0 0 1px var(--poc); }}
+ .r.poc .px {{ color:var(--poc); font-weight:700; visibility:visible; }}
+ .r.here .px {{ color:var(--here); font-weight:700; visibility:visible; }}
+ .r.here {{ box-shadow:inset 0 -1px 0 var(--here); }}
+ /* The floating frame. width:max-content, capped — the note and the banner are
+    the only long runs and they wrap at their own max-width, so the frame's
+    width is set by the stats row, not by a sentence. */
+ #hud {{ position:absolute; top:10px; left:10px; z-index:5; width:max-content;
+         max-width:min(420px, calc(100vw - 110px)); padding:8px 12px 9px;
+         border:1px solid var(--line); border-radius:8px;
+         background:color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter:blur(3px);
+         box-shadow:0 2px 10px rgba(0,0,0,.25); cursor:grab; user-select:none; font-size:12px; }}
+ #hud.dragging {{ cursor:grabbing; box-shadow:0 4px 16px rgba(0,0,0,.4); }}
+ h1 {{ font-size:14px; margin:0; }}
+ .sub {{ color:var(--dim); font-size:11px; line-height:1.4; margin:2px 0 0; }}
+ .stats {{ display:flex; gap:12px 16px; flex-wrap:wrap; margin:7px 0 0;
+           padding:7px 9px; border:1px solid var(--line); border-radius:6px; }}
+ .stat b {{ display:block; font:600 15px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; }}
  .stat b.up {{ color:var(--buy); }} .stat b.dn {{ color:var(--sell); }}
- .stat span {{ color:var(--dim); font-size:11.5px; text-transform:uppercase;
-               letter-spacing:.05em; }}
- .legend {{ display:flex; gap:16px; margin:0 0 6px; color:var(--dim); font-size:11.5px; }}
+ .stat span {{ color:var(--dim); font-size:10px; text-transform:uppercase; letter-spacing:.05em; }}
+ .legend {{ display:flex; gap:12px; flex-wrap:wrap; margin:6px 0 0; color:var(--dim); font-size:11px; }}
  .k {{ display:flex; align-items:center; gap:5px; }}
- .k i {{ width:11px; height:11px; border-radius:2px; display:inline-block; }}
+ .k i {{ width:10px; height:10px; border-radius:2px; display:inline-block; }}
  i.buy {{ background:var(--buy); }} i.sell {{ background:var(--sell); }}
  i.flat {{ background:var(--flat); }}
- /* The profile itself: price axis right, bars growing leftward. */
- .prof {{ border-top:1px solid var(--line); border-bottom:1px solid var(--line);
-          padding:6px 0; overflow-x:auto; }}
- .r {{ display:flex; align-items:center; height:4px; }}
- .r .bars {{ flex:1; display:flex; justify-content:flex-end; align-items:center;
-             min-width:200px; }}
- .r .bars i {{ display:block; height:4px; }}
- .r .px {{ width:58px; flex:none; text-align:right; padding-left:8px; color:var(--dim);
-           font:10px/4px ui-monospace,SFMono-Regular,Menlo,monospace; }}
- .r.va {{ background:var(--vaTint); }}
- .r.poc {{ background:var(--vaTint); }}
- .r.poc .bars i {{ height:5px; }}
- .r.poc .px {{ color:var(--poc); font-weight:700; }}
- .r.here .px {{ color:var(--here); font-weight:700; }}
- .r.here {{ box-shadow:inset 0 -1px 0 var(--here); }}
- .note {{ margin-top:16px; color:var(--dim); font-size:12px; max-width:820px; }}
- .banner {{ margin:0 0 16px; padding:11px 14px; max-width:820px; border-radius:8px;
-            background:#fff4e5; border:1px solid #f0c987; color:#7a4b06; font-size:12.5px; }}
+ .note {{ margin:6px 0 0; color:var(--dim); font-size:11px; line-height:1.4; max-width:380px; }}
+ .banner {{ margin:6px 0 0; padding:6px 9px; max-width:380px; border-radius:6px; line-height:1.4;
+            background:#fff4e5; border:1px solid #f0c987; color:#7a4b06; font-size:11px; }}
  @media (prefers-color-scheme: dark) {{ .banner {{ background:#3a2c12;
             border-color:#7a5a1e; color:#f0d9a8; }} }}
 </style>
+<div class="prof" id="prof" data-bucket="{profile.bucket_pts:g}">{"".join(rows)}</div>
+<div id="hud">
 <h1>Premarket Volume Profile — {SYMBOL}</h1>
 <div class="sub">
-  Anchored {anchor_ct:%A %b %-d, 08:30 CT} (prior RTH open) → {end_ct:%a %H:%M CT} ·
+  Anchored {anchor_ct:%A %b %-d, 08:30 CT} (prior RTH open) → {end_ct:%a %H:%M CT}<br>
   {bar_count:,} {"prints" if source == "ticks" else "bars"} ·
   {profile.total:,} contracts · {profile.bucket_pts:g}-pt buckets ·
   generated {generated_ct:%Y-%m-%d %H:%M CT}
@@ -330,11 +347,48 @@ def render_page(profile, va: ValueArea, last: float, bar_count: int,
   {delta_stat}
 </div>
 <div class="legend">{legend}<span class="k">hover a row for exact volumes</span></div>
-<div class="prof">{"".join(rows)}</div>
 <p class="note">
   Price is <b>{html.escape(pos)}</b>. Value area holds {va.achieved:.0%} of volume
   ({va.volume:,} of {va.total:,} contracts). {SOURCES[source][1]}
 </p>
+</div>
+<script>
+// Inline, no external assets (desk pages render with no network).
+(function () {{
+  var prof = document.getElementById("prof"), hud = document.getElementById("hud");
+  // Price labels: the HTML labels whole points; when rows are tighter than
+  // the type (a full-height profile at ~2 px a row), keep only every 2, 5,
+  // 10, 25 … points so labels never overprint. POC and Last always show.
+  function thin() {{
+    var rows = prof.querySelectorAll(".r"); if (!rows.length) return;
+    var rowH = prof.clientHeight / rows.length, bucket = +prof.dataset.bucket || 0.25;
+    var steps = [1, 2, 5, 10, 25, 50, 100], step = steps[steps.length - 1];
+    for (var i = 0; i < steps.length; i++) {{ if (steps[i] / bucket * rowH >= 12) {{ step = steps[i]; break; }} }}
+    rows.forEach(function (r) {{
+      var px = r.querySelector(".px"); if (!px || !px.textContent) return;
+      var p = parseFloat(px.textContent);
+      px.classList.toggle("thin", Math.abs(p / step - Math.round(p / step)) > 1e-9);
+    }});
+  }}
+  thin(); window.addEventListener("resize", thin);
+  // Drag the frame anywhere inside the page; clamped so it cannot be lost.
+  var dx = 0, dy = 0, on = false;
+  hud.addEventListener("mousedown", function (e) {{
+    if (e.target.closest("a,button,select,input")) return;
+    var r = hud.getBoundingClientRect(); dx = e.clientX - r.left; dy = e.clientY - r.top;
+    on = true; hud.classList.add("dragging"); e.preventDefault();
+    function move(ev) {{
+      if (!on) return;
+      var x = Math.min(Math.max(ev.clientX - dx, 0), Math.max(0, window.innerWidth - hud.offsetWidth));
+      var y = Math.min(Math.max(ev.clientY - dy, 0), Math.max(0, window.innerHeight - hud.offsetHeight));
+      hud.style.left = x + "px"; hud.style.top = y + "px";
+    }}
+    function up() {{ on = false; hud.classList.remove("dragging");
+      window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); }}
+    window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
+  }});
+}})();
+</script>
 """
 
 def publish(page_html: str, dry_run: bool = False) -> None:

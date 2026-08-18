@@ -103,7 +103,7 @@ class TestSplitProfile:
 class TestRender:
     def test_page_is_self_contained_no_external_assets(self, tick_page):
         page, _, _ = tick_page
-        for bad in ("http://", "https://", "<script"):
+        for bad in ("http://", "https://", "<script src", "<link "):
             assert bad not in page
 
     def test_header_states_anchor_and_generation_time(self, tick_page):
