@@ -230,15 +230,28 @@ td:first-child, th:first-child { text-align:left; }
 #vp { position:absolute; left:0; top:0; bottom:0; width:0; overflow:hidden; display:none;
   border-right:1px solid var(--grid); background:var(--surface-1); }
 body.vp-on #vp { display:block; }
-#vp .vphdr { position:absolute; left:4px; right:4px; top:2px; font-size:9px; line-height:1.2; color:var(--muted);
+/* Panel captions sit at the BOTTOM: the floating frame's home is the top-left
+   corner, where it covered the header line since the panel was built. [st-9olq] */
+#vp .vphdr { position:absolute; left:4px; right:4px; bottom:35px; font-size:9px; line-height:1.2; color:var(--muted);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; z-index:2; pointer-events:none; }
+/* Second header line: the POC and value area by price, with ↑/↓ when the
+   POC sits outside the window — otherwise a panel showing only the tail
+   carries no sign that a POC exists at all. [st-9olq] */
+#vp .vppoc, #vp .vpva { position:absolute; left:4px; right:4px; font-size:9px; line-height:1.2; color:var(--ink-2);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; z-index:2; pointer-events:none; }
+#vp .vppoc { bottom:24px; }
+#vp .vpva { bottom:13px; }
 #vp .vprow { position:absolute; left:2px; right:2px; display:flex; align-items:stretch; }
 #vp .vprow .seg { height:100%; }
 #vp .vprow .ss { background:var(--sell); opacity:.45; }
 #vp .vprow .st { background:var(--sell); }
 #vp .vprow .bs { background:var(--buy); opacity:.45; }
 #vp .vprow .bt { background:var(--buy); }
-#vp .vprow.va { background:color-mix(in srgb, var(--mid) 70%, transparent); }
+/* Value area: a band the eye can find. Was --mid at 70%, which on the light
+   surface (#f0efec on #fcfcfb) was invisible — Steve, 2026-08-18, saw the
+   H/L letters and asked where the POC was; the band would have said "above".
+   ink-2 at 12% reads on both themes. [st-9olq] */
+#vp .vprow.va { background:color-mix(in srgb, var(--ink-2) 12%, transparent); }
 #vp .vprow.poc { outline:2px solid var(--ink-2); outline-offset:-2px; }
 /* Node letters in a gutter at the row's right edge — P (point of control),
    H (high-volume node), L (low-volume node). Were 5×2 / 3×2 px dashes; Steve,
@@ -972,12 +985,27 @@ function renderProfile() {
   }
   const hdr = document.createElement("div");
   hdr.className = "vphdr";
-  const anchorTxt = P.anchor === "prior-rth" ? `${fmtDow(P.anchor_ts)} 08:30 CT` : P.anchor === "prior-globex" ? `${fmtDow(P.anchor_ts)} 17:00 CT` : (P.anchor || "?");
-  hdr.textContent = `VP · anchor ${anchorTxt} · ${fmtK(P.n)} ${P.unit || "prints"}`;
+  const anchorTxt = P.anchor === "prior-rth" ? `${fmtDow(P.anchor_ts)} 08:30` : P.anchor === "prior-globex" ? `${fmtDow(P.anchor_ts)} 17:00` : (P.anchor || "?");
+  // Short: the panel is 142 px at 9 px type — the long form (anchor, CT,
+  // unit) is the tooltip. [st-9olq]
+  hdr.textContent = `VP · ${anchorTxt} · ${fmtK(P.n)}`;
   hdr.title = `anchored aggressor volume profile — anchor ${P.anchor_ts}, ${P.n} prints from ${P.first_ts} to ${P.last_ts}`
     + (P.va ? `\nPOC ${fmtPrice(P.va.poc)} · VAH ${fmtPrice(P.va.vah)} · VAL ${fmtPrice(P.va.val)}` : "")
     + `\nsell-aggressor from the left (red), buy-aggressor stacked (blue); faint = before today's 08:30 CT open (prior session + overnight), solid = today's cash session\nv toggles this panel`;
   vp.appendChild(hdr);
+  if (P.va && poc != null) {
+    const where = poc > viewHi ? " ↑" : poc < viewLo ? " ↓" : "";
+    const pl = document.createElement("div");
+    pl.className = "vppoc";
+    pl.textContent = `POC ${fmtPrice(poc)}${where}`;
+    pl.title = where ? `the point of control is ${where.trim() === "↑" ? "above" : "below"} the price window` : "point of control is in view (P, outlined)";
+    vp.appendChild(pl);
+    const vl = document.createElement("div");
+    vl.className = "vpva";
+    vl.textContent = `VA ${fmtPrice(val)}–${fmtPrice(vah)}`;
+    vl.title = "value area (70% of the profile's volume around the POC) — the shaded rows";
+    vp.appendChild(vl);
+  }
   if (P.hole && P.hole.length) {
     const h = document.createElement("div");
     h.className = "vphole";

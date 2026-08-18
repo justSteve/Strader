@@ -138,7 +138,8 @@ function aligned() {
   const hole = d.querySelector("#vp .vphole");
   ok("hole banner is drawn from the payload", hole && /hole 15:05→02:50 CT/.test(hole.textContent), hole && hole.textContent);
   const hdr = d.querySelector("#vp .vphdr");
-  ok("header names the anchor and print count", hdr && /anchor Thu 08:30 CT/.test(hdr.textContent) && /5\.0k prints/.test(hdr.textContent), hdr && hdr.textContent);
+  // Short caption since st-9olq (142 px panel, 9 px type): "VP · Thu 08:30 · 5.0k"; the long form is its title.
+  ok("header names the anchor and print count", hdr && /Thu 08:30/.test(hdr.textContent) && /5\.0k/.test(hdr.textContent) && /anchor .*5000 prints/.test(hdr.title || ""), hdr && hdr.textContent);
 
   // 6. toggle
   d.dispatchEvent(new w.KeyboardEvent("keydown", { code: "KeyV", bubbles: true }));
@@ -149,7 +150,7 @@ function aligned() {
   // 7. growth without a bar
   profileN = 7000;
   await sleep(POLL());
-  ok("a grown profile redraws without a new bar", /7\.0k prints/.test(d.querySelector("#vp .vphdr").textContent), d.querySelector("#vp .vphdr").textContent);
+  ok("a grown profile redraws without a new bar", /7\.0k/.test(d.querySelector("#vp .vphdr").textContent), d.querySelector("#vp .vphdr").textContent);
 
   if (errors.length) { console.error(`\nFAIL — ${errors.length}:`); errors.forEach(e => console.error("  " + e)); process.exit(1); }
   console.log("\nall checks clean");
