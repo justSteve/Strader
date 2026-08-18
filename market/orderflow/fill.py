@@ -13,7 +13,11 @@ are real tape slices, not interpolation.
 from __future__ import annotations
 
 #: Progressive-build chunks per bar (st-9lh) — real tape slices, not animation.
-FILL_STEPS = 8
+#: 8 → 16 on 2026-08-18 [st-9olq]: at 8 a slow RTH bar drilled at 2× repainted
+#: every 8-13 s (08-12 drill: p90 7.9 s, max 13.3 s) and read as a stall; Steve:
+#: "smoother is better". Doubling halves every gap; a drill page grows ~40%
+#: (08-12: 626 KB → ~870 KB), all of it tape, all of it local.
+FILL_STEPS = 16
 
 
 def bar_fill_steps(trades, bars, n_steps: int = FILL_STEPS) -> list[list]:

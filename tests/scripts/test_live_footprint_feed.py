@@ -220,7 +220,7 @@ def test_bar_payload_shape_matches_the_drill_column(tmp_path):
         "t0", "t1", "o", "h", "l", "c", "v", "d", "nv", "dur", "poc",
         "cells", "steps", "ev",
     }
-    assert len(live[0]["steps"]) == 8          # FILL_STEPS
+    assert len(live[0]["steps"]) == 16         # FILL_STEPS [st-9olq]
     assert all(len(c) == 3 for c in live[0]["cells"])
     assert isinstance(live[0]["ev"], list)
 
