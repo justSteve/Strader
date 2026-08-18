@@ -91,11 +91,16 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 
     cd "$STRADER_REPO" || { log "FATAL: repo dir missing: $STRADER_REPO"; exit 2; }
 
-    # --prepare-only [st-lw58, ruled 2026-08-06]: this job no longer publishes.
+    # --prepare-only [st-lw58, ruled 2026-08-06]: this job never parses.
     # It fetches, cleans, scrapes the deterministic lists, then alerts "ready
     # to parse" — Steve triggers every real parse in-session (/mancini-parse).
-    # When an in-session parse already exists it reloads the richer payload
-    # into the clipboard, which is this job's whole value in the good case.
+    # When an in-session parse already exists it (a) reloads the richer payload
+    # into the clipboard and (b) re-renders the SAME plan doc with the level-
+    # interaction window brought from the letter's write-time to now
+    # [st-vxbw, Steve 2026-08-18] — the parse may have run at 01:28 CT, and
+    # its section covered a slice of the overnight. Levels are never touched;
+    # no browser window from cron. Manual, with a browser window:
+    #   PYTHONPATH=. .venv/bin/python -m runbook.mancini.refresh --open
     PYTHONPATH="$STRADER_REPO" "$PY" -m runbook.mancini.run --from-blob --prepare-only $CLIP_ARG "$@"
     rc=$?
     log "=== mancini-preopen end $(date +%Y-%m-%dT%H:%M:%S%z) (rc=$rc) ==="

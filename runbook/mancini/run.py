@@ -171,6 +171,20 @@ def _prepare_only(args, day: str, det_levels: list) -> int:
             except Exception as e:  # noqa: BLE001
                 logger.warning("payload reload failed (non-fatal): %s", e)
                 msg += f" clipboard: RELOAD FAILED ({e})"
+        # Overnight refresh [st-vxbw]: the parse that exists ran whenever Steve
+        # ran it — 01:28 CT today — so its interaction section covers a slice
+        # of the overnight. Re-render the SAME plan doc from the full
+        # letter-time → now window. Levels untouched; no browser window from
+        # cron (the parked tab refreshes in place). Non-fatal.
+        if not args.no_desk:
+            try:
+                from . import refresh as refresh_mod
+
+                outcome = refresh_mod.refresh(day, open_browser=False, quiet=True)
+                msg += " " + outcome.summary
+            except Exception as e:  # noqa: BLE001
+                logger.warning("overnight refresh failed (non-fatal): %s", e)
+                msg += f" overnight refresh: FAILED ({e})"
         print(msg)
         return 0
 
@@ -242,7 +256,8 @@ def _render_brief(result: ParseResult) -> str:
 
 
 def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = None,
-                      overnight_section: str | None = None) -> str:
+                      overnight_section: str | None = None,
+                      header_note: str | None = None) -> str:
     """The prose plan-day doc for the steves-desk Trading window. [st-eo0]
 
     Same content contract as the hand-written myDesk/reports/mancini docs:
@@ -270,7 +285,8 @@ def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = No
         "",
         f"> {len(result.levels)} levels · {len(result.commentary)} forward notes · "
         f"model `{result.model}` · parsed {result.parsed_at[:16]}Z · "
-        "prices verbatim from the letter.",
+        "prices verbatim from the letter."
+        + (f" {header_note}" if header_note else ""),
         "",
         "## Bias",
         "",
@@ -375,11 +391,14 @@ def _render_desk_html(doc: Path) -> Path | None:
 
 
 def _emit_desk_plan(result: ParseResult, extra_sections: list[str] | None = None,
-                    overnight_section: str | None = None) -> Path | None:
+                    overnight_section: str | None = None,
+                    header_note: str | None = None) -> Path | None:
     """Write the plan-day doc and refresh the Trading window's stable title.
 
     Non-fatal by contract (mirrors the chart emit): the parse artifacts are the
-    critical output; a desk failure logs and moves on."""
+    critical output; a desk failure logs and moves on. Also the re-render path
+    of the overnight refresh [st-vxbw] — same doc, same title, same html; only
+    the interaction section and ``header_note`` differ."""
     import subprocess
 
     desk_root = DESK_REPORTS.parent.parent  # COO/myDesk — absent => no desk here
@@ -388,7 +407,8 @@ def _emit_desk_plan(result: ParseResult, extra_sections: list[str] | None = None
         return None
     DESK_REPORTS.mkdir(parents=True, exist_ok=True)
     doc = DESK_REPORTS / f"mancini-es-{result.date}.md"
-    doc.write_text(_render_desk_plan(result, extra_sections, overnight_section),
+    doc.write_text(_render_desk_plan(result, extra_sections, overnight_section,
+                                     header_note),
                    encoding="utf-8")
     logger.info("desk plan doc: %s", doc)
     if DESK_REFRESH.exists():

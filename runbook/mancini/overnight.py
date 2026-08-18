@@ -191,9 +191,16 @@ def compute_interactions(levels: Sequence[Level], candles: Sequence[dict],
 _SIGNIFICANCE = {"reclaimed": 0, "broken": 1, "tested-held": 2, "untouched": 3}
 
 
-def render_section(report: OvernightReport) -> str:
-    """The '## Overnight interaction' markdown block for the desk plan doc."""
-    lines = ["## Overnight interaction — what has already happened to these levels", ""]
+DEFAULT_SECTION_TITLE = "Overnight interaction — what has already happened to these levels"
+
+
+def render_section(report: OvernightReport, title: str | None = None) -> str:
+    """The '## Overnight interaction' markdown block for the desk plan doc.
+
+    ``title`` overrides the heading text (no leading ``## ``) — the 08:15 /
+    manual refresh [st-vxbw] re-renders this block intraday, when "overnight"
+    is no longer the honest word for the window."""
+    lines = [f"## {title or DEFAULT_SECTION_TITLE}", ""]
     if report.error:
         lines.append(f"_Overnight data unavailable ({report.error}) — "
                      "section skipped. The chart's state markers still track "
@@ -243,10 +250,14 @@ def render_section(report: OvernightReport) -> str:
     return "\n".join(lines)
 
 
-def build_overnight_section(result: ParseResult,
-                            fetch: Callable[..., list[dict]] | None = None,
-                            tolerance: float = DEFAULT_TOLERANCE_PTS) -> str:
-    """Orchestrate fetch → compute → render. Never raises."""
+def build_overnight_report(result: ParseResult,
+                           fetch: Callable[..., list[dict]] | None = None,
+                           tolerance: float = DEFAULT_TOLERANCE_PTS) -> OvernightReport:
+    """Fetch → compute, as data. Never raises — errors land in ``report.error``.
+
+    Split out of ``build_overnight_section`` for the refresh path [st-vxbw],
+    which wants the counts (broken / reclaimed / held) for its terminal summary
+    as well as the rendered block."""
     report = OvernightReport()
     try:
         start = letter_window_start(result.date)
@@ -260,4 +271,12 @@ def build_overnight_section(result: ParseResult,
     except Exception as e:  # noqa: BLE001 — degradation contract
         logger.warning("overnight brief unavailable: %s", e)
         report.error = str(e)
-    return render_section(report)
+    return report
+
+
+def build_overnight_section(result: ParseResult,
+                            fetch: Callable[..., list[dict]] | None = None,
+                            tolerance: float = DEFAULT_TOLERANCE_PTS,
+                            title: str | None = None) -> str:
+    """Orchestrate fetch → compute → render. Never raises."""
+    return render_section(build_overnight_report(result, fetch, tolerance), title)
