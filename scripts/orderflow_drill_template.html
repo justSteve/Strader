@@ -240,9 +240,16 @@ body.vp-on #vp { display:block; }
 #vp .vprow .bt { background:var(--buy); }
 #vp .vprow.va { background:color-mix(in srgb, var(--mid) 70%, transparent); }
 #vp .vprow.poc { outline:2px solid var(--ink-2); outline-offset:-2px; }
-#vp .vprow.hvn::after, #vp .vprow.lvn::after { content:""; position:absolute; right:0; top:50%;
-  width:5px; height:2px; transform:translateY(-50%); background:var(--ink-2); }
-#vp .vprow.lvn::after { background:var(--muted); width:3px; }
+/* Node letters in a gutter at the row's right edge — P (point of control),
+   H (high-volume node), L (low-volume node). Were 5×2 / 3×2 px dashes; Steve,
+   2026-08-18: "replace the graphics with initials … it shouldn't take much
+   more room to have a letter instead of dots/dashes". Absolutely positioned,
+   so the pseudo-element is not a flex item of the row. [st-9olq] */
+#vp .vprow.hvn::after, #vp .vprow.lvn::after, #vp .vprow.poc::after { position:absolute; right:1px; top:50%;
+  transform:translateY(-50%); font-size:9px; line-height:1; font-weight:600; color:var(--ink-2); pointer-events:none; }
+#vp .vprow.hvn::after { content:"H"; }
+#vp .vprow.lvn::after { content:"L"; color:var(--muted); font-weight:400; }
+#vp .vprow.poc::after { content:"P"; color:var(--ink); }
 #vp .vphole { position:absolute; left:4px; right:4px; bottom:2px; font-size:9px; color:var(--cue);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 /* Producer health dots [st-n0qm.3]: one per health file the bridge reads —
@@ -902,7 +909,7 @@ for (let i = 0; i < bars.length; i++) indexCues(i, false);
 // construction) and posts it on the bridge's `profile` slot; this draws it as a
 // panel of price rows to the LEFT of the columns, on the cells' own yFor. Key
 // `v` toggles it. Nothing here in replay — the drill payload carries no profile.
-const VP_W = 132;                                  // panel width, px
+const VP_W = 142;                                  // panel width, px (+10 for the P/H/L gutter, st-9olq)
 let PROFILE = null;                                // last payload from the bridge
 let vpOn = localStorage.getItem("oflow-vp-on") !== "0";   // live and drill [st-fgno]
 const fmtK = n => n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e5 ? 0 : 1) + "k" : String(n);
@@ -935,7 +942,7 @@ function renderProfile() {
     vmax = Math.max(vmax, buy + sell);
     rows.push([i, price, y, buy, sell]);
   }
-  const usable = VP_W - 10;
+  const usable = VP_W - 20;                        // bars stop short of the letter gutter
   const poc = P.va && P.va.poc, vah = P.va && P.va.vah, val = P.va && P.va.val;
   const hvn = new Set((P.hvn || []).map(p => Math.round(p / bucket)));
   const lvn = new Set((P.lvn || []).map(p => Math.round(p / bucket)));
