@@ -149,3 +149,29 @@ def test_recognizer_reports_idle_only_when_the_anchor_is_free():
     del rec._active[id(a)]
     rec._blocked[id(a)] = -1
     assert not rec.is_idle(a)
+
+
+def test_live_anchors_ignore_bars_that_start_before_the_session_open():
+    """[st-fgno] The tape starts at 02:50 CT; the day's range edges must not.
+    Bars starting before ``session_open`` neither seed nor extend; the first
+    bar at/after it seeds, later ones extend as before."""
+    from datetime import datetime, timezone
+    from market.orderflow.anchors import LiveAnchors
+
+    class _TBar:
+        def __init__(self, high, low, start_ts):
+            self.high, self.low, self.start_ts = high, low, start_ts
+
+    open_utc = datetime(2026, 8, 18, 13, 30, tzinfo=timezone.utc)   # 08:30 CT
+    la = LiveAnchors([6212.0], session_open=open_utc)
+    la.observe(_TBar(6300.0, 6100.0, datetime(2026, 8, 18, 8, 0, tzinfo=timezone.utc)))   # 03:00 CT
+    assert (la.high.price, la.low.price) == (0.0, 0.0)          # still placeholders
+    la.observe(_TBar(6220.0, 6210.0, open_utc))                  # 08:30:00 CT seeds
+    assert (la.high.price, la.low.price) == (6220.0, 6210.0)
+    la.observe(_TBar(6231.0, 6215.0, datetime(2026, 8, 18, 14, 0, tzinfo=timezone.utc)))
+    assert (la.high.price, la.low.price) == (6231.0, 6210.0)
+    # a bar without start_ts (legacy fixture) is not filtered
+    class _Bar:
+        def __init__(self, high, low): self.high, self.low = high, low
+    la.observe(_Bar(6240.0, 6200.0))
+    assert (la.high.price, la.low.price) == (6240.0, 6200.0)

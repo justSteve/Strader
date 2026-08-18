@@ -312,6 +312,23 @@ class BridgeState:
                                   "dropped_alerts": len(self._alerts)})
                     self._bars, self._final, self._alerts = [], [], []
                     self._developing = self._profile = None
+                elif (old_day and new_day == old_day and self._bar_meta.get("started")
+                      and meta.get("started") and meta["started"] != self._bar_meta["started"]
+                      and self._bars):
+                    # Same day, NEW feeder run [st-fgno]: the feeder posts meta
+                    # only on its first push, and on a restart it re-reads the
+                    # day's file from the top and re-posts every bar from index
+                    # 0. Appending those onto the bars already held doubled the
+                    # tape. A different `started` on the same day is that
+                    # re-run: drop the bars (and what rides on them) and let
+                    # the re-post rebuild them; alerts are the sentinel's, and
+                    # the profile is re-pushed with the next tick — both stay.
+                    self._append({"channel": "bars", "kind": "rerun_reset",
+                                  "day": new_day, "from_started": self._bar_meta["started"],
+                                  "to_started": meta["started"],
+                                  "dropped_bars": len(self._bars)})
+                    self._bars, self._final = [], []
+                    self._developing = None
                 self._bar_meta = meta
             if final:
                 self._final = final

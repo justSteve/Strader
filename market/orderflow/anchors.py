@@ -139,7 +139,15 @@ class LiveAnchors:
     freely — there is no state to protect.
     """
 
-    def __init__(self, mancini_levels: list[float]):
+    def __init__(self, mancini_levels: list[float], session_open=None):
+        """``session_open`` (tz-aware datetime, optional): bars that START
+        before it do not seed or extend the range edges [st-fgno]. The tape
+        starts at 02:50 CT (st-btu) and without this the "day high/low" the
+        recognizer judges against were the overnight range from the first
+        bar of the tape. Steve, 2026-08-18: session means the cash session.
+        None keeps the seed-from-first-bar behaviour (tests, replays of a
+        tape that is itself RTH-only)."""
+        self.session_open = session_open
         self.mancini = sorted(float(x) for x in mancini_levels)
         # Placeholder edges; the first bar seeds them before anything is judged.
         self.anchors = day_anchors(self.mancini, 0.0, 0.0)
@@ -179,8 +187,14 @@ class LiveAnchors:
         """Extend the developing range edges from a completed bar.
 
         Call BEFORE handing the bar to the recognizer, so the bar is judged
-        against the session it belongs to.
+        against the session it belongs to. A bar that starts before
+        ``session_open`` is pre-open tape: it is judged (against the Mancini
+        levels and the placeholder edges) but never becomes the day's range.
         """
+        if self.session_open is not None:
+            start = getattr(bar, "start_ts", None)
+            if start is not None and start < self.session_open:
+                return
         if not self._seeded:
             self._move(self._hi, bar.high)
             self._move(self._lo, bar.low)

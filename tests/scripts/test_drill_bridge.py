@@ -398,3 +398,26 @@ def test_drill_routes_serve_days_drill_and_candles_under_the_prefix(monkeypatch,
         assert code == 400
     finally:
         stop()
+
+
+def test_a_feeder_rerun_on_the_same_day_replaces_the_bars_instead_of_doubling_them(state):
+    """[st-fgno] A restarted feeder re-posts the day from index 0 with a meta
+    whose `started` differs. That must replace the held bars, not append to
+    them; alerts and the profile survive (they are not the feeder's to drop).
+    A same-day meta with the SAME started (or none) still resets nothing."""
+    m1 = {"day": "2026-08-18", "bar_n": 2000, "started": "2026-08-18T00:00:10"}
+    state.add_bars([{"o": 1}, {"o": 2}, {"o": 3}], m1, None, None, {"v": 1, "n": 9})
+    state.add_alert({"kind": "approach", "strike": 7805})
+    state.add_bars([{"o": 4}], m1)                       # same run, meta re-sent
+    assert state.bars_since(0)["total"] == 4
+    m2 = {"day": "2026-08-18", "bar_n": 2000, "started": "2026-08-18T09:15:02"}
+    state.add_bars([{"o": 1}, {"o": 2}], m2)             # new run re-posting from 0
+    r = state.bars_since(0)
+    assert r["total"] == 2 and [b["o"] for b in r["bars"]] == [1, 2]
+    assert r["profile"] == {"v": 1, "n": 9}
+    assert state.alerts_since(0)["total"] == 1
+    assert any('"kind":"rerun_reset"' in l and '"dropped_bars":4' in l
+               for l in state.log_path.read_text().splitlines())
+    # meta without `started` on either side: legacy shape, no reset
+    state.add_bars([{"o": 9}], {"day": "2026-08-18", "bar_n": 2000})
+    assert state.bars_since(0)["total"] == 3

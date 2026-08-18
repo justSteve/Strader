@@ -462,7 +462,11 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001 — no anchors must not stop the chart
             logger.warning("no Mancini levels for %s (%s) — range edges only", day, e)
             mancini = []
-    live_anchors = LiveAnchors(mancini)
+    # The day's range edges start at the cash open, not the tape start
+    # [st-fgno]: bars before 08:30 CT are judged but never become "day high" /
+    # "day low". Steve, 2026-08-18: session means the cash session.
+    session_open_utc = anchor_utc(day, RTH_OPEN_CT)
+    live_anchors = LiveAnchors(mancini, session_open=session_open_utc)
     driver = StackDriver(anchors=live_anchors.anchors, mancini_prices=mancini)
     live_anchors.attach(driver.recognizer)
 
@@ -527,14 +531,18 @@ def main() -> int:
             for t in iter_trades(prior_trading_day(day), start_ts=vp_anchor_ts):
                 vp.add(t)
                 n_seed += 1
-            vp.mark_seeded()
             logger.info("profile pre-seeded from %s: %d prints since %s (%s)",
                         prior_trading_day(day), n_seed, vp_anchor_ts.isoformat(), vp_label)
         except FileNotFoundError:
-            vp.mark_seeded()
             logger.warning("profile: no corpus file for %s — prior-day layer empty; "
                            "today's prints still accrete from the anchor rule",
                            prior_trading_day(day))
+        # The faint/solid boundary is TODAY'S 08:30 CT OPEN, not the end of the
+        # seed [st-fgno]: everything before it — prior session AND this
+        # morning's overnight tape from 02:50 — is the faint layer, and "solid"
+        # is the cash session only. mark_seeded() fires in the tee on the first
+        # trade at/after the open (below); if the tape somehow starts after the
+        # open it fires on the first trade.
         post_bars(args.bridge, [], None, None, None,
                   profile=profile_payload(vp, anchor=vp_label, anchor_ts=vp_anchor_ts,
                                           session_day=day.isoformat()))
@@ -542,8 +550,16 @@ def main() -> int:
     def _vp_payload():
         if vp is None:
             return None
-        return profile_payload(vp, anchor=vp_label, anchor_ts=vp_anchor_ts,
-                               session_day=day.isoformat())
+        out = profile_payload(vp, anchor=vp_label, anchor_ts=vp_anchor_ts,
+                              session_day=day.isoformat())
+        # Before today's 08:30 open nothing has been marked seeded yet, and
+        # everything held — prior session AND this morning's overnight — IS the
+        # faint layer. Say so, or the page draws the whole overnight solid as
+        # if it were the cash session. [st-fgno]
+        if out.get("n") and "seeded" not in out:
+            out["seeded"] = {"n": out["n"], "through_ts": out.get("last_ts"),
+                             "buy": list(out["buy"]), "sell": list(out["sell"])}
+        return out
 
     # Pin only when following TODAY. An explicit --date is a deliberate replay
     # of a past day and must not trip the rollover guard. [st-h510]
@@ -589,7 +605,17 @@ def main() -> int:
         def _pulse() -> None:
             while True:
                 time.sleep(30)
-                _beat(state="following" if feed_health["sent"] or feed_health["developing_t"] else "waiting")
+                waiting = not (feed_health["sent"] or feed_health["developing_t"])
+                _beat(state="waiting" if waiting else "following")
+                if waiting:
+                    # While no tick has arrived, nothing else re-posts the day
+                    # or the profile — so a bridge restart in the pre-tape hours
+                    # left the page with no day and no profile until 02:50
+                    # (2026-08-18 01:57-02:50 CT: the profile Steve had seen at
+                    # 01:40 was gone). Re-announce every pulse; the bridge
+                    # treats same-day meta from the same run as a no-op and the
+                    # profile slot is replace-not-append. [st-fgno]
+                    post_bars(args.bridge, [], meta, None, None, profile=_vp_payload())
         threading.Thread(target=_pulse, name="feed-health", daemon=True).start()
         _beat(state="waiting")
 
@@ -598,6 +624,8 @@ def main() -> int:
         for t in it:
             pending_trades.append(t)
             if vp is not None:
+                if vp.seeded is None and t.ts >= session_open_utc:
+                    vp.mark_seeded()      # faint = before today's open; solid = RTH [st-fgno]
                 vp.add(t)   # the profile sees exactly what build_bars sees, before it does
             if dev_on:
                 now = time.monotonic()
@@ -628,9 +656,17 @@ def main() -> int:
                   final=len(final or ()) or feed_health["final"])
 
     _install_stop_handler()
+    # push_every_n=1: a closed bar is posted the moment it closes. The batch
+    # coalescing (25 bars / 1 s) was written against "hundreds of round trips"
+    # for a catch-up burst — but the bridge is 127.0.0.1 and a post is
+    # sub-millisecond, while the coalescing condition is only re-checked when
+    # the NEXT bar closes. So after a mid-day restart the tail of the catch-up
+    # burst sat unposted until the next bar closed — 50 s on 2026-08-18 03:12
+    # CT (six bars held; overnight bars close ten minutes apart), and any
+    # burst's last bars always lagged one bar. [st-fgno]
     drive_and_publish(live_drive(_closed_bars(), driver, live_anchors),
                       driver, pending_trades, runlog, _publish, meta=meta, gex=gex,
-                      basis=basis)
+                      basis=basis, push_every_n=1)
     return 0
 
 

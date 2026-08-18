@@ -25,7 +25,7 @@ import json
 import logging
 import subprocess
 import sys
-from datetime import date as _date
+from datetime import date as _date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -37,6 +37,9 @@ from market.orderflow.recognizer import SetupRecognizer  # noqa: E402
 from market.orderflow.anatomy import anatomy_payload, build_instances  # noqa: E402
 from market.orderflow.anchors import day_anchors, mancini_levels_for  # noqa: E402
 from market.orderflow.parity import full_stack_events  # noqa: E402
+from market.orderflow.anchored_profile import (  # noqa: E402
+    CENTRAL, RTH_OPEN_CT, SplitAccumulator, anchor_utc, profile_payload,
+)
 from market.signals.orderflow_config import TICK, VOLUME_BAR_N  # noqa: E402
 
 logger = logging.getLogger("orderflow_drill")
@@ -139,15 +142,13 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
         })
 
     # level chips the drill offers out of the box (session-derived; the UI
-    # also accepts any typed price)
-    am = [b for b in bars if b.start_ts.hour < 11]
-    suggested = {
-        "open": bars[0].open,
-        "am_high": max(b.high for b in (am or bars)),
-        "am_low": min(b.low for b in (am or bars)),
-        "session_high": max(b.high for b in bars),
-        "session_low": min(b.low for b in bars),
-    }
+    # also accepts any typed price). SESSION MEANS THE CASH SESSION [st-fgno]:
+    # the tape starts at 02:50 CT (st-btu), and until 2026-08-18 "Open" was the
+    # 02:50 print, "AM" ran 02:50-11:00 and "Day Hi/Lo" spanned the overnight —
+    # numbers wearing labels they did not earn. A bar is RTH when it STARTS at
+    # or after 08:30 CT (a bar straddling the open is pre-open); a day with no
+    # RTH bars (partial capture) falls back to the whole tape.
+    suggested, first_rth, n_rth = session_levels(bars, day)
     mancini = mancini_levels if mancini_levels is not None else mancini_levels_for(day)
     anatomy = build_anatomy(bars, suggested, mancini)
 
@@ -179,7 +180,17 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
             "n_bars": len(bars),
             "contracts": sum(b.volume for b in bars),
             "candles_file": f"desk-candles-{day.isoformat()}.html",
+            # session = cash session [st-fgno]; the page numbers, sums and dims by it
+            "rth_open_ct": RTH_OPEN_CT.strftime("%H:%M:%S"),
+            "first_rth_bar": first_rth,
+            "n_rth_bars": n_rth,
         },
+        # The prior-session layer of the anchored volume profile [st-fgno]:
+        # prints from the prior trading day's 08:30 CT open through the end of
+        # its tape (the live feed seeds the same). Today's layer is built on the
+        # page from the bars' cells as the drill advances, so it never shows a
+        # print the trainee has not yet "seen".
+        "profile_seed": profile_seed(day),
         "_candles": minute_candles(trades),
         "levels": suggested,
         "bars": out_bars,
@@ -188,6 +199,57 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
         "final": final,
         "scenarios": scenario_deck_for(day, bar_n),
     }
+
+
+def session_levels(bars, day: _date) -> tuple[dict, int | None, int]:
+    """Cash-session level chips + where the session starts in ``bars``.
+
+    Returns ``(levels, first_rth_index, n_rth_bars)``. A bar is RTH when it
+    STARTS at or after 08:30 CT on ``day``; a bar straddling the open is
+    pre-open. ``levels``: open = first RTH bar's open, am_* = RTH bars starting
+    before 11:00 CT, session_* = all RTH bars. A tape with no RTH bar (partial
+    capture) falls back to the whole tape and reports ``first_rth_index=None``.
+    [st-fgno]
+    """
+    session_open = datetime.combine(day, RTH_OPEN_CT, tzinfo=CENTRAL)
+    first_rth = next((i for i, b in enumerate(bars)
+                      if b.start_ts.astimezone(CENTRAL) >= session_open), None)
+    rth = bars[first_rth:] if first_rth is not None else bars
+    am = [b for b in rth if b.start_ts.astimezone(CENTRAL).hour < 11]
+    levels = {
+        "open": rth[0].open,
+        "am_high": max(b.high for b in (am or rth)),
+        "am_low": min(b.low for b in (am or rth)),
+        "session_high": max(b.high for b in rth),
+        "session_low": min(b.low for b in rth),
+    }
+    return levels, first_rth, (len(rth) if first_rth is not None else 0)
+
+
+def profile_seed(day: _date) -> dict | None:
+    """The prior trading day's aggressor-split profile from its 08:30 CT open,
+    in the bridge wire form (``profile_payload``) — the faint layer the drill's
+    volume profile panel draws under today's bars. None when the prior day has
+    no ES tape (the panel then starts empty and says so). [st-fgno]"""
+    from strader.market_calendar import prior_trading_day
+    prior = prior_trading_day(day)
+    anchor_ts = anchor_utc(prior, RTH_OPEN_CT)
+    try:
+        trades = read_corpus_day(prior)
+    except FileNotFoundError:
+        logger.warning("profile seed: no ES tape for %s — drill profile starts empty", prior)
+        return None
+    acc = SplitAccumulator(1)
+    for t in trades:
+        if t.ts >= anchor_ts:
+            acc.add(t)
+    if not acc.n:
+        return None
+    acc.mark_seeded()
+    out = profile_payload(acc, anchor="prior-rth", anchor_ts=anchor_ts,
+                          session_day=day.isoformat())
+    logger.info("profile seed: %d prints from %s 08:30 CT", acc.n, prior)
+    return out
 
 
 def render(payload: dict, out_path: Path) -> None:
