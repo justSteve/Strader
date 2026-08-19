@@ -994,12 +994,12 @@ def render_page(res: dict, hist: dict) -> str:
             parts.append(f"{r['started'][11:16]}" + (f" (re-walked {ov} bars, measured once)" if ov else ""))
         restarts = " — restarts at " + ", ".join(parts)
     L.append("")
-    L.append(f"Record: {cov['first_ct'] or '?'} → {cov['last_ct'] or '?'} CT, {cov['bars']} bars of "
+    L.append(f"Record: {cov['first_ct'] or '?'} to {cov['last_ct'] or '?'} CT, {cov['bars']} bars of "
              f"{_f(res.get('bar_n'))} contracts; {len(runs)} run(s){restarts}. "
              f"Anchors in play: {len(res['anchors'])} Mancini levels.")
     for r in runs:
         if r.get("anchorless"):
-            L += ["", f"**Run {r['run']} carried no Mancini levels** ({r.get('first_ct') or '?'} → "
+            L += ["", f"**Run {r['run']} carried no Mancini levels** ({r.get('first_ct') or '?'} to "
                       f"{r.get('last_ct') or '?'} CT) — no calls there is not nothing to call."]
     if cov.get("unmeasured_note"):
         L += ["", f"**Note:** {cov['unmeasured_note']}."]
@@ -1084,7 +1084,7 @@ def render_page(res: dict, hist: dict) -> str:
     if not hist.get("days"):
         L.append("No earlier days in the ledger yet.")
     else:
-        L += [f"{len(hist['days'])} day(s) in the ledger ({hist['days'][0]} → {hist['days'][-1]}).", "",
+        L += [f"{len(hist['days'])} day(s) in the ledger ({hist['days'][0]} to {hist['days'][-1]}).", "",
               "| | Today | Median of the last days |", "|---|---|---|",
               f"| Confirmed setups | {n_conf_today} | {_f(hist['median_confirms'])} |",
               f"| Silent moves near a level | {n_silent_today} | {_f(hist['median_silent'])} |", "",
@@ -1129,6 +1129,10 @@ def backfill_summary(day_rows: list[dict], knobs: Knobs) -> dict:
     level legs per day, and (Addendum A3) confirmed outcomes split by lid
     rejections before the confirm."""
     ok = [r for r in day_rows if r.get("status") == "ok"]
+    # The recognizer confirms only on anchors; a day with no Mancini levels
+    # (no labeled row, no parse) has nothing to confirm and would drag the
+    # confirmed-per-day figure to zero. Count confirms over anchored days.
+    anchored = [r for r in ok if r.get("n_anchors", 1) > 0]
     legs_at: dict[str, list[int]] = {}
     by_setup: dict[str, dict[str, int]] = {}
     by_lid: dict[str, dict[str, int]] = {"ge3": {}, "lt3": {}}
@@ -1142,7 +1146,8 @@ def backfill_summary(day_rows: list[dict], knobs: Knobs) -> dict:
     return {
         "n_days": len(ok), "skipped": [r for r in day_rows if r.get("status") != "ok"],
         "first": ok[0]["day"] if ok else None, "last": ok[-1]["day"] if ok else None,
-        "confirmed_per_day": _dist([r["n_confirmed"] for r in ok]),
+        "n_anchored_days": len(anchored),
+        "confirmed_per_day": _dist([r["n_confirmed"] for r in anchored]),
         "legs_per_day_at": {k: _dist(v) for k, v in sorted(legs_at.items(), key=lambda kv: float(kv[0]))},
         "silent_near_per_day": _dist([r["n_silent_near"] for r in ok]),
         "by_setup": by_setup,
@@ -1160,9 +1165,12 @@ def render_backfill_page(s: dict) -> str:
     k = s["knobs"]
     big = max(k["windows_min"])
     L = ["# Day post-mortem — backfill", "",
-         f"{s['n_days']} tape days, {s['first']} → {s['last']}, today's recognizer on each "
+         f"{s['n_days']} tape days, {s['first']} to {s['last']}, today's recognizer on each "
          f"day's tape (not what was on the screen). Skipped: {len(s['skipped'])}.", "",
          "## Confirmed setups per day", "",
+         f"Over the {s['n_anchored_days']} days that carried Mancini anchors (a labeled row or the day's "
+         f"parse); on the other {s['n_days'] - s['n_anchored_days']} the recognizer watched range edges "
+         f"only and confirmed nothing — they count in the legs tables below.", "",
          "| n | median | 10th pct | 90th pct | max |", "|---|---|---|---|---|"]
     d = s["confirmed_per_day"]
     L.append(f"| {d['n']} | {_f(d['median'])} | {_f(d['p10'])} | {_f(d['p90'])} | {_f(d['max'])} |")
@@ -1188,3 +1196,28 @@ def render_backfill_page(s: dict) -> str:
         L += ["", "## Skipped days", ""] + [f"- {r['day']}: {r.get('status')}" for r in s["skipped"]]
     L += ["", FOOTER, ""]
     return "\n".join(L)
+
+
+# ------------------------------------------------------- trade-level twin
+
+def excursion_from_trades(trades: list, start_i: int, entry: float, sign: int,
+                          until: datetime, *, target: float = 5.0) -> tuple[float, float, str]:
+    """Trade-level twin of ``excursion`` (moved from scripts/acuity_run2.py,
+    numbers unchanged): MFE, MAE and first-touch verdict from trades[start_i:]
+    until ``until``."""
+    mfe = mae = 0.0
+    verdict = "neither"
+    for t in trades[start_i:]:
+        if t.ts > until:
+            break
+        ex = sign * (t.price - entry)
+        if ex > mfe:
+            mfe = ex
+        if -ex > mae:
+            mae = -ex
+        if verdict == "neither":
+            if ex >= target:
+                verdict = "win"
+            elif ex <= -target:
+                verdict = "loss"
+    return mfe, mae, verdict

@@ -613,11 +613,14 @@ def test_backfill_summary_distributions():
          "legs_at": {"4": 12, "6": 6, "8": 3}, "by_setup": {"failed_breakdown": {"win": 8, "loss": 9}},
          "by_lid": {"ge3": {"win": 2, "loss": 2}, "lt3": {"win": 6, "loss": 7}}},
         {"day": "2026-08-05", "status": "empty-tape"},
+        {"day": "2026-08-06", "status": "ok", "n_confirmed": 0, "n_legs": 3, "n_silent_near": 0,
+         "legs_at": {"4": 5, "6": 3, "8": 1}, "by_setup": {}, "by_lid": {}, "n_anchors": 0},
     ]
     s = pm.backfill_summary(days, pm.Knobs())
-    assert s["n_days"] == 2 and len(s["skipped"]) == 1
-    assert s["confirmed_per_day"]["median"] == 15
-    assert s["legs_per_day_at"]["6"]["median"] == 5
+    assert s["n_days"] == 3 and len(s["skipped"]) == 1 and s["n_anchored_days"] == 2
+    assert s["confirmed_per_day"]["median"] == 15          # the anchorless day does not drag it down
+    assert s["legs_per_day_at"]["6"]["n"] == 3             # but it counts for legs
+    assert s["legs_per_day_at"]["6"]["median"] == 4
     assert s["by_setup"]["failed_breakdown"] == {"win": 12, "loss": 12}
     assert s["by_lid"] == {"ge3": {"win": 5, "loss": 3}, "lt3": {"win": 7, "loss": 9}}
     md = pm.render_backfill_page(s)

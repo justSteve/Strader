@@ -35,6 +35,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from market.orderflow.anchors import mancini_levels_for            # noqa: E402
+from market.orderflow.postmortem import excursion_from_trades   # noqa: E402
 from market.orderflow.bars import build_bars                       # noqa: E402
 from market.orderflow.profile import build_profile, profile_levels  # noqa: E402
 from market.orderflow.recognizer import Anchor, SetupRecognizer    # noqa: E402
@@ -80,27 +81,6 @@ def prior_day_lvns(day: _date, open_px: float) -> list[float]:
                           reverse=True)
             return list(lvns[:MAX_LVN_ANCHORS])
     return []
-
-
-def _excursion(trades: list, start_i: int, entry: float, sign: int,
-               until: datetime) -> tuple[float, float, str]:
-    """MFE, MAE (pts) and first-touch verdict from trades[start_i:] until ts."""
-    mfe = mae = 0.0
-    verdict = "neither"
-    for t in trades[start_i:]:
-        if t.ts > until:
-            break
-        ex = sign * (t.price - entry)
-        if ex > mfe:
-            mfe = ex
-        if -ex > mae:
-            mae = -ex
-        if verdict == "neither":
-            if ex >= TARGET_PTS:
-                verdict = "win"
-            elif ex <= -TARGET_PTS:
-                verdict = "loss"
-    return mfe, mae, verdict
 
 
 def run_day(day: _date) -> dict:
@@ -184,8 +164,8 @@ def run_day(day: _date) -> dict:
                "day_type": day_type, "developing_day_type": dev_type,
                "dev_upto": dev_upto, "coverage": coverage}
         for w in WINDOWS_MIN:
-            mfe, mae, verdict = _excursion(
-                trades, i, entry, sign, r.timestamp + timedelta(minutes=w))
+            mfe, mae, verdict = excursion_from_trades(
+                trades, i, entry, sign, r.timestamp + timedelta(minutes=w), target=TARGET_PTS)
             row[f"mfe{w}"] = round(mfe, 2)
             row[f"mae{w}"] = round(mae, 2)
             row[f"verdict{w}"] = verdict
