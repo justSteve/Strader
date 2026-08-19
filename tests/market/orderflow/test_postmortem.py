@@ -329,3 +329,58 @@ def test_tag_legs_lid_rejections_and_window_delta():
     far = pm.tag_legs(pm.keep_legs(pm.zigzag_legs(bars, 6.0), knobs), seg,
                       anchors=[7760.0], knobs=knobs)
     assert far[0]["lid_rejections"] is None and far[0]["window_delta"] == 320
+
+
+# ------------------------------------------------------------------ recap
+
+RECAP = """On to today: Basic Themes
+blah blah.
+Trade Recap/Daily Summary
+NOTE: The purpose of this trade recap section is to run down in greater detail previous examples of my three setup types that occurred within the last couple days.
+The first high quality Failed Breakdown was the Failed Breakdown of 7777. I wrote yesterday at 2pm: "There is a safer Failed Breakdown just a little lower at 7777."
+We recovered this shelf by 1:50PM, and I tweeted the long as well at 1:40PM: This was a classic, shallow Failed Breakdown not of a singular low, but a shelf at 7738.
+Then a Level Reclaim of 7797 at 10:15AM which I did not take.
+Trade Plan Wednesday
+Supports are: 7777 (major), 7767.
+"""
+
+
+def test_extract_recap_rows():
+    rows = pm.extract_recap(RECAP, letter_date=date(2026, 8, 18))
+    setups = {(r["setup"], r["level"], r["time_et"]) for r in rows}
+    assert any(s == "failed_breakdown" and lv == 7777.0 for s, lv, _ in setups)
+    assert ("failed_breakdown", 7738.0, "1:40PM") in setups
+    assert ("level_reclaim", 7797.0, "10:15AM") in setups
+    assert all(r["letter_date"] == "2026-08-18" and r["quote"] for r in rows)
+
+
+def test_extract_recap_without_section_is_empty():
+    assert pm.extract_recap("no recap here. Trade Plan Monday", letter_date=date(2026, 8, 18)) == []
+
+
+def test_match_recap_tiers_and_word_match():
+    calls = [
+        {"type": "SetupRecognition", "state": "confirmed", "setup": "failed_breakdown",
+         "anchor": 7738.0, "ct": "12:45", "direction": "bullish"},      # 1:40PM ET = 12:40 CT → Δ5 EXACT
+        {"type": "SetupRecognition", "state": "confirmed", "setup": "level_reclaim",
+         "anchor": 7777.0, "ct": "10:00", "direction": "bullish"},
+        {"type": "SetupRecognition", "state": "confirmed", "setup": "level_reclaim",
+         "anchor": 7797.0, "ct": "09:30", "direction": "bullish"},      # his FBD 9:45AM ET = 08:45 CT → Δ45: LEVEL
+    ]
+    rows = [{"setup": "failed_breakdown", "level": 7738.0, "time_et": "1:40PM"},
+            {"setup": "failed_breakdown", "level": 7777.0, "time_et": None},
+            {"setup": "failed_breakdown", "level": 7797.0, "time_et": "9:45AM"},
+            {"setup": "range_trap", "level": 7900.0, "time_et": "9:00AM"}]
+    m = pm.match_recap(rows, calls)
+    assert [x["tier"] for x in m] == ["EXACT", "LEVEL", "LEVEL", "MISS"]
+    assert m[0]["matched_ct"] == "12:45" and m[1]["matched_ct"] == "10:00"
+    # Addendum A4: his word against the machine's word, on every matched row
+    assert [x["word_match"] for x in m] == [True, False, False, None]
+
+
+def test_match_recap_family_tier():
+    calls = [{"type": "SetupRecognition", "state": "confirmed", "setup": "level_reclaim",
+              "anchor": 7738.0, "ct": "12:55", "direction": "bullish"}]   # Δ15 from 12:40 but other word
+    rows = [{"setup": "failed_breakdown", "level": 7738.0, "time_et": "1:40PM"}]
+    m = pm.match_recap(rows, calls)
+    assert m[0]["tier"] == "FAMILY" and m[0]["word_match"] is False

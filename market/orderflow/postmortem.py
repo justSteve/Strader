@@ -492,3 +492,105 @@ def tag_legs(legs: list[Leg], seg: Segment, *, anchors: list[float], knobs: Knob
                                       nearest if near else None, knobs))
         out.append(row)
     return out
+
+
+# ------------------------------------------------------------------ recap
+
+RECAP_START = "Trade Recap/Daily Summary"
+RECAP_END = ("Trade Plan", "Unsubscribe")
+SETUP_WORDS = (("failed breakdown", "failed_breakdown"),
+               ("level reclaim", "level_reclaim"),
+               ("range trap", "range_trap"))
+FAMILY = {"failed_breakdown", "level_reclaim"}   # score_recognizer's sibling pair
+
+
+def extract_recap(letter_text: str, *, letter_date: _date) -> list[dict]:
+    """Spec §3c. Sentences of the recap section naming one of his three setup
+    words with a four-digit level; the time, when the sentence has one.
+    Plain text in (run the blob through runbook.mancini.clean.html_to_text
+    first). Deterministic; no model."""
+    from mancini.parser import extract_section
+    section = extract_section(letter_text, RECAP_START, list(RECAP_END))
+    if not section:
+        return []
+    rows: list[dict] = []
+    for s in _recap_sentences(section):
+        low = s.lower()
+        hit = next(((low.find(word), code) for word, code in SETUP_WORDS if word in low), None)
+        if not hit:
+            continue
+        at, setup = hit
+        levels = [float(m) for m in re.findall(r"\b([5-9]\d{3})\b", s)]
+        if not levels:
+            continue
+        t = _time_nearest(s, at)
+        for lv in dict.fromkeys(levels):
+            rows.append({"letter_date": letter_date.isoformat(), "setup": setup,
+                         "level": lv, "time_et": t, "quote": s.strip()[:300]})
+    return rows
+
+
+_TIME_RE = re.compile(r"\d{1,2}:\d{2}\s*[AP]M|\d{3,4}\s*[AP]M|\d{1,2}\s*[AP]M", re.IGNORECASE)
+
+
+def _recap_sentences(text: str) -> list[str]:
+    """mancini.parser.split_sentences, but a sentence may end in a closing
+    quote (``...at 7777." We recovered``) — his recap quotes his own letter,
+    and the parser's split runs those two sentences together."""
+    raw = re.split(r"""(?:(?<=[.!?])|(?<=[.!?]["'\u201c\u201d\u2019]))\s+(?=[A-Z"'\u201c])""", text)
+    return [x.strip() for x in raw if len(x.strip()) > 15]
+
+
+def _time_nearest(sentence: str, at: int) -> str | None:
+    """The time mention nearest the setup word (``tweeted the long at 1:40PM:
+    This was a ... Failed Breakdown`` names two times; the nearer is his)."""
+    from mancini.parser import _normalize_time
+    best, best_d = None, None
+    for m in _TIME_RE.finditer(sentence):
+        d = min(abs(m.start() - at), abs(m.end() - at))
+        if best_d is None or d < best_d:
+            best, best_d = m.group(0), d
+    return _normalize_time(best) if best else None
+
+
+def _minutes_ct(time_et: str | None) -> int | None:
+    """Mancini writes ET; the record is CT (ET − 1h)."""
+    if not time_et:
+        return None
+    m = re.fullmatch(r"(\d{1,2}):(\d{2})(AM|PM)", time_et)
+    if not m:
+        return None
+    h, mn, ap = int(m.group(1)), int(m.group(2)), m.group(3)
+    return ((h % 12) + (12 if ap == "PM" else 0)) * 60 + mn - 60
+
+
+def match_recap(rows: list[dict], calls: list[dict]) -> list[dict]:
+    """score_recognizer's tiers over the day's confirmed setups:
+    EXACT same setup at his level within 15 min; FAMILY the FBD/reclaim
+    sibling within 30 min; LEVEL at his level but no time agreement; MISS.
+    ``word_match`` (Addendum A4): on a matched row, whether his word for the
+    setup is the machine's word; None on a MISS."""
+    rank = {"EXACT": 3, "FAMILY": 2, "LEVEL": 1, "MISS": 0}
+    confirmed = [c for c in calls if c.get("type") == "SetupRecognition"
+                 and c.get("state") == "confirmed" and c.get("anchor") is not None]
+    out: list[dict] = []
+    for r in rows:
+        best = {"tier": "MISS", "matched_ct": None, "matched_setup": None, "word_match": None}
+        t_ct = _minutes_ct(r.get("time_et"))
+        for c in confirmed:
+            if abs(float(c["anchor"]) - float(r["level"])) > 2.0:
+                continue
+            hh, mm = c["ct"].split(":")
+            dt = abs(int(hh) * 60 + int(mm) - t_ct) if t_ct is not None else None
+            same = c.get("setup") == r["setup"]
+            if dt is not None and dt <= 15 and same:
+                tier = "EXACT"
+            elif dt is not None and dt <= 30 and c.get("setup") in FAMILY and r["setup"] in FAMILY:
+                tier = "FAMILY"
+            else:
+                tier = "LEVEL"
+            if rank[tier] > rank[best["tier"]]:
+                best = {"tier": tier, "matched_ct": c["ct"], "matched_setup": c.get("setup"),
+                        "word_match": same}
+        out.append(r | best)
+    return out
