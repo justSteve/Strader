@@ -47,7 +47,7 @@ from typing import Callable
 from zoneinfo import ZoneInfo
 
 from . import overnight
-from .schema import ParseResult
+from .schema import ParseResult, is_levels_only
 
 logger = logging.getLogger("runbook.mancini")
 
@@ -95,10 +95,11 @@ def _load_parse(day: str):
     if not path.exists():
         return None, path
     data = json.loads(path.read_text(encoding="utf-8"))
-    if data.get("model", "") == "deterministic-lists":
-        # A hybrid (levels-only) parse is not the plan Steve reads; refreshing
-        # it would put a commentary-free doc on the desk. Same rule as
-        # _prepare_only: only a real parse is worth re-rendering.
+    if is_levels_only(data.get("model", "")):
+        # A levels-only artifact (the old hybrid parse, or a backfill row) is
+        # not the plan Steve reads; refreshing it would put a commentary-free
+        # doc on the desk. Same rule as _prepare_only: only a real parse is
+        # worth re-rendering.
         return None, path
     return ParseResult.from_dict(data), path
 

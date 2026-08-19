@@ -18,6 +18,20 @@ from typing import Any
 LEVEL_KINDS = ("support", "resistance", "pivot", "target", "trigger")
 TRIGGER_TYPES = ("price_cross", "price_zone", "time", "regime", "unconditional")
 
+# ParseResult.model values that mean "levels only, no reading of the letter":
+# the old hybrid path's "deterministic-lists" and the backfill's
+# "listlevels-backfill" (scripts/mancini_backfill_levels.py, co-vp45h). The
+# 08:15 prepare, the hybrid skip and the overnight refresh all treat such an
+# artifact as NOT a parse — the morning must still ask for the real one.
+DETERMINISTIC_LISTS_MODEL = "deterministic-lists"
+BACKFILL_MODEL = "listlevels-backfill"
+LEVELS_ONLY_MODELS = (DETERMINISTIC_LISTS_MODEL, BACKFILL_MODEL)
+
+
+def is_levels_only(model: str | None) -> bool:
+    """True when ``model`` names a levels-only artifact (see LEVELS_ONLY_MODELS)."""
+    return (model or "") in LEVELS_ONLY_MODELS
+
 # Level.label carries two things at once [st-eo0]: the letter's `(major)`
 # annotation and Mancini's own callout for that level ("shelf of lows from noon
 # Thursday", "heavily used up now"). The convention is a `major` PREFIX,

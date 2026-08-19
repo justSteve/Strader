@@ -8,7 +8,9 @@ from runbook.mancini.schema import Level, ParseResult
 
 
 def _args(clip=False):
-    return argparse.Namespace(clip=clip, no_clip=False, extraction_json=None)
+    # no_desk=True: the prepare's good case hooks the overnight refresh (st-vxbw),
+    # which renders through the desk; these tests cover readiness, not rendering.
+    return argparse.Namespace(clip=clip, no_clip=False, extraction_json=None, no_desk=True)
 
 
 def _det_levels():
@@ -91,4 +93,23 @@ def test_alert_failure_is_non_fatal(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr("strader.alerts.send", boom)
     rc = run_mod._prepare_only(_args(), "2026-08-06", _det_levels())
     assert rc == 0                                 # readiness still reported
+    assert "awaiting parse" in capsys.readouterr().out
+
+
+def test_backfill_artifact_does_not_block_readiness(tmp_path, monkeypatch, capsys):
+    # A listlevels-backfill artifact (scripts/mancini_backfill_levels.py,
+    # co-vp45h) is levels-only like the old hybrid parse: the morning must
+    # still ask for the real parse.
+    monkeypatch.setattr(run_mod, "PARSED_ROOT", tmp_path)
+    (tmp_path / "2026-08-06.json").write_text(
+        json.dumps(_stored("listlevels-backfill").to_dict()), encoding="utf-8")
+    monkeypatch.setattr("strader.alerts.send", lambda *a, **kw: None)
+    pushed = []
+    monkeypatch.setattr(run_mod, "_push_payload",
+                        lambda *a, **kw: pushed.append(a))
+
+    rc = run_mod._prepare_only(_args(clip=True), "2026-08-06", _det_levels())
+
+    assert rc == 0
+    assert not pushed
     assert "awaiting parse" in capsys.readouterr().out

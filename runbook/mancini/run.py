@@ -161,7 +161,7 @@ def _prepare_only(args, day: str, det_levels: list) -> int:
             prev_model = json.loads(existing.read_text(encoding="utf-8")).get("model", "")
         except (OSError, ValueError):
             prev_model = ""
-    if prev_model and prev_model != "deterministic-lists":
+    if prev_model and not schema.is_levels_only(prev_model):
         msg = f"OK (prepared): {day} already parsed by {prev_model!r}."
         if _clip_wanted(args):
             try:
@@ -600,7 +600,7 @@ def main(argv: list[str] | None = None) -> int:
                 prev_model = json.loads(existing.read_text(encoding="utf-8")).get("model", "")
             except (OSError, ValueError):
                 prev_model = ""
-            if prev_model and prev_model != "deterministic-lists":
+            if prev_model and not schema.is_levels_only(prev_model):
                 logger.info("hybrid skip: %s already parsed by %r — keeping it",
                             day, prev_model)
                 msg = f"OK (no-op): {day} already has a richer parse ({prev_model})."
@@ -629,7 +629,7 @@ def main(argv: list[str] | None = None) -> int:
             session_bias="(commentary pending — no in-session extraction; "
                          "deterministic list levels only)",
             levels=det_levels, commentary=[],
-            raw_excerpt=raw[:2000], model="deterministic-lists",
+            raw_excerpt=raw[:2000], model=schema.DETERMINISTIC_LISTS_MODEL,
             parsed_at=parsed_at,
         )
         outcome = parse_mod.ParseOutcome(
