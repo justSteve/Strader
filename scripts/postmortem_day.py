@@ -201,7 +201,116 @@ def run_live_pass(*, day: _date, pass_name: str, record: Path, root: Path,
 
 
 # ------------------------------------------------------------------ backfill
-# (filled in by Task 12 — leave this comment as the anchor for it)
+
+BACKFILL_BAR_N = 2000
+BACKFILL_START = _date(2025, 5, 27)
+
+
+def corpus_days_with_tape(start: _date = BACKFILL_START, end: _date | None = None) -> list[_date]:
+    """Weekdays with ES tape from ``start`` through the last completed session
+    (today is still being written; the live passes own it)."""
+    end = end or most_recent_session_day(datetime.now(tz=CT))
+    days = []
+    d = start
+    while d <= end:
+        if d.weekday() < 5 and has_es_day(d):
+            days.append(d)
+        d += timedelta(days=1)
+    return days
+
+
+def _outcomes(calls: list[dict], big: int, pick) -> dict[str, dict[str, int]]:
+    out: dict[str, dict[str, int]] = {}
+    for c in calls:
+        if c.get("state") != "confirmed":
+            continue
+        key = pick(c)
+        if key is None:
+            continue
+        t = out.setdefault(key, {})
+        v = c.get(f"verdict{big}") or "neither"
+        t[v] = t.get(v, 0) + 1
+    return out
+
+
+def backfill_one(day: _date, *, root: Path, knobs: pm.Knobs, now: datetime) -> dict:
+    """One day through the replay path: ledger rows + a summary row. Never
+    raises — a bad day is a row with a status, so the pool finishes."""
+    try:
+        mancini = mancini_levels_for(day)
+        segs = pm.segments_from_replay(day, bar_n=BACKFILL_BAR_N, mancini=mancini)
+        if not segs:
+            return {"day": day.isoformat(), "status": "empty-tape"}
+        res = pm.analyze_day(segs, knobs, day=day, source="replay", pass_name="backfill", now=now,
+                             parsed_kinds=parsed_kinds_for(day))
+        pm.write_ledger(res, root)
+        legs_at = {}
+        for x in (knobs.x_pts - 2, knobs.x_pts, knobs.x_pts + 2):
+            k2 = pm.replace(knobs, x_pts=x)
+            legs_at[f"{x:g}"] = sum(len(pm.keep_legs(pm.zigzag_legs(seg.bars, x), k2)) for seg in segs)
+        big = max(knobs.windows_min)
+        by_setup = _outcomes(res["calls"], big, lambda c: c.get("setup") or "?")
+        by_lid = _outcomes(res["calls"], big,
+                           lambda c: None if c.get("lid_rejections") is None
+                           else ("ge3" if c["lid_rejections"] >= 3 else "lt3"))
+        return {"day": day.isoformat(), "status": "ok",
+                "n_confirmed": sum(1 for c in res["calls"] if c.get("state") == "confirmed"),
+                "n_legs": len(res["legs"]),
+                "n_silent_near": sum(1 for l in res["legs"] if l["tag"] == "silent" and l["near_level"]),
+                "legs_at": legs_at, "by_setup": by_setup,
+                "by_lid": {"ge3": by_lid.get("ge3", {}), "lt3": by_lid.get("lt3", {})},
+                "n_flags": len(res["flags"]), "n_anchors": len(mancini)}
+    except Exception as e:  # noqa: BLE001 — one bad day must not sink 300
+        logger.exception("backfill %s failed", day)
+        return {"day": day.isoformat(), "status": f"error: {type(e).__name__}: {e}"[:200]}
+
+
+def _bf_worker(args: tuple) -> dict:
+    day_s, root_s, knobs_d, now_s = args
+    logging.basicConfig(level=logging.WARNING)
+    return backfill_one(_date.fromisoformat(day_s), root=Path(root_s),
+                        knobs=pm.knobs_from_dict(knobs_d), now=datetime.fromisoformat(now_s))
+
+
+def run_backfill(*, root: Path, knobs: pm.Knobs, workers: int, publish_pages: bool,
+                 dry_run: bool) -> int:
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    days = corpus_days_with_tape()
+    print(f"backfill: {len(days)} tape days {days[0] if days else '-'} → {days[-1] if days else '-'}, "
+          f"{workers} workers, ledger {root}", flush=True)
+    if dry_run or not days:
+        return 0
+    now = datetime.now(tz=CT)
+    # each worker writes its own ledger shard; merged below (the jsonl rewrite
+    # is not safe under concurrent writers)
+    shards = root / "_shards"
+    shards.mkdir(parents=True, exist_ok=True)
+    jobs = [(d.isoformat(), str(shards / d.isoformat()), pm.knobs_to_dict(knobs), now.isoformat())
+            for d in days]
+    rows: list[dict] = []
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        futs = [pool.submit(_bf_worker, j) for j in jobs]
+        for n, f in enumerate(as_completed(futs), start=1):
+            r = f.result()
+            rows.append(r)
+            if n % 25 == 0 or r["status"] != "ok":
+                print(f"  {n}/{len(days)} {r['day']} {r['status']}", flush=True)
+    rows.sort(key=lambda r: r["day"])
+    for r in rows:                      # merge shards, replace-by-day+pass
+        shard = shards / r["day"] / f"{r['day']}.json"
+        if shard.exists():
+            pm.write_ledger(json.loads(shard.read_text()), root)
+    shutil.rmtree(shards, ignore_errors=True)
+    (root / "backfill-days.json").write_text(json.dumps(rows, indent=1), encoding="utf-8")
+    summary = pm.backfill_summary(rows, knobs)
+    pages = root / "pages"
+    pages.mkdir(parents=True, exist_ok=True)
+    p = pages / "postmortem-backfill.md"
+    p.write_text(pm.render_backfill_page(summary), encoding="utf-8")
+    print(f"backfill: {summary['n_days']} ok, {len(summary['skipped'])} skipped; summary {p}", flush=True)
+    if publish_pages:
+        return publish(p, "desk-postmortem-backfill.html", also_latest=False)
+    return 0
 
 
 # ------------------------------------------------------------------------ main

@@ -384,6 +384,9 @@ def measure_calls(seg: Segment, knobs: Knobs,
             row["back_to_level_min"] = back_to_level(
                 seg, k, anchor, direction,
                 bar.t1 + timedelta(minutes=max(knobs.windows_min)))
+            # Addendum A3 at the call: the lid under the anchor and the delta
+            # in the window before the bar the setup fired on.
+            row.update(lid_and_absorption(seg, k, direction, anchor, knobs))
         rows.append(row)
     return rows
 
@@ -968,6 +971,11 @@ def _call_row(c: dict, knobs: Knobs) -> str:
         cells.append(f"{lp:+.2f}")
     else:
         cells.append("—")
+    if c.get("lid_rejections") is not None or c.get("window_delta") is not None:
+        wd = c.get("window_delta")
+        cells.append(f"{_f(c.get('lid_rejections'))} / {wd:+d}" if wd is not None else _f(c.get("lid_rejections")))
+    else:
+        cells.append("—")
     return "| " + " | ".join(str(x) for x in cells) + " |"
 
 
@@ -1014,7 +1022,7 @@ def render_page(res: dict, hist: dict) -> str:
     L += ["## Calls made", ""]
     hdr = ["Time CT", "Run:bar", "What it said", "Dir", "nth on level", "Conf"]
     hdr += [f"For / against at {w} min" for w in knobs.windows_min]
-    hdr += [f"±{_f(knobs.target_pts)} first", "Back to level", "Confirm lag"]
+    hdr += [f"±{_f(knobs.target_pts)} first", "Back to level", "Confirm lag", "Lid rej / window delta"]
     for sess in ("cash", "overnight", "evening"):
         rows = [c for c in res["calls"] if c.get("session") == sess]
         L += [f"### {sess.capitalize()} session — {len(rows)} measured call(s)", ""]
@@ -1093,5 +1101,90 @@ def render_page(res: dict, hist: dict) -> str:
         where = (f" (bar {f['bar']}, {f['at']})" if f.get("bar") is not None
                  else (f" ({f['at']})" if f.get("at") else ""))
         L.append(f"- **{f['flag']}**{where}: {f['why']}.")
+    L += ["", FOOTER, ""]
+    return "\n".join(L)
+
+
+# --------------------------------------------------------------- backfill
+
+def _dist(vals: list) -> dict:
+    if not vals:
+        return {"n": 0, "median": None, "p10": None, "p90": None, "max": None}
+    s = sorted(vals)
+
+    def q(p: float):
+        return s[min(len(s) - 1, int(p * (len(s) - 1)))]
+
+    return {"n": len(s), "median": statistics.median(s), "p10": q(0.1), "p90": q(0.9), "max": s[-1]}
+
+
+def _add_counts(into: dict, more: dict) -> None:
+    for k, n in more.items():
+        into[k] = into.get(k, 0) + n
+
+
+def backfill_summary(day_rows: list[dict], knobs: Knobs) -> dict:
+    """Distributions over the backfilled days (spec §6): calls per day, ±target
+    outcomes by setup, legs per day at X and its two neighbours, silent-near-
+    level legs per day, and (Addendum A3) confirmed outcomes split by lid
+    rejections before the confirm."""
+    ok = [r for r in day_rows if r.get("status") == "ok"]
+    legs_at: dict[str, list[int]] = {}
+    by_setup: dict[str, dict[str, int]] = {}
+    by_lid: dict[str, dict[str, int]] = {"ge3": {}, "lt3": {}}
+    for r in ok:
+        for k, v in r.get("legs_at", {}).items():
+            legs_at.setdefault(k, []).append(v)
+        for s, v in r.get("by_setup", {}).items():
+            _add_counts(by_setup.setdefault(s, {}), v)
+        for s, v in r.get("by_lid", {}).items():
+            _add_counts(by_lid.setdefault(s, {}), v)
+    return {
+        "n_days": len(ok), "skipped": [r for r in day_rows if r.get("status") != "ok"],
+        "first": ok[0]["day"] if ok else None, "last": ok[-1]["day"] if ok else None,
+        "confirmed_per_day": _dist([r["n_confirmed"] for r in ok]),
+        "legs_per_day_at": {k: _dist(v) for k, v in sorted(legs_at.items(), key=lambda kv: float(kv[0]))},
+        "silent_near_per_day": _dist([r["n_silent_near"] for r in ok]),
+        "by_setup": by_setup,
+        "by_lid": by_lid,
+        "knobs": knobs_to_dict(knobs),
+    }
+
+
+def _outcome_row(label: str, v: dict) -> str:
+    return (f"| {label} | {v.get('win', 0)} | {v.get('loss', 0)} | {v.get('neither', 0)} "
+            f"| {v.get('both-in-one-bar', 0)} |")
+
+
+def render_backfill_page(s: dict) -> str:
+    k = s["knobs"]
+    big = max(k["windows_min"])
+    L = ["# Day post-mortem — backfill", "",
+         f"{s['n_days']} tape days, {s['first']} → {s['last']}, today's recognizer on each "
+         f"day's tape (not what was on the screen). Skipped: {len(s['skipped'])}.", "",
+         "## Confirmed setups per day", "",
+         "| n | median | 10th pct | 90th pct | max |", "|---|---|---|---|---|"]
+    d = s["confirmed_per_day"]
+    L.append(f"| {d['n']} | {_f(d['median'])} | {_f(d['p10'])} | {_f(d['p90'])} | {_f(d['max'])} |")
+    L += ["", "## Legs per day at each X (points)", "",
+          "| X | median | 10th pct | 90th pct | max |", "|---|---|---|---|---|"]
+    for x, d in s["legs_per_day_at"].items():
+        L.append(f"| {x} | {_f(d['median'])} | {_f(d['p10'])} | {_f(d['p90'])} | {_f(d['max'])} |")
+    d = s["silent_near_per_day"]
+    L += ["", f"## Silent moves near a level per day (X={_f(float(k['x_pts']))}, Z={_f(float(k['z_pts']))})", "",
+          "| median | 10th pct | 90th pct | max |", "|---|---|---|---|",
+          f"| {_f(d['median'])} | {_f(d['p10'])} | {_f(d['p90'])} | {_f(d['max'])} |", "",
+          f"## ±{_f(float(k['target_pts']))} first touch by setup ({big} min)", "",
+          "| Setup | win | loss | neither | both in one bar |", "|---|---|---|---|---|"]
+    for setup, v in sorted(s["by_setup"].items()):
+        L.append(_outcome_row(setup, v))
+    L += ["", f"## ±{_f(float(k['target_pts']))} first touch by the lid before the confirm ({big} min)", "",
+          f"Lid rejections: bars in the {k['lid_window_min']} minutes before the confirm bar whose high came "
+          f"within {k['lid_ticks']} ticks under the anchor and closed under it.", "",
+          "| Confirms with… | win | loss | neither | both in one bar |", "|---|---|---|---|---|",
+          _outcome_row("3 or more lid rejections", s["by_lid"].get("ge3", {})),
+          _outcome_row("fewer than 3", s["by_lid"].get("lt3", {}))]
+    if s["skipped"]:
+        L += ["", "## Skipped days", ""] + [f"- {r['day']}: {r.get('status')}" for r in s["skipped"]]
     L += ["", FOOTER, ""]
     return "\n".join(L)

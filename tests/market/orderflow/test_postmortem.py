@@ -588,3 +588,38 @@ def test_flags_no_breakout_word():
     fl = pm.flags([], legs, cen, session_range=30.0, knobs=pm.Knobs())
     hits = [f for f in fl if f["flag"] == "no-breakout-word"]
     assert len(hits) == 1 and hits[0]["bar"] == 3
+
+
+def test_measure_calls_carries_lid_and_delta_at_the_confirm():
+    """Addendum A3 at the call: four highs under 7720 in the 30 minutes before the confirm bar."""
+    bars, events = _flush_reclaim_confirm()
+    seg = _segment(bars, events, mancini=[7720.0])
+    c = next(r for r in pm.measure_calls(seg, pm.Knobs()) if r.get("state") == "confirmed")
+    # bars 0..6 before the confirm: highs 7721.75, 7721.25, 7718.75, 7716.75, 7717.75, 7722.25, 7722.25
+    # within 2 pts under 7720 (band 7718–7720) and closing under it: bar 2 (h 7718.75, c 7718);
+    # bar 4's high 7717.75 is under the band → 1
+    assert c["lid_rejections"] == 1
+    assert c["window_delta"] == 0 and c["window_px_change"] == round(7723.75 - 7721, 2)
+
+
+# --------------------------------------------------------------- backfill
+
+def test_backfill_summary_distributions():
+    days = [
+        {"day": "2026-08-01", "status": "ok", "n_confirmed": 10, "n_legs": 4, "n_silent_near": 1,
+         "legs_at": {"4": 9, "6": 4, "8": 2}, "by_setup": {"failed_breakdown": {"win": 4, "loss": 3}},
+         "by_lid": {"ge3": {"win": 3, "loss": 1}, "lt3": {"win": 1, "loss": 2}}},
+        {"day": "2026-08-04", "status": "ok", "n_confirmed": 20, "n_legs": 6, "n_silent_near": 3,
+         "legs_at": {"4": 12, "6": 6, "8": 3}, "by_setup": {"failed_breakdown": {"win": 8, "loss": 9}},
+         "by_lid": {"ge3": {"win": 2, "loss": 2}, "lt3": {"win": 6, "loss": 7}}},
+        {"day": "2026-08-05", "status": "empty-tape"},
+    ]
+    s = pm.backfill_summary(days, pm.Knobs())
+    assert s["n_days"] == 2 and len(s["skipped"]) == 1
+    assert s["confirmed_per_day"]["median"] == 15
+    assert s["legs_per_day_at"]["6"]["median"] == 5
+    assert s["by_setup"]["failed_breakdown"] == {"win": 12, "loss": 12}
+    assert s["by_lid"] == {"ge3": {"win": 5, "loss": 3}, "lt3": {"win": 7, "loss": 9}}
+    md = pm.render_backfill_page(s)
+    assert md.startswith("# Day post-mortem — backfill") and "| 6 |" in md and "2026-08-05" in md
+    assert "3 or more lid rejections" in md

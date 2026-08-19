@@ -98,3 +98,25 @@ def test_next_morning_pass_reads_recap_from_the_letter(tmp_path, monkeypatch):
     tiers = {(r["level"], r["tier"]) for r in res["recap"]["rows"]}
     assert (7720.0, "EXACT") in tiers and (7797.0, "MISS") in tiers     # 13:18 CT confirm on 7720 = 2:18PM ET
     assert (tmp_path / "recaps" / "2026-08-18.json").exists()
+
+
+def test_backfill_one_day_worker_returns_summary_row(tmp_path, monkeypatch):
+    m = _load()
+    segs = m.pm.load_live_segments(FIXTURE)     # stand in for the replay
+    monkeypatch.setattr(m.pm, "segments_from_replay", lambda day, *, bar_n, mancini: segs)
+    monkeypatch.setattr(m, "mancini_levels_for", lambda day: [7720.0, 7724.0])
+    row = m.backfill_one(date(2026, 8, 18), root=tmp_path, knobs=m.pm.Knobs(),
+                         now=datetime(2026, 8, 19, 0, 0, tzinfo=CT))
+    assert row["day"] == "2026-08-18" and row["status"] == "ok"
+    assert row["n_confirmed"] >= 1 and set(row["legs_at"]) == {"4", "6", "8"}
+    assert set(row["by_lid"]) == {"ge3", "lt3"}
+    rows = [json.loads(l) for l in (tmp_path / "ledger.jsonl").read_text().splitlines()]
+    assert rows and all(r["pass"] == "backfill" and r["source"] == "replay" for r in rows)
+
+
+def test_backfill_one_day_never_raises(tmp_path, monkeypatch):
+    m = _load()
+    monkeypatch.setattr(m, "mancini_levels_for", lambda day: (_ for _ in ()).throw(RuntimeError("boom")))
+    row = m.backfill_one(date(2026, 8, 18), root=tmp_path, knobs=m.pm.Knobs(),
+                         now=datetime(2026, 8, 19, 0, 0, tzinfo=CT))
+    assert row["status"].startswith("error: RuntimeError")
