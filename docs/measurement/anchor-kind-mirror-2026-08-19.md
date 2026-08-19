@@ -155,3 +155,62 @@ long-side read was 39%.
 peer-ledger NOTE-row test, not this change). New: 5 recognizer mirror tests,
 7 anchor-kind tests, 1 three-path parity test; parity snapshot regenerated
 deliberately.
+
+---
+
+## Addendum — the enriched corpus (run `20260819T213124Z`, same day, st-2a8v)
+
+Hours after the sweep above, COO's levels backfill (co-vp45h) gave every letter
+in the blob cache a parse artifact: `runbook/mancini/parsed/` went 27 → 284
+days, covering 255 of 280 tape days. Two changes and a re-sweep on top:
+
+1. **Labeled days gain the parse's resistance side.** `mancini_levels_for` /
+   `mancini_kinds_for` on a labeled day now merge in the parse's resistance
+   prices; the support set stays exactly the labels'. Resistance anchors
+   cannot emit a bullish setup, so the bullish stream on labeled days is
+   unchanged **by construction and by measurement**: on the 49 tape days with
+   actual label levels, 124 bullish confirms before, 124 after, 0 added, 0
+   removed. (Pinned by `test_labeled_day_gains_the_parses_resistance_side_only`.)
+2. **Coverage.** Scored days 197 → **270** (no-anchors 83 → 10); days with
+   resistance anchors 26 → **253**. Anchor source: 63 labels / 192 letter.
+
+### Population, enriched
+
+| Cut | n | Win (±5 @30) | W / L / und | Med MFE / MAE |
+|---|---|---|---|---|
+| bullish (support anchors) | 1235 | 46% | 500 / 586 / 149 | 6.25 / 6.75 |
+| bearish (resistance anchors) | 1077 | 49% | 418 / 442 / 217 | 4.75 / 5.00 |
+
+Bearish at 49% (418/860, two-sided p = 0.43): a coin flip, now on 4.4× the
+sample — the 51% above was the same coin on fewer days. `level_reject` 51%
+(n=286) vs `failed_breakout` 48% (n=791). Bearish time split: tune 48% /
+validate 49% — stable across the halves, unlike bullish (49% / 41%).
+
+### Cuts derived on the old anchor body FLATTEN on the fuller one
+
+These were measured before trusting the old numbers forward; both moved:
+
+| Cut (bullish) | old body | enriched | note |
+|---|---|---|---|
+| fire_index ≥ 4 | 33% vs ~50% fi 1–3 (st-98z: the damp's evidence) | **42%** vs 46–49% | direction survives, the cliff is now a slope; the 0.8→0.6 confidence damp in the recognizer rests on the old measurement |
+| full-day b (trend down) | 32–33% | **46%** | the "bullish confirms get run over on b days" pattern largely dissolves |
+| full-day P (trend up) | 54–65% | **50%** | likewise the P-day pocket |
+
+On the bearish side there is **no fi≥4 cliff at all** (fi4 = 52%, n=170).
+The recognizer's step-damp fires on both sides today; its evidence base is
+now the weakest number in the stack — re-deriving it (time-split, per side)
+before anything consumes the damped confidence is the follow-up this
+addendum leaves open. Same for the developing-day-type gate idea: the
+day-type dependence it was meant to exploit is much flatter here.
+
+### Sample-shape caveat
+
+The enriched tune half is dominated by 2025 late-day pulls (13:00–15:00 CT
+tape), which is why bearish median MFE/MAE compressed to 4.75/5.00 — shorter
+windows to the close truncate excursions (217 of 1077 undecided). Hour rows
+13–14 CT carry 731 of the 1077 bearish confirms. Nothing here is a
+recommendation; Steve directs the trading.
+
+Verification: strict-reproduction diff script in the run notes; full pytest
+suite green post-merge. Runs `20260819T205533Z` (kind rule, 26 letter days)
+and `20260819T213124Z` (enriched) both stand in the append-only store.

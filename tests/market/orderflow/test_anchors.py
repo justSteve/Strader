@@ -240,9 +240,40 @@ def test_labeled_day_kinds_are_supports(monkeypatch, tmp_path):
     labels.write_text(json.dumps([{"session_date": "2026-03-03", "setup": "failed_breakdown",
                                    "es_levels": [6212.0, 6230.0]}]))
     monkeypatch.setattr(A, "LABELS", labels)
+    monkeypatch.setattr(A, "PARSED", tmp_path / "no-parses")   # no parse for the day
     assert A.mancini_levels_for(date(2026, 3, 3)) == [6212.0, 6230.0]
     assert A.mancini_kinds_for(date(2026, 3, 3)) == {6212.0: ("support",), 6230.0: ("support",)}
     assert A.mancini_source_for(date(2026, 3, 3)) == "labels"
+
+
+def test_labeled_day_gains_the_parses_resistance_side_only(monkeypatch, tmp_path):
+    """The st-2a8v merge: on a labeled day the SUPPORT set stays exactly the
+    labels' (no parse support leaks in — the bullish stream must reproduce
+    every prior run), while the parse's resistance prices come in as
+    resistance anchors. A label price the parse also calls resistance carries
+    both kinds."""
+    import json
+    from market.orderflow import anchors as A
+    d = date(2026, 3, 3)
+    labels = tmp_path / "labels.json"
+    labels.write_text(json.dumps([{"session_date": d.isoformat(), "setup": "failed_breakdown",
+                                   "es_levels": [6212.0, 6230.0]}]))
+    (tmp_path / f"{d.isoformat()}.json").write_text(json.dumps({"levels": [
+        {"price": 6212.0, "kind": "resistance"},    # also a label support
+        {"price": 6208.0, "kind": "support"},       # parse support: must NOT enter
+        {"price": 6250.0, "kind": "resistance"},
+        {"price": 6260.0, "kind": "target"},        # never an anchor
+    ]}))
+    monkeypatch.setattr(A, "LABELS", labels)
+    monkeypatch.setattr(A, "PARSED", tmp_path)
+    assert A.mancini_levels_for(d) == [6212.0, 6230.0, 6250.0]
+    assert A.mancini_kinds_for(d) == {6212.0: ("support", "resistance"),
+                                      6230.0: ("support",),
+                                      6250.0: ("resistance",)}
+    # and through day_anchors: the support anchors are exactly the labels'
+    a = day_anchors(A.mancini_levels_for(d), 6300.0, 6200.0, A.mancini_kinds_for(d))
+    assert [x.price for x in a if x.kind == "support"] == [6212.0, 6230.0]
+    assert [x.price for x in a if x.kind == "resistance"] == [6212.0, 6250.0]
 
 
 def test_levels_from_arg_grammar():

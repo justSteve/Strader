@@ -104,17 +104,28 @@ def mancini_levels_for(day: _date) -> list[float]:
     """The day's Mancini level prices — chart lines and the confluence set.
 
     The labeled corpus (score_recognizer.py's validated source, st-3vu) wins
-    wherever it covers the day, so no labeled day's anchors move. Days it does
-    not cover fall back to that day's own parse artifact — which is what makes
-    a live session and a later replay of it watch the SAME anchor set instead
-    of the live surface watching range edges alone. Empty when neither exists.
+    the SUPPORT side wherever it covers the day, so no labeled day's support
+    anchors move — every prior run's bullish stream reproduces. A labeled day
+    additionally gains the RESISTANCE prices from its own parse artifact where
+    one exists [st-2a8v]: the labels are the supports of hand-labeled
+    failed-breakdown / level-reclaim setups and are silent about the ladder
+    overhead, so without the merge the 89 labeled tape days measure blind on
+    the resistance side. Resistance anchors cannot emit a bullish setup, so
+    the merge provably leaves the bullish stream unchanged (pinned by test).
+
+    Days the labels do not cover fall back to that day's own parse — which is
+    what makes a live session and a later replay of it watch the SAME anchor
+    set instead of the live surface watching range edges alone. Empty when
+    neither exists.
 
     Pair with ``mancini_kinds_for`` (same sources, same precedence) for the
     side each level is engaged from.
     """
     labeled = _labeled_levels(day)
     if labeled:
-        return labeled
+        res = [p for p, ks in parsed_mancini_kinds(day).items()
+               if "resistance" in ks and p not in labeled]
+        return sorted(set(labeled) | set(res))
     parsed = parsed_mancini_levels(day)
     if parsed:
         logger.info("Mancini anchors for %s: %d from the day's parse (unlabeled day)",
@@ -124,13 +135,17 @@ def mancini_levels_for(day: _date) -> list[float]:
 
 def mancini_kinds_for(day: _date) -> Kinds:
     """{price: anchor kinds} for the day, same precedence as
-    ``mancini_levels_for``: the labeled corpus (its levels are the supports
-    of hand-labeled failed-breakdown / level-reclaim setups, so ``support``
-    by construction) else the parse's own kinds. Every price
-    ``mancini_levels_for`` returns is a key here."""
+    ``mancini_levels_for``: label prices are supports by construction, plus
+    the parse's resistance side on labeled days [st-2a8v]; else the parse's
+    own kinds. Every price ``mancini_levels_for`` returns is a key here."""
     labeled = _labeled_levels(day)
     if labeled:
-        return {p: ("support",) for p in labeled}
+        kinds: dict[float, set[str]] = {p: {"support"} for p in labeled}
+        for p, ks in parsed_mancini_kinds(day).items():
+            if "resistance" in ks:
+                kinds.setdefault(p, set()).add("resistance")
+        return {p: tuple(k for k in ("support", "resistance") if k in ks)
+                for p, ks in sorted(kinds.items())}
     return parsed_mancini_kinds(day)
 
 
