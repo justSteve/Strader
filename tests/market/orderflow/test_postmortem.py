@@ -492,3 +492,53 @@ def test_history_prefers_latest_pass_per_day(tmp_path):
     assert h["silent_legs_per_day"] == [3, 1]
     assert h["median_confirms"] == 3.5
     assert h["by_setup"]["failed_breakdown"]["win"] == 3 and h["by_setup"]["failed_breakdown"]["loss"] == 4
+
+
+# ------------------------------------------------------------------- page
+
+HEADINGS = ["## Census", "## Calls made", "## Moves", "## Mancini's recap",
+            "## Last 20 days", "## For Strader", "## What this page does not judge"]
+
+
+def test_render_page_has_every_section_and_the_footer():
+    segs = pm.load_live_segments(FIXTURE)
+    res = pm.analyze_day(segs, pm.Knobs(), day=date(2026, 8, 18), source="live",
+                         pass_name="same-day", now=datetime(2026, 8, 18, 15, 30, tzinfo=CT))
+    md = pm.render_page(res, pm.history(Path("/nonexistent"), days=20))
+    assert md.startswith("# Day post-mortem — 2026-08-18")
+    for h in HEADINGS:
+        assert h in md, h
+    assert "what you saw" in md                    # live source label
+    assert "Mancini's recap: not yet received" in md
+    assert "| 13:" in md                           # a cash-session call row
+    assert "The numbers above are the record." in md
+    assert "Run 1 carried no Mancini levels" in md  # Addendum A2, from the fixture's first header
+    assert "Lid rejections" in md                  # Addendum A3 columns on the Moves table
+
+
+def test_render_page_replay_label_and_truncation_banner():
+    segs = pm.load_live_segments(FIXTURE)
+    res = pm.analyze_day(segs, pm.Knobs(), day=date(2026, 8, 18), source="replay",
+                         pass_name="backfill", now=datetime(2026, 8, 18, 23, 0, tzinfo=CT))
+    res["coverage"]["unmeasured_note"] = "record ends 13:35 CT; 565 minutes before the pass unmeasured"
+    md = pm.render_page(res, pm.history(Path("/nonexistent")))
+    assert "today's recognizer on that day's tape" in md
+    assert "record ends 13:35 CT" in md
+
+
+def test_render_page_parse_kind_and_word_match():
+    """Addendum A1 on the call row; Addendum A4's count on the recap section."""
+    bars, events = _flush_reclaim_confirm()
+    seg = _segment(bars, events, mancini=[7720.0])
+    recap_rows = [{"letter_date": "2026-08-18", "setup": "level_reclaim", "level": 7720.0,
+                   "time_et": "9:40AM", "quote": "a Level Reclaim of 7720 at 9:40AM"},
+                  {"letter_date": "2026-08-18", "setup": "range_trap", "level": 7900.0,
+                   "time_et": None, "quote": "range trap at 7900"}]
+    res = pm.analyze_day([seg], pm.Knobs(), day=date(2026, 8, 18), source="live",
+                         pass_name="next-morning", now=datetime(2026, 8, 19, 8, 27, tzinfo=CT),
+                         recap_rows=recap_rows, letter_status="received",
+                         parsed_kinds={7720.0: "resistance"})
+    md = pm.render_page(res, pm.history(Path("/nonexistent")))
+    assert "@ 7720 (parse: resistance)" in md
+    assert "**kind-mismatch**" in md
+    assert "1 of 1 matched setups he named by the other word" in md

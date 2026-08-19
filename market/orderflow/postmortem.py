@@ -856,3 +856,172 @@ def history(root: Path = LEDGER_ROOT, *, days: int = 20, before: str | None = No
         out["median_confirms"] = statistics.median(out["confirms_per_day"])
         out["median_silent"] = statistics.median(out["silent_legs_per_day"])
     return out
+
+
+# ------------------------------------------------------------------- page
+
+FOOTER = """## What this page does not judge
+
+Whether any level deserved to be an anchor, whether a move was "a breakdown"
+in a trader's sense, and whether any refinement is right. Those are Strader's,
+with Steve. The numbers above are the record."""
+
+SOURCE_LABEL = {"live": "what you saw — the feeder's own record",
+                "replay": "today's recognizer on that day's tape — not what was on the screen"}
+
+
+def _f(x, nd: int = 2) -> str:
+    if x is None:
+        return "—"
+    if isinstance(x, float):
+        s = f"{x:.{nd}f}"
+        return s.rstrip("0").rstrip(".") if "." in s else s
+    return str(x)
+
+
+def _call_row(c: dict, knobs: Knobs) -> str:
+    what = c["type"] if c["type"] != "SetupRecognition" else f"{c['setup']} {c['state']}"
+    if c.get("anchor") is not None:
+        what += f" @ {_f(c['anchor'])}"
+        pk, rk = c.get("anchor_kind_parse"), c.get("anchor_kind")
+        if pk is not None and rk is not None and pk != rk:
+            what += f" (parse: {pk})"
+    nth = _f(c.get("fire_index")) if c["type"] == "SetupRecognition" else "—"
+    cells = [c["ct"], f"{c['run']}:{c['bar_i']}", what, c["direction"], nth, _f(c.get("confidence"))]
+    for w in knobs.windows_min:
+        cell = f"+{_f(c.get(f'mfe{w}'))} / −{_f(c.get(f'mae{w}'))}"
+        if c.get(f"truncated{w}"):
+            cell += " (window truncated)"
+        cells.append(cell)
+    big = max(knobs.windows_min)
+    cells.append(c.get(f"verdict{big}", "—"))
+    btl = c.get("back_to_level_min")
+    cells.append(f"{btl} min" if btl is not None else "—")
+    lb, lp = c.get("confirm_lag_bars"), c.get("confirm_lag_pts")
+    if lb is not None:
+        cells.append(f"{lb} bars, {lp:+.2f}")
+    elif lp is not None:
+        cells.append(f"{lp:+.2f}")
+    else:
+        cells.append("—")
+    return "| " + " | ".join(str(x) for x in cells) + " |"
+
+
+def render_page(res: dict, hist: dict) -> str:
+    knobs = knobs_from_dict(res["knobs"])
+    day = res["day"]
+    L: list[str] = [f"# Day post-mortem — {day}", ""]
+    L.append(f"Source: **{SOURCE_LABEL.get(res['source'], res['source'])}**. Pass: {res['pass']}, "
+             f"written {res['generated_at'][:16].replace('T', ' ')}.")
+    cov, runs = res["coverage"], res["runs"]
+    restarts = "" if len(runs) <= 1 else " — restarts at " + ", ".join(r["started"][11:16] for r in runs[1:])
+    L.append("")
+    L.append(f"Record: {cov['first_ct'] or '?'} → {cov['last_ct'] or '?'} CT, {cov['bars']} bars of "
+             f"{_f(res.get('bar_n'))} contracts; {len(runs)} run(s){restarts}. "
+             f"Anchors in play: {len(res['anchors'])} Mancini levels.")
+    for r in runs:
+        if r.get("anchorless"):
+            L += ["", f"**Run {r['run']} carried no Mancini levels** ({r.get('first_ct') or '?'} → "
+                      f"{r.get('last_ct') or '?'} CT) — no calls there is not nothing to call."]
+    if cov.get("unmeasured_note"):
+        L += ["", f"**Note:** {cov['unmeasured_note']}."]
+    if res.get("range", {}).get("cash"):
+        L.append("")
+        L.append(f"Cash-session range: {_f(res['range']['cash'])} points "
+                 f"({_f(res['range']['low'])}–{_f(res['range']['high'])} over the whole record).")
+    L.append("")
+    # census
+    L += ["## Census", "", "| Type | State | Count |", "|---|---|---|"]
+    for t, states in sorted(res["census"]["by_type"].items()):
+        for s, n in sorted(states.items()):
+            L.append(f"| {t} | {s} | {n} |")
+    L += ["", "| Anchor | forming | confirmed | invalidated | first | last |", "|---|---|---|---|---|---|"]
+    for a in res["census"]["per_anchor"]:
+        L.append(f"| {_f(a['anchor'])} | {a['forming']} | {a['confirmed']} | {a['invalidated']} "
+                 f"| {a['first_ct'] or '—'} | {a['last_ct'] or '—'} |")
+    L.append("")
+    # calls
+    L += ["## Calls made", ""]
+    hdr = ["Time CT", "Run:bar", "What it said", "Dir", "nth on level", "Conf"]
+    hdr += [f"For / against at {w} min" for w in knobs.windows_min]
+    hdr += [f"±{_f(knobs.target_pts)} first", "Back to level", "Confirm lag"]
+    for sess in ("cash", "overnight", "evening"):
+        rows = [c for c in res["calls"] if c.get("session") == sess]
+        L += [f"### {sess.capitalize()} session — {len(rows)} measured call(s)", ""]
+        if not rows:
+            L += ["None.", ""]
+            continue
+        L.append("| " + " | ".join(hdr) + " |")
+        L.append("|" + "---|" * len(hdr))
+        L += [_call_row(c, knobs) for c in rows]
+        L.append("")
+    # legs
+    L += ["## Moves", "",
+          f"Legs of at least {_f(knobs.x_pts)} points that reached that inside {knobs.y_min} minutes. "
+          f"\"Near a level\" is within {_f(knobs.z_pts)} points; \"said before\" looks back {knobs.w_min} minutes. "
+          f"\"Lid rejections\" counts bars in the {knobs.lid_window_min} minutes before the start whose high "
+          f"came within {knobs.lid_ticks} ticks under the nearest level and closed under it (mirrored for down "
+          f"legs); \"window delta\" is the buy-minus-sell volume over those same minutes, beside how far "
+          f"price moved in them.",
+          "", "| Start CT | End CT | Dir | Points | Minutes | Nearest level (dist) | Near | Lid rejections "
+              "| Window delta / px change | Said before | Tag |",
+          "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for l in res["legs"]:
+        said = ", ".join(l["said_before"]) if l["said_before"] else "nothing"
+        wd = l.get("window_delta")
+        wpx = l.get("window_px_change")
+        win = "—" if wd is None else f"{wd:+d} / {wpx:+.2f}"
+        L.append(f"| {l['origin_ct']} | {l['end_ct']} | {l['direction']} | {_f(l['pts'])} | {l['minutes']} "
+                 f"| {_f(l['nearest_level'])} ({_f(l['level_distance'])}) | {'yes' if l['near_level'] else 'no'} "
+                 f"| {_f(l.get('lid_rejections'))} | {win} | {said} | **{l['tag']}** |")
+    if not res["legs"]:
+        L.append("| — | — | — | — | — | — | — | — | — | — | — |")
+    L.append("")
+    # recap
+    L += ["## Mancini's recap", ""]
+    rc = res["recap"]
+    if rc["status"] == "not-received":
+        L.append("Mancini's recap: not yet received (filled by the next-morning pass).")
+    elif rc["status"] == "no-recap-section":
+        L.append("The letter arrived but has no Trade Recap section.")
+    elif not rc["rows"]:
+        L.append("The letter's recap names no setup with a level.")
+    else:
+        L += ["| His setup | Level | His time (ET) | Match | Machine call (CT) | His words |",
+              "|---|---|---|---|---|---|"]
+        for r in rc["rows"]:
+            L.append(f"| {r['setup']} | {_f(r['level'])} | {r.get('time_et') or '—'} | **{r['tier']}** "
+                     f"| {r.get('matched_ct') or '—'} {r.get('matched_setup') or ''} | "
+                     f"{r['quote'][:160].replace('|', '/').replace(chr(10), ' ')} |")
+        matched = [r for r in rc["rows"] if r.get("tier") != "MISS"]
+        other = sum(1 for r in matched if r.get("word_match") is False)
+        if matched:
+            L += ["", f"{other} of {len(matched)} matched setups he named by the other word "
+                      f"(his Failed Breakdown was the machine's level_reclaim, or the reverse)."]
+    L.append("")
+    # history
+    L += [f"## Last {knobs.history_days} days", ""]
+    n_conf_today = sum(1 for c in res["calls"] if c.get("state") == "confirmed")
+    n_silent_today = sum(1 for l in res["legs"] if l["tag"] == "silent" and l["near_level"])
+    if not hist.get("days"):
+        L.append("No earlier days in the ledger yet.")
+    else:
+        L += [f"{len(hist['days'])} day(s) in the ledger ({hist['days'][0]} → {hist['days'][-1]}).", "",
+              "| | Today | Median of the last days |", "|---|---|---|",
+              f"| Confirmed setups | {n_conf_today} | {_f(hist['median_confirms'])} |",
+              f"| Silent moves near a level | {n_silent_today} | {_f(hist['median_silent'])} |", "",
+              f"| Setup | ±{_f(knobs.target_pts)} win | loss | neither | both in one bar |",
+              "|---|---|---|---|---|"]
+        for s, v in sorted(hist["by_setup"].items()):
+            L.append(f"| {s} | {v.get('win', 0)} | {v.get('loss', 0)} | {v.get('neither', 0)} | {v.get('both-in-one-bar', 0)} |")
+    L.append("")
+    # flags
+    L += ["## For Strader", ""]
+    if not res["flags"]:
+        L.append("No flag tripped today.")
+    for f in res["flags"]:
+        where = (f" (bar {f['bar']}, {f['at']})" if f.get("bar") is not None
+                 else (f" ({f['at']})" if f.get("at") else ""))
+        L.append(f"- **{f['flag']}**{where}: {f['why']}.")
+    L += ["", FOOTER, ""]
+    return "\n".join(L)
