@@ -309,6 +309,7 @@ body.live #prod-dots { display:inline-flex; }
   color:#111; background:var(--cue); box-shadow:0 1px 3px rgba(0,0,0,.4);
   transition:top .45s ease, left .45s ease; white-space:normal; }
 .coach-label.edge { background:var(--ink-2); color:#fff; }
+.coach-label.flip { transform:translateX(-100%); }
 .col .cell.coach-hi { outline:2px solid var(--cue); outline-offset:-1px; z-index:3; }
 @keyframes coach-pulse { 0% { box-shadow:0 0 0 0 var(--cue); } 100% { box-shadow:0 0 0 12px rgba(0,0,0,0); } }
 .col .cell.coach-pulse { animation:coach-pulse 900ms ease-out 2; }
@@ -1177,6 +1178,7 @@ function drawLevelLine() {
   if (viewHi == null) return;
   drawManciniLevels();
   drawSentinelRows();   // same y-mapping, same repaint path [st-n0qm.9]
+  drawCoachPoint();     // the coach cursor rides the same repaint [st-135m]
   if (level == null || level > viewHi || level < viewLo) return;
   const ln = document.createElement("div"); ln.className = "lvl-line"; ln.style.top = yFor(level) + "px";
   const tag = document.createElement("div"); tag.className = "lvl-tag"; tag.style.top = yFor(level) + "px";
@@ -2247,8 +2249,76 @@ function sendState(kind, extra) {
   fetch(BRIDGE + "/state", { method: "POST", body: JSON.stringify(snapshot(kind, extra)),
                              headers: { "Content-Type": "text/plain" } }).catch(() => {});
 }
+// ── coach cursor [st-135m] ────────────────────────────────────────────────
+// A drawn pointer the coach puts on a cell: `point {bar, price, text, pulse,
+// hold_ms}` and `clear` on the coach channel. Steve, 2026-08-18: "a hover would
+// allow you to draw my eye to a specific place on the screen … a cursor would
+// be awesome." State lives outside the DOM (like cueIndex) so it survives
+// repaintAll / zoom; drawCoachPoint() re-places it on the same repaint path
+// the sentinel rows use (drawLevelLine). It is a page element, not the OS
+// mouse — it works on the iPad and cannot interfere with the real pointer.
+let coachPoint = null;          // {bar|null, price, text, pulse, _pulsed} | null
+let coachHoldTimer = null;
+const COACH_CURSOR_SVG = '<svg viewBox="0 0 22 28"><path d="M2 2 L2 22 L7.5 17 L11.5 26 L15 24.5 L11 15.5 L18 15.5 Z"/></svg>';
+function coachTargetCell(bar, price) {
+  return strip.querySelector(`.col[data-i="${bar}"] .cell[data-tk="${Math.round(price / TICK)}"]`);
+}
+function drawCoachPoint() {
+  document.querySelectorAll(".coach-cursor,.coach-label").forEach(e => e.remove());
+  strip.querySelectorAll(".cell.coach-hi").forEach(c => c.classList.remove("coach-hi"));
+  if (!coachPoint || viewHi == null || !stage.clientHeight) return;
+  const cols = $("cols"); if (!cols) return;
+  const bar = coachPoint.bar == null ? idx : coachPoint.bar;
+  const price = coachPoint.price;
+  const { x, on } = senColX(bar);
+  const inY = price <= viewHi && price >= viewLo;
+  const colsLeft = cols.offsetLeft || 0;
+  // Off-view targets park at the nearest edge and the label says so, rather
+  // than vanishing — the coach must be able to see that the pointer landed.
+  const y = inY ? yFor(price) : (price > viewHi ? 4 : Math.max(4, stage.clientHeight - FOOT_H - 4));
+  const cx = colsLeft + (on ? x + COL_W / 2 : 4);
+  const cur = document.createElement("div"); cur.className = "coach-cursor";
+  cur.innerHTML = COACH_CURSOR_SVG;
+  cur.style.left = cx + "px"; cur.style.top = y + "px";
+  const lab = document.createElement("div");
+  const clean = on && inY;
+  lab.className = "coach-label" + (clean ? "" : " edge");
+  lab.textContent = (coachPoint.text || fmtPrice(price))
+    + (clean ? "" : (on ? ` (${fmtPrice(price)} is off-view)` : " (bar off-screen ←)"));
+  lab.style.left = (cx + 18) + "px"; lab.style.top = (y + 10) + "px";
+  stage.appendChild(cur); stage.appendChild(lab);
+  // The newest column sits at the right edge, so a label to the right of the
+  // cursor runs off the page — flip it to the left when it would overflow.
+  if (lab.offsetWidth && lab.offsetLeft + lab.offsetWidth > (stage.clientWidth || 0)) {
+    lab.classList.add("flip"); lab.style.left = (cx - 10) + "px";
+  }
+  const cell = on ? coachTargetCell(bar, price) : null;
+  if (cell) {
+    cell.classList.add("coach-hi");
+    if (coachPoint.pulse && !coachPoint._pulsed) {
+      coachPoint._pulsed = true;
+      cell.classList.add("coach-pulse");
+      setTimeout(() => cell.classList.remove("coach-pulse"), 1900);
+    }
+  }
+}
+function coachPointTo(cmd) {
+  if (!isFinite(cmd.price)) return;
+  coachPoint = { bar: cmd.bar == null ? null : Number(cmd.bar), price: Number(cmd.price),
+                 text: cmd.text || "", pulse: !!cmd.pulse, _pulsed: false };
+  if (coachHoldTimer) { clearTimeout(coachHoldTimer); coachHoldTimer = null; }
+  if (isFinite(cmd.hold_ms) && Number(cmd.hold_ms) > 0) coachHoldTimer = setTimeout(coachClear, Number(cmd.hold_ms));
+  drawCoachPoint();
+}
+function coachClear() {
+  coachPoint = null;
+  if (coachHoldTimer) { clearTimeout(coachHoldTimer); coachHoldTimer = null; }
+  drawCoachPoint();
+}
 function applyCoach(cmd) {
   if (cmd.type === "say") showCaption("COACH: " + (cmd.text || ""));
+  else if (cmd.type === "point") coachPointTo(cmd);
+  else if (cmd.type === "clear") coachClear();
   else if (cmd.type === "arm" && isFinite(cmd.price)) { $("lvlinput").value = cmd.price; armLevel(true); }
   else if (cmd.type === "jump" && isFinite(cmd.bar)) { seekTo(Number(cmd.bar)); showCaption(cmd.text ? "COACH: " + cmd.text : "Coach moved you to bar " + cmd.bar); }
   else if (cmd.type === "pause") pause();

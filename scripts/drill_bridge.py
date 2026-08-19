@@ -11,7 +11,7 @@ Endpoints (all JSON; POST bodies are sent as text/plain so file:// pages make
   GET  /health                     -> {ok, started, events, queued}
   POST /state                      <- drill state event; appended to the log
   GET  /state/tail?n=50            -> last n logged events (coach convenience)
-  POST /coach                      <- {type: say|arm|jump|pause|play, ...}
+  POST /coach                      <- {type: say|arm|jump|pause|play|point|clear, ...}
   GET  /commands?since=<id>        -> {commands: [...], last: <id>} (drill poll)
   POST /bars                       <- {bars: [...], meta: {...}, final: [...]} from the feeder
   GET  /bars?since=<n>             -> {bars: [...], total, meta, final, developing, profile}
@@ -97,7 +97,8 @@ PRODUCERS = {
     "feed":     {"file": "_footprint_health.json",   "per_day": True,  "fresh_s": 90},
 }
 
-COACH_TYPES = {"say", "arm", "jump", "pause", "play"}
+# point/clear: the coach cursor [st-135m] — a page-drawn pointer on a cell.
+COACH_TYPES = {"say", "arm", "jump", "pause", "play", "point", "clear"}
 
 # ── drill mode [st-v7a0] ────────────────────────────────────────────────────
 # The live page is one day's tape; the drill is a past day's tape with the

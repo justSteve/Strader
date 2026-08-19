@@ -36,6 +36,18 @@ def test_coach_ids_are_monotonic_and_polled_incrementally(state):
     assert state.commands_since(2) == []
 
 
+def test_coach_point_and_clear_are_accepted(state):
+    """The coach cursor verbs [st-135m]: point {bar, price, text, pulse, hold_ms}
+    and clear — the page draws/removes a pointer; the bridge only relays."""
+    a = state.add_coach({"type": "point", "bar": 66, "price": 7730.75,
+                         "text": "POC of the 730-delta bar", "pulse": True})
+    b = state.add_coach({"type": "clear"})
+    got = state.commands_since(0)
+    assert [c["type"] for c in got] == ["point", "clear"]
+    assert got[0]["price"] == 7730.75 and got[0]["bar"] == 66 and got[0]["pulse"] is True
+    assert (a["id"], b["id"]) == (1, 2)
+
+
 def test_invalid_coach_type_rejected(state):
     with pytest.raises(ValueError, match="coach type"):
         state.add_coach({"type": "format_disk"})
