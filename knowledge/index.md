@@ -62,6 +62,7 @@ in it covered external domain knowledge or facts about the operator.
 - [Directional GEX Butterflies](directional-gex-butterflies.md) — Steve trades late-day flies DIRECTIONALLY centered on the GEX target, not neutral/ATM theta-harvest
 - [ORB Playbook](orb-playbook.md) — Strategy 2, the mechanical 8:30–10:00 CT opening range breakout on LuxAlgo Ultimate ORB: HV signals only, ATR trail, take Target 1, one trade per morning
 - [PAC Order Blocks for Strike Centering](pac-order-blocks-for-strike-centering.md) — LuxAlgo PAC order blocks are Steve's primary tool for butterfly strike centering — more precise than Mancini levels alone
+- [Reclaim Under the Lid](reclaim-under-the-lid.md) — Named setup from Carmine's 2026-08-19 7739 trades: Mancini's FBD shape on a level with history, plus a stepping-down seller lid and absorbed dips under the reclaim point, thin volume above to the first target; six conditions, five mechanical
 - [Selective Range Scalping](selective-range-scalping.md) — Strategy 3, **exploratory** — A+ PAC level bounces only, 2–3 per session max, 3–5 SPX point targets sized to beat option spread friction
 - [Singles as Futures Proxy](singles-as-futures-proxy.md) — Steve trades 0DTE long singles as a proxy for futures strategies — "an option single is a futures contract on its last day"
 - [V-Day Target Is v_down Only](v-day-target-is-v-down-only.md) — For st-r2o V-day detection, Steve's actual butterfly-strategy target is v_down only; v_up (inverted-V) is diagnostic, not a trade setup
