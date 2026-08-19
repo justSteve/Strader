@@ -164,3 +164,79 @@ def test_excursion_truncated_when_record_ends_before_until():
     r = pm.excursion(bars, start=0, entry=100.0, sign=+1,
                      until=bars[1].t1 + timedelta(minutes=30), target=5.0)
     assert r.truncated is True and r.verdict == "neither"
+
+
+# ------------------------------------------------------------------ calls
+
+def _flush_reclaim_confirm():
+    """Anchor 7720. Bars: above, flush below (bar 2), stay below, first close
+    back above at bar 5 (the reclaim), confirm at bar 7 (lag 2) with close
+    7723.75 (+3.75 from the anchor). Then a drift back under the level at
+    bar 12 (back-to-level after 5 minutes)."""
+    closes = [7721, 7720.5, 7718, 7716, 7717, 7721.5, 7721.5, 7723.75,
+              7724, 7723, 7722, 7721, 7719.5, 7719, 7720.5, 7722]
+    bars = [_bar(i, c, c + 0.75, c - 0.75, c) for i, c in enumerate(closes)]
+    events = [
+        _ev(2, bars, setup="failed_breakdown", bias="bullish", anchor_price=7720.0,
+            anchor_kind="support", state="forming", beats=["flush"], fire_index=1,
+            confidence=0.35, mancini_confluence=True),
+        _ev(7, bars, setup="failed_breakdown", bias="bullish", anchor_price=7720.0,
+            anchor_kind="support", state="confirmed", beats=["flush", "flip", "stall", "confirm"],
+            fire_index=1, confidence=0.8, mancini_confluence=True),
+        _ev(9, bars, type="SweepPrint", direction="buy", start_price=7723.0,
+            end_price=7724.5, ticks_swept=6, total_size=300, confidence=1.0),
+    ]
+    return bars, events
+
+
+def test_measure_calls_rows_and_confirm_lag():
+    bars, events = _flush_reclaim_confirm()
+    seg = _segment(bars, events, mancini=[7720.0])
+    rows = pm.measure_calls(seg, pm.Knobs())
+    kinds = [(r["type"], r.get("state")) for r in rows]
+    assert ("SetupRecognition", "confirmed") in kinds and ("SweepPrint", None) in kinds
+    assert ("SetupRecognition", "forming") not in kinds       # counted elsewhere, not measured
+    c = next(r for r in rows if r.get("state") == "confirmed")
+    assert c["bar_i"] == 7 and c["entry"] == 7723.75 and c["direction"] == "bullish"
+    assert c["fire_index"] == 1 and c["anchor"] == 7720.0
+    assert c["confirm_lag_bars"] == 2 and c["confirm_lag_pts"] == 3.75
+    assert c["back_to_level_min"] == 5            # bar 12 closes under 7720
+    assert c["mfe5"] >= 0 and "verdict30" in c and "truncated30" in c
+    assert c["anchor_kind"] == "support" and c["anchor_kind_parse"] is None
+    s = next(r for r in rows if r["type"] == "SweepPrint")
+    assert s["direction"] == "bullish" and s["entry"] == 7723.0 and s["anchor"] is None
+
+
+def test_measure_calls_anchor_kind_from_the_parse():
+    """Addendum A1: the recognizer says support for every level; the parse
+    knows which were resistance. Exact price match; None when absent."""
+    bars, events = _flush_reclaim_confirm()
+    seg = _segment(bars, events, mancini=[7720.0])
+    rows = pm.measure_calls(seg, pm.Knobs(), parsed_kinds={7720.0: "resistance"})
+    c = next(r for r in rows if r.get("state") == "confirmed")
+    assert c["anchor_kind_parse"] == "resistance"
+    rows = pm.measure_calls(seg, pm.Knobs(), parsed_kinds={7724.0: "support"})
+    c = next(r for r in rows if r.get("state") == "confirmed")
+    assert c["anchor_kind_parse"] is None
+
+
+def test_measure_calls_direction_mapping_and_invalidated_sign():
+    bars = [_bar(i, 100, 100.5, 99.5, 100) for i in range(4)]
+    events = [
+        _ev(0, bars, type="DeltaDivergence", kind="bearish", price_extreme=100.0,
+            prior_extreme=99.0, cvd_at_extreme=1, cvd_at_prior=2),
+        _ev(1, bars, type="ImbalanceStack", direction="sell", prices=[100.0], ratios=[3.0]),
+        _ev(2, bars, setup="level_reclaim", bias="bullish", anchor_price=99.0,
+            anchor_kind="support", state="invalidated", beats=[], fire_index=2, confidence=0.0),
+    ]
+    rows = pm.measure_calls(_segment(bars, events), pm.Knobs())
+    assert [r["direction"] for r in rows] == ["bearish", "bearish", "bullish"]
+    assert rows[2]["state"] == "invalidated"
+
+
+def test_measure_calls_skips_events_without_a_known_bar():
+    bars = [_bar(i, 100, 100.5, 99.5, 100) for i in range(2)]
+    ev = _ev(0, bars, type="Level", price=100.0, level_type="support")
+    ev["bar_i"] = None
+    rows = pm.measure_calls(_segment(bars, [ev]), pm.Knobs())
+    assert rows == []

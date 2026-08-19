@@ -217,3 +217,120 @@ def excursion(bars: list, *, start: int, entry: float, sign: int,
                 verdict = "loss"
     return Excursion(mfe=round(mfe, 2), mae=round(mae, 2), verdict=verdict,
                      truncated=last_t1 < until)
+
+
+MEASURED_TYPES = ("SetupRecognition", "DeltaDivergence", "SweepPrint", "ImbalanceStack")
+
+
+def direction_of(ev: dict) -> str | None:
+    """bullish | bearish | None. One place for every emitter's field name."""
+    t = ev.get("type")
+    if t == "SetupRecognition":
+        return ev.get("bias")
+    if t == "DeltaDivergence":
+        return ev.get("kind")
+    if t in ("SweepPrint", "ImbalanceStack"):
+        return {"buy": "bullish", "sell": "bearish"}.get(ev.get("direction"))
+    return None
+
+
+def _sign(direction: str) -> int:
+    return 1 if direction == "bullish" else -1
+
+
+def _right_side(price: float, anchor: float, direction: str) -> bool:
+    """Is ``price`` on the setup's side of the anchor?"""
+    return price > anchor if direction == "bullish" else price < anchor
+
+
+def confirm_lag(seg: Segment, ev: dict) -> tuple[int | None, float | None]:
+    """(bars from the reclaim to the confirm, points past the anchor at the
+    confirm close). The reclaim is the first close back on the setup's side
+    of the anchor after the flush bar; the flush bar is the earliest
+    ``forming`` beat for the same (anchor, setup, fire_index). Without one the
+    lag is None and the points still report."""
+    k = seg.pos(ev.get("bar_i"))
+    if k is None:
+        return None, None
+    anchor = float(ev["anchor_price"])
+    direction = ev.get("bias") or "bullish"
+    pts = round(_sign(direction) * (seg.bars[k].c - anchor), 2)
+    key = (ev.get("anchor_price"), ev.get("setup"), ev.get("fire_index"))
+    forming_pos = [seg.pos(e.get("bar_i")) for e in seg.events
+                   if e.get("type") == "SetupRecognition" and e.get("state") == "forming"
+                   and (e.get("anchor_price"), e.get("setup"), e.get("fire_index")) == key]
+    forming_pos = [p for p in forming_pos if p is not None and p <= k]
+    if not forming_pos:
+        return None, pts
+    for j in range(min(forming_pos) + 1, k + 1):
+        if _right_side(seg.bars[j].c, anchor, direction):
+            return k - j, pts
+    return 0, pts
+
+
+def back_to_level(seg: Segment, k: int, anchor: float, direction: str,
+                  until: datetime) -> int | None:
+    """Minutes until the first close back on the wrong side of ``anchor``
+    after bar index ``k``, inside ``until``; None if it never happened."""
+    for b in seg.bars[k + 1:]:
+        if b.t0 > until:
+            return None
+        if not _right_side(b.c, anchor, direction) and b.c != anchor:
+            return int(round((b.t1 - seg.bars[k].t1).total_seconds() / 60))
+    return None
+
+
+def measure_calls(seg: Segment, knobs: Knobs,
+                  parsed_kinds: dict[float, str] | None = None) -> list[dict]:
+    """One row per measured emission (spec §3a). ``forming`` beats and
+    ``Level`` rows are not measured; events without a known bar are skipped
+    (end-of-stream flush signals, profile levels).
+
+    ``parsed_kinds`` (Addendum A1) is {price: kind} from the day's Mancini
+    parse; every SetupRecognition row carries ``anchor_kind_parse`` — the
+    parse's word for the anchor, or None when the parse has no such level.
+    """
+    rows: list[dict] = []
+    parsed_kinds = parsed_kinds or {}
+    for ev in seg.events:
+        if ev.get("type") not in MEASURED_TYPES:
+            continue
+        if ev.get("type") == "SetupRecognition" and ev.get("state") == "forming":
+            continue
+        k = seg.pos(ev.get("bar_i"))
+        if k is None:
+            continue
+        direction = direction_of(ev)
+        if direction not in ("bullish", "bearish"):
+            continue
+        bar = seg.bars[k]
+        entry = float(ev.get("start_price", bar.c)) if ev["type"] == "SweepPrint" else bar.c
+        anchor = float(ev["anchor_price"]) if ev.get("anchor_price") is not None else None
+        row = {
+            "run": seg.run_no, "bar_i": bar.i, "ct": bar.t1.strftime("%H:%M"),
+            "t1": bar.t1.isoformat(), "type": ev["type"],
+            "setup": ev.get("setup"), "state": ev.get("state"),
+            "direction": direction, "entry": entry,
+            "confidence": ev.get("confidence"), "reason": ev.get("reason"),
+            "anchor": anchor,
+            "anchor_kind": ev.get("anchor_kind"),
+            "anchor_kind_parse": (parsed_kinds.get(anchor) if anchor is not None else None),
+            "fire_index": ev.get("fire_index"),
+            "confirm_lag_bars": None, "confirm_lag_pts": None,
+            "back_to_level_min": None,
+        }
+        for w in knobs.windows_min:
+            ex = excursion(seg.bars, start=k, entry=entry, sign=_sign(direction),
+                           until=bar.t1 + timedelta(minutes=w), target=knobs.target_pts)
+            row[f"mfe{w}"] = ex.mfe
+            row[f"mae{w}"] = ex.mae
+            row[f"verdict{w}"] = ex.verdict
+            row[f"truncated{w}"] = ex.truncated
+        if ev["type"] == "SetupRecognition" and anchor is not None:
+            if ev.get("state") == "confirmed":
+                row["confirm_lag_bars"], row["confirm_lag_pts"] = confirm_lag(seg, ev)
+            row["back_to_level_min"] = back_to_level(
+                seg, k, anchor, direction,
+                bar.t1 + timedelta(minutes=max(knobs.windows_min)))
+        rows.append(row)
+    return rows
