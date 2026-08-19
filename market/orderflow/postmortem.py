@@ -334,3 +334,161 @@ def measure_calls(seg: Segment, knobs: Knobs,
                 bar.t1 + timedelta(minutes=max(knobs.windows_min)))
         rows.append(row)
     return rows
+
+
+# ------------------------------------------------------------------- legs
+
+@dataclass
+class Leg:
+    direction: str        # bullish | bearish
+    origin_i: int         # list index into seg.bars (NOT feeder bar number)
+    end_i: int
+    origin_px: float
+    end_px: float
+    minutes: int = 0
+    reached_x_min: int | None = None
+
+    @property
+    def pts(self) -> float:
+        return round(abs(self.end_px - self.origin_px), 2)
+
+
+def zigzag_legs(bars: list, x_pts: float) -> list[Leg]:
+    """Legs between alternating extremes, using highs and lows. A new leg is
+    opened when price has moved ``x_pts`` against the running extreme of the
+    current one; the first touch of an extreme is the leg's end (a later
+    equal high does not move it). The last, unfinished leg is included — it
+    is what the day ended doing."""
+    if not bars:
+        return []
+    legs: list[Leg] = []
+    lo_i = hi_i = 0
+    lo, hi = bars[0].l, bars[0].h
+    direction: str | None = None
+    origin_i, origin_px, ext_i, ext_px = 0, bars[0].c, 0, bars[0].c
+    for k, b in enumerate(bars):
+        if direction is None:
+            if b.h > hi:
+                hi, hi_i = b.h, k
+            if b.l < lo:
+                lo, lo_i = b.l, k
+            if hi - lo >= x_pts:
+                if hi_i >= lo_i:        # rose from the low: bullish leg from lo
+                    direction, origin_i, origin_px, ext_i, ext_px = "bullish", lo_i, lo, hi_i, hi
+                else:
+                    direction, origin_i, origin_px, ext_i, ext_px = "bearish", hi_i, hi, lo_i, lo
+            continue
+        if direction == "bullish":
+            if b.h > ext_px:
+                ext_i, ext_px = k, b.h
+            elif ext_px - b.l >= x_pts:
+                legs.append(Leg("bullish", origin_i, ext_i, origin_px, ext_px))
+                direction, origin_i, origin_px, ext_i, ext_px = "bearish", ext_i, ext_px, k, b.l
+        else:
+            if b.l < ext_px:
+                ext_i, ext_px = k, b.l
+            elif b.h - ext_px >= x_pts:
+                legs.append(Leg("bearish", origin_i, ext_i, origin_px, ext_px))
+                direction, origin_i, origin_px, ext_i, ext_px = "bullish", ext_i, ext_px, k, b.h
+    if direction is not None:
+        legs.append(Leg(direction, origin_i, ext_i, origin_px, ext_px))
+    for leg in legs:
+        o, e = bars[leg.origin_i], bars[leg.end_i]
+        leg.minutes = int(round((e.t1 - o.t1).total_seconds() / 60))
+        sign = 1 if leg.direction == "bullish" else -1
+        for b in bars[leg.origin_i:leg.end_i + 1]:
+            far = sign * ((b.h if sign > 0 else b.l) - leg.origin_px)
+            if far >= x_pts:
+                leg.reached_x_min = int(round((b.t1 - o.t1).total_seconds() / 60))
+                break
+    return legs
+
+
+def keep_legs(legs: list[Leg], knobs: Knobs) -> list[Leg]:
+    """Spec §3b step 2: at least X points, and X reached inside Y minutes."""
+    return [l for l in legs
+            if l.pts >= knobs.x_pts and l.reached_x_min is not None
+            and l.reached_x_min <= knobs.y_min]
+
+
+def lid_and_absorption(seg: Segment, origin_i: int, direction: str,
+                       level: float | None, knobs: Knobs) -> dict:
+    """Addendum A3 — two bar-measurable facts from the ``lid_window_min``
+    minutes before a leg's origin (bars strictly before the origin bar):
+
+    ``lid_rejections``: bars whose high landed within ``lid_ticks`` under the
+    level and closed under it (bullish legs; mirrored for bearish). A high
+    exactly on the level counts — on a quarter-tick grid a touch that did not
+    get through is a rejection. None when no level is within ``z_pts``.
+    ``window_delta``: the bars' ``d`` summed. ``window_px_change``: the origin
+    close minus the close at the start of the window (the last bar at or
+    before it, else the first bar inside it). Absorption reads as delta one
+    way while price went nowhere; the numbers are shown, not named.
+    """
+    o = seg.bars[origin_i]
+    since = o.t1 - timedelta(minutes=knobs.lid_window_min)
+    window = [b for b in seg.bars[:origin_i] if b.t1 >= since]
+    before = [b for b in seg.bars[:origin_i] if b.t1 < since]
+    out = {"lid_rejections": None, "window_delta": None, "window_px_change": None}
+    if not window:
+        return out
+    out["window_delta"] = int(sum(b.d for b in window))
+    ref = before[-1] if before else window[0]
+    out["window_px_change"] = round(o.c - ref.c, 2)
+    if level is None:
+        return out
+    band = knobs.lid_ticks * 0.25
+    if direction == "bullish":
+        n = sum(1 for b in window if level - band <= b.h <= level and b.c < level)
+    else:
+        n = sum(1 for b in window if level <= b.l <= level + band and b.c > level)
+    out["lid_rejections"] = n
+    return out
+
+
+def tag_legs(legs: list[Leg], seg: Segment, *, anchors: list[float], knobs: Knobs) -> list[dict]:
+    """Spec §3b steps 3–5: nearest level at the origin, and what was said in
+    the W minutes before it, in the leg's direction. Plus Addendum A3's lid
+    and absorption numbers on every row."""
+    out: list[dict] = []
+    for leg in legs:
+        o = seg.bars[leg.origin_i]
+        nearest, dist = None, None
+        for a in anchors:
+            d = abs(a - leg.origin_px)
+            if dist is None or d < dist:
+                nearest, dist = a, round(d, 2)
+        near = dist is not None and dist <= knobs.z_pts
+        since = o.t1 - timedelta(minutes=knobs.w_min)
+        said: list[str] = []
+        tag = "silent"
+        for ev in seg.events:
+            if ev.get("type") not in MEASURED_TYPES:
+                continue
+            k = seg.pos(ev.get("bar_i"))
+            if k is None:
+                continue
+            t = seg.bars[k].t1
+            if t < since or t > o.t1:
+                continue
+            if direction_of(ev) != leg.direction:
+                continue
+            said.append(f"{ev['type']}:{ev.get('state') or ''}@{t.strftime('%H:%M')}")
+            if ev["type"] == "SetupRecognition" and ev.get("state") == "confirmed":
+                tag = "called"
+            elif tag != "called":
+                tag = "hinted"
+        row = {
+            "run": seg.run_no, "direction": leg.direction,
+            "origin_bar": o.i, "origin_ct": o.t1.strftime("%H:%M"),
+            "end_bar": seg.bars[leg.end_i].i, "end_ct": seg.bars[leg.end_i].t1.strftime("%H:%M"),
+            "origin_px": leg.origin_px, "end_px": leg.end_px, "pts": leg.pts,
+            "minutes": leg.minutes, "reached_x_min": leg.reached_x_min,
+            "nearest_level": nearest, "level_distance": dist,
+            "near_level": near,
+            "tag": tag, "said_before": said,
+        }
+        row.update(lid_and_absorption(seg, leg.origin_i, leg.direction,
+                                      nearest if near else None, knobs))
+        out.append(row)
+    return out

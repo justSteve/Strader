@@ -240,3 +240,92 @@ def test_measure_calls_skips_events_without_a_known_bar():
     ev["bar_i"] = None
     rows = pm.measure_calls(_segment(bars, [ev]), pm.Knobs())
     assert rows == []
+
+
+# ------------------------------------------------------------------- legs
+
+def _path(closes, *, spread=0.5):
+    return [_bar(i, c, c + spread, c - spread, c) for i, c in enumerate(closes)]
+
+
+def test_zigzag_legs_threshold_and_window():
+    # up 8 in 5 minutes (kept), down 7 in 4 (kept), then up 9 at 0.2/min —
+    # X=6 reached 30 minutes after the origin, outside Y=15 (dropped).
+    closes = [100, 101, 103, 104, 106, 108, 108,
+              106, 104, 102, 101] + [101 + 0.2 * n for n in range(1, 46)]
+    bars = _path(closes, spread=0.0)
+    knobs = pm.Knobs(x_pts=6.0, y_min=15)
+    legs = pm.zigzag_legs(bars, knobs.x_pts)
+    assert [(l.direction, round(l.pts, 1)) for l in legs] == \
+        [("bullish", 8.0), ("bearish", 7.0), ("bullish", 9.0)]
+    assert legs[2].reached_x_min == 30
+    kept = pm.keep_legs(legs, knobs)
+    assert [round(l.pts, 1) for l in kept] == [8.0, 7.0]
+    a = kept[0]
+    assert a.direction == "bullish" and a.origin_i == 0 and a.pts == 8.0
+    assert a.end_i == 5 and a.minutes == 5 and a.reached_x_min <= 15
+
+
+def test_zigzag_uses_highs_and_lows_not_closes():
+    # closes flat, but bar 2 spikes 7 points high then back: one up leg, one down leg
+    bars = [_bar(0, 100, 100.5, 99.5, 100), _bar(1, 100, 100.5, 99.5, 100),
+            _bar(2, 100, 107, 99.5, 100), _bar(3, 100, 100.5, 99.5, 100),
+            _bar(4, 100, 100.5, 99.5, 100)]
+    legs = pm.zigzag_legs(bars, 6.0)
+    assert [l.direction for l in legs][:2] == ["bullish", "bearish"]
+    assert legs[0].pts == 7.5          # 99.5 low → 107 high
+
+
+def test_tag_legs_called_hinted_silent_and_near_level():
+    bars, events = _flush_reclaim_confirm()     # confirm at bar 7, sweep at bar 9
+    # then a 10-point up leg from bar 16 (7723) → bar 20 (7731), inside W of the sweep
+    extra = [_bar(16 + n, 7723 + 2 * n, 7723 + 2 * n + 0.5, 7723 + 2 * n - 0.5, 7723 + 2 * n)
+             for n in range(5)]
+    seg = _segment(bars + extra, events, mancini=[7720.0, 7734.0])
+    knobs = pm.Knobs(x_pts=6.0, y_min=15, z_pts=3.0, w_min=10)
+    legs = pm.keep_legs(pm.zigzag_legs(seg.bars, knobs.x_pts), knobs)
+    tagged = pm.tag_legs(legs, seg, anchors=seg.mancini, knobs=knobs)
+    up = [t for t in tagged if t["direction"] == "bullish"]
+    assert up, "expected a kept bullish leg"
+    assert up[-1]["tag"] in ("called", "hinted")      # a confirm or sweep preceded it
+    assert up[-1]["nearest_level"] in (7720.0, 7734.0)
+    assert "near_level" in up[-1] and "said_before" in up[-1]
+    assert {"lid_rejections", "window_delta", "window_px_change"} <= set(up[-1])
+
+
+def test_tag_legs_silent_when_nothing_in_window():
+    bars = _path([100, 100, 100, 100, 101, 103, 105, 107, 108])
+    seg = _segment(bars, [], mancini=[101.0])
+    knobs = pm.Knobs(x_pts=6.0, y_min=15, z_pts=3.0, w_min=10)
+    tagged = pm.tag_legs(pm.keep_legs(pm.zigzag_legs(bars, 6.0), knobs), seg,
+                         anchors=[101.0], knobs=knobs)
+    assert len(tagged) == 1 and tagged[0]["tag"] == "silent" and tagged[0]["near_level"] is True
+
+
+def test_tag_legs_lid_rejections_and_window_delta():
+    """Addendum A3: four highs within 8 ticks under the 7738 lid in the 30
+    minutes before the origin; window delta sums the bars' d."""
+    def b(i, h, d):
+        return pm.Bar(i=i, t0=T0 + timedelta(minutes=i), t1=T0 + timedelta(minutes=i, seconds=55),
+                      o=7735.5, h=h, l=7735.5, c=7735.5, v=2000, d=d)
+    lid_highs = {2: 7737.75, 4: 7738.0, 6: 7737.5, 8: 7737.75}
+    bars = [b(i, lid_highs.get(i, 7735.75), 50 if i in lid_highs else 20) for i in range(10)]
+    bars.append(pm.Bar(i=10, t0=T0 + timedelta(minutes=10), t1=T0 + timedelta(minutes=10, seconds=55),
+                       o=7735.5, h=7735.75, l=7735.25, c=7735.5, v=2000, d=-30))   # the origin low
+    rise = [7737.0, 7738.5, 7740.0, 7741.5, 7743.0, 7744.0]
+    bars += [pm.Bar(i=11 + n, t0=T0 + timedelta(minutes=11 + n), t1=T0 + timedelta(minutes=11 + n, seconds=55),
+                    o=c - 0.5, h=c + 0.25, l=c - 0.5, c=c, v=2000, d=100) for n, c in enumerate(rise)]
+    seg = _segment(bars, [], mancini=[7738.0])
+    knobs = pm.Knobs(x_pts=6.0, y_min=15, z_pts=3.0, lid_ticks=8, lid_window_min=30)
+    tagged = pm.tag_legs(pm.keep_legs(pm.zigzag_legs(bars, 6.0), knobs), seg,
+                         anchors=[7738.0], knobs=knobs)
+    assert len(tagged) == 1
+    t = tagged[0]
+    assert t["direction"] == "bullish" and t["origin_bar"] == 10 and t["near_level"] is True
+    assert t["lid_rejections"] == 4
+    assert t["window_delta"] == 4 * 50 + 6 * 20
+    assert t["window_px_change"] == 0.0           # 7735.5 at origin, 7735.5 thirty minutes earlier
+    # no level near the origin → the lid count is None, the delta still reports
+    far = pm.tag_legs(pm.keep_legs(pm.zigzag_legs(bars, 6.0), knobs), seg,
+                      anchors=[7760.0], knobs=knobs)
+    assert far[0]["lid_rejections"] is None and far[0]["window_delta"] == 320
