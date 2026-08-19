@@ -125,3 +125,42 @@ def test_segment_pos_maps_bar_number_to_index():
     seg = _segment(bars, [])
     assert seg.pos(11) == 1
     assert seg.pos(99) is None and seg.pos(None) is None
+
+
+# -------------------------------------------------------------- excursion
+
+def test_excursion_for_and_against_from_bars():
+    # entry 100 at bar 0 close; next bars: up to 103, down to 98, up to 106
+    bars = [_bar(0, 100, 100, 100, 100),
+            _bar(1, 100, 103, 99.5, 102),
+            _bar(2, 102, 102, 98, 99),
+            _bar(3, 99, 106, 99, 105)]
+    r = pm.excursion(bars, start=0, entry=100.0, sign=+1,
+                     until=bars[0].t1 + timedelta(minutes=30), target=5.0)
+    assert r == pm.Excursion(mfe=6.0, mae=2.0, verdict="win", truncated=True)
+    r = pm.excursion(bars, start=0, entry=100.0, sign=-1,
+                     until=bars[0].t1 + timedelta(minutes=30), target=5.0)
+    assert (r.mfe, r.mae, r.verdict) == (2.0, 6.0, "loss")
+
+
+def test_excursion_window_stops_at_until():
+    bars = [_bar(0, 100, 100, 100, 100), _bar(1, 100, 101, 99, 100),
+            _bar(2, 100, 120, 100, 119)]
+    r = pm.excursion(bars, start=0, entry=100.0, sign=+1,
+                     until=bars[1].t1, target=5.0)
+    assert (r.mfe, r.mae, r.verdict, r.truncated) == (1.0, 1.0, "neither", False)
+
+
+def test_excursion_both_in_one_bar_is_named_not_guessed():
+    bars = [_bar(0, 100, 100, 100, 100), _bar(1, 100, 106, 94, 100)]
+    r = pm.excursion(bars, start=0, entry=100.0, sign=+1,
+                     until=bars[1].t1, target=5.0)
+    assert r.verdict == "both-in-one-bar"
+    assert (r.mfe, r.mae) == (6.0, 6.0)
+
+
+def test_excursion_truncated_when_record_ends_before_until():
+    bars = [_bar(0, 100, 100, 100, 100), _bar(1, 100, 101, 99, 100)]
+    r = pm.excursion(bars, start=0, entry=100.0, sign=+1,
+                     until=bars[1].t1 + timedelta(minutes=30), target=5.0)
+    assert r.truncated is True and r.verdict == "neither"

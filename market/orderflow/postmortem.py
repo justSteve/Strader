@@ -174,3 +174,46 @@ def segments_from_replay(day: _date, *, bar_n: int, mancini: list[float]) -> lis
             "replay": True}
     return [Segment(run_no=1, bars=[Bar.from_record(b) for b in bars],
                     events=events, meta=meta, complete=True)]
+
+
+# --------------------------------------------------------------- measuring
+
+@dataclass(frozen=True)
+class Excursion:
+    mfe: float          # furthest the call's way, points
+    mae: float          # furthest against, points
+    verdict: str        # win | loss | neither | both-in-one-bar
+    truncated: bool     # the record ended before ``until``
+
+
+def excursion(bars: list, *, start: int, entry: float, sign: int,
+              until: datetime, target: float) -> Excursion:
+    """For/against from ``entry`` over bars after index ``start`` until ``until``.
+
+    The bar-level twin of acuity_run2's trade-level function: highs and lows
+    stand in for prints. First touch at ±target is graded bar by bar; a bar
+    whose range covers both sides before either was touched alone is reported
+    as such, not resolved by a coin.
+    """
+    mfe = mae = 0.0
+    verdict = "neither"
+    last_t1 = bars[start].t1
+    for b in bars[start + 1:]:
+        if b.t0 > until:
+            break
+        last_t1 = b.t1
+        up = sign * (b.h - entry)
+        dn = sign * (b.l - entry)
+        hi, lo = max(up, dn), min(up, dn)
+        mfe = max(mfe, hi)
+        mae = max(mae, -lo)
+        if verdict == "neither":
+            hit_for, hit_against = hi >= target, -lo >= target
+            if hit_for and hit_against:
+                verdict = "both-in-one-bar"
+            elif hit_for:
+                verdict = "win"
+            elif hit_against:
+                verdict = "loss"
+    return Excursion(mfe=round(mfe, 2), mae=round(mae, 2), verdict=verdict,
+                     truncated=last_t1 < until)
