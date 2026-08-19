@@ -413,7 +413,8 @@ def test_flags_kind_mismatch():
     """Addendum A1: the parse says resistance, the recognizer said support."""
     bars, events = _flush_reclaim_confirm()
     seg = _segment(bars, events, mancini=[7720.0])
-    for parse_kind, expect in (("resistance", True), ("support", False), (None, False)):
+    for parse_kind, expect in (("resistance", True), ("support", False), (None, False),
+                               ("trigger", False)):   # shown on the row, not a flag
         kinds = {7720.0: parse_kind} if parse_kind else {}
         calls = pm.measure_calls(seg, pm.Knobs(), parsed_kinds=kinds)
         fl = pm.flags(calls, [], pm.census(seg, calls), session_range=20.0, knobs=pm.Knobs())
@@ -439,10 +440,10 @@ def test_analyze_day_on_fixture_has_every_section_input():
     assert res["runs"] == [
         {"run": 1, "started": segs[0].started, "bars": 3, "complete": True,
          "anchorless": True, "first_ct": segs[0].bars[0].t0.strftime("%H:%M"),
-         "last_ct": segs[0].bars[-1].t1.strftime("%H:%M")},
+         "last_ct": segs[0].bars[-1].t1.strftime("%H:%M"), "overlap_bars": 0},
         {"run": 2, "started": segs[1].started, "bars": 41, "complete": True,
          "anchorless": False, "first_ct": segs[1].bars[0].t0.strftime("%H:%M"),
-         "last_ct": segs[1].bars[-1].t1.strftime("%H:%M")}]
+         "last_ct": segs[1].bars[-1].t1.strftime("%H:%M"), "overlap_bars": 0}]
     assert res["coverage"]["first_ct"] and res["coverage"]["last_ct"]
     assert res["census"]["by_type"]["SetupRecognition"]["confirmed"] >= 1
     per = {a["anchor"]: a for a in res["census"]["per_anchor"]}
@@ -542,3 +543,48 @@ def test_render_page_parse_kind_and_word_match():
     assert "@ 7720 (parse: resistance)" in md
     assert "**kind-mismatch**" in md
     assert "1 of 1 matched setups he named by the other word" in md
+
+
+def test_stitch_drops_a_restarts_rewalk_and_keeps_run_numbers():
+    """A restart re-walks the tape from the day's start; only the bars after
+    the earlier run's last bar are new. Events on dropped bars go with them;
+    a bar-less Level announcement is kept once."""
+    a = [_bar(i, 100 + i, 100.5 + i, 99.5 + i, 100 + i) for i in range(6)]          # 08:30–08:35
+    b = [_bar(i, 100 + i, 100.5 + i, 99.5 + i, 100 + i) for i in range(10)]         # 08:30–08:39, re-walk + 4 new
+    ev_a = [_ev(3, a, type="SweepPrint", direction="buy", start_price=103.0, end_price=104.0)]
+    ev_b = [_ev(3, b, type="SweepPrint", direction="buy", start_price=103.0, end_price=104.0),  # the re-walk's copy
+            _ev(8, b, type="SweepPrint", direction="sell", start_price=108.0, end_price=107.0),
+            {"k": "ev", "type": "Level", "bar_i": None, "price": 101.0, "level_type": "support"}]
+    s1 = pm.Segment(run_no=1, bars=[pm.Bar(**{**asdict(x), "run": 1}) for x in a],
+                    events=[dict(e, run=1) for e in ev_a], meta={"bar_n": 2000, "mancini": [101.0], "started": "x"})
+    s2 = pm.Segment(run_no=2, bars=[pm.Bar(**{**asdict(x), "run": 2}) for x in b],
+                    events=[dict(e, run=2) for e in ev_b]
+                    + [{"k": "ev", "type": "Level", "bar_i": None, "price": 101.0, "level_type": "support", "run": 2}],
+                    meta={"bar_n": 2000, "mancini": [], "started": "y"})
+    day = pm.stitch([s1, s2])
+    assert [(x.run, x.i) for x in day.bars] == [(1, i) for i in range(6)] + [(2, i) for i in range(6, 10)]
+    assert day.meta["overlap_bars"] == {1: 0, 2: 6}
+    kinds = [(e["type"], e.get("run"), e.get("bar_i")) for e in day.events]
+    assert ("SweepPrint", 1, 3) in kinds and ("SweepPrint", 2, 8) in kinds
+    assert ("SweepPrint", 2, 3) not in kinds                     # the re-walk's copy dropped
+    assert sum(1 for k in kinds if k[0] == "Level") == 1       # announced once
+    assert day.mancini == [101.0] and day.pos(8, 2) == 8 and day.pos(3, 1) == 3 and day.pos(3, 2) is None
+    res = pm.analyze_day([s1, s2], pm.Knobs(), day=date(2026, 8, 18), source="live",
+                         pass_name="same-day", now=datetime(2026, 8, 18, 15, 30, tzinfo=CT))
+    assert [r["overlap_bars"] for r in res["runs"]] == [0, 6]
+    assert sorted((c["run"], c["bar_i"]) for c in res["calls"]) == [(1, 3), (2, 8)]
+    assert res["coverage"]["bars"] == 10
+
+
+def test_flags_no_breakout_word():
+    """A 10+ point leg through a level with only 'invalidated' said about it."""
+    legs = [{"tag": "hinted", "near_level": True, "pts": 12.0, "direction": "bearish",
+             "origin_ct": "09:00", "origin_bar": 3, "nearest_level": 7724.0,
+             "said_before": ["failed_breakdown invalidated @7724 08:55"]},
+            {"tag": "hinted", "near_level": True, "pts": 12.0, "direction": "bearish",
+             "origin_ct": "10:00", "origin_bar": 9, "nearest_level": 7724.0,
+             "said_before": ["failed_breakdown invalidated @7724 09:55", "SweepPrint 09:58"]}]
+    cen = {"by_type": {}, "per_anchor": [], "n_calls_measured": 0}
+    fl = pm.flags([], legs, cen, session_range=30.0, knobs=pm.Knobs())
+    hits = [f for f in fl if f["flag"] == "no-breakout-word"]
+    assert len(hits) == 1 and hits[0]["bar"] == 3

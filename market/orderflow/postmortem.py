@@ -88,14 +88,15 @@ class Bar:
     c: float
     v: int
     d: int
+    run: int = 1            # the feeder run that wrote it (bar numbers restart per run)
 
     @classmethod
-    def from_record(cls, rec: dict) -> "Bar":
+    def from_record(cls, rec: dict, run: int = 1) -> "Bar":
         return cls(i=int(rec["i"]),
                    t0=datetime.fromisoformat(rec["t0"]),
                    t1=datetime.fromisoformat(rec["t1"]),
                    o=float(rec["o"]), h=float(rec["h"]), l=float(rec["l"]),
-                   c=float(rec["c"]), v=int(rec["v"]), d=int(rec["d"]))
+                   c=float(rec["c"]), v=int(rec["v"]), d=int(rec["d"]), run=run)
 
 
 @dataclass
@@ -110,12 +111,18 @@ class Segment:
     complete: bool = True
 
     def __post_init__(self) -> None:
-        self._pos = {b.i: k for k, b in enumerate(self.bars)}
+        self._pos = {(b.run, b.i): k for k, b in enumerate(self.bars)}
 
-    def pos(self, bar_i) -> int | None:
+    def pos(self, bar_i, run: int | None = None) -> int | None:
+        """List index of feeder bar ``bar_i`` of ``run`` (this segment's run
+        when not given). Bar numbers restart at every feeder run, so a
+        stitched day keys on both."""
         if bar_i is None:
             return None
-        return self._pos.get(int(bar_i))
+        return self._pos.get((self.run_no if run is None else int(run), int(bar_i)))
+
+    def pos_of(self, ev: dict) -> int | None:
+        return self.pos(ev.get("bar_i"), ev.get("run"))
 
     @property
     def mancini(self) -> list[float]:
@@ -159,8 +166,9 @@ def load_live_segments(path: Path) -> list[Segment]:
             continue
         if not run.bars:
             continue
-        out.append(Segment(run_no=n, bars=[Bar.from_record(b) for b in run.bars],
-                           events=list(run.events), meta=run.meta, complete=run.complete))
+        out.append(Segment(run_no=n, bars=[Bar.from_record(b, run=n) for b in run.bars],
+                           events=[dict(e, run=n) for e in run.events],
+                           meta=run.meta, complete=run.complete))
     return out
 
 
@@ -172,8 +180,52 @@ def segments_from_replay(day: _date, *, bar_n: int, mancini: list[float]) -> lis
         return []
     meta = {"bar_n": bar_n, "mancini": list(mancini), "started": bars[0]["t0"],
             "replay": True}
-    return [Segment(run_no=1, bars=[Bar.from_record(b) for b in bars],
-                    events=events, meta=meta, complete=True)]
+    return [Segment(run_no=1, bars=[Bar.from_record(b, run=1) for b in bars],
+                    events=[dict(e, run=1) for e in events], meta=meta, complete=True)]
+
+
+def stitch(segments: list[Segment]) -> Segment | None:
+    """One Segment for the day from a run's worth of restarts.
+
+    A feeder restart re-walks the tape from the day's start (catch-up), so a
+    later run's record repeats every bar an earlier run already showed live;
+    measured per run, the overlap counts twice (08-18: runs 10 and 11 both
+    cover 02:50→13:01). Each run keeps only the bars after the last bar kept
+    so far — what was on the screen at the time — with its events on those
+    bars. Events with no bar (the ``Level`` announcements a run makes at
+    start) are kept once per distinct (type, price, level_type). Each kept
+    bar and event still names its run, so the page's ``run:bar`` is the
+    file's. ``meta["overlap_bars"]`` records, per run, how many bars were
+    dropped as re-walked. None when there is nothing to stitch.
+    """
+    if not segments:
+        return None
+    bars: list[Bar] = []
+    events: list[dict] = []
+    seen_nobar: set = set()
+    overlap: dict[int, int] = {}
+    last_t1: datetime | None = None
+    for seg in segments:
+        kept = [b for b in seg.bars if last_t1 is None or b.t0 >= last_t1]
+        overlap[seg.run_no] = len(seg.bars) - len(kept)
+        kept_keys = {(b.run, b.i) for b in kept}
+        for e in seg.events:
+            if e.get("bar_i") is None:
+                key = (e.get("type"), e.get("price"), e.get("level_type"))
+                if key in seen_nobar:
+                    continue
+                seen_nobar.add(key)
+                events.append(e)
+            elif (e.get("run", seg.run_no), int(e["bar_i"])) in kept_keys:
+                events.append(e)
+        bars += kept
+        if kept:
+            last_t1 = kept[-1].t1
+    mancini = sorted({a for seg in segments for a in seg.mancini})
+    meta = {"bar_n": segments[0].bar_n, "mancini": mancini, "started": segments[0].started,
+            "overlap_bars": overlap, "stitched_runs": [seg.run_no for seg in segments]}
+    return Segment(run_no=segments[0].run_no, bars=bars, events=events, meta=meta,
+                   complete=segments[-1].complete)
 
 
 # --------------------------------------------------------------- measuring
@@ -249,14 +301,14 @@ def confirm_lag(seg: Segment, ev: dict) -> tuple[int | None, float | None]:
     of the anchor after the flush bar; the flush bar is the earliest
     ``forming`` beat for the same (anchor, setup, fire_index). Without one the
     lag is None and the points still report."""
-    k = seg.pos(ev.get("bar_i"))
+    k = seg.pos_of(ev)
     if k is None:
         return None, None
     anchor = float(ev["anchor_price"])
     direction = ev.get("bias") or "bullish"
     pts = round(_sign(direction) * (seg.bars[k].c - anchor), 2)
     key = (ev.get("anchor_price"), ev.get("setup"), ev.get("fire_index"))
-    forming_pos = [seg.pos(e.get("bar_i")) for e in seg.events
+    forming_pos = [seg.pos_of(e) for e in seg.events
                    if e.get("type") == "SetupRecognition" and e.get("state") == "forming"
                    and (e.get("anchor_price"), e.get("setup"), e.get("fire_index")) == key]
     forming_pos = [p for p in forming_pos if p is not None and p <= k]
@@ -297,7 +349,7 @@ def measure_calls(seg: Segment, knobs: Knobs,
             continue
         if ev.get("type") == "SetupRecognition" and ev.get("state") == "forming":
             continue
-        k = seg.pos(ev.get("bar_i"))
+        k = seg.pos_of(ev)
         if k is None:
             continue
         direction = direction_of(ev)
@@ -307,7 +359,7 @@ def measure_calls(seg: Segment, knobs: Knobs,
         entry = float(ev.get("start_price", bar.c)) if ev["type"] == "SweepPrint" else bar.c
         anchor = float(ev["anchor_price"]) if ev.get("anchor_price") is not None else None
         row = {
-            "run": seg.run_no, "bar_i": bar.i, "ct": bar.t1.strftime("%H:%M"),
+            "run": bar.run, "bar_i": bar.i, "ct": bar.t1.strftime("%H:%M"),
             "t1": bar.t1.isoformat(), "type": ev["type"],
             "setup": ev.get("setup"), "state": ev.get("state"),
             "direction": direction, "entry": entry,
@@ -465,7 +517,7 @@ def tag_legs(legs: list[Leg], seg: Segment, *, anchors: list[float], knobs: Knob
         for ev in seg.events:
             if ev.get("type") not in MEASURED_TYPES:
                 continue
-            k = seg.pos(ev.get("bar_i"))
+            k = seg.pos_of(ev)
             if k is None:
                 continue
             t = seg.bars[k].t1
@@ -473,13 +525,17 @@ def tag_legs(legs: list[Leg], seg: Segment, *, anchors: list[float], knobs: Knob
                 continue
             if direction_of(ev) != leg.direction:
                 continue
-            said.append(f"{ev['type']}:{ev.get('state') or ''}@{t.strftime('%H:%M')}")
+            if ev["type"] == "SetupRecognition":
+                said.append(f"{ev.get('setup')} {ev.get('state')} @{float(ev.get('anchor_price') or 0):g} "
+                            f"{t.strftime('%H:%M')}")
+            else:
+                said.append(f"{ev['type']} {t.strftime('%H:%M')}")
             if ev["type"] == "SetupRecognition" and ev.get("state") == "confirmed":
                 tag = "called"
             elif tag != "called":
                 tag = "hinted"
         row = {
-            "run": seg.run_no, "direction": leg.direction,
+            "run": o.run, "direction": leg.direction,
             "origin_bar": o.i, "origin_ct": o.t1.strftime("%H:%M"),
             "end_bar": seg.bars[leg.end_i].i, "end_ct": seg.bars[leg.end_i].t1.strftime("%H:%M"),
             "origin_px": leg.origin_px, "end_px": leg.end_px, "pts": leg.pts,
@@ -619,7 +675,7 @@ def census(seg: Segment, calls: list[dict]) -> dict:
         by_type[t][state] += 1
         if t == "SetupRecognition" and ev.get("anchor_price") is not None:
             a = float(ev["anchor_price"])
-            k = seg.pos(ev.get("bar_i"))
+            k = seg.pos_of(ev)
             ct = seg.bars[k].t1.strftime("%H:%M") if k is not None else None
             row = per.setdefault(a, {"anchor": a, "forming": 0, "confirmed": 0,
                                      "invalidated": 0, "first_ct": ct, "last_ct": ct})
@@ -678,7 +734,10 @@ def flags(calls: list[dict], legs: list[dict], cen: dict, *, session_range: floa
             out.append({"flag": "late-confirm", "anchor": c["anchor"], "bar": c["bar_i"],
                         "at": c["ct"], "lag_bars": lb, "lag_pts": lp, "why": why})
         pk, rk = c.get("anchor_kind_parse"), c.get("anchor_kind")
-        if pk is not None and rk is not None and pk != rk:
+        # Strader's rule (Addendum A1): the parse says resistance, the recognizer
+        # said support. The parse also says trigger / target / pivot; those show
+        # on the call row beside the anchor and do not trip the flag.
+        if pk == "resistance" and rk is not None and pk != rk:
             out.append({"flag": "kind-mismatch", "anchor": c["anchor"], "bar": c["bar_i"],
                         "at": c["ct"], "parse_kind": pk, "recognizer_kind": rk,
                         "why": f"the parse calls {c['anchor']:g} {pk}; the recognizer "
@@ -690,7 +749,7 @@ def flags(calls: list[dict], legs: list[dict], cen: dict, *, session_range: floa
                         "why": f"{l['pts']:g} pts {l['direction']} from {l['origin_ct']} near "
                                f"{l['nearest_level']:g}, nothing said in the prior window"})
         if l["pts"] >= knobs.breakout_pts and l["near_level"] and l["tag"] != "called" and \
-           l["said_before"] and all(s.startswith("SetupRecognition:invalidated") for s in l["said_before"]):
+           l["said_before"] and all(" invalidated " in s for s in l["said_before"]):
             out.append({"flag": "no-breakout-word", "bar": l["origin_bar"], "at": l["origin_ct"],
                         "pts": l["pts"], "direction": l["direction"], "anchor": l["nearest_level"],
                         "why": f"{l['pts']:g} pts through {l['nearest_level']:g} with only "
@@ -711,52 +770,57 @@ def analyze_day(segments: list[Segment], knobs: Knobs, *, day: _date, source: st
                 letter_status: str = "not-received",
                 parsed_kinds: dict[float, str] | None = None) -> dict:
     """The whole day as one dict — the ``<day>.json`` of spec §4a.
-    ``parsed_kinds`` is {price: kind} from the day's Mancini parse (Addendum A1)."""
+
+    The runs are stitched first (see ``stitch``): a restart's re-walk of the
+    tape is not measured twice, and a call late in one run is measured on
+    into the next. ``res["runs"]`` still lists every run as the file has it,
+    with the bars each re-walked. ``parsed_kinds`` is {price: kind} from the
+    day's Mancini parse (Addendum A1).
+    """
+    day_seg = stitch(segments)
     calls: list[dict] = []
     legs: list[dict] = []
-    cens: list[dict] = []
+    cen = {"by_type": {}, "per_anchor": [], "n_calls_measured": 0}
     lo = hi = None
-    for seg in segments:
-        c = measure_calls(seg, knobs, parsed_kinds)
-        for row in c:
+    if day_seg is not None and day_seg.bars:
+        calls = measure_calls(day_seg, knobs, parsed_kinds)
+        for row in calls:
             row["session"] = session_of(datetime.fromisoformat(row["t1"]))
-        calls += c
-        anchors = set(seg.mancini) | {float(e["price"]) for e in seg.events
-                                      if e.get("type") == "Level" and e.get("price") is not None}
-        lg = tag_legs(keep_legs(zigzag_legs(seg.bars, knobs.x_pts), knobs), seg,
-                      anchors=sorted(anchors), knobs=knobs)
-        for row in lg:
-            k = seg.pos(row["origin_bar"])
-            row["session"] = session_of(seg.bars[k].t1) if k is not None else "?"
-        legs += lg
-        cens.append(census(seg, c))
-        for b in seg.bars:
-            lo = b.l if lo is None else min(lo, b.l)
-            hi = b.h if hi is None else max(hi, b.h)
-    cen = merge_census(cens) if cens else {"by_type": {}, "per_anchor": [], "n_calls_measured": 0}
-    cash = [b for s in segments for b in s.bars if session_of(b.t1) == "cash"]
+        anchors = set(day_seg.mancini) | {float(e["price"]) for e in day_seg.events
+                                          if e.get("type") == "Level" and e.get("price") is not None}
+        legs = tag_legs(keep_legs(zigzag_legs(day_seg.bars, knobs.x_pts), knobs), day_seg,
+                        anchors=sorted(anchors), knobs=knobs)
+        for row in legs:
+            k = day_seg.pos(row["origin_bar"], row["run"])
+            row["session"] = session_of(day_seg.bars[k].t1) if k is not None else "?"
+        cen = census(day_seg, calls)
+        lo = min(b.l for b in day_seg.bars)
+        hi = max(b.h for b in day_seg.bars)
+    bars = day_seg.bars if day_seg is not None else []
+    cash = [b for b in bars if session_of(b.t1) == "cash"]
     cash_range = (max(b.h for b in cash) - min(b.l for b in cash)) if cash else 0.0
-    spans = [s.span for s in segments if s.span]
     coverage = {
-        "first_ct": min(s[0] for s in spans).strftime("%H:%M") if spans else None,
-        "last_ct": max(s[1] for s in spans).strftime("%H:%M") if spans else None,
-        "bars": sum(len(s.bars) for s in segments),
+        "first_ct": bars[0].t0.strftime("%H:%M") if bars else None,
+        "last_ct": bars[-1].t1.strftime("%H:%M") if bars else None,
+        "bars": len(bars),
         "unmeasured_note": None,
     }
-    if spans:
-        last = max(s[1] for s in spans)
+    if bars:
+        last = bars[-1].t1
         if last.date() == now.date() and last < now - timedelta(minutes=30):
             coverage["unmeasured_note"] = (
                 f"record ends {last.strftime('%H:%M')} CT; "
                 f"{int((now - last).total_seconds() // 60)} minutes before the pass unmeasured")
     recap = {"status": letter_status, "rows": match_recap(recap_rows, calls) if recap_rows else []}
+    overlap = (day_seg.meta.get("overlap_bars") or {}) if day_seg is not None else {}
     runs = []
     for s in segments:
         span = s.span
         runs.append({"run": s.run_no, "started": s.started, "bars": len(s.bars),
                      "complete": s.complete, "anchorless": s.anchorless,
                      "first_ct": span[0].strftime("%H:%M") if span else None,
-                     "last_ct": span[1].strftime("%H:%M") if span else None})
+                     "last_ct": span[1].strftime("%H:%M") if span else None,
+                     "overlap_bars": int(overlap.get(s.run_no, 0))})
     return {
         "day": day.isoformat(), "source": source, "pass": pass_name,
         "generated_at": now.isoformat(),
@@ -914,7 +978,13 @@ def render_page(res: dict, hist: dict) -> str:
     L.append(f"Source: **{SOURCE_LABEL.get(res['source'], res['source'])}**. Pass: {res['pass']}, "
              f"written {res['generated_at'][:16].replace('T', ' ')}.")
     cov, runs = res["coverage"], res["runs"]
-    restarts = "" if len(runs) <= 1 else " — restarts at " + ", ".join(r["started"][11:16] for r in runs[1:])
+    restarts = ""
+    if len(runs) > 1:
+        parts = []
+        for r in runs[1:]:
+            ov = r.get("overlap_bars") or 0
+            parts.append(f"{r['started'][11:16]}" + (f" (re-walked {ov} bars, measured once)" if ov else ""))
+        restarts = " — restarts at " + ", ".join(parts)
     L.append("")
     L.append(f"Record: {cov['first_ct'] or '?'} → {cov['last_ct'] or '?'} CT, {cov['bars']} bars of "
              f"{_f(res.get('bar_n'))} contracts; {len(runs)} run(s){restarts}. "
