@@ -1,5 +1,7 @@
 # Day Post-Mortem — design
 
+**Status:** landed 2026-08-19 (Strader 0a161e8…62687a3 + the landing commit; COO 36ce47e SCHEDULE.md); crons installed (15:30 same-day, 08:27 next-morning); backfill 279 tape days, 88 of them with Mancini anchors (see bead co-7kgte). Runs are stitched before measuring — a restart re-walks the tape from the day's start and that overlap is measured once (not in the spec; found on the 08-18 record).
+
 COO for Steve, 2026-08-19. Bead co-7kgte (**Post Mortem Process**). Approved in
 conversation: a post-mortem of the **trading day**, run **by itself after every
 close**, that **measures** what followed each call and **lists the moves the

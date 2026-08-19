@@ -132,12 +132,14 @@ def write_pages(root: Path, day: _date, md: str) -> tuple[Path, Path]:
     return p, latest
 
 
-def publish(md_path: Path, html_name: str, *, also_latest: bool) -> int:
-    """Render through desk-html.sh to /var/moo/desk/<html_name>; copy to the
-    stable 'latest' page; put the .md where the desk NAV lists it
-    (COO/myDesk/trading/postmortem-latest.md) and register it once
-    (idempotent). Returns 0, or 3 when the renderer is absent/failed (the
-    ledger still stands)."""
+def publish(md_path: Path, html_name: str, *, also_latest: bool,
+            register_name: str | None = DESK_LATEST_NAME) -> int:
+    """Render through desk-html.sh to /var/moo/desk/<html_name>; with
+    ``also_latest`` copy it to the stable 'latest' page too; with
+    ``register_name`` put the .md where the desk NAV lists it
+    (COO/myDesk/trading/<register_name>) and register it once (idempotent).
+    Returns 0, or 3 when the renderer is absent/failed (the ledger still
+    stands)."""
     if not DESK_HTML.exists():
         logger.warning("desk-html.sh absent at %s — page not rendered", DESK_HTML)
         return 3
@@ -154,11 +156,12 @@ def publish(md_path: Path, html_name: str, *, also_latest: bool) -> int:
     logger.info("page: %s", target)
     if also_latest:
         shutil.copyfile(target, DESK_DIR / "desk-postmortem-latest.html")
-        desk_md = COO_ROOT / DESK_TRADING_REL / DESK_LATEST_NAME
+    if register_name:
+        desk_md = COO_ROOT / DESK_TRADING_REL / register_name
         try:
             desk_md.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(md_path, desk_md)
-            out = subprocess.run([str(DESK_REGISTER), "Trading", str(DESK_TRADING_REL / DESK_LATEST_NAME)],
+            out = subprocess.run([str(DESK_REGISTER), "Trading", str(DESK_TRADING_REL / register_name)],
                                  capture_output=True, text=True, timeout=30)
             if out.returncode:
                 logger.warning("desk-register rc=%d: %s", out.returncode, out.stderr.strip()[:200])
@@ -309,7 +312,8 @@ def run_backfill(*, root: Path, knobs: pm.Knobs, workers: int, publish_pages: bo
     p.write_text(pm.render_backfill_page(summary), encoding="utf-8")
     print(f"backfill: {summary['n_days']} ok, {len(summary['skipped'])} skipped; summary {p}", flush=True)
     if publish_pages:
-        return publish(p, "desk-postmortem-backfill.html", also_latest=False)
+        return publish(p, "desk-postmortem-backfill.html", also_latest=False,
+                       register_name="postmortem-backfill.md")
     return 0
 
 
