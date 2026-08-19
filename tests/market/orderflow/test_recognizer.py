@@ -283,3 +283,95 @@ def test_fire_counter_survives_block_and_invalidation_cycles():
     assert [c.fire_index for c in confirms] == [1, 2]
     assert [c.confidence for c in confirms] == [0.8, 0.8]
     assert len(invalidated) == 1 and invalidated[0].fire_index == 2  # would-be fire 2, didn't count
+
+
+# ── the upside mirror at a RESISTANCE anchor [st-q5xu, st-tme] ───────────────
+# Same four beats read upward: push above on buying, stall, delta flips down,
+# close back beneath on selling. The name says which way the break went —
+# failed_breakout / level_reject — and the bias is bearish.
+R = 7815.0
+FBO_BARS = [
+    _bar(0, R - 3, R - 2.5, R - 3.5, R - 2.8, -50),                      # below, no engagement
+    _bar(1, R - 2, R + 2, R - 2, R + 1.5, FLUSH_DELTA_MIN + 50),         # beat 1: violent push above
+    _bar(2, R + 1.5, R + 2.25, R + 1, R + 1.75, FLIP_DELTA_MIN + 10),    # beat 2: buyers press, 1-tick extension
+    _bar(3, R + 1.75, R + 2, R + 0.5, R + 0.75, -(FLIP_DELTA_MIN + 20)), # beat 3: delta flips down
+    _bar(4, R + 0.75, R + 1, R - 1.5, R - 1, -(CONFIRM_DELTA_MIN + 30)), # beat 4: recloses beneath R
+]
+
+
+def test_failed_breakout_bearish_at_resistance():
+    recs = _drive(Anchor(R, "resistance"), FBO_BARS, mancini=[R])
+    assert [r.state for r in recs] == ["forming", "forming", "forming", "confirmed"]
+    final = recs[-1]
+    assert final.setup == "failed_breakout"
+    assert final.bias == "bearish"
+    assert final.anchor_kind == "resistance"
+    assert final.beats == ("flush", "stall", "flip", "confirm")
+    assert final.reason.startswith("failed_breakout confirmed @ 7815.00 (resistance ∩ mancini)")
+    s = to_singleton_setup(final)
+    assert s.bias == "bearish" and s.trigger == "failed_breakout" and s.right == "PUT"
+    assert s.anchor.label == "resistance"
+    assert orderflow_confirm(recs, "bearish") and not orderflow_confirm(recs, "bullish")
+
+
+def test_same_bars_at_a_support_anchor_read_the_other_way():
+    """The 2026-08-05 inversion, pinned: 7815 was a resistance in the parse and
+    entered as a support. On the same tape the support anchor reads price
+    falling back beneath 7815 as a flush below a support — a BULLISH
+    failed-breakdown family read forming — where the resistance anchor reads
+    the push-and-fail as the bear signal it is. Same silhouette, opposite
+    meaning; the anchor's kind is what decides it."""
+    as_support = _drive(Anchor(R, "support"), FBO_BARS)
+    assert as_support and all(r.bias == "bullish" for r in as_support)
+    assert {r.setup for r in as_support} <= {"failed_breakdown", "level_reclaim"}
+    as_resistance = _drive(Anchor(R, "resistance"), FBO_BARS)
+    assert all(r.bias == "bearish" and r.setup == "failed_breakout" for r in as_resistance)
+    assert as_resistance[-1].state == "confirmed"
+
+
+def test_quiet_push_is_level_reject_not_failed_breakout():
+    bars = [
+        _bar(0, R - 2, R - 1, R - 2.5, R - 1.2, -30),
+        _bar(1, R - 1, R + 1, R - 1, R + 0.75, QUIET_DELTA_MAX - 10),      # quiet drift over
+        _bar(2, R + 0.75, R + 1.25, R - 0.5, R - 0.25, -(FLIP_DELTA_MIN + 5)),
+        _bar(3, R - 0.25, R, R - 2, R - 1.5, -(CONFIRM_DELTA_MIN + 10)),
+    ]
+    recs = _drive(Anchor(R, "resistance"), bars)
+    assert recs[-1].setup == "level_reject"
+    assert recs[-1].state == "confirmed" and recs[-1].bias == "bearish"
+    assert "stall" not in recs[-1].beats
+
+
+def test_resistance_invalidation_reads_upward():
+    """Acceptance above a resistance is the breakout holding — the word is
+    not 'no reclaim' (a support never recovered) but its mirror."""
+    bars = [
+        _bar(0, R - 2, R - 1, R - 3, R - 1.5, -40),
+        _bar(1, R - 1, R + 2, R - 1, R + 1.5, FLUSH_DELTA_MIN + 20),
+        _bar(2, R + 1.5, R + INVALIDATE_TICKS * TICK + 1, R + 1, R + INVALIDATE_TICKS * TICK,
+             FLIP_DELTA_MIN + 50),
+    ]
+    recs = _drive(Anchor(R, "resistance"), bars)
+    assert recs[-1].state == "invalidated" and recs[-1].setup == "failed_breakout"
+    assert "held above, no reject" in recs[-1].reason
+    down = _drive(Anchor(L, "support"), [
+        _bar(0, L + 3, L + 3.5, L + 2.5, L + 2.8, +50),
+        _bar(1, L + 2, L + 2, L - 2, L - 1.5, -(FLUSH_DELTA_MIN + 50)),
+        _bar(2, L - 1.5, L - 1, L - INVALIDATE_TICKS * TICK - 1, L - INVALIDATE_TICKS * TICK,
+             -(FLIP_DELTA_MIN + 50)),
+    ])
+    assert "no reclaim" in down[-1].reason
+
+
+def test_pivot_is_two_anchors_engaged_from_either_side():
+    """A Mancini pivot enters as a support AND a resistance at one price. Each
+    is engaged from its own side and emits under its own kind and name;
+    neither's state leaks into the other."""
+    sup, res = Anchor(R, "support", "mancini"), Anchor(R, "resistance", "mancini")
+    recs = SetupRecognizer([sup, res]).run(FBO_BARS)
+    by_kind = {}
+    for r in recs:
+        by_kind.setdefault(r.anchor_kind, set()).add((r.setup, r.bias))
+    assert by_kind["resistance"] == {("failed_breakout", "bearish")}
+    assert by_kind["support"] <= {("failed_breakdown", "bullish"), ("level_reclaim", "bullish")}
+    assert [r for r in recs if r.anchor_kind == "resistance"][-1].state == "confirmed"

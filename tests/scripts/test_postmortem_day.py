@@ -103,7 +103,7 @@ def test_next_morning_pass_reads_recap_from_the_letter(tmp_path, monkeypatch):
 def test_backfill_one_day_worker_returns_summary_row(tmp_path, monkeypatch):
     m = _load()
     segs = m.pm.load_live_segments(FIXTURE)     # stand in for the replay
-    monkeypatch.setattr(m.pm, "segments_from_replay", lambda day, *, bar_n, mancini: segs)
+    monkeypatch.setattr(m.pm, "segments_from_replay", lambda day, *, bar_n, mancini, kinds=None: segs)
     monkeypatch.setattr(m, "mancini_levels_for", lambda day: [7720.0, 7724.0])
     row = m.backfill_one(date(2026, 8, 18), root=tmp_path, knobs=m.pm.Knobs(),
                          now=datetime(2026, 8, 19, 0, 0, tzinfo=CT))

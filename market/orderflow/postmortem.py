@@ -172,14 +172,17 @@ def load_live_segments(path: Path) -> list[Segment]:
     return out
 
 
-def segments_from_replay(day: _date, *, bar_n: int, mancini: list[float]) -> list[Segment]:
-    """One Segment from a full replay of the day's tape (backfill path)."""
+def segments_from_replay(day: _date, *, bar_n: int, mancini: list[float],
+                         kinds=None) -> list[Segment]:
+    """One Segment from a full replay of the day's tape (backfill path).
+    ``kinds``: the Mancini levels' anchor kinds (``mancini_kinds_for``)."""
+    from market.orderflow.anchors import kinds_to_records
     from market.orderflow.replay_live import replay_events
-    bars, events = replay_events(day, bar_n=bar_n, mancini=mancini)
+    bars, events = replay_events(day, bar_n=bar_n, mancini=mancini, kinds=kinds)
     if not bars:
         return []
-    meta = {"bar_n": bar_n, "mancini": list(mancini), "started": bars[0]["t0"],
-            "replay": True}
+    meta = {"bar_n": bar_n, "mancini": list(mancini), "mancini_kinds": kinds_to_records(kinds),
+            "started": bars[0]["t0"], "replay": True}
     return [Segment(run_no=1, bars=[Bar.from_record(b, run=1) for b in bars],
                     events=[dict(e, run=1) for e in events], meta=meta, complete=True)]
 
@@ -559,8 +562,10 @@ RECAP_START = "Trade Recap/Daily Summary"
 RECAP_END = ("Trade Plan", "Unsubscribe")
 SETUP_WORDS = (("failed breakdown", "failed_breakdown"),
                ("level reclaim", "level_reclaim"),
+               ("failed breakout", "failed_breakout"),     # the upside mirror [st-q5xu]
                ("range trap", "range_trap"))
 FAMILY = {"failed_breakdown", "level_reclaim"}   # score_recognizer's sibling pair
+MIRROR_FAMILY = {"failed_breakout", "level_reject"}   # the same pair read upward [st-q5xu]
 
 
 def extract_recap(letter_text: str, *, letter_date: _date) -> list[dict]:
@@ -644,7 +649,8 @@ def match_recap(rows: list[dict], calls: list[dict]) -> list[dict]:
             same = c.get("setup") == r["setup"]
             if dt is not None and dt <= 15 and same:
                 tier = "EXACT"
-            elif dt is not None and dt <= 30 and c.get("setup") in FAMILY and r["setup"] in FAMILY:
+            elif dt is not None and dt <= 30 and any(
+                    c.get("setup") in fam and r["setup"] in fam for fam in (FAMILY, MIRROR_FAMILY)):
                 tier = "FAMILY"
             else:
                 tier = "LEVEL"

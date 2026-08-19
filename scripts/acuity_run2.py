@@ -34,7 +34,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from market.orderflow.anchors import mancini_levels_for            # noqa: E402
+from market.orderflow.anchors import (                             # noqa: E402
+    day_anchors, mancini_kinds_for, mancini_levels_for, mancini_source_for)
 from market.orderflow.postmortem import excursion_from_trades   # noqa: E402
 from market.orderflow.bars import build_bars                       # noqa: E402
 from market.orderflow.profile import build_profile, profile_levels  # noqa: E402
@@ -52,16 +53,20 @@ WINDOWS_MIN = (15, 30)    # excursion windows
 MAX_LVN_ANCHORS = 6       # nearest prior-session LVNs below/above open
 
 
-def letter_levels_for(day: _date) -> list[float]:
-    p = PARSED / f"{day.isoformat()}.json"
-    if not p.exists():
-        return []
-    try:
-        j = json.loads(p.read_text())
-    except (OSError, json.JSONDecodeError):
-        return []
-    return sorted({round(float(l["price"]), 2) for l in j.get("levels", [])
-                   if l.get("kind") == "support" and 5000 < float(l["price"]) < 9000})
+def letter_anchors_for(day: _date) -> tuple[list[float], list[Anchor]]:
+    """The day's Mancini levels and the anchors they make, by the SAME rule the
+    drill, the replay recorder and the live feed use (``anchors.day_anchors``
+    with ``mancini_kinds_for``) — minus the two range edges, which this sweep
+    has never scored [st-tme: same-anchor rule restored; a parity test pins
+    it]. Until 2026-08-19 this script kind-filtered the letter to supports
+    while the live path admitted every level as support; now both derive
+    support AND resistance anchors from one rule, so the resistance
+    (bearish) population enters the measurement for the first time."""
+    mancini = mancini_levels_for(day)
+    kinds = mancini_kinds_for(day)
+    anchors = [a for a in day_anchors(mancini, 0.0, 0.0, kinds)
+               if a.kind not in ("range_high", "range_low")]
+    return mancini, anchors
 
 
 def prior_day_lvns(day: _date, open_px: float) -> list[float]:
@@ -91,21 +96,14 @@ def run_day(day: _date) -> dict:
     first_t, last_t = trades[0].ts, trades[-1].ts
     coverage = "rth" if first_t.hour < 9 else "late_day"
 
-    mancini = mancini_levels_for(day)
-    src_label = "labels"
-    if not mancini:
-        mancini = letter_levels_for(day)
-        src_label = "letter" if mancini else "none"
+    mancini, anchors = letter_anchors_for(day)
+    src_label = mancini_source_for(day)
     lvns = prior_day_lvns(day, open_px)
 
-    anchors, seen = [], set()
-    for lv in mancini:
-        if lv not in seen:
-            seen.add(lv)
-            anchors.append(Anchor(lv, "support", f"mancini {lv:g}", mancini=True))
+    seen = {(a.price, a.kind) for a in anchors}
     for lv in lvns:
-        if lv not in seen:
-            seen.add(lv)
+        if (lv, "support") not in seen:
+            seen.add((lv, "support"))
             anchors.append(Anchor(lv, "support", f"lvn {lv:g}"))
     if not anchors:
         return {"day": day.isoformat(), "status": "no_anchors",
@@ -129,15 +127,18 @@ def run_day(day: _date) -> dict:
     # per-(day,anchor) confirm sequence, counted in chronological confirm
     # order. The recognizer's field is authoritative; a mismatch means the
     # two sequences diverged (e.g. anchor-identity vs price keying) — log it.
-    fire_counts: dict[float, int] = {}
+    # keyed on (price, kind), not price: a Mancini pivot is a support AND a
+    # resistance anchor at one price [st-tme], each with its own fire history.
+    fire_counts: dict[tuple[float, str], int] = {}
     for r in confirmed:
         import bisect
-        fire_counts[r.anchor_price] = fire_counts.get(r.anchor_price, 0) + 1
-        if r.fire_index != fire_counts[r.anchor_price]:
+        fk = (r.anchor_price, r.anchor_kind)
+        fire_counts[fk] = fire_counts.get(fk, 0) + 1
+        if r.fire_index != fire_counts[fk]:
             logger.warning(
-                "fire_index mismatch %s @ %.2f %s: recognizer=%d derived=%d",
-                day.isoformat(), r.anchor_price, r.timestamp.strftime("%H:%M"),
-                r.fire_index, fire_counts[r.anchor_price])
+                "fire_index mismatch %s @ %.2f (%s) %s: recognizer=%d derived=%d",
+                day.isoformat(), r.anchor_price, r.anchor_kind,
+                r.timestamp.strftime("%H:%M"), r.fire_index, fire_counts[fk])
         i = bisect.bisect_left(ts_index, r.timestamp)
         if i >= len(trades):
             continue
@@ -155,7 +156,7 @@ def run_day(day: _date) -> dict:
         else:
             dev_upto, dev_type = -1, "unknown"
         row = {"day": day.isoformat(), "setup": r.setup, "bias": r.bias,
-               "anchor": r.anchor_price,
+               "anchor": r.anchor_price, "anchor_kind": r.anchor_kind,
                "anchor_src": ("mancini" if any(a.price == r.anchor_price and a.mancini
                                                for a in anchors) else "lvn"),
                "ct": r.timestamp.strftime("%H:%M"), "hour": r.timestamp.hour,
@@ -174,6 +175,7 @@ def run_day(day: _date) -> dict:
     return {"day": day.isoformat(), "status": "ok", "coverage": coverage,
             "day_type": day_type, "anchor_src": src_label,
             "n_anchors": len(anchors), "n_lvn_anchors": len(lvns),
+            "n_resistance_anchors": sum(1 for a in anchors if a.kind == "resistance"),
             "n_trades": len(trades), "n_bars": len(bars),
             "n_emissions": len(recs), "n_confirmed": len(confirmed),
             "n_invalidated": len(invalidated),
@@ -204,8 +206,9 @@ def main() -> int:
     if args.days:
         days = sorted(args.days)
     else:
-        days = sorted(p.parent.name for p in
-                      (REPO_ROOT / "data" / "corpus").glob("*/databento_glbx_es.jsonl"))
+        # compacted days are .jsonl.gz [st-itky]; one glob missed them until 08-19
+        days = sorted({p.parent.name for p in
+                       (REPO_ROOT / "data" / "corpus").glob("*/databento_glbx_es.jsonl*")})
     if args.since:
         days = [d for d in days if d >= args.since]
     if args.until:

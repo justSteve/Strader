@@ -31,6 +31,12 @@ from the recognizer's own definitions, not from a number anyone picked. The
 distinct levels) are conventional starting points and are marked as such.
 Obvious Line Formalization (st-rtuu) is the lane that measures them; until it
 does, callers must treat a MELTDOWN verdict as a shadow-mode signal.
+
+DOWNSIDE ONLY, BY DESIGN. Since 2026-08-19 the stream also carries the upside
+mirror at resistance anchors — ``failed_breakout`` CONFIRMED (the bull trap
+sprang) / INVALIDATED (the breakout held) [st-q5xu]. This read tallies
+``failed_breakdown`` alone: the playbook question is about breakdowns. A
+melt-UP read from the mirror is a separate question, not asked here.
 """
 from __future__ import annotations
 

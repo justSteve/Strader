@@ -4,8 +4,18 @@ Both the drill surface (scripts/orderflow_drill.py) and the replay recorder
 (market/orderflow/session_record.py) must run the recognizer against the SAME
 anchor set, or the record Steve reviews will not match the surface he watched.
 This module owns that rule: the day's Mancini levels (the validated anchor
-source, st-3vu) as ``support`` anchors, plus the session range edges so
-unlabeled days still surface ``range_trap`` recognitions.
+source, st-3vu) as anchors OF THE KIND THE LETTER GAVE THEM — a support
+engages on a flush below it, a resistance on a push above it [st-tme,
+st-q5xu] — plus the session range edges so unlabeled days still surface
+``range_trap`` recognitions.
+
+Until 2026-08-19 every Mancini level entered as ``support``. On 2026-08-05,
+with ES parabolic and the whole ladder overhead, the recognizer read a push
+above 7815 (a resistance in the parse) that fell back beneath it as a bullish
+``failed_breakdown forming`` — a failed BREAKOUT, the bear read, labelled as
+the long. Same silhouette, opposite meaning, because the kind was dropped
+(`knowledge/direction-inversion-watch.md`, one level down: verify the
+anchor's role, then name the move).
 """
 from __future__ import annotations
 
@@ -23,21 +33,27 @@ LABELS = ROOT / "docs/measurement/mancini-setup-labels-2026-07-06.json"
 PARSED = ROOT / "runbook/mancini/parsed"
 FAMILY = {"failed_breakdown", "level_reclaim"}
 
+# What a parsed Mancini level kind means to the recognizer. A ``pivot`` is a
+# level price trades around — engaged from either side, so it is two anchors
+# at one price. ``trigger`` and ``target`` are his commentary about a
+# direction or a destination, not a ladder level: "bear case begins below
+# 7695" says which way, not which side the level is on (the 08-19 letter's
+# 7738 "reclaims are a possible long trigger" was yesterday's CEILING, and
+# admitting it as support is what printed ``failed_breakdown @ 7738`` on a
+# breakout retest). A level whose role we cannot read is not watched; the
+# price still reaches the chart and the confluence set via
+# ``mancini_levels_for``.
+ANCHOR_KINDS_BY_PARSE_KIND: dict[str, tuple[str, ...]] = {
+    "support": ("support",),
+    "resistance": ("resistance",),
+    "pivot": ("support", "resistance"),
+    "trigger": (),
+    "target": (),
+}
+Kinds = dict[float, tuple[str, ...]]     # price -> anchor kinds at that price
 
-def parsed_mancini_levels(day: _date) -> list[float]:
-    """The day's levels from its own Mancini parse artifact. [st-b0n9]
 
-    The labeled corpus (``LABELS``) stops at the hand-labeled study days, so
-    every recent session — including today's, the one a live surface needs —
-    resolves to no anchors at all, leaving the recognizer watching nothing but
-    range edges. This reads the pre-open parse the runbook already writes.
-
-    Prices only. The parse carries a ``kind`` per level, but ``day_anchors``
-    deliberately admits every Mancini level as ``support``; carrying resistance
-    through as a downward-mirrored engagement is st-tme's job, not this
-    loader's, and doing it here would change what the recognizer fires on
-    without the measurement that bead is holding.
-    """
+def _read_parse(day: _date) -> list[dict]:
     path = PARSED / f"{day.isoformat()}.json"
     if not path.exists():
         return []
@@ -46,20 +62,55 @@ def parsed_mancini_levels(day: _date) -> list[float]:
     except (OSError, json.JSONDecodeError) as e:
         logger.warning("could not read Mancini parse for %s (%s)", day, e)
         return []
-    lv = {round(float(x["price"]), 2) for x in doc.get("levels", [])
-          if isinstance(x, dict) and x.get("price") is not None
-          and 5000 < float(x["price"]) < 9000}
-    return sorted(lv)
+    return [x for x in doc.get("levels", [])
+            if isinstance(x, dict) and x.get("price") is not None
+            and 5000 < float(x["price"]) < 9000]
+
+
+def parsed_mancini_levels(day: _date) -> list[float]:
+    """The day's level PRICES from its own Mancini parse artifact. [st-b0n9]
+
+    The labeled corpus (``LABELS``) stops at the hand-labeled study days, so
+    every recent session — including today's, the one a live surface needs —
+    resolves to no anchors at all, leaving the recognizer watching nothing but
+    range edges. This reads the pre-open parse the runbook already writes.
+
+    Every kind, prices only — this is the chart's level list and the
+    confluence set. Which of them the recognizer WATCHES, and from which
+    side, is ``parsed_mancini_kinds``.
+    """
+    return sorted({round(float(x["price"]), 2) for x in _read_parse(day)})
+
+
+def parsed_mancini_kinds(day: _date) -> Kinds:
+    """{price: anchor kinds} from the day's parse, per
+    ``ANCHOR_KINDS_BY_PARSE_KIND``. A price the letter lists under more than
+    one kind (a resistance that is also a target, a support that is also a
+    trigger) carries the union. Every price in ``parsed_mancini_levels`` is a
+    key; a price with an empty tuple is on the chart and not watched."""
+    kinds: dict[float, set[str]] = {}
+    for x in _read_parse(day):
+        price = round(float(x["price"]), 2)
+        k = str(x.get("kind") or "").lower()
+        if k not in ANCHOR_KINDS_BY_PARSE_KIND:
+            logger.warning("Mancini parse %s: unknown level kind %r at %g — not an anchor",
+                           day, x.get("kind"), price)
+        kinds.setdefault(price, set()).update(ANCHOR_KINDS_BY_PARSE_KIND.get(k, ()))
+    return {p: tuple(k for k in ("support", "resistance") if k in ks)
+            for p, ks in sorted(kinds.items())}
 
 
 def mancini_levels_for(day: _date) -> list[float]:
-    """The day's Mancini support/resistance levels.
+    """The day's Mancini level prices — chart lines and the confluence set.
 
     The labeled corpus (score_recognizer.py's validated source, st-3vu) wins
     wherever it covers the day, so no labeled day's anchors move. Days it does
     not cover fall back to that day's own parse artifact — which is what makes
     a live session and a later replay of it watch the SAME anchor set instead
     of the live surface watching range edges alone. Empty when neither exists.
+
+    Pair with ``mancini_kinds_for`` (same sources, same precedence) for the
+    side each level is engaged from.
     """
     labeled = _labeled_levels(day)
     if labeled:
@@ -69,6 +120,71 @@ def mancini_levels_for(day: _date) -> list[float]:
         logger.info("Mancini anchors for %s: %d from the day's parse (unlabeled day)",
                     day, len(parsed))
     return parsed
+
+
+def mancini_kinds_for(day: _date) -> Kinds:
+    """{price: anchor kinds} for the day, same precedence as
+    ``mancini_levels_for``: the labeled corpus (its levels are the supports
+    of hand-labeled failed-breakdown / level-reclaim setups, so ``support``
+    by construction) else the parse's own kinds. Every price
+    ``mancini_levels_for`` returns is a key here."""
+    labeled = _labeled_levels(day)
+    if labeled:
+        return {p: ("support",) for p in labeled}
+    return parsed_mancini_kinds(day)
+
+
+def mancini_source_for(day: _date) -> str:
+    """Which source ``mancini_levels_for`` / ``mancini_kinds_for`` resolve the
+    day to: ``"labels"`` (hand-labeled corpus), ``"letter"`` (the day's parse)
+    or ``"none"``."""
+    if _labeled_levels(day):
+        return "labels"
+    return "letter" if parsed_mancini_levels(day) else "none"
+
+
+def levels_from_arg(spec: str) -> tuple[list[float], Kinds]:
+    """The ``--mancini-levels`` override, shared by the drill, the recorder
+    and the live feed so one grammar anchors all three: comma-separated
+    ``PRICE`` or ``PRICE:KIND`` with KIND one of support / resistance /
+    pivot (``7800,7815:resistance,7820:pivot``). A bare price is a support —
+    the pre-08-19 meaning of the flag, kept so existing invocations anchor
+    what they always did."""
+    prices: list[float] = []
+    kinds: dict[float, set[str]] = {}
+    for tok in (t.strip() for t in spec.split(",")):
+        if not tok:
+            continue
+        price_s, _, kind = tok.partition(":")
+        price = round(float(price_s), 2)
+        kind = (kind or "support").strip().lower()
+        if kind not in ANCHOR_KINDS_BY_PARSE_KIND or not ANCHOR_KINDS_BY_PARSE_KIND[kind]:
+            raise ValueError(f"--mancini-levels: {tok!r} — kind must be support, "
+                             f"resistance or pivot")
+        prices.append(price)
+        kinds.setdefault(price, set()).update(ANCHOR_KINDS_BY_PARSE_KIND[kind])
+    return (sorted(set(prices)),
+            {p: tuple(k for k in ("support", "resistance") if k in ks)
+             for p, ks in sorted(kinds.items())})
+
+
+def kinds_to_records(kinds: Kinds | None) -> list[list] | None:
+    """``Kinds`` as JSON-safe ``[[price, kind], ...]`` rows for a run log or
+    page meta; ``kinds_from_records`` reads them back. None stays None (an
+    older log with no kinds row replays as all-supports, which is what it
+    ran)."""
+    if kinds is None:
+        return None
+    return [[p, k] for p, ks in sorted(kinds.items()) for k in ks]
+
+
+def kinds_from_records(rows) -> Kinds | None:
+    if rows is None:
+        return None
+    out: dict[float, list[str]] = {}
+    for p, k in rows:
+        out.setdefault(round(float(p), 2), []).append(str(k))
+    return {p: tuple(ks) for p, ks in out.items()}
 
 
 def _labeled_levels(day: _date) -> list[float]:
@@ -86,10 +202,21 @@ def _labeled_levels(day: _date) -> list[float]:
     return sorted(lv)
 
 
+def _kinds_of(price: float, kinds: Kinds | None) -> tuple[str, ...]:
+    """Anchor kinds for one Mancini price. ``kinds is None`` is the legacy /
+    test default — every level a support. With a kinds map, a price it does
+    not name is a level we could not read the role of: on the chart, not
+    watched."""
+    if kinds is None:
+        return ("support",)
+    return kinds.get(round(price, 2), ())
+
+
 def day_anchors(mancini_levels: list[float], session_high: float,
-                session_low: float) -> list[Anchor]:
-    """Mancini levels as support anchors plus the session range edges,
-    deduped on (price, kind)."""
+                session_low: float, kinds: Kinds | None = None) -> list[Anchor]:
+    """Mancini levels as anchors of their parsed kind (``kinds``, from
+    ``mancini_kinds_for``; None = every level a support) plus the session
+    range edges, deduped on (price, kind)."""
     anchors: list[Anchor] = []
     seen: set[tuple[float, str]] = set()
 
@@ -101,7 +228,8 @@ def day_anchors(mancini_levels: list[float], session_high: float,
         anchors.append(Anchor(price, kind, label, mancini=mancini))
 
     for lv in mancini_levels:
-        add(lv, "support", f"mancini {lv:g}", mancini=True)
+        for kind in _kinds_of(lv, kinds):
+            add(lv, kind, f"mancini {lv:g}", mancini=True)
     add(session_high, "range_high", "day high")
     add(session_low, "range_low", "day low")
     return anchors
@@ -139,8 +267,14 @@ class LiveAnchors:
     freely — there is no state to protect.
     """
 
-    def __init__(self, mancini_levels: list[float], session_open=None):
-        """``session_open`` (tz-aware datetime, optional): bars that START
+    def __init__(self, mancini_levels: list[float], session_open=None,
+                 kinds: Kinds | None = None):
+        """``kinds``: the Mancini levels' anchor kinds (``mancini_kinds_for``);
+        None = every level a support. The live feed and the parity replay
+        of its run log must pass the same map, or the two watch different
+        anchor sets — the run log carries it for that reason.
+
+        ``session_open`` (tz-aware datetime, optional): bars that START
         before it do not seed or extend the range edges [st-fgno]. The tape
         starts at 02:50 CT (st-btu) and without this the "day high/low" the
         recognizer judges against were the overnight range from the first
@@ -149,8 +283,9 @@ class LiveAnchors:
         tape that is itself RTH-only)."""
         self.session_open = session_open
         self.mancini = sorted(float(x) for x in mancini_levels)
+        self.kinds = kinds
         # Placeholder edges; the first bar seeds them before anything is judged.
-        self.anchors = day_anchors(self.mancini, 0.0, 0.0)
+        self.anchors = day_anchors(self.mancini, 0.0, 0.0, kinds)
         self._hi = next(i for i, a in enumerate(self.anchors) if a.kind == "range_high")
         self._lo = next(i for i, a in enumerate(self.anchors) if a.kind == "range_low")
         self._rec = None

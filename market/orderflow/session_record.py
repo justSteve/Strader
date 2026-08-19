@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Iterable
 
 import market.signals.orderflow_config as _config
-from market.orderflow.anchors import day_anchors, mancini_levels_for
+from market.orderflow.anchors import Kinds, day_anchors, mancini_kinds_for, mancini_levels_for
 from market.orderflow.bars import build_bars
 from market.orderflow.parity import absorption_parity_run, full_stack_events
 from market.orderflow.quotes import mbp1_day_path, read_mbp1_day
@@ -71,13 +71,16 @@ def _config_snapshot() -> dict:
 def record_day(day: _date | Path, *, bar_n: int = _config.VOLUME_BAR_N,
                anchors: list[Anchor] | None = None,
                mancini_prices: Iterable[float] | None = None,
+               mancini_kinds: Kinds | None = None,
                book_path: Path | None = None,
                out_path: Path | None = None) -> dict:
     """Run the production stack over one day and append the record.
 
     ``day`` may be a fixture Path (tests). When ``anchors`` is None they are
-    derived by the shared rule: the day's Mancini levels (or the explicit
-    ``mancini_prices`` override) plus session range edges. Absorption: for a
+    derived by the shared rule: the day's Mancini levels of their parsed kind
+    (``mancini_kinds_for``; or the explicit ``mancini_prices`` override with
+    ``mancini_kinds``, bare prices = supports) plus session range edges
+    [st-tme]. Absorption: for a
     real date the day's MBP-1 file is auto-detected (``mbp1_day_path``); for a
     fixture Path pass ``book_path`` explicitly. Days without book data record
     trades-only, flagged ``mbp1: false`` in RunMeta. Returns the RunMeta dict
@@ -95,9 +98,11 @@ def record_day(day: _date | Path, *, bar_n: int = _config.VOLUME_BAR_N,
         mancini = sorted(a.price for a in anchors if a.mancini)
     else:
         mancini = mancini_levels_for(day_d)
+        if mancini_kinds is None:
+            mancini_kinds = mancini_kinds_for(day_d)
     if anchors is None:
         anchors = day_anchors(mancini, max(b.high for b in bars),
-                              min(b.low for b in bars))
+                              min(b.low for b in bars), mancini_kinds)
 
     events = full_stack_events(trades, bar_n=bar_n, anchors=anchors,
                                mancini_prices=mancini)

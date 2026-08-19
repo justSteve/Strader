@@ -178,7 +178,8 @@ def main() -> int:
     print(f"  live:   {len(run.bars)} bars, {len(run.events)} emissions "
           f"(N={run.bar_n}, {len(run.mancini)} mancini anchors)")
 
-    bars, events = replay_events(day, bar_n=run.bar_n, mancini=run.mancini)
+    bars, events = replay_events(day, bar_n=run.bar_n, mancini=run.mancini,
+                                 kinds=run.mancini_kinds)
     print(f"  replay: {len(bars)} bars, {len(events)} emissions")
 
     problems = diff_bars(run.bars, bars)

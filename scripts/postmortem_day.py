@@ -50,7 +50,8 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from market.corpus.paths import central_date, most_recent_session_day   # noqa: E402
 from market.orderflow import postmortem as pm                           # noqa: E402
-from market.orderflow.anchors import PARSED as PARSED_DIR, mancini_levels_for  # noqa: E402
+from market.orderflow.anchors import (  # noqa: E402
+    PARSED as PARSED_DIR, mancini_kinds_for, mancini_levels_for)
 from market.orderflow.replay import has_es_day                          # noqa: E402
 from market.orderflow.run_log import run_log_path                       # noqa: E402
 
@@ -241,7 +242,8 @@ def backfill_one(day: _date, *, root: Path, knobs: pm.Knobs, now: datetime) -> d
     raises — a bad day is a row with a status, so the pool finishes."""
     try:
         mancini = mancini_levels_for(day)
-        segs = pm.segments_from_replay(day, bar_n=BACKFILL_BAR_N, mancini=mancini)
+        segs = pm.segments_from_replay(day, bar_n=BACKFILL_BAR_N, mancini=mancini,
+                                       kinds=mancini_kinds_for(day))
         if not segs:
             return {"day": day.isoformat(), "status": "empty-tape"}
         res = pm.analyze_day(segs, knobs, day=day, source="replay", pass_name="backfill", now=now,

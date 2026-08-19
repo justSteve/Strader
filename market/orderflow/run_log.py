@@ -47,6 +47,8 @@ from dataclasses import dataclass, field
 from datetime import date as _date, datetime
 from pathlib import Path
 
+from market.orderflow.anchors import kinds_from_records, kinds_to_records
+
 logger = logging.getLogger(__name__)
 
 _ROOT = Path(__file__).resolve().parent.parent.parent / "data" / "derived" / "live-parity"
@@ -83,7 +85,7 @@ class RunLogWriter:
 
     def __init__(self, path: Path, *, day: _date, bar_n: int,
                  mancini: list[float], reorder_lag: float, catch_up: bool,
-                 started: datetime):
+                 started: datetime, mancini_kinds=None):
         self.path = path
         self._fh = None
         self.bars = 0
@@ -92,7 +94,12 @@ class RunLogWriter:
             path.parent.mkdir(parents=True, exist_ok=True)
             self._fh = path.open("a", encoding="utf-8")
             self._write({"k": "run", "day": day.isoformat(), "bar_n": bar_n,
-                         "mancini": list(mancini), "reorder_lag": reorder_lag,
+                         "mancini": list(mancini),
+                         # [[price, kind], ...] — which side each Mancini level
+                         # is engaged from [st-tme]; the parity replay needs the
+                         # same map or it watches a different anchor set
+                         "mancini_kinds": kinds_to_records(mancini_kinds),
+                         "reorder_lag": reorder_lag,
                          "catch_up": bool(catch_up),
                          "started": started.isoformat()})
         except OSError as e:  # noqa: BLE001 — logging must not kill capture
@@ -158,6 +165,12 @@ class Run:
     @property
     def mancini(self) -> list[float]:
         return [float(x) for x in (self.meta.get("mancini") or [])]
+
+    @property
+    def mancini_kinds(self):
+        """{price: kinds} the run anchored with; None for a log written
+        before the header carried it (every level was a support then)."""
+        return kinds_from_records(self.meta.get("mancini_kinds"))
 
 
 def read_runs(path: Path) -> list[Run]:

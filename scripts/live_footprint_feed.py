@@ -61,7 +61,8 @@ from market.orderflow.basis import BasisEstimator  # noqa: E402
 from market.orderflow.anchored_profile import (  # noqa: E402
     CENTRAL, RTH_OPEN_CT, SplitAccumulator, anchor_utc, profile_payload,
 )
-from market.orderflow.anchors import LiveAnchors, mancini_levels_for  # noqa: E402
+from market.orderflow.anchors import (  # noqa: E402
+    LiveAnchors, kinds_to_records, levels_from_arg, mancini_kinds_for, mancini_levels_for)
 from market.orderflow.tradesource import iter_trades  # noqa: E402
 from strader.market_calendar import prior_trading_day  # noqa: E402
 from market.orderflow.gex_context import GexContext                # noqa: E402
@@ -406,8 +407,10 @@ def main() -> int:
     ap.add_argument("--idle-stop", type=float, default=None,
                     help="stop after N seconds with no new rows")
     ap.add_argument("--mancini-levels",
-                    help="comma-separated ES levels the recognizer watches; "
-                         "default reads the day's parse (same rule as the page)")
+                    help="comma-separated ES levels the recognizer watches, "
+                         "PRICE or PRICE:KIND (support|resistance|pivot; bare = "
+                         "support); default reads the day's parse, kinds included "
+                         "(same rule as the page)")
     ap.add_argument("--developing-interval", type=float, default=1.0,
                     help="seconds between pushes of the DEVELOPING (still "
                          "forming) bar; 0 disables and the page shows closed "
@@ -455,18 +458,21 @@ def main() -> int:
     # with the session (LiveAnchors owns that rule and why it differs from the
     # replay's lookahead).
     if args.mancini_levels:
-        mancini = [float(x) for x in args.mancini_levels.split(",") if x.strip()]
+        mancini, mancini_kinds = levels_from_arg(args.mancini_levels)
     else:
         try:
             mancini = mancini_levels_for(day)
+            mancini_kinds = mancini_kinds_for(day)
         except Exception as e:  # noqa: BLE001 — no anchors must not stop the chart
             logger.warning("no Mancini levels for %s (%s) — range edges only", day, e)
-            mancini = []
+            mancini, mancini_kinds = [], {}
     # The day's range edges start at the cash open, not the tape start
     # [st-fgno]: bars before 08:30 CT are judged but never become "day high" /
     # "day low". Steve, 2026-08-18: session means the cash session.
     session_open_utc = anchor_utc(day, RTH_OPEN_CT)
-    live_anchors = LiveAnchors(mancini, session_open=session_open_utc)
+    # Each Mancini level is engaged from the side the letter gave it — a
+    # resistance on a push above, a support on a flush below [st-tme, st-q5xu].
+    live_anchors = LiveAnchors(mancini, session_open=session_open_utc, kinds=mancini_kinds)
     driver = StackDriver(anchors=live_anchors.anchors, mancini_prices=mancini)
     live_anchors.attach(driver.recognizer)
 
@@ -484,6 +490,7 @@ def main() -> int:
     meta = {"day": day.isoformat(), "bar_n": args.bar_n, "tick": TICK,
             "source": "live", "started": datetime.now().isoformat(timespec="seconds"),
             "mancini": mancini,
+            "mancini_kinds": kinds_to_records(mancini_kinds),
             "gex": bool(gex is not None and gexbot_path(day).exists())}
 
     # ANNOUNCE THE DAY BEFORE THE FIRST BAR [st-f4at, st-h510 follow-up].
@@ -506,15 +513,18 @@ def main() -> int:
     # a session worth certifying.
     runlog = RunLogWriter(
         run_log_path(day), day=day, bar_n=args.bar_n, mancini=mancini,
+        mancini_kinds=mancini_kinds,
         reorder_lag=args.reorder_lag, catch_up=bool(args.catch_up_only),
         started=datetime.now(),
     ) if not (args.no_run_log or args.dry_run) else _NullRunLog()
 
     logger.info("live footprint feed — day=%s bar_n=%d reorder_lag=%.1fs bridge=%s "
-                "anchors=%d (%d mancini)",
+                "anchors=%d (%d mancini levels: %d support, %d resistance)",
                 day, args.bar_n, args.reorder_lag,
                 "(dry-run)" if args.dry_run else args.bridge,
-                len(live_anchors.anchors), len(mancini))
+                len(live_anchors.anchors), len(mancini),
+                sum(1 for a in live_anchors.anchors if a.mancini and a.kind == "support"),
+                sum(1 for a in live_anchors.anchors if a.mancini and a.kind == "resistance"))
 
     # ── anchored aggressor volume profile [st-n0qm.4] ─────────────────────
     # A second VIEW of the same tape the cells show: pre-seeded from the prior

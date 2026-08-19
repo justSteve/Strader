@@ -6,10 +6,15 @@ the same rhythm relative to an anchor level L:
   beat 1 ``flush``   — a bar trades ≥ ENGAGE_PENETRATION_TICKS beyond L with
                        aggression in the break direction. Intensity names the
                        setup at support/resistance anchors: |Δ| ≥ FLUSH_DELTA_MIN
-                       is a violent break (failed_breakdown); |Δ| ≤ QUIET_DELTA_MAX
-                       is a quiet loss (level_reclaim); in between defaults to
-                       failed_breakdown. Range edges are range_trap; LVN anchors
-                       are return_to_lvn regardless of intensity.
+                       is a violent break; |Δ| ≤ QUIET_DELTA_MAX is a quiet one;
+                       in between counts as violent. At a SUPPORT (break is
+                       down) that is failed_breakdown / level_reclaim, the long;
+                       at a RESISTANCE (break is up) it is the mirror,
+                       failed_breakout / level_reject, the short [st-q5xu] —
+                       the same four beats read upward: push above, stall,
+                       delta flips down, close back beneath. Range edges are
+                       range_trap; LVN anchors are return_to_lvn regardless of
+                       intensity.
   beat 2 ``stall``   — aggression continues in the break direction but the
                        extreme extends ≤ STALL_EXTENSION_TICKS: force without
                        effect (the trades-only absorption proxy).
@@ -218,6 +223,12 @@ class SetupRecognizer:
             setup = "range_trap"
         elif a.kind == "lvn":
             setup = "return_to_lvn"
+        elif a.kind == "resistance":
+            # the upside mirror [st-q5xu]: the name says which way the break
+            # went, because "failed_breakdown @ 7815 (resistance)" on a push
+            # ABOVE 7815 is unreadable — Mancini's Failed Breakdown is the
+            # long; this is the bull trap, the short.
+            setup = "level_reject" if mag <= QUIET_DELTA_MAX else "failed_breakout"
         else:
             setup = "level_reclaim" if mag <= QUIET_DELTA_MAX else "failed_breakdown"
         extreme = bar.low if direction < 0 else bar.high
@@ -303,11 +314,14 @@ class SetupRecognizer:
         # panel's "why the stack said it" column. The internal field is still
         # named `beats`; renaming it touches the replay records, the anatomy
         # payload and the template together, which is st-g9y's job. [st-emy5]
+        # "no reclaim" is the downside word (price never came back over a
+        # lost support); the mirror at a resistance is price holding above it.
+        never_back = "no reclaim" if eng.direction < 0 else "held above, no reject"
         words = {
             "forming": f"stages so far: {'+'.join(eng.beats)}",
             "confirmed": ("confirmed with stacked imbalance" if stacked
                           else "confirmed on opposite delta"),
-            "invalidated": f"no reclaim (stages: {'+'.join(eng.beats)})",
+            "invalidated": f"{never_back} (stages: {'+'.join(eng.beats)})",
         }[state]
         proposed = " [proposed two-branch LVN read — validate empirically]" \
             if eng.setup == "return_to_lvn" else ""

@@ -39,6 +39,10 @@ Right = Literal["CALL", "PUT"]
 CarmineSetup = Literal[
     "failed_breakdown",  # big low flush, trap, recover — Mancini's signature setup
     "level_reclaim",     # slower reclaim of a lost S/R shelf — FBD's gentle sibling
+    "failed_breakout",   # the upside mirror at a resistance: push above, fail, close back
+                         # beneath — the bull trap, a short [st-q5xu]
+    "level_reject",      # quiet poke above a resistance that is retaken — failed_breakout's
+                         # gentle sibling, as level_reclaim is to failed_breakdown
     "return_to_lvn",     # price returns to a ripped-through low-volume node
     "range_trap",        # trap at a range boundary, then reverse
 ]

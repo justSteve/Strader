@@ -9,17 +9,21 @@ from __future__ import annotations
 
 from datetime import date as _date
 
-from market.orderflow.anchors import LiveAnchors
+from market.orderflow.anchors import Kinds, LiveAnchors
 from market.orderflow.bars import build_bars
 from market.orderflow.parity import StackDriver, live_drive
 from market.orderflow.replay import read_corpus_day
 from market.orderflow.run_log import bar_record
 
 
-def replay_events(day: _date, *, bar_n: int, mancini: list[float]) -> tuple[list[dict], list[dict]]:
-    """Returns ``(bar_records, emissions)`` in the shape the run log holds them."""
+def replay_events(day: _date, *, bar_n: int, mancini: list[float],
+                  kinds: Kinds | None = None) -> tuple[list[dict], list[dict]]:
+    """Returns ``(bar_records, emissions)`` in the shape the run log holds them.
+    ``kinds`` is the Mancini levels' anchor-kind map the live run used (its
+    run-log header carries it); None replays every level as a support, which
+    is what runs before 2026-08-19 watched."""
     trades = read_corpus_day(day)
-    live_anchors = LiveAnchors(mancini)
+    live_anchors = LiveAnchors(mancini, kinds=kinds)
     driver = StackDriver(anchors=live_anchors.anchors, mancini_prices=mancini)
     pending = list(trades)
     cursor = {"i": 0}

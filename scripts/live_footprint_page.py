@@ -32,7 +32,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from market.corpus.paths import central_date            # noqa: E402
-from market.orderflow.anchors import mancini_levels_for  # noqa: E402
+from market.orderflow.anchors import levels_from_arg, mancini_levels_for  # noqa: E402
 from market.signals.orderflow_config import TICK, VOLUME_BAR_N  # noqa: E402
 
 logger = logging.getLogger("live_footprint_page")
@@ -93,7 +93,7 @@ def main(argv: list[str] | None = None) -> int:
 
     day = _date.fromisoformat(args.date) if args.date else central_date()
     if args.mancini_levels:
-        mancini = [float(x) for x in args.mancini_levels.split(",") if x.strip()]
+        mancini, _kinds = levels_from_arg(args.mancini_levels)   # same grammar as the feed
     else:
         try:
             mancini = mancini_levels_for(day)

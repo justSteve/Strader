@@ -35,7 +35,8 @@ from market.orderflow.fill import bar_fill_steps      # noqa: E402
 from market.orderflow.replay import read_corpus_day   # noqa: E402
 from market.orderflow.recognizer import SetupRecognizer  # noqa: E402
 from market.orderflow.anatomy import anatomy_payload, build_instances  # noqa: E402
-from market.orderflow.anchors import day_anchors, mancini_levels_for  # noqa: E402
+from market.orderflow.anchors import (  # noqa: E402
+    Kinds, day_anchors, mancini_kinds_for, mancini_levels_for)
 from market.orderflow.parity import full_stack_events  # noqa: E402
 from market.orderflow.anchored_profile import (  # noqa: E402
     CENTRAL, RTH_OPEN_CT, SplitAccumulator, anchor_utc, profile_payload,
@@ -86,13 +87,16 @@ def scenario_deck_for(day: _date, bar_n: int) -> list[dict]:
     return out
 
 
-def build_anatomy(bars: list, suggested: dict, mancini_levels: list[float]) -> list[dict]:
+def build_anatomy(bars: list, suggested: dict, mancini_levels: list[float],
+                  mancini_kinds: Kinds | None = None) -> list[dict]:
     """Run the validated recognizer over the day and fold its emissions into
     four-stage walkthrough instances (st-yfn anatomy mode). Anchors come from
     market.orderflow.anchors.day_anchors — the same rule the replay recorder
-    uses (st-055), so drill anatomy and the measured record cannot diverge."""
+    uses (st-055), so drill anatomy and the measured record cannot diverge.
+    ``mancini_kinds``: each level's parsed kind (None = all supports)."""
     anchors = day_anchors(mancini_levels,
-                          suggested["session_high"], suggested["session_low"])
+                          suggested["session_high"], suggested["session_low"],
+                          mancini_kinds)
     if not anchors:
         return []
     recs = SetupRecognizer(anchors, mancini_prices=mancini_levels).run(bars)
@@ -120,7 +124,8 @@ def minute_candles(trades) -> list[list]:
     return out
 
 
-def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = None) -> dict:
+def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = None,
+                 mancini_kinds: Kinds | None = None) -> dict:
     trades = read_corpus_day(day)
     if not trades:
         raise SystemExit(f"corpus day {day} parsed to zero trades")
@@ -149,8 +154,13 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
     # or after 08:30 CT (a bar straddling the open is pre-open); a day with no
     # RTH bars (partial capture) falls back to the whole tape.
     suggested, first_rth, n_rth = session_levels(bars, day)
-    mancini = mancini_levels if mancini_levels is not None else mancini_levels_for(day)
-    anatomy = build_anatomy(bars, suggested, mancini)
+    if mancini_levels is not None:
+        mancini = mancini_levels            # override: kinds as given (bare = support)
+    else:
+        mancini = mancini_levels_for(day)
+        if mancini_kinds is None:
+            mancini_kinds = mancini_kinds_for(day)
+    anatomy = build_anatomy(bars, suggested, mancini, mancini_kinds)
 
     # Emissions per bar [st-b0n9] — the same panel the live surface carries, so
     # a rep drilled on a replay reads the identical thing live. Same anchor rule
@@ -162,7 +172,7 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
     final: list[dict] = []
     events = full_stack_events(trades, bar_n=bar_n,
                                anchors=day_anchors(mancini, suggested["session_high"],
-                                                   suggested["session_low"]),
+                                                   suggested["session_low"], mancini_kinds),
                                mancini_prices=mancini)
     for e in events:
         i = e.get("bar_i")

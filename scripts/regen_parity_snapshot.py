@@ -21,7 +21,8 @@ import argparse
 import json
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -54,7 +55,7 @@ def main() -> int:
 
     head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT,
                           capture_output=True, text=True).stdout.strip() or "unknown"
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%MZ")
+    stamp = datetime.now(ZoneInfo("America/Chicago")).strftime("%Y-%m-%d %H:%M CT")   # human-facing: Central
     entry = (f"- **{stamp}** ({len(events)} events + {len(reads)} absorption, "
              f"base {head}): {args.reason}\n")
     if CHANGES.exists():

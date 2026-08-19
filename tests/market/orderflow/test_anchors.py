@@ -175,3 +175,102 @@ def test_live_anchors_ignore_bars_that_start_before_the_session_open():
         def __init__(self, high, low): self.high, self.low = high, low
     la.observe(_Bar(6240.0, 6200.0))
     assert (la.high.price, la.low.price) == (6240.0, 6200.0)
+
+
+# --- anchor KIND from the parse [st-tme, st-q5xu] ---------------------------
+
+PARSE_LEVELS = [
+    {"price": 7716.0, "kind": "support", "label": "major"},
+    {"price": 7742.0, "kind": "resistance", "label": "major"},
+    {"price": 7738.0, "kind": "trigger", "label": "reclaims are a possible long trigger"},
+    {"price": 7760.0, "kind": "target", "label": "breakout target"},
+    {"price": 7760.0, "kind": "resistance", "label": ""},     # target that is also a resistance
+    {"price": 7730.0, "kind": "pivot", "label": "major pivot inside range"},
+    {"price": 4000.0, "kind": "support", "label": "out of band"},
+]
+
+
+def _write_parse(tmp_path, monkeypatch, day, levels=PARSE_LEVELS):
+    import json
+    from market.orderflow import anchors as A
+    (tmp_path / f"{day.isoformat()}.json").write_text(json.dumps({"levels": levels}))
+    monkeypatch.setattr(A, "PARSED", tmp_path)
+    return A
+
+
+def test_parsed_kinds_follow_the_letter(tmp_path, monkeypatch):
+    A = _write_parse(tmp_path, monkeypatch, date(2026, 8, 19))
+    kinds = A.mancini_kinds_for(date(2026, 8, 19))
+    assert kinds == {
+        7716.0: ("support",),
+        7730.0: ("support", "resistance"),   # pivot: engaged from either side
+        7738.0: (),                          # trigger: on the chart, not watched
+        7742.0: ("resistance",),
+        7760.0: ("resistance",),             # the target's price is also a resistance
+    }
+    # every chart price is a key, so the two cannot drift apart
+    assert set(A.mancini_levels_for(date(2026, 8, 19))) == set(kinds)
+
+
+def test_day_anchors_carry_the_parsed_kind(tmp_path, monkeypatch):
+    A = _write_parse(tmp_path, monkeypatch, date(2026, 8, 19))
+    d = date(2026, 8, 19)
+    a = day_anchors(A.mancini_levels_for(d), 7770.0, 7700.0, A.mancini_kinds_for(d))
+    assert [(x.price, x.kind, x.mancini) for x in a] == [
+        (7716.0, "support", True),
+        (7730.0, "support", True),
+        (7730.0, "resistance", True),
+        (7742.0, "resistance", True),
+        (7760.0, "resistance", True),
+        (7770.0, "range_high", False),
+        (7700.0, "range_low", False),
+    ]
+
+
+def test_day_anchors_without_kinds_is_all_supports():
+    """The legacy / test default, and what a bare --mancini-levels list means."""
+    a = day_anchors([7716.0, 7742.0], 7770.0, 7700.0)
+    assert [(x.price, x.kind) for x in a][:2] == [(7716.0, "support"), (7742.0, "support")]
+
+
+def test_labeled_day_kinds_are_supports(monkeypatch, tmp_path):
+    import json
+    from market.orderflow import anchors as A
+    labels = tmp_path / "labels.json"
+    labels.write_text(json.dumps([{"session_date": "2026-03-03", "setup": "failed_breakdown",
+                                   "es_levels": [6212.0, 6230.0]}]))
+    monkeypatch.setattr(A, "LABELS", labels)
+    assert A.mancini_levels_for(date(2026, 3, 3)) == [6212.0, 6230.0]
+    assert A.mancini_kinds_for(date(2026, 3, 3)) == {6212.0: ("support",), 6230.0: ("support",)}
+    assert A.mancini_source_for(date(2026, 3, 3)) == "labels"
+
+
+def test_levels_from_arg_grammar():
+    from market.orderflow.anchors import levels_from_arg
+    prices, kinds = levels_from_arg("7800, 7815:resistance,7820:pivot,7800")
+    assert prices == [7800.0, 7815.0, 7820.0]
+    assert kinds == {7800.0: ("support",), 7815.0: ("resistance",),
+                     7820.0: ("support", "resistance")}
+    import pytest
+    with pytest.raises(ValueError):
+        levels_from_arg("7800:target")
+
+
+def test_kinds_round_trip_through_records():
+    from market.orderflow.anchors import kinds_from_records, kinds_to_records
+    kinds = {7716.0: ("support",), 7730.0: ("support", "resistance"), 7738.0: ()}
+    rows = kinds_to_records(kinds)
+    assert rows == [[7716.0, "support"], [7730.0, "support"], [7730.0, "resistance"]]
+    back = kinds_from_records(rows)
+    assert back == {7716.0: ("support",), 7730.0: ("support", "resistance")}
+    assert kinds_to_records(None) is None and kinds_from_records(None) is None
+    # a price whose kinds were () is simply absent after the round trip, and an
+    # absent price is "not watched" — the same meaning
+    assert day_anchors([7738.0], 1.0, 0.0, back)[0].kind == "range_high"
+
+
+def test_live_anchors_take_kinds():
+    from market.orderflow.anchors import LiveAnchors
+    la = LiveAnchors([7716.0, 7742.0], kinds={7716.0: ("support",), 7742.0: ("resistance",)})
+    assert [(a.price, a.kind) for a in la.anchors if a.mancini] == [
+        (7716.0, "support"), (7742.0, "resistance")]
