@@ -1,0 +1,22 @@
+# config/postmortem.yaml — Day Post-Mortem thresholds. [co-7kgte]
+#
+# Steve owns every number here; edit and commit. Read at the start of each
+# pass (15:30 same-day, 08:27 next-morning) — a mid-afternoon edit changes
+# that day's 15:30 page. Every key is a field of Knobs in
+# market/orderflow/postmortem.py; an unknown key stops the run rather than
+# silently keeping a default. Units: ES points, minutes, ticks (0.25 pt).
+
+x_pts: 6            # a leg counts when price moves this far against the prior extreme
+y_min: 15           # ...and reached it inside this many minutes of the leg's origin
+z_pts: 3            # a leg is "near a level" when its origin is within this of an anchor
+w_min: 10           # calls in the leg's direction are looked for this far before the origin
+windows_min: [5, 15, 30]   # for/against measured at each of these minutes after a call
+target_pts: 5       # first-touch grade: win/loss at ±this from the call's close
+dense_anchor_fires: 5      # flag: one anchor confirmed at least this many times in a day
+late_confirm_bars: 2       # flag: confirm this many bars after the reclaim, or...
+late_confirm_pts: 3        # ...this many points past the anchor at the confirm close
+breakout_pts: 10           # flag: a leg this big through a level with only "invalidated" said
+grid_density: 8            # flag: confirmed setups per 10 points of session range
+history_days: 20           # the "last N days" section
+lid_ticks: 8               # a bar high within this many ticks under the level counts as a lid rejection
+lid_window_min: 30         # lid rejections and window delta are counted over this many minutes before a leg's origin
