@@ -1,5 +1,45 @@
 # DaysActivity - 2026-08-19
 
+## 16:06 - Session Handoff [Anchor Kind Fidelity · Upside Mirror]
+
+**Summary**: Closed st-tme and st-q5xu (Steve: "proceed") — Mancini levels now enter the recognizer as the kind the letter gave them (support / resistance / pivot→both; trigger and target are not anchors), the upside mirror at a resistance is named `failed_breakout` / `level_reject` (bearish), one anchor rule feeds drill, live feed (run-log header + page meta carry `mancini_kinds`), replay, post-mortem backfill and acuity (parity test), and the full-corpus acuity re-sweep `20260819T205533Z` grades bullish and bearish separately: the support stream is byte-identical to the st-98z baseline (0 added / 0 removed on 197 common days), the new bearish stream is 244 confirms, 51% ±5@30, median MFE/MAE 7.25/6.12, validate-half only. Desk: `desk-anchor-kind-mirror-2026-08-19.html`; doc `docs/measurement/anchor-kind-mirror-2026-08-19.md`; COO memo `2026-08-19-strader-to-coo-anchor-kind` (its backfill ledger was measured under the old all-support rule — re-run is COO's to schedule).
+
+**Open Work**:
+- Live feeder still runs the pre-change code until its midnight restart; tomorrow's live record is the first under the new rule (no restart done post-close — a human should see a kill).
+- A concurrent session has uncommitted work in `runbook/mancini/{listlevels,refresh,run,schema}.py`, `runbook/mancini/tests/test_listlevels.py`, `scripts/mancini_backfill_levels.py` (Richer Mancini Extraction, st-9r51?) — left untouched, not staged.
+- `tests/test_a2a_channel.py::test_real_inbox_has_no_malformed_lines` fails on COO's three NOTE rows (inbox.md:184/185/189) — pre-existing, kind-contract decision still open (st-s8ng).
+- Two Strader→COO memos await receipt: claudemd-scope (08-14, 2 sessions) and anchor-kind (today).
+
+**Files Changed**:
+market/orderflow/anchors.py
+market/orderflow/recognizer.py
+market/orderflow/postmortem.py
+market/orderflow/regime.py
+market/orderflow/replay_live.py
+market/orderflow/run_log.py
+market/orderflow/session_record.py
+scripts/acuity_run2.py
+scripts/acuity_run2_summary.py
+scripts/live_footprint_feed.py
+scripts/live_footprint_page.py
+scripts/live_parity_check.py
+scripts/orderflow_drill.py
+scripts/orderflow_drill_template.html
+scripts/postmortem_day.py
+scripts/regen_parity_snapshot.py
+scripts/replay_day.py
+strader/entities/singleton.py
+tests/market/fixtures/parity/CHANGES.md
+tests/market/fixtures/parity/expected_signals_20260702.json
+tests/market/orderflow/test_anchors.py
+tests/market/orderflow/test_anchor_parity.py
+tests/market/orderflow/test_recognizer.py
+tests/scripts/test_postmortem_day.py
+docs/measurement/anchor-kind-mirror-2026-08-19.md
+docs/a2a/inbox.md
+
+---
+
 ## 07:10 - Session Handoff [V2 walkthrough prep → live operator walk; strats-as-Zentities memo; overnight refresh; coach cursor; two parses]
 
 **Summary**: Long session spanning 08-17 16:05 → 08-19 07:10. Prepared the Watcher V2 code walkthrough (desk page `desk-2026-08-17-watcher-v2-walkthrough.html`, three agent code maps, 135 tests green, live-proof evidence) — Steve found it "too clipped" and asked to learn by watching the system operated, so **Walk 1** (`docs/walkthroughs/2026-08-18-watcher-walk-01-data-path.md`) narrated one trade and one 1 Hz row live at the 08-18 open; terminal-length rule recorded (anything past a screenful → desk page). Steve's strats-as-host-emitters idea shared with COO as **Strats As Zentities** (st-q9re, in progress) — COO's reply memo is on the desk (both Zentity definitions hold; June spec deferred the binding layer; classifier landed, live binding open; contract-is-the-Zentity product read). Built on his "make it so": **Overnight Refresh At 08:15** (st-vxbw, closed — `runbook.mancini.refresh`, hooked into the 08:15 good case, `--open` drops the page in the browser) and **Coach Cursor** (st-135m, closed — `point`/`clear` verbs, `tools/coach.py`, 17/17 check, confirmed on his page). CT-not-UTC rule applied to the plan-doc header, brief, Pine and the footprint sentinel strip. Parsed 08-18 (70 levels) and 08-19 (72 levels, bearish control below 7797; clipboard loaded, NAV [today]). Answered PA/gauge/levels reads through the 08-18 session and a bond-market news read; his 14:16 7695/7680/7665 put fly (−$35) logged in conversation only — trade journal declined "not yet".
