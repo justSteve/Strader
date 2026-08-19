@@ -294,3 +294,5 @@ COO:
   reset each keep their own minute).
 - Ledger under `data/measurement/postmortem/`.
 - Backfill over all 306 days, no per-day pages.
+
+**Addendum A (2026-08-19, after Strader's st-g1u7 memo):** anchor kind from the parse + `kind-mismatch` flag; anchorless runs said outright; `lid_rejections` / `window_delta` on every leg; `word_match` on recap rows. Details in the plan, `docs/superpowers/plans/2026-08-19-day-postmortem.md` → Addendum A.
