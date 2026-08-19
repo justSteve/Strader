@@ -72,3 +72,105 @@ def load_knobs(path: Path = CONFIG_PATH) -> Knobs:
     if "windows_min" in doc:
         doc["windows_min"] = tuple(int(w) for w in doc["windows_min"])
     return replace(Knobs(), **doc)
+
+
+# ------------------------------------------------------------------ inputs
+
+@dataclass(frozen=True)
+class Bar:
+    """One volume bar as the run log records it (run_log.bar_record)."""
+    i: int
+    t0: datetime
+    t1: datetime
+    o: float
+    h: float
+    l: float
+    c: float
+    v: int
+    d: int
+
+    @classmethod
+    def from_record(cls, rec: dict) -> "Bar":
+        return cls(i=int(rec["i"]),
+                   t0=datetime.fromisoformat(rec["t0"]),
+                   t1=datetime.fromisoformat(rec["t1"]),
+                   o=float(rec["o"]), h=float(rec["h"]), l=float(rec["l"]),
+                   c=float(rec["c"]), v=int(rec["v"]), d=int(rec["d"]))
+
+
+@dataclass
+class Segment:
+    """One feeder run: its bars, its emissions, its header. Bars keep the
+    feeder's own numbering (``Bar.i``); ``pos`` maps a bar number to a list
+    index, because a trimmed or restarted run need not start at zero."""
+    run_no: int
+    bars: list
+    events: list
+    meta: dict
+    complete: bool = True
+
+    def __post_init__(self) -> None:
+        self._pos = {b.i: k for k, b in enumerate(self.bars)}
+
+    def pos(self, bar_i) -> int | None:
+        if bar_i is None:
+            return None
+        return self._pos.get(int(bar_i))
+
+    @property
+    def mancini(self) -> list[float]:
+        return [float(x) for x in (self.meta.get("mancini") or [])]
+
+    @property
+    def anchorless(self) -> bool:
+        """Addendum A2: the run's header carried no Mancini levels (a restart
+        before the morning parse landed). No calls there is not nothing to call."""
+        return not self.mancini
+
+    @property
+    def bar_n(self) -> int:
+        return int(self.meta.get("bar_n") or 0)
+
+    @property
+    def started(self) -> str:
+        return str(self.meta.get("started", "?"))
+
+    @property
+    def span(self) -> tuple[datetime, datetime] | None:
+        if not self.bars:
+            return None
+        return self.bars[0].t0, self.bars[-1].t1
+
+
+def load_live_segments(path: Path) -> list[Segment]:
+    """The feeder's record of a day → Segments, one per run with bars.
+
+    Runs without ``bar_n`` (an older feeder) are skipped with a warning, never
+    guessed at; runs with no bars (a header and an immediate end) are dropped
+    silently — they carry nothing to measure. Run numbers count every header
+    in the file, skipped or not, so the page's run number matches the file.
+    """
+    from market.orderflow.run_log import read_runs
+    out: list[Segment] = []
+    for n, run in enumerate(read_runs(path), start=1):
+        if not run.bar_n:
+            logger.warning("%s run %d (started %s): header carries no bar_n — skipped",
+                           path.name, n, run.started)
+            continue
+        if not run.bars:
+            continue
+        out.append(Segment(run_no=n, bars=[Bar.from_record(b) for b in run.bars],
+                           events=list(run.events), meta=run.meta, complete=run.complete))
+    return out
+
+
+def segments_from_replay(day: _date, *, bar_n: int, mancini: list[float]) -> list[Segment]:
+    """One Segment from a full replay of the day's tape (backfill path)."""
+    from market.orderflow.replay_live import replay_events
+    bars, events = replay_events(day, bar_n=bar_n, mancini=mancini)
+    if not bars:
+        return []
+    meta = {"bar_n": bar_n, "mancini": list(mancini), "started": bars[0]["t0"],
+            "replay": True}
+    return [Segment(run_no=1, bars=[Bar.from_record(b) for b in bars],
+                    events=events, meta=meta, complete=True)]

@@ -82,3 +82,46 @@ def test_load_knobs_rejects_unknown_key(tmp_path):
 def test_shipped_config_loads_and_round_trips():
     k = pm.load_knobs(pm.CONFIG_PATH)
     assert pm.knobs_from_dict(pm.knobs_to_dict(k)) == k
+
+
+# ---------------------------------------------------------------- loaders
+
+def test_bar_from_record_parses_times_and_prices():
+    rec = {"k": "bar", "i": 7, "t0": "2026-08-18T08:30:15-05:00",
+           "t1": "2026-08-18T08:31:05-05:00", "o": 7720.0, "h": 7721.5,
+           "l": 7719.75, "c": 7721.0, "v": 2000, "d": 120, "nv": 0}
+    b = pm.Bar.from_record(rec)
+    assert b.i == 7 and b.h == 7721.5 and b.d == 120
+    assert b.t0.tzinfo is not None and b.t0.hour == 8 and b.t1.minute == 31
+
+
+def test_load_live_segments_splits_runs_and_keeps_feeder_bar_numbers():
+    segs = pm.load_live_segments(FIXTURE)
+    assert [s.run_no for s in segs] == [1, 2]
+    assert len(segs[0].bars) == 3 and segs[0].bars[0].i == 0
+    assert segs[0].mancini == [] and segs[0].anchorless is True      # Addendum A2
+    assert segs[1].bars[0].i == 380 and segs[1].bars[-1].i == 420
+    assert all(e["bar_i"] is None or 380 <= e["bar_i"] <= 420 for e in segs[1].events)
+    assert 7720.0 in segs[1].mancini and segs[1].anchorless is False
+    assert segs[1].complete is True
+    confirmed = [e for e in segs[1].events
+                 if e["type"] == "SetupRecognition" and e["state"] == "confirmed"]
+    assert any(e["anchor_price"] == 7720.0 and e["bar_i"] == 395 for e in confirmed)
+
+
+def test_load_live_segments_skips_runs_without_bar_n(tmp_path, caplog):
+    p = tmp_path / "x.jsonl"
+    p.write_text('{"k":"run","day":"2026-08-18","mancini":[]}\n'
+                 '{"k":"bar","i":0,"t0":"2026-08-18T08:30:00-05:00","t1":"2026-08-18T08:31:00-05:00",'
+                 '"o":1,"h":2,"l":0,"c":1,"v":2000,"d":0,"nv":0}\n')
+    with caplog.at_level("WARNING"):
+        segs = pm.load_live_segments(p)
+    assert segs == []
+    assert "bar_n" in caplog.text
+
+
+def test_segment_pos_maps_bar_number_to_index():
+    bars = [_bar(i + 10, 10, 11, 9, 10) for i in range(3)]     # numbered 10, 11, 12
+    seg = _segment(bars, [])
+    assert seg.pos(11) == 1
+    assert seg.pos(99) is None and seg.pos(None) is None
