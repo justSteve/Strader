@@ -55,11 +55,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from market.corpus.paths import most_recent_session_day           # noqa: E402
-from market.orderflow.anchors import LiveAnchors                  # noqa: E402
-from market.orderflow.bars import build_bars                      # noqa: E402
-from market.orderflow.parity import StackDriver, live_drive       # noqa: E402
-from market.orderflow.replay import has_es_day, read_corpus_day   # noqa: E402
-from market.orderflow.run_log import Run, bar_record, read_runs, run_log_path  # noqa: E402
+from market.orderflow.replay import has_es_day                    # noqa: E402
+from market.orderflow.run_log import Run, read_runs, run_log_path  # noqa: E402
+from market.orderflow.replay_live import replay_events                   # noqa: E402,F401 — re-exported for callers
 
 logger = logging.getLogger("live_parity_check")
 
@@ -72,40 +70,6 @@ BAR_FIELDS = ("t0", "t1", "o", "h", "l", "c", "v", "d", "nv")
 # that fires on a different print is a different signal even when its numbers
 # match.
 _EV_SKIP = ("k",)
-
-
-def replay_events(day: _date, *, bar_n: int, mancini: list[float]) -> tuple[list[dict], list[dict]]:
-    """Drive the day's tape exactly as the live feeder drove it.
-
-    Closed bars only and LiveAnchors, because those are the live rules — see
-    the module docstring. Returns ``(bar_records, emissions)`` in the same
-    shape the run log holds them.
-    """
-    trades = read_corpus_day(day)
-    live_anchors = LiveAnchors(mancini)
-    driver = StackDriver(anchors=live_anchors.anchors, mancini_prices=mancini)
-    pending = list(trades)
-    cursor = {"i": 0}
-
-    def _closed_bars():
-        # Bars close on known trade boundaries, so walk the trade list until
-        # each bar's volume is covered — the same straddle convention the
-        # feeder's take_bar_trades() reclaims a slice by.
-        for bar in build_bars(iter(trades), n=bar_n):
-            vol = 0
-            start = cursor["i"]
-            while cursor["i"] < len(pending) and vol < bar.volume:
-                vol += pending[cursor["i"]].size
-                cursor["i"] += 1
-            yield bar, pending[start:cursor["i"]]
-
-    bars: list[dict] = []
-    events: list[dict] = []
-    for bar_i, bar, _trades, evs in live_drive(_closed_bars(), driver, live_anchors):
-        bars.append(bar_record(bar_i, bar))
-        events.extend({"k": "ev"} | e for e in evs)
-    events.extend({"k": "ev"} | e for e in driver.finish(pending[cursor["i"]:]))
-    return bars, events
 
 
 def diff_bars(live: list[dict], repl: list[dict]) -> list[str]:
