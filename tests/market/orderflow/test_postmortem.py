@@ -453,3 +453,42 @@ def test_analyze_day_on_fixture_has_every_section_input():
     assert isinstance(res["flags"], list)
     assert res["knobs"] == _knobs_dict(pm.Knobs())
     assert res["coverage"]["unmeasured_note"]            # record ends 13:57, pass at 15:30
+
+
+# ----------------------------------------------------------------- ledger
+
+def _res(day, pass_name, n_calls=2, n_legs=1):
+    return {"day": day, "pass": pass_name, "source": "live", "generated_at": "x",
+            "calls": [{"bar_i": i, "state": "confirmed", "setup": "failed_breakdown",
+                       "verdict30": "win" if i % 2 else "loss", "type": "SetupRecognition"}
+                      for i in range(n_calls)],
+            "legs": [{"tag": "silent", "near_level": True} for _ in range(n_legs)],
+            "flags": [], "census": {"by_type": {}, "per_anchor": [], "n_calls_measured": n_calls}}
+
+
+def test_write_ledger_replaces_same_day_and_pass(tmp_path):
+    root = tmp_path / "pm"
+    pm.write_ledger(_res("2026-08-18", "same-day", 2, 1), root)
+    pm.write_ledger(_res("2026-08-18", "same-day", 3, 2), root)     # re-run: replaces
+    pm.write_ledger(_res("2026-08-18", "next-morning", 1, 1), root) # other pass: adds
+    pm.write_ledger(_res("2026-08-17", "same-day", 1, 0), root)
+    rows = [json.loads(l) for l in (root / "ledger.jsonl").read_text().splitlines()]
+    assert sum(1 for r in rows if r["day"] == "2026-08-18" and r["pass"] == "same-day") == 3
+    assert sum(1 for r in rows if r["day"] == "2026-08-18" and r["pass"] == "next-morning") == 1
+    assert all({"day", "pass", "source"} <= set(r) for r in rows)
+    legs = [json.loads(l) for l in (root / "legs.jsonl").read_text().splitlines()]
+    assert len(legs) == 2 + 1 + 0
+    assert json.loads((root / "2026-08-18.json").read_text())["pass"] == "next-morning"
+
+
+def test_history_prefers_latest_pass_per_day(tmp_path):
+    root = tmp_path / "pm"
+    pm.write_ledger(_res("2026-08-17", "same-day", 4, 2), root)
+    pm.write_ledger(_res("2026-08-17", "next-morning", 5, 3), root)
+    pm.write_ledger(_res("2026-08-18", "same-day", 2, 1), root)
+    h = pm.history(root, days=20, before="2026-08-19")
+    assert h["days"] == ["2026-08-17", "2026-08-18"]
+    assert h["confirms_per_day"] == [5, 2]
+    assert h["silent_legs_per_day"] == [3, 1]
+    assert h["median_confirms"] == 3.5
+    assert h["by_setup"]["failed_breakdown"]["win"] == 3 and h["by_setup"]["failed_breakdown"]["loss"] == 4

@@ -769,3 +769,90 @@ def analyze_day(segments: list[Segment], knobs: Knobs, *, day: _date, source: st
         "flags": flags(calls, legs, cen, session_range=cash_range, knobs=knobs),
         "knobs": knobs_to_dict(knobs),
     }
+
+
+# ----------------------------------------------------------------- ledger
+
+PASS_ORDER = {"backfill": 0, "same-day": 1, "next-morning": 2}
+
+
+def _rewrite_jsonl(path: Path, keep, new_rows: list[dict]) -> None:
+    """Replace rows failing ``keep`` with ``new_rows``; atomic via a temp file."""
+    old: list[dict] = []
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                r = json.loads(line)
+            except json.JSONDecodeError:
+                logger.warning("%s: unreadable line dropped", path.name)
+                continue
+            if keep(r):
+                old.append(r)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8") as fh:
+        for r in old + new_rows:
+            fh.write(json.dumps(r, separators=(",", ":"), default=str) + "\n")
+    tmp.replace(path)
+
+
+def write_ledger(res: dict, root: Path = LEDGER_ROOT) -> dict:
+    """``<day>.json`` (whole result, last writer wins), and one row per call /
+    leg in ``ledger.jsonl`` / ``legs.jsonl`` — rows for this (day, pass)
+    replaced, never duplicated. Returns the paths written."""
+    root.mkdir(parents=True, exist_ok=True)
+    day, pass_name, source = res["day"], res["pass"], res["source"]
+    stamp = {"day": day, "pass": pass_name, "source": source}
+
+    def keep(r: dict) -> bool:
+        return not (r.get("day") == day and r.get("pass") == pass_name)
+
+    _rewrite_jsonl(root / "ledger.jsonl", keep, [stamp | c for c in res["calls"]])
+    _rewrite_jsonl(root / "legs.jsonl", keep, [stamp | l for l in res["legs"]])
+    day_path = root / f"{day}.json"
+    tmp = day_path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(res, indent=1, default=str), encoding="utf-8")
+    tmp.replace(day_path)
+    return {"day_json": day_path, "ledger": root / "ledger.jsonl", "legs": root / "legs.jsonl"}
+
+
+def history(root: Path = LEDGER_ROOT, *, days: int = 20, before: str | None = None) -> dict:
+    """The last ``days`` session days strictly before ``before`` (ISO date),
+    one pass per day (the latest in PASS_ORDER). Inputs for spec §4b.6."""
+    calls_by_day: dict[str, dict[str, list[dict]]] = {}
+    legs_by_day: dict[str, dict[str, list[dict]]] = {}
+    for path, store in ((root / "ledger.jsonl", calls_by_day), (root / "legs.jsonl", legs_by_day)):
+        if not path.exists():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                r = json.loads(line)
+            except json.JSONDecodeError:
+                logger.warning("%s: unreadable line skipped", path.name)
+                continue
+            if before and r["day"] >= before:
+                continue
+            store.setdefault(r["day"], {}).setdefault(r["pass"], []).append(r)
+    all_days = sorted(set(calls_by_day) | set(legs_by_day))[-days:]
+    out = {"days": all_days, "confirms_per_day": [], "silent_legs_per_day": [],
+           "by_setup": {}, "median_confirms": None, "median_silent": None}
+    for d in all_days:
+        cp, lp = calls_by_day.get(d, {}), legs_by_day.get(d, {})
+        best = max(set(cp) | set(lp), key=lambda p: PASS_ORDER.get(p, -1))
+        conf = [c for c in cp.get(best, []) if c.get("state") == "confirmed"]
+        out["confirms_per_day"].append(len(conf))
+        out["silent_legs_per_day"].append(
+            sum(1 for l in lp.get(best, []) if l.get("tag") == "silent" and l.get("near_level")))
+        for c in conf:
+            s = out["by_setup"].setdefault(c.get("setup") or "?",
+                                           {"win": 0, "loss": 0, "neither": 0, "both-in-one-bar": 0})
+            v = c.get("verdict30") or "neither"
+            s[v] = s.get(v, 0) + 1
+    if all_days:
+        out["median_confirms"] = statistics.median(out["confirms_per_day"])
+        out["median_silent"] = statistics.median(out["silent_legs_per_day"])
+    return out
