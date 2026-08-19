@@ -4,6 +4,15 @@
 **Data:** `data/measurement/acuity-run2-{days,confirmations}.jsonl` (append-only; filter on the run id)
 **Code:** `scripts/acuity_run2.py` at the commit tagged in this file's git history
 
+> **Superseded in part, 2026-08-19 (st-gno7):** the day-type cut and the
+> developing-shape-gate recommendation below did not survive re-derivation on
+> the enriched 270-day corpus (the day-type pattern *inverts* on the added
+> days; the proposed gate never held even on the body it was proposed from),
+> and the midday hour cells weakened to a combined-only effect. See
+> `hour-daytype-rederivation-2026-08-19.md` before quoting §Cuts or
+> Recommendations 1–2. The fire-index damp (st-98z) was likewise removed —
+> `fire-index-rederivation-2026-08-19.md`.
+
 ## Question
 
 Run 1 (st-3vu, `score_recognizer.py`) asked *sensitivity*: does the machine confirm
