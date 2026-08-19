@@ -384,3 +384,72 @@ def test_match_recap_family_tier():
     rows = [{"setup": "failed_breakdown", "level": 7738.0, "time_et": "1:40PM"}]
     m = pm.match_recap(rows, calls)
     assert m[0]["tier"] == "FAMILY" and m[0]["word_match"] is False
+
+
+# ----------------------------------------------------------- analyze_day
+
+def test_session_of():
+    assert pm.session_of(datetime(2026, 8, 18, 3, 0, tzinfo=CT)) == "overnight"
+    assert pm.session_of(datetime(2026, 8, 18, 8, 30, tzinfo=CT)) == "cash"
+    assert pm.session_of(datetime(2026, 8, 18, 14, 59, tzinfo=CT)) == "cash"
+    assert pm.session_of(datetime(2026, 8, 18, 15, 0, tzinfo=CT)) == "evening"
+
+
+def test_flags_rules():
+    bars, events = _flush_reclaim_confirm()
+    seg = _segment(bars, events, mancini=[7720.0])
+    calls = pm.measure_calls(seg, pm.Knobs())
+    legs = [{"tag": "silent", "near_level": True, "pts": 7.0, "direction": "bullish",
+             "origin_ct": "09:00", "origin_bar": 3, "nearest_level": 7720.0, "said_before": []}]
+    cen = pm.census(seg, calls)
+    flags = pm.flags(calls, legs, cen, session_range=20.0, knobs=pm.Knobs())
+    kinds = {f["flag"] for f in flags}
+    assert "late-confirm" in kinds and "silent-move" in kinds   # lag 2 bars / +3.75; silent near level
+    assert "dense-anchor" not in kinds and "grid-density" not in kinds
+    assert "kind-mismatch" not in kinds                          # parse had no word for it
+
+
+def test_flags_kind_mismatch():
+    """Addendum A1: the parse says resistance, the recognizer said support."""
+    bars, events = _flush_reclaim_confirm()
+    seg = _segment(bars, events, mancini=[7720.0])
+    for parse_kind, expect in (("resistance", True), ("support", False), (None, False)):
+        kinds = {7720.0: parse_kind} if parse_kind else {}
+        calls = pm.measure_calls(seg, pm.Knobs(), parsed_kinds=kinds)
+        fl = pm.flags(calls, [], pm.census(seg, calls), session_range=20.0, knobs=pm.Knobs())
+        assert ("kind-mismatch" in {f["flag"] for f in fl}) is expect, parse_kind
+
+
+def test_flags_dense_anchor_and_grid_density():
+    bars = [_bar(i, 100, 100.5, 99.5, 100) for i in range(12)]
+    events = [_ev(i, bars, setup="failed_breakdown", bias="bullish", anchor_price=99.0,
+                  anchor_kind="support", state="confirmed", beats=[], fire_index=i + 1,
+                  confidence=0.6) for i in range(6)]
+    seg = _segment(bars, events, mancini=[99.0])
+    calls = pm.measure_calls(seg, pm.Knobs())
+    flags = pm.flags(calls, [], pm.census(seg, calls), session_range=5.0, knobs=pm.Knobs())
+    assert {"dense-anchor", "grid-density"} <= {f["flag"] for f in flags}
+
+
+def test_analyze_day_on_fixture_has_every_section_input():
+    segs = pm.load_live_segments(FIXTURE)
+    res = pm.analyze_day(segs, pm.Knobs(), day=date(2026, 8, 18), source="live",
+                         pass_name="same-day", now=datetime(2026, 8, 18, 15, 30, tzinfo=CT))
+    assert res["day"] == "2026-08-18" and res["source"] == "live" and res["pass"] == "same-day"
+    assert res["runs"] == [
+        {"run": 1, "started": segs[0].started, "bars": 3, "complete": True,
+         "anchorless": True, "first_ct": segs[0].bars[0].t0.strftime("%H:%M"),
+         "last_ct": segs[0].bars[-1].t1.strftime("%H:%M")},
+        {"run": 2, "started": segs[1].started, "bars": 41, "complete": True,
+         "anchorless": False, "first_ct": segs[1].bars[0].t0.strftime("%H:%M"),
+         "last_ct": segs[1].bars[-1].t1.strftime("%H:%M")}]
+    assert res["coverage"]["first_ct"] and res["coverage"]["last_ct"]
+    assert res["census"]["by_type"]["SetupRecognition"]["confirmed"] >= 1
+    per = {a["anchor"]: a for a in res["census"]["per_anchor"]}
+    assert 7720.0 in per and per[7720.0]["confirmed"] >= 1
+    assert isinstance(res["calls"], list) and isinstance(res["legs"], list)
+    assert all("session" in c for c in res["calls"])
+    assert res["recap"] == {"status": "not-received", "rows": []}
+    assert isinstance(res["flags"], list)
+    assert res["knobs"] == _knobs_dict(pm.Knobs())
+    assert res["coverage"]["unmeasured_note"]            # record ends 13:57, pass at 15:30

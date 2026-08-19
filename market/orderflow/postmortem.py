@@ -594,3 +594,178 @@ def match_recap(rows: list[dict], calls: list[dict]) -> list[dict]:
                         "word_match": same}
         out.append(r | best)
     return out
+
+
+# ------------------------------------------------------------- the day
+
+def session_of(t: datetime) -> str:
+    """overnight (before 08:30 CT) | cash (08:30–15:00) | evening (from 15:00)."""
+    m = t.hour * 60 + t.minute
+    if m < 8 * 60 + 30:
+        return "overnight"
+    if m < 15 * 60:
+        return "cash"
+    return "evening"
+
+
+def census(seg: Segment, calls: list[dict]) -> dict:
+    """Counts by type/state and per anchor (spec §4b.2)."""
+    by_type: dict[str, dict[str, int]] = {}
+    per: dict[float, dict] = {}
+    for ev in seg.events:
+        t = ev.get("type", "?")
+        state = ev.get("state") or "-"
+        by_type.setdefault(t, {}).setdefault(state, 0)
+        by_type[t][state] += 1
+        if t == "SetupRecognition" and ev.get("anchor_price") is not None:
+            a = float(ev["anchor_price"])
+            k = seg.pos(ev.get("bar_i"))
+            ct = seg.bars[k].t1.strftime("%H:%M") if k is not None else None
+            row = per.setdefault(a, {"anchor": a, "forming": 0, "confirmed": 0,
+                                     "invalidated": 0, "first_ct": ct, "last_ct": ct})
+            if state in row:
+                row[state] += 1
+            if ct:
+                row["first_ct"] = min(row["first_ct"] or ct, ct)
+                row["last_ct"] = max(row["last_ct"] or ct, ct)
+    return {"by_type": by_type,
+            "per_anchor": sorted(per.values(), key=lambda r: r["anchor"]),
+            "n_calls_measured": len(calls)}
+
+
+def merge_census(parts: list[dict]) -> dict:
+    out = {"by_type": {}, "per_anchor": [], "n_calls_measured": 0}
+    per: dict[float, dict] = {}
+    for c in parts:
+        for t, states in c["by_type"].items():
+            for s, n in states.items():
+                out["by_type"].setdefault(t, {}).setdefault(s, 0)
+                out["by_type"][t][s] += n
+        for r in c["per_anchor"]:
+            if r["anchor"] not in per:
+                per[r["anchor"]] = dict(r)
+                continue
+            row = per[r["anchor"]]
+            for kf in ("forming", "confirmed", "invalidated"):
+                row[kf] += r[kf]
+            cts = [x for x in (row["first_ct"], r["first_ct"]) if x]
+            row["first_ct"] = min(cts) if cts else None
+            cts = [x for x in (row["last_ct"], r["last_ct"]) if x]
+            row["last_ct"] = max(cts) if cts else None
+        out["n_calls_measured"] += c["n_calls_measured"]
+    out["per_anchor"] = sorted(per.values(), key=lambda r: r["anchor"])
+    return out
+
+
+def flags(calls: list[dict], legs: list[dict], cen: dict, *, session_range: float,
+          knobs: Knobs) -> list[dict]:
+    """Spec §3d plus Addendum A1. Each flag names the bar it points at."""
+    out: list[dict] = []
+    for a in cen["per_anchor"]:
+        if a["confirmed"] >= knobs.dense_anchor_fires:
+            out.append({"flag": "dense-anchor", "anchor": a["anchor"], "n": a["confirmed"],
+                        "at": f"{a['first_ct']}–{a['last_ct']}",
+                        "why": f"{a['confirmed']} confirmed fires on {a['anchor']:g}"})
+    for c in calls:
+        if c.get("state") != "confirmed":
+            continue
+        lb, lp = c.get("confirm_lag_bars"), c.get("confirm_lag_pts")
+        if (lb is not None and lb >= knobs.late_confirm_bars) or \
+           (lp is not None and lp >= knobs.late_confirm_pts):
+            why = f"confirm {lb if lb is not None else '?'} bars after the reclaim"
+            if lp is not None:
+                why += f", {lp:+.2f} from {c['anchor']:g}"
+            out.append({"flag": "late-confirm", "anchor": c["anchor"], "bar": c["bar_i"],
+                        "at": c["ct"], "lag_bars": lb, "lag_pts": lp, "why": why})
+        pk, rk = c.get("anchor_kind_parse"), c.get("anchor_kind")
+        if pk is not None and rk is not None and pk != rk:
+            out.append({"flag": "kind-mismatch", "anchor": c["anchor"], "bar": c["bar_i"],
+                        "at": c["ct"], "parse_kind": pk, "recognizer_kind": rk,
+                        "why": f"the parse calls {c['anchor']:g} {pk}; the recognizer "
+                               f"confirmed a {c.get('setup') or 'setup'} on it as {rk}"})
+    for l in legs:
+        if l["tag"] == "silent" and l["near_level"]:
+            out.append({"flag": "silent-move", "bar": l["origin_bar"], "at": l["origin_ct"],
+                        "pts": l["pts"], "direction": l["direction"], "anchor": l["nearest_level"],
+                        "why": f"{l['pts']:g} pts {l['direction']} from {l['origin_ct']} near "
+                               f"{l['nearest_level']:g}, nothing said in the prior window"})
+        if l["pts"] >= knobs.breakout_pts and l["near_level"] and l["tag"] != "called" and \
+           l["said_before"] and all(s.startswith("SetupRecognition:invalidated") for s in l["said_before"]):
+            out.append({"flag": "no-breakout-word", "bar": l["origin_bar"], "at": l["origin_ct"],
+                        "pts": l["pts"], "direction": l["direction"], "anchor": l["nearest_level"],
+                        "why": f"{l['pts']:g} pts through {l['nearest_level']:g} with only "
+                               f"'invalidated' said about it"})
+    n_conf = sum(1 for c in calls if c.get("state") == "confirmed")
+    if session_range > 0:
+        density = n_conf / (session_range / 10.0)
+        if density >= knobs.grid_density:
+            out.append({"flag": "grid-density", "n": n_conf, "range": session_range,
+                        "per_10": round(density, 1),
+                        "why": f"{n_conf} confirms over a {session_range:g}-pt range "
+                               f"({density:.1f} per 10 pts)"})
+    return out
+
+
+def analyze_day(segments: list[Segment], knobs: Knobs, *, day: _date, source: str,
+                pass_name: str, now: datetime, recap_rows: list[dict] | None = None,
+                letter_status: str = "not-received",
+                parsed_kinds: dict[float, str] | None = None) -> dict:
+    """The whole day as one dict — the ``<day>.json`` of spec §4a.
+    ``parsed_kinds`` is {price: kind} from the day's Mancini parse (Addendum A1)."""
+    calls: list[dict] = []
+    legs: list[dict] = []
+    cens: list[dict] = []
+    lo = hi = None
+    for seg in segments:
+        c = measure_calls(seg, knobs, parsed_kinds)
+        for row in c:
+            row["session"] = session_of(datetime.fromisoformat(row["t1"]))
+        calls += c
+        anchors = set(seg.mancini) | {float(e["price"]) for e in seg.events
+                                      if e.get("type") == "Level" and e.get("price") is not None}
+        lg = tag_legs(keep_legs(zigzag_legs(seg.bars, knobs.x_pts), knobs), seg,
+                      anchors=sorted(anchors), knobs=knobs)
+        for row in lg:
+            k = seg.pos(row["origin_bar"])
+            row["session"] = session_of(seg.bars[k].t1) if k is not None else "?"
+        legs += lg
+        cens.append(census(seg, c))
+        for b in seg.bars:
+            lo = b.l if lo is None else min(lo, b.l)
+            hi = b.h if hi is None else max(hi, b.h)
+    cen = merge_census(cens) if cens else {"by_type": {}, "per_anchor": [], "n_calls_measured": 0}
+    cash = [b for s in segments for b in s.bars if session_of(b.t1) == "cash"]
+    cash_range = (max(b.h for b in cash) - min(b.l for b in cash)) if cash else 0.0
+    spans = [s.span for s in segments if s.span]
+    coverage = {
+        "first_ct": min(s[0] for s in spans).strftime("%H:%M") if spans else None,
+        "last_ct": max(s[1] for s in spans).strftime("%H:%M") if spans else None,
+        "bars": sum(len(s.bars) for s in segments),
+        "unmeasured_note": None,
+    }
+    if spans:
+        last = max(s[1] for s in spans)
+        if last.date() == now.date() and last < now - timedelta(minutes=30):
+            coverage["unmeasured_note"] = (
+                f"record ends {last.strftime('%H:%M')} CT; "
+                f"{int((now - last).total_seconds() // 60)} minutes before the pass unmeasured")
+    recap = {"status": letter_status, "rows": match_recap(recap_rows, calls) if recap_rows else []}
+    runs = []
+    for s in segments:
+        span = s.span
+        runs.append({"run": s.run_no, "started": s.started, "bars": len(s.bars),
+                     "complete": s.complete, "anchorless": s.anchorless,
+                     "first_ct": span[0].strftime("%H:%M") if span else None,
+                     "last_ct": span[1].strftime("%H:%M") if span else None})
+    return {
+        "day": day.isoformat(), "source": source, "pass": pass_name,
+        "generated_at": now.isoformat(),
+        "bar_n": segments[0].bar_n if segments else None,
+        "runs": runs,
+        "anchors": sorted({a for s in segments for a in s.mancini}),
+        "coverage": coverage,
+        "range": {"low": lo, "high": hi, "cash": round(cash_range, 2)},
+        "census": cen, "calls": calls, "legs": legs, "recap": recap,
+        "flags": flags(calls, legs, cen, session_range=cash_range, knobs=knobs),
+        "knobs": knobs_to_dict(knobs),
+    }
