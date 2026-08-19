@@ -1,7 +1,7 @@
 ---
 type: playbook
 title: "Reclaim Under the Lid"
-description: "A named setup Steve identified on 2026-08-19 from Carmine's 7739 trades — Mancini's failed-breakdown shape on a level with history, plus a stepping-down seller lid and absorbed dips forming under the reclaim point, with thin volume above to the first target. Six conditions; five are mechanical."
+description: "A named setup Steve identified on 2026-08-19 from Carmine's 7739 trades — continuation up through a level with history (broken overnight, retested from above), once a stepping-down seller lid and absorbed dips have formed under it, with thin volume above to the first target. Not a failed breakdown: the level was resistance, not support. Six conditions; five are mechanical."
 timestamp: 2026-08-19T11:12:17-05:00
 metadata:
   authorizing_bead: st-jhof
@@ -14,7 +14,8 @@ metadata:
 On the morning of 2026-08-19 Carmine Rosato took three swings at one level in
 33 minutes — unusual for him — and the last one ran 7730 → 7750. Steve read
 the posts against our tape and named what he saw: *a set of conditions as
-distinct as Mancini's failed breakdown*. This concept records those conditions
+distinct as Mancini's failed breakdown* — and, on review the same day, *not*
+a failed breakdown: "to my eye it's continuation upward from below." This concept records those conditions
 with the morning as the worked example, so the setup can be recognised the
 next time it forms and, later, checked by code.
 
@@ -33,10 +34,13 @@ directs the trading.
    never recovered."*
 2. **Broken overnight, opened above it.** The 07:35 CT bar went 7722 → 7740
    straight through, ran to 7758.25 by 07:50; RTH opened 7743.
-3. **Flush back under it, bought back fast.** 08:45–08:50: 7745.75 →
-   7720.75 → 7743 inside ten minutes, +891 delta on the bounce bar. This is
-   Mancini's failed-breakdown shape — the break below fails, the sellers who
-   sold it are the fuel.
+3. **Retest from above: flush back under it, bought back fast.** 08:45–08:50:
+   7745.75 → 7720.75 → 7743 inside ten minutes, +891 delta on the bounce
+   bar. The flush went through Mancini's 7724 minor support and was bought
+   straight back — that part has the failed-breakdown shape, and it is what
+   put the floor under the setup (Carmine's 08:53 "pullback into 7729–24"
+   zone is that floor). But the setup itself is not the recovery of 24; it is
+   the continuation back up through 39.
 4. **A tight lid right under the level, stepping down.** Highs 7743.25 (08:55)
    → 7742.25 (09:00) → 7740.25 (09:05) → 7738.25 (09:10) → 7741 / 7741.25 /
    7740.25 (09:15–09:25). Five rejections at 7738–41 in 25 minutes.
@@ -56,7 +60,16 @@ Conditions 1, 2, 3, 4 and 6 are mechanical — testable from the Mancini parse
 and the 2,000-lot bars the bridge already builds. Condition 5 is a read, but
 the bid/ask-by-price table below is most of it.
 
-## How it differs from a plain failed breakdown
+## Not a failed breakdown — continuation from below
+
+Steve, 2026-08-19: "to my eye it's continuation upward from below." That is
+the right kind. Mancini's failed breakdown is a *low* that breaks and is
+recovered — a support trade. 39 was never support; it was yesterday's
+ceiling, broken overnight (the breakout), pulled back under on the open, and
+taken back through in the morning — breakout, retest, continuation. Mancini's
+own letter keeps the two words apart: "7738 *reclaims* are a possible long
+trigger" against "the *Failed Breakdown* of this shelf [7716] is actionable."
+The FBD shape lives beneath the setup (condition 3), not at it.
 
 Mancini's trigger is the reclaim itself. Carmine waited for conditions 4–5 to
 form *under* the reclaim point and bought the last dip into the structure,
