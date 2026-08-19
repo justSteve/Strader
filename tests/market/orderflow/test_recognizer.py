@@ -224,7 +224,7 @@ def test_determinism_double_run():
     assert a == b
 
 
-# ── per-anchor re-fire damping (st-98z item 2) ──────────────────────────────
+# ── per-anchor fire counting (st-98z item 2; damp removed st-7kmt) ──────────
 def _fbd_cycle(base, start_i):
     """One full flush→stall→flip→confirm cycle at ``base``. The leading
     above-level bar clears any re-engagement block from a prior cycle."""
@@ -237,14 +237,16 @@ def _fbd_cycle(base, start_i):
     ]
 
 
-def test_fourth_confirm_carries_fire_index_4_and_damped_confidence():
-    """Fires 1-3 confirm at 0.8; fire 4 on the same anchor still EMITS
-    (score-don't-gate) but carries fire_index=4 and step-damped 0.6."""
+def test_fourth_confirm_carries_fire_index_4_at_full_confidence():
+    """Every confirm carries its fire number; none is confidence-damped. The
+    st-98z fi>=4 step-damp (0.6) was removed under st-7kmt — the cliff does
+    not reproduce on the enriched corpus on either side — so fire 4 confirms
+    at the same 0.8 as fires 1-3, and consumers weigh fire_index directly."""
     bars = [b for cyc in range(4) for b in _fbd_cycle(L, cyc * 5)]
     recs = _drive(Anchor(L, "support"), bars)
     confirms = [r for r in recs if r.state == "confirmed"]
     assert [c.fire_index for c in confirms] == [1, 2, 3, 4]
-    assert [c.confidence for c in confirms] == [0.8, 0.8, 0.8, 0.6]
+    assert [c.confidence for c in confirms] == [0.8, 0.8, 0.8, 0.8]
     # forming emissions of the 4th engagement already carry its fire number
     assert all(r.fire_index == 4 for r in recs if r.state == "forming"
                and r.timestamp >= confirms[2].timestamp)
@@ -268,7 +270,7 @@ def test_independent_anchors_do_not_share_fire_counters():
 def test_fire_counter_survives_block_and_invalidation_cycles():
     """The counter counts CONFIRMS per anchor across the recognizer's whole
     lifetime: an invalidated engagement in between neither increments it nor
-    resets it — that persistence is the point of the damping."""
+    resets it — the count is the anchor's session-long history."""
     deep = INVALIDATE_TICKS * TICK + 1
     bars = list(_fbd_cycle(L, 0))                                # confirm: fire 1
     bars += [

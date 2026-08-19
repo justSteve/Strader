@@ -116,9 +116,14 @@ class SetupRecognizer:
         self._prev_close: float | None = None
         # per-anchor confirmed-fire counter [st-98z item 2] — keyed like
         # _active/_blocked on id(anchor). Deliberately NEVER cleared: the
-        # count survives block/re-engage cycles, because the evidence is
-        # about the anchor's session-long fire history (fire #4+ on the
-        # same level ran 33% vs ~50% for fires 1-3), not the engagement's.
+        # count survives block/re-engage cycles because it is the anchor's
+        # session-long fire history, and it feeds ``fire_index`` (spoken and
+        # displayed — the 4th call at a level is a different call from the
+        # 1st). It no longer damps confidence: st-98z's 31%-vs-48% fi≥4
+        # cliff (p=.019 on the old 65-day body) does not generalize — on the
+        # enriched corpus no fire threshold shows a supported step on either
+        # side (bullish fi≥4 42% vs 47%, p=.275; bearish 52% vs 48%, p=.448)
+        # [st-7kmt, docs/measurement/fire-index-rederivation-2026-08-19.md].
         self._fires: dict[int, int] = {}
 
     # ── per-bar drive ───────────────────────────────────────────────────────
@@ -300,14 +305,14 @@ class SetupRecognizer:
         # prior confirms, so this engagement would be fire prior+1.
         fired = self._fires.get(id(eng.anchor), 0)
         fire_index = fired if state == "confirmed" else fired + 1
-        # confirmed confidence [st-98z item 2]: base 0.8 (0.9 with stacked
-        # imbalance), STEP-damped to 0.6 (0.7 stacked) at fire_index >= 4 —
-        # baseline evidence is a cliff, not a slope: fires 1-3 ran 51/49/49%
-        # first-touch, fire 4+ ran 33%. Emission still happens either way
-        # (score-don't-gate); consumers weigh the damped score.
+        # confirmed confidence: base 0.8, 0.9 with stacked imbalance. The
+        # st-98z fi>=4 step-damp (0.8→0.6) was removed 2026-08-19 [st-7kmt]:
+        # its cliff does not reproduce on the enriched corpus on either side
+        # (see the _fires note above). fire_index still rides every emission
+        # for consumers to weigh — score-don't-gate cuts both ways: a score
+        # must not encode evidence the corpus no longer supports.
         conf = {"forming": min(0.75, 0.2 + 0.15 * len(eng.beats)),
-                "confirmed": ((0.9 if stacked else 0.8) if fire_index < 4
-                              else (0.7 if stacked else 0.6)),
+                "confirmed": 0.9 if stacked else 0.8,
                 "invalidated": 0.0}[state]
         # "stages", never "beats" — the four-part sequence collides with the
         # musical sense and Steve reads this string directly in the emissions
