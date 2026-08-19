@@ -249,8 +249,9 @@ tape. It is the engine's record, not what was on the screen that day.
 - end to end: fixture record → `<day>.json` with the expected counts, and the
   markdown page containing each section heading.
 
-Plus a nightly smoke in Strader's existing test wrapper: yesterday's
-`<day>.json` exists and parses.
+Plus a smoke inside the morning pass itself: before it runs, the wrapper checks
+that the previous session's `<day>.json` exists and parses, and alerts if not
+(Strader has no nightly test cron to hang this on).
 
 ## 9. Files
 
