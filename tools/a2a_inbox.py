@@ -61,16 +61,28 @@ FIELDS = ("when", "actor", "kind", "bead", "ref", "paths", "why")
 # permission rule and the ledger vocabulary now say the same thing. It stays
 # READABLE so the historical rows above it still parse — retiring a word must
 # not rewrite history — but it is refused for new rows.
+# NOTE is RETIRED in favour of STATUS (st-xa5p, 2026-08-20). It was never a
+# writable kind, but COO wrote three of them on 2026-08-18/19 and the parser
+# dropped all three rows on the floor — one of them announcing the plain-words
+# gate on the shared desk renderer, which is precisely the class of event this
+# ledger exists to make visible. STATUS already means what those rows meant: a
+# peer reporting on work already announced, owing no reply. Same treatment as
+# COMMIT — readable so the rows count as history, refused for new ones.
 WRITABLE_KINDS = {"WRITE", "MEMO", "ACK", "SERVICED", "DIGEST", "FILED", "STATUS"}
-RETIRED_KINDS = {"COMMIT": "WRITE"}
+RETIRED_KINDS = {"COMMIT": "WRITE", "NOTE": "STATUS"}
 KINDS = WRITABLE_KINDS | set(RETIRED_KINDS)
-# Retirement is enforced by DATE, not by deletion. This tool only reads, so the
-# parse is the only place a rule can bite: a retired KIND dated on or after the
-# ruling is a problem, the same rows dated before it are clean history. That
+# Retirement is enforced by DATE, not by deletion, and the date is PER WORD —
+# each retirement starts its own clock, so retiring a second word cannot
+# retroactively make the first one's history dirty. This tool only reads, so the
+# parse is the only place a rule can bite: a retired KIND dated on or after its
+# own ruling is a problem, the same rows dated before it are clean history. That
 # makes test_real_inbox_has_no_malformed_lines the enforcement mechanism — the
 # suite goes red the first time anyone writes a retired word, which is the only
 # kind of rule that survives nobody remembering it.
-RETIRED_FROM = datetime(2026, 8, 13, 18, 0)
+RETIRED_FROM = {
+    "COMMIT": datetime(2026, 8, 13, 18, 0),
+    "NOTE": datetime(2026, 8, 20, 14, 0),
+}
 
 
 class Event:
@@ -123,7 +135,7 @@ def parse_inbox(path: Path) -> tuple[list[Event], list[str]]:
         if cells[2] not in KINDS:
             problems.append(f"line {lineno}: unknown KIND {cells[2]!r}")
             continue
-        if cells[2] in RETIRED_KINDS and when >= RETIRED_FROM:
+        if cells[2] in RETIRED_KINDS and when >= RETIRED_FROM[cells[2]]:
             # Flagged but still recorded: the event is real and belongs in the
             # ledger whatever it was called. Losing a row to a vocabulary
             # complaint is the failure this whole reconciliation came from.

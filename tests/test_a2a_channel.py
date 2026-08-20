@@ -115,6 +115,35 @@ def test_every_writable_kind_parses(kind):
     assert kind not in a2a.RETIRED_KINDS
 
 
+@pytest.mark.parametrize("kind", sorted(a2a.RETIRED_KINDS))
+def test_every_retired_kind_has_its_own_start_date(kind):
+    """Retirement is per word. A second retirement must not backdate the first."""
+    assert kind in a2a.RETIRED_FROM
+    assert a2a.RETIRED_KINDS[kind] in a2a.WRITABLE_KINDS
+
+
+def test_note_rows_written_before_the_ruling_are_clean_history(tmp_path):
+    """COO's 2026-08-18/19 NOTE rows are real events and must count. [st-xa5p]"""
+    p = tmp_path / "inbox.md"
+    p.write_text(
+        _ledger("| 2026-08-18 12:58 CT | COO | NOTE | co-y | ref | CLAUDE.md | attribution |\n"),
+        encoding="utf-8")
+    events, problems = a2a.parse_inbox(p)
+    assert problems == []
+    assert [e.kind for e in events] == ["NOTE"]
+
+
+def test_note_written_from_now_on_is_flagged_toward_status(tmp_path):
+    """A NOTE dated after its ruling turns the suite red, pointing at STATUS."""
+    p = tmp_path / "inbox.md"
+    p.write_text(
+        _ledger("| 2026-08-21 09:00 CT | COO | NOTE | co-y | ref | CLAUDE.md | new row |\n"),
+        encoding="utf-8")
+    events, problems = a2a.parse_inbox(p)
+    assert len(problems) == 1 and "retired" in problems[0] and "STATUS" in problems[0]
+    assert [e.kind for e in events] == ["NOTE"]   # flagged, not swallowed
+
+
 # --- receipts -------------------------------------------------------------
 
 
