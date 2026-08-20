@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 
 from market.entities.trade import Trade
-from market.orderflow.moves import (_grade_dev, grade_atoms,
+from market.orderflow.moves import (_pctl_rank_midrank, grade_atoms,
                                     grade_atoms_developing, one_minute_atoms,
                                     segment_moves)
 
@@ -64,39 +64,41 @@ def test_developing_grade_is_causal_not_day_relative():
     assert not all(h.effort_pct == d["effort_pct_dev"] for h, d in zip(hindsight, full))
 
 
-def test_developing_grade_weighs_distance_against_sampling_noise():
-    """COO, 2026-08-20: _pctl_rank ranks a lone value at its own 100th
-    percentile, so atom 1 is unconditionally F1 at raw distance 50 (the
-    boundary's max) — maximum apparent extremity with zero information.
-    _grade_dev compares that distance to the percentile's own sampling
-    noise (~50/sqrt(n) points) rather than a fitted constant: at n=1 the
-    noise floor is exactly as large as the maximum possible distance, so
-    the grade is exactly 0.5 — "can't yet tell," not "certain" and not
-    "worthless" either. It should rise as n grows and the noise floor
-    shrinks (grade held ~constant by construction here — every atom is a
-    new extreme)."""
+def test_midrank_softens_the_running_maximum():
+    """COO, 2026-08-20, second pass: bisect_right ranks a lone observation
+    at its own 100th percentile regardless of n — the numerator (distance)
+    is maximised by the very smallness that should shrink the grade, and no
+    after-the-fact discount fully undoes that (a well-sampled near-boundary
+    atom could still land below a 1-atom reading's forced floor). Mid-rank
+    fixes it at the source: the running max softens from the boundary (50)
+    toward, but never reaching, 100 as the sample grows."""
+    for n, expected in [(1, 50.0), (2, 75.0), (5, 90.0), (10, 95.0),
+                        (30, 98.3), (120, 99.6)]:
+        vals = list(range(n))
+        assert _pctl_rank_midrank(vals, n - 1) == expected
+
+
+def test_developing_grade_floor_is_zero_not_half():
+    """A lone observation ranks at the boundary itself under mid-rank —
+    with one observation you cannot know whether it is high or low — so
+    distance and grade fall to exactly 0, no separate confidence term
+    needed. Confidence then rises as n grows (grade held ~constant by
+    construction here — every atom is a new extreme)."""
     trades = []
-    for m in range(6):
-        px = 100.0 + m * 3          # deliberately extreme: max effort AND effect
-        trades += [_t(m * 60, px, 100, "B"), _t(m * 60 + 30, px + 2.0, 100, "B")]
+    px = 100.0
+    for m in range(6):                  # escalating: each atom is a fresh
+        vol = 10 * (m + 1)              # running max on BOTH effort and effect
+        trades += [_t(m * 60, px, vol, "B"), _t(m * 60 + 30, px + (m + 1), vol, "B")]
+        px += (m + 1)
     atoms = one_minute_atoms(trades)
     dev = grade_atoms_developing(atoms)
 
     assert dev[0]["n_atoms"] == 1
     assert dev[0]["cell_dev"] == "F1"          # still the right cell...
-    assert dev[0]["cell_grade_dev"] == 0.5     # ...at the noise floor, not overclaimed
+    assert dev[0]["cell_grade_dev"] == 0.0     # ...but zero confidence, the true floor
     grades = [row["cell_grade_dev"] for row in dev]
     assert grades == sorted(grades)
     assert grades[-1] > grades[0]
-
-
-def test_developing_grade_distinguishes_extremity_at_equal_n():
-    """COO, 2026-08-20: "an atom at 99/99 with ten behind it is genuinely
-    more trustworthy than one at 51/51 with ten behind it" — a flat n-only
-    damp scales both the same and can't tell them apart; _grade_dev must."""
-    extreme = _grade_dev(99.0, 99.0, 10)
-    boundary = _grade_dev(51.0, 51.0, 10)
-    assert extreme[1] > boundary[1]
 
 
 def test_zigzag_splits_on_reversal_and_covers_every_atom():

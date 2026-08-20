@@ -27,7 +27,6 @@ are made of.
 from __future__ import annotations
 
 import bisect
-import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -121,35 +120,37 @@ def _pctl_rank(sorted_vals: list[float], v: float) -> float:
     return round(100.0 * i / len(sorted_vals), 1)
 
 
+def _pctl_rank_midrank(sorted_vals: list[float], v: float) -> float:
+    """Mid-rank percentile of v within sorted_vals, 0-100 — (bisect_left +
+    bisect_right)/2, the standard convention when v may be its own only (or a
+    tied) member of the sample. A lone observation ranks at 50, the
+    boundary, not 100: with one observation you cannot know whether it is
+    high or low relative to a population you have not seen yet.
+
+    Deliberately a SEPARATE function from ``_pctl_rank`` (COO, 2026-08-20).
+    ``_pctl_rank`` is shared by ``grade_atoms`` and ``segment_moves`` — the
+    hindsight grade behind the published corpus figures (F1 34.7 / F2 16.0 /
+    F3 22.4 / F4 26.9, docs/measurement/orderflow-fundamental-units.md,
+    derived from moves.jsonl). Switching that shared function to mid-rank
+    changes which cell ~11% of atoms land in on a tie-heavy day (large
+    |net| tie blocks — doji atoms among them — that bisect_right ranks at
+    the TOP of the tie and mid-rank ranks in the MIDDLE); moving those
+    published figures is a deliberate re-run-and-republish decision, not a
+    side effect of fixing a live grade. Only ``grade_atoms_developing`` uses
+    this function.
+    """
+    if not sorted_vals:
+        return 0.0
+    lo = bisect.bisect_left(sorted_vals, v)
+    hi = bisect.bisect_right(sorted_vals, v)
+    return round(100.0 * (lo + hi) / 2.0 / len(sorted_vals), 1)
+
+
 def _grade(effort_pct: float, effect_pct: float) -> tuple[str, float]:
     """Cell + distance-from-boundary grade. Grades, not gates: the grade is
     min(distance from 50) scaled to 0-1 — 0 at the boundary, 1 at a corner."""
     cell = CELLS[(effort_pct >= 50.0, effect_pct >= 50.0)]
     grade = round(min(abs(effort_pct - 50.0), abs(effect_pct - 50.0)) / 50.0, 3)
-    return cell, grade
-
-
-def _grade_dev(effort_pct: float, effect_pct: float, n: int) -> tuple[str, float]:
-    """Cell + a confidence-weighted grade for the developing (causal)
-    percentile — NOT ``_grade``'s fixed 0-1 scaling, because a developing
-    percentile carries sampling noise a completed-day one does not: n
-    observations bound how far a rank can be trusted, and that bound has to
-    shrink the grade, not a fitted constant (COO, 2026-08-20: "an atom at
-    99/99 with ten behind it is genuinely more trustworthy than one at 51/51
-    with ten behind it" — a flat n-only damp scales both the same and can't
-    tell them apart).
-
-    Near the 50/50 boundary the standard error of an empirical percentile is
-    ~50/sqrt(n) points (binomial SE at p=0.5, in 0-100 units) — the raw
-    distance from the boundary is compared against that noise floor rather
-    than a corpus-fitted threshold. ``distance / (distance + SE)`` falls out
-    of that arithmetic: 0 at the boundary, approaching 1 only once the
-    distance clears the sampling noise for the n behind it.
-    """
-    cell = CELLS[(effort_pct >= 50.0, effect_pct >= 50.0)]
-    distance = min(abs(effort_pct - 50.0), abs(effect_pct - 50.0))
-    se = 50.0 / math.sqrt(n) if n > 0 else 50.0
-    grade = round(distance / (distance + se), 3) if (distance + se) > 0 else 0.0
     return cell, grade
 
 
@@ -180,20 +181,18 @@ def grade_atoms_developing(atoms: list[Atom]) -> list[dict]:
     estimator's first cut (percentile vs the day-so-far), an engineering
     default rather than a corpus-derived one. [st-lxhz]
 
-    ``cell_grade_dev`` is graded by ``_grade_dev`` (COO, 2026-08-20, checked
-    against 27 corpus days): ``_pctl_rank`` ranks a lone observation at its
-    own 100th percentile, so atom 1 of every session is unconditionally
-    effort_pct 100 / effect_pct 100 -> F1 — maximum confidence with zero
-    information under the naive 0-1 scaling ``_grade`` uses for the
-    (unlimited-n) hindsight grade. Confirmed empirically: cell agreement
-    with the hindsight grade over the first 10 atoms is ~20% (median across
-    27 days), at or below the ~27% two independent draws from the corpus
-    cell mix would agree by chance, and only reaches the day's ceiling
-    (~63%) by session end — the two are different quantities by design, but
-    the confidence number must not overstate an early read. ``_grade_dev``
-    weighs distance-from-boundary against that atom count's sampling noise
-    instead. This does not change which cell an atom lands in, only how
-    much weight ``cell_grade_dev`` claims for it.
+    Percentiles here use ``_pctl_rank_midrank``, not ``_pctl_rank`` (COO,
+    2026-08-20, second pass): ``_pctl_rank``'s bisect_right ranks a lone
+    observation at its own 100th percentile regardless of n, which no
+    after-the-fact discount fully removes — a well-sampled near-boundary
+    atom (e.g. 52nd percentile at n=390) can still land BELOW a 1-atom
+    reading's forced floor. Mid-rank fixes this at the source: a lone
+    observation ranks at 50 (the boundary — with one observation you cannot
+    know whether it is high or low), so distance and grade fall to exactly 0
+    with no separate confidence term needed. The running maximum softens
+    naturally as n grows (50, 75, 90, 95, 98.3, 99.6 at n = 1, 2, 5, 10, 30,
+    120) instead of pinning at 100 forever. Cell + grade then come straight
+    from the shared ``_grade`` — no bespoke developing-only grading function.
     """
     out: list[dict] = []
     efforts: list[float] = []
@@ -201,11 +200,10 @@ def grade_atoms_developing(atoms: list[Atom]) -> list[dict]:
     for a in atoms:
         bisect.insort(efforts, a.volume)
         bisect.insort(effects, abs(a.net))
-        effort_pct = _pctl_rank(efforts, a.volume)
-        effect_pct = _pctl_rank(effects, abs(a.net))
-        n = len(efforts)
-        cell, grade = _grade_dev(effort_pct, effect_pct, n)
-        out.append({"ts": a.ts, "n_atoms": n,
+        effort_pct = _pctl_rank_midrank(efforts, a.volume)
+        effect_pct = _pctl_rank_midrank(effects, abs(a.net))
+        cell, grade = _grade(effort_pct, effect_pct)
+        out.append({"ts": a.ts, "n_atoms": len(efforts),
                     "effort_pct_dev": effort_pct, "effect_pct_dev": effect_pct,
                     "cell_dev": cell, "cell_grade_dev": grade})
     return out
