@@ -211,6 +211,39 @@ def test_reconnect_recovers_and_keeps_both_segments(corpus_tmp):
     assert any("possible gap" in e for e in worker.status.errors)
 
 
+def test_recovered_reconnect_is_not_gave_up(corpus_tmp):
+    """A drop followed by a real recovery that runs to its own tick cap —
+    reconnects stays under budget, so this must NOT read as gave_up."""
+    spec = streamer.default_specs("trades")["opra"]
+    seg1 = [FakeTrade("SPXW A", 1, 1.0, 1, "B")]
+    seg2 = [FakeTrade("SPXW B", 2, 2.0, 1, "A")]
+    clients = iter([
+        FakeLiveClient(seg1, raise_after=1),  # drops after 1 trade
+        FakeLiveClient(seg2),
+    ])
+    worker = _make_worker(spec, lambda: next(clients),
+                          max_reconnects=5, max_ticks=2)
+    worker.run()
+
+    assert worker.status.ticks == 2
+    assert worker.status.reconnects == 1
+    assert not worker.gave_up
+
+
+def test_gave_up_when_reconnect_budget_exhausted(corpus_tmp):
+    """Every reconnect attempt ends cleanly with nothing yielded, so the
+    worker never recovers and exhausts its budget. This is the state
+    main() must turn into a non-zero exit — see the docstring on
+    StreamWorker.gave_up — or systemd's Restart=on-failure never fires."""
+    spec = streamer.default_specs("trades")["opra"]
+    worker = _make_worker(spec, lambda: FakeLiveClient([]), max_reconnects=1)
+    worker.run()
+
+    assert worker.status.reconnects == 2     # exceeds max_reconnects (1)
+    assert worker.gave_up
+    assert any("giving up after 2 reconnects" in e for e in worker.status.errors)
+
+
 def test_raw_tee_creates_dbn_and_registers_stream(corpus_tmp):
     spec = streamer.default_specs("trades")["opra"]
     trades = [FakeTrade("SPXW A", 1, 1.0, 1, "B"),

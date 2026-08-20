@@ -260,6 +260,17 @@ class StreamWorker(threading.Thread):
 
     # -- lifecycle -------------------------------------------------------
 
+    @property
+    def gave_up(self) -> bool:
+        """True once this stream exhausted its reconnect budget and stopped
+        unasked — as opposed to stop_event (scheduled/signalled stop) or
+        _done (own tick cap). reconnects only exceeds max_reconnects in the
+        give-up branch, which breaks the loop immediately after, so this is
+        stable once the thread has exited. main() needs the distinction: a
+        stream that quietly dies must not look like a clean scheduled stop,
+        or systemd's Restart=on-failure never sees a reason to fire."""
+        return self.status.reconnects > self.max_reconnects
+
     def shutdown(self) -> None:
         """Unblock the record iterator from another thread."""
         with self._client_lock:
@@ -703,6 +714,11 @@ def main() -> int:
         print(f"  {w.spec.name}: {w.status.ticks:,} ticks, "
               f"{w.status.reconnects} reconnect(s){unmapped}")
 
+    gave_up = [w.spec.name for w in workers if w.gave_up]
+    if gave_up:
+        print(f"[ALERT] stream(s) exhausted their reconnect budget and were "
+              f"not recovered this run: {', '.join(gave_up)}", file=sys.stderr)
+
     if probe:
         secs = max(time.monotonic() - started, 1e-6)
         print(f"\n# PROBE projection (sampled {secs:.0f}s)")
@@ -718,7 +734,7 @@ def main() -> int:
                   f"~{proj:,.0f} ticks over a {window_min:.0f}-min window")
         print("  (no corpus rows written)")
 
-    return 0
+    return 1 if gave_up else 0
 
 
 if __name__ == "__main__":
