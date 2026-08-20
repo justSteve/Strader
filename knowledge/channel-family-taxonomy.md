@@ -126,7 +126,18 @@ unfinished. Derived vol *state*: `NEVER-TRAVERSED` — `expected_move.jsonl` and
 
 **7. Clock and session structure** — time elapsed in the move, time of session,
 distance from the open.
-**`NEVER-TRAVERSED` — and it beats everything the program built.** Minutes elapsed
+**`MEASURED` 2026-08-20 (st-1bv1) — and it beats everything the program built.**
+Traversed at last, over the 63-day 1s archive (2026-05-07..08-06). Time OF
+SESSION carries the same gradient that time IN the move does: P(>=10pt
+excursion in a 15-minute window) runs **81% in the 08:30 hour, 66 / 45 / 33 / 26
+/ 25 across 09-13, and 27% at 14** — median excursion 15.30 pts falling to 6.51.
+And **97.7% of giant flow prints land in the 14:00 hour, where displacement is
+at its floor**: expiry mechanics move notional without moving price, so the
+late-day flow concentration is not a signal about tradeable movement. Round 4's
+pooled ">=10pt in ~40% of windows" comparator averaged across that 81-to-25
+gradient and is RETIRED; candidates score against their own hour.
+`docs/measurement/clock-family-traversal-2026-08-20.md` carries the table, the
+committed script, and an honest note on what did NOT reproduce. Minutes elapsed
 since the move began grades the continuation label at AUC **.728, day-median
 .875**, against the convergence score's **.678 / .607** on the identical 1,882
 minutes. Base rate runs **85.4%** before 09:00 CT and **42.0%** at/after 10:00 CT;
