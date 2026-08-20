@@ -3,7 +3,7 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
-**Last refreshed**: 2026-08-19 [st-tme, st-q5xu, st-7kmt, st-gno7; earlier same day st-vxbw, st-135m, st-kxnv; prior 2026-08-17 st-slj4, st-n0qm.5; 2026-08-13 st-aski, st-ad6p, st-g0or, st-75z0, st-pfrz, st-4ld0, st-xxo0, st-ylqw]
+**Last refreshed**: 2026-08-20 [st-ksgu, st-cc5k, st-1bv1, st-88ei; earlier 2026-08-19 st-tme, st-q5xu, st-7kmt, st-gno7; earlier same day st-vxbw, st-135m, st-kxnv; prior 2026-08-17 st-slj4, st-n0qm.5; 2026-08-13 st-aski, st-ad6p, st-g0or, st-75z0, st-pfrz, st-4ld0, st-xxo0, st-ylqw]
 
 > Standing operational snapshot — what is wired up, live, or paused right now.
 > Session history lives in `DaysActivity.md`; work lives in beads; durable

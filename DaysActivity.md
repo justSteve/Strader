@@ -1,4 +1,45 @@
 # DaysActivity - 2026-08-20
+## 17:12 - Session Handoff [Live Tape Watch Through the Close · Six Beads · Clock Family Traversed]
+
+**Summary**: Resumed the live F1-F4 tape watch (the scorer never died — `live_effort_effect.py` ran uninterrupted from 10:37, 972 atoms) and narrated it through the cash close. The afternoon was a 115-minute absorption range at ES 7670–7677 — seven defences of the floor, five stalls at the ceiling, heavy volume repeatedly producing nothing — which broke at 14:45, faked a full V-return at 14:49 (+6.25 in three bars, grade 0.80, fully reversed within five minutes), then produced every volume and delta record of the afternoon in the last fifteen minutes: 9,050 lots at 14:54, 12,777 at 14:55 (delta −891, grade 0.94), +1,201 delta at 14:58, and a 59,876-lot auction printing 7659.00 before reclaiming to close 7665.25. SPX settled 7641.82 (−0.86%), low 7639.01 — landing on the 7639.93 short-gamma level after the gamma flip collapsed 7716 → 7650 through the day and spot crossed beneath it at ~14:43, two minutes before the break accelerated. Steve asked for GEX (answered: major positive walked 7735 → 7660, tracking spot rather than acting as a magnet) and priced a 0DTE SPX 7660/7670/7680 call fly he was *considering, not taking* — mid 1.72 against his 1.45 limit, net delta +0.18 (~$18/SPX point), body sitting exactly on the 0DTE major positive. His condition ("if it stayed in range without the back test lower") did not hold: ES took 7659. He also observed "just not enough vol for the big moves" at 14:41; measured against the day that was false in level (14:00 hour ran 1,847 lots/bar, above both lunch hours) and true in conversion (since 13:40, 1.9× the volume bought 1.2× the movement) — and conversion returned four minutes later. Then, with the tape dead post-close, worked the P1 queue: six beads closed, two peer beads serviced with findings, three left alone as COO's or Steve's.
+
+**Open Work**:
+- **The live watch is still armed** — persistent Monitor (task `b5rqdhli5`, filter `developing, n=|Traceback|Error|reconnect|gave up`) over the tmux pane's tee at the *previous* session's scratchpad path; the durable copy is `/var/moo/logs/effort-effect/2026-08-20-coo.log`. Two scorer instances run (pids 3045818 → /var/moo, 3049532 → tmux `steves-desk:AdHoc.1`), output verified identical, both read-only tailers of the footprint feeder. Deliberately left running.
+- **st-9r51 needs one ruling from Steve**: keep the Mancini parse in-session (free, status quo) or automate it with standing API spend. Recommendation is in-session — Tier 1 is free and closes most of the gap. Bead left in progress pending that word.
+- **st-s8ng left open, patch prepared**: the announce gate has NOT recurred (today's `013832e` carried its row in the same commit; `3183acd` only filled the REF sha). One-sentence rule edit drafted on the bead — `.claude/rules/` is harness surface and lands with Steve. Note the bead cites the retired `zgent-permissions.md` path; the live file is `.claude/rules/scope-and-permissions.md`.
+- **Separate tension flagged, not touched**: the ledger header says rows are "never edited" while `REF` requires the commit's own sha, which cannot exist before the commit. Every peer row needs a post-hoc fill; the next literal reader will file it as a violation.
+- **Remaining P1s all need Steve**: st-863b/st-bxls (Fools remote arm — live order-firing path, hard boundary), st-kr4a (56G gexbot-hist rename, destructive), st-fsf3 (bash-guard hook, settings), st-055 (drills he runs).
+- Two Strader→COO memos still awaited: code-estate-plan (08-12, 5 sessions), claudemd-scope (08-14, 2 sessions). Untouched.
+
+**Tried**:
+- Assumed `st-cqwc` ("recognizer emits no effort/effect context") was made stale by yesterday's `live_effort_effect.py` and said so → wrong; that bead is about `recognizer.py`/`engine.py`/`signals/orderflow.py`, which still reference none of F1–F4, and the script is a standalone surface that only cites it as motivation. It is also COO's. Left alone.
+- Called several afternoon deltas "the largest of the day" live → afternoon-scope, not day-scope. Full-day deltas were −1501 at 07:06, −1200 at 09:19, +1040 at 11:34, so 14:58's +1201 was second and 14:55's −891 fourth. Fixed at the source (st-z19p): every graded line now carries `smax: vol N@HH:MM d+N@HH:MM` and flags records, folding over the atom list which backfills from the session open rather than process start.
+- Tried to reproduce st-1bv1's hour-of-day table three ways before finding the measure: raw 1 Hz max−min gave 94/83/62/47/38/36/39, net |last−first| gave 45/31/21/18/13/15/15, minute-sampled closes gave 81/66/45/33/26/25/27 against the recorded 77/62/42/32/26/25/27 — exact at hours 12/13/14. The window-inclusion rule was never recovered (~6% more windows kept; coverage filters swept at ≥30/45/55 samples, all drop *n* far faster than they move *P*). Left stated rather than fitted — matching a target by tuning an unrecorded filter manufactures agreement instead of reproducing a result.
+- `bd comment <id> "--- HEADER ..."` printed the tail of the text and looked successful but stored nothing — the leading `---` is eaten as flags. `bd comments <id>` showed "No comments". Use `--file` for anything starting with dashes; a finding filed that way evaporates silently.
+- Chained `desk-html.sh` with the commit in one foreground Bash call → the 2-minute default timeout killed the whole chain at the render step and nothing landed, not even the commit. tap-in had already measured the plain-words gate at 6m30s. Commit first, render in the background.
+- Guarded against a multi-hour 9p read before touching `/mnt/z/Harvest/gexbot-hist` for st-1bv1 → unwarranted: one day loads in 0.4s, all 63 in ~25s. The caution cost a timing probe, which was cheap, but the shell-shim/9p hazard rules do not imply this archive is slow.
+
+**Files Changed**:
+CurrentStatus.md
+docs/reviews/2026-08-20-live-tape-watch.md
+scripts/live_effort_effect.py
+tests/test_live_effort_effect.py
+scripts/surface_liveness.sh
+scripts/live-footprint-up.sh
+tests/test_surface_liveness_probe.py
+scripts/measurement/synth_meter_frames.py
+tests/scripts/test_synth_meter_frames.py
+docs/measurement/flush-watcher-validation-2026-08-20.md
+scripts/measurement/clock_family_traversal.py
+docs/measurement/clock-family-traversal-2026-08-20.md
+knowledge/channel-family-taxonomy.md
+knowledge/log.md
+docs/plans/2026-08-20-richer-mancini-extraction.md
+docs/a2a/inbox.md
+
+---
+
+
 
 ## 13:29 - Session Handoff [Mancini Thursday Plan · Capture Exit-Code Fix · Live F1-F4 Tape Scorer]
 
