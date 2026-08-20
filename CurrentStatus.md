@@ -139,7 +139,9 @@ receipt [st-75z0]:
    unverified pending recount. Decision 3 of that plan is withdrawn.
    Related live state: steves-desk has only the hand-rebuilt Trading window —
    the other seven remain absent until the adopt fix (`st-b9pf`, COO's script).
-   Schwab token healthy to **2026-08-19** (`st-6akd` closed).
+   Schwab token healthy to **2026-08-24** (wall 2026-08-24T20:19:55Z, from
+   `data/corpus/_schwab_token_health.json`; `st-6akd` closed). The date here is
+   a snapshot of that probe — read the file, not this line.
 3. *(This slot held `st-i68` for four sessions, reading "fires every weekday at
    08:15 until fixed" while that job was exiting rc=0 on 08-04 through 08-07.
    Closed 2026-08-10 with the gate bug `st-1qpz` that was its actual failure,
