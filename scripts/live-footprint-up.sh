@@ -117,7 +117,33 @@ fi
 # When capture is already up, the answer is NOT to refuse the whole stack —
 # that leaves the operator with no chart on a day the data is fine. Start the
 # render-only panes and leave the running capture strictly alone.
-CAPTURE_PID="$(pgrep -f 'corpus_stream_databento\.py' | head -1 || true)"
+# A LAUNCHER MENTIONS THE CAPTURE WITHOUT RUNNING IT. [st-cc5k]
+#
+# 2026-08-14: this guard printed "capture already running (pid 133436)" at a
+# leftover tmux CLIENT from 08-12 whose argv still carried the capture command
+# line. `pgrep -f` matches the whole command line and `head -1` takes the
+# lowest pid, so the stale client won over the real systemd capture.
+#
+# Here the false positive is the DANGEROUS direction: believing capture is up
+# takes the RENDER_ONLY branch and starts no capture at all — and live trades
+# and MBP-1 are never backfilled, so the day is lost, not delayed. Same fix as
+# scripts/surface_liveness.sh: ask systemd which pid it started, and fall back
+# to an argv scan that drops anything which spawns rather than runs.
+capture_pid() {
+    local u pid state
+    for u in strader-capture.service strader-capture-early.service \
+             strader-capture-evening.service; do
+        state="$(systemctl show "$u" -p ActiveState --value 2>/dev/null || true)"
+        [[ "$state" == "active" ]] || continue
+        pid="$(systemctl show "$u" -p MainPID --value 2>/dev/null || true)"
+        [[ -n "$pid" && "$pid" != "0" ]] && { printf '%s\n' "$pid"; return 0; }
+    done
+    ps -eo pid=,args= \
+        | grep -F -- 'corpus_stream_databento.py' \
+        | grep -Ev -- 'tmux|new-session|send-keys|live-footprint-up\.sh' \
+        | grep -v grep | head -1 | awk '{print $1}'
+}
+CAPTURE_PID="$(capture_pid || true)"
 if [[ -n "$CAPTURE_PID" ]]; then
     echo "capture already running (pid $CAPTURE_PID) — NOT starting a second one."
     echo "bringing up the render panes only (bridge + feeder)."
