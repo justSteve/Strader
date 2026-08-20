@@ -3,7 +3,7 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
-**Last refreshed**: 2026-08-19 [st-vxbw, st-135m, st-kxnv; prior 2026-08-17 st-slj4, st-n0qm.5; 2026-08-13 st-aski, st-ad6p, st-g0or, st-75z0, st-pfrz, st-4ld0, st-xxo0, st-ylqw]
+**Last refreshed**: 2026-08-19 [st-tme, st-q5xu, st-7kmt, st-gno7; earlier same day st-vxbw, st-135m, st-kxnv; prior 2026-08-17 st-slj4, st-n0qm.5; 2026-08-13 st-aski, st-ad6p, st-g0or, st-75z0, st-pfrz, st-4ld0, st-xxo0, st-ylqw]
 
 > Standing operational snapshot — what is wired up, live, or paused right now.
 > Session history lives in `DaysActivity.md`; work lives in beads; durable
@@ -147,13 +147,19 @@ receipt [st-75z0]:
    re-checks against observable state is worse than an empty list.)*
 3. **`st-08p` blocked externally** — training steps 3–5 need Steve's NotebookLM
    upload and COO's deck import.
-4. **Recognizer is direction-blind upward** — all four setups are downside
-   forms (no failed-breakout), and every Mancini level enters as
-   `kind=support`, including parsed **resistances**. A rejection at overhead
-   supply emits as a bullish `failed_breakdown`. Treat recognizer reads at
-   resistance levels as unreliable in direction. Two calls outstanding from
-   Steve: the mirrored setup's name, and whether to apply the interim
-   kind-filter-to-supports the acuity path already uses. `st-q5xu`, `st-tme`.
+4. **RESOLVED 2026-08-19 (`st-tme`, `st-q5xu`, `st-2a8v`, `st-7kmt`,
+   `st-gno7`)** — anchors carry the parsed Mancini kind; a resistance
+   engagement emits the upside mirror `failed_breakout` / `level_reject`
+   (bearish); pivots enter both sides; trigger/target are charted, not
+   watched. Enriched-corpus re-derivation then removed the fire-index
+   confidence damp and retired the day-type cut and the developing-b gate
+   (`docs/measurement/{anchor-kind-mirror,fire-index-rederivation,hour-daytype-rederivation}-2026-08-19.md`).
+   Standing read: the raw confirm stream has **no mechanical ±5 edge either
+   side** (bullish 46%, below coin at p≈.01; bearish 49%) — the recognizer is
+   an event detector whose descriptive layer is sound and whose directional
+   vocabulary ("Buy signal", confidence 0.8) is unearned. Open with Steve:
+   reword the surfaces to narrate events not forecasts, and run the
+   matched-random null.
 5. **`rcl` is sticky on the Mancini Pine indicator** — `lvState` 3 (RECLAIMED)
    has no outgoing transition, so a level that reclaims and then breaks again
    reads `rcl` for the rest of the session. Observed live on 7741, 2026-08-06.
