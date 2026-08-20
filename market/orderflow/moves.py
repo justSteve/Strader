@@ -27,6 +27,7 @@ are made of.
 from __future__ import annotations
 
 import bisect
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -34,12 +35,6 @@ from market.orderflow.replay import Trade
 
 REVERSAL_FRAC = 0.20      # of the day's final high-low range
 REVERSAL_MIN_PTS = 1.5
-
-# n/(n+K) confidence ramp for grade_atoms_developing's cell_grade_dev — an
-# engineering default (COO, 2026-08-20), not corpus-calibrated: no threshold
-# in the 27-day check showed a clean elbow, so this is a smooth approach to 1
-# rather than a fitted constant. Revisit if a real calibration ever runs.
-DEV_GRADE_WARMUP_ATOMS = 30
 
 CELLS = {(True, True): "F1", (True, False): "F2",
          (False, True): "F3", (False, False): "F4"}
@@ -134,6 +129,30 @@ def _grade(effort_pct: float, effect_pct: float) -> tuple[str, float]:
     return cell, grade
 
 
+def _grade_dev(effort_pct: float, effect_pct: float, n: int) -> tuple[str, float]:
+    """Cell + a confidence-weighted grade for the developing (causal)
+    percentile — NOT ``_grade``'s fixed 0-1 scaling, because a developing
+    percentile carries sampling noise a completed-day one does not: n
+    observations bound how far a rank can be trusted, and that bound has to
+    shrink the grade, not a fitted constant (COO, 2026-08-20: "an atom at
+    99/99 with ten behind it is genuinely more trustworthy than one at 51/51
+    with ten behind it" — a flat n-only damp scales both the same and can't
+    tell them apart).
+
+    Near the 50/50 boundary the standard error of an empirical percentile is
+    ~50/sqrt(n) points (binomial SE at p=0.5, in 0-100 units) — the raw
+    distance from the boundary is compared against that noise floor rather
+    than a corpus-fitted threshold. ``distance / (distance + SE)`` falls out
+    of that arithmetic: 0 at the boundary, approaching 1 only once the
+    distance clears the sampling noise for the n behind it.
+    """
+    cell = CELLS[(effort_pct >= 50.0, effect_pct >= 50.0)]
+    distance = min(abs(effort_pct - 50.0), abs(effect_pct - 50.0))
+    se = 50.0 / math.sqrt(n) if n > 0 else 50.0
+    grade = round(distance / (distance + se), 3) if (distance + se) > 0 else 0.0
+    return cell, grade
+
+
 def grade_atoms(atoms: list[Atom]) -> list[Atom]:
     """Day-relative percentile grades + matrix cell per atom (in place)."""
     efforts = sorted(a.volume for a in atoms)
@@ -161,19 +180,20 @@ def grade_atoms_developing(atoms: list[Atom]) -> list[dict]:
     estimator's first cut (percentile vs the day-so-far), an engineering
     default rather than a corpus-derived one. [st-lxhz]
 
-    ``cell_grade_dev`` is damped by sample size (COO, 2026-08-20, checked
+    ``cell_grade_dev`` is graded by ``_grade_dev`` (COO, 2026-08-20, checked
     against 27 corpus days): ``_pctl_rank`` ranks a lone observation at its
     own 100th percentile, so atom 1 of every session is unconditionally
-    effort_pct 100 / effect_pct 100 -> F1, grade 1.0 — maximum confidence
-    with zero information, before the raw grade is scaled by
-    ``n / (n + DEV_GRADE_WARMUP_ATOMS)``. Confirmed empirically: cell
-    agreement with the hindsight grade over the first 10 atoms is ~20%
-    (median across 27 days), at or below the ~27% two independent draws from
-    the corpus cell mix would agree by chance, and only reaches the day's
-    ceiling (~63%) by session end — the two are different quantities by
-    design, but the confidence number must not overstate an early read. This
-    does not change which cell an atom lands in, only how much weight
-    ``cell_grade_dev`` claims for it.
+    effort_pct 100 / effect_pct 100 -> F1 — maximum confidence with zero
+    information under the naive 0-1 scaling ``_grade`` uses for the
+    (unlimited-n) hindsight grade. Confirmed empirically: cell agreement
+    with the hindsight grade over the first 10 atoms is ~20% (median across
+    27 days), at or below the ~27% two independent draws from the corpus
+    cell mix would agree by chance, and only reaches the day's ceiling
+    (~63%) by session end — the two are different quantities by design, but
+    the confidence number must not overstate an early read. ``_grade_dev``
+    weighs distance-from-boundary against that atom count's sampling noise
+    instead. This does not change which cell an atom lands in, only how
+    much weight ``cell_grade_dev`` claims for it.
     """
     out: list[dict] = []
     efforts: list[float] = []
@@ -184,8 +204,7 @@ def grade_atoms_developing(atoms: list[Atom]) -> list[dict]:
         effort_pct = _pctl_rank(efforts, a.volume)
         effect_pct = _pctl_rank(effects, abs(a.net))
         n = len(efforts)
-        cell, raw_grade = _grade(effort_pct, effect_pct)
-        grade = round(raw_grade * n / (n + DEV_GRADE_WARMUP_ATOMS), 3)
+        cell, grade = _grade_dev(effort_pct, effect_pct, n)
         out.append({"ts": a.ts, "n_atoms": n,
                     "effort_pct_dev": effort_pct, "effect_pct_dev": effect_pct,
                     "cell_dev": cell, "cell_grade_dev": grade})

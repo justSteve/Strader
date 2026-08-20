@@ -2,8 +2,9 @@
 from datetime import datetime, timedelta
 
 from market.entities.trade import Trade
-from market.orderflow.moves import (grade_atoms, grade_atoms_developing,
-                                    one_minute_atoms, segment_moves)
+from market.orderflow.moves import (_grade_dev, grade_atoms,
+                                    grade_atoms_developing, one_minute_atoms,
+                                    segment_moves)
 
 T0 = datetime(2026, 7, 22, 8, 30)
 
@@ -63,11 +64,17 @@ def test_developing_grade_is_causal_not_day_relative():
     assert not all(h.effort_pct == d["effort_pct_dev"] for h, d in zip(hindsight, full))
 
 
-def test_developing_grade_is_damped_by_sample_size():
+def test_developing_grade_weighs_distance_against_sampling_noise():
     """COO, 2026-08-20: _pctl_rank ranks a lone value at its own 100th
-    percentile, so atom 1 is unconditionally F1 at raw grade 1.0 — maximum
-    confidence with zero information. cell_grade_dev must not report that
-    raw value; it has to start near zero and grow with n."""
+    percentile, so atom 1 is unconditionally F1 at raw distance 50 (the
+    boundary's max) — maximum apparent extremity with zero information.
+    _grade_dev compares that distance to the percentile's own sampling
+    noise (~50/sqrt(n) points) rather than a fitted constant: at n=1 the
+    noise floor is exactly as large as the maximum possible distance, so
+    the grade is exactly 0.5 — "can't yet tell," not "certain" and not
+    "worthless" either. It should rise as n grows and the noise floor
+    shrinks (grade held ~constant by construction here — every atom is a
+    new extreme)."""
     trades = []
     for m in range(6):
         px = 100.0 + m * 3          # deliberately extreme: max effort AND effect
@@ -77,12 +84,19 @@ def test_developing_grade_is_damped_by_sample_size():
 
     assert dev[0]["n_atoms"] == 1
     assert dev[0]["cell_dev"] == "F1"          # still the right cell...
-    assert dev[0]["cell_grade_dev"] < 0.1      # ...but not reported as certain
-    # confidence rises monotonically as n grows (grade held ~constant by
-    # construction — every atom here is the new extreme)
+    assert dev[0]["cell_grade_dev"] == 0.5     # ...at the noise floor, not overclaimed
     grades = [row["cell_grade_dev"] for row in dev]
     assert grades == sorted(grades)
     assert grades[-1] > grades[0]
+
+
+def test_developing_grade_distinguishes_extremity_at_equal_n():
+    """COO, 2026-08-20: "an atom at 99/99 with ten behind it is genuinely
+    more trustworthy than one at 51/51 with ten behind it" — a flat n-only
+    damp scales both the same and can't tell them apart; _grade_dev must."""
+    extreme = _grade_dev(99.0, 99.0, 10)
+    boundary = _grade_dev(51.0, 51.0, 10)
+    assert extreme[1] > boundary[1]
 
 
 def test_zigzag_splits_on_reversal_and_covers_every_atom():
