@@ -35,6 +35,12 @@ from market.orderflow.replay import Trade
 REVERSAL_FRAC = 0.20      # of the day's final high-low range
 REVERSAL_MIN_PTS = 1.5
 
+# n/(n+K) confidence ramp for grade_atoms_developing's cell_grade_dev — an
+# engineering default (COO, 2026-08-20), not corpus-calibrated: no threshold
+# in the 27-day check showed a clean elbow, so this is a smooth approach to 1
+# rather than a fitted constant. Revisit if a real calibration ever runs.
+DEV_GRADE_WARMUP_ATOMS = 30
+
 CELLS = {(True, True): "F1", (True, False): "F2",
          (False, True): "F3", (False, False): "F4"}
 CELL_NAMES = {"F1": "conviction", "F2": "absorption",
@@ -154,6 +160,20 @@ def grade_atoms_developing(atoms: list[Atom]) -> list[dict]:
     future work; nothing in this document defines it") — this is that
     estimator's first cut (percentile vs the day-so-far), an engineering
     default rather than a corpus-derived one. [st-lxhz]
+
+    ``cell_grade_dev`` is damped by sample size (COO, 2026-08-20, checked
+    against 27 corpus days): ``_pctl_rank`` ranks a lone observation at its
+    own 100th percentile, so atom 1 of every session is unconditionally
+    effort_pct 100 / effect_pct 100 -> F1, grade 1.0 — maximum confidence
+    with zero information, before the raw grade is scaled by
+    ``n / (n + DEV_GRADE_WARMUP_ATOMS)``. Confirmed empirically: cell
+    agreement with the hindsight grade over the first 10 atoms is ~20%
+    (median across 27 days), at or below the ~27% two independent draws from
+    the corpus cell mix would agree by chance, and only reaches the day's
+    ceiling (~63%) by session end — the two are different quantities by
+    design, but the confidence number must not overstate an early read. This
+    does not change which cell an atom lands in, only how much weight
+    ``cell_grade_dev`` claims for it.
     """
     out: list[dict] = []
     efforts: list[float] = []
@@ -163,8 +183,10 @@ def grade_atoms_developing(atoms: list[Atom]) -> list[dict]:
         bisect.insort(effects, abs(a.net))
         effort_pct = _pctl_rank(efforts, a.volume)
         effect_pct = _pctl_rank(effects, abs(a.net))
-        cell, grade = _grade(effort_pct, effect_pct)
-        out.append({"ts": a.ts, "n_atoms": len(efforts),
+        n = len(efforts)
+        cell, raw_grade = _grade(effort_pct, effect_pct)
+        grade = round(raw_grade * n / (n + DEV_GRADE_WARMUP_ATOMS), 3)
+        out.append({"ts": a.ts, "n_atoms": n,
                     "effort_pct_dev": effort_pct, "effect_pct_dev": effect_pct,
                     "cell_dev": cell, "cell_grade_dev": grade})
     return out

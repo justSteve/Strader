@@ -26,7 +26,11 @@ TWO KINDS OF LINE, never conflated:
   - A GRADED line prints once per completed clock-minute (the ratified atom
     boundary) — cell, dev-percentiles, cell_grade, and the atom's own raw
     OHLCV/delta printed alongside so a wrong grade and a wrong reading are
-    distinguishable on sight (the whole point of watching this live).
+    distinguishable on sight (the whole point of watching this live). Every
+    graded line says "(developing, n=N)" — cell_grade_dev is damped toward 0
+    at low n (COO caught this: a single atom ranks itself at the 100th
+    percentile by construction, which read as certainty, not the absence of
+    it) — so the label carries the same caveat the field does.
   - A PARTIAL line prints only while price sits within CONFLUENCE_TOLERANCE_PTS
     of a Mancini level (market.signals.orderflow_config), on --partial-interval
     seconds, showing the in-progress minute's volume/move so far. It carries
@@ -90,9 +94,8 @@ class LiveScorer:
     atom causally, and offers an ungraded partial read of the in-progress
     minute. No wall-clock reads anywhere — every decision keys off Trade.ts."""
 
-    def __init__(self, *, min_atoms: int, near_band: float, partial_interval: float,
+    def __init__(self, *, near_band: float, partial_interval: float,
                 levels: list[float], kinds: dict[float, tuple[str, ...]]):
-        self.min_atoms = min_atoms
         self.near_band = near_band
         self.partial_interval = partial_interval
         self.levels = levels
@@ -107,19 +110,19 @@ class LiveScorer:
         atom = one_minute_atoms(self._minute_buf)[0]
         self._atoms.append(atom)
         self._minute_buf = []
-        if len(self._atoms) < self.min_atoms:
-            return (f"{atom.ts:%H:%M} CT  atom  ES o{atom.open:g} h{atom.high:g} "
-                    f"l{atom.low:g} c{atom.close:g}  vol {atom.volume} d{atom.delta:+d}"
-                    f"  net {atom.net:+.2f} rng {atom.range_pts:.2f}"
-                    f"   [dev grade needs {self.min_atoms} atoms, have {len(self._atoms)}]")
+        # cell_grade_dev is damped by n (COO, 2026-08-20 — a lone atom ranks
+        # itself at the 100th percentile by construction, which is not
+        # confidence), but the LABEL has to carry "developing" too, not just
+        # the number — "F1 conviction" on screen imports the hindsight
+        # meaning even when the field behind it is the causal one.
         dev = grade_atoms_developing(self._atoms)[-1]
         cell = dev["cell_dev"]
-        return (f"{atom.ts:%H:%M} CT  {cell} {CELL_NAMES[cell]:<11} "
+        return (f"{atom.ts:%H:%M} CT  {cell} (developing, n={dev['n_atoms']}) "
+                f"{CELL_NAMES[cell]:<11} "
                 f"ES o{atom.open:g} h{atom.high:g} l{atom.low:g} c{atom.close:g}  "
                 f"vol {atom.volume} d{atom.delta:+d}  net {atom.net:+.2f} rng {atom.range_pts:.2f}"
                 f"   dev: effort_pct {dev['effort_pct_dev']:.0f} effect_pct "
-                f"{dev['effect_pct_dev']:.0f} grade {dev['cell_grade_dev']:.2f} "
-                f"(n={dev['n_atoms']})")
+                f"{dev['effect_pct_dev']:.0f} grade {dev['cell_grade_dev']:.2f}")
 
     def _partial_line(self, t) -> str | None:
         if not self._minute_buf:
@@ -161,12 +164,6 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--date", help="corpus day YYYY-MM-DD (default: today CT)")
-    ap.add_argument("--min-atoms", type=int, default=10,
-                    help="developing grade is suppressed (raw atom still "
-                         "printed) below this many completed atoms — an "
-                         "engineering choice, not a corpus-derived one; the "
-                         "percentile is technically defined from atom 1 but "
-                         "not trustworthy that early (default 10)")
     ap.add_argument("--near-band", type=float, default=CONFLUENCE_TOLERANCE_PTS,
                     help=f"points from a Mancini level counted as 'near' for "
                          f"partial reads (default {CONFLUENCE_TOLERANCE_PTS}, "
@@ -207,10 +204,10 @@ def main() -> int:
 
     print(f"# effort/effect scorer (live F1-F4) — {day}  "
          f"near<= {args.near_band}pt @ {args.partial_interval}s partial  "
-         f"min_atoms={args.min_atoms}  {len(levels)} levels loaded")
+         f"{len(levels)} levels loaded")
 
     scorer = LiveScorer(
-        min_atoms=args.min_atoms, near_band=args.near_band,
+        near_band=args.near_band,
         partial_interval=args.partial_interval, levels=levels, kinds=kinds,
     )
 

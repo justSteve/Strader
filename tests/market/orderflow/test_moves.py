@@ -63,6 +63,28 @@ def test_developing_grade_is_causal_not_day_relative():
     assert not all(h.effort_pct == d["effort_pct_dev"] for h, d in zip(hindsight, full))
 
 
+def test_developing_grade_is_damped_by_sample_size():
+    """COO, 2026-08-20: _pctl_rank ranks a lone value at its own 100th
+    percentile, so atom 1 is unconditionally F1 at raw grade 1.0 — maximum
+    confidence with zero information. cell_grade_dev must not report that
+    raw value; it has to start near zero and grow with n."""
+    trades = []
+    for m in range(6):
+        px = 100.0 + m * 3          # deliberately extreme: max effort AND effect
+        trades += [_t(m * 60, px, 100, "B"), _t(m * 60 + 30, px + 2.0, 100, "B")]
+    atoms = one_minute_atoms(trades)
+    dev = grade_atoms_developing(atoms)
+
+    assert dev[0]["n_atoms"] == 1
+    assert dev[0]["cell_dev"] == "F1"          # still the right cell...
+    assert dev[0]["cell_grade_dev"] < 0.1      # ...but not reported as certain
+    # confidence rises monotonically as n grows (grade held ~constant by
+    # construction — every atom here is the new extreme)
+    grades = [row["cell_grade_dev"] for row in dev]
+    assert grades == sorted(grades)
+    assert grades[-1] > grades[0]
+
+
 def test_zigzag_splits_on_reversal_and_covers_every_atom():
     trades = []
     for m in range(10):                              # up 5 minutes, down 5
