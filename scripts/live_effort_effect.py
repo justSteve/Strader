@@ -105,6 +105,16 @@ class LiveScorer:
         self._minute_buf: list = []
         self._atoms: list = []
         self._last_partial_ts = None
+        # Running session extrema. A watch resumed mid-session has no view of
+        # the morning, so a superlative called from the emission ("largest
+        # delta of the day") silently scopes to whatever the WATCHER has seen
+        # rather than to the day. On 2026-08-20 that produced three wrong
+        # day-scope calls in the 14:50s: the day's deltas were -1501 at 07:06,
+        # -1200 at 09:19 and +1040 at 11:34, against which 14:58's +1201 was
+        # second and 14:55's -891 fourth. These track the whole atom list,
+        # which is backfilled from the session open, not from process start.
+        self._max_vol = None      # (volume, ts)
+        self._max_delta = None    # (delta, ts) — kept SIGNED, ranked on |d|
 
     def _close_minute(self) -> str | None:
         atom = one_minute_atoms(self._minute_buf)[0]
@@ -117,12 +127,33 @@ class LiveScorer:
         # meaning even when the field behind it is the causal one.
         dev = grade_atoms_developing(self._atoms)[-1]
         cell = dev["cell_dev"]
+        flags = self._update_extrema(atom)
         return (f"{atom.ts:%H:%M} CT  {cell} (developing, n={dev['n_atoms']}) "
                 f"{CELL_NAMES[cell]:<11} "
                 f"ES o{atom.open:g} h{atom.high:g} l{atom.low:g} c{atom.close:g}  "
                 f"vol {atom.volume} d{atom.delta:+d}  net {atom.net:+.2f} rng {atom.range_pts:.2f}"
                 f"   dev: effort_pct {dev['effort_pct_dev']:.0f} effect_pct "
-                f"{dev['effect_pct_dev']:.0f} grade {dev['cell_grade_dev']:.2f}")
+                f"{dev['effect_pct_dev']:.0f} grade {dev['cell_grade_dev']:.2f}"
+                f"   {self._extrema_text()}{flags}")
+
+    def _update_extrema(self, atom) -> str:
+        """Fold atom into the running session extrema; return a NEW-MAX flag
+        suffix for the emitted line (empty when it set no record)."""
+        flags = []
+        if self._max_vol is None or atom.volume > self._max_vol[0]:
+            self._max_vol = (atom.volume, atom.ts)
+            flags.append("NEW-MAX-VOL")
+        if self._max_delta is None or abs(atom.delta) > abs(self._max_delta[0]):
+            self._max_delta = (atom.delta, atom.ts)
+            flags.append("NEW-MAX-DELTA")
+        return ("  ** " + " ".join(flags) + " **") if flags else ""
+
+    def _extrema_text(self) -> str:
+        """Compact running session max, so a superlative read off this line is
+        scoped to the session and not to the watcher's uptime."""
+        v, vt = self._max_vol
+        d, dt = self._max_delta
+        return f"smax: vol {v}@{vt:%H:%M} d{d:+d}@{dt:%H:%M}"
 
     def _partial_line(self, t) -> str | None:
         if not self._minute_buf:
