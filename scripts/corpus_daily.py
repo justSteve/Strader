@@ -313,16 +313,42 @@ def main(argv: list[str] | None = None) -> int:
         logger.warning("MBP-1 backfill refused for %s: %s", day, mbp1_reason)
     elif not args.force and stream_healthy_in_manifest(day, MBP1_STREAM):
         logger.info("skip %s: already healthy in manifest for %s", MBP1_STREAM, day)
+    elif not args.force and stream_has_rows_in_manifest(day, MBP1_STREAM)[0]:
+        # Risk 15 again, on the depth stream this time. The trades loop above
+        # got this guard after 2026-08-11; MBP-1 kept the healthy-only check and
+        # doubled 2026-08-19 on 2026-08-20 — 12,377,582 cycles against a 6.25M
+        # median (max on any other day 9.92M), the appended batch visible at the
+        # file tail: last record ts_event 14:59:59.999 CT (the --end-ct bound)
+        # with batch provenance (ES.c.0, no "source": "live"), while the live
+        # capture ran to 18:46. A stream carrying reconnect notes is not a
+        # missing stream; a gap wants a windowed --force pull, never a
+        # full-session append. [co-j5qzq]
+        _, errs = stream_has_rows_in_manifest(day, MBP1_STREAM)
+        logger.warning("skip %s: already holds rows for %s (errors: %s) — "
+                       "a batch append would double the depth tape; use --force "
+                       "with --start-ct/--end-ct to fill a specific gap",
+                       MBP1_STREAM, day, "; ".join(errs) or "-")
+        emit_alert(
+            "mbp1_errors",
+            f"MBP-1 depth for {day} carries {len(errs)} reconnect note(s) — rows "
+            f"are present and were NOT re-pulled (a batch append would double "
+            f"the tape). Verify coverage before filling: "
+            f".venv/bin/python scripts/{MBP1_SCRIPT} --date {day.isoformat()} "
+            f"--force --start-ct HH:MM --end-ct HH:MM",
+            {"day": day.isoformat(), "errors": errs},
+        )
     elif args.dry_run:
         logger.info("[dry-run] would pull %s (%s)", MBP1_STREAM, mbp1_reason)
     else:
         logger.info("%s: %s", MBP1_STREAM, mbp1_reason)
         rc, _ = run_pull(MBP1_SCRIPT, day,
                          ["--start-ct", "08:30", "--end-ct", "15:00"])
-        if rc != 0 or not stream_healthy_in_manifest(day, MBP1_STREAM):
-            # Live capture is the only other source of MBP-1 depth; a day that
-            # is still unhealthy after the backfill attempt is a durable gap,
-            # so it alerts instead of rotting as a log line. Non-gate-blocking.
+        if rc != 0 or not stream_has_rows_in_manifest(day, MBP1_STREAM)[0]:
+            # No rows from either source. Live capture is the only other source
+            # of MBP-1 depth, so a day with no rows after the backfill attempt is
+            # a durable gap and alerts rather than rotting as a log line.
+            # Non-gate-blocking. Note this tests for ROWS, not health: a stream
+            # that captured rows with reconnect notes is not missing depth.
             emit_alert(
                 "mbp1_gap",
                 f"MBP-1 depth missing for {day} after backfill attempt "
