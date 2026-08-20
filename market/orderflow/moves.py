@@ -139,6 +139,37 @@ def grade_atoms(atoms: list[Atom]) -> list[Atom]:
     return atoms
 
 
+def grade_atoms_developing(atoms: list[Atom]) -> list[dict]:
+    """Causal percentile grades — atom i ranked against atoms[0:i+1] only,
+    never against an atom after it. This is a DIFFERENT quantity from
+    ``grade_atoms``'s day-relative percentiles (docs/measurement/
+    orderflow-fundamental-units.md §0.1: "All percentiles are day-relative
+    and computable only at session close"), so it returns plain dicts rather
+    than writing Atom.effort_pct/effect_pct/cell/cell_grade — those fields
+    are the hindsight grade and must never be overloaded with a live one.
+    The two are not comparable: a developing percentile with 3 atoms behind
+    it and one with 300 behind it are both "the rank so far," not "the rank."
+
+    Unratified (§0.1: "the live estimator for percentiles ... is unratified
+    future work; nothing in this document defines it") — this is that
+    estimator's first cut (percentile vs the day-so-far), an engineering
+    default rather than a corpus-derived one. [st-lxhz]
+    """
+    out: list[dict] = []
+    efforts: list[float] = []
+    effects: list[float] = []
+    for a in atoms:
+        bisect.insort(efforts, a.volume)
+        bisect.insort(effects, abs(a.net))
+        effort_pct = _pctl_rank(efforts, a.volume)
+        effect_pct = _pctl_rank(effects, abs(a.net))
+        cell, grade = _grade(effort_pct, effect_pct)
+        out.append({"ts": a.ts, "n_atoms": len(efforts),
+                    "effort_pct_dev": effort_pct, "effect_pct_dev": effect_pct,
+                    "cell_dev": cell, "cell_grade_dev": grade})
+    return out
+
+
 def segment_moves(atoms: list[Atom]) -> list[Move]:
     """Zigzag over minute closes: a move ends when price retraces
     REVERSAL_FRAC of the day range (floor REVERSAL_MIN_PTS) from its
