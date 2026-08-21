@@ -215,11 +215,19 @@ the follow-on bead once Phase 0 lands.
 
 ## Decisions that are yours
 
-1. **Gas City final deletion.** Both `.gc` trees, and the 104MB `gc` binary on
-   PATH (not in git — this one is genuinely irreversible). Evidence says fully
-   dead; the binary's settings include a dangerous permission bypass, and its
-   recovery verb contradicts beads doctrine. My read: delete all three, after
-   an archive tarball to `/var/moo/backups/`.
+1. ~~**Gas City final deletion.**~~ **VOID 2026-08-21 — nothing here is Steve's
+   to decide.** The 104MB `gc` binary is gone: absent from `/usr/local/bin`,
+   `/usr/bin` and `~/.local/bin`, and not on PATH at all. The irreversible piece
+   this decision existed for no longer exists. What remained was dead directory
+   trees, none tracked in git: Strader's own `.gc` (2.0M, gitignored) is
+   **deleted**; `moocity` (1017M), `/root/.gc` (32M) and `DReader` (68K) sit
+   outside Strader's write boundary and are COO's to sweep — not a Steve
+   decision either.
+
+   **No archive tarball.** Steve's standing ruling, stated repeatedly and again
+   on 2026-08-21: *"there was nothing of value produced by GC - it was an
+   experiment."* Archiving it would preserve what he has told us has no value.
+   Do not put Gas City in front of him again.
 2. **The May-17 test stratum.** ~10 green suites pin a superseded entity/
    indicator architecture (GEX math frozen pre-GexBot-live). Delete with their
    targets, or mark legacy so `801 passed` stops overstating. My read: delete —
