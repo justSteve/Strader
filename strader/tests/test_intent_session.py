@@ -47,7 +47,7 @@ def test_stale_pending_is_refused_not_armed(tmp_path):
 def test_go_refuses_until_priced_and_confirmed(tmp_path):
     s = _session(tmp_path)
     s.read((FIX / "constructed-day-read.txt").read_text())
-    assert "Nothing priced" in s.go()
+    assert "waiting for a yes or no" in s.go()                        # the staged branch comes first
     out = s.price(_chain())
     assert "Buying 2 butterfly calls, 6300 / 6320 / 6340" in out and "0.55 debit" in out and "$110 total" in out
     assert "inferred" in out                                          # no TOS fixture yet
@@ -69,6 +69,7 @@ def test_no_drops_the_pending_intent(tmp_path):
     s.arm("the failed breakdown at sixty-four twelve, short on the reclaim")
     assert s.pending is not None and s.pending.looks_inverted
     assert "Dropped" in s.no() and s.pending is None and s.plan.intents == []
+    assert "Nothing priced" in s.go()                                  # nothing waiting, nothing priced
 
 
 def test_es_center_needs_a_basis(tmp_path):
