@@ -39,6 +39,12 @@ def test_find_numbers_spoken_digits_fractions_and_frames():
     assert (7438.25, None) in values
 
 
+def test_whisper_decimal_pair_is_a_price_but_a_premium_is_not():
+    # the 07-24 drill file came back from Whisper as "Buy signal at 74.47, support" (co-2a7ft)
+    assert [n.value for n in find_numbers("Buy signal at 74.47, support")] == [7447.0]
+    assert [n.value for n in find_numbers("fifty-five cents, 1.55 debit, .55")] == []
+
+
 def test_find_numbers_keeps_times_for_the_grammar_to_refuse():
     # "ten thirty" is a time; numbers.py reports it, grammar.py's PRICE_FLOOR refuses it
     assert [n.value for n in find_numbers("found its low around ten thirty")] == [1030.0]

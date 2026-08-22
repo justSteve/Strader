@@ -46,6 +46,11 @@ _SPOKEN_RE = re.compile(
     re.IGNORECASE,
 )
 _DIGIT_RE = re.compile(r"\b(\d{1,2},\d{3}|\d{3,5})(?:\.(\d{1,2}))?\b")
+# Whisper's number normalization writes a spoken pair as a decimal now and then —
+# "seventy-four forty-seven" came back as "74.47" on the 07-24 drill file (co-2a7ft).
+# Two digits, a point, two digits, first group 20 or more: a pair price, not a premium
+# (a debit like 1.55 has one digit before the point and never matches).
+_DECIMAL_PAIR_RE = re.compile(r"\b([2-9]\d)\.(\d{2})\b")
 _FRAME_AFTER_RE = re.compile(r"^\s*(spx|es)\b", re.IGNORECASE)
 
 
@@ -157,6 +162,9 @@ def find_numbers(text: str) -> list[SpokenNumber]:
         whole = m.group(1).replace(",", "")
         frac = m.group(2)
         value = float(whole) + (float(f"0.{frac}") if frac else 0.0)
+        out.append(_with_frame(text, SpokenNumber(value, m.group(0), m.start(), m.end())))
+    for m in _DECIMAL_PAIR_RE.finditer(text):
+        value = float(m.group(1)) * 100 + float(m.group(2))
         out.append(_with_frame(text, SpokenNumber(value, m.group(0), m.start(), m.end())))
     for m in _SPOKEN_RE.finditer(text):
         value = words_to_number(m.group(1))
