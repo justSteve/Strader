@@ -1,0 +1,19 @@
+{
+  "underlying": "SPX",
+  "underlying_price": 6321.5,
+  "expiry": "2026-08-22",
+  "calls": [
+    {"strike": 6280, "bid": 44.0, "ask": 44.6, "delta": 0.93},
+    {"strike": 6300, "bid": 3.00, "ask": 3.10, "delta": 0.78},
+    {"strike": 6320, "bid": 1.45, "ask": 1.55, "delta": 0.52},
+    {"strike": 6340, "bid": 0.45, "ask": 0.55, "delta": 0.21},
+    {"strike": 6360, "bid": 0.10, "ask": 0.20, "delta": 0.06}
+  ],
+  "puts": [
+    {"strike": 6280, "bid": 0.15, "ask": 0.25, "delta": -0.07},
+    {"strike": 6300, "bid": 0.60, "ask": 0.70, "delta": -0.22},
+    {"strike": 6320, "bid": 1.60, "ask": 1.70, "delta": -0.48},
+    {"strike": 6340, "bid": 19.0, "ask": 19.6, "delta": -0.79},
+    {"strike": 6360, "bid": 38.5, "ask": 39.1, "delta": -0.94}
+  ]
+}
