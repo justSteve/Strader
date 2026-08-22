@@ -1,43 +1,4 @@
-# DaysActivity - 2026-08-21
-
-## 22:06 - Session Handoff [Live Tape Watch Full Session · Decision Stack · Gas City Voided · Baseline Defect Settled From Corpus]
-
-**Summary**: Second full live F1–F4 tape watch, voiced through the RTH session at Steve's direction, closing with a review that corrected the day's central read; Steve issued three standing corrections during the session (filter the list to what actually needs him, orderflow leads with structure only breaking ties, and stop surfacing Gas City), and proposed a decision stack that got its first live use and its first save.
-
-**Open Work**:
-- st-9r51 Richer Mancini Extraction — Steve ruled Tier 2 stays in-session (route a). Tier 1 needs no ruling and is UNBUILT: scrape extension over listlevels.py plus four additive schema fields (section, mechanism, triggers, tradeable). One session of work.
-- st-lrjf Character Habitat Registry — holds both the strats-as-characters findings and Steve's decision stack. Parked under his standing "no coding, no conclusions" constraint on the st-q9re Zentities thread.
-- st-dioq (COO's) — baseline fix. Strader supplied the corpus dose-response; the fix itself is COO's.
-- Three things still needing Steve, down from the six first offered: code-estate decision 2 (May-17 test stratum) and decision 4 (ratify the COO delegation bundle), and the st-fsf3 bash-guard patch once prepared.
-
-**Tried**:
-- Repairing the 2026-08-19 doubled depth tape → superseded. Measured it read-only (live covered 23,394/23,400 RTH seconds, six isolated 1-second gaps, ZERO batch rows inside them), then found COO had already repaired it at 05:47 (84e9b55). My pass became an independent verification: 6,937,164 records, zero non-live rows, matching COO's kept count exactly. The ledger row was there at 05:47 and I started at 06:09 — reading it costs one command.
-- Confirming the F-grade baseline defect by watching more live days → wrong instrument. grade_atoms_developing() is pure, so 270 corpus days were already on disk. One 30-day sweep replaced a two-day confirmation with a monotone dose-response: capture held RTH-ONLY through 08-03 (390 atoms/day, 0% overnight), then ~47%, then 63–72%, and RTH's F3+F4 share tracks it 79.0% → 48.7% → 2.2% → 0.3%. "RTH produced zero F3/F4" was never a fact about the RTH tape.
-- Tuning the live alert filter by raising thresholds → same bug four times. A threshold on close (c >= 7695) encodes a STATE, not an event, so it fired every bar while price sat there. Fixed with hysteresis — fire once on entry, re-arm after price clears a band — which scripts/orderflow_sentinel.py already documents. Should have been copied, not rediscovered.
-- Rendering documents to the desk mid-session → desk-translate.py is slow enough to background (120s+) and queues behind other renders. Not a failure, but budget for it.
-
-**Files Changed**:
-docs/reviews/2026-08-21-live-tape-watch.md
-docs/a2a/2026-08-21-strader-to-coo-dev-baseline-dose-response.md
-docs/a2a/inbox.md
-docs/plans/2026-08-12-code-estate-plan.md
-runbook/mancini/commentary/2026-08-21.jsonl
-runbook/mancini/parsed/2026-08-21.json
-
-**Session Notes**:
-- Mancini parse ran clean for plan-day Friday 2026-08-21 — 68 levels (34 labelled, 17 rich), 9 commentary items, full list parity on 20 supports + 45 resistances, clipboard loaded, desk NAV green.
-- ES session: open 7695.75, high 7714.00 (10:53), low 7676.75 (08:54), close 7691.25. 391 RTH atoms, 873,782 lots.
-- The review's central finding corrects the live commentary: points per 1,000 net contracts shows buyers held the conversion edge ONLY in the opening hour (3.81 vs 1.35); from 09:43 on sellers converted better in every period, including the one where price rose 37 points. The morning rally was absence of supply, not buyer strength — which is Steve's own "a range void of orderblocks can be run thru", arriving from the data side.
-- Gauge earned its keep three times: cum TICK peaked +4,799 at 10:46 against a 10:53 price high; 11:21 printed "TICK climax" +61 with cum FALLING through it; 14:50 was the day's only OF+gauge agreement.
-- Gas City: the 104MB gc binary is gone from every bin and off PATH. Strader's own .gc deleted, no archive per Steve's standing ruling that it produced nothing of value. Code-estate decision 1 struck as void — nothing in it was ever his to decide.
-
-**Peer Digest** *(delivered to COO's inbox)*:
-- Baseline defect measured from corpus as dose-response — st-dioq no longer needs live days.
-- Gas City decision 1 voided; the gc-mail-stub hook now false-positives on any command containing "gc ".
-- Steve's OF-first / structure-breaks-ties directive binds both agents' live commentary.
-
----
-
+# DaysActivity - 2026-08-20
 ## 17:12 - Session Handoff [Live Tape Watch Through the Close · Six Beads · Clock Family Traversed]
 
 **Summary**: Resumed the live F1-F4 tape watch (the scorer never died — `live_effort_effect.py` ran uninterrupted from 10:37, 972 atoms) and narrated it through the cash close. The afternoon was a 115-minute absorption range at ES 7670–7677 — seven defences of the floor, five stalls at the ceiling, heavy volume repeatedly producing nothing — which broke at 14:45, faked a full V-return at 14:49 (+6.25 in three bars, grade 0.80, fully reversed within five minutes), then produced every volume and delta record of the afternoon in the last fifteen minutes: 9,050 lots at 14:54, 12,777 at 14:55 (delta −891, grade 0.94), +1,201 delta at 14:58, and a 59,876-lot auction printing 7659.00 before reclaiming to close 7665.25. SPX settled 7641.82 (−0.86%), low 7639.01 — landing on the 7639.93 short-gamma level after the gamma flip collapsed 7716 → 7650 through the day and spot crossed beneath it at ~14:43, two minutes before the break accelerated. Steve asked for GEX (answered: major positive walked 7735 → 7660, tracking spot rather than acting as a magnet) and priced a 0DTE SPX 7660/7670/7680 call fly he was *considering, not taking* — mid 1.72 against his 1.45 limit, net delta +0.18 (~$18/SPX point), body sitting exactly on the 0DTE major positive. His condition ("if it stayed in range without the back test lower") did not hold: ES took 7659. He also observed "just not enough vol for the big moves" at 14:41; measured against the day that was false in level (14:00 hour ran 1,847 lots/bar, above both lunch hours) and true in conversion (since 13:40, 1.9× the volume bought 1.2× the movement) — and conversion returned four minutes later. Then, with the tape dead post-close, worked the P1 queue: six beads closed, two peer beads serviced with findings, three left alone as COO's or Steve's.
