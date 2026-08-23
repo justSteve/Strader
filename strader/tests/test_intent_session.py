@@ -5,6 +5,9 @@ import datetime as dt
 import json
 from pathlib import Path
 
+import pytest
+
+from strader.execution.compose import Ticket
 from strader.intent.cli import load_chain, main
 from strader.intent.session import Session
 from strader.intent.tos import fixture_status, occ_symbols, tos_string
@@ -90,6 +93,78 @@ def test_single_first_itm(tmp_path):
     o = s.plan.orders[0]
     assert tos_string(o) == "BUY +2 SPX 100 (Weeklys) 22 AUG 26 6320 CALL @1.55 LMT"
     assert occ_symbols(o) == ["SPXW  260822C06320000"]
+
+
+def test_single_call_gets_an_fd0_bracket_stop_below_spot(tmp_path):
+    """The join (st-79z.3 × st-apzt): a directional single hands FD0 the
+    contract; FD0 derives the stop from budget and puts the SPX-conditional
+    trigger on the loss side. A long call loses as SPX falls, so 'at or below'."""
+    s = _session(tmp_path)
+    s.single("one 6320 call, 0DTE")
+    out = s.price(_chain())
+    assert "FD0 stop (budget-derived" in out
+    assert "at or below" in out                                     # call cut below spot
+    assert s.plan.bracket is not None
+    assert s.plan.bracket["stop_trigger_spx"] < _chain().underlying_price
+    # go carries the bracket into the staged record and never re-captions the exit
+    s.go()
+    rec = json.loads(next((tmp_path / "staged").glob("*-single.json")).read_text())
+    assert rec["fd0"]["exit_fields"]["trigger_direction"] == "at or below"
+    assert rec["fd0"]["exit_fields"]["action"] == "SELL -1, MARKET"
+    assert rec["fd0"]["max_loss_usd"] == 50.0                        # $100 / 2 attempts
+
+
+def test_single_put_stop_sits_above_spot(tmp_path):
+    s = _session(tmp_path)
+    s.single("one 6300 put, 0DTE")
+    out = s.price(_chain())
+    assert "at or above" in out                                     # put cut above spot
+    assert s.plan.bracket["stop_trigger_spx"] > _chain().underlying_price
+    assert Ticket.from_dict(s.plan.bracket).exit_fields["action"] == "SELL -1, MARKET"
+
+
+def test_two_lot_single_scales_friction_and_sell_qty(tmp_path):
+    s = _session(tmp_path)
+    s.single("first strike in the money, calls, two lots")
+    s.price(_chain())
+    b = s.plan.bracket
+    assert b["lots"] == 2
+    # friction is per-lot: $10 spread + $3 fees, doubled
+    assert b["derivation"]["friction_usd"] == pytest.approx(26.0)
+    assert Ticket.from_dict(b).exit_fields["action"] == "SELL -2, MARKET"
+
+
+def test_butterfly_is_defined_risk_no_bracket(tmp_path):
+    s = _session(tmp_path)
+    s.fly("6320, twenty wide, 0DTE calls, two lots")
+    out = s.price(_chain())
+    assert "FD0 stop" not in out and s.plan.bracket is None
+    s.go()
+    rec = json.loads(next((tmp_path / "staged").glob("*-butterfly.json")).read_text())
+    assert "fd0" not in rec                                          # nothing for a stop to protect
+
+
+def test_bracket_survives_the_one_line_per_process_pane(tmp_path):
+    """The dictation pane runs a process per line: price in one, go in the
+    next. The FD0 bracket persists on the plan so go can render it with no
+    chain in hand."""
+    s = _session(tmp_path)
+    s.single("one 6320 call, 0DTE")
+    s.price(_chain())
+    again = Session(plan_dir=tmp_path, day=DAY)               # a fresh process
+    assert again.plan.bracket is not None
+    out = again.go()
+    assert "at or below" in out
+    assert "SELL -1, MARKET" in out
+
+
+def test_stand_down_clears_the_bracket(tmp_path):
+    s = _session(tmp_path)
+    s.single("one 6320 call, 0DTE")
+    s.price(_chain())
+    assert s.plan.bracket is not None
+    s.stand_down()
+    assert s.plan.bracket is None and s.plan.orders == []
 
 
 def test_stand_down_and_frame(tmp_path):

@@ -24,6 +24,12 @@ than forwards from a chart: the stop distance is whatever the remaining risk
 budget can fund at the live delta. It is never a fixed number of points. Steve
 set that explicitly on 08-02 — his 0.60δ two-point sketch priced out at roughly
 3.6× the $100 ceiling, which is how the derivation ended up inverted.
+
+2026-08-23, the join with the intent dialect (st-79z.3): the engine now takes
+the contract the dialect chose (``compose(..., contract=)``) instead of always
+picking by delta band, carries the contract's ``right`` so a long call's stop
+sits *below* spot, and scales friction and premium by ``lots``. Flush-down on
+one put is still the default and the only thing the delta-band pick returns.
 """
 from __future__ import annotations
 
@@ -39,6 +45,7 @@ log = logging.getLogger(__name__)
 __all__ = [
     "Contract", "Budget", "Derivation", "Ticket",
     "parse_chain", "pick_strike", "derive", "noise_floor_spx", "compose",
+    "order_string", "exit_fields", "template_fields", "stop_trigger",
     "NoStrikeInBand", "CannotFund",
     "CONTRACT_MULTIPLIER", "DELTA_TARGET", "DELTA_BAND", "FEES_RT_USD",
 ]
@@ -92,6 +99,7 @@ class Contract:
     delta: float                    # signed, as the chain reports it
     expiration: str                 # ISO date, e.g. "2026-08-03"
     dte: int
+    right: str = "PUT"              # PUT (FD0's own shape) or CALL (via the dialect)
 
     @property
     def mid_pts(self) -> float:
@@ -108,6 +116,16 @@ class Contract:
     @property
     def abs_delta(self) -> float:
         return abs(self.delta)
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Contract":
+        return cls(symbol=d["symbol"], strike=float(d["strike"]), bid_pts=float(d["bid_pts"]),
+                   ask_pts=float(d["ask_pts"]), delta=float(d["delta"]),
+                   expiration=d["expiration"], dte=int(d.get("dte", 0)),
+                   right=d.get("right", "PUT"))
 
 
 @dataclass(frozen=True)
@@ -147,7 +165,8 @@ class Budget:
 @dataclass(frozen=True)
 class Derivation:
     """Every number between the budget and the stop, in order, so the ticket
-    can be audited at a glance and the journal can replay the reasoning."""
+    can be audited at a glance and the journal can replay the reasoning.
+    Spread, fees and premium are for all ``lots`` together."""
 
     budget_remaining_usd: float
     attempts_left: int
@@ -159,6 +178,7 @@ class Derivation:
     delta_live: float
     stop_distance_spx: float
     noise_floor_spx: float
+    lots: int = 1
 
     @property
     def inside_noise_floor(self) -> bool:
@@ -168,6 +188,11 @@ class Derivation:
         d = asdict(self)
         d["inside_noise_floor"] = self.inside_noise_floor
         return d
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Derivation":
+        names = set(cls.__dataclass_fields__)
+        return cls(**{k: v for k, v in d.items() if k in names})
 
 
 @dataclass(frozen=True)
@@ -183,6 +208,11 @@ class Ticket:
     template_fields: dict
     warnings: tuple[str, ...] = ()
     composed_at: datetime | None = None
+    lots: int = 1
+
+    @property
+    def right(self) -> str:
+        return self.contract.right
 
     @property
     def max_loss_usd(self) -> float:
@@ -190,10 +220,17 @@ class Ticket:
         the friction already assumed. This is the number the ceiling governs."""
         return self.derivation.attempt_risk_usd + self.derivation.friction_usd
 
+    @property
+    def exit_fields(self) -> dict:
+        return exit_fields(self.stop_trigger_spx, right=self.right, lots=self.lots)
+
     def as_record(self) -> dict:
+        """The journal's summary of a ticket."""
         return {
             "symbol": self.contract.symbol,
             "strike": self.contract.strike,
+            "right": self.right,
+            "lots": self.lots,
             "delta": self.contract.delta,
             "limit_pts": self.limit_pts,
             "spx_at_compose": self.spx_at_compose,
@@ -205,18 +242,55 @@ class Ticket:
             "composed_at": self.composed_at.isoformat() if self.composed_at else None,
         }
 
+    def to_dict(self) -> dict:
+        """Everything, so the ticket survives a process boundary — the dictation
+        pane runs one line per process, and ``in <px>`` has to find what ``go``
+        composed."""
+        return {
+            "contract": self.contract.to_dict(),
+            "limit_pts": self.limit_pts,
+            "spx_at_compose": self.spx_at_compose,
+            "stop_trigger_spx": self.stop_trigger_spx,
+            "derivation": asdict(self.derivation),
+            "order_string": self.order_string,
+            "template_fields": dict(self.template_fields),
+            "warnings": list(self.warnings),
+            "composed_at": self.composed_at.isoformat() if self.composed_at else None,
+            "lots": self.lots,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Ticket":
+        return cls(
+            contract=Contract.from_dict(d["contract"]),
+            limit_pts=float(d["limit_pts"]),
+            spx_at_compose=float(d["spx_at_compose"]),
+            stop_trigger_spx=float(d["stop_trigger_spx"]),
+            derivation=Derivation.from_dict(d["derivation"]),
+            order_string=d["order_string"],
+            template_fields=dict(d.get("template_fields", {})),
+            warnings=tuple(d.get("warnings", ())),
+            composed_at=datetime.fromisoformat(d["composed_at"]) if d.get("composed_at") else None,
+            lots=int(d.get("lots", 1)),
+        )
+
 
 # ----------------------------------------------------------------- chain ---
 
-def parse_chain(data: dict, *, expiration: str | None = None) -> list[Contract]:
-    """Normalize a Schwab chain payload into put :class:`Contract` s.
+def parse_chain(data: dict, *, expiration: str | None = None,
+                right: str = "PUT") -> list[Contract]:
+    """Normalize a Schwab chain payload into :class:`Contract` s of one right.
 
     ``expiration`` selects one expiry (ISO date); omitted, the nearest is used
     — FD0 is a 0DTE tool and the front expiry is the intent. Contracts missing
     a delta or a two-sided market are dropped, not defaulted: a strike we
-    cannot price is a strike we must not pick.
+    cannot price is a strike we must not pick. ``right`` is PUT (FD0's own
+    shape) or CALL (the dialect's long calls); the two maps are never mixed.
     """
-    exp_map = data.get("putExpDateMap") or {}
+    right = right.upper()
+    if right not in ("PUT", "CALL"):
+        raise ValueError(f"right must be PUT or CALL, not {right!r}")
+    exp_map = data.get("putExpDateMap" if right == "PUT" else "callExpDateMap") or {}
     if not exp_map:
         return []
 
@@ -227,8 +301,8 @@ def parse_chain(data: dict, *, expiration: str | None = None) -> list[Contract]:
     if expiration is not None:
         keys = [k for k in exp_map if _key_date(k) == expiration]
         if not keys:
-            log.warning("no put expiry %s in chain; have %s",
-                        expiration, sorted(_key_date(k) for k in exp_map))
+            log.warning("no %s expiry %s in chain; have %s",
+                        right.lower(), expiration, sorted(_key_date(k) for k in exp_map))
             return []
     else:
         keys = [min(exp_map, key=lambda k: (_key_date(k), k))]
@@ -255,6 +329,7 @@ def parse_chain(data: dict, *, expiration: str | None = None) -> list[Contract]:
                     delta=float(delta),
                     expiration=_key_date(key),
                     dte=int(line.get("daysToExpiration", 0)),
+                    right=right,
                 ))
     return out
 
@@ -315,24 +390,32 @@ def derive(
     *,
     recent_minute_ranges_spx: Sequence[float] = (),
     fees_rt_usd: float = FEES_RT_USD,
+    lots: int = 1,
 ) -> Derivation:
     """Run the budget backwards into a stop distance.
 
-        friction   = spread + fees
+        friction   = (spread + fees) × lots
         attempt    = remaining / attempts_left − friction
-        premium    = attempt / 100
+        premium    = attempt / (100 × lots)
         distance   = premium / delta
 
     Raises :class:`CannotFund` when friction alone exhausts the slice. That is
     a refusal with arithmetic attached, not a crash — the design requires the
     numbers be printed so the refusal can be argued with.
     """
+    if lots < 1:
+        raise ValueError(f"lots must be at least 1, not {lots}")
+    if contract.abs_delta <= 0:
+        raise ValueError(f"{contract.strike:g} {contract.right} has no delta in the "
+                         f"snapshot — cannot turn premium into SPX points")
     if budget.attempts_left <= 0:
         raise CannotFund(
             f"no attempts left: {budget.attempts_used} of {budget.attempts} used"
         )
 
-    friction_usd = contract.spread_usd + fees_rt_usd
+    spread_usd = contract.spread_usd * lots
+    fees_usd = fees_rt_usd * lots
+    friction_usd = spread_usd + fees_usd
     slice_usd = budget.remaining_usd / budget.attempts_left
     attempt_risk_usd = slice_usd - friction_usd
 
@@ -340,18 +423,19 @@ def derive(
         raise CannotFund(
             f"{_usd(budget.remaining_usd)} remaining / {budget.attempts_left} "
             f"attempt(s) = {_usd(slice_usd)} per attempt, but friction is "
-            f"{_usd(friction_usd)} ({_usd(contract.spread_usd)} spread + "
-            f"{_usd(fees_rt_usd)} fees). Nothing left to risk."
+            f"{_usd(friction_usd)} ({_usd(spread_usd)} spread + "
+            f"{_usd(fees_usd)} fees{f' for {lots} lots' if lots > 1 else ''}). "
+            f"Nothing left to risk."
         )
 
-    stop_premium_pts = attempt_risk_usd / CONTRACT_MULTIPLIER
+    stop_premium_pts = attempt_risk_usd / (CONTRACT_MULTIPLIER * lots)
     stop_distance_spx = stop_premium_pts / contract.abs_delta
 
     return Derivation(
         budget_remaining_usd=budget.remaining_usd,
         attempts_left=budget.attempts_left,
-        spread_usd=contract.spread_usd,
-        fees_rt_usd=fees_rt_usd,
+        spread_usd=spread_usd,
+        fees_rt_usd=fees_usd,
         friction_usd=friction_usd,
         attempt_risk_usd=attempt_risk_usd,
         stop_premium_pts=stop_premium_pts,
@@ -360,6 +444,7 @@ def derive(
         noise_floor_spx=noise_floor_spx(
             contract.spread_pts, contract.abs_delta, recent_minute_ranges_spx
         ),
+        lots=lots,
     )
 
 
@@ -387,7 +472,7 @@ def _round_limit_up(pts: float, tick: float = PREMIUM_TICK_PTS) -> float:
     return round(math.ceil(round(pts / tick, 6)) * tick, 2)
 
 
-def order_string(contract: Contract, limit_pts: float) -> str:
+def order_string(contract: Contract, limit_pts: float, lots: int = 1) -> str:
     """The entry leg, in thinkorswim's documented paste-from-clipboard grammar.
 
     Shape confirmed against TOS documentation (researched 08-03, design §"What
@@ -404,8 +489,8 @@ def order_string(contract: Contract, limit_pts: float) -> str:
     the values that go into it.
     """
     return (
-        f"BUY +1 SPX 100 (Weeklys) {_tos_expiry(contract.expiration)} "
-        f"{contract.strike:g} PUT @{limit_pts:.2f} LMT"
+        f"BUY +{lots} SPX 100 (Weeklys) {_tos_expiry(contract.expiration)} "
+        f"{contract.strike:g} {contract.right} @{limit_pts:.2f} LMT"
     )
 
 
@@ -415,7 +500,19 @@ def order_string(contract: Contract, limit_pts: float) -> str:
 CONDITION_SYMBOL = "SPX"
 
 
-def exit_fields(stop_trigger_spx: float) -> dict:
+def stop_trigger(spx_now: float, stop_distance_spx: float, right: str = "PUT") -> float:
+    """Where the cut sits. A long put loses as SPX rallies, so the trigger is
+    above spot; a long call loses as SPX falls, so it is below. Same distance
+    either way — the budget engine is direction-blind; the sign is not."""
+    r = right.upper()
+    if r == "PUT":
+        return spx_now + stop_distance_spx
+    if r == "CALL":
+        return spx_now - stop_distance_spx
+    raise ValueError(f"right must be PUT or CALL, not {right!r}")
+
+
+def exit_fields(stop_trigger_spx: float, right: str = "PUT", lots: int = 1) -> dict:
     """The values Steve types into the TOS Order Rules condition.
 
     TOS conditions can trigger on a symbol other than the one being traded —
@@ -434,25 +531,33 @@ def exit_fields(stop_trigger_spx: float) -> dict:
     there is no ``last``. ``study`` is thinkScript and is the one a saved order
     degrades, keeping the study's name but not its script, so nothing here is
     ever script-shaped.
+
+    ``trigger_direction`` follows the right: a put is cut when SPX is at or
+    above the trigger, a call when it is at or below.
     """
+    r = right.upper()
+    if r not in ("PUT", "CALL"):
+        raise ValueError(f"right must be PUT or CALL, not {right!r}")
     return {
         "attach_to": "the SELL leg of a 1st Triggers order — never the entry",
         "trigger_symbol": CONDITION_SYMBOL,
         "method": "mark",
-        "trigger_direction": "at or above",
+        "trigger_direction": "at or above" if r == "PUT" else "at or below",
         "trigger_price": round(stop_trigger_spx, 2),
-        "action": "SELL -1, MARKET",
+        "action": f"SELL -{lots}, MARKET",
     }
 
 
-def template_fields(contract: Contract, limit_pts: float, stop_trigger_spx: float) -> dict:
+def template_fields(contract: Contract, limit_pts: float, stop_trigger_spx: float,
+                    lots: int = 1) -> dict:
     """Everything the operator retypes when reloading a saved ``FD0`` template."""
     return {
         "strike": contract.strike,
+        "right": contract.right,
         "limit_pts": round(limit_pts, 2),
         "condition_spx": round(stop_trigger_spx, 2),
         "expiry": _tos_expiry(contract.expiration),
-        "exit": "SELL -1, MARKET on trigger",
+        "exit": f"SELL -{lots}, MARKET on trigger",
     }
 
 
@@ -468,6 +573,8 @@ def compose(
     limit_mode: Literal["ask", "mid"] = "ask",
     fees_rt_usd: float = FEES_RT_USD,
     now: datetime | None = None,
+    contract: Contract | None = None,
+    lots: int = 1,
 ) -> Ticket:
     """Build one ticket. Raises :class:`NoStrikeInBand` or :class:`CannotFund`.
 
@@ -475,21 +582,31 @@ def compose(
     with the budget engine, which already charges the *full* spread as friction
     (half on the way in, half on the way out). Bidding mid would understate the
     risk the engine just priced, and a miss on a flush costs more than a nickel.
+
+    ``contract`` is the strike the caller already chose — the intent dialect's
+    ``price`` resolves one from what Steve said, and the desk must not overrule
+    him with the delta-band pick. Given, the chain is not consulted; omitted,
+    the put nearest the delta target inside the band is picked, which is FD0's
+    own flush-down shape.
     """
-    contracts = parse_chain(chain, expiration=expiration) if isinstance(chain, dict) else list(chain)
-    contract = pick_strike(contracts)
+    if contract is None:
+        contracts = (parse_chain(chain, expiration=expiration) if isinstance(chain, dict)
+                     else list(chain))
+        contract = pick_strike(contracts)
 
     derivation = derive(
         budget, contract,
         recent_minute_ranges_spx=recent_minute_ranges_spx,
         fees_rt_usd=fees_rt_usd,
+        lots=lots,
     )
 
     raw_limit = contract.ask_pts if limit_mode == "ask" else contract.mid_pts
     limit_pts = _round_limit_up(raw_limit)
 
-    # Long put: the loss case is SPX rallying away from the strike.
-    stop_trigger_spx = spx_now + derivation.stop_distance_spx
+    # Long put: the loss case is SPX rallying away from the strike. A long
+    # call is the mirror; stop_trigger carries the sign.
+    stop_trigger_spx = stop_trigger(spx_now, derivation.stop_distance_spx, contract.right)
 
     warnings: list[str] = []
     if derivation.inside_noise_floor:
@@ -509,10 +626,11 @@ def compose(
         spx_at_compose=spx_now,
         stop_trigger_spx=stop_trigger_spx,
         derivation=derivation,
-        order_string=order_string(contract, limit_pts),
-        template_fields=template_fields(contract, limit_pts, stop_trigger_spx),
+        order_string=order_string(contract, limit_pts, lots),
+        template_fields=template_fields(contract, limit_pts, stop_trigger_spx, lots),
         warnings=tuple(warnings),
         composed_at=now,
+        lots=lots,
     )
 
     for w in warnings:

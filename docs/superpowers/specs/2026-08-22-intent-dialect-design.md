@@ -24,7 +24,9 @@ dictation (typed, or Whisper-local on the COO side)
   → read-back: four tiers, for the eye or for the ear (speech phrasebook prices)
   → direction-anchor echo on every branch; only "yes" arms it
   → price: the latest vehicle resolved against a chain snapshot → Order
-  → go: TOS paste string + OCC legs, staged as data under data/intent/staged/. Never sent.
+      (a directional single also hands the contract to FD0 → budget-derived stop + exit fields)
+  → go: TOS paste string + OCC legs (+ the FD0 exit block for a single),
+        staged as data under data/intent/staged/. Never sent.
 ```
 
 ## Decisions (each reversible; each a one-line change where it lives)
@@ -78,11 +80,28 @@ dictation (typed, or Whisper-local on the COO side)
 
 Run: `python -m strader.intent [--once "..."] [--speak] [--chain FILE.json] [--day D] [--plan-dir DIR]`.
 
-## What is not built, and where it goes
+## The bracket — built 2026-08-23 (st-79z.3 × st-apzt)
 
-- **Bracket** (entry + conditional exit as TOS's `1st trgs` tree): FD0 already establishes
-  that the exit is built in the TOS UI, not pasted; the dialect's `go` can render FD0's
-  `exit_fields` once the harness and the dialect are joined (st-apzt, now un-tabled).
+A priced **directional single** (a long put or a long call — the futures-proxy play)
+now carries an FD0 bracket. At `price`, with the chain in hand, `strader/intent/bracket.py`
+hands the chosen contract to FD0's budget engine; FD0 derives the stop distance from its
+standing ceiling ($100, two attempts) at the live delta and sets the SPX-conditional
+trigger on the loss side — **above** spot for a put, **below** for a call. `price` reads
+back the stop and the exit fields; `go` writes them into the staged record's `fd0` block
+and prints the exit lines under the paste line. The bracket persists on the plan
+(`DayPlan.bracket`), so the one-line-per-process dictation pane can `price` in one process
+and `go` in the next.
+
+A **butterfly is defined-risk** — its loss is the debit the dialect already prints — so
+there is nothing for a stop to protect and `go` stages it unbracketed. Verticals and
+condors the dialect does not price yet, so they are not bracketable either.
+
+The stop the bracket derives is FD0's counter-chase stop, tight by construction ($100/2
+funds roughly one SPX point at 0.3δ). That is right for a chase into a flush; whether a
+futures-proxy single wants the same ceiling is Steve's to set — the budget is a one-line
+default in `bracket()` today.
+
+## What is not built, and where it goes
 - **Position and management verbs** (scale, runner, cut): entities exist in
   `market/entities/position.py` and `strader/entities/singleton.py`; the dialect reads
   them next, after a real specimen shows how Steve says them.

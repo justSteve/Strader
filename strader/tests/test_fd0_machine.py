@@ -191,12 +191,30 @@ def test_cannot_compose_while_a_position_is_open():
         _quiet(h)
 
 
-def test_cannot_confirm_an_exit_that_was_never_presumed():
-    h = _harness()
+def test_manual_cut_from_open_books_the_attempt_on_his_word(tmp_path):
+    """2026-08-23: ``out`` is legal straight from OPEN. At the dictation pane
+    nothing feeds the tape, so a presumption may never come; Steve saying he
+    is out is the ledger's truth either way, and it is journaled as manual."""
+    h = _harness(tmp_path)
     _quiet(h)
     h.confirm_fill(1.60)
+    a = h.confirm_exit(1.20)
+    assert h.state is State.WAITING
+    assert a.closed and a.estimated is False and a.exit_premium_pts == 1.20
+    assert a.realized_usd == pytest.approx(40.0)
+    assert len(h.attempts) == 1 and h.budget.attempts_left == 1
+    events = [json.loads(l) for l in (tmp_path / "fd0.jsonl").read_text().splitlines()]
+    exit_ev = [e for e in events if e["event"] == "confirm_exit"][0]
+    assert exit_ev["manual_cut"] is True
+
+
+def test_cannot_confirm_an_exit_with_nothing_open():
+    h = _harness()
     with pytest.raises(IllegalTransition):
-        h.confirm_exit(1.20)
+        h.confirm_exit(1.20)                       # IDLE
+    _quiet(h)
+    with pytest.raises(IllegalTransition):
+        h.confirm_exit(1.20)                       # COMPOSED, never filled
 
 
 def test_observe_is_inert_unless_a_position_is_open():

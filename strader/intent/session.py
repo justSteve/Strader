@@ -21,7 +21,10 @@ from zoneinfo import ZoneInfo
 from market.entities.chain import Chain
 from market.entities.spread import ButterflyTemplate
 from market.resolve import ResolutionError, resolve_butterfly
+from strader.execution.compose import CannotFund, Ticket
+from strader.execution.fd0 import Fd0
 from strader.intent import grammar
+from strader.intent.bracket import NotBracketable, bracket
 from strader.intent.entities import DayPlan, Intent, Order, StructureTemplate
 from strader.intent.readback import anchor_echo, order_line, read_back
 from strader.intent.tos import occ_symbols, render
@@ -245,12 +248,39 @@ class Session:
             self._log(f"price refused: {e}")
             return f"Could not price the {s.vehicle}: {e}"
         self.plan.orders = [order]
+        self.plan.bracket = self._bracket_for(order, chain)
         self._log(f"priced: {order_line(order, False)}")
         self._save()
         string, status = render(order)
-        return (f"{order_line(order, self.speak)}.\n"
-                f"Paste line ({status}): {string}\n"
-                f"Say go to stage it, or stand down.")
+        head = (f"{order_line(order, self.speak)}.\n"
+                f"Paste line ({status}): {string}")
+        tail = self._bracket_readback()
+        return f"{head}{tail}\nSay go to stage it, or stand down."
+
+    def _bracket_for(self, order: Order, chain: Chain) -> dict | None:
+        """FD0's budget-derived stop and SPX-conditional exit for a directional
+        single. None (and a logged reason) for anything defined-risk — a
+        butterfly's loss is the debit, so there is no stop to add."""
+        try:
+            ticket = bracket(order, chain, day=self.day)
+        except NotBracketable as e:
+            self._log(f"no bracket: {e}")
+            return None
+        except CannotFund as e:
+            self._log(f"bracket refused: {e}")
+            self._last_bracket_note = f"FD0 could not fund a stop: {e}"
+            return None
+        self._last_bracket_note = ""
+        return ticket.to_dict()
+
+    def _bracket_readback(self) -> str:
+        if getattr(self, "_last_bracket_note", ""):
+            return f"\n{self._last_bracket_note}"
+        if not self.plan.bracket:
+            return ""
+        t = Ticket.from_dict(self.plan.bracket)
+        lines = Fd0.render_stop(t) + [""] + Fd0.render_exit(t)
+        return "\nFD0 stop (budget-derived, $100 / 2 attempts):\n" + "\n".join(lines)
 
     def _resolve(self, s: StructureTemplate, chain: Chain) -> Order:
         right = s.right or "CALL"
@@ -311,19 +341,32 @@ class Session:
         order = self.plan.orders[-1]
         string, status = render(order)
         stamp = dt.datetime.now(CT).strftime("%Y%m%dT%H%M%S")
-        staged = self.plan_dir / "staged" / f"{stamp}-{order.spread_type.lower()}.json"
-        staged.parent.mkdir(parents=True, exist_ok=True)
-        staged.write_text(json.dumps({
+        staged_record = {
             "staged_at": dt.datetime.now(CT).isoformat(), "order": self.plan.to_dict()["orders"][-1],
             "tos": string, "tos_status": status, "occ": occ_symbols(order), "plan": self.path.name,
-        }, indent=2), encoding="utf-8")
-        self._log(f"go: staged {staged.name} — {string}")
+        }
+        bracket_text = ""
+        if self.plan.bracket:
+            t = Ticket.from_dict(self.plan.bracket)
+            staged_record["fd0"] = {
+                "stop_trigger_spx": t.stop_trigger_spx,
+                "exit_fields": t.exit_fields,
+                "max_loss_usd": round(t.max_loss_usd, 2),
+                "derivation": t.derivation.as_record(),
+            }
+            bracket_text = "\n" + "\n".join(Fd0.render_exit(t))
+        staged = self.plan_dir / "staged" / f"{stamp}-{order.spread_type.lower()}.json"
+        staged.parent.mkdir(parents=True, exist_ok=True)
+        staged.write_text(json.dumps(staged_record, indent=2), encoding="utf-8")
+        self._log(f"go: staged {staged.name} — {string}"
+                  + (" +FD0 bracket" if self.plan.bracket else ""))
         self._save()
         return (f"Staged, nothing sent. Paste this into thinkorswim ({status} shape):\n{string}\n"
-                f"Legs: {', '.join(occ_symbols(order))}")
+                f"Legs: {', '.join(occ_symbols(order))}{bracket_text}")
 
     def stand_down(self) -> str:
         self.plan.orders = []
+        self.plan.bracket = None
         self._clear_pending()
         self._log("stand down")
         self._save()

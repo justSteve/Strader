@@ -203,6 +203,10 @@ class DayPlan:
     # refuses while it waits, and a stale one is refused rather than armed.
     pending: Intent | None = None
     pending_at: str = ""
+    # the FD0 bracket for a priced directional single: a compose.Ticket.to_dict()
+    # (budget-derived stop + the SPX-conditional exit fields). Computed at price
+    # time, when the chain is in hand, so go can render it in a later process.
+    bracket: dict | None = None
 
     # ------------------------------------------------------------ persistence
     def to_dict(self) -> dict[str, Any]:
@@ -232,6 +236,7 @@ class DayPlan:
             log=list(d.get("log", [])),
             pending=_intent(d["pending"]) if d.get("pending") else None,
             pending_at=d.get("pending_at", ""),
+            bracket=d.get("bracket"),
         )
 
     @classmethod

@@ -1,6 +1,17 @@
 # FD0 — Bare-Bones Flush-Down Harness
 
-> **STATUS 2026-08-14 — OPEN, adjacent to tabled work.** Tracked by st-apzt, moved out of `in_progress` back to `open` in this review (11 days untouched). It is not itself named in the tabled counter-dictum charter, but it is stop-and-entry design, which is the class Steve TABLED on 2026-08-10. Confirm with him before resuming.
+> **STATUS 2026-08-23 — UN-TABLED and joined to the intent dialect.** Steve's
+> "Go" on 2026-08-22 (st-xhxs) lifted FD0 as the execution engine's trigger
+> desk. The compose/derive/machine/feed layer is built and tested (14 FD0
+> tests); on 2026-08-23 the budget engine was generalized to take a
+> caller-chosen contract, a `right`, and `lots`, and joined to the intent
+> dialect: `strader/intent/bracket.py` hands a priced directional single to
+> FD0, which returns the budget-derived stop and the SPX-conditional exit
+> fields (st-79z.3 × st-apzt). What remains genuinely Steve's is unchanged —
+> the one account-behaviour check in "The one thing still genuinely his" below,
+> plus the standing NO-GO inputs the checklist prints. History of the 08-14
+> pause: it was the stop-and-entry class TABLED on 08-10; the 08-14 review's
+> "confirm before resuming" is satisfied by Steve's own Go.
 
 
 **Bead:** Cut And Await (st-apzt) · child of Coded Counter Wisdom (st-ug5)
