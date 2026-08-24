@@ -65,6 +65,7 @@ from market.orderflow.anchors import (  # noqa: E402
     LiveAnchors, kinds_to_records, levels_from_arg, mancini_kinds_for, mancini_levels_for)
 from market.orderflow.tradesource import iter_trades  # noqa: E402
 from strader.market_calendar import prior_trading_day  # noqa: E402
+from market.orderflow.fuel import FuelTracker, load_level_history  # noqa: E402
 from market.orderflow.gex_context import GexContext                # noqa: E402
 from market.orderflow.bars import build_bars                    # noqa: E402
 from market.orderflow.fill import bar_fill_steps                # noqa: E402
@@ -427,6 +428,9 @@ def main() -> int:
                     help="do not stamp bars with GexBot dealer positioning "
                          "[st-8ywx]; the stamp is already a no-op when the "
                          "feed is absent, so this is for isolating it")
+    ap.add_argument("--no-fuel", action="store_true",
+                    help="do not append the trapped-seller fuel context line "
+                         "when price engages a level [st-aq1n]")
     ap.add_argument("--no-run-log", action="store_true",
                     help="do not record this run's bars and emissions to "
                          "data/derived/live-parity/<day>.jsonl [st-x2mp]. The "
@@ -486,6 +490,17 @@ def main() -> int:
     # Live SPX→ES basis from the 1 Hz vendor spot [st-n0qm.8]; same flag —
     # both are GexBot, and without GexBot there is nothing SPX to convert.
     basis = None if args.no_gex else BasisEstimator(gexbot_orderflow_1s_path(day))
+    # Trapped-seller fuel [st-aq1n]: display context computed per closed bar
+    # when price engages a Mancini level. Never in the run log (parity), never
+    # able to raise into the feed (fuel.py owns that contract).
+    fuel = None
+    if not args.no_fuel and mancini:
+        fuel_hist = load_level_history(day)
+        fuel = FuelTracker(mancini, history=fuel_hist,
+                           history_loader=lambda: load_level_history(day))
+        logger.info("fuel: watching %d levels, history rows for %d%s",
+                    len(mancini), len(fuel_hist),
+                    "" if fuel_hist else " (retrying after the 08:20 tracker runs)")
 
     meta = {"day": day.isoformat(), "bar_n": args.bar_n, "tick": TICK,
             "source": "live", "started": datetime.now().isoformat(timespec="seconds"),
@@ -689,7 +704,7 @@ def main() -> int:
     # burst's last bars always lagged one bar. [st-fgno]
     drive_and_publish(live_drive(_closed_bars(), driver, live_anchors),
                       driver, pending_trades, runlog, _publish, meta=meta, gex=gex,
-                      basis=basis, push_every_n=1)
+                      basis=basis, fuel=fuel, push_every_n=1)
     return 0
 
 
@@ -739,7 +754,7 @@ def _install_stop_handler() -> None:
 
 
 def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
-                      *, meta: dict | None = None, gex=None, basis=None,
+                      *, meta: dict | None = None, gex=None, basis=None, fuel=None,
                       push_every_s: float = 1.0, push_every_n: int = 25) -> dict:
     """Consume (bar_i, bar, bar_trades, events) from `drive_iter`, publish bars
     in coalesced batches, and — WHATEVER ends the stream — flush the engine and
@@ -778,7 +793,14 @@ def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
             if gex is not None:
                 gex.refresh()
                 gex_ctx = gex.for_bar(bar, basis=bs["pts"] if bs else None)
-            batch.append(bar_payload(bar, bar_trades, events, gex=gex_ctx, bs=bs))
+            # Fuel context [st-aq1n]: after the run log, payload-only — the
+            # emissions row renders it; the recognition record never holds it.
+            ev_out = events
+            if fuel is not None:
+                fuel_ev = fuel.on_bar(bar)
+                if fuel_ev is not None:
+                    ev_out = [*events, fuel_ev | {"bar_i": bar_i}]
+            batch.append(bar_payload(bar, bar_trades, ev_out, gex=gex_ctx, bs=bs))
             now = time.monotonic()
             # Push promptly — a bar the page has not seen is a bar Steve is not
             # watching — but coalesce the catch-up burst so a full day does not
