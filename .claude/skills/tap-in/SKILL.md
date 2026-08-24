@@ -111,6 +111,26 @@ receipt-protocol §3). Do not eyeball `docs/a2a/inbox.md` and judge staleness
 yourself, and do not reimplement the counting anywhere — one home per fact
 applies to code too.
 
+### 4c-bridge. Poll the zgent-bridge file-drop
+
+The a2a ledger above is the in-repo channel COO and Strader both read every
+session. The **zgent-bridge** (`/mnt/c/Users/steve/zgent-bridge/{co,st,cd}/inbox/`)
+is a separate Windows-side file-drop that no WSL estate used to poll at start —
+so a message dropped there sat until Steve relayed "check the bridge". Added
+here 2026-08-24 (COO co-ur0fv) so it surfaces on its own:
+
+```bash
+bash /root/projects/COO/factory/scripts/bridge-check.sh
+```
+
+The **`st/ Strader … N unread`** line is Strader's own inbound. If `N > 0`,
+surface each named file in the briefing under Peer Activity and read it — it is
+a message (usually from COO) waiting on Strader. Routing note: COO↔Strader
+traffic belongs in the a2a ledger above; a COO→Strader message that arrives
+here instead is a routing mistake, so answer its substance and tell COO to land
+future ones as a ledger row. The `co/` and `cd/` lines are not Strader's to act
+on. Read-only; non-fatal if the script or the mount is absent.
+
 ### 4d. Probe the Entitlements Registry
 
 ```bash
