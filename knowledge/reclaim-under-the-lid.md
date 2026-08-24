@@ -160,5 +160,8 @@ Running RTH VWAP at 09:17 was 7736.4 — so 39 was not VWAP; it was the level.
 
 [[carmine-rosato-investitrade-lvn-method]] · [[zone-framework-equivalence]] ·
 [[pac-order-blocks-for-strike-centering]] · [[buying-movement-delta-first]] ·
-[[singles-as-futures-proxy]]. A recognizer for conditions 1–4 and 6 on the
-live footprint page is a natural follow-on; not built.
+[[singles-as-futures-proxy]] · [[trapped-seller-fuel]] — the "trapped sellers
+are the fuel" read from this morning, codified 2026-08-24 as a measured entry
+feature (st-45dw) with the epistemic caveat from the same session's certitude
+challenge. A recognizer for conditions 1–4 and 6 on the live footprint page
+is a natural follow-on; not built — the fuel scorer bead is the first step.

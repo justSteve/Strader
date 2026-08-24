@@ -65,6 +65,7 @@ in it covered external domain knowledge or facts about the operator.
 - [Reclaim Under the Lid](reclaim-under-the-lid.md) — Named setup from Carmine's 2026-08-19 7739 trades: Mancini's FBD shape on a level with history, plus a stepping-down seller lid and absorbed dips under the reclaim point, thin volume above to the first target; six conditions, five mechanical
 - [Selective Range Scalping](selective-range-scalping.md) — Strategy 3, **exploratory** — A+ PAC level bounces only, 2–3 per session max, 3–5 SPX point targets sized to beat option spread friction
 - [Singles as Futures Proxy](singles-as-futures-proxy.md) — Steve trades 0DTE long singles as a proxy for futures strategies — "an option single is a futures contract on its last day"
+- [Trapped-Seller Fuel](trapped-seller-fuel.md) — The 08-19 Carmine insight as a measurable entry feature: underwater aggression at the level, lid rejections, absorbed dips, thin above — measured quantities only, never the cohorts-and-stops narrative
 - [V-Day Target Is v_down Only](v-day-target-is-v-down-only.md) — For st-r2o V-day detection, Steve's actual butterfly-strategy target is v_down only; v_up (inverted-V) is diagnostic, not a trade setup
 
 ### reference
