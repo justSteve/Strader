@@ -114,7 +114,8 @@ applies to code too.
 ### 4c-bridge. Poll the zgent-bridge file-drop
 
 The a2a ledger above is the in-repo channel COO and Strader both read every
-session. The **zgent-bridge** (`/mnt/c/Users/steve/zgent-bridge/{co,st,cd}/inbox/`)
+session. The **zgent-bridge** (`/mnt/c/Users/steve/zgent-bridge/<Participant>/inbox/`,
+one folder per participant: `COO/ Strader/ Desk/ Steve/ Claude-Monitor/`)
 is a separate Windows-side file-drop that no WSL estate used to poll at start —
 so a message dropped there sat until Steve relayed "check the bridge". Added
 here 2026-08-24 (COO co-ur0fv) so it surfaces on its own:
@@ -123,13 +124,18 @@ here 2026-08-24 (COO co-ur0fv) so it surfaces on its own:
 bash /root/projects/COO/factory/scripts/bridge-check.sh
 ```
 
-The **`st/ Strader … N unread`** line is Strader's own inbound. If `N > 0`,
+The **`Strader/ … N unread`** line is Strader's own inbound. If `N > 0`,
 surface each named file in the briefing under Peer Activity and read it — it is
 a message (usually from COO) waiting on Strader. Routing note: COO↔Strader
 traffic belongs in the a2a ledger above; a COO→Strader message that arrives
 here instead is a routing mistake, so answer its substance and tell COO to land
-future ones as a ledger row. The `co/` and `cd/` lines are not Strader's to act
-on. Read-only; non-fatal if the script or the mount is absent.
+future ones as a ledger row. Every other participant's line is not Strader's to
+act on. Read-only; non-fatal if the script or the mount is absent.
+
+The folders were two-letter codes (`co/ st/ cd/`) until 2026-08-24; COO renamed
+them to full zgent names (COO co-2fa6a) so that adding a participant is a mkdir.
+A message left in a legacy folder is swept to the new path automatically, so an
+old name in someone's notes costs nothing but is worth correcting when seen.
 
 ### 4d. Probe the Entitlements Registry
 
