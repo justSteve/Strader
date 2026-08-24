@@ -255,3 +255,14 @@ def test_history_loader_retries_until_rows_arrive():
     assert ev and "touched 7x / defended 3x" in ev["reason"]
     tr.on_bar(bar(40, 7737, 7738, 7736, 7737))         # loaded: no more calls
     assert len(calls) == 2
+
+
+def test_flapping_between_adjacent_levels_is_rate_limited():
+    """Two levels 2 pts apart, close oscillating between their engage bands:
+    emissions bounded by the global refresh floor, not one per flip."""
+    k = FuelKnobs(refresh_bars=5)
+    tr = FuelTracker([7674.0, 7676.0], knobs=k)
+    events = [tr.on_bar(b) for b in close_seq([7674.5, 7675.5] * 10)]
+    emitted = [e for e in events if e]
+    assert len(emitted) <= 4            # 20 bars / floor 5
+    assert emitted[0] is events[0]      # first engagement still prompt

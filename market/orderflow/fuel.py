@@ -263,7 +263,12 @@ class FuelTracker:
         self._window: list = []          # bars inside knobs.window_s of newest
         self._vol_by_price: dict[float, int] = {}
         self._engaged: float | None = None
-        self._since_emit = 0
+        # Global bars-since-last-emission, seeded so the first engagement
+        # emits at once. One floor for BOTH cadence and engagement changes:
+        # adjacent Mancini levels sit 2-6 pts apart, so a close oscillating
+        # between two engage bands would otherwise emit on every flip and
+        # bury the emissions row (measured 15 events in 26 overnight bars).
+        self._gap = knobs.refresh_bars
         self._warned = False
 
     # -- internals -------------------------------------------------------
@@ -361,17 +366,14 @@ class FuelTracker:
         """
         try:
             self._push(bar)
+            self._gap += 1
             level = self._nearest(bar.close)
             if level is None:
                 self._engaged = None
                 return None
-            if level != self._engaged:
-                self._engaged = level
-                self._since_emit = 0
-                return self._compute(level, bar)
-            self._since_emit += 1
-            if self._since_emit >= self.k.refresh_bars:
-                self._since_emit = 0
+            self._engaged = level
+            if self._gap >= self.k.refresh_bars:
+                self._gap = 0
                 return self._compute(level, bar)
             return None
         except Exception:  # noqa: BLE001 — display context must never kill the feed
