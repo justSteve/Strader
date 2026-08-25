@@ -87,6 +87,31 @@ KIND_PLAN_LEVEL = "PLAN-LEVEL"
 
 EVENT_MARK = "EVENT"          # the greppable token; a monitor filters on this
 
+# RTH open in CENTRAL time, deliberately — atom timestamps are CT tape time, so
+# comparing against a CT constant is DST-safe. A UTC constant here would be the
+# same landmine already flagged against the context strip's hardcoded 13:30 UTC,
+# which fires on the November changeover.
+RTH_OPEN_CT = (8, 30)
+
+
+def rth_minutes(ts: datetime) -> int:
+    """Minutes since the RTH open, negative before it.
+
+    Carried on SUPERLATIVE events because Steve's 2026-08-25 amendment makes the
+    discount explicit: "within-day superlatives early in RTH are additionally
+    discounted — sixty minutes in, some bar is always the record." That is
+    mechanically knowable, and st-eaa8's mechanical-first condition says anything
+    mechanically knowable belongs here rather than in the analyst's memory.
+
+    The calibration case is exactly 60: 2026-08-25 09:30 set BOTH the day's max
+    volume (14,778) and max sell delta (-1240) on one 17-point bar, met every
+    mechanical failed-breakdown criterion on the reclaim, and returned about 3.75
+    points inside a roughly 12-point rotation. The detection was right; treating
+    it as an entry was not.
+    """
+    open_min = RTH_OPEN_CT[0] * 60 + RTH_OPEN_CT[1]
+    return (ts.hour * 60 + ts.minute) - open_min
+
 
 @dataclass(frozen=True)
 class EventKnobs:
@@ -322,6 +347,7 @@ class TapeEventDetector:
                     ("delta", f"{atom.delta:+d}"),
                     ("net", f"{atom.net:+.2f}"),
                     ("close", _fmt_px(atom.close)),
+                    ("rth_min", str(rth_minutes(atom.ts))),
                 )))
 
         # Buy and sell maxima are separate series on purpose — see the module
@@ -336,6 +362,7 @@ class TapeEventDetector:
                     ("vol", str(atom.volume)),
                     ("net", f"{atom.net:+.2f}"),
                     ("close", _fmt_px(atom.close)),
+                    ("rth_min", str(rth_minutes(atom.ts))),
                 )))
         if atom.delta < 0 and (self._max_sell is None or atom.delta < self._max_sell[0]):
             prev = self._max_sell
@@ -347,6 +374,7 @@ class TapeEventDetector:
                     ("vol", str(atom.volume)),
                     ("net", f"{atom.net:+.2f}"),
                     ("close", _fmt_px(atom.close)),
+                    ("rth_min", str(rth_minutes(atom.ts))),
                 )))
         return out
 

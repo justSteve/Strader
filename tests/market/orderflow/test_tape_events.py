@@ -409,3 +409,36 @@ def test_detection_is_causal():
 
     assert full_events[:len(prefix_events)] == prefix_events, (
         "a later bar changed what earlier bars emitted")
+
+
+# ── the regime gate's mechanical half [Desk amendment, 2026-08-25 ~09:55] ───
+
+def test_superlatives_carry_minutes_since_the_rth_open():
+    """Steve's amendment: "within-day superlatives early in RTH are additionally
+    discounted — sixty minutes in, some bar is always the record." That is
+    mechanically knowable, and st-eaa8's mechanical-first condition puts
+    anything mechanically knowable in the instrument rather than in the
+    analyst's memory.
+
+    The calibration case is exactly 60 minutes: 2026-08-25 09:30 set BOTH day
+    records on one 17-point bar, met every mechanical failed-breakdown criterion
+    on the reclaim, and gave back nearly all of it inside a rotation."""
+    det = TapeEventDetector()
+    warmup(det)
+    events = feed(det, [(atom("09:30", volume=14778, delta=-1240,
+                              o=7680, h=7680.25, l=7663.25, c=7676.75), dev(100, 98))])
+    sup = [e for e in events if e.kind == "SUPERLATIVE"]
+    assert sup, "the day's record volume and sell delta must both be detected"
+    for e in sup:
+        assert ("rth_min", "60") in e.fields, e.fields
+
+
+def test_an_overnight_record_reads_as_before_the_open():
+    """A record set overnight is not an early-RTH record, and the sign says so
+    rather than the reader having to work it out."""
+    det = TapeEventDetector()
+    warmup(det)
+    events = feed(det, [(atom("02:00", volume=20000, delta=+900), dev(99, 99))])
+    sup = [e for e in events if e.kind == "SUPERLATIVE"]
+    assert sup
+    assert ("rth_min", "-390") in sup[0].fields, sup[0].fields

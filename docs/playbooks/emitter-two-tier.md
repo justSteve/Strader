@@ -141,6 +141,44 @@ Any precondition that can be detected mechanically belongs in Tier 0, not in
 your judgement. Name setups *on top of* detected structure so the judgement
 surface stays as small as it can be.
 
+### The regime gate — amendment, 2026-08-25 ~09:55 (Steve-sourced, via Desk)
+
+The ruling above says name setups. This says: **name the regime first, and let it
+govern how the setup is delivered.**
+
+**5. Criteria-cited naming must carry a regime qualifier — trending, or
+established rotation.** A completed setup at a range edge *inside a rotation* is
+named as what it is, with fade/skip context per the playbook. It is not pushed
+as an entry.
+
+> The calibration case is today, 09:30-09:32. The flush of 7680 to 7663.25 and
+> the reclaim came on the day's max volume (14,778) **and** the day's max sell
+> delta (-1240), on one 17-point bar. It met every mechanical failed-breakdown
+> criterion. It then produced about 3.75 points of favourable excursion inside a
+> roughly 12-point rotation, and gave it all back.
+>
+> Steve's read — "just chop" — was correct. Desk's "completed on record bars"
+> framing was **the emitter failure class inverted: accurate numbers, inflated
+> narrative.** Every figure in it was right. The story built on them was not.
+
+That inversion is the one this whole runbook is least protected against, because
+the instrument cannot catch it. The numbers will be correct. The discipline has
+to come from the analyst.
+
+**Within-day superlatives early in RTH are additionally discounted.** Sixty
+minutes in, some bar is always the record. The instrument now says how far into
+the session a record landed rather than leaving you to remember: every
+`SUPERLATIVE` event carries `rth_min=`, minutes since the 08:30 CT open, negative
+overnight. `rth_min=60` on a day-max is a much weaker claim than the same record
+at `rth_min=300`, and the line tells you which one you have.
+
+**What is deliberately NOT mechanical here.** There is no regime classifier. The
+detector does not decide trending-versus-rotation, and it should not — that is a
+method judgement belonging to `knowledge/`, not to an event threshold. If a
+mechanical regime read is wanted later, it needs Strader's definition first, not
+COO's guess. Until then the qualifier is the analyst's to state, and stating it
+is mandatory.
+
 ### What is still out of scope
 
 Sizing, order placement, and anything that transmits. The fire key is Steve's
