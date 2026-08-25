@@ -22,6 +22,19 @@ Cell names are the ratified ones (moves.CELL_NAMES), not invented ones:
     F3 hollow      — effect, no effort (price drifting on air)
     F4 dead        — neither
 
+A THIRD KIND OF LINE, added 2026-08-25 [st-dgwj]: EVENT. The 08-24 audit found
+that accuracy in the narration came from this scorer, not from the model — what
+the model missed, it missed by not noticing, and what it got wrong, it got wrong
+by recalling instead of reading. So the noticing moves here, where it is
+mechanical: market/orderflow/tape_events.py detects superlatives, absorption
+clusters, climaxes and plan-level touches/acceptances/rejections against stated
+thresholds, and each one prints its own greppable line. A monitor then wakes on
+EVENT rather than on a five-minute clock.
+
+EVENT emission is strictly ADDITIVE. The graded and partial lines below are
+untouched, byte for byte, so a day spanning the cutover stays comparable across
+it and the pre/post minutes can be diffed. Disable with --no-events.
+
 TWO KINDS OF LINE, never conflated:
   - A GRADED line prints once per completed clock-minute (the ratified atom
     boundary) — cell, dev-percentiles, cell_grade, and the atom's own raw
@@ -62,6 +75,8 @@ import argparse
 import logging
 import sys
 from datetime import date as _date
+from datetime import datetime as _dt
+from datetime import timezone as _tz
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # repo root for market.*
@@ -71,6 +86,8 @@ from market.orderflow.anchors import mancini_kinds_for, mancini_levels_for  # no
 from market.orderflow.moves import (CELL_NAMES, grade_atoms_developing,  # noqa: E402
                                     one_minute_atoms)
 from market.orderflow.replay import es_day_path  # noqa: E402
+from market.orderflow.tape_events import (TapeEventDetector,  # noqa: E402
+                                          knobs_to_dict, load_knobs)
 from market.signals.orderflow_config import CONFLUENCE_TOLERANCE_PTS  # noqa: E402
 
 # Sibling script, same directory — Python puts the invoked script's own dir
@@ -95,11 +112,14 @@ class LiveScorer:
     minute. No wall-clock reads anywhere — every decision keys off Trade.ts."""
 
     def __init__(self, *, near_band: float, partial_interval: float,
-                levels: list[float], kinds: dict[float, tuple[str, ...]]):
+                levels: list[float], kinds: dict[float, tuple[str, ...]],
+                events: TapeEventDetector | None = None):
         self.near_band = near_band
         self.partial_interval = partial_interval
         self.levels = levels
         self.kinds = kinds
+        # Optional and defaulted so the existing constructor contract holds.
+        self.events = events
 
         self._minute_key = None
         self._minute_buf: list = []
@@ -116,7 +136,11 @@ class LiveScorer:
         self._max_vol = None      # (volume, ts)
         self._max_delta = None    # (delta, ts) — kept SIGNED, ranked on |d|
 
-    def _close_minute(self) -> str | None:
+    def _close_minute(self) -> list[str]:
+        """The graded line, followed by any EVENT lines the closed atom
+        triggered. Events come AFTER the bar that produced them so the log
+        reads in the order a person would reconstruct it: here is the minute,
+        and here is what was notable about it."""
         atom = one_minute_atoms(self._minute_buf)[0]
         self._atoms.append(atom)
         self._minute_buf = []
@@ -128,13 +152,17 @@ class LiveScorer:
         dev = grade_atoms_developing(self._atoms)[-1]
         cell = dev["cell_dev"]
         flags = self._update_extrema(atom)
-        return (f"{atom.ts:%H:%M} CT  {cell} (developing, n={dev['n_atoms']}) "
-                f"{CELL_NAMES[cell]:<11} "
-                f"ES o{atom.open:g} h{atom.high:g} l{atom.low:g} c{atom.close:g}  "
-                f"vol {atom.volume} d{atom.delta:+d}  net {atom.net:+.2f} rng {atom.range_pts:.2f}"
-                f"   dev: effort_pct {dev['effort_pct_dev']:.0f} effect_pct "
-                f"{dev['effect_pct_dev']:.0f} grade {dev['cell_grade_dev']:.2f}"
-                f"   {self._extrema_text()}{flags}")
+        graded = (f"{atom.ts:%H:%M} CT  {cell} (developing, n={dev['n_atoms']}) "
+                  f"{CELL_NAMES[cell]:<11} "
+                  f"ES o{atom.open:g} h{atom.high:g} l{atom.low:g} c{atom.close:g}  "
+                  f"vol {atom.volume} d{atom.delta:+d}  net {atom.net:+.2f} rng {atom.range_pts:.2f}"
+                  f"   dev: effort_pct {dev['effort_pct_dev']:.0f} effect_pct "
+                  f"{dev['effect_pct_dev']:.0f} grade {dev['cell_grade_dev']:.2f}"
+                  f"   {self._extrema_text()}{flags}")
+        lines = [graded]
+        if self.events is not None:
+            lines.extend(e.line() for e in self.events.on_atom(atom, dev))
+        return lines
 
     def _update_extrema(self, atom) -> str:
         """Fold atom into the running session extrema; return a NEW-MAX flag
@@ -178,9 +206,7 @@ class LiveScorer:
         lines = []
         m = t.ts.replace(second=0, microsecond=0)
         if self._minute_key is not None and m != self._minute_key:
-            line = self._close_minute()
-            if line:
-                lines.append(line)
+            lines.extend(self._close_minute())
         if self._minute_key is None or m != self._minute_key:
             self._minute_key = m
         self._minute_buf.append(t)
@@ -206,6 +232,11 @@ def main() -> int:
                     help="seconds of event-time buffer absorbing reconnect "
                          "disorder, same knob as the footprint feeder "
                          "(default 2.0)")
+    ap.add_argument("--no-events", dest="events", action="store_false",
+                    default=True,
+                    help="suppress EVENT lines (superlative / absorption "
+                         "cluster / climax / plan-level). They are additive and "
+                         "on by default; this is the escape hatch, not the norm")
     ap.add_argument("--catch-up-only", action="store_true",
                     help="process what is already on disk and exit, instead "
                          "of following live — for sanity-checking the grading "
@@ -237,9 +268,29 @@ def main() -> int:
          f"near<= {args.near_band}pt @ {args.partial_interval}s partial  "
          f"{len(levels)} levels loaded")
 
+    detector = None
+    if args.events:
+        knobs = load_knobs()
+        detector = TapeEventDetector(levels=levels, kinds=kinds, knobs=knobs)
+        # THE CUTOVER MARKER. A day that spans the change has to read as
+        # "clock regime, then event regime" rather than as one undifferentiated
+        # log — both so a person can see where the behaviour changed and so the
+        # setup-ledger rubric (st-uqme) gets a same-day, same-tape before/after
+        # pair to score. The wall-clock read here is an annotation on the log,
+        # not an input to any decision: the no-wall-clock rule this file keeps
+        # is about what the SCORING keys off, and that is still Trade.ts alone.
+        stamp = _dt.now(_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        print(f"# ==== REGIME CHANGE {stamp} — EVENT-EMISSION ENABLED "
+              f"[st-dgwj] ====")
+        print("# knobs: " + "  ".join(f"{k}={v}" for k, v in
+                                      sorted(knobs_to_dict(knobs).items())))
+        print(f"# classes: SUPERLATIVE ABSORPTION-CLUSTER CLIMAX PLAN-LEVEL  "
+              f"({len(levels)} anchors)")
+
     scorer = LiveScorer(
         near_band=args.near_band,
         partial_interval=args.partial_interval, levels=levels, kinds=kinds,
+        events=detector,
     )
 
     rows = tail_rows(path, follow=not args.catch_up_only, pinned_day=day)

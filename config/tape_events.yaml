@@ -1,0 +1,70 @@
+# Tape-event thresholds — the accuracy tier of the two-tier emitter.
+# [st-dgwj, st-85dv]
+#
+# STEVE OWNS THESE NUMBERS. Every value below is the measured default from
+# market/orderflow/tape_events.py; this file exists so they can be changed
+# without touching code. Delete a line to fall back to the default; a key that
+# is not a real knob is a loud error rather than a silent no-op, because a
+# typo'd threshold that quietly does nothing is the worst outcome for a knob.
+#
+# WHAT AN EVENT COSTS. Events marked sig=alert wake the analyst tier; events
+# marked sig=note are logged and read as context but wake nobody. Measured over
+# two real sessions with these values:
+#
+#     2026-08-24   194 events logged,  35 alert,  17 of them inside RTH
+#     2026-08-25    59 events logged,  25 alert,  10 of them inside RTH
+#
+# against 276 wakes a day for the five-minute clock this replaced. Loosening a
+# threshold costs model wakes; tightening one costs coverage.
+
+# ── ABSORPTION-CLUSTER — effort with nothing to show for it ─────────────────
+# Consecutive bars inside the band. min_bars=2 is load-bearing: a lone
+# absorption bar is a bar, not a cluster (2026-08-25 08:47 is one, at effort 97
+# / effect 7, and must not fire).
+#
+# NOTE THE 80. The calibration cluster (2026-08-24 10:41-42) PRINTS as effort
+# 85 and 90 in the log, because the graded line formats percentiles with ".0f".
+# Its true values are 84.7 and 90.4, so a threshold of 85 read off the printed
+# line missed the exact case the class was built for. Set these against the
+# underlying floats, not against what the log displays.
+absorption_effort_pct: 80.0
+absorption_effect_pct: 10.0
+absorption_min_bars: 2
+
+# ── CLIMAX — a delta extreme that is not necessarily a record ───────────────
+# Percentile of |delta| against the session so far, by mid-rank. Measured on
+# 2026-08-24: 10:20's d-725 sits at 99.8 and 08:42's d-1100 at 99.9, while
+# 10:42's d-493 — large, but absorption rather than climax — sits at 99.0.
+# 99.5 separates them. The absolute floor guards the small-n start of a session.
+climax_delta_pctl: 99.5
+climax_min_abs_delta: 300
+climax_min_atoms: 60
+
+# ── SUPERLATIVE — new session max volume, max BUY delta, max SELL delta ─────
+# Buy and sell are separate series on purpose: the scorer's existing `smax`
+# ranks delta on |d|, so whichever side is larger hides the other completely.
+# That is how "biggest buy-delta of the day" got answered wrong off a line that
+# only ever showed a sell maximum.
+superlative_min_atoms: 30
+superlative_min_vol: 500
+superlative_min_abs_delta: 150
+
+# ── PLAN-LEVEL — touch, acceptance, rejection at a Mancini anchor ───────────
+# The anchor set is the whole ladder, not today's plan levels: 69 prices every
+# 5-10 points across a 600-point span on 2026-08-24. Without hysteresis a naive
+# detector fired 415 times in one session, level 7674 alone announcing
+# acceptance 58 times as price chopped across it. These knobs make an event mean
+# "price did something decisive here" rather than "price wobbled near a number".
+#
+# level_scan_nearest = 1 means only the nearest anchor above and below price —
+# the bracket it is trading inside — are in play. Which levels MATTER is a
+# trading judgement and not the detector's to make, so the scope is mechanical.
+# Raise it to widen the ladder.
+level_acceptance_closes: 2
+level_acceptance_min_pts: 1.0
+level_penetration_min_pts: 0.5
+level_rejection_min_pts: 0.75
+level_reset_pts: 2.0
+level_event_cooldown_min: 20
+level_max_distance_pts: 25.0
+level_scan_nearest: 1

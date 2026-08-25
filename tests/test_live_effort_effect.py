@@ -78,3 +78,47 @@ def test_no_flag_when_nothing_is_a_record():
     s = _scorer()
     s._update_extrema(_atom("07:06", 3839, -1501))
     assert s._update_extrema(_atom("15:07", 693, +67)) == ""
+
+
+# ── EVENT emission is additive [st-dgwj, 2026-08-25] ────────────────────────
+# The mid-session cutover's stated acceptance condition is that the minutes
+# either side of it stay comparable, which is only true if turning events on
+# changes nothing about the lines that already existed. Verified empirically
+# over a whole real session (2026-08-24: 6,582 pre-existing lines, byte
+# identical with events on and off); this pins it at unit level so a future
+# edit to the graded line cannot quietly break the property.
+
+def _trade(hhmm: str, second: int, price: float, size: int, side: str):
+    h, m = hhmm.split(":")
+    return SimpleNamespace(ts=datetime(2026, 8, 25, int(h), int(m), second),
+                           price=price, size=size, side=side)
+
+
+def _run(scorer: LiveScorer, trades) -> list[str]:
+    out = []
+    for t in trades:
+        out.extend(scorer.on_trade(t))
+    return out
+
+
+def test_event_emission_does_not_alter_the_graded_lines():
+    from market.orderflow.tape_events import TapeEventDetector
+
+    trades = []
+    for i in range(6):
+        for s in range(0, 60, 10):
+            trades.append(_trade(f"09:{i:02d}", s, 7690 + i + s / 100,
+                                 40 + s, "B" if s % 20 == 0 else "A"))
+
+    # Identical in every respect EXCEPT the detector — otherwise a difference
+    # in `levels` shows up as partial lines and gets mistaken for the thing
+    # under test. The first cut of this test made exactly that mistake.
+    common = dict(near_band=2.0, partial_interval=10.0,
+                  levels=[7692.0], kinds={7692.0: ("support",)})
+    plain = _run(LiveScorer(**common), trades)
+    withev = _run(LiveScorer(**common, events=TapeEventDetector(levels=[7692.0])),
+                  trades)
+
+    assert plain, "the fixture should produce graded lines"
+    assert [ln for ln in withev if " EVENT " not in ln] == plain, (
+        "turning EVENT emission on changed a line that already existed")
