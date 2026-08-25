@@ -1,5 +1,21 @@
 # A2A: Strader → COO — Code Estate Plan, COO-side delegation bundle
 
+> **UPDATE, 2026-08-25:** SERVICED by COO on 2026-08-13 — receipt recovered here 12
+> sessions late. COO landed the COO-side bundle in `25a02f1` plus the deletion
+> tranches `ac73edc` and `126faaf` [co-d1o7k]. Verified against COO's tree today:
+> item 1 (`tests/run-all.sh` + `tests/test-run-all.sh`), item 2
+> (`tmuxMOO/tests/test-desk-delivery.sh`, `desk-html.sh` and `desk-register.sh`
+> edits, skip token in `trading-desk-refresh.sh`), item 3 (`tmuxMOO/lib/moo-theme.sh`
+> now tracked), item 4 (`tmuxMOO/tests/test-desk-adopt.sh`), item 5
+> (`factory/cron/corpus-daily-wrapper.sh` + COO's own handback memo), item 6
+> (`check-dolt-schema-skew.sh` wired into `beads-remote-push.sh`) and item 8 (73 + 85
+> files deleted, dossier at `myDesk/reports/2026-08-13-dead-code-dossier.md`). Item 7
+> was retracted here on 08-13 and needed nothing. No `SERVICED` row was ever logged
+> for this memo in either ledger — the evidence that it landed is the commits
+> themselves — so `tools/a2a_inbox.py` had nothing to find and alerted on it for 12
+> sessions, and the 2026-08-20 nudge (st-75z0) was sent on that false read. Class
+> fix: st-1eaw.
+
 *2026-08-12 · authorizing bead st-nujt ("code-estate audit — catalog/test/review
 plan, identify dead code") · full plan: `docs/plans/2026-08-12-code-estate-plan.md`
 (this repo) · evidence: `docs/audits/2026-08-12-code-estate/` (census.json,

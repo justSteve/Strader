@@ -243,3 +243,88 @@ def test_stub_points_at_the_replacement_channel():
     out = subprocess.run(["bash", str(STUB)], input=payload, capture_output=True, text=True)
     assert "docs/a2a/" in out.stderr
     assert out.stdout == ""  # hook messaging goes to stderr, never stdout
+
+
+# --- peer-ledger receipt backstop [st-1eaw] -------------------------------
+#
+# The 08-25 failure this pins: COO serviced two Strader memos within a day and
+# logged both SERVICED rows in COO's OWN ledger. This tool read only Strader's
+# file, printed [ALERT] OPEN for 12 and 9 sessions against finished work, and a
+# nudge went out on the false read. The backstop must close such a memo — and
+# must never let a peer's file break this repo's parse or its suite.
+
+
+def _peers(tmp_path, rows: str, name: str = "COO") -> dict:
+    p = tmp_path / f"{name}-inbox.md"
+    p.write_text(_ledger(rows), encoding="utf-8")
+    return {name: p}
+
+
+def test_peer_ledger_receipt_closes_a_memo_this_ledger_never_got(tmp_path):
+    mine = tmp_path / "inbox.md"
+    mine.write_text(
+        _ledger("| 2026-08-12 07:17 CT | Strader | MEMO | st-nujt | 2026-08-12-strader-to-coo-x | - | asks |\n"),
+        encoding="utf-8",
+    )
+    events, _ = a2a.parse_inbox(mine)
+    assert len(a2a.open_memos(events)) == 1, "no backstop: the memo reads as open"
+
+    extra = a2a.peer_receipts(_peers(
+        tmp_path,
+        "| 2026-08-13 08:11 CT | COO | SERVICED | co-d1o7k | 2026-08-12-strader-to-coo-x | - | landed |\n",
+    ))
+    assert a2a.open_memos(events, extra) == []
+
+
+def test_peer_receipt_dated_before_the_memo_does_not_close_it(tmp_path):
+    """Ordering still binds across ledgers — an older row is not an answer."""
+    mine = tmp_path / "inbox.md"
+    mine.write_text(
+        _ledger("| 2026-08-12 07:17 CT | Strader | MEMO | st-nujt | 2026-08-12-strader-to-coo-x | - | asks |\n"),
+        encoding="utf-8",
+    )
+    events, _ = a2a.parse_inbox(mine)
+    extra = a2a.peer_receipts(_peers(
+        tmp_path,
+        "| 2026-08-01 08:11 CT | COO | SERVICED | co-d1o7k | 2026-08-12-strader-to-coo-x | - | stale |\n",
+    ))
+    assert len(a2a.open_memos(events, extra)) == 1
+
+
+def test_peer_ledger_problems_are_not_this_ledgers_problems(tmp_path):
+    """A typo in COO's file must not turn Strader's suite red."""
+    peers = _peers(tmp_path, "| 2026-08-13 08:11 CT | COO | SERVICED | co-d | ref-a |\n")
+    extra = a2a.peer_receipts(peers)
+    assert extra == {}
+    events, problems = a2a.parse_inbox(INBOX)
+    assert problems == []
+
+
+def test_missing_peer_repo_degrades_to_the_old_behaviour(tmp_path):
+    assert a2a.peer_receipts({"COO": tmp_path / "nope" / "inbox.md"}) == {}
+
+
+def test_earliest_peer_receipt_wins_across_peers(tmp_path):
+    peers = {}
+    peers.update(_peers(
+        tmp_path,
+        "| 2026-08-15 08:00 CT | COO | SERVICED | co-d | ref-a | - | late |\n", name="COO"))
+    peers.update(_peers(
+        tmp_path,
+        "| 2026-08-13 08:00 CT | Desk | ACK | dk-1 | ref-a | - | early |\n", name="Desk"))
+    when, who = a2a.peer_receipts(peers)["ref-a"]
+    assert (when, who) == (datetime(2026, 8, 13, 8, 0), "Desk")
+
+
+def test_no_peers_flag_turns_the_backstop_off():
+    out = subprocess.run(
+        ["python3", str(TOOL), "--open", "--no-peers"],
+        capture_output=True, text=True, cwd=REPO, check=True).stdout
+    assert "RECEIPTS AWAITED FROM PEERS" in out
+
+
+def test_live_run_reads_the_peer_ledger_without_crashing():
+    out = subprocess.run(
+        ["python3", str(TOOL), "--open"],
+        capture_output=True, text=True, cwd=REPO, check=True).stdout
+    assert "RECEIPTS AWAITED FROM PEERS" in out

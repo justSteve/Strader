@@ -9,7 +9,8 @@ Two questions, both computed rather than remembered:
 Definitions live in docs/a2a/receipt-protocol.md and are implemented here so a
 skill step never has to reimplement them:
 
-  OPEN   a MEMO line whose REF has no later ACK or SERVICED line with that REF
+  OPEN   a MEMO line whose REF has no later ACK or SERVICED line with that REF,
+         in this ledger OR in a peer's own ledger (see PEER_LEDGERS)
   STALE  OPEN, and >= 3 session handoffs have been written since the memo
 
 "Session" is one `## HH:MM - Session Handoff` heading in DaysActivity.md or
@@ -29,6 +30,24 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 INBOX = REPO / "docs" / "a2a" / "inbox.md"
+
+# Peer ledgers, read for RECEIPTS ONLY [st-1eaw].
+#
+# WHY: receipt-protocol.md §2 puts the ACK/SERVICED row in the SENDER's inbox,
+# because the party waiting on the answer is the one who needs to see it. On
+# 2026-08-25 both of Strader's open memos turned out to have been serviced by COO
+# within a day of being sent — code-estate-plan on 08-13 (COO 25a02f1), claudemd-
+# scope on 08-14 (COO cfa18f7) — with both SERVICED rows logged in COO's own
+# ledger. This tool read only the file above, so it printed [ALERT] OPEN for 12
+# and 9 sessions against finished work, and a receipt nudge went out on that
+# false read. A tracker that a peer's filing habit can silently starve of
+# receipts is the defect; reading the peer ledger as a BACKSTOP fixes it without
+# depending on anyone remembering the protocol.
+#
+# Receipts only. Peer rows never become "landed here" events, and a malformed
+# line in a peer's file is never reported as this ledger's problem — this repo's
+# suite must not go red for someone else's typo.
+PEER_LEDGERS = {"COO": REPO.parent / "COO" / "docs" / "a2a" / "inbox.md"}
 
 STALE_SESSIONS = 3
 SELF = "strader"
@@ -184,13 +203,51 @@ def sessions_since(when: datetime, stamps: list[datetime]) -> int:
     return sum(1 for s in stamps if s > when)
 
 
-def open_memos(events: list[Event]) -> list[Event]:
-    """MEMOs with no later ACK/SERVICED carrying the same REF."""
+def receipt_index(events: list[Event]) -> dict[str, datetime]:
+    """REF -> the earliest ACK/SERVICED time carrying it."""
     answered: dict[str, datetime] = {}
     for e in events:
         if e.kind in ("ACK", "SERVICED") and e.ref and e.ref != "-":
-            answered.setdefault(e.ref, e.when)
-            answered[e.ref] = min(answered[e.ref], e.when)
+            prior = answered.get(e.ref)
+            answered[e.ref] = e.when if prior is None else min(prior, e.when)
+    return answered
+
+
+def peer_receipts(ledgers: dict[str, Path] | None = None) -> dict[str, tuple[datetime, str]]:
+    """REF -> (earliest receipt time, peer name), read from the peers' own ledgers.
+
+    A missing or unreadable peer repo is not an error here: the backstop degrades
+    to the old behaviour rather than taking the briefing down with it.
+    """
+    out: dict[str, tuple[datetime, str]] = {}
+    for name, path in (PEER_LEDGERS if ledgers is None else ledgers).items():
+        try:
+            events, _ = parse_inbox(Path(path))
+        except OSError:
+            continue
+        for ref, when in receipt_index(events).items():
+            prior = out.get(ref)
+            if prior is None or when < prior[0]:
+                out[ref] = (when, name)
+    return out
+
+
+def open_memos(
+    events: list[Event],
+    extra: dict[str, tuple[datetime, str]] | None = None,
+) -> list[Event]:
+    """MEMOs with no later ACK/SERVICED carrying the same REF.
+
+    `extra` is the peer-ledger backstop: REF -> (when, peer). A memo answered
+    only there is genuinely answered, so it does not belong on the alert list —
+    but main() prints it in its own section, because a receipt filed in the wrong
+    ledger is the defect that produced the 08-25 false alerts [st-1eaw].
+    """
+    answered = receipt_index(events)
+    for ref, (when, _peer) in (extra or {}).items():
+        prior = answered.get(ref)
+        if prior is None or when < prior:
+            answered[ref] = when
     out = []
     for e in events:
         if e.kind != "MEMO":
@@ -222,6 +279,8 @@ def main() -> int:
     ap.add_argument("--since", help="cutoff YYYY-MM-DD or 'YYYY-MM-DD HH:MM' (default: last session handoff)")
     ap.add_argument("--landed", action="store_true", help="only the landed-since section")
     ap.add_argument("--open", dest="open_only", action="store_true", help="only the receipts sections")
+    ap.add_argument("--no-peers", action="store_true",
+                    help="do not read peer ledgers for receipts (backstop off)")
     args = ap.parse_args()
 
     events, problems = parse_inbox(Path(args.file))
@@ -249,7 +308,9 @@ def main() -> int:
         print()
 
     if show_open:
-        pending = open_memos(events)
+        local = receipt_index(events)
+        extra = {} if args.no_peers else peer_receipts()
+        pending = open_memos(events, extra)
         owed = [e for e in pending if e.actor.lower() != SELF]
         awaited = [e for e in pending if e.actor.lower() == SELF]
 
@@ -266,6 +327,22 @@ def main() -> int:
         for e in sorted(awaited, key=lambda x: x.when):
             print(fmt_memo(e, stamps))
         print()
+
+        # Answered, but the row is in the wrong ledger. Not an alert — the work
+        # is done — and not silence either, because silence is how 08-25 happened.
+        peer_only = [
+            e for e in events
+            if e.kind == "MEMO" and e.ref in extra and extra[e.ref][0] >= e.when
+            and not (e.ref in local and local[e.ref] >= e.when)
+        ]
+        if peer_only:
+            print(f"RECEIPTS FILED PEER-SIDE ONLY ({len(peer_only)}) — answered, wrong ledger [st-1eaw]")
+            for e in sorted(peer_only, key=lambda x: x.when):
+                when, peer = extra[e.ref]
+                slug = re.sub(r"^\d{4}-\d{2}-\d{2}-", "", e.ref)
+                print(f"  {e.when:%Y-%m-%d} {slug} — receipt sits in {peer}'s ledger "
+                      f"({when:%Y-%m-%d}); receipt-protocol §2 wants it here")
+            print()
 
     if problems:
         print(f"[ALERT] inbox.md has {len(problems)} malformed line(s) — they are NOT counted above:")
