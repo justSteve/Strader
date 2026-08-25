@@ -20,6 +20,8 @@ The properties that make the replacement worth having, each pinned below:
 """
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -48,9 +50,16 @@ class Watch:
         self.log.write_text("")
         self.out = tmp_path / "watch.out"
         self._fh = self.out.open("w")
+        # start_new_session puts the script in its own PROCESS GROUP, which is
+        # what makes it killable as a unit. The watch is a pipeline —
+        # `tail -F ... | { while read ... }` — so terminating the bash parent
+        # alone leaves the tail and the subshell orphaned, each still following
+        # a temp log that the test then deletes. The first version of this
+        # fixture did exactly that and leaked a watcher per test: twenty-four
+        # stray processes accumulated across a few runs before anyone looked.
         self.proc = subprocess.Popen(
             ["bash", str(SCRIPT), str(self.log), str(liveness), str(batch_gap)],
-            stdout=self._fh, stderr=subprocess.STDOUT)
+            stdout=self._fh, stderr=subprocess.STDOUT, start_new_session=True)
         self._await_arm()
 
     def _await_arm(self, timeout: float = 10.0):
@@ -82,11 +91,18 @@ class Watch:
         time.sleep(seconds)
 
     def stop(self):
-        self.proc.terminate()
+        """Kill the whole process GROUP, not just the script — see __init__."""
+        try:
+            pgid = os.getpgid(self.proc.pid)
+        except ProcessLookupError:
+            self._fh.close()
+            return
+        os.killpg(pgid, signal.SIGTERM)
         try:
             self.proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            self.proc.kill()
+            os.killpg(pgid, signal.SIGKILL)
+            self.proc.wait(timeout=5)
         self._fh.close()
 
 
