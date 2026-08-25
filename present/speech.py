@@ -6,15 +6,20 @@ rendering rather than a reuse of ``Signal.reason``:
 
 1. ``reason`` is written to be read, in measurement-harness vocabulary.
    ``docs/training/plain-words-glossary.md`` (st-v95) exists precisely because
-   that vocabulary reached Steve undefined. The glossary is the authority for
-   every word chosen here.
+   that vocabulary reached Steve undefined, and every word chosen here comes
+   from it. The glossary is not itself the authority: it is the plain-words
+   rendering of ``docs/lexicon/lexicon.yaml``, which is (Strader ruling
+   2026-08-25, st-hmbr, finding 12 of the emission vocabulary review). On any
+   disagreement the lexicon wins and the glossary is corrected.
 2. Prices must be spoken the way a trader says them. "7438.25" read literally
    is "seven thousand four hundred thirty eight point two five" — wrong idiom,
    and too slow to be useful while the tape is moving.
 3. LIVE vs HINDSIGHT is a safety property. The glossary marks percentiles,
    cells, legs and archetypes as HINDSIGHT — computable only once the day
    completes. Speaking one in real time asserts something unknowable, so
-   :func:`speak` refuses to emit them at all.
+   :func:`speak` refuses to emit them at all. That stamp originates in the
+   lexicon's per-term ``live:`` field; ``_HINDSIGHT_TOKENS`` below is a hand
+   copy of it and should be derived from the lexicon instead — st-hd51.
 
 Scope: a pure function, ``Signal -> str | None``. ``None`` means "no phrasing
 for this", never a guess. What is *worth* saying, how utterances queue, what

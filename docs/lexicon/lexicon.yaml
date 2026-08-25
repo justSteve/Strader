@@ -16,6 +16,19 @@ meta:
   version: 1
   date: 2026-07-28
   bead: st-g9y
+  authority: >
+    This file is the enforceable authority over how every surface names price
+    action — Strader ruling 2026-08-25, st-hmbr, answering finding 12 of
+    docs/reviews/2026-08-25-emission-vocabulary-review.md (st-66ld).
+    docs/training/plain-words-glossary.md (st-v95) is DOWNSTREAM of it: it is
+    channel-zero teaching prose for Steve and the plain-word renderings the
+    coach speaks, and it derives its LIVE/HINDSIGHT stamps from the `live:`
+    field below. Where the two ever disagree, this file wins and the glossary
+    is corrected — never the reverse. Same relationship .claude/rules/
+    fly-doctrine.md carries to knowledge/ canon.
+    ENFORCEMENT lives in tests/docs/test_lexicon.py, which reads banned_bare
+    and `live:` as policy data. A surface that emits words is not conformant
+    because someone read this file; it is conformant when the linter covers it.
   conventions:
     compound_term: >
       A word that crosses domain boundaries never appears bare in a

@@ -6,6 +6,13 @@ accuracy briefing reached Steve in measurement-harness vocabulary — *anchor*,
 glossary is **channel zero**: plain trader language first, the term second.
 Nothing here assumes you remember any other document.
 
+**Where this sits.** `docs/lexicon/lexicon.yaml` (PA Lexicon v1, st-g9y) is the
+enforceable authority over how the surfaces name price action — Strader ruling
+2026-08-25, st-hmbr. This glossary is downstream of it: the same terms in plain
+trader words, for reading and for speaking. Where the two disagree the lexicon
+wins and this file gets fixed. The LIVE/HINDSIGHT stamps in Part 2 are the
+lexicon's own `live:` field, restated.
+
 ---
 
 ## Part 1 — The measurement layer (the words the accuracy numbers are spoken in)
