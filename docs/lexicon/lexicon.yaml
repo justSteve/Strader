@@ -95,22 +95,37 @@ meta:
       date: 2026-08-25
       bead: st-1s1
       recommend: >
-        The Carmine attribution goes. It is not a type rename: measured
-        2026-08-25, no CarmineSetup type exists — the name survives in one
-        comment (market/signals/orderflow.py:82) and two docstrings
-        (:76, market/orderflow/recognizer.py:1), and no emission Steve can see
-        has ever carried it. Correcting three prose sites moves no fixture and
-        needs no migration.
+        The Carmine attribution goes. It IS a real type rename — an earlier
+        version of this entry said no such type existed, which was false and
+        is corrected here (Strader 2026-08-25; caught by COO, who was right).
+        CarmineSetup is a Literal at strader/entities/singleton.py:39,
+        annotating SingletonSetup.trigger at :61, imported and exported in
+        strader/entities/__init__.py:11 and :19. Five code sites over three
+        files, one of them a public export, plus the prose at
+        market/signals/orderflow.py:82, market/signals/orderflow.py:76 and
+        market/orderflow/recognizer.py:1, plus roughly eight doc references.
+      sizing: >
+        Still small and still landable on its own, and three things the wrong
+        measurement did not change: the Literal's six string VALUES do not
+        move, so no fixture and no replay record churns; no emission Steve can
+        see has ever carried the type name; and st-1s1's hold for the Discord
+        harvest does not apply, because the harvest settles what Carmine's
+        method IS and cannot make a six-setup taxonomy holding two of
+        Mancini's signature setups correctly named after him either way.
+        What does stay held is scripts/level_strength.py:4, a claim about his
+        method. One dependency the recount surfaced:
+        docs/research/2026-07-25-trade-language-entity-survey.md:343 asks that
+        the target name be confirmed so the CLI and the code do not fork.
       constraint: >
-        Not SetupTrigger. This repo already uses "trigger" for a distinct
-        thing in st-1s1's own finding — Carmine's LEVELS are conventional and
-        his TRIGGERS are Bookmap-based — so that word would mint the next
-        collision. If a Literal is introduced later, SetupName. Unblocking
-        note: st-1s1 held this for the Discord harvest, and it does not need
-        to be. The harvest settles what Carmine's method IS; it cannot make a
-        six-setup taxonomy containing two of Mancini's signature setups
-        correctly named after Carmine either way. What stays held is
-        scripts/level_strength.py:4, which is a claim about his method.
+        Not SetupTrigger, and the reason is sharper than first stated. The
+        field this type annotates is ALREADY called trigger, so the collision
+        with st-1s1's own sense of the word — Carmine's LEVELS are
+        conventional, his TRIGGERS are Bookmap-based — exists in the code
+        today whatever the type is called. SetupTrigger does not create it, it
+        compounds it, and yields the redundant trigger: SetupTrigger. Prefer
+        SetupName, which reads trigger: SetupName and keeps the two ideas
+        apart: the FIELD is the trigger role, the TYPE is the name vocabulary.
+        Desk should see both halves of this.
   conventions:
     compound_term: >
       A word that crosses domain boundaries never appears bare in a
