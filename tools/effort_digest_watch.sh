@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# SUPERSEDED 2026-08-25 by tools/effort_event_watch.sh [st-85dv] — do not arm this.
+# It wakes on a 300-second clock (~276 wakes/day, almost all of them "nothing");
+# the replacement wakes only on sig=alert EVENT lines the scorer detects itself.
+# Kept as the record of what the clock tier was, and for a log with no EVENT lines
+# (a scorer older than st-dgwj). Contract: docs/playbooks/emitter-two-tier.md.
+#
 # Digest watch for scripts/live_effort_effect.py [st-2nyb].
 #
 # Emits one compact digest line per interval summarising the new scorer bars,
