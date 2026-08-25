@@ -141,15 +141,75 @@ Any precondition that can be detected mechanically belongs in Tier 0, not in
 your judgement. Name setups *on top of* detected structure so the judgement
 surface stays as small as it can be.
 
-### The regime gate — amendment, 2026-08-25 ~09:55 (Steve-sourced, via Desk)
+### The regime gate — amendment 2026-08-25 ~09:55, REVISED ~10:35
 
-The ruling above says name setups. This says: **name the regime first, and let it
-govern how the setup is delivered.**
+**The first version of this section said a completed setup at a range edge in
+rotation is "fade/skip context rather than pushed as an entry." That phrasing is
+WITHDRAWN.** Steve challenged its provenance; Desk traced it and retracted it as
+unsourced synthesis — training-data reading of a trading-modes framework blended
+with generic auction lore, not anything in Strader's canon. The best-sourced
+version says regime changes a setup's **management and expectancy**, not its
+**validity**.
+
+The revised criterion, and the discipline it imposes on itself:
 
 **5. Criteria-cited naming must carry a regime qualifier — trending, or
-established rotation.** A completed setup at a range edge *inside a rotation* is
-named as what it is, with fade/skip context per the playbook. It is not pushed
-as an entry.
+established rotation — and state the playbook's regime-specific MANAGEMENT
+implication, citing the exact rule from Strader's own knowledge files. No regime
+rule enters this runbook until the codifying session has read
+`orb-playbook`, `selective-range-scalping` and `trapped-seller-fuel` and cites
+them.** The criteria-cited discipline applies to the doctrine as much as to the
+call.
+
+#### What those three files actually say — read 2026-08-25 during codification
+
+**There is exactly one regime rule in canon, and it governs expectation, not
+validity.** `knowledge/orb-playbook.md`:
+
+> "**GEX sign** — positive (mean-revert regime) is hostile to continuation;
+> negative (trending regime) favors it."
+
+and, on management:
+
+> "Take Target 1 and walk away. Cross-check against GEX first: a GEX wall sitting
+> between price and the target means the target probably does not get hit — skip
+> the trade or **downgrade the expectation**."
+
+Note what that rule is keyed to: a **GEX wall between price and the target**. It
+is not keyed to rotation as such. "Skip" appears in canon only under that
+specific condition — which is why the withdrawn phrasing could not be sourced.
+
+**Range trading exists in canon but is not settled method.**
+`knowledge/selective-range-scalping.md` opens by saying so:
+
+> "Strategy 3, and it is **exploratory** — that is the status it carried in
+> CLAUDE.md and it was never promoted past it. Nothing here is settled method;
+> treat it as a candidate, not a playbook Steve runs."
+
+Its binding parts are a cadence cap (2-3 trades per session) and a friction rule,
+with 3-5 SPX point targets. Any rotation-management claim leaning on this file
+must carry its exploratory status out loud.
+
+**And the ceiling on what may be claimed at all.**
+`knowledge/trapped-seller-fuel.md`:
+
+> "trades tell us where aggression happened, not who is still holding or where
+> anyone's stop sits"
+
+> "High fuel is not a signal to enter; it is one input Steve weighs. The feature
+> never fires advice."
+
+#### The honest state of this criterion
+
+Canon supports the **qualifier** requirement and the **GEX-sign** management rule.
+It does **not** currently contain a regime-specific management rule for the
+rotation case beyond that. So criterion 5 is satisfiable today only where the GEX
+rule applies; anywhere else, the analyst states the regime and says plainly that
+the playbook has no management rule for it rather than inventing one. Writing
+that rule is Steve's and Strader's, not the emitter's and not COO's.
+
+That gap is the whole reason the fade/skip phrasing had to be withdrawn: the
+runbook reached for a rule that did not exist, and reaching felt like knowing.
 
 > The calibration case is today, 09:30-09:32. The flush of 7680 to 7663.25 and
 > the reclaim came on the day's max volume (14,778) **and** the day's max sell
