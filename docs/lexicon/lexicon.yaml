@@ -29,6 +29,88 @@ meta:
     ENFORCEMENT lives in tests/docs/test_lexicon.py, which reads banned_bare
     and `live:` as policy data. A surface that emits words is not conformant
     because someone read this file; it is conformant when the linter covers it.
+  recommendations:
+    # NOT YET CLEARED. Nothing below binds a surface until Desk signs it.
+    #
+    # Desk holds Steve's standing-in authority on this class of choice — Steve
+    # 2026-08-25, confirmed to Strader in session, and quoted the same day in
+    # COO's ledger row: he does not feel positioned to contribute on these and
+    # asks that Desk's choices be taken as his. These four are STRADER'S INPUT
+    # to that decision, each answering one open question from
+    # docs/reviews/2026-08-25-emission-vocabulary-review.md (st-66ld).
+    #
+    # HAZARD IF THEY SIT. COO's review offers its own defaults on the same four
+    # and states that silence takes them. Strader's reading differs from COO's
+    # on two — the name for the delta-percentile kind, and SetupTrigger — so
+    # leaving these unread does not leave the question open, it settles it the
+    # other way. Whichever Desk picks, picking is what has to happen.
+    - id: climax-belongs-to-the-gauge
+      date: 2026-08-25
+      bead: st-66ld
+      recommend: >
+        "climax" belongs to the TICK gauge, which has used it since July and
+        speaks it aloud. The EVENT tier's delta-percentile kind takes another
+        name. Not merely to break the collision: a 99.5th-percentile delta
+        minute is an extreme of pressure, and "climax" imports an exhaustion
+        reading the measurement does not support.
+      constraint: >
+        Whatever name it takes must not read as a synonym of the SUPERLATIVE
+        kinds MAX-BUY-DELTA and MAX-SELL-DELTA, which already say the delta
+        was large. The distinction is record versus rarity — biggest so far
+        against top half-percent of minutes — and the chosen name has to carry
+        it. DELTA-EXTREME as proposed does not.
+    - id: one-plan-level-state-machine
+      date: 2026-08-25
+      bead: st-66ld
+      recommend: >
+        One vocabulary for a plan-level's condition, and it is the chart's,
+        because that is the one on Steve's screen and it is ratified:
+        untouched, held, broken, reclaimed (pine/mancini_forecast.pine:184).
+        The EVENT tier adopts the STATE MACHINE, not only the words —
+        pine/mancini_forecast.pine:141 computes held against the anchor's own
+        role, which is precisely the direction the EVENT rejection kind was
+        measured to be missing. Renaming alone would carry the defect across
+        under a better word.
+      mapping: >
+        EVENT touch is the untouched-to-held transition; EVENT rejection is
+        held; EVENT acceptance is broken. Reclaimed has no EVENT emitter at
+        all. If the state machine cannot land in one commit the word swap may
+        go first, but the two vocabularies must never both ship.
+    - id: confidence-off-the-display
+      date: 2026-08-25
+      bead: st-66ld
+      recommend: >
+        The confidence number comes off every display. Four of its seven
+        meanings are constants, they print in one column in one format beside
+        three measured ones, and nothing anywhere orders on it, so the column
+        buys a false comparison and nothing else.
+      constraint: >
+        The FIELD STAYS in the data model, the records and the replay
+        fixtures. Only the rendering goes — otherwise a display decision
+        becomes a schema migration. Where a measured grade exists, show it
+        with its grade-band; a coin-flip-band label stays unreportable alone.
+        Sweeps lose the number and gain span and size in the same change,
+        which is the honest replacement.
+    - id: setup-taxonomy-not-named-for-carmine
+      date: 2026-08-25
+      bead: st-1s1
+      recommend: >
+        The Carmine attribution goes. It is not a type rename: measured
+        2026-08-25, no CarmineSetup type exists — the name survives in one
+        comment (market/signals/orderflow.py:82) and two docstrings
+        (:76, market/orderflow/recognizer.py:1), and no emission Steve can see
+        has ever carried it. Correcting three prose sites moves no fixture and
+        needs no migration.
+      constraint: >
+        Not SetupTrigger. This repo already uses "trigger" for a distinct
+        thing in st-1s1's own finding — Carmine's LEVELS are conventional and
+        his TRIGGERS are Bookmap-based — so that word would mint the next
+        collision. If a Literal is introduced later, SetupName. Unblocking
+        note: st-1s1 held this for the Discord harvest, and it does not need
+        to be. The harvest settles what Carmine's method IS; it cannot make a
+        six-setup taxonomy containing two of Mancini's signature setups
+        correctly named after Carmine either way. What stays held is
+        scripts/level_strength.py:4, which is a claim about his method.
   conventions:
     compound_term: >
       A word that crosses domain boundaries never appears bare in a
