@@ -155,6 +155,14 @@ again until 00:36. 9h35m was not a missed check — it was the designed interval
 between checks. COO's 5-minute `bridge-notify.sh` does not close it either:
 line 29 hardcodes `COO/inbox` and it watches nothing else.
 
+Scope, so the claim is not read wider than it is: this is about THE BRIDGE,
+which is the only route for a participant that is not a live local session.
+Session-to-session messaging is live and needs no poll — COO and Strader
+exchange messages mid-turn all the time. Desk cannot: it is Claude Desktop, it
+does not appear in the peer list, and a file on the bridge is all it has. That
+is why COO relaying Desk's rulings by hand is a courtesy and not a path — it
+works only while COO happens to be live and talking.
+
 So a memo arriving one minute after this step is invisible for the rest of the
 session unless something watches. `--watch` prints only on arrival, so a quiet
 bridge wakes nobody; `--ledger` writes a MEMO row per waiting memo so the
