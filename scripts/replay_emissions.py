@@ -36,33 +36,40 @@ DETERMINISM. Nothing here reads a wall clock. Every decision keys off
 depends on. Two runs over one region with unchanged code are byte-identical, or
 this tool is broken and the diff it produces means nothing.
 
-WHAT IS PROVEN, AND WHAT IS NOT. Read this before quoting a number from it.
+WHAT IS PROVEN. Read this before quoting a number from it.
 
 *Proven:* two runs of this tool over one region are byte-identical with
 unchanged code, and a code change shows up as a counted diff. That is exactly
 what Ruling 9 asks for as a review artifact, and it is what st-cua1 needs to
 land its fourth plan-level kind with evidence rather than argument.
 
-*NOT proven:* that a replay reproduces what the live emitter actually said on
-a given day. Measured 2026-08-26 against 2026-08-25, the one day with both a
-live log and an archive:
+*Also proven, 2026-08-26 (st-v3wj):* a replay reproduces what the live emitter
+actually said. 2026-08-25 is the one day with both a full live log and an
+archive, and it reproduces exactly — 102 EVENT lines against the 102 in
+``/var/moo/logs/effort-effect/2026-08-25.log``, compared line by line, all 102
+byte-identical, PLAN-LEVEL 37/28/10 = 75 either way::
 
-    live log, that session           74 events  (PLAN-LEVEL 25/19/8 = 52)
-    replay, whole Globex session    102 events  (PLAN-LEVEL 37/28/10 = 75)
-    replay, --rth                    45 events  (PLAN-LEVEL 13/7/7   = 27)
+    scripts/replay_emissions.py run --from 2026-08-25 --to 2026-08-25 -o r.jsonl
+    # then compare each row's "line" field against the log's EVENT lines
 
-The live count sits between the two replay windows and matches neither. Window
-alone does not explain it; two candidates are ruled out by measurement — the
-knobs have not changed since the emitter landed (`3614fcc`), and seeding the
-detector with RTH only rather than the whole session leaves PLAN-LEVEL
-unchanged at 27, so overnight cooldown is not suppressing anything. The
-remaining suspect is the anchor set: this replays `mancini_levels_for(day)` as
-it resolves TODAY, and the live run used whatever it resolved to then.
+THE EARLIER MISMATCH WAS A BAD BASELINE, not a defect in this tool. This
+docstring used to record the live side as 74 events (PLAN-LEVEL 25/19/8 = 52)
+and name the anchor set as the suspect. That 74 was a PARTIAL-DAY count,
+copied from ``docs/reviews/2026-08-25-emission-vocabulary-review.md``, whose
+census was taken mid-session: the log stands at exactly 74 / 25/19/8 between
+12:28 and 13:15 CT on 08-25 and grows to 102 / 37/28/10 by 22:52. Nothing was
+ever wrong with the anchor set — the live scorer loaded 68 anchors at its
+10:28 restart, the same 68 ``mancini_levels_for`` resolves today.
 
-So: **use this tool to compare a change against itself, which is what it is
-for. Do not use it to audit a historical log until st-v3wj closes.**
-Saying it plainly here because a tool whose whole purpose is to make claims
-checkable must not itself carry an unchecked one.
+The near miss worth remembering: ``scripts/live_footprint_feed.py`` genuinely
+DID run 08-25 with zero anchors (st-kxnv, a real and separate bug), and its
+``live-parity`` run row records ``mancini: []``. That is a different process
+from this one. ``live_effort_effect.py:261`` loads anchors on its own, and the
+EVENT tier is its output, not the feeder's. A zero in the feeder's run row
+says nothing about the scorer's log.
+
+So: this tool may be used both to compare a change against itself and to audit
+a historical log.
 
 USE — prove a change silent::
 

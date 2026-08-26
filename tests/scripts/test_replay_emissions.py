@@ -11,7 +11,9 @@ The corpus tests are marked ``corpus``: they read real archived days from
 without the archive green rather than red-for-the-wrong-reason.
 """
 import collections
+import re
 from datetime import date, time
+from pathlib import Path
 
 import pytest
 
@@ -26,6 +28,14 @@ DAY = date(2026, 8, 25)
 
 corpus = pytest.mark.skipif(not has_es_day(DAY),
                             reason=f"{DAY} not in data/corpus")
+
+# The live scorer's own log for that day, written by scripts/live_effort_effect.py.
+# It lives outside the repo (it is operational output, not source), so the one
+# test that compares against it skips where the box does not have it.
+LIVE_LOG = Path(f"/var/moo/logs/effort-effect/{DAY}.log")
+EVENT_LINE = re.compile(r"^\d{2}:\d{2} CT\s+EVENT ")
+live_log = pytest.mark.skipif(not LIVE_LOG.exists(),
+                              reason=f"{LIVE_LOG} not on this box")
 
 
 @pytest.fixture(scope="module")
@@ -44,6 +54,33 @@ def test_two_runs_of_one_region_are_identical(knobs):
     b = replay_day(DAY, region, Filter(), knobs)
     assert a == b
     assert diff(a, b)["identical"]
+
+
+@corpus
+@live_log
+def test_replay_reproduces_the_live_emitter_log(knobs):
+    """THE OTHER load-bearing property, and the one st-v3wj was opened to
+    doubt: a replay says what the live emitter actually said.
+
+    Determinism above makes a BEFORE/AFTER diff trustworthy. This makes a
+    historical audit trustworthy — it is what co-j9t1g's learning surface
+    rests on, because a view that quietly differs from what happened teaches
+    the difference.
+
+    2026-08-25 is the only day with both a full live log and an archive. The
+    scorer restarted at 10:28 CT and re-read the day's corpus from 00:00, so
+    the log covers the whole Globex session and is comparable end to end.
+
+    If this goes red, the emission path moved and the log did not — read the
+    diff before touching the test. st-v3wj's own failure was the reverse: the
+    baseline was a partial-day count read at lunchtime, so make sure any new
+    baseline carries the clock time it was taken at.
+    """
+    live = [ln.rstrip() for ln in LIVE_LOG.read_text(errors="replace").splitlines()
+            if EVENT_LINE.match(ln)]
+    replayed = [r["line"].rstrip()
+                for r in replay_day(DAY, Region(start=DAY, end=DAY), Filter(), knobs)]
+    assert replayed == live
 
 
 @corpus

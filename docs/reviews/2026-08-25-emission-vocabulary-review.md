@@ -127,6 +127,18 @@ kinds of line, each marked either **alert** (wake the analyst now) or **note**
 
 Seventy-four lines on 2026-08-25, of which the level lines are seven in ten.
 
+> **Correction, 2026-08-26 (COO, st-v3wj).** This census is a *partial day*,
+> not the day. The counts above are exactly what
+> `/var/moo/logs/effort-effect/2026-08-25.log` held between 12:28 and 13:15 CT;
+> the session ran on to 22:52 and finished at **102 lines — SUPERLATIVE 7/6/6,
+> CLIMAX 2/4, ABSORPTION-CLUSTER 1/1, PLAN-LEVEL 37/28/10 = 75**. Finding 2's
+> "all 52 of today's PLAN-LEVEL lines" is 75 by the same measure. The words
+> the review is about are unaffected — every finding stands — but the numbers
+> were read mid-session and presented as the day's, and the 74 was later quoted
+> as the live baseline in `st-v3wj`, which cost a day chasing a replay
+> mismatch that did not exist. **A census line carries the clock time it was
+> taken at, or it is not a census.**
+
 ### Tier 3 — The scorer's own lines (three)
 
 The **graded** line, once a minute: the cell (F1 conviction, F2 absorption, F3
