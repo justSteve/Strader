@@ -1,5 +1,63 @@
 # DaysActivity - 2026-08-26
 
+## 11:48 - Session Handoff [st-v3wj Link Withdrawn, st-kxnv Ownership Corrected]
+
+**Summary**: COO measured that the replay harness reproduces 08-25's live log exactly (102 of 102, byte-identical), which withdrew the causal link I had drawn from the anchorless feeder to `st-v3wj`; Steve then challenged my parking of `st-kxnv`'s fix as "obvious", and he was right — the fix is option (b), it needs no privileged call, and it is Strader's.
+
+**RESUMPTION POINT — read this first**:
+Tree clean at `e92cd0c`, pushed. **Nothing is half-done and nothing is blocked.**
+
+**The one live thing carried forward**: `st-kxnv` option (b) — the feeder
+notices its own empty Mancini anchors and picks them up when the parse lands.
+**Strader's, queued for after a close.** Steve, 11:48: *"sometime between now
+and tomorrow morning and COO's input we will sort this out."* So do not land it
+unilaterally before that conversation; it changes the live emitter path.
+
+Why it is not a one-liner, measured this session: after
+`live_anchors.attach(driver.recognizer)` the RECOGNIZER owns the anchor list
+and `LiveAnchors` mutates it by fixed slot index (`_hi`, `_lo`,
+`anchors.py:303-330`). Growing that list mid-run is the "needs care" the bead
+flagged on 2026-08-17. Option (a) — `systemctl restart` at the end of
+`/mancini-parse` — is REJECTED as the wrong fix, not deferred: writing that
+command into a script Strader then invokes routes around the permission block
+on the command itself.
+
+**Open Work**:
+- `st-kxnv` Anchorless Midnight Feeder (P1) — option (b), Strader's, after a
+  close, pending Steve + COO's conversation. The parse already REPORTS the gap
+  (`ad5e727`), so it can never be silent again in the meantime.
+- `st-92m7` Desk Ruling Never Arrived (P1, in progress) — open until the git
+  cutover proves the channel end to end.
+- `st-7lw9` Grep Reaches Credentials (P1) — genuinely Steve's: it needs a
+  permissions-layer change. Listing it beside `st-kxnv` was a category error.
+- `st-ltk0` Spoken Surface Unlinted (P2) — ruled, gated behind the plan-level
+  migration.
+- `st-pc9q` Emission Side Columns (P2) — schema signed; alert-kind admission
+  to the emission catalog still open and not gating.
+- `st-cua1`, `st-iq9g`, `st-jg77`, `st-v3wj`, `co-b18wf`, `co-d7jcv` — COO's.
+
+**Tried**:
+- Claimed the anchorless feeder explains why `st-v3wj` could not reproduce
+  08-25 → WITHDRAWN. Verified COO's counter at source: the scorer
+  (`live_effort_effect.py:261`) loads its OWN anchors and logged "68 from the
+  day's parse" at 10:28:35; PLAN-LEVEL total is 75, matching the replay. Two
+  different processes. The feeder's zero was real and explained nothing.
+- Counted 103 EVENT lines against COO's 102 → MINE WAS LOOSE. `'EVENT' in
+  line` catches log line 634, `# ==== REGIME CHANGE … EVENT-EMISSION ENABLED
+  ====`, a startup marker. It sits at the 10:28 restart boundary, so a loose
+  grep gets the count wrong AND invites reading the anchorless first run as
+  productive — two wrong conclusions from one line.
+- Parked `st-kxnv`'s fix as "yours to land" → STEVE PUSHED BACK AND WAS RIGHT.
+  A timing constraint (live emitter path, market open) was mislabelled as a
+  permission constraint, which moved Strader's work onto Steve's desk.
+
+**Files Changed**:
+CurrentStatus.md
+DaysActivity.md
+docs/a2a/inbox.md
+
+---
+
 ## 09:58 - Session Handoff [Rulings 7-14 Landed, Bridge Cut To Git, Anchorless Feeder Caught Live]
 
 **Summary**: Closed Desk Rulings 7 and 8 (the `live:` domain and the derived speech guard), then spent the session having every claim audited — twice by COO, twice by Steve — which withdrew two of my own numbers, repriced a bead, and caught a live instrument failure: the footprint feeder served Steve's plan-day page with ZERO Mancini anchors for 65 minutes of the open session while the parsed plan sat on the desk and the clipboard.
