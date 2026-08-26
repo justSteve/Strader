@@ -137,6 +137,31 @@ them to full zgent names (COO co-2fa6a) so that adding a participant is a mkdir.
 A message left in a legacy folder is swept to the new path automatically, so an
 old name in someone's notes costs nothing but is worth correcting when seen.
 
+**Then arm the in-session watch — this step is the point.** [st-92m7]
+
+```bash
+.venv/bin/python3 tools/bridge_inbox.py --ledger   # log what is already waiting
+```
+
+and put `tools/bridge_inbox.py --watch` under Monitor for the session.
+
+The poll above runs ONCE, here, at start-up. That is the whole defect st-92m7
+records and it is worth stating plainly, because the shape is easy to mistake
+for coverage: on 2026-08-25 four Desk memos sat unread for up to 9h35m and
+**none of them was mis-routed.** They landed in `Strader/inbox`, the folder
+`bridge-check.sh` reads, and it counted them. They were invisible because the
+session that needed them had already tapped in at 14:33 and did not tap in
+again until 00:36. 9h35m was not a missed check — it was the designed interval
+between checks. COO's 5-minute `bridge-notify.sh` does not close it either:
+line 29 hardcodes `COO/inbox` and it watches nothing else.
+
+So a memo arriving one minute after this step is invisible for the rest of the
+session unless something watches. `--watch` prints only on arrival, so a quiet
+bridge wakes nobody; `--ledger` writes a MEMO row per waiting memo so the
+receipt clock sees it like any other. Verified live 2026-08-26 02:10: the
+watch's first run found four memos that had arrived DURING the session that
+built it, one of them an `intent` from Steve.
+
 ### 4d. Probe the Entitlements Registry
 
 ```bash
