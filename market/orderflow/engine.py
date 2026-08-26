@@ -32,6 +32,7 @@ from collections import deque
 from datetime import datetime, time as _time
 from typing import Iterable
 
+from market.emission import render
 from market.entities.trade import Trade
 from market.signals.orderflow import DeltaDivergence, SweepPrint
 from market.signals.types import Signal
@@ -184,8 +185,15 @@ class OrderflowEngine:
         return [SweepPrint(
             timestamp=r["last_ts"], source="orderflow.sweep",
             confidence=min(1.0, ticks / (2 * SWEEP_MIN_TICKS)),
-            reason=(f"{direction} sweep {r['start_price']:.2f}->{r['last_price']:.2f} "
-                    f"({ticks} levels, {r['size']} contracts)"),
+            # The line said "N levels" here and "N ticks" in speech.py for one
+            # field the lexicon had already named tick-level. Both now render
+            # from that one word — st-bkvt, Desk Ruling 1 item 5.
+            reason=render("sweep-print", "reason", {
+                "direction": direction,
+                "span": (r["start_price"], r["last_price"]),
+                "ticks_swept": ticks,
+                "total_size": r["size"],
+            }),
             direction=direction, start_price=r["start_price"],
             end_price=r["last_price"], ticks_swept=ticks, total_size=r["size"],
         )]

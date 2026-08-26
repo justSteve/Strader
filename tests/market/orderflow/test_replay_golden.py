@@ -105,7 +105,12 @@ def test_engine_golden_sensitized(trades, monkeypatch):
     h = hashlib.sha256()
     for s in sigs:
         h.update(repr(s).encode())
-    assert h.hexdigest() == "9ed02f366306614c5a73ea31f87e97f0f63c4d3761c9c5c2d0d13fc91ef19ac2"
+    # Repinned 2026-08-26 [st-bkvt]: `repr` covers `reason`, and the sweep's
+    # reason now renders from the lexicon — "3 levels" became "3 tick-levels".
+    # No engine behaviour moved: the assertions above (count, direction,
+    # ticks_swept, total_size, large-lot count) all held across the change,
+    # and the regenerated parity snapshot diffs only those five strings.
+    assert h.hexdigest() == "aebc15b32f9e29a410c55dcb7ab629be82e05e0019b4f745b78b2b0beba8b002"
 
 
 # ── imbalance golden (st-su4) ────────────────────────────────────────────────

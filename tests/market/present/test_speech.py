@@ -155,10 +155,14 @@ def test_frozen_beat_tokens_are_never_spoken(token, plain):
 # -------------------------------------------------------- other orderflow ---
 
 def test_sweep_print():
+    """Said "eight ticks" until 2026-08-26. The same field was written "8
+    levels" by the engine and ratified as tick-level by the lexicon — one
+    number, three words, review finding 1. Both surfaces now render from the
+    lexicon and neither can name it: st-bkvt."""
     said = speak(SweepPrint(**_base(), direction="buy", start_price=7436.0,
                             end_price=7438.0, ticks_swept=8, total_size=412))
-    assert said == ("Buy sweep, eight ticks through to seventy-four thirty-eight, "
-                    "four hundred twelve contracts.")
+    assert said == ("Buy sweep, eight tick-levels through to seventy-four "
+                    "thirty-eight, four hundred twelve contracts.")
 
 
 def test_delta_divergence_bearish_names_the_high():

@@ -21,6 +21,17 @@ rendering rather than a reuse of ``Signal.reason``:
    lexicon's per-term ``live:`` field; ``_HINDSIGHT_TOKENS`` below is a hand
    copy of it and should be derived from the lexicon instead — st-hd51.
 
+4. Vocabulary is not written here either, for the emissions that have moved
+   so far — one, ``sweep-print``. It renders through
+   ``market/emission/renderer.py`` from the lexicon's ``emission:`` block, so the
+   word naming a quantity is necessarily the same word the written line uses:
+   neither surface contains it. The spoken line used to say "eight ticks"
+   while the log said "3 levels", for one field the lexicon had already named
+   tick-level — st-bkvt, Desk Ruling 1 item 5. Every phrasing below that still
+   builds its own string is the un-migrated remainder, each on its own bead
+   (``_imbalance_stack`` on st-iq9g, and see the note there for why partial
+   migration of a single emission is worse than none).
+
 Scope: a pure function, ``Signal -> str | None``. ``None`` means "no phrasing
 for this", never a guess. What is *worth* saying, how utterances queue, what
 gets dropped when speech falls behind the tape, and the reader process itself
@@ -32,6 +43,12 @@ from __future__ import annotations
 
 import logging
 
+# spoken_price/spoken_count live in market/emission/numbers.py so the market
+# layer can reach them without importing the presentation layer. Re-exported
+# here: this module was their home and strader/intent/readback.py imports them
+# from it. [st-bkvt]
+from market.emission import render
+from market.emission.numbers import spoken_count, spoken_price
 from market.signals.types import (
     Signal, Bias, Regime, Level, Alert, Action, InferenceRequest,
 )
@@ -43,95 +60,6 @@ from market.signals.orderflow import (
 log = logging.getLogger(__name__)
 
 __all__ = ["speak", "spoken_price", "spoken_count", "HindsightLeak"]
-
-
-# --------------------------------------------------------------------------
-# Numbers
-#
-# Number words are generated here rather than handed to the TTS engine as
-# digits. espeak-ng, piper and any cloud voice each read "74" and "7438.25"
-# differently; generating the words in-process makes output engine-independent
-# and testable without audio.
-# --------------------------------------------------------------------------
-
-_ONES = (
-    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
-    "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
-    "sixteen", "seventeen", "eighteen", "nineteen",
-)
-_TENS = (
-    "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
-    "eighty", "ninety",
-)
-
-# ES trades in quarter points. Anything else is spoken digit-wise rather than
-# silently rounded onto a tick that the instrument may not have.
-_FRACTIONS = {0: "", 25: " and a quarter", 50: " and a half", 75: " and three quarters"}
-
-
-def _under_hundred(n: int) -> str:
-    if n < 20:
-        return _ONES[n]
-    tens, ones = divmod(n, 10)
-    return _TENS[tens] if ones == 0 else f"{_TENS[tens]}-{_ONES[ones]}"
-
-
-def spoken_count(n: int) -> str:
-    """A plain cardinal, for sizes and tick counts. Falls back to digits above
-    999 — every engine reads large integers acceptably, and spelling them out
-    makes a sentence longer than the move it describes."""
-    if n < 0:
-        return f"minus {spoken_count(-n)}"
-    if n < 100:
-        return _under_hundred(n)
-    if n < 1000:
-        hundreds, rest = divmod(n, 100)
-        head = f"{_ONES[hundreds]} hundred"
-        return head if rest == 0 else f"{head} {_under_hundred(rest)}"
-    return str(n)
-
-
-def spoken_price(price: float) -> str:
-    """Speak a price the way a trader says it.
-
-    >>> spoken_price(7438.0)
-    'seventy-four thirty-eight'
-    >>> spoken_price(7438.25)
-    'seventy-four thirty-eight and a quarter'
-    >>> spoken_price(7400.0)
-    'seventy-four hundred'
-    >>> spoken_price(7405.0)
-    'seventy-four oh five'
-    """
-    whole = int(price)
-    cents = round(round(price - whole, 2) * 100)
-    if cents == 100:            # 7437.999 -> 7438.0
-        whole, cents = whole + 1, 0
-
-    tail = _FRACTIONS.get(cents)
-    if tail is None:
-        # Not on a quarter. Say the decimal rather than round it away — a
-        # non-ES instrument's real price beats a tidy ES-shaped lie.
-        tail = f" point {''.join(_ONES[int(d)] + ' ' for d in f'{cents:02d}').strip()}"
-
-    # The four-digit pair form ("seventy-four thirty-eight") is how ES and SPX
-    # are spoken. Outside that range it stops being idiomatic, so fall back.
-    if 1000 <= whole < 10000:
-        hi, lo = divmod(whole, 100)
-        if whole % 1000 == 0:
-            # 7400 is "seventy-four hundred", but 7000 is "seven thousand" —
-            # nobody says "seventy hundred".
-            head = f"{_ONES[whole // 1000]} thousand"
-        elif lo == 0:
-            head = f"{_under_hundred(hi)} hundred"
-        elif lo < 10:
-            head = f"{_under_hundred(hi)} oh {_ONES[lo]}"
-        else:
-            head = f"{_under_hundred(hi)} {_under_hundred(lo)}"
-    else:
-        head = spoken_count(whole)
-
-    return head + tail
 
 
 # --------------------------------------------------------------------------
@@ -220,11 +148,12 @@ def _ordinal(n: int) -> str:
 
 
 def _sweep_print(s: SweepPrint) -> str:
-    side = "Buy" if s.direction == "buy" else "Sell"
-    return (
-        f"{side} sweep, {spoken_count(s.ticks_swept)} ticks through "
-        f"to {spoken_price(s.end_price)}, {spoken_count(s.total_size)} contracts."
-    )
+    return render("sweep-print", "speech", {
+        "direction": s.direction,
+        "ticks_swept": s.ticks_swept,
+        "end_price": s.end_price,
+        "total_size": s.total_size,
+    })
 
 
 def _delta_divergence(s: DeltaDivergence) -> str:
@@ -236,6 +165,13 @@ def _delta_divergence(s: DeltaDivergence) -> str:
 
 
 def _imbalance_stack(s: ImbalanceStack) -> str:
+    # NOT YET RENDERED FROM THE SCHEMA, deliberately. The bare "levels" here is
+    # the second half of the review's finding 2 and its replacement word,
+    # ladder-rung, is already declared in the lexicon. But this emission's
+    # WRITTEN half (market/orderflow/imbalance.py:69) hand-builds "N levels"
+    # too, and moving only the spoken half would leave one field with two
+    # words across two surfaces — the exact defect st-bkvt exists to end,
+    # recreated one file over. Both halves migrate together on st-iq9g.
     side = "Buy" if s.direction == "buy" else "Sell"
     levels = len(s.prices)
     if not levels:

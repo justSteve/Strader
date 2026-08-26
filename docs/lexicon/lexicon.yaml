@@ -45,7 +45,7 @@ meta:
     availability: hindsight_only per term; the `live:` field below has carried
     exactly that since 2026-07-28. The gap was not schema, it was that NOTHING
     CONSUMED IT. HALF-CLOSED 2026-08-26: the emission renderer
-    (market/emission/render.py, st-bkvt, landing on its own commit) reads
+    (market/emission/renderer.py, st-bkvt, landing on its own commit) reads
     `live:` and REFUSES to render a quantity that is not exactly `live` onto a
     `live_only` surface — Ruling 8's fail-closed shape, applied at the point of
     write. That is the seam, not the whole. The half still open is
@@ -712,7 +712,9 @@ terms:
 # and connective tissue only. The word that names a quantity is written once,
 # in `quantities` below, and every surface pulls it from there. So there is no
 # edit that gives one number two words — you would have to add a second
-# quantity binding the same field, and test_lexicon.py fails on that.
+# quantity binding the same field, and market/emission/renderer.py refuses to
+# LOAD a lexicon that does — the whole file, at first import, not at the first
+# emission. Its tests are tests/market/emission/test_render.py.
 # Point-of-write validation, which Desk named as the principle behind this
 # ruling (18:00 amendment, process note) after a ledger writer let a bad KIND
 # through because its check ran after the string was already built.
@@ -732,7 +734,7 @@ emission:
     ruled_by: >
       Desk Ruling 1 item 5, memo 20260825T143000__Desk__lexicon-ruling-scope-
       boundary; re-sequenced to lead by 20260825T180000__Desk__rulings-amended-
-      on-dissent. Consumed by market/emission/render.py.
+      on-dissent. Consumed by market/emission/renderer.py.
     second_consumer: >
       Desk also ruled this term set is the controlled identifier list for the
       signal ledger's strategy/emission join key — one ratification, two
@@ -788,8 +790,9 @@ emission:
   # `Signal.field`, fully qualified, because `direction` and `price` recur
   # across signal types and a bare field name would silently merge them.
   #
-  # RULE, enforced by tests/docs/test_lexicon.py: a field appears in at most
-  # one quantity. That is what makes one number with two words unwritable.
+  # RULE, enforced at load by market/emission/renderer.py: a field appears in
+  # at most one quantity. That is what makes one number with two words
+  # unwritable. Test: test_one_field_in_two_quantities_is_refused.
   quantities:
     - id: tick-level
       term: tick-level
@@ -848,7 +851,10 @@ emission:
 
   # ── Templates ───────────────────────────────────────────────────────────
   # Connective tissue and slots. NEVER a field's display word — that is the
-  # whole point, and test_lexicon.py fails a template that contains one.
+  # whole point. Enforced by tests/market/emission/test_render.py:
+  # test_no_template_contains_a_field_display_word, and its partner test
+  # applies the 07-28 bare-word ban to templates as well, since a template is
+  # every future instance of that emission at once.
   #
   # Slot forms:
   #   {field}        value + its quantity's display word ("3 tick-levels")
