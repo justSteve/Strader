@@ -40,13 +40,50 @@ printf '%s\n' "-----------------------------------------------------------------
 # indefinitely. That day it was right by accident, which is exactly the
 # "plausible, well-formed, wrong data" this file exists to end (header, above).
 #
-# Two defences, in order:
+# Three defences, in order:
 #   1. systemd is asked which pid IT started, wherever a unit exists. No argv
 #      pattern can know that; the supervisor does.
 #   2. The argv scan (for cron-driven surfaces with no unit) now drops anything
 #      that spawns rather than runs.
-# Every row reports which of the two answered, so a wrong green is diagnosable
-# on sight rather than requiring a ps archaeology session.
+#   3. A unit-backed row NEVER falls back to the argv scan when the supervisor
+#      was reachable and said no. See below.
+# Every row reports which of the three answered, so a wrong green is
+# diagnosable on sight rather than requiring a ps archaeology session.
+#
+# DEFENCE 3 — "ASKED AND TOLD NO" IS AN ANSWER, NOT A MISS. [st-9cp0]
+#
+# Found 2026-08-26 00:42 CT: this file printed "GEX collector UP 00:00 via argv
+# scan" while the unit was correctly inactive (outside the RTH gate) and
+# _gexbot_health.json said IDLE. The pid was gone a moment later. etime 00:00 is
+# the signature: a process zero seconds old, which a collector never is.
+#
+# The mechanism is not exotic and it is not rare. `probe` asked systemd, got no
+# active unit — the CORRECT answer at 00:42 — and then fell through to the argv
+# scan anyway, where any short-lived process carrying the script's NAME in its
+# argv wins. An agent grepping the repo for "corpus_poll_gexbot.py" is enough,
+# and the search binary is not called "grep", so neither `grep -v grep` nor
+# LAUNCHER_RE excludes it.
+#
+# Harmless at 00:42, when DOWN is expected anyway. Inside 08:30-15:05 it is the
+# exact failure this file exists to end: a green row over a dead feed, at the
+# only hours it matters.
+#
+# THE FIX IS NOT A WIDER LAUNCHER_RE. That is a hand-maintained denylist with no
+# completion — the same defect as the hindsight-token denylist st-hd51 retired
+# one layer up (Desk, 2026-08-26: "a machine only enforces where it is pointed,
+# and a hand-maintained site list is the same defect as a hand-maintained token
+# list, one level out"). Adding `2.1.233|--search` would fix today's instance
+# and none of tomorrow's.
+#
+# Instead: the supervisor is AUTHORITATIVE where it can be reached. If a row
+# names a unit and systemctl answered, its answer stands, including "not
+# active". The argv scan remains what the comment above always said it was —
+# the fallback for surfaces with NO unit — plus the case where systemd itself
+# is unreachable and there is no supervisor to ask.
+#
+# An argv match on a unit-backed row is not discarded, only demoted: it is
+# reported inside the DOWN row as NOT SUPERVISOR-CONFIRMED, so a hand-started
+# run is still visible to a human without ever being green.
 LAUNCHER_RE='tmux|new-session|send-keys|surface_liveness\.sh'
 
 ps_table() {        # indirected so the control case can inject a canned table
@@ -61,9 +98,12 @@ scan_argv() {       # scan_argv <pattern> -> "pid etime ..." or empty
     ps_table | grep -F -- "$1" | grep -Ev -- "$LAUNCHER_RE" | grep -v grep | head -1
 }
 
+systemd_reachable() { # can we ask the supervisor at all?
+    [[ -z "${LIVENESS_NO_SYSTEMD:-}" ]] && command -v systemctl >/dev/null 2>&1
+}
+
 unit_pid() {        # unit_pid <unit>... -> "pid unit" for the first active one
-    command -v systemctl >/dev/null 2>&1 || return 0
-    [[ -n "${LIVENESS_NO_SYSTEMD:-}" ]] && return 0
+    systemd_reachable || return 0
     local u state pid
     for u in "$@"; do
         state="$(systemctl show "$u" -p ActiveState --value 2>/dev/null || true)"
@@ -78,12 +118,15 @@ unit_pid() {        # unit_pid <unit>... -> "pid unit" for the first active one
 probe() {           # probe <label> <pattern> <detail> [unit...]
     local label="$1" pat="$2" detail="${3:-}"
     shift 3 2>/dev/null || shift $#
-    local pid="" et="" src="" line u
-    if (( $# > 0 )); then
+    local pid="" et="" src="" line u note="" asked=0
+    if (( $# > 0 )) && systemd_reachable; then
+        asked=1
         read -r pid u <<<"$(unit_pid "$@")"
         [[ -n "$pid" ]] && { et="$(ps -p "$pid" -o etime= 2>/dev/null | tr -d " ")"; src="$u"; }
     fi
-    if [[ -z "$pid" ]]; then
+    # Defence 3: only scan argv when there was no supervisor to ask. A unit-backed
+    # row whose systemctl answered "not active" is DOWN, and that is an answer.
+    if [[ -z "$pid" ]] && (( ! asked )); then
         line="$(scan_argv "$pat")"
         if [[ -n "$line" ]]; then
             pid="$(awk '{print $1}' <<<"$line")"
@@ -95,7 +138,13 @@ probe() {           # probe <label> <pattern> <detail> [unit...]
         printf '%-22s %-8s %-10s %s\n' "$label" "UP" "${et:--}" \
             "pid $pid via $src${detail:+ · $detail}"
     else
-        printf '%-22s %-8s %-10s %s\n' "$label" "DOWN" "-" "${detail:-no process}"
+        # Demoted, not discarded: a hand-started run stays visible to a human
+        # without the row ever going green on it.
+        if (( asked )); then
+            line="$(scan_argv "$pat")"
+            [[ -n "$line" ]] && note=" · NOT SUPERVISOR-CONFIRMED: pid $(awk '{print $1}' <<<"$line") mentions this script but no unit is active — a hand-started run, or a process that merely names it"
+        fi
+        printf '%-22s %-8s %-10s %s\n' "$label" "DOWN" "-" "${detail:-no process}${note}"
     fi
 }
 
