@@ -107,7 +107,11 @@ receipt [st-75z0]:
    a restart" was Steve's `/handoff` argument at 14:28 CT on 08-25 — a session
    handoff note, not a ruling to stop the watch. Recording it as "Steve's
    call" was Strader's inference. The stop holds on Desk's ruling below, not
-   on that note.* The two-tier cutover itself landed
+   on that note. Steve, 14:55 CT same day: the note explained why he was
+   willing to reboot services THAT afternoon, "not a decision that stood from
+   that point forward … i remain interested in learning more about late day
+   singletons … currently that's a priority for my account." Late-day work is
+   live, not stood down.* The two-tier cutover itself landed
    and verified (COO st-dgwj/st-85dv; scorer emits `EVENT` lines, watch tier is
    `tools/effort_event_watch.sh`, contract `docs/playbooks/emitter-two-tier.md`).
    The defect is **`st-mieu`**: SUPERLATIVE is a one-way ratchet and CLIMAX is
