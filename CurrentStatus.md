@@ -102,8 +102,12 @@ receipt [st-75z0]:
 ## Attention Items
 
 0a. **Emitter watch is STOPPED and should stay stopped until its shape is
-   decided** — Steve, 2026-08-25 14:28 CT: *"the monitor is not effective here
-   in last 30 minutes… we need a restart."* The two-tier cutover itself landed
+   decided.** *Attribution corrected 2026-08-26 (Steve: "i don't recall saying"
+   it): the line "the monitor is not effective here in last 30 minutes… we need
+   a restart" was Steve's `/handoff` argument at 14:28 CT on 08-25 — a session
+   handoff note, not a ruling to stop the watch. Recording it as "Steve's
+   call" was Strader's inference. The stop holds on Desk's ruling below, not
+   on that note.* The two-tier cutover itself landed
    and verified (COO st-dgwj/st-85dv; scorer emits `EVENT` lines, watch tier is
    `tools/effort_event_watch.sh`, contract `docs/playbooks/emitter-two-tier.md`).
    The defect is **`st-mieu`**: SUPERLATIVE is a one-way ratchet and CLIMAX is
