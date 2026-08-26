@@ -1,5 +1,90 @@
 # DaysActivity - 2026-08-26
 
+## 09:58 - Session Handoff [Rulings 7-14 Landed, Bridge Cut To Git, Anchorless Feeder Caught Live]
+
+**Summary**: Closed Desk Rulings 7 and 8 (the `live:` domain and the derived speech guard), then spent the session having every claim audited — twice by COO, twice by Steve — which withdrew two of my own numbers, repriced a bead, and caught a live instrument failure: the footprint feeder served Steve's plan-day page with ZERO Mancini anchors for 65 minutes of the open session while the parsed plan sat on the desk and the clipboard.
+
+**RESUMPTION POINT — read this first**:
+Tree clean at `ad5e727`, suite **1308 passed, 2 xfailed**. Nothing half-done.
+The bridge watch must be re-armed at tap-in — it is session-scoped and dies with
+the session:
+
+    Monitor: .venv/bin/python3 tools/bridge_inbox.py --watch --interval 60
+
+**What Steve decided today** (both via Desk, relayed in `Strader/_archive/`):
+- **Git replaces Drive as bridge transport** (Ruling 12a). COO migrated it;
+  `BRIDGE_DIR` unchanged, nothing of Strader's needed a change.
+- **Doctrine masters in the C:\ bridge repo**, one writer: Desk (Ruling 12b).
+- **STANDING CHANGE (Ruling 14):** workings-level decisions — schema, log
+  vocabulary, code pattern, internal sequencing — are ruled by Desk WITHOUT
+  Steve's countersignature. Steve's review moves to usage: what he sees, hears,
+  risks or spends. Address workings rulings to Desk and expect an answer with no
+  Steve round-trip. A ruled word that reads wrong on a live surface reopens on
+  his say-so.
+
+**Open Work**:
+- `st-92m7` Desk Ruling Never Arrived (P1, in progress) — stays open until COO's
+  git cutover proves the channel end to end. Its acceptance is the four memo
+  files, re-run against git rather than against what Drive did.
+- `st-kxnv` Anchorless Midnight Feeder (P1) — the parse now REPORTS the gap; the
+  one-line restart patch is still an ask for Steve. Option (b), the feeder
+  polling while empty, is the product-grade fix and wants a quiet window.
+- `st-ltk0` Spoken Surface Unlinted (P2) — ruled by Desk 13d (all three bare
+  `level`s speak `plan-level`) but gated behind the plan-level migration.
+- `st-pc9q` Emission Side Columns (P2) — schema SIGNED by Desk. Alert-kind
+  admission to the emission catalog stays open and does not gate the landing.
+- `st-cua1`, `st-iq9g`, `st-jg77`, `st-v3wj`, `co-b18wf` — all COO's.
+- `st-gsbu` Row Cannot Cite Itself — COO ruled it; `-` in REF is correct.
+- `st-7lw9` Grep Reaches Credentials (P1) — still unfixed, Steve's to land.
+
+**Tried**:
+- Claimed the four memos waited "27-53 minutes" from filename stamps → PARTLY
+  WRONG PREMISE. `bridge_inbox` computes age from mtime, so those were already
+  measurements. Steve's audit assumed otherwise; the assumption was wrong about
+  the tool, right about the risk.
+- Claimed "79m53s sync latency" → WITHDRAWN. Half measured, half a Desk filename
+  stamp from before Desk adopted mtime-derived naming. Drive manifests bracket
+  the true value in a 2h03m window and cannot narrow it.
+- Claimed "inbound rides a 4-hour cron" → WITHDRAWN, read off the crontab line
+  rather than measured. 48 runs: median gap 12 MINUTES, zero of 47 gaps reach
+  four hours. The recommendation built on it (event-driven inbound) was
+  withdrawn too.
+- Filed st-ltk0 P1 saying three bare `level`s are "lines Steve actually hears" →
+  REPRICED P2. `speak()` has exactly one caller and it is offline by design.
+- Nearly filed a dissent that the signal-ledger source did not exist → MY ERROR.
+  Read "the `ev` rows" as a field name, tested for it as a key, got zero. `ev` is
+  the VALUE of the `k` discriminator; 2808 rows exist.
+- Defined a helper INSIDE `main()` in run.py → the module-level `def` silently
+  truncated the function body; `main()` returned None and the brief never
+  printed. Python parsed it. Ten existing tests caught it.
+- `continue` on a broken channel in `bridge_inbox.watch` skipped the `once`
+  return and spun forever → caught by its own test, by hanging.
+- Backticks inside a double-quoted `git commit -m` were command-substituted and
+  ate two words of `e9aab4c`'s message → commit messages now go through a file
+  with `-F`. Same bug had already corrupted a bead description.
+
+**Files Changed**:
+.claude/skills/tap-in/SKILL.md
+CurrentStatus.md
+DaysActivity.md
+docs/a2a/inbox.md
+docs/lexicon/lexicon.yaml
+market/emission/__init__.py
+market/emission/renderer.py
+present/speech.py
+runbook/mancini/commentary/2026-08-26.jsonl
+runbook/mancini/run.py
+scripts/lexicon_render.py
+scripts/surface_liveness.sh
+tests/docs/test_lexicon.py
+tests/market/emission/test_live_guard.py
+tests/runbook/test_mancini_feeder_note.py
+tests/test_surface_liveness_probe.py
+tests/tools/test_bridge_inbox.py
+tools/bridge_inbox.py
+
+---
+
 ## 00:36 - Session Handoff [Emission Vocabulary — Finding 12 Answered, Desk Rulings Landed, Domain Close Next]
 
 **Summary**: Answered the one structural call COO's emission vocabulary review assigned to Strader (lexicon.yaml is the enforceable authority, the glossary is a derived view), corrected COO's "nothing enforces it" claim by measuring that the enforcement was built in July and parked behind `xfail`, filed four vocabulary recommendations for Desk after Steve handed that class to Desk mid-session, and discovered at 00:25 that five Desk ruling memos had been sitting unread in the bridge inbox for up to 9h35m — all now read, ACKed, archived, and logged.
