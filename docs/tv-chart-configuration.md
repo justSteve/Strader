@@ -3,6 +3,30 @@
 Primary instrument: SPX (or ES1! for futures reference)
 All times: Central Time
 
+## As Loaded (observed from Steve's screen caps, 2026-08-26)
+
+The tabs below are the recommended setup. This is what the caps actually
+show running, with the drawing conventions pinned so a reader can name what
+is on screen without re-deriving it. The ES chart is the one he caps.
+
+- **LuxAlgo Price Action Concepts** — CHoCH / CHoCH+ / BOS labels, volumetric
+  order blocks (the boxes with contract counts and %), Premium / Discount
+  zones, dashed equal-high/low lines. Order blocks are his strike-centering
+  tool (`knowledge/pac-order-blocks-for-strike-centering.md`).
+- **LuxAlgo Signals & Overlays** — Trend Catcher band (red bearish / blue
+  bullish), ▲+ / ▼+ confirmation signals, **exit crosses: blue ✕ = bullish
+  exit, orange ✕ = bearish exit**, Autopilot / Trend Strength dashboard.
+- **LuxAlgo Oscillator Matrix** — loaded (Steve, 2026-08-26: "oscillator is
+  loaded - not captured"). With *Show Divergences On Chart* it draws
+  **divergence lines on price: red connecting two highs = bearish
+  divergence (higher high in price, lower high in the oscillator); blue
+  connecting two lows = bullish.** The lines are set retrospectively — drawn
+  once the second pivot confirms, not while it forms.
+- **VWAP** (blue line) with a dotted current-price line.
+
+Chart reads follow `knowledge/never-guess-chart-readings.md`: crop before
+quoting a number.
+
 ---
 
 ## Tab 1: ORB Morning (8:30–10:00 CT)
