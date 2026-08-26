@@ -3,7 +3,7 @@
 **Role**: SPX Options Trading Intelligence (Consumer tier)
 **Bead Prefix**: `st`
 **Status**: zgent (in-process toward certification)
-**Last refreshed**: 2026-08-25 [st-mieu, st-2nyb, st-1eaw; earlier 2026-08-24 st-aq1n, st-wnuk, token re-auth; earlier 2026-08-21 st-9bsi, st-dioq, st-nujt; earlier 2026-08-20 st-ksgu, st-cc5k, st-1bv1, st-88ei; earlier 2026-08-19 st-tme, st-q5xu, st-7kmt, st-gno7; earlier same day st-vxbw, st-135m, st-kxnv; prior 2026-08-17 st-slj4, st-n0qm.5; 2026-08-13 st-aski, st-ad6p, st-g0or, st-75z0, st-pfrz, st-4ld0, st-xxo0, st-ylqw]
+**Last refreshed**: 2026-08-26 [st-66ld, st-hmbr, st-92m7, st-hd51, st-bkvt, st-cua1; earlier 2026-08-25 st-mieu, st-2nyb, st-1eaw; earlier 2026-08-24 st-aq1n, st-wnuk, token re-auth; earlier 2026-08-21 st-9bsi, st-dioq, st-nujt; earlier 2026-08-20 st-ksgu, st-cc5k, st-1bv1, st-88ei; earlier 2026-08-19 st-tme, st-q5xu, st-7kmt, st-gno7; earlier same day st-vxbw, st-135m, st-kxnv; prior 2026-08-17 st-slj4, st-n0qm.5; 2026-08-13 st-aski, st-ad6p, st-g0or, st-75z0, st-pfrz, st-4ld0, st-xxo0, st-ylqw]
 
 > Standing operational snapshot — what is wired up, live, or paused right now.
 > Session history lives in `DaysActivity.md`; work lives in beads; durable
@@ -106,11 +106,28 @@ receipt [st-75z0]:
    in last 30 minutes… we need a restart."* The two-tier cutover itself landed
    and verified (COO st-dgwj/st-85dv; scorer emits `EVENT` lines, watch tier is
    `tools/effort_event_watch.sh`, contract `docs/playbooks/emitter-two-tier.md`).
-   What is unresolved is **`st-mieu`**: SUPERLATIVE is a one-way ratchet and
-   CLIMAX is the 99.5th percentile of the session so far, so both alert bars
-   rise all day — measured silence 11:30-14:27 CT through a 13.50-pt range that
-   touched both framing anchors. Loudest at the open, mute in Steve's own
-   after-3pm window. The scorer keeps running regardless; it is the data source.
+   The defect is **`st-mieu`**: SUPERLATIVE is a one-way ratchet and CLIMAX is
+   the 99.5th percentile of the session so far, so both alert bars rise all day
+   — measured silence 11:30-14:27 CT through a 13.50-pt range that touched both
+   framing anchors. **Its shape is now RULED** (Desk, 2026-08-25/26): heartbeat
+   first as the emission schema's first citizen, rolling-window percentile
+   second and evidence-gated, thresholds retuned last from the counts. COO holds
+   the bead. Spec correction that binds both agents — sensitivity must be
+   **time-invariant across full RTH**; clock-time-weighted wake thresholds are
+   off the table and "loudest when Steve trades" is retracted as spec. The watch
+   stays stopped until the heartbeat lands. The scorer keeps running regardless;
+   it is the data source.
+
+0b. **Desk rulings addressed to Strader do not reach Strader** — `st-92m7`,
+   P1. Five ruling memos sat unread in `zgent-bridge/Strader/inbox/` for up to
+   9h35m on 2026-08-25, found only by listing the directory. Nothing Strader
+   owns polls that folder, so a ruling can be delivered and invisible at the
+   same time; Strader re-derived one of them independently and spent an evening
+   relaying dissents through COO to an authority already writing to it directly.
+   Desk now writes to both inboxes and routes nothing through COO by courtesy —
+   that is the outbound half. The inbound half is unbuilt: tap-in step 4c must
+   surface peer memos whose `for:` names Strader and log a MEMO row. Until it
+   does, **check the bridge inbox by hand at tap-in**.
 
 0. *(Done 2026-08-12 pre-open: method-notes section removed before the parse
    published — `st-st6h` closed, commit `028341a`.)*
