@@ -7,7 +7,9 @@ arrives after start-up is reported, a quiet bridge says nothing, and an absent
 Windows mount is silence rather than a crash.
 """
 import json
+import os
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -18,6 +20,12 @@ from tools import bridge_inbox as bi
 HEADER = ("# {title}\n\n"
           "**class:** {klass} · **from:** {sender} · **for:** COO, Strader\n\n"
           "body\n")
+
+
+@pytest.fixture(autouse=True)
+def _isolated_seen_ledger(tmp_path, monkeypatch):
+    """Never let a test append to the real /var/moo ledger."""
+    monkeypatch.setattr(bi, "SEEN_LEDGER", tmp_path / "seen.jsonl")
 
 
 @pytest.fixture
@@ -181,3 +189,165 @@ def test_only_strader_inbox_is_read(bridge, capsys):
     (bridge / "Strader" / "_archive" / "20260825T143000__Desk__done.md").write_text(
         HEADER.format(title="t", klass="ruling", sender="Desk"), encoding="utf-8")
     assert bi.scan(str(bridge)) == []
+
+
+# ── arrival: the durable mark, and its fallbacks [st-w87l] ─────────────────
+
+def test_first_sighting_falls_back_to_mtime_and_records_it(bridge):
+    """Nothing has seen it yet, so mtime is the floor — and the row written
+    says so, because a claim's provenance travels with it."""
+    drop(bridge, "20260826T012334__Desk__x.md", age_s=600)
+    memos = bi.scan(str(bridge))
+    assert memos[0].first_seen_source == "mtime"
+    rows = [json.loads(l) for l in bi.SEEN_LEDGER.read_text().splitlines() if l.strip()]
+    assert len(rows) == 1
+    assert rows[0]["stem"] == "20260826T012334__Desk__x"
+    assert rows[0]["observed_source"] == "mtime"
+
+
+def test_the_second_read_prefers_the_ledger(bridge):
+    drop(bridge, "20260826T012334__Desk__x.md")
+    assert bi.scan(str(bridge))[0].first_seen_source == "mtime"
+    assert bi.scan(str(bridge))[0].first_seen_source == "ledger"
+
+
+def test_the_ledger_survives_an_mtime_rewrite(bridge):
+    """THE POINT OF THE BEAD. On 2026-08-25 the Drive sync re-delivered four
+    edited-in-place memos and overwrote their arrival mtimes. Once this
+    observer has recorded a sighting, a later rewrite cannot move it."""
+    p = drop(bridge, "20260826T012334__Desk__x.md", age_s=7200)
+    first = bi.scan(str(bridge))[0]
+    assert first.first_seen_source == "mtime" and first.age_s >= 7000
+
+    now = time.time()                      # the re-delivery
+    os.utime(p, (now, now))
+
+    after = bi.scan(str(bridge))[0]
+    assert after.first_seen_source == "ledger"
+    assert after.age_s >= 7000, "a rewrite must not make an old memo look new"
+    assert abs(after.first_seen_ts - first.first_seen_ts) < 1
+
+
+def test_first_write_wins_when_the_ledger_has_duplicates(bridge):
+    """Append-only means a later row is history, not an update."""
+    stem = "20260826T012334__Desk__x"
+    bi.SEEN_LEDGER.write_text(
+        json.dumps({"ts": "2026-08-26T01:00:00+00:00", "stem": stem}) + "\n"
+        + json.dumps({"ts": "2026-08-26T09:00:00+00:00", "stem": stem}) + "\n")
+    assert bi._ledger_first_seen()[stem] == \
+        datetime.fromisoformat("2026-08-26T01:00:00+00:00").timestamp()
+
+
+def test_a_torn_ledger_line_does_not_lose_the_rest(bridge):
+    """An append-only file written by a poller can be torn by a crash
+    mid-write. Losing every arrival mark because of one bad line would be the
+    same class of loss this ledger exists to prevent."""
+    bi.SEEN_LEDGER.write_text(
+        json.dumps({"ts": "2026-08-26T01:00:00+00:00", "stem": "good-1"}) + "\n"
+        + '{"ts": "2026-08-26T02:00:00+00:00", "stem": "tor\n'
+        + "not json at all\n"
+        + json.dumps({"stem": "no-ts"}) + "\n"
+        + json.dumps({"ts": "nonsense", "stem": "bad-ts"}) + "\n"
+        + json.dumps({"ts": "2026-08-26T03:00:00+00:00", "stem": "good-2"}) + "\n")
+    seen = bi._ledger_first_seen()
+    assert set(seen) == {"good-1", "good-2"}
+
+
+def test_an_unwritable_ledger_does_not_break_the_poll(bridge, monkeypatch):
+    """/var/moo can be absent or read-only. Bookkeeping must never be the
+    reason a bridge poll dies — the poll is the safety mechanism."""
+    monkeypatch.setattr(bi, "SEEN_LEDGER", bridge / "nope" / "x" / "seen.jsonl")
+    monkeypatch.setattr(bi.Path, "mkdir",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("ro")))
+    drop(bridge, "20260826T012334__Desk__x.md")
+    memos = bi.scan(str(bridge))
+    assert len(memos) == 1 and memos[0].first_seen_source == "mtime"
+
+
+def test_git_author_date_supplies_send_time_not_arrival(bridge):
+    """Ruling 12a: the bridge becomes a git repo. Git answers WHEN IT WAS SENT,
+    which is the leg st-92m7 measures; arrival stays this observer's to record.
+    Wired before the cutover so it needs no second pass."""
+    import subprocess
+    inbox = bridge / "Strader" / "inbox"
+    p = drop(bridge, "20260826T012334__Desk__x.md")
+    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+           "GIT_AUTHOR_DATE": "2026-08-26T01:00:00-05:00",
+           "GIT_COMMITTER_DATE": "2026-08-26T01:00:00-05:00",
+           "PATH": os.environ.get("PATH", ""), "HOME": str(bridge)}
+    for cmd in (["git", "init", "-q"], ["git", "add", "-A"],
+                ["git", "commit", "-qm", "x"]):
+        r = subprocess.run(cmd, cwd=bridge, env=env, capture_output=True)
+        if r.returncode != 0:
+            pytest.skip(f"git unavailable: {r.stderr[:120]}")
+    now = time.time()
+    os.utime(p, (now, now))                # checkout-time mtime, i.e. wrong
+
+    memo = bi.read_memo(p, "", seen={})
+    assert memo.sent_source == "git", "git author date is SEND time, not arrival"
+    assert datetime.fromtimestamp(memo.sent_ts, timezone.utc).astimezone(
+        timezone(timedelta(hours=-5))).hour == 1
+    assert memo.first_seen_source == "mtime", "arrival is still ours to observe"
+
+
+def test_the_report_marks_a_weaker_first_seen_source(bridge, capsys):
+    """An mtime-sourced age is weaker evidence than a ledger-sourced one, and
+    the difference has already changed a diagnosis once."""
+    drop(bridge, "20260826T012334__Desk__x.md")
+    bi.main(["--bridge", str(bridge)])
+    assert "(mtime)" in capsys.readouterr().out
+    bi.main(["--bridge", str(bridge)])
+    assert "(mtime)" not in capsys.readouterr().out
+
+
+# ── first-seen and sent are different quantities [st-w87l, COO's catch] ─────
+
+def test_send_and_arrival_are_recorded_separately(bridge):
+    """Collapsing them would answer the question we do not ask and lose the
+    one we keep asking: st-92m7 is a SEND-to-read measurement."""
+    drop(bridge, "20260826T012334__Desk__x.md", age_s=600)
+    m = bi.scan(str(bridge))[0]
+    assert m.first_seen_source == "mtime"
+    assert m.sent_source == "stamp"
+    assert m.sent_ts != m.first_seen_ts
+    assert m.transit_s == int(m.first_seen_ts - m.sent_ts)
+
+
+def test_the_filename_stamp_is_read_as_central():
+    """Every human-facing stamp here is CT. Reading one as UTC would put a
+    five-hour error straight into a transit figure."""
+    p = Path("/x/20260826T013442__Desk__x.md")
+    ts, src = bi.sent_at(p, "20260826T013442__Desk__x")
+    assert src == "stamp"
+    ct = datetime.fromtimestamp(ts, timezone.utc).astimezone(bi._CT)
+    assert (ct.hour, ct.minute) == (1, 34)
+
+
+def test_an_unparseable_name_yields_no_send_time_rather_than_a_guess(bridge):
+    """`none` is a real answer. Substituting arrival for send would manufacture
+    a transit of zero and look like perfect delivery."""
+    p = bridge / "Strader" / "inbox" / "not-a-memo-name.md"
+    p.write_text("# x\n", encoding="utf-8")
+    ts, src = bi.sent_at(p, "not-a-memo-name")
+    assert (ts, src) == (None, "none")
+    assert bi.read_memo(p, "", seen={}).transit_s is None
+
+
+def test_the_ledger_carries_send_time_beside_arrival(bridge):
+    """After cutover a pull lands a backlog at one instant, so first-seen goes
+    flat and send time is the only thing still separating the memos in it."""
+    drop(bridge, "20260826T012334__Desk__x.md", age_s=600)
+    bi.scan(str(bridge))
+    row = json.loads(bi.SEEN_LEDGER.read_text().splitlines()[0])
+    assert row["sent_source"] == "stamp"
+    assert row["sent"] and row["sent"] != row["ts"]
+
+
+def test_transit_is_reported_with_its_provenance(bridge, capsys):
+    """A stamp-sourced transit inherits the stamp's uncertainty, so it may not
+    appear without the label."""
+    drop(bridge, "20260826T012334__Desk__x.md", age_s=7200)
+    bi.main(["--bridge", str(bridge)])
+    out = capsys.readouterr().out
+    assert "transit" in out and "a claim" in out
