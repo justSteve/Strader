@@ -333,6 +333,26 @@ terms:
     live: hindsight
     definition: Grade > 0.6 (15.8% / 23.0%). Survives any reasonable reclassification.
     on_the_chart: Unmistakable — the textbook example you would screenshot.
+  - term: grade-band
+    tier: band
+    status: ratified
+    live: hindsight
+    definition: >
+      Which stripe of certainty a grade falls in — coin-flip, lean, solid,
+      strong — and the name for that four-way scale itself. Hindsight because
+      a grade is day-relative: it ranks a unit against the whole session, so
+      no grade-band can be known until the session is.
+    on_the_chart: Nothing directly — it is the certainty stripe on a label, not a mark on the tape.
+    note: >
+      Registered by Desk Ruling 13a, 2026-08-26. It was a term in everything
+      but registration: named in banned_bare's compounds since 2026-07-28,
+      used normatively in conventions.grades_not_gates ("report it with the
+      grade-band attached"), and carried in the hand-written denylist st-hd51
+      retired. Registering it is what puts it in the derived refusal set,
+      which is the point of Ruling 8 — the entry does the work, not a list
+      somewhere. Distinct from VWAP-band, the price envelope; that collision
+      is why the bare form is banned, and this entry's first draft used it
+      four times in its own prose until the linter said so.
 
   # ── Atom tier (1 minute) ─────────────────────────────────────────────────
   - term: raw-atom
