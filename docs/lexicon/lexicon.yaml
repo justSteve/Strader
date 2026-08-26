@@ -75,14 +75,21 @@ meta:
     # leaving these unread does not leave the question open, it settles it the
     # other way. Whichever Desk picks, picking is what has to happen.
     #
-    # AND THERE IS A DEADLOCK UNDERNEATH IT, measured 2026-08-25. Desk's own
-    # 14:30 ruling memo closes by listing these same four as "Open on Steve's
-    # desk (unchanged) ... COO's defaults stand unless he speaks." Steve then
-    # told Strader at ~17:00 that Desk clears them. So as things stand Desk is
-    # waiting on Steve, Steve is waiting on Desk, and COO's defaults win by
-    # mutual deferral — including on the two Strader dissents, which is the
-    # one outcome nobody chose. Desk has to be told its own premise changed.
-    # Routed through COO, which is the only working path to Desk (st-92m7).
+    # THERE IS NO DEADLOCK. An earlier version of this note claimed one — that
+    # Desk was waiting on Steve while Steve waited on Desk — and it was wrong.
+    # Corrected 2026-08-25 by Strader; caught by COO, who was right.
+    # COO's 16:30 memo had already told Desk, four hours before that note was
+    # written: "He has now spoken, and what he said is that you speak for him
+    # on these. So they are not open on his desk any more; they are open on
+    # yours." It asks Desk to rule each in a line and flags this same hazard
+    # in Ruling 1's own terms. Desk archived it, which is how receipt is
+    # signalled here. The true state is simply that DESK HAS THE BALL AND HAS
+    # NOT YET RULED — no premise to repair, only a ruling outstanding.
+    # How the error happened, since it is the day's recurring shape: Strader
+    # read Desk's 14:30 memo and took it for current state without checking
+    # what superseded it. The 16:30 memo was one line above it in a directory
+    # listing Strader had already produced and did not open. Same defect as
+    # the scoped grep — a partial read reported as the state of the world.
     - id: climax-belongs-to-the-gauge
       date: 2026-08-25
       bead: st-66ld
