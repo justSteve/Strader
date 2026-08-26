@@ -54,11 +54,11 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass, asdict
+from datetime import datetime, timezone
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 log = logging.getLogger(__name__)
-from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
-from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LEDGER = REPO_ROOT / "docs/a2a/inbox.md"
@@ -267,6 +267,45 @@ def record_first_seen(memos: list["Memo"]) -> int:
     return len(fresh)
 
 
+# AN EMPTY CHANNEL AND A BROKEN ONE ARE NOT THE SAME THING. [st-92m7]
+#
+# Until 2026-08-26 this module reported all three of these as the identical
+# string "Strader/inbox empty" with exit 0:
+#
+#   the Windows mount is away          -> cannot tell
+#   the mount is there, the inbox is not -> BROKEN
+#   the inbox is there and drained     -> nothing waiting
+#
+# COO surfaced the shape while migrating the bridge to git: its first commit
+# silently dropped seven empty directories, Strader/inbox among them, because
+# git does not track them. A fresh clone would have had no inbox at all and
+# this tool would have said "empty" — cheerfully, at exit 0, forever.
+#
+# Its sentence is the one to keep: an empty inbox means drained, an absent one
+# means broken, and at clone time those had become the same thing. They were
+# the same thing here ALWAYS, not only at clone time — which makes it the very
+# defect this module was written four hours earlier to end, in the module
+# itself. A mechanism that looks like coverage.
+
+
+def channel_state(bridge: str | None = None) -> tuple[str, str]:
+    """('waiting' | 'empty' | 'missing' | 'unreachable', why).
+
+    ``unreachable`` is NORMAL — the Windows host is often away — and is not a
+    fault. ``missing`` is never normal: the mount is present and our own inbox
+    is not, which after the git cutover means a clone without its .gitkeep, and
+    before it meant someone moved a folder.
+    """
+    root = Path(bridge or os.environ.get("BRIDGE_DIR", DEFAULT_BRIDGE))
+    if not root.is_dir():
+        return "unreachable", f"bridge mount absent ({root}) — host away, normal"
+    d = root / ME / "inbox"
+    if not d.is_dir():
+        return "missing", (f"{ME}/inbox does not exist under {root} — the "
+                           f"channel is BROKEN, not drained")
+    return ("waiting" if any(d.glob("*.md")) else "empty"), ""
+
+
 def inbox_dir(bridge: str | None = None) -> Path:
     root = bridge or os.environ.get("BRIDGE_DIR", DEFAULT_BRIDGE)
     return Path(root) / ME / "inbox"
@@ -362,9 +401,13 @@ def _now_ct() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M CT")
 
 
-def render(memos: list[Memo]) -> str:
+def render(memos: list[Memo], state: str = "empty", why: str = "") -> str:
     if not memos:
-        return f"bridge: {ME}/inbox empty"
+        if state == "missing":
+            return f"[ALERT] bridge: {why}"
+        if state == "unreachable":
+            return f"bridge: {why}"
+        return f"bridge: {ME}/inbox empty — drained, and the directory is there"
     lines = [f"bridge: {len(memos)} waiting for {ME}"]
     for m in memos:
         flag = "" if m.in_ledger else "  [NOT IN LEDGER]"
@@ -392,16 +435,36 @@ def watch(interval: int, bridge: str | None = None, once: bool = False) -> int:
     the backlog as though it just landed — tap-in has already reported that.
     """
     seen = {m.stem for m in scan(bridge)}
+    # None, not the current state: arming a watch on an ALREADY broken
+    # channel and saying nothing is the same silence this exists to end.
+    last_state = None
     while True:
         time.sleep(max(interval, 1))
-        for m in scan(bridge):
-            if m.stem in seen:
-                continue
-            seen.add(m.stem)
-            print(f"[BRIDGE] {m.sender} {m.klass} for {ME}: {m.stem}",
-                  flush=True)
-            if m.addressed_to != "?":
-                print(f"         for: {m.addressed_to}", flush=True)
+        # A watch silently watching a directory that no longer exists is worse
+        # than no watch: it produces the same silence as a quiet channel and is
+        # indistinguishable from it. Report the TRANSITION, once — reporting
+        # every tick would make an away host into a wake generator.
+        state, why = channel_state(bridge)
+        if state != last_state:
+            if state in ("missing", "unreachable"):
+                mark = "[ALERT] " if state == "missing" else ""
+                print(f"{mark}[BRIDGE] channel {state}: {why}", flush=True)
+            elif last_state in ("missing", "unreachable"):
+                print(f"[BRIDGE] channel back: {ME}/inbox readable again",
+                      flush=True)
+            last_state = state
+        # NOT `continue` here: that skips the `once` return below and spins
+        # forever on a broken channel. The test for this behaviour caught it by
+        # hanging, which is the loudest a test can be about a loop.
+        if state not in ("missing", "unreachable"):
+            for m in scan(bridge):
+                if m.stem in seen:
+                    continue
+                seen.add(m.stem)
+                print(f"[BRIDGE] {m.sender} {m.klass} for {ME}: {m.stem}",
+                      flush=True)
+                if m.addressed_to != "?":
+                    print(f"         for: {m.addressed_to}", flush=True)
         if once:
             return 0
 
@@ -421,6 +484,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.watch:
         return watch(args.interval, args.bridge)
 
+    state, why = channel_state(args.bridge)
+    if state == "missing":
+        # Loud and non-zero. A broken channel that exits 0 is how a session
+        # concludes "nothing waiting" about a channel it cannot see.
+        print(render([], state, why))
+        return 2
     memos = scan(args.bridge)
 
     if args.ledger:
@@ -429,10 +498,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.json:
-        print(json.dumps({"count": len(memos),
+        print(json.dumps({"state": state, "count": len(memos),
                           "memos": [asdict(m) for m in memos]}, indent=2))
     else:
-        print(render(memos))
+        print(render(memos, state, why))
     return 1 if memos else 0
 
 

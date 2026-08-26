@@ -351,3 +351,82 @@ def test_transit_is_reported_with_its_provenance(bridge, capsys):
     bi.main(["--bridge", str(bridge)])
     out = capsys.readouterr().out
     assert "transit" in out and "a claim" in out
+
+
+# ── drained, broken and unreachable are three states [st-92m7, COO's catch] ──
+#
+# COO's git migration silently dropped seven empty directories, Strader/inbox
+# among them, because git does not track them. A clone would have had no inbox
+# and this tool would have said "empty" at exit 0. Its sentence: an empty inbox
+# means drained, an absent one means broken. They were the same thing here
+# always, not only at clone time.
+
+def test_a_drained_inbox_says_the_directory_is_there(bridge, capsys):
+    assert bi.main(["--bridge", str(bridge)]) == 0
+    out = capsys.readouterr().out
+    assert "drained" in out and "directory is there" in out
+
+
+def test_a_missing_inbox_is_loud_and_non_zero(tmp_path, capsys):
+    """THE CLONE CASE. The mount is present and our own inbox is not."""
+    (tmp_path / "COO" / "inbox").mkdir(parents=True)     # a real bridge...
+    assert bi.main(["--bridge", str(tmp_path)]) == 2     # ...missing ours
+    # (tmp_path has no Strader/ — the `bridge` fixture is not used here)
+    out = capsys.readouterr().out
+    assert "[ALERT]" in out
+    assert "BROKEN, not drained" in out
+
+
+def test_an_unreachable_mount_is_normal_and_not_an_alert(capsys):
+    """The Windows host is often away. That is not a fault and must not cry
+    wolf, or the alert that matters gets filtered out with it."""
+    assert bi.main(["--bridge", "/no/such/mount"]) == 0
+    out = capsys.readouterr().out
+    assert "[ALERT]" not in out and "normal" in out
+
+
+def test_the_three_states_do_not_share_a_string(tmp_path, bridge):
+    other = tmp_path / "other-bridge"          # `bridge` IS tmp_path
+    (other / "COO" / "inbox").mkdir(parents=True)
+    drained = bi.render([], *bi.channel_state(str(bridge)))
+    missing = bi.render([], *bi.channel_state(str(other)))
+    unreach = bi.render([], *bi.channel_state("/no/such/mount"))
+    assert len({drained, missing, unreach}) == 3, "a state that reads like another is not a state"
+
+
+def test_json_carries_the_state(bridge, capsys):
+    bi.main(["--bridge", str(bridge), "--json"])
+    assert json.loads(capsys.readouterr().out)["state"] == "empty"
+
+
+def test_the_watch_announces_a_channel_that_breaks_mid_session(bridge, capsys, monkeypatch):
+    """A watch silently watching a directory that no longer exists produces the
+    same silence as a quiet channel. That silence is the failure."""
+    inbox = bridge / "Strader" / "inbox"
+    real_sleep = time.sleep
+
+    def sleep_then_break(_):
+        if inbox.exists():
+            inbox.rmdir()
+        real_sleep(0)
+
+    monkeypatch.setattr(bi.time, "sleep", sleep_then_break)
+    bi.watch(interval=1, bridge=str(bridge), once=True)
+    out = capsys.readouterr().out
+    assert "[ALERT]" in out and "missing" in out
+
+
+def test_the_watch_does_not_cry_wolf_every_tick(bridge, capsys, monkeypatch):
+    """Report the TRANSITION. An away host reported every tick is a wake
+    generator, and a noisy alert is one that gets ignored."""
+    (bridge / "Strader" / "inbox").rmdir()
+    real_sleep = time.sleep
+    monkeypatch.setattr(bi.time, "sleep", lambda _: real_sleep(0))
+    seen = []
+    for _ in range(3):
+        bi.watch(interval=1, bridge=str(bridge), once=True)
+        seen.append(capsys.readouterr().out)
+    # Each call is a fresh watch, and a fresh watch arming on an already
+    # broken channel MUST announce — saying nothing there is the failure.
+    assert all(s.count("[BRIDGE]") == 1 for s in seen), seen
+    assert all("[ALERT]" in s for s in seen)
