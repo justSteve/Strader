@@ -448,6 +448,45 @@ def _emit_desk_plan(result: ParseResult, extra_sections: list[str] | None = None
     return doc
 
 
+def _feeder_anchor_note(parse_date) -> str:
+    """Say whether the LIVE feeder actually holds the levels just published.
+
+    st-kxnv, measured 2026-08-26: the footprint feeder reads
+    ``mancini_levels_for(day)`` exactly once at start
+    (``scripts/live_footprint_feed.py:468``) and nothing re-reads it. Its unit
+    restarts at midnight on DayRolledOver; the parse lands hours later. So on
+    most days the feeder runs the entire session with ZERO of Steve's letter
+    levels, and the page looks completely normal while it does — measured
+    anchor counts at process start were 0 on 08-21, 08-22, 08-23, 08-25 and
+    08-26, and non-zero on 08-24 only because someone restarted it by hand.
+
+    The parse is the last thing that knows the levels changed, so it is the
+    right place to check. This REPORTS rather than restarts: bouncing a live
+    producer is a privileged act that belongs to a human who can see it happen,
+    and a script that quietly acquires that reach is worse than the gap it
+    closes. The one-line restart patch is on st-kxnv for Steve to land.
+
+    Never raises and never blocks the parse — a briefing line is not worth
+    failing a publish over.
+    """
+    from datetime import date as _d
+    if parse_date != _d.today():
+        return ""                      # a backfill says nothing about the feed
+    try:
+        import urllib.request
+        with urllib.request.urlopen(
+                "http://127.0.0.1:7788/bars?n=1", timeout=5) as fh:
+            meta = (json.loads(fh.read().decode()) or {}).get("meta") or {}
+        live = len(meta.get("mancini") or [])
+    except Exception:
+        return "\nfeeder: could not be reached — anchor state unknown [st-kxnv]"
+    if live:
+        return f"\nfeeder: holding {live} mancini level(s) — live page is current"
+    return ("\n[ALERT] feeder: holding 0 mancini levels — the live page does NOT "
+            "have today's plan [st-kxnv].\n        Fix: systemctl restart "
+            "strader-footprint-feed.service")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Mancini Runbook pilot")
     ap.add_argument("--show", metavar="YYYY-MM-DD", nargs="?", const="today",
@@ -746,6 +785,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         clip_note = f"clipboard: untouched — payload at {payload_path}"
 
+
     # 5. Brief (mini #9).
     brief = _render_brief(result)
     if chart_path is not None:
@@ -755,6 +795,7 @@ def main(argv: list[str] | None = None) -> int:
                   f"<- {desk_path.name}")
     if clip_note is not None:
         brief += f"\n{clip_note}"
+    brief += _feeder_anchor_note(result.date)
     print(brief)
     return 0
 
