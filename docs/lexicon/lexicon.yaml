@@ -44,13 +44,16 @@ meta:
     machine-checkable attributes — PARTLY ALREADY HERE. Desk proposes
     availability: hindsight_only per term; the `live:` field below has carried
     exactly that since 2026-07-28. The gap was not schema, it was that NOTHING
-    CONSUMED IT. HALF-CLOSED 2026-08-26: the emission renderer
-    (market/emission/renderer.py, st-bkvt, landing on its own commit) reads
-    `live:` and REFUSES to render a quantity that is not exactly `live` onto a
-    `live_only` surface — Ruling 8's fail-closed shape, applied at the point of
-    write. That is the seam, not the whole. The half still open is
-    present/speech.py, which hand-copies the stamp into _HINDSIGHT_TOKENS;
-    derive it instead and retire the denylist — st-hd51, still P1.
+    CONSUMED IT. CLOSED 2026-08-26, both halves. The emission renderer
+    (market/emission/renderer.py, st-bkvt) reads `live:` and refuses to render
+    a quantity that is not exactly `live` onto a `live_only` surface — Ruling
+    8's fail-closed shape at the point of write. And present/speech.py's
+    hand-copied _HINDSIGHT_TOKENS is RETIRED, not extended (st-hd51, Desk
+    Ruling 8): the refusal derives from this field via
+    renderer.assert_speakable, so the 13 hand-copied tokens covering 10 of 27
+    hindsight terms became total coverage that needs no edit when a term is
+    added. tests/market/emission/test_live_guard.py pins it, including that
+    speech.py carries no quoted lexicon term at all.
     (2) REPOINT speech.speak's citation from the glossary to this file — DONE,
     commit 52bb638.
     (3) GLOSSARY CARRIES A BANNER saying derived, not authoritative — DONE,

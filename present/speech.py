@@ -14,12 +14,16 @@ rendering rather than a reuse of ``Signal.reason``:
 2. Prices must be spoken the way a trader says them. "7438.25" read literally
    is "seven thousand four hundred thirty eight point two five" — wrong idiom,
    and too slow to be useful while the tape is moving.
-3. LIVE vs HINDSIGHT is a safety property. The glossary marks percentiles,
-   cells, legs and archetypes as HINDSIGHT — computable only once the day
-   completes. Speaking one in real time asserts something unknowable, so
-   :func:`speak` refuses to emit them at all. That stamp originates in the
-   lexicon's per-term ``live:`` field; ``_HINDSIGHT_TOKENS`` below is a hand
-   copy of it and should be derived from the lexicon instead — st-hd51.
+3. LIVE vs HINDSIGHT is a safety property. Percentiles, cells, legs and
+   archetypes are computable only once the day completes; speaking one in real
+   time asserts something unknowable, so :func:`speak` refuses to emit them at
+   all. The stamp is the lexicon's per-term ``live:`` field and the refusal is
+   DERIVED from it — :func:`market.emission.renderer.assert_speakable`, which
+   refuses anything not stamped exactly ``live``. This module carried a
+   hand-copied list of 13 tokens until 2026-08-26; it covered 10 of 27
+   hindsight terms and could not be completed in principle, because a
+   substring denylist cannot tell ``leg`` from *allege*. Desk Ruling 8
+   retired it rather than extending it. [st-hd51]
 
 4. Vocabulary is not written here either, for the emissions that have moved
    so far — one, ``sweep-print``. It renders through
@@ -47,8 +51,17 @@ import logging
 # layer can reach them without importing the presentation layer. Re-exported
 # here: this module was their home and strader/intent/readback.py imports them
 # from it. [st-bkvt]
-from market.emission import render
+# ``render`` is the function and ``renderer`` is the module. They are imported
+# under their own names deliberately: `from market.emission import render` used
+# to resolve to whichever the import machinery had bound last, and aliasing the
+# module over the function is a TypeError one call site away. [st-hd51]
+from market.emission import render, renderer
 from market.emission.numbers import spoken_count, spoken_price
+# One HindsightLeak, not two. The schema-rendered path and the hand-built
+# phrasings below fail the same way with the same class, so a caller guarding
+# against a hindsight leak does not have to know which half produced it.
+# Re-exported here because this module was its home. [st-hd51]
+from market.emission.renderer import HindsightLeak
 from market.signals.types import (
     Signal, Bias, Regime, Level, Alert, Action, InferenceRequest,
 )
@@ -90,21 +103,6 @@ _ANCHOR_KINDS = {
 # threshold sits between those two bands and exists to name that damping out
 # loud, not to invent a grading of its own.
 _CONF_GUARDED = 0.75
-
-# Quantities the glossary marks HINDSIGHT — knowable only after the day
-# completes. None of the LIVE signal types below carry them; this net exists so
-# that a future subclass cannot start narrating them by accident.
-_HINDSIGHT_TOKENS = (
-    "percentile", "archetype", "flush-leg", "steady-leg", "leg-grind",
-    "counterforce-leg", "absorption-stall", "hollow-glide", "probe-fade",
-    "dead-drift", "pivot-atom", "grade-band", "coin-flip",
-)
-
-
-class HindsightLeak(AssertionError):
-    """Raised when a phrasing would speak a quantity that is only knowable
-    after the session ends. A bug in a phrasing function, never user input."""
-
 
 # --------------------------------------------------------------------------
 # Phrasings
@@ -262,10 +260,14 @@ def speak(sig: Signal) -> str | None:
 
 
 def _assert_live(line: str, sig: Signal) -> None:
-    lowered = line.lower()
-    for token in _HINDSIGHT_TOKENS:
-        if token in lowered:
-            raise HindsightLeak(
-                f"{type(sig).__name__} phrasing would speak the HINDSIGHT term "
-                f"{token!r} in real time: {line!r}"
-            )
+    """Refuse to speak anything the lexicon does not stamp exactly ``live``.
+
+    The net exists because no LIVE signal type below carries a hindsight
+    quantity today — it is here so a future phrasing, or a subclass someone
+    adds in a hurry, cannot start narrating one by accident. What it refuses
+    is derived from ``docs/lexicon/lexicon.yaml`` at
+    :func:`market.emission.renderer.unspeakable`, never listed here: a term
+    added to the lexicon is covered the day it lands, and this module has no
+    copy of the vocabulary to fall out of date. [st-hd51, Desk Ruling 8]
+    """
+    renderer.assert_speakable(line, f"{type(sig).__name__} phrasing")

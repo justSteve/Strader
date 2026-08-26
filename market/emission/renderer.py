@@ -50,6 +50,7 @@ from market.emission.numbers import spoken_count, spoken_price
 
 __all__ = [
     "render", "renders", "schema", "reload",
+    "unspeakable", "assert_speakable",
     "EmissionError", "SchemaError", "SlotError", "HindsightLeak",
 ]
 
@@ -88,13 +89,15 @@ class HindsightLeak(EmissionError):
 # ── schema ─────────────────────────────────────────────────────────────────
 
 _CACHE: dict | None = None
+_DOC: dict | None = None
+_UNSPEAKABLE: tuple[dict, "re.Pattern[str]"] | None = None
 
 
 def reload() -> dict:
-    """Drop the cached schema and re-read the lexicon. For tests and for the
-    desk renderer; production reads the file once per process."""
-    global _CACHE
-    _CACHE = None
+    """Drop every cache and re-read the lexicon. For tests and for the desk
+    renderer; production reads the file once per process."""
+    global _CACHE, _DOC, _UNSPEAKABLE
+    _CACHE = _DOC = _UNSPEAKABLE = None
     return schema()
 
 
@@ -111,14 +114,91 @@ def schema() -> dict:
 
 
 def _load_raw() -> dict:
-    doc = yaml.safe_load(LEXICON_PATH.read_text(encoding="utf-8"))
-    block = doc.get("emission")
+    block = _document().get("emission")
     if not block:
         raise SchemaError(
             f"{LEXICON_PATH} has no top-level `emission:` block. The renderer "
             "has no vocabulary without it; nothing can be emitted."
         )
     return block
+
+
+def _document() -> dict:
+    """The whole lexicon, parsed once. Two things are read out of it — the
+    ``emission:`` block and the term list's ``live:`` stamps — and two loaders
+    over one file is how the copies this module exists to end get made."""
+    global _DOC
+    if _DOC is None:
+        _DOC = yaml.safe_load(LEXICON_PATH.read_text(encoding="utf-8"))
+    return _DOC
+
+
+# ── the spoken surface's allowlist, derived ────────────────────────────────
+# Desk Ruling 8, memo 20260826T001224: a surface that speaks in real time may
+# say nothing whose `live:` is not exactly `live`. Fails closed against
+# `hindsight`, `definitional`, and any value invented after this was written.
+#
+# WHY IT IS DERIVED. present/speech.py carried a hand-copied denylist of 13
+# tokens. Measured 2026-08-26: it covered 10 of 27 hindsight terms, and a
+# denylist of this shape has no completion in principle — Desk's own examples,
+# `leg` inside *allege* and `pace` inside *space*, are why "just add the
+# missing 17" breaks the module while looking like the obvious move. The list
+# is not extended. It is computed from the file that already carries the
+# answer, so a term added to the lexicon tomorrow is covered tomorrow.
+#
+# The fused-word discipline is the lexicon linter's, verbatim in effect: a term
+# fused to a word character or a hyphen is a different word. That is what makes
+# *allege* and *space* safe to write while `leg` and `pace` stay refused.
+
+
+def unspeakable() -> dict[str, str]:
+    """Every lexicon term a real-time surface may not say, to its ``live:``.
+
+    Not "the hindsight terms": anything not exactly ``live``, so a fourth
+    domain member added without a consumer change fails closed rather than
+    silently becoming speakable.
+    """
+    return dict(_unspeakable()[0])
+
+
+def assert_speakable(line: str, where: str) -> None:
+    """Raise :class:`HindsightLeak` if ``line`` says something unspeakable.
+
+    ``where`` names the caller for the message — a phrasing function, a
+    template id. Every failure is a bug in the caller, never user input.
+    """
+    terms, rx = _unspeakable()
+    m = rx.search(line)
+    if m is None:
+        return
+    term = m.group(0)
+    stamp = terms.get(term.lower(), "not live")
+    raise HindsightLeak(
+        f"{where} would speak {term!r} in real time, and the lexicon stamps it "
+        f"`live: {stamp}`. A real-time surface says only what is knowable in "
+        f"the moment: {line!r}"
+    )
+
+
+def _unspeakable() -> tuple[dict[str, str], "re.Pattern[str]"]:
+    global _UNSPEAKABLE
+    if _UNSPEAKABLE is None:
+        doc = _document()
+        terms = {t["term"].lower(): t["live"] for t in doc.get("terms", ())
+                 if t.get("live") != "live"}
+        if not terms:
+            raise SchemaError(
+                f"{LEXICON_PATH} yielded no non-`live` terms. The lexicon has "
+                "carried hindsight stamps since 2026-07-28, so an empty set "
+                "means the file or its `live:` field changed shape and the "
+                "spoken surface just lost its guard — st-hd51."
+            )
+        # Longest first: "coin-flip band" must report as itself, not as "band".
+        alternation = "|".join(
+            re.escape(t) for t in sorted(terms, key=len, reverse=True))
+        rx = re.compile(rf"(?i)(?<![\w-])(?:{alternation})(?![\w-])")
+        _UNSPEAKABLE = (terms, rx)
+    return _UNSPEAKABLE
 
 
 def _build(block: dict) -> dict:
