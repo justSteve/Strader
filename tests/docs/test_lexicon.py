@@ -29,12 +29,47 @@ def _lexicon():
 
 
 def test_loads_and_has_required_fields():
+    """Field policy comes from meta.term_fields, not from a constant here —
+    the same discipline the banned-bare tests follow. [st-zt9b]"""
     lex = _lexicon()
     assert lex["meta"]["version"] >= 1
     assert lex["banned_bare"] and lex["terms"]
+    required = lex["meta"]["term_fields"]["required"]
     for t in lex["terms"]:
-        for f in ("term", "tier", "status", "live", "definition", "on_the_chart"):
+        for f in required:
             assert f in t, f"{t.get('term', '?')} missing {f}"
+
+
+def test_no_term_carries_an_unknown_field():
+    """required + optional is the WHOLE field set. A misspelled key (`notes:`
+    for `note:`) is otherwise invisible — YAML accepts it and every consumer
+    silently ignores it. [st-zt9b]"""
+    lex = _lexicon()
+    fields = lex["meta"]["term_fields"]
+    known = set(fields["required"]) | set(fields["optional"])
+    offenders = [f"{t['term']}: unknown field {k!r}"
+                 for t in lex["terms"] for k in t if k not in known]
+    assert not offenders, "\n".join(offenders)
+
+
+def test_live_domain_is_closed():
+    """Desk Ruling 7, 2026-08-26: the `live:` domain is exactly the three
+    members meta.live_domain names. A dual-natured term is SPLIT into two
+    entries (raw-atom / graded-atom), never given a fourth token — one term
+    carrying two meanings is the defect the whole vocabulary review is about.
+
+    This is the domain half of the ruling; the consumer half is st-hd51,
+    where speech.py speaks nothing whose value is not exactly `live`. Order is
+    deliberate: honest members first, allowlist over them second. [st-zt9b]"""
+    lex = _lexicon()
+    domain = set(lex["meta"]["live_domain"])
+    assert domain == {"live", "hindsight", "definitional"}, (
+        f"the closed domain moved without a ruling: {sorted(domain)}")
+    offenders = [f"{t['term']}: live: {t['live']!r}"
+                 for t in lex["terms"] if t["live"] not in domain]
+    assert not offenders, (
+        f"{len(offenders)} term(s) outside the closed live: domain "
+        f"{sorted(domain)}:\n" + "\n".join(offenders))
 
 
 def test_no_banned_bare_word_in_definitions():
@@ -42,7 +77,7 @@ def test_no_banned_bare_word_in_definitions():
     banned = [b["word"] for b in lex["banned_bare"]]
     offenders = []
     for t in lex["terms"]:
-        text = f"{t['definition']} {t['on_the_chart']}"
+        text = f"{t['definition']} {t['on_the_chart']} {t.get('note', '')}"
         for w in banned:
             # bare = the word with no hyphen fused on either side
             for m in re.finditer(rf'(?i)(?<![\w"-]){re.escape(w)}(?![\w"-])', text):

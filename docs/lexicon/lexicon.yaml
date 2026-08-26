@@ -10,7 +10,11 @@
 # FootPrint drill surface (or candlesticks where noted). `live` says whether
 # the thing is knowable in the moment (live) or only after the fact
 # (hindsight) — your yea/nay decisions can only ever be asked about live
-# terms; hindsight terms are how the tape gets graded afterward.
+# terms; hindsight terms are how the tape gets graded afterward. A third
+# value, `definitional`, means the tape cannot be asked at all: the term
+# describes the grading machinery rather than the market. Those three are the
+# whole list. `note` is the small print on a term — why the stamp reads the
+# way it does, and what would change it.
 
 meta:
   version: 1
@@ -39,9 +43,14 @@ meta:
     (1) MIGRATE the glossary's normative rules into this file as
     machine-checkable attributes — PARTLY ALREADY HERE. Desk proposes
     availability: hindsight_only per term; the `live:` field below has carried
-    exactly that since 2026-07-28. The gap is not schema, it is that NOTHING
-    CONSUMES IT: present/speech.py hand-copies the stamp into
-    _HINDSIGHT_TOKENS. Derive it instead — st-hd51.
+    exactly that since 2026-07-28. The gap was not schema, it was that NOTHING
+    CONSUMED IT. HALF-CLOSED 2026-08-26: the emission renderer
+    (market/emission/render.py, st-bkvt, landing on its own commit) reads
+    `live:` and REFUSES to render a quantity that is not exactly `live` onto a
+    `live_only` surface — Ruling 8's fail-closed shape, applied at the point of
+    write. That is the seam, not the whole. The half still open is
+    present/speech.py, which hand-copies the stamp into _HINDSIGHT_TOKENS;
+    derive it instead and retire the denylist — st-hd51, still P1.
     (2) REPOINT speech.speak's citation from the glossary to this file — DONE,
     commit 52bb638.
     (3) GLOSSARY CARRIES A BANNER saying derived, not authoritative — DONE,
@@ -172,6 +181,32 @@ meta:
         SetupName, which reads trigger: SetupName and keeps the two ideas
         apart: the FIELD is the trigger role, the TYPE is the name vocabulary.
         Desk should see both halves of this.
+  live_domain:
+    # CLOSED SET — Desk Ruling 7, memo 20260826T001224__Desk__rulings-7-8-and-
+    # setupname, 2026-08-26. A `live:` value outside this list fails the suite.
+    # A term that is genuinely two things gets TWO ENTRIES, never a fourth
+    # token: one term carrying two meanings is the defect this whole review is
+    # about, and `both` would ratify it into the schema. See raw-atom /
+    # graded-atom for the worked case. [st-zt9b]
+    live: >
+      Knowable in the moment. The only value speech.py may speak — Ruling 8,
+      st-hd51 — and the only one your yea/nay decisions can ride on.
+    hindsight: >
+      Knowable only after the fact. How the tape gets graded afterward;
+      diagnostic, never a live call.
+    definitional: >
+      Not a question the tape can answer at all — a property of the
+      definitions themselves. Named for what it is rather than `n/a`, which
+      was a value that said nothing.
+  term_fields:
+    required: [term, tier, status, live, definition, on_the_chart]
+    optional: [note]
+    note_field: >
+      `note` carries qualifying prose that used to sit in trailing YAML
+      comments — provenance, a stamp's conditions, what would change it. A
+      comment is invisible to every consumer that parses this file; a field is
+      not. Prose that qualifies a term belongs here, and the banned-bare rule
+      scans it like any other lexicon surface. [st-zt9b]
   conventions:
     compound_term: >
       A word that crosses domain boundaries never appears bare in a
@@ -255,7 +290,7 @@ terms:
   - term: cutpoint
     tier: band
     status: ratified
-    live: n/a (a property of definitions, not of tape)
+    live: definitional
     definition: >
       A dividing line in a classification — pace 0.75 is the flush-leg
       cutpoint; the archetype-grade measures distance from it. Distinct
@@ -264,6 +299,10 @@ terms:
       flip-stage). Cutpoints sort; thresholds act. Bare "cut" is banned in
       definitions — in speech it keeps its trading sense: cutting a position.
     on_the_chart: Nothing — cutpoints live in the grading, not on the tape.
+    note: >
+      A property of the definitions, not of the tape, so the tape can never be
+      asked about it — which is why `live:` reads `definitional` and not the
+      older `n/a`, a value that said nothing. [st-zt9b]
   - term: coin-flip band
     tier: band
     status: ratified
@@ -293,15 +332,34 @@ terms:
     on_the_chart: Unmistakable — the textbook example you would screenshot.
 
   # ── Atom tier (1 minute) ─────────────────────────────────────────────────
-  - term: atom
+  - term: raw-atom
     tier: atom
     status: ratified
-    live: live (raw) / hindsight (graded)
+    live: live
     definition: >
-      One clock minute of tape: net, range, travel-ratio, effort, force —
-      live at minute close. Its percentile grades and F-cell are
-      day-relative, hence hindsight.
+      One clock minute of tape as measured: net, range, travel-ratio, effort,
+      force. Complete at minute close — nothing in it waits on the rest of the
+      day, which is what makes it the live half of the minute.
     on_the_chart: Roughly 2-4 footprint columns' worth of tape at typical pace (columns are volume-bars, not minutes).
+    note: >
+      Was one term `atom` carrying both halves, stamped
+      `live (raw) / hindsight (graded)`. Split by Desk Ruling 7, 2026-08-26 —
+      one term with two availabilities is one term with two meanings, and the
+      `both` token was refused rather than ratified into the schema. The
+      partner entry is graded-atom. [st-zt9b]
+  - term: graded-atom
+    tier: atom
+    status: ratified
+    live: hindsight
+    definition: >
+      The same minute once it carries its percentile grades and F-cell. Those
+      are day-relative — each one ranks the minute against every other minute
+      of the session — so they cannot exist until the session does.
+    on_the_chart: The same column, once the day's grading has colored it.
+    note: >
+      The hindsight half of the split described in raw-atom. Every F-cell and
+      grade-band term in this tier reads a graded-atom, never a raw one.
+      [st-zt9b]
   - term: F1 conviction
     tier: atom
     status: ratified
@@ -541,6 +599,53 @@ terms:
     definition: ">= 3 consecutive diagonal bid/ask dominances (3:1) — one side owning a price ladder."
     on_the_chart: A diagonal run of lopsided cells.
 
+  # ── Level compounds (the three senses the bare word hides) ───────────────
+  # banned_bare has named these as the permitted replacements for "level"
+  # since 2026-07-28 but never defined them, so nothing could point AT them.
+  # The emission schema below binds fields to terms, which requires the term
+  # to exist. Definitions here are conformance to the 07-28 ruling, not new
+  # vocabulary. ladder-rung is the one addition: the emission review
+  # (2026-08-25, finding 2) named it as the replacement for the spoken
+  # imbalance line's bare "levels", in its own act-without-asking pile.
+  - term: tick-level
+    tier: unit
+    status: ratified
+    live: live
+    definition: >
+      One distinct price a sweep-print's aggressor walked through, counted in
+      ticks of the instrument. The sweep's only number. NOT a plan-level:
+      three tick-levels on /ES is half a point, which is why the bare word
+      misled — the same log line carries plan-levels four digits wide.
+    on_the_chart: Each price the single-print tail covers, one cell per tick.
+  - term: ladder-rung
+    tier: unit
+    status: ratified
+    live: live
+    definition: >
+      One price row of the bid/ask ladder inside a footprint column. What an
+      imbalance-stack stacks: three consecutive rungs one side dominated.
+      Distinct from tick-level (a sweep's path) and plan-level (a price from
+      the letter) though all three are prices.
+    on_the_chart: One horizontal cell pair in the column.
+  - term: plan-level
+    tier: unit
+    status: ratified
+    live: live
+    definition: >
+      A price carried into the session as structure to trade against —
+      Mancini's letter levels, the profile's POC/HVN/LVN, the prior day's
+      range edges. The only one of the three a level-state attaches to.
+    on_the_chart: The horizontal line drawn before the open, with its state word in the HUD.
+  - term: price-level
+    tier: unit
+    status: ratified
+    live: live
+    definition: >
+      A price the stage vocabulary breaks or retakes, named without claiming
+      it came from the plan. flush-stage goes through a price-level;
+      confirm-stage closes back across it.
+    on_the_chart: Wherever the stage sequence happened — marked after the fact, not drawn before.
+
   # ── Level-state tier (the Pine renderer's close-based words) ─────────────
   - term: level-state
     tier: level-state
@@ -557,12 +662,17 @@ terms:
   - term: V-signature
     tier: signature
     status: ratified
-    live: hindsight   # live trigger (provisional-pivot) is unbuilt future work
+    live: hindsight
     definition: >
       Prior down flush-leg <= -8 pts, confirmation-event within 3 min of
       the new up-leg. 77.5% wins vs 46.9% base (31/40, hindsight
       attribution). The measured V-dump fly entry.
     on_the_chart: The cliff, the turn, the immediate retake — your butterfly setup in taxonomy words.
+    note: >
+      Hindsight today because the attribution is hindsight. The live trigger —
+      a provisional-pivot that would call the prior down flush-leg before the
+      leg closes — is unbuilt future work; `live:` flips to `live` if it ever
+      ships. [st-zt9b]
   - term: host-leg
     tier: signature
     status: ratified
@@ -581,3 +691,185 @@ terms:
       conviction — the four-stage sequence at leg scale. 27.6% of down-up
       pairs; stall-conditional 0.60 vs 0.46.
     on_the_chart: Pile-up at the low, loud turn, bright staircase out.
+
+# ═══════════════════════════════════════════════════════════════════════════
+# EMISSION SCHEMA — how the words above reach a surface. [st-bkvt]
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Desk Ruling 1, requirement 5 (memo 20260825T143000, re-sequenced to LEAD by
+# the 18:00 amendment): emission strings are never hand-formatted. They render
+# from a mapping of field to canonical display name per surface, and that
+# mapping lives here.
+#
+# THE DEFECT THIS EXISTS TO MAKE IMPOSSIBLE. One number — how many distinct
+# prices a sweep's aggressor walked — went by three words at once: the field
+# said `ticks_swept`, the written line said "3 levels", the spoken line said
+# "three ticks", and the ratified word was a fourth thing, tick-level. Nothing
+# was broken; nobody had lied; the three surfaces had simply each been written
+# by hand. A linter can only catch that AFTER someone writes it wrong.
+#
+# THE MECHANISM. A template never contains a field's name. It contains slots
+# and connective tissue only. The word that names a quantity is written once,
+# in `quantities` below, and every surface pulls it from there. So there is no
+# edit that gives one number two words — you would have to add a second
+# quantity binding the same field, and test_lexicon.py fails on that.
+# Point-of-write validation, which Desk named as the principle behind this
+# ruling (18:00 amendment, process note) after a ledger writer let a bad KIND
+# through because its check ran after the string was already built.
+#
+# WHAT IS NOT HERE YET. Migration is deliberately partial: SweepPrint and
+# ImbalanceStack render from this schema, and the rest of the estate does not.
+# Desk's build order — schema, then the heartbeat as its first citizen, then
+# the evidence pass, then renames as migration consequences — puts the
+# remaining surfaces on their own beads (st-cua1 plan-level, st-1s1 SetupName,
+# st-mieu heartbeat). Adding one is a `templates` row plus a call site, and
+# the renames those beads carry become one-line edits HERE rather than a
+# search across three files.
+
+emission:
+  meta:
+    bead: st-bkvt
+    ruled_by: >
+      Desk Ruling 1 item 5, memo 20260825T143000__Desk__lexicon-ruling-scope-
+      boundary; re-sequenced to lead by 20260825T180000__Desk__rulings-amended-
+      on-dissent. Consumed by market/emission/render.py.
+    second_consumer: >
+      Desk also ruled this term set is the controlled identifier list for the
+      signal ledger's strategy/emission join key — one ratification, two
+      consumers. `quantities[].id` and `templates[].id` are that list. They are
+      lexicon term names, not invented ids, so a ledger row and an emission
+      string cannot come to disagree about what a thing is called.
+
+  # ── Surfaces ────────────────────────────────────────────────────────────
+  # A surface is a place an emission is rendered FOR someone. Two exist. The
+  # tmux pane (present/signals.py) is not a third — it prints `reason`
+  # verbatim, so it is a consumer of the reason surface, not a surface.
+  surfaces:
+    - id: reason
+      renders_to: Signal.reason
+      audience: >
+        The written line: the log, the pane, the postmortem, the replay
+        record. Read by Steve and by the harness both, so it stays terse and
+        keeps the measurement vocabulary.
+      numbers: digits
+      prices: decimal2      # 7555.00
+      span_join: "->"
+      sentence_case: false
+      live_only: false      # the written record may carry hindsight quantities
+    - id: speech
+      renders_to: present/speech.py
+      audience: >
+        The spoken line, heard while the tape is moving. Plain words, numbers
+        as words, prices in trader idiom. This is the surface st-v95 was
+        raised over.
+      numbers: words
+      prices: spoken        # "seventy-five fifty-five"
+      span_join: " to "
+      sentence_case: true
+      live_only: true       # speaking a hindsight quantity asserts the unknowable
+
+  # ── Emission names ──────────────────────────────────────────────────────
+  # What an emission calls ITSELF, written once. A rename — Ruling 3 defers
+  # one for the delta-percentile kind — is a one-line edit here, not a search
+  # across engine, speech, fixtures and log parsers.
+  names:
+    - id: sweep-print
+      term: sweep-print
+      display: sweep
+      note: >
+        Displayed as the short form; `sweep-print` is the ratified compound
+        and stays the identifier. Review finding 13 notes "sweep" also names a
+        parameter sweep in about eight engineering scripts — never in front of
+        Steve, recorded so a future rename does not walk into it.
+
+  # ── Quantities ──────────────────────────────────────────────────────────
+  # The unit of the whole mechanism: a thing an emission can carry a value of,
+  # its ONE display word, and the fields that hold it. `fields` is the join —
+  # `Signal.field`, fully qualified, because `direction` and `price` recur
+  # across signal types and a bare field name would silently merge them.
+  #
+  # RULE, enforced by tests/docs/test_lexicon.py: a field appears in at most
+  # one quantity. That is what makes one number with two words unwritable.
+  quantities:
+    - id: tick-level
+      term: tick-level
+      kind: count
+      live: live
+      display: {one: tick-level, many: tick-levels}
+      fields: [SweepPrint.ticks_swept]
+    - id: ladder-rung
+      term: ladder-rung
+      kind: count
+      live: live
+      from: length          # the value is the price tuple; the count is its len()
+      display: {one: ladder-rung, many: ladder-rungs}
+      fields: [ImbalanceStack.prices]
+      note: >
+        Declared with no template yet, which is legal: a quantity is the WORD,
+        a template is a rendering that uses it. ImbalanceStack says "N levels"
+        on both its surfaces today (present/speech.py, and the written line at
+        market/orderflow/imbalance.py:69). Migrating one surface alone would
+        put two words on one field, so both go together on st-iq9g — and the
+        word they migrate onto is already ratified, here.
+    - id: contract
+      kind: count
+      live: live
+      display: {one: contract, many: contracts}
+      fields: [SweepPrint.total_size]
+      note: >
+        No lexicon term: a contract is the instrument's unit, not price-action
+        vocabulary. Declared here so the word still has one home and the
+        renderer can pluralize it.
+    - id: aggressor-side
+      kind: enum
+      live: live
+      values: {buy: buy, sell: sell}
+      fields: [SweepPrint.direction, ImbalanceStack.direction]
+      note: >
+        Two fields, one quantity — legitimately the same thing on both types.
+        The surface decides case (speech capitalizes the sentence); the word
+        itself is written once, here.
+    - id: swept-span
+      kind: price-span
+      live: live
+      fields: [SweepPrint.span]
+      note: >
+        A (start, end) pair. Not two price fields, because the pair IS the
+        quantity — st-jg77's finding is that the span and the size predict
+        what the tick-level count does not, and it wants them led with.
+    - id: sweep-end
+      kind: price
+      live: live
+      fields: [SweepPrint.end_price]
+      note: >
+        The spoken line says where the sweep ENDED — where price is now —
+        and omits where it began, because by the time it is heard the start
+        is history. The written line keeps both as the span.
+
+  # ── Templates ───────────────────────────────────────────────────────────
+  # Connective tissue and slots. NEVER a field's display word — that is the
+  # whole point, and test_lexicon.py fails a template that contains one.
+  #
+  # Slot forms:
+  #   {field}        value + its quantity's display word ("3 tick-levels")
+  #   {field:bare}   value alone, no word — for when the tissue already names it
+  #   {@name}        the emission's own display name from `names` above
+  #
+  # A surface key absent from a template means that surface does not render
+  # this emission at all — a deliberate silence, not an oversight.
+  templates:
+    - id: sweep-print
+      signal: SweepPrint
+      name: sweep-print
+      surfaces:
+        reason: "{direction} {@name} {span} ({ticks_swept}, {total_size})"
+        speech: "{direction} {@name}, {ticks_swept} through to {end_price}, {total_size}."
+      note: >
+        The whole emission, both surfaces, which is the point — this is the
+        one the review is named for and it is migrated completely rather than
+        half. The written line keeps the span and drops nothing; the spoken
+        line omits where the sweep BEGAN, because by the time it is heard the
+        start is history and the end is where price is now.
+        st-jg77 wants this line led by span and size rather than the
+        tick-level count. Under this schema that is an edit to the two strings
+        above and nothing else — no code, no second surface to keep in step.
