@@ -166,6 +166,26 @@ def assert_speakable(line: str, where: str) -> None:
 
     ``where`` names the caller for the message — a phrasing function, a
     template id. Every failure is a bug in the caller, never user input.
+
+    NOT A SECOND LOCK ON THE SAME DOOR. The ``live_only`` check in
+    :func:`_format` is STRUCTURAL: it fires at the schema, so an emission that
+    would slot a non-``live`` quantity into a real-time surface is unwritable.
+    This one is TEXTUAL: it fires at the finished string, whatever built it.
+    While migration is partial it is the only thing covering the hand-built
+    phrasings — ``_setup_recognition``, ``_absorption_read``,
+    ``_delta_divergence`` all still write their own strings.
+
+    It stays after migration completes, and not merely as belt-and-braces for
+    a phrasing added in a hurry. A machine only enforces where it is POINTED.
+    ``banned_bare``'s coverage is a hand-maintained site list in
+    ``tests/docs/test_lexicon.py`` (``EMISSION_SITES``), and the denylist
+    st-hd51 retired was a hand-maintained token list; deriving *what* to
+    refuse without deriving *where* to look moves the hole one level out
+    instead of closing it. That is not hypothetical — st-ltk0 is exactly that
+    hole, found the day this landed: ``present/speech.py`` is absent from
+    ``EMISSION_SITES`` and says bare "level" in three lines Steve hears. This
+    function has no site list. It runs at every ``speak()`` call, which is why
+    it was the half actually covering the spoken surface. [st-hd51, st-ltk0]
     """
     terms, rx = _unspeakable()
     m = rx.search(line)
