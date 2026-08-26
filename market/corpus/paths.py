@@ -71,6 +71,12 @@ def schwab_path(d: date | None = None) -> Path:
     return day_dir(d) / "schwab.jsonl"
 
 
+def schwab_late_chain_path(d: date | None = None) -> Path:
+    """The last-hour 0DTE chain series (30s cadence, 14:00-15:01 CT) that gives
+    a late-day singleton a mark PATH instead of one 14:45 snapshot [st-9dyz]."""
+    return day_dir(d) / "schwab_late_chain.jsonl"
+
+
 def gexbot_path(d: date | None = None) -> Path:
     return day_dir(d) / "gexbot.jsonl"
 
