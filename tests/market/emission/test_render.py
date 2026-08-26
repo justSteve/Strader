@@ -148,7 +148,29 @@ def test_span_wants_a_pair():
 
 # ── schema validation ───────────────────────────────────────────────────────
 
+# A WHOLE stub lexicon, not an `emission:` fragment. The `terms:` and
+# `banned_bare:` stanzas are here because renderer.py has a second reader over
+# this same file — `_unspeakable()`, which derives the spoken surface's
+# allowlist from the term list (st-hd51). A stub carrying only `emission:`
+# still passes every test in this module, because none of them speak. But the
+# first test that used this fixture and then called speak() would get
+# "the file or its `live:` field changed shape" when the truth is "this stub
+# has no term list" — a real error message misdiagnosing a fake lexicon.
+# Cheaper to make the stub whole than to make the message hedge.
 _MINIMAL = """
+terms:
+  - term: widget-gauge
+    tier: axis
+    status: ratified
+    live: live
+    definition: A live thing, so the guard lets it be spoken.
+    on_the_chart: Nothing — this lexicon is a test stub.
+  - term: widget-grade
+    tier: band
+    status: ratified
+    live: hindsight
+    definition: A hindsight thing, so `_unspeakable()` has something to find.
+    on_the_chart: Nothing — this lexicon is a test stub.
 emission:
   surfaces:
     - id: reason
@@ -263,6 +285,19 @@ def test_duplicate_ids_are_refused(lexicon):
 def test_a_lexicon_with_no_emission_block_is_refused(lexicon):
     with pytest.raises(SchemaError, match="no top-level `emission:` block"):
         lexicon("terms: []\n")
+
+
+def test_the_stub_lexicon_is_whole_enough_for_the_other_reader(lexicon):
+    """`renderer.py` has two readers over one file — the `emission:` block and
+    `_unspeakable()`'s derivation from `terms:` (st-hd51). This fixture's stub
+    must satisfy both, or a future test that uses it and then speaks gets a
+    real error message describing a fake problem. Pinned so the `terms:`
+    stanza cannot be tidied out of _MINIMAL as unused."""
+    lexicon(_MINIMAL)
+    assert R.unspeakable() == {"widget-grade": "hindsight"}
+    R.assert_speakable("a widget-gauge is live and may be said", "stub")
+    with pytest.raises(HindsightLeak):
+        R.assert_speakable("a widget-grade may not", "stub")
 
 
 # ── the live guard (Ruling 8's shape, at the point of write) ────────────────
