@@ -5,6 +5,45 @@
 
 ---
 
+## Corrections, added the same evening
+
+Strader checked this review against the source and found three things wrong with
+it. All three were verified before being accepted here.
+
+**The guard test already exists, and that is worse news than none.** This page
+says nothing enforces the lexicon. In fact `tests/docs/test_lexicon.py` has been
+there since 31 July and is substantially the test proposed at the end of this
+page — it reads the banned-word list out of the lexicon and scans the code for
+emission strings. It has never caught anything, for two reasons: both of its
+banned-word tests are marked to be ignored whatever they find, and the list of
+places it looks is hand-maintained at five entries over four files. **None of the
+surfaces in this review are on that list.** The marks each name the same four
+rulings as their reason for being there. So the enforcement was built, then
+parked pending decisions that never came, while five new surfaces shipped past
+it. That looks like coverage and is not, which is worse than an honest gap.
+
+**Finding 12 overstated its case.** The plain-words glossary claims nothing about
+its own authority. The competing claim is one line in `speech.py`, about
+`speech.py`'s own renderings. Two documents did not each claim to be the
+authority; one module claimed it on the other's behalf.
+
+**Finding 7 has a better answer than the one below it.** The Pine chart does not
+merely use different words — at line 141 it already decides "held" against each
+level's own role, close-above for a support and close-below for a resistance,
+which is the exact direction this page measured as missing from REJECTION. So
+the fix is to adopt that machine, not its vocabulary; taking the words alone
+would carry the defect across under a better name. And the sharper finding is
+one this page missed entirely: **the emitter has no event for a level being
+reclaimed** — the state nearest two of the setups the whole system is built
+around. Filed as st-cua1, and it ranks above the rename.
+
+Also: `CarmineSetup` is smaller than this page implies. No emission has ever
+carried the name and no fixture moves, so it can land any time. The
+recommendation of `SetupTrigger` is withdrawn — the word *trigger* already means
+something else in the finding that prompted the rename.
+
+---
+
 ## The short version
 
 You asked to stop arguing about the word *sweep* on its own and look at the
