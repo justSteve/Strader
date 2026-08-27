@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 from datetime import datetime, time as _time, timedelta
 from pathlib import Path
@@ -19,8 +20,8 @@ sys.path.insert(0, str(ROOT))
 
 from market.corpus.paths import CENTRAL  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location(
-    "corpus_poll_schwab_late_chain", ROOT / "scripts" / "corpus_poll_schwab_late_chain.py")
+SCRIPT = ROOT / "scripts" / "corpus_poll_schwab_late_chain.py"
+_spec = importlib.util.spec_from_file_location("corpus_poll_schwab_late_chain", SCRIPT)
 mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(mod)
 
@@ -32,9 +33,29 @@ def ct(y, mo, d, h, mi, s=0):
 START, UNTIL = _time(14, 0), _time(15, 1)
 
 
-def test_module_does_not_import_the_schwab_reach_at_load():
-    assert "market.corpus.schwab_stream" not in sys.modules
-    assert "schwab" not in sys.modules and "broker_schwab" not in sys.modules
+def test_module_does_not_import_the_schwab_reach_at_load(tmp_path):
+    """Loading this script must not pull in the client reach — it defers to main().
+
+    Checked in a SUBPROCESS, deliberately. ``sys.modules`` is process-global, so
+    the in-process form this test used to have was decided by whatever ran
+    before it: green alone, RED in the full suite, and — the worse half — once
+    any earlier test has imported the name, the assertion stops saying anything
+    about THIS script at all. A guard the gate hook depends on must not be
+    answerable by test ordering. [st-4583, measured 2026-08-27]
+    """
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "import importlib.util, sys\n"
+        f"spec = importlib.util.spec_from_file_location('leg', {str(SCRIPT)!r})\n"
+        "mod = importlib.util.module_from_spec(spec)\n"
+        "spec.loader.exec_module(mod)\n"
+        "names = ('market.corpus.schwab_stream', 'schwab', 'broker_schwab')\n"
+        "print(','.join(n for n in names if n in sys.modules))\n",
+        encoding="utf-8",
+    )
+    out = subprocess.run([sys.executable, str(probe)], capture_output=True, text=True, cwd=str(ROOT))
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "", f"loading the script reached: {out.stdout.strip()}"
 
 
 @pytest.mark.parametrize("now,expected", [
