@@ -42,6 +42,8 @@ from market.signals.orderflow_config import (
     LARGE_LOT_MEDIAN_WINDOW,
     LARGE_LOT_MIN_SIZE,
     PIVOT_FILTER_TICKS,
+    SWEEP_MAX_SPAN_MS,
+    SWEEP_MIN_CONCENTRATION,
     SWEEP_MIN_SIZE,
     SWEEP_MIN_TICKS,
     SWEEP_WINDOW_MS,
@@ -167,18 +169,32 @@ class OrderflowEngine:
                 r["last_ts"] = t.ts
                 r["last_price"] = t.price
                 r["size"] += t.size
+                r["biggest"] = max(r["biggest"], t.size)
                 r["prices"].add(round(t.price / TICK))
                 return out
             out.extend(self._end_run())
         if t.side in ("B", "A"):
             self._run = {"side": t.side, "start_ts": t.ts, "last_ts": t.ts,
                          "start_price": t.price, "last_price": t.price,
-                         "size": t.size, "prices": {round(t.price / TICK)}}
+                         "size": t.size, "biggest": t.size,
+                         "prices": {round(t.price / TICK)}}
         return out
 
     def _end_run(self) -> list[Signal]:
         r, self._run = self._run, None
         if r is None or len(r["prices"]) < SWEEP_MIN_TICKS or r["size"] < SWEEP_MIN_SIZE:
+            return []
+        # ONE ORDER, NOT A CROWD [2026-08-27]. The gates above measure how much
+        # aggression happened; these two measure whether it came from a single
+        # participant. Without them the emission fires ~42x a session on
+        # thirteen small prints leaning the same way for 56ms, which is a real
+        # thing but is not a sweep. See orderflow_config for the measurement.
+        # Both are recorded on the signal, not just tested — the span is the
+        # field that best separates the two populations and it was previously
+        # computed and thrown away, so nothing downstream could filter on it.
+        span_ms = (r["last_ts"] - r["start_ts"]).total_seconds() * 1000.0
+        concentration = r["biggest"] / r["size"] if r["size"] else 0.0
+        if span_ms > SWEEP_MAX_SPAN_MS or concentration < SWEEP_MIN_CONCENTRATION:
             return []
         direction = "buy" if r["side"] == "B" else "sell"
         ticks = len(r["prices"])
@@ -196,6 +212,7 @@ class OrderflowEngine:
             }),
             direction=direction, start_price=r["start_price"],
             end_price=r["last_price"], ticks_swept=ticks, total_size=r["size"],
+            span_ms=round(span_ms, 3), concentration=round(concentration, 4),
         )]
 
     # ── pivots + divergence ─────────────────────────────────────────────────

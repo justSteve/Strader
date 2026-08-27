@@ -57,15 +57,52 @@ def test_large_lot_silent_during_warmup_then_fires():
 
 # ── sweeps ──────────────────────────────────────────────────────────────────
 def test_buy_sweep_emitted_on_run_end():
+    """One order taking several levels in one instant. [2026-08-27]
+
+    The fixture is deliberately shaped like the phenomenon: the fills land in
+    the same millisecond and one print carries most of the size. It used to be
+    three equal 40-lots ten milliseconds apart, which is a crowd — and which
+    the detector accepted, because it only counted levels and contracts."""
     e = OrderflowEngine()
     sigs = []
     for k in range(SWEEP_MIN_TICKS):
-        sigs += e.process(_t(k * 10, price=7500.0 + k * TICK, size=40, side="B"))
+        size = 200 if k == 0 else 20              # one dominant print
+        sigs += e.process(_t(0, price=7500.0 + k * TICK, size=size, side="B"))
     sigs += e.process(_t(5000, price=7500.0, size=1, side="A"))  # gap+side ends run
     sweeps = [s for s in sigs if isinstance(s, SweepPrint)]
     assert len(sweeps) == 1
     s = sweeps[0]
-    assert s.direction == "buy" and s.ticks_swept == SWEEP_MIN_TICKS and s.total_size == 120
+    assert s.direction == "buy" and s.ticks_swept == SWEEP_MIN_TICKS
+    assert s.total_size == 200 + 20 * (SWEEP_MIN_TICKS - 1)
+    assert s.span_ms == 0.0
+    assert s.concentration >= 0.5
+
+
+def test_a_crowd_of_small_prints_is_not_a_sweep():
+    """The 2026-08-27 correction, pinned. Thirteen small aggressors leaning the
+    same way for tens of milliseconds is real aggression and is NOT one entity
+    crossing the book — measured at ~42/session before this gate, against ~6
+    that survive it. Same levels, same total size as the test above; only the
+    origin differs."""
+    e = OrderflowEngine()
+    sigs = []
+    for k in range(SWEEP_MIN_TICKS):
+        for j in range(5):                        # no dominant print
+            sigs += e.process(_t(k * 15 + j, price=7500.0 + k * TICK, size=16, side="B"))
+    sigs += e.process(_t(5000, price=7500.0, size=1, side="A"))
+    assert not [s for s in sigs if isinstance(s, SweepPrint)]
+
+
+def test_one_big_print_spread_over_time_is_not_a_sweep():
+    """Concentration alone is not enough — a dominant print still has to arrive
+    with the rest of the run, or it is a large lot followed by a drift."""
+    e = OrderflowEngine()
+    sigs = []
+    for k in range(SWEEP_MIN_TICKS):
+        size = 200 if k == 0 else 20
+        sigs += e.process(_t(k * 40, price=7500.0 + k * TICK, size=size, side="B"))
+    sigs += e.process(_t(5000, price=7500.0, size=1, side="A"))
+    assert not [s for s in sigs if isinstance(s, SweepPrint)]
 
 
 def test_slow_walk_is_not_a_sweep():

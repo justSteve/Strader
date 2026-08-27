@@ -9,7 +9,9 @@
   "start_price": 7555.0,
   "end_price": 7555.5,
   "ticks_swept": 3,
-  "total_size": 49
+  "total_size": 49,
+  "span_ms": 0.743,
+  "concentration": 0.4694
  },
  {
   "type": "SweepPrint",
@@ -21,7 +23,9 @@
   "start_price": 7555.75,
   "end_price": 7555.0,
   "ticks_swept": 4,
-  "total_size": 66
+  "total_size": 66,
+  "span_ms": 8.2,
+  "concentration": 0.1364
  },
  {
   "type": "SetupRecognition",
@@ -50,7 +54,9 @@
   "start_price": 7557.0,
   "end_price": 7557.75,
   "ticks_swept": 4,
-  "total_size": 33
+  "total_size": 33,
+  "span_ms": 46.229,
+  "concentration": 0.2121
  },
  {
   "type": "SweepPrint",
@@ -62,7 +68,9 @@
   "start_price": 7482.5,
   "end_price": 7482.0,
   "ticks_swept": 3,
-  "total_size": 41
+  "total_size": 41,
+  "span_ms": 178.31,
+  "concentration": 0.4634
  },
  {
   "type": "SetupRecognition",
@@ -128,7 +136,9 @@
   "start_price": 7481.25,
   "end_price": 7481.75,
   "ticks_swept": 3,
-  "total_size": 39
+  "total_size": 39,
+  "span_ms": 4.933,
+  "concentration": 0.2051
  },
  {
   "type": "SetupRecognition",

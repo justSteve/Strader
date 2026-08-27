@@ -46,6 +46,41 @@ LARGE_LOT_MEDIAN_WINDOW = 500   # prints in the rolling-median warm-up window
 SWEEP_MIN_TICKS = 3             # distinct price levels walked by one aggressor
 SWEEP_MIN_SIZE = 100            # total contracts in the run (AND with above)
 SWEEP_WINDOW_MS = 250           # event-time window; never wall-clock
+# ── what makes a run ONE ORDER rather than a crowd [2026-08-27] ─────────────
+# Steve, seeing a 3-level 129-contract callout: "sweep implies a substantial
+# move by a high funded entity just crashing thru the book." The four gates
+# above cannot express that, and the measurement says why.
+#
+# ES print sizes, 1.69M prints over 5 sessions: the MEDIAN PRINT IS 1 CONTRACT,
+# 54% of prints are size 1, and prints of 100+ number 34 in five days carrying
+# under 1% of volume. So 129 contracts is essentially never one order. Measured
+# on the runs themselves:
+#
+#     run size          prints/run   largest print   duration
+#     100-250              13             54          56 ms
+#     250+                 14            140           1 ms
+#
+# A 100-250 run is thirteen prints averaging ten lots leaning the same way for
+# 56ms — a crowd of small aggressors, which is a real phenomenon but is not
+# what the word means. The 250+ population completes in ONE MILLISECOND with a
+# single print carrying half of it: one order filled across several resting
+# levels. The practitioner literature agrees — a sweep is large orders hitting
+# multiple price levels *simultaneously*, not aggregate pressure summed over a
+# burst.
+#
+# So the discriminator is not a bigger size floor (which still admits thirteen
+# small aggressors totalling 400). It is evidence of single-order origin:
+# SPAN, because one order's fills are reported in one instant, and
+# CONCENTRATION, because one order leaves one dominant print.
+#
+# Rate at each candidate, same 5 sessions (today's rule yields 42.2/day):
+#     span<=50ms                        21.4/day
+#     span<=5ms                         15.4/day
+#     one print >= 50%                  13.2/day
+#     span<=5ms AND one print >= 50%     6.0/day   <- adopted, median 256 lots
+#     one print >= 80%                   3.8/day
+SWEEP_MAX_SPAN_MS = 5           # first print to last; "simultaneously"
+SWEEP_MIN_CONCENTRATION = 0.5   # largest single print / total run size
 
 # ── divergence pivots (spec §2) [literature seed; calibrate st-wnc] ─────────
 PIVOT_FILTER_TICKS = 8          # swing high/low confirmation filter (2.0 pts)

@@ -24,6 +24,15 @@ class SweepPrint(Signal):
     end_price: float = 0.0
     ticks_swept: int = 0
     total_size: int = 0
+    # The two fields that make "one aggressor" and "near-instantly" checkable
+    # rather than asserted [2026-08-27]. Until then this docstring described a
+    # single participant crossing the book while the gates only counted levels
+    # and contracts, so a burst of thirteen small prints over 56ms qualified.
+    # span_ms was computed inside the detector and discarded; it is the field
+    # that best separates one order from a crowd, and nothing downstream could
+    # filter on what was never recorded.
+    span_ms: float = 0.0          # first print to last, event time
+    concentration: float = 0.0    # largest single print / total_size
 
 
 @dataclass(frozen=True)

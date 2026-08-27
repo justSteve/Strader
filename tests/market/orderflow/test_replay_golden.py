@@ -94,6 +94,9 @@ def test_engine_golden_sensitized(trades, monkeypatch):
     import market.orderflow.engine as eng
     from market.signals.orderflow import SweepPrint
     monkeypatch.setattr(eng, "SWEEP_MIN_SIZE", 30)
+    # fixture scale, as above — the synthetic tape has no dominant prints
+    monkeypatch.setattr(eng, "SWEEP_MAX_SPAN_MS", 10**9)
+    monkeypatch.setattr(eng, "SWEEP_MIN_CONCENTRATION", 0.0)
     monkeypatch.setattr(eng, "LARGE_LOT_MIN_SIZE", 20)
     e = eng.OrderflowEngine()
     sigs = e.run(trades)
@@ -110,7 +113,16 @@ def test_engine_golden_sensitized(trades, monkeypatch):
     # No engine behaviour moved: the assertions above (count, direction,
     # ticks_swept, total_size, large-lot count) all held across the change,
     # and the regenerated parity snapshot diffs only those five strings.
-    assert h.hexdigest() == "aebc15b32f9e29a410c55dcb7ab629be82e05e0019b4f745b78b2b0beba8b002"
+    #
+    # Repinned 2026-08-27: SweepPrint gained span_ms and concentration, the two
+    # fields that make its own docstring ("one aggressor ... near-instantly")
+    # checkable. PROVEN additive rather than argued: stripping those two fields
+    # from each repr reproduces the 08-26 hash above byte for byte
+    # (aebc15b3...), and the five behavioural assertions all still hold. The
+    # production gates are relaxed to fixture scale here, so this golden pins
+    # serialization, not the new rule — the rule's evidence is the re-emission
+    # diff over archived tape.
+    assert h.hexdigest() == "63e29085dab3ea13287fd192bd42ed318a113941091fac9359f5b230b199de6a"
 
 
 # ── imbalance golden (st-su4) ────────────────────────────────────────────────
