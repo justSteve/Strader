@@ -124,5 +124,103 @@ emit_alert(
 PYEOF
     fi
 
+    # ── feeder anchor reconciliation [st-kxnv] ──────────────────────────────
+    # THE BUG. The live feeder loads the day's Mancini set ONCE at start
+    # (live_footprint_feed.py:468) and the unit restarts at the CT midnight
+    # rollover, hours before the letter is parsed. Measured from the run rows
+    # 2026-08-21..27: every day recorded ZERO anchors except 08-24, and that
+    # one only because the feeder was restarted by hand. A session with no
+    # anchors cannot emit plan-level events about Steve's own levels — 08-25
+    # produced 570 rows of which 7 were Level events.
+    #
+    # WHY A RESTART AND NOT A HOT RELOAD. The anchor set being fixed at start
+    # is the design, not the oversight: the run log carries the map so that a
+    # parity replay of this tape watches the identical set (LiveAnchors'
+    # docstring, market/orderflow/anchors.py). Loading levels mid-session
+    # would give the live process a different set from bar 0 than any replay
+    # of the same tape, which is exactly the divergence Ruling 9 makes the
+    # acceptance floor. A restart re-posts the whole day from the corpus, so
+    # the session is RE-DERIVED with the full set and parity holds. That is
+    # why 08-24's run rows read [0, 69, 69, 69, 69] rather than a split day.
+    #
+    # WHY HERE AND NOT IN THE PARSE. The real parse runs in-session
+    # (this job is --prepare-only, st-lw58), and a script calling systemctl
+    # from inside an agent session routes around a permission prompt rather
+    # than answering it — Strader rejected that on 2026-08-26 and was right.
+    # This wrapper is cron: root, no agent, no prompt to route around.
+    #
+    # Idempotent by construction — it restarts only when the day's levels
+    # exist AND the running feeder recorded zero of them. Smoke test without
+    # touching the unit:  STRADER_FEEDER_RESTART=0 <this script>
+    FEEDER_UNIT="${STRADER_FEEDER_UNIT:-strader-footprint-feed.service}"
+    if [[ "${STRADER_FEEDER_RESTART:-1}" != "1" ]]; then
+        log "feeder reconciliation: disabled by STRADER_FEEDER_RESTART"
+    elif ! systemctl is-active --quiet "$FEEDER_UNIT"; then
+        log "feeder reconciliation: $FEEDER_UNIT is not active — leaving it alone"
+    else
+        verdict=$(PYTHONPATH="$STRADER_REPO" "$PY" - <<'PYEOF'
+import datetime, json, pathlib, sys
+
+day = datetime.date.today().isoformat()
+levels = pathlib.Path("runbook/mancini/commentary") / f"{day}.jsonl"
+parity = pathlib.Path("data/derived/live-parity") / f"{day}.jsonl"
+
+if not levels.exists():
+    print("skip no-levels-parsed-yet")
+    sys.exit(0)
+
+# The last `run` row is the running process's own record of what it started
+# with. Absent file or unreadable row = say so and change nothing; this job
+# must never restart a live feed on a guess.
+last = None
+try:
+    with parity.open() as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if row.get("k") == "run":
+                last = row
+except OSError as e:
+    print(f"skip parity-unreadable({e.__class__.__name__})")
+    sys.exit(0)
+
+if last is None:
+    print("skip no-run-row")
+elif len(last.get("mancini") or []):
+    print(f"ok anchors={len(last['mancini'])}")
+else:
+    print("restart anchors=0")
+PYEOF
+) || verdict="skip probe-failed"
+        log "feeder reconciliation: $verdict"
+        if [[ "$verdict" == restart* ]]; then
+            if systemctl restart "$FEEDER_UNIT"; then
+                log "feeder reconciliation: restarted $FEEDER_UNIT — the day re-derives from the corpus with the parsed set"
+            else
+                log "ERROR: restart of $FEEDER_UNIT failed"
+                PYTHONPATH="$STRADER_REPO" "$PY" - <<'PYEOF' || log "WARN: alert emission failed"
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.environ["PYTHONPATH"], "scripts"))
+from corpus_daily import emit_alert
+
+emit_alert(
+    "feeder_anchors",
+    "Live feeder is running with zero Mancini anchors and the restart failed — "
+    "the footprint surface will emit no plan-level events today. "
+    "Fix: systemctl restart strader-footprint-feed.service",
+    {"source": "mancini-preopen-wrapper", "unit": "strader-footprint-feed.service"},
+)
+PYEOF
+            fi
+        fi
+    fi
+
     exit $rc
 } >> "$LOG" 2>&1
