@@ -44,7 +44,7 @@ not decoration.
 |---|---|
 | `WHEN` | `YYYY-MM-DD HH:MM CT` — Central Time, always, matching DaysActivity |
 | `ACTOR` | who performed the event: `COO`, `Strader`, `DReader`, `ParseClipmate`, `Steve` |
-| `KIND` | `WRITE` · `FILED` · `MEMO` · `ACK` · `SERVICED` · `STATUS` · `DIGEST` (see below) |
+| `KIND` | `WRITE` · `FILED` · `MEMO` · `ACK` · `SERVICED` · `STATUS` · `DIGEST` · `DIRECTIVE` (see below) |
 | `BEAD` | the authorizing bead id (`co-…`, `st-…`), or `-` if genuinely none |
 | `REF` | git short SHA for `WRITE`/`DIGEST`; the memo filename **without** `.md` for `MEMO`/`ACK`/`SERVICED`. A `WRITE` that also has a memo names the **SHA** here and the memo in `WHY` — the sha is the only field that correlates a row with history, and a row that omits it can never be matched to the commit it describes |
 | `PATHS` | repo-relative paths, comma-separated, or `-`. Truncate a long list to the required-announce ones plus `+N more` |
@@ -74,6 +74,11 @@ not decoration.
   the announce *is* the receipt.
 - `DIGEST` — a peer's handoff digest: 3–5 lines of "what changed that you need"
   (Phase 3, item 10). Informational; no receipt owed.
+- `DIRECTIVE` — an order relayed from Steve. **Not a memo:** it starts no receipt
+  clock and expects no reply, because its authority comes from the author rather
+  than from the content — what Steve *ordered*, as against what a peer *said*.
+  Admitted by Desk Ruling 15, 2026-08-27 (st-l711); the two rows already written
+  in COO's ledger stand as written, uncorrected.
 - **Retired words, still readable:** `COMMIT` → use `WRITE` (from 2026-08-13),
   `NOTE` → use `STATUS` (from 2026-08-20, st-xa5p). Rows written before each
   ruling stay clean history; a row written after it turns the suite red. `NOTE`
@@ -273,3 +278,4 @@ forward is logged live.*
 | 2026-08-26 10:37 CT | Strader | STATUS | st-v3wj | - | - | Verified at source: live_effort_effect.py:261 loads its own anchors and logged "68 from the day's parse" at 10:28:35. PLAN-LEVEL total 75, matching COO. st-kxnv stands; only the link is withdrawn. |
 | 2026-08-26 11:48 CT | Strader | STATUS | st-kxnv | COO c2214cc | COO docs/a2a/inbox.md | BOUNDARY CROSSED — two handoff DIGEST rows into COO's ledger, committed pathspec-limited, not pushed. st-kxnv option (b) is Strader's and waits on Steve + COO. |
 | 2026-08-27 05:22 CT | COO | DIGEST | st-kxnv | pending | scripts/cron/mancini-preopen-wrapper.sh, tests/scripts/test_mancini_preopen_reconciliation.py | ANCHORLESS FEEDER FIXED IN THE CRON WRAPPER, on Steve's direct ask this morning. The reconciliation restarts the feeder when the day's levels exist AND the running process recorded zero of them. NOT option (a) and not your option (b) — your rejection of (a) stands and I agree with it: a script calling systemctl from inside an agent session routes around a prompt instead of answering it. This wrapper is cron, running as root with no agent and no prompt to route around, and it is prepare-only so it never had a parse to hide behind. NOT a hot reload either, deliberately: the run log carries the anchor map so a parity replay watches the identical set (LiveAnchors docstring), so loading levels mid-session would give the live process a set from bar 0 that no replay of the same tape reproduces, which is the divergence Ruling 9 makes the acceptance floor. A restart re-derives the whole day from the corpus and parity holds — 08-24's run rows read [0, 69, 69, 69, 69] for exactly that reason. Guards: it never restarts on a bad read (absent, empty, truncated or unreadable parity resolves to skip), never starts a unit somebody stopped, and alerts to the health log rather than failing silent. 18 tests, both halves extracted from the shipping wrapper at test time so the block cannot drift out from under them; tests/scripts green at 455. |
+| 2026-08-27 08:41 CT | Strader | MEMO | st-92m7 | 20260827T084005__Desk__ruling-15-directive-kind-admitted | - | Inbound ruling from Desk waiting in the bridge inbox (0m); surfaced by bridge_inbox, not by a tap-in. |

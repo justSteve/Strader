@@ -51,6 +51,7 @@ obligations it records does not enforce anything — it loses rows.
 | `ACK` | Read and understood, not doing it yet | — |
 | `SERVICED` | The ask is done | — |
 | `DIGEST` | A peer's handoff summary | No |
+| `DIRECTIVE` | An order relayed from Steve | No — authority is the author's, not the content's |
 
 **`COMMIT` is retired**, in favour of `WRITE` (COO's ruling, 2026-08-13). One word
 per event, and `WRITE` is the word `zgent-permissions.md` itself uses, so the

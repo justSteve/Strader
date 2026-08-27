@@ -74,6 +74,7 @@ FIELDS = ("when", "actor", "kind", "bead", "ref", "paths", "why")
 #   ACK       read and understood, not doing it yet
 #   MEMO      FYI, no action owed
 #   DIGEST    a peer's handoff summary; owes no reply
+#   DIRECTIVE an order relayed from Steve; owes no reply
 #
 # COMMIT is RETIRED in favour of WRITE (COO's ruling, 2026-08-13). One word per
 # event, and WRITE is the word zgent-permissions.md itself uses, so the
@@ -87,7 +88,16 @@ FIELDS = ("when", "actor", "kind", "bead", "ref", "paths", "why")
 # ledger exists to make visible. STATUS already means what those rows meant: a
 # peer reporting on work already announced, owing no reply. Same treatment as
 # COMMIT — readable so the rows count as history, refused for new ones.
-WRITABLE_KINDS = {"WRITE", "MEMO", "ACK", "SERVICED", "DIGEST", "FILED", "STATUS"}
+# DIRECTIVE is ADMITTED (Desk Ruling 15, 2026-08-27, st-l711). A directive is
+# not a memo: it starts no receipt clock, expects no reply, and its authority
+# derives from the AUTHOR rather than the content. Folding it into MEMO would
+# erase the one distinction this ledger exists to preserve — what Steve ORDERED
+# versus what anyone SAID. The distinction is already load-bearing on two rows
+# in COO's ledger, one of them carrying the credential-estate convention; those
+# rows stand as written, and admitting the word is what makes them parse.
+# Rewriting ratified history as MEMO plus correction rows would trade two
+# accurate rows for four rows and a lie about what happened.
+WRITABLE_KINDS = {"WRITE", "MEMO", "ACK", "SERVICED", "DIGEST", "FILED", "STATUS", "DIRECTIVE"}
 RETIRED_KINDS = {"COMMIT": "WRITE", "NOTE": "STATUS"}
 KINDS = WRITABLE_KINDS | set(RETIRED_KINDS)
 # Retirement is enforced by DATE, not by deletion, and the date is PER WORD —

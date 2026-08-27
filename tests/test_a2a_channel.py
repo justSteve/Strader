@@ -171,6 +171,30 @@ def test_receipt_closes_the_memo(tmp_path, kind):
     assert a2a.open_memos(events) == []
 
 
+def test_directive_starts_no_receipt_clock(tmp_path):
+    """Desk Ruling 15: a DIRECTIVE is an order, not an ask — it owes no reply.
+
+    The whole point of admitting the word rather than folding it into MEMO is
+    that MEMO starts a clock and a directive must not. If this ever regresses,
+    every relayed order from Steve shows up as a peer owing Strader an answer.
+    """
+    p = tmp_path / "inbox.md"
+    p.write_text(
+        _ledger("| 2026-08-27 08:40 CT | Desk | DIRECTIVE | st-l711 | 20260827T084005__Desk__ruling-15 | - | orders |\n"),
+        encoding="utf-8",
+    )
+    events, problems = a2a.parse_inbox(p)
+    assert problems == []
+    assert len(events) == 1 and events[0].kind == "DIRECTIVE"
+    assert a2a.open_memos(events) == []
+
+
+def test_directive_is_writable_not_retired():
+    """It is a live word, so a row dated today must not be flagged as retired."""
+    assert "DIRECTIVE" in a2a.WRITABLE_KINDS
+    assert "DIRECTIVE" not in a2a.RETIRED_KINDS
+
+
 def test_receipt_must_match_the_ref(tmp_path):
     """A receipt with the wrong REF leaves the memo open — the failure to catch."""
     p = tmp_path / "inbox.md"
