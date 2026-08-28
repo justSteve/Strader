@@ -35,7 +35,7 @@ DEFAULT_PLAN_DIR = Path(__file__).resolve().parents[2] / "data" / "intent"
 # a staged intent older than this is refused by "yes" — say it again; the tape has moved
 PENDING_MAX_MINUTES = 10
 VERBS = ("read", "mark", "call", "arm", "yes", "no", "fly", "single", "price", "go",
-         "stand down", "show", "frame", "basis")
+         "stand down", "show", "frame", "basis", "replay")
 
 
 class Session:
@@ -116,10 +116,43 @@ class Session:
         fn = {"read": self.read, "mark": self.mark, "call": self.call, "arm": self.arm,
               "yes": lambda _r: self.yes(), "no": lambda _r: self.no(), "fly": self.fly,
               "single": self.single, "show": lambda _r: self.show(), "go": lambda _r: self.go(),
-              "frame": self.frame, "basis": self.basis}.get(verb)
+              "frame": self.frame, "basis": self.basis, "replay": self.replay}.get(verb)
         if fn is None:
             return self.read(text)
         return fn(rest)
+
+    def replay(self, text: str, runner=None) -> str:
+        """The spoken door to a region replay [co-j9t1g]: "replay Monday 13:30
+        to 14:10, sweeps and plan-level only". Read back what was understood,
+        then the emissions of that region, one line each — the same records
+        the FootPrint page's shift-drag and ``scripts/replay_emissions.py``
+        produce, because all three call the one engine. Touches nothing on
+        the plan beyond its log; ``runner`` is injectable for tests."""
+        from strader.intent.replay import ReplayParseError, parse_replay, readback
+        try:
+            req = parse_replay(text, today=self.day, default_day=self.day)
+        except ReplayParseError as e:
+            return f"Cannot replay that: {e}."
+        head = readback(req, speak=self.speak)
+        if runner is None:
+            from market.orderflow.region_replay import Filter, Region, replay as _replay
+            from market.orderflow.replay import has_es_day
+
+            def runner(r):
+                if not has_es_day(r.day):
+                    return None
+                return _replay(Region(r.day, r.end or r.day, r.between, r.price_band),
+                               Filter(kinds=r.kinds))
+        records = runner(req)
+        self._log(f"replay: {text}")
+        self._save()
+        if records is None:
+            return f"{head}\nNo tape for {req.day.isoformat()} in the corpus."
+        if not records:
+            return f"{head}\nNothing fired there."
+        lines = [head, f"{len(records)} emission{'s' if len(records) != 1 else ''}:"]
+        lines += ["  " + r["line"] for r in records]
+        return "\n".join(lines)
 
     def read(self, text: str) -> str:
         ex = grammar.extract(text, self.plan.frame_default)

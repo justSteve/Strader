@@ -78,8 +78,11 @@ def test_replay_reproduces_the_live_emitter_log(knobs):
     """
     live = [ln.rstrip() for ln in LIVE_LOG.read_text(errors="replace").splitlines()
             if EVENT_LINE.match(ln)]
+    # The scorer's log is the TAPE path; the engine path (sweeps, stacks) is
+    # the feeder's output and lives in its run log, not here.
     replayed = [r["line"].rstrip()
-                for r in replay_day(DAY, Region(start=DAY, end=DAY), Filter(), knobs)]
+                for r in replay_day(DAY, Region(start=DAY, end=DAY), Filter(), knobs,
+                                    paths=("tape",))]
     assert replayed == live
 
 
@@ -114,7 +117,7 @@ def test_one_minute_can_carry_two_events_of_one_kind_and_the_key_separates_them(
     7667 (resistance) — one bar, two levels. A diff key of (ts, kind, subtype)
     collapses them, which would silently drop half of every such minute. This
     is the measured case that put `level` in SUBJECT_FIELDS."""
-    recs = replay_day(DAY, Region(start=DAY, end=DAY), Filter(), knobs)
+    recs = replay_day(DAY, Region(start=DAY, end=DAY), Filter(), knobs, paths=("tape",))
     keys = [_key(r) for r in recs]
     assert len(keys) == len(set(keys)), "the diff key is not unique per event"
 

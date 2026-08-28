@@ -139,6 +139,39 @@ td:first-child, th:first-child { text-align:left; }
 .beat-pill.done { color:var(--ink); border-color:var(--buy); }
 .beat-pill.current { color:var(--ink); border-color:var(--buy);
   background:color-mix(in srgb, var(--buy) 14%, var(--surface-1)); }
+/* region replay [co-j9t1g]: pick a region, hear what the instrument would
+   have said there. A typed sentence or a shift-drag on the chart; the results
+   are a list below the controls that seeks the tape on click. Not an overlay:
+   Steve opens it on purpose and reads it while stepping, so it may reflow. */
+#rqrow input { min-width:min(420px, 60vw); }
+#rqrow .rq-status { color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
+#rqrow .rq-status.err { color:var(--sell); }
+.rq-kind { cursor:pointer; padding:1px 8px; border:1px solid var(--axis); border-radius:10px;
+  font-size:11px; color:var(--ink-2); background:var(--surface-1); user-select:none; white-space:nowrap; }
+.rq-kind.on { border-color:var(--good); color:var(--ink); font-weight:600; }
+.rq-kind.tape { border-style:solid; } .rq-kind.engine { border-style:dashed; }
+#rqpanel { margin:0 16px 6px; border:1px solid var(--axis); border-radius:8px;
+  background:var(--surface-1); font-size:12px; max-height:220px; overflow:auto;
+  font-variant-numeric:tabular-nums; }
+#rqpanel h4 { position:sticky; top:0; margin:0; padding:6px 10px; font-size:12px; font-weight:600;
+  color:var(--ink-2); background:var(--surface-1); border-bottom:1px solid var(--grid);
+  display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+#rqpanel h4 .x { margin-left:auto; cursor:pointer; color:var(--muted); }
+#rqpanel h4 .rq-keys { color:var(--muted); font-weight:400; font-size:11px; }
+#rqpanel table { width:100%; border-collapse:collapse; }
+#rqpanel td { padding:3px 8px; vertical-align:top; }
+#rqpanel tr.rq-row { cursor:pointer; }
+#rqpanel tr.rq-row:hover { background:color-mix(in srgb, var(--ink) 6%, transparent); }
+#rqpanel tr.rq-row.cur { background:color-mix(in srgb, var(--good) 16%, transparent); }
+#rqpanel tr.rq-row.off { opacity:.45; }
+#rqpanel td.t { white-space:nowrap; color:var(--ink-2); }
+#rqpanel td.k { white-space:nowrap; font-size:10px; text-transform:uppercase; letter-spacing:.04em; font-weight:600; }
+#rqpanel td.k.tape { color:var(--ink); } #rqpanel td.k.engine { color:var(--ink-2); }
+#rqpanel td.g { color:var(--ink-2); }
+#rqpanel td.l { width:1.6em; text-align:center; }
+#rqpanel .rq-empty { padding:8px 10px; color:var(--muted); font-style:italic; }
+#rqsel { display:none; position:absolute; z-index:30; pointer-events:none;
+  border:1px dashed var(--good); background:color-mix(in srgb, var(--good) 12%, transparent); }
 /* emissions: what the stack said about this bar (st-b0n9) */
 /* The panel's containing block is the controls + readouts + emissions row as a
    UNIT, not the control strip alone. Anchored to the strip it was a variable-
@@ -468,6 +501,13 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
   <button id="anat" class="drill-only" title="Walk the recognizer's four-stage setups on this day">Anatomy</button>
   <button id="helpbtn" title="What am I looking at?">?</button>
 </div>
+<div class="crow" id="rqrow">
+  <label title="Replay a region of this day with the emitter scoped. Say it — '13:30 to 14:10, sweeps and plan-level only' — or shift-drag the chart.">Replay
+    <input type="text" id="rqinput" placeholder="13:30 to 14:10, sweeps and plan-level only — or shift-drag the chart"></label>
+  <button id="rqrun" title="Replay the region (Enter in the box does the same)">▷ Region</button>
+  <span id="rqkinds" title="Scope the emitter: click to keep only these kinds. None selected = everything, or the words in the sentence."></span>
+  <span id="rqstatus" class="rq-status"></span>
+</div>
 </div>
 <div class="readouts">
   <span>Bar <b id="ro-bar">0</b></span>
@@ -480,6 +520,7 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
 <div id="emrow"></div>
 <div id="empanel"></div>
 </div>
+<div id="rqpanel" hidden></div>
 <div id="visits"></div>
 <div id="scendeck" class="drill-only"></div>
 <div id="anatomy" class="drill-only"></div>
@@ -487,8 +528,9 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
 <div id="stage"><div id="vp"></div><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
   <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
   <div id="livehud"></div>
+  <div id="rqsel"></div>
 </div>
-<p class="hint">Space = play/pause · ←/→ = step · Ctrl+←/→ = speed down/up · Pick a level (Level ▾) to arm it AND jump to its first visit · <b>?</b> explains the screen ·
+<p class="hint">Space = play/pause · ←/→ = step · Ctrl+←/→ = speed down/up · Shift-drag the chart = replay that region · Pick a level (Level ▾) to arm it AND jump to its first visit · <b>?</b> explains the screen ·
 Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button>
 · <button id="candles" title="Open the same tape as 1-minute candles in a second window, synced to this minute">Candles ↗</button>
 · coach: <span id="bridge-dot">—</span>
@@ -498,6 +540,7 @@ Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">bigges
 <div id="help"><div class="card">
   <h2>What am I looking at?</h2>
   <p>This is one full trading day replayed as <b>volume bars</b>: every column is exactly the same number of contracts changing hands (shown in the header), <b>not</b> the same amount of time. When columns arrive fast, the market is busy; when they crawl, it's quiet. Each column's <b>footer</b> carries the bar's real duration as its colored fill height — tall fill = slow bar, short fill = urgent tape. That height is on a <b>fixed absolute scale — full = 120s</b>, the same on every day you drill, so heights are comparable across days and you can learn what a given pace looks like.</p>
+  <p><b>Replay a region.</b> Hold <b>Shift</b> and drag a box on the chart, or type it in the <b>Replay</b> box — <i>13:30 to 14:10, sweeps and plan-level only</i> — and press Enter. The instrument re-runs that window of tape through the same code the live page runs and lists everything it would have said there: the scorer's minute events (plan-level, superlatives, climax) and the footprint stack's emissions (sweeps, stacks, divergences, setups), in time order. Click a row to jump to that bar; <b>n</b>/<b>p</b> step through the rows, <b>g</b> marks one worth keeping, <b>d</b> drops it as noise, <b>Esc</b> closes. The kind chips beside the box scope the list; with none selected the words in the sentence decide, and no words means everything. A drag writes the same sentence into the box from the bars and prices it covered, so you can edit it and run again.</p>
   <h4>Reading one cell (a price inside a bar)</h4>
   <ul>
     <li><span class="swatch" style="background:var(--buy)"></span> <b>Blue = buyers were the aggressors</b> at that price (they crossed the spread to lift sellers' offers). <span class="swatch" style="background:var(--sell)"></span> <b>Red = sellers were the aggressors</b> (they hit buyers' bids).</li>
@@ -2250,6 +2293,252 @@ function sendState(kind, extra) {
   fetch(BRIDGE + "/state", { method: "POST", body: JSON.stringify(snapshot(kind, extra)),
                              headers: { "Content-Type": "text/plain" } }).catch(() => {});
 }
+// ── region replay [co-j9t1g] ──────────────────────────────────────────────
+// Steve, via Desk memo 20260826T013442: "from the chart, target a region of
+// price action that interests you and get a full replay of that window with
+// the emitter scoped to a chosen subset — sweeps only, plan-level only."
+//
+// Two doors, one sentence. The typed box takes the spoken form ("13:30 to
+// 14:10, sweeps and plan-level only"); a shift-drag on the chart WRITES that
+// same sentence into the box from the columns and prices it covered, then
+// runs it. So there is exactly one description of a region anywhere, and
+// what the intent dialect's `replay` verb and scripts/replay_emissions.py
+// produce for it is what this list shows — the bridge shells out to that
+// very script (GET /replay), which is how the learning view and Ruling 9's
+// acceptance floor stay one machine.
+//
+// The results are the records as the engine emitted them: TAPE lines (what
+// the live scorer logged — plan-level, superlatives, climax) and ENGINE lines
+// (what the footprint feeder emitted — sweeps, stacks, divergences, setups),
+// in time order. Clicking a row seeks the tape to that bar and pins its
+// emission panel; in LIVE it pins without seeking, the same rule the tape
+// marks follow [st-ug3f]. Keys while the list is open: n/p next/previous,
+// g = keep (worth studying), d = drop (noise) — a label goes to the bridge
+// as a `region_label` state event and to localStorage, so studying regions
+// grows the labeled set as a side effect (the memo's one-keystroke loop).
+//
+// EVERY field access here is guarded, and the whole block boots inside a
+// try — a page that lost this feature is a page; a page that lost its boot
+// script is a blank tab (the ea77d7a lesson).
+const RQ_SEED_KINDS = [   // mirrors market/orderflow/region_replay.vocabulary(); refreshed from /replay/kinds
+  { id: "PLAN-LEVEL", path: "tape", label: "plan-level" },
+  { id: "SUPERLATIVE", path: "tape", label: "superlatives" },
+  { id: "CLIMAX", path: "tape", label: "climax" },
+  { id: "ABSORPTION-CLUSTER", path: "tape", label: "absorption clusters" },
+  { id: "SweepPrint", path: "engine", label: "sweeps" },
+  { id: "ImbalanceStack", path: "engine", label: "stacks" },
+  { id: "SetupRecognition", path: "engine", label: "setups" },
+  { id: "DeltaDivergence", path: "engine", label: "divergences" },
+  { id: "AbsorptionRead", path: "engine", label: "absorption reads" },
+  { id: "Level", path: "engine", label: "profile levels" },
+];
+const RQ_LS_KEY = `oflow-replay-labels-${PAGE_DAY || "live"}`;
+let rqKinds = new Set();          // selected chip ids; empty = the sentence decides
+let rqResult = null;              // last payload from /replay
+let rqRows = [];                  // records in display order
+let rqCur = -1;                   // highlighted row
+let rqBusy = false;
+
+function rqStatus(text, err) {
+  const s = $("rqstatus"); if (!s) return;
+  s.textContent = text || ""; s.classList.toggle("err", !!err);
+}
+function rqBuildKinds(list) {
+  const box = $("rqkinds"); if (!box) return;
+  box.innerHTML = "";
+  for (const k of (list || [])) {
+    if (!k || !k.id) continue;
+    const c = document.createElement("span");
+    c.className = `rq-kind ${k.path || ""}` + (rqKinds.has(k.id) ? " on" : "");
+    c.textContent = k.label || k.id;
+    c.title = `${k.id} · ${k.path === "tape" ? "tape path (the scorer's log)" : "engine path (the feeder's emissions)"}`;
+    c.onclick = () => { rqKinds.has(k.id) ? rqKinds.delete(k.id) : rqKinds.add(k.id); c.classList.toggle("on", rqKinds.has(k.id)); };
+    box.appendChild(c);
+  }
+}
+// The gist of a line: everything after the clock and the path word, so the
+// row reads "PLAN-LEVEL TOUCH  sig=note  level=7692 …" beside its time.
+function rqGist(rec) {
+  const line = (rec && typeof rec.line === "string") ? rec.line : "";
+  const m = line.match(/^\d{2}:\d{2}(?::\d{2})? CT\s+(?:EVENT|ENGINE)\s+(.*)$/);
+  return m ? m[1] : line;
+}
+const rqClock = rec => (rec && typeof rec.ts === "string") ? rec.ts.slice(11, 19) : "?";
+// Which bar an emission belongs to: the first bar whose close is at or after
+// the emission's time. Engine records carry bar_i outright; tape records are
+// placed by their minute. Binary search over t1, which is monotonic.
+function rqBarFor(rec) {
+  if (rec && Number.isInteger(rec.bar_i) && rec.bar_i >= 0 && rec.bar_i < bars.length) return rec.bar_i;
+  const ts = rec && typeof rec.ts === "string" ? rec.ts.slice(11, 19) : null;
+  if (!ts || !bars.length) return null;
+  let lo = 0, hi = bars.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (bars[mid] && bars[mid].t1 && fmtClock(bars[mid].t1) < ts) lo = mid + 1; else hi = mid;
+  }
+  return lo;
+}
+function rqLabels() {
+  try { return JSON.parse(localStorage.getItem(RQ_LS_KEY) || "{}") || {}; } catch (e) { return {}; }
+}
+const rqLabelKey = rec => `${rec.ts}|${rec.kind}|${rec.subtype}|${(rec.fields && (rec.fields.level || rec.fields.start_price || rec.fields.anchor_price)) || ""}`;
+function rqLabel(k, label) {
+  const rec = rqRows[k]; if (!rec) return;
+  const all = rqLabels(); const key = rqLabelKey(rec);
+  if (all[key] === label) delete all[key]; else all[key] = label;
+  try { localStorage.setItem(RQ_LS_KEY, JSON.stringify(all)); } catch (e) { /* private mode: the bridge copy still lands */ }
+  sendState("region_label", { label: all[key] || "clear", key, line: rec.line, ts: rec.ts, kind: rec.kind,
+                              request: rqResult && rqResult.request && rqResult.request.text });
+  rqRenderRows();
+}
+function rqGo(k) {
+  if (k < 0 || k >= rqRows.length) return;
+  rqCur = k;
+  const i = rqBarFor(rqRows[k]);
+  if (i != null) {
+    if (!LIVE) seekTo(i);
+    emPinned = true; emPinnedIdx = i; openEmPanel(i);
+  }
+  rqRenderRows();
+  const row = document.querySelector(`#rqpanel tr.rq-row[data-k="${k}"]`);
+  if (row && row.scrollIntoView) row.scrollIntoView({ block: "nearest" });
+}
+function rqRenderRows() {
+  const p = $("rqpanel"); if (!p) return;
+  const body = p.querySelector("tbody"); if (!body) return;
+  const labels = rqLabels();
+  body.innerHTML = "";
+  rqRows.forEach((rec, k) => {
+    const tr = document.createElement("tr");
+    const lbl = labels[rqLabelKey(rec)];
+    tr.className = "rq-row" + (k === rqCur ? " cur" : "") + (lbl === "drop" ? " off" : "");
+    tr.dataset.k = k;
+    const i = rqBarFor(rec);
+    tr.innerHTML = `<td class="l">${lbl === "keep" ? "✓" : lbl === "drop" ? "✗" : ""}</td>`
+      + `<td class="t">${rqClock(rec)}</td>`
+      + `<td class="k ${rec.path || ""}">${EM_LABEL[rec.kind] || rec.kind || "?"}</td>`
+      + `<td class="g">${rqGist(rec).replace(/</g, "&lt;")}</td>`
+      + `<td class="t">${i != null ? "bar " + (i + 1) : ""}</td>`;
+    tr.onclick = () => rqGo(k);
+    body.appendChild(tr);
+  });
+}
+function rqClose() { const p = $("rqpanel"); if (p) p.hidden = true; rqCur = -1; }
+function rqRender(payload) {
+  const p = $("rqpanel"); if (!p) return;
+  rqResult = payload; rqRows = Array.isArray(payload.records) ? payload.records : []; rqCur = -1;
+  const req = payload.request || {};
+  const unknown = Array.isArray(req.unknown) && req.unknown.length ? ` · not understood: ${req.unknown.join(", ")}` : "";
+  const how = payload.cached ? "cached" : (typeof payload.took_ms === "number" ? `${(payload.took_ms / 1000).toFixed(1)}s` : "");
+  p.innerHTML = `<h4><span>${(req.readback || req.region || "Replay").replace(/</g, "&lt;")}</span>`
+    + `<span>${rqRows.length} emission${rqRows.length === 1 ? "" : "s"}${how ? " · " + how : ""}${unknown}</span>`
+    + `<span class="rq-keys">click a row to go there · n/p next/prev · g keep · d drop · Esc close</span>`
+    + `<span class="x" title="close">×</span></h4>`
+    + (rqRows.length ? `<table><tbody></tbody></table>` : `<div class="rq-empty">Nothing fired in that region with that scope.</div>`);
+  p.querySelector(".x").onclick = rqClose;
+  p.hidden = false;
+  rqRenderRows();
+}
+async function rqRun(text) {
+  const say = (text != null ? text : ($("rqinput") ? $("rqinput").value : "")).trim();
+  if (rqBusy) return;
+  if (!say && !rqKinds.size) { rqStatus("say a window, a price band, or pick kinds", true); return; }
+  const q = new URLSearchParams();
+  if (say) q.append("say", say);
+  if (PAGE_DAY) q.append("day", PAGE_DAY);
+  for (const k of rqKinds) q.append("kind", k);
+  rqBusy = true; rqStatus("replaying…");
+  try {
+    const r = await fetch(`${BRIDGE}/replay?${q.toString()}`);
+    let d = null;
+    try { d = await r.json(); } catch (e) { d = { error: `bridge answered ${r.status} without JSON` }; }
+    if (!r.ok || !d || d.error) {
+      rqStatus(String((d && d.error) || `bridge ${r.status}`), true);
+      return;
+    }
+    rqStatus("");
+    rqRender(d);
+    sendState("region_replay", { say, kinds: [...rqKinds], count: d.count, day: d.day });
+  } catch (e) {
+    rqStatus("bridge unreachable — the replay runs through it", true);
+  } finally { rqBusy = false; }
+}
+// Shift-drag on the chart → the sentence. Columns under the drag give the
+// window (first bar's open minute to last bar's close minute); the vertical
+// extent gives the band through the same y-mapping the cells use.
+function rqWireDrag() {
+  const sel = $("rqsel"); if (!sel || !stage) return;
+  let x0 = 0, y0 = 0, on = false;
+  const rel = e => { const r = stage.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  stage.addEventListener("mousedown", e => {
+    if (!e.shiftKey || e.button !== 0) return;
+    if (e.target.closest("#livehud,#caption,button,select,input,a")) return;
+    [x0, y0] = rel(e); on = true;
+    sel.style.left = x0 + "px"; sel.style.top = y0 + "px"; sel.style.width = "0px"; sel.style.height = "0px";
+    sel.style.display = "block";
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove", e => {
+    if (!on) return;
+    const [x, y] = rel(e);
+    sel.style.left = Math.min(x, x0) + "px"; sel.style.top = Math.min(y, y0) + "px";
+    sel.style.width = Math.abs(x - x0) + "px"; sel.style.height = Math.abs(y - y0) + "px";
+  });
+  window.addEventListener("mouseup", e => {
+    if (!on) return;
+    on = false; sel.style.display = "none";
+    const [x1, y1] = rel(e);
+    const left = Math.min(x0, x1), right = Math.max(x0, x1), top = Math.min(y0, y1), bottom = Math.max(y0, y1);
+    if (right - left < 6 && bottom - top < 6) return;   // a shift-click, not a drag
+    // columns whose box overlaps the drag, by their data-i
+    const sr = stage.getBoundingClientRect();
+    const hit = [];
+    for (const col of strip.querySelectorAll(".col")) {
+      const r = col.getBoundingClientRect();
+      const cl = r.left - sr.left, cr = r.right - sr.left;
+      if (cr >= left && cl <= right) { const i = Number(col.dataset.i); if (Number.isInteger(i)) hit.push(i); }
+    }
+    if (!hit.length || viewHi == null) { rqStatus("drag across the bars", true); return; }
+    const i0 = Math.min(...hit), i1 = Math.max(...hit);
+    const b0 = bars[i0], b1 = bars[i1];
+    if (!b0 || !b1 || !b0.t0 || !b1.t1) return;
+    const t0 = fmtClock(b0.t0).slice(0, 5), t1 = fmtClock(b1.t1).slice(0, 5);
+    // y → price is the inverse of yFor(); whole ticks; the taller edge is the higher price
+    const pAt = y => Math.round((viewHi - (y / cellH) * TICK) / TICK) * TICK;
+    const hi = pAt(top), lo = pAt(bottom);
+    const parts = [`${t0} to ${t1}`];
+    if (bottom - top >= cellH) parts.push(`${fmtPrice(lo)} to ${fmtPrice(hi)}`);
+    const inp = $("rqinput");
+    // keep any kind words the box already carried after the last comma-free tail
+    const kindWords = inp && inp.value ? inp.value.split(",").map(s => s.trim()).filter(s => s && !/\d/.test(s)) : [];
+    const sentence = parts.concat(kindWords).join(", ");
+    if (inp) inp.value = sentence;
+    rqRun(sentence);
+  });
+}
+function rqWire() {
+  rqBuildKinds(RQ_SEED_KINDS);
+  const inp = $("rqinput"), btn = $("rqrun");
+  if (btn) btn.onclick = () => rqRun();
+  if (inp) inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); rqRun(); } });
+  rqWireDrag();
+  document.addEventListener("keydown", e => {
+    const p = $("rqpanel");
+    if (!p || p.hidden) return;
+    if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA")) return;
+    if (e.key === "Escape") { rqClose(); return; }
+    if (e.code === "KeyN") { e.preventDefault(); rqGo(Math.min(rqRows.length - 1, rqCur + 1)); }
+    if (e.code === "KeyP") { e.preventDefault(); rqGo(Math.max(0, rqCur - 1)); }
+    if (e.code === "KeyG" && rqCur >= 0) rqLabel(rqCur, "keep");
+    if (e.code === "KeyD" && rqCur >= 0) rqLabel(rqCur, "drop");
+  });
+  // the vocabulary from the engine itself, when the bridge is up
+  fetch(`${BRIDGE}/replay/kinds`).then(r => r.json()).then(v => {
+    if (v && Array.isArray(v.kinds) && v.kinds.length) rqBuildKinds(v.kinds);
+  }).catch(() => { /* seed list stands */ });
+}
+try { rqWire(); } catch (e) { console.warn("region replay not wired:", e); }
+
 // ── coach cursor [st-135m] ────────────────────────────────────────────────
 // A drawn pointer the coach puts on a cell: `point {bar, price, text, pulse,
 // hold_ms}` and `clear` on the coach channel. Steve, 2026-08-18: "a hover would

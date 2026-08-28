@@ -7,7 +7,9 @@
     python -m strader.intent --day 2026-08-22 --plan-dir data/intent
 
 Verbs: read, mark, call, arm, yes, no, fly, single, price, go, stand down, show, frame,
-basis. A line with no known verb is read as dictation.
+basis, replay. A line with no known verb is read as dictation. ``replay`` is the spoken
+door to a region replay [co-j9t1g] — "replay Monday 13:30 to 14:10, sweeps and plan-level
+only" — and prints what the instrument would have said there.
 
 Chain snapshot format (a fixture, or a dump from the feed): {"underlying": "SPX",
 "underlying_price": 6320.5, "expiry": "2026-08-22", "calls": [{"strike": 6300, "bid": 8.1,
@@ -84,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         print(handle(args.once))
         return 0
 
-    print(f"intent dialect — plan {session.path} — verbs: read mark call arm yes no fly single price go stand down show")
+    print(f"intent dialect — plan {session.path} — verbs: read mark call arm yes no fly single price go stand down show replay")
     try:
         while True:
             try:

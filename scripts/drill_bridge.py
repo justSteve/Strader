@@ -21,6 +21,8 @@ Endpoints (all JSON; POST bodies are sent as text/plain so file:// pages make
   GET  /days                       -> corpus days with an ES tape, newest first [st-v7a0]
   GET  /drill-<YYYY-MM-DD>.html    -> that day's DRILL page, rendered on demand and cached
   GET  /desk-candles-<day>.html    -> the drill's minute-candle companion window
+  GET  /replay?say=…|day=…&…       -> region replay: the emissions of a window, scoped [co-j9t1g]
+  GET  /replay/kinds               -> the replay filter vocabulary
 
 Serving the page [st-n0qm.3]: the page used to exist only as a file:// bookmark
 on the desktop. Steve, 2026-08-16: "any instrument at the level of the FP chart
@@ -486,6 +488,118 @@ def producers_health(now: datetime | None = None, corpus_root: Path | None = Non
     return out
 
 
+# ── region replay [co-j9t1g] ────────────────────────────────────────────────
+# Steve's request (Desk memo 20260826T013442): from the chart, target a region
+# and get a full replay of that window with the emitter scoped to a chosen
+# subset — sweeps only, plan-level only. The page's shift-drag and its typed
+# sentence both land here:
+#     GET /replay?say=<sentence>&day=<YYYY-MM-DD>          the spoken form
+#     GET /replay?day=&between=HH:MM-HH:MM&price=LO-HI&kind=…&kind=…
+#     GET /replay/kinds                                     the filter vocabulary
+# The bridge does not import market/ (dependency-light on purpose), so like
+# the drill render this shells out to the tested entry point —
+# scripts/replay_emissions.py, the SAME process a reviewer runs for Ruling 9's
+# acceptance diff. One engine, so the learning view cannot drift from the
+# acceptance floor. A full day costs ~5 s per path on first request; the CLI
+# caches nothing across processes, so identical requests are cached here,
+# keyed on the exact argv and the ES file's mtime (a day still being captured
+# grows, and a grown tape is a different replay).
+REPLAY_SCRIPT = REPO / "scripts" / "replay_emissions.py"
+REPLAY_TIMEOUT_S = 180.0
+REPLAY_CACHE_MAX = 32
+_replay_cache: dict[tuple, dict] = {}
+_replay_cache_guard = threading.Lock()
+_replay_kinds: dict | None = None
+_REPLAY_PASSTHROUGH = ("between", "price", "kind", "subtype", "sig", "path")
+
+
+def replay_argv(params: dict[str, list[str]]) -> list[str]:
+    """Query parameters → the CLI's argv. Only the CLI's own flags pass
+    through; anything else is ignored rather than becoming a shell argument."""
+    argv = ["run", "--json"]
+    say = (params.get("say") or [""])[0].strip()
+    day = (params.get("day") or [""])[0].strip()
+    if day:
+        if not _DAY_RE.match(day):
+            raise ValueError(f"day wants YYYY-MM-DD, got {day!r}")
+        argv += ["--from", day]
+    end = (params.get("to") or [""])[0].strip()
+    if end:
+        if not _DAY_RE.match(end):
+            raise ValueError(f"to wants YYYY-MM-DD, got {end!r}")
+        argv += ["--to", end]
+    if say:
+        argv += ["--say", say[:400]]
+    if not (say or day):
+        raise ValueError("replay wants a day or a sentence")
+    for name in _REPLAY_PASSTHROUGH:
+        for v in params.get(name) or []:
+            v = v.strip()
+            if v:
+                argv += [f"--{name}", v[:80]]
+    return argv
+
+
+def _replay_stamp(day: str | None) -> float | None:
+    src = _es_source(day) if day and _DAY_RE.match(day) else None
+    return src.stat().st_mtime if src else None
+
+
+def run_replay(params: dict[str, list[str]]) -> tuple[int, dict]:
+    """Shell out to the replay CLI and return (http status, payload).
+    Cached on (argv, ES mtime). Errors come back as JSON, never as a 500 with
+    a traceback the page cannot show."""
+    argv = replay_argv(params)
+    day = (params.get("day") or [None])[0]
+    key = (tuple(argv), _replay_stamp(day))
+    with _replay_cache_guard:
+        hit = _replay_cache.get(key)
+    if hit is not None:
+        return 200, dict(hit, cached=True)
+    t0 = time.monotonic()
+    try:
+        proc = subprocess.run([str(DRILL_PYTHON), str(REPLAY_SCRIPT), *argv],
+                              capture_output=True, text=True, timeout=REPLAY_TIMEOUT_S,
+                              cwd=str(REPO))
+    except subprocess.TimeoutExpired:
+        return 504, {"error": f"replay took longer than {REPLAY_TIMEOUT_S:.0f}s"}
+    took_ms = int((time.monotonic() - t0) * 1000)
+    try:
+        payload = json.loads(proc.stdout or "{}")
+    except json.JSONDecodeError:
+        logger.error("replay produced no JSON (exit %d): %s", proc.returncode, proc.stderr[-800:])
+        return 500, {"error": "replay produced no JSON", "exit": proc.returncode,
+                     "stderr": proc.stderr[-800:]}
+    if proc.returncode != 0:
+        payload.setdefault("error", f"replay exit {proc.returncode}")
+        payload["stderr"] = proc.stderr[-800:]
+        return 400 if proc.returncode == 2 else 500, payload
+    # The day the sentence resolved to may differ from the query's; the page
+    # needs the resolved one to place rows on its own tape.
+    req = payload.get("request") or {}
+    payload["day"] = req.get("day") or day
+    payload["took_ms"] = took_ms
+    payload["cached"] = False
+    logger.info("replay %s -> %s events in %d ms", " ".join(argv[2:]), payload.get("count"), took_ms)
+    with _replay_cache_guard:
+        if len(_replay_cache) >= REPLAY_CACHE_MAX:
+            _replay_cache.pop(next(iter(_replay_cache)))
+        _replay_cache[key] = payload
+    return 200, payload
+
+
+def replay_kinds() -> dict:
+    """The filter vocabulary, read once per process from the CLI."""
+    global _replay_kinds
+    if _replay_kinds is None:
+        proc = subprocess.run([str(DRILL_PYTHON), str(REPLAY_SCRIPT), "kinds", "--json"],
+                              capture_output=True, text=True, timeout=60, cwd=str(REPO))
+        if proc.returncode != 0:
+            raise RuntimeError(f"replay kinds failed: {proc.stderr[-400:]}")
+        _replay_kinds = json.loads(proc.stdout)
+    return _replay_kinds
+
+
 STATE = BridgeState()
 
 
@@ -584,6 +698,14 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send_page()
             elif route == "/days":
                 self._send(200, {"days": corpus_days(), "live_day": _central_day()})
+            elif route == "/replay/kinds":
+                try:
+                    self._send(200, replay_kinds())
+                except RuntimeError as e:
+                    self._send(500, {"error": str(e)})
+            elif route == "/replay":
+                code, payload = run_replay(parse_qs(url.query))
+                self._send(code, payload)
             elif route.startswith("/drill-") and route.endswith(".html"):
                 self._send_drill(route[len("/drill-"):-len(".html")])
             elif route.startswith("/desk-candles-") and route.endswith(".html"):
