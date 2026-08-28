@@ -18,7 +18,9 @@ file:
 PYTHONPATH=. .venv/bin/python -c "from runbook.mancini.fetch import fetch_latest; print(fetch_latest()[0])"
 
 # 2. Read it, apply the instructions below, write the JSON.
-#    clean_newsletter() strips the Substack HTML down to ~30k chars of prose.
+#    clean_newsletter() strips the Substack HTML down to ~30k chars of prose,
+#    then segment.render() cuts that to the forward plan — a median 16% —
+#    split into labelled sections. Read the SEGMENTED text. [st-9r51]
 
 # 3. Feed it back in. This is the last step — it publishes AND concludes by
 #    loading the Daily Payload into Steve's Windows clipboard.
@@ -59,6 +61,15 @@ capture them all).
   paragraphs (breakout targets, range boundaries, pivots, short/long triggers) —
   capture these too, classified by how Mancini frames them
   (target / pivot / trigger / support / resistance).
+
+> **These must be the sections AFTER the ladder.** Mancini reprints his previous
+> letter inside the recap — "I expanded on this yesterday:" and then yesterday's
+> bull case in full — so `Bull case` appears twice in most letters and the first
+> one is out of date. Measured: on 201 of 353 letters the first hit in the file
+> is the quoted prior edition. The segmented input (`/tmp/mancini-plan.txt`)
+> already contains only the forward sections, which is the reason to read it
+> rather than the raw letter. If you are reading raw text for any reason, take
+> the sections that follow `Supports are:` and no earlier ones.
 
 **Level callouts — put Mancini's own words in `label`.** [st-eo0, Steve
 2026-08-11] When the letter says something specific about a level, carry it:

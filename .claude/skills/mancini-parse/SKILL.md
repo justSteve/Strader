@@ -20,12 +20,18 @@ clipboard and the desk NAV, not at the JSON.
 cd /root/projects/Strader && PYTHONPATH=. .venv/bin/python -c "
 from runbook.mancini.fetch import fetch_latest
 from runbook.mancini.clean import clean_newsletter
+from runbook.mancini.segment import segment, render
 from pathlib import Path
 name, raw = fetch_latest()
-out = Path('/tmp/mancini-clean.txt')
-out.write_text(clean_newsletter(raw), encoding='utf-8')
+clean = clean_newsletter(raw)
+out = Path('/tmp/mancini-clean.txt'); out.write_text(clean, encoding='utf-8')
+seg = segment(clean)
+plan = Path('/tmp/mancini-plan.txt'); plan.write_text(render(seg), encoding='utf-8')
 print(f'blob: {name}')
-print(f'clean letter: {out}')
+print(f'clean letter: {out}  ({seg.source_len} chars)')
+print(f'forward plan: {plan}  ({len(seg.forward_text)} chars, '
+      f'{seg.kept_fraction*100:.0f}%; anchored={seg.anchored})')
+print(f'sections absent: {list(seg.missing) or \"none\"}')
 "
 ```
 
@@ -34,11 +40,28 @@ Blob only, never Gmail. The letter published the prior weekday targets the
 Weekend resends carry the same plan — parse the newest blob, date the result
 by plan-day.
 
+`/tmp/mancini-plan.txt` is the letter cut down to the part that plans the next
+session — a median 16% of it — and split into labelled sections [st-9r51].
+**Read that, not the raw letter, when writing the extraction.** The reason is
+not brevity: the recap you would otherwise be reading contains Mancini
+**quoting his previous letter verbatim**, bull case and bear case included, and
+on 201 of 353 real letters the first `Bull case` in the file is yesterday's.
+Extracting it would put yesterday's direction under today's date.
+
+Two things to check in that output before Step 2:
+
+- `anchored=False` means no `Supports are:` ladder was found — a truncated
+  edition. The deterministic scrape will find no levels either, so the run is
+  going to fail; say so rather than extracting from the fragment.
+- `sections absent` is a **reported** absence. Some letters genuinely carry no
+  bear case. Do not go hunting in the recap to fill the gap.
+
 ## Step 2 — Extract, per the contract
 
-Read `/tmp/mancini-clean.txt` and `runbook/mancini/extraction-contract.md`,
-then write the extraction JSON to `/tmp/mancini-extraction.json` following the
-contract exactly. Non-negotiables the validator will enforce anyway:
+Read `/tmp/mancini-plan.txt` and `runbook/mancini/extraction-contract.md`, then
+write the extraction JSON to `/tmp/mancini-extraction.json` following the
+contract exactly. Fall back to `/tmp/mancini-clean.txt` only when the segmenter
+reports `anchored=False`. Non-negotiables the validator will enforce anyway:
 
 - Every price verbatim from the letter — never invented, rounded, or inferred.
 - The explicit Supports/Resistances lists commonly hold 25–30 levels; capture
