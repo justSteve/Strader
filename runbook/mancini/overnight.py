@@ -66,6 +66,11 @@ class LevelInteraction:
     # survive construction here or the decision cannot be made downstream.
     callout_quotes: list[str] = field(default_factory=list)
     callout_attribution: str = ""
+    # Typed level fields [st-9r51]. Same drop-site reasoning as above: the
+    # sentinel branches on these, so they must survive construction here.
+    intent: str = "unstated"
+    conviction: str = "unstated"
+    setup: str = "none"
     state: str = "untouched"       # untouched | tested-held | broken | reclaimed
     touches: int = 0
     defenses: int = 0              # touched-and-held closes
@@ -158,6 +163,9 @@ def compute_interactions(levels: Sequence[Level], candles: Sequence[dict],
             label=lv.label, source_quote=lv.source_quote,
             callout_quotes=list(getattr(lv, "callout_quotes", []) or []),
             callout_attribution=getattr(lv, "callout_attribution", "") or "",
+            intent=getattr(lv, "intent", "") or "unstated",
+            conviction=getattr(lv, "conviction", "") or "unstated",
+            setup=getattr(lv, "setup", "") or "none",
         )
         is_sup = lv.kind == "support"
         for c in candles:

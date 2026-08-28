@@ -82,3 +82,38 @@ def test_same_text_different_trigger_is_a_different_note(tmp_path):
     store.append([_item("a", [1])], "2026-06-29", store_root=tmp_path)
     store.append([_item("a", [2])], "2026-06-29", store_root=tmp_path)
     assert len(store.load("2026-06-29", store_root=tmp_path)) == 2
+
+
+def test_a_changed_field_updates_the_note_in_place(tmp_path):
+    """Identity says it is the same note; the newest parse says what it holds.
+
+    Closing the tag vocabulary re-tagged notes already in the store [st-9r51].
+    Under skip-if-present the store kept the old spellings while the parse file
+    held the canonical ones — the same divergence the dedupe was added to stop.
+    """
+    first = _item("a", [1]); first.tags = ["bull-case"]
+    store.append([first], "2026-06-29", ingested_at="T1", store_root=tmp_path)
+    second = _item("a", [1]); second.tags = ["bull_case", "long_entry"]
+    store.append([second], "2026-06-29", ingested_at="T2", store_root=tmp_path)
+    records = store.load("2026-06-29", store_root=tmp_path)
+    assert len(records) == 1, "an update must not append a near-duplicate"
+    assert records[0]["tags"] == ["bull_case", "long_entry"]
+
+
+def test_an_update_keeps_the_original_ingested_at(tmp_path):
+    """When the note entered the store is not the re-parse's to rewrite."""
+    first = _item("a", [1]); first.tags = ["bull-case"]
+    store.append([first], "2026-06-29", ingested_at="T1", store_root=tmp_path)
+    second = _item("a", [1]); second.tags = ["bull_case"]
+    store.append([second], "2026-06-29", ingested_at="T2", store_root=tmp_path)
+    assert store.load("2026-06-29", store_root=tmp_path)[0]["ingested_at"] == "T1"
+
+
+def test_an_update_preserves_the_other_notes_and_their_order(tmp_path):
+    items = [_item("a", [1]), _item("b", [2]), _item("c", [3])]
+    store.append(items, "2026-06-29", ingested_at="T1", store_root=tmp_path)
+    changed = _item("b", [2]); changed.tags = ["risk"]
+    store.append([changed], "2026-06-29", ingested_at="T2", store_root=tmp_path)
+    records = store.load("2026-06-29", store_root=tmp_path)
+    assert [r["text"] for r in records] == ["a", "b", "c"]
+    assert records[1]["tags"] == ["risk"]

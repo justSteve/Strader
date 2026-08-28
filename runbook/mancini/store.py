@@ -70,14 +70,24 @@ def append(
     Identity is ``(text, trigger)``. Deliberately NOT the whole record: a
     re-parse stamps a fresh ``ingested_at``, so including the envelope would
     make every item look new and restore the bug.
+
+    A note already held whose *other* fields have changed is **updated in
+    place**, keeping its original ``ingested_at`` [st-9r51]. That case is real:
+    closing the tag vocabulary re-tagged today's notes, and under
+    skip-if-present the store would have kept this morning's spellings while
+    ``parsed/<day>.json`` held the canonical ones — the same silent divergence
+    the dedupe was added to stop, one field down. Identity decides whether it is
+    the same note; the newest parse decides what that note says.
     """
     root = Path(store_root) if store_root is not None else DEFAULT_STORE_ROOT
     root.mkdir(parents=True, exist_ok=True)
     path = _day_path(day, root)
 
-    seen = {_identity(rec) for rec in load(day, store_root=root)}
+    existing = load(day, store_root=root)
+    by_ident = {_identity(rec): i for i, rec in enumerate(existing)}
 
-    lines: list[str] = []
+    appended: list[str] = []
+    changed = False
     for item in items:
         record: dict[str, Any] = {
             "date": day,
@@ -86,15 +96,30 @@ def append(
             **item.to_dict(),
         }
         ident = _identity(record)
-        if ident in seen:
+        idx = by_ident.get(ident)
+        if idx is None:
+            by_ident[ident] = len(existing)
+            existing.append(record)
+            # sort_keys for deterministic, diff-friendly output.
+            appended.append(json.dumps(record, sort_keys=True, ensure_ascii=False))
             continue
-        seen.add(ident)
-        # sort_keys for deterministic, diff-friendly output.
-        lines.append(json.dumps(record, sort_keys=True, ensure_ascii=False))
+        prior = existing[idx]
+        # The first ingest's timestamp is when this note entered the store and
+        # is not the re-parse's to overwrite.
+        record["ingested_at"] = prior.get("ingested_at", ingested_at)
+        if record != prior:
+            existing[idx] = record
+            changed = True
 
-    if lines:
+    if changed:
+        # A field changed on a note already held: rewrite the whole day so the
+        # correction lands, rather than appending a near-duplicate.
+        with path.open("w", encoding="utf-8") as fh:
+            for rec in existing:
+                fh.write(json.dumps(rec, sort_keys=True, ensure_ascii=False) + "\n")
+    elif appended:
         with path.open("a", encoding="utf-8") as fh:
-            fh.write("\n".join(lines) + "\n")
+            fh.write("\n".join(appended) + "\n")
     return path
 
 

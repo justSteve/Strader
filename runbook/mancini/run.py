@@ -688,6 +688,12 @@ def main(argv: list[str] | None = None) -> int:
     if not result.date:
         result.date = day
 
+    # Tags outside the closed vocabulary [st-9r51]. Reported, never fatal:
+    # validate folded the known variants and kept the rest of the note.
+    if outcome.validation.unknown_tags:
+        logger.warning("unknown commentary tag(s), dropped: %s",
+                       "; ".join(outcome.validation.unknown_tags))
+
     # Count-parity cross-check [st-ze6]: when the interpretive leg ran, every
     # deterministically-listed level must appear in its output — a missing one
     # is an omission (the quiet failure mode validation can't otherwise see).

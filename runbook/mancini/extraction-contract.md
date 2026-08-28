@@ -93,6 +93,42 @@ precisely because a callout can contain the word ("lost the major June 11th
 low") and a substring test would promote that level on the Pine chart and in
 the Daily Payload. Do not write `label: "shelf of lows (major)"`.
 
+**Typed fields — `intent`, `conviction`, `setup`.** [st-9r51] `label` stays as
+written, for display. These three are what a sentinel branches on without
+parsing prose, and each is a **closed vocabulary** `validate.check()` enforces
+as strictly as `kind` — an invalid value fails the parse.
+
+| field | values | set it when |
+|---|---|---|
+| `intent` | `trade` | he would take an entry here |
+| | `offered` | he names an entry but does not take it himself — **his shorts**, every letter: *"I don't short ES … but I still give short entries here for those who like them"* |
+| | `watch` | a target, boundary or marker, not an entry |
+| | `avoid` | he says outright he will not touch it |
+| | `unstated` | no intent language — **the default, and the honest answer for most of the ladder** |
+| `conviction` | `high` / `medium` / `low` | his confidence in his own words: *"VERY actionable"* → high, *"very weak, shaky"* → low |
+| | `unstated` | no confidence language |
+| `setup` | `failed_breakdown` · `level_reclaim` · `breakdown_short` · `backtest_long` · `breakout_target` · `bid_direct` | the setup he names at the level |
+| | `none` | he names no setup |
+
+Read them off what the letter says, never off what would be useful. A ladder
+where most levels are `unstated`/`none` is the correct output — he comments on
+roughly a quarter of his levels, and inventing intent for the rest destroys the
+signal the fields exist to carry. `offered` in particular is not a synonym for
+`trade`: Steve trades long premium only, and a short entry Mancini publishes
+while saying he has not taken one in over a year must not reach a surface
+looking like his recommendation.
+
+**Commentary `tags` are a closed vocabulary too:** `bull_case`, `bear_case`,
+`summary`, `long_entry`, `short_entry`, `no_entry`, `failed_breakdown`,
+`level_reclaim`, `breakdown_short`, `backtest_long`, `breakout_target`,
+`bid_direct`, `regime`, `risk`, `runner`, `catalyst`, `structure`. Unlike the
+level fields, an unknown tag does **not** fail the parse — known variants are
+folded and anything else is reported and dropped, because a tag is metadata and
+failing at 08:15 costs the session its levels. Do not rely on that: the store
+reached 83 distinct tags under the old open vocabulary, with `failed_breakdown`
+beside `failed-breakdown` and eight spellings of "short", which is precisely
+why a consumer could never branch on it.
+
 **Excluded from callouts: Mancini's own runners and position talk.** Steve does
 not want to read which runner Mancini is holding or when he entered it — skip
 *"I am still holding my 10% long runner from the 4:36PM 7325 Failed
@@ -136,6 +172,9 @@ The file passed to `--extraction-json` is a single object mapping 1:1 onto
       "price": 7449,           // REQUIRED — must appear literally in the letter
       "kind": "support",       // REQUIRED — support | resistance | pivot | target | trigger
       "label": "major",        // optional
+      "intent": "trade",       // closed enum, default "unstated"
+      "conviction": "high",    // closed enum, default "unstated"
+      "setup": "failed_breakdown",     // closed enum, default "none"
       "source_quote": "7449 (major)"   // REQUIRED — verbatim, minimal span
     }
   ],
@@ -156,8 +195,11 @@ The file passed to `--extraction-json` is a single object mapping 1:1 onto
 ```
 
 `date`, `instrument`, `session_bias`, `levels`, and `commentary` are required
-keys. `kind` and `trigger.type` are closed enums — `schema.LEVEL_KINDS` and
-`schema.TRIGGER_TYPES` are authoritative; a value outside them fails validation.
+keys. `kind`, `trigger.type`, `intent`, `conviction` and `setup` are closed
+enums — `schema.LEVEL_KINDS`, `TRIGGER_TYPES`, `LEVEL_INTENTS`,
+`LEVEL_CONVICTIONS` and `LEVEL_SETUPS` are authoritative; a value outside them
+fails validation. `schema.COMMENTARY_TAGS` is closed too but folds and reports
+rather than failing.
 
 The harness stamps `model` and `parsed_at` itself; do not set them. `run.py`
 records `model` as `in-session:<label>` so the store shows which route produced
