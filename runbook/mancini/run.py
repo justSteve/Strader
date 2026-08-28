@@ -37,6 +37,7 @@ from . import parse as parse_mod
 from . import schema
 from . import store as store_mod
 from . import attribution
+from . import completeness
 from . import validate as validate_mod
 from .schema import ParseResult
 
@@ -717,6 +718,21 @@ def main(argv: list[str] | None = None) -> int:
                               for k, v in sorted(attr_counts.items())))
     except Exception as e:  # noqa: BLE001
         logger.warning("callout attribution failed (non-fatal): %s", e)
+
+    # 2c. Completeness floor [st-9r51]. Grades how RICH the parse is, where
+    # validate grades whether it is TRUE. It warns and never blocks: a thin
+    # parse is worth publishing and a wrong one is not, and that second call
+    # was already made above. Deliberately after attribution so the run's
+    # output reads correctness, attribution, richness in that order.
+    try:
+        comp = completeness.check(result, raw)
+        rendered = completeness.render(comp)
+        if rendered:
+            (logger.warning if comp.warnings else logger.info)("%s", rendered)
+            if comp.warnings:
+                print(rendered, file=sys.stderr)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("completeness check failed (non-fatal): %s", e)
 
     # 3. Persist: commentary store + last-good full result.
     store_path = store_mod.append(

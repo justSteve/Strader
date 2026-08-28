@@ -86,6 +86,33 @@ SECTION_RES: list[tuple[str, re.Pattern[str]]] = [
 # absent means the letter did not arrive whole; the rest are genuinely optional.
 SECTION_NAMES = tuple(name for name, _ in SECTION_RES)
 
+# Substack's own chrome, which survives clean_newsletter and lands at the tail
+# of whichever section runs last — usually the summary. It is not Mancini's
+# text, and its copyright year is four digits, so a naive price scan over the
+# summary reads "© 2026" as a level he named. Line-anchored so the word "Like"
+# inside a sentence is untouched, and only honoured near the end (see _TAIL_FRAC).
+_FOOTER_RE = re.compile(
+    r"\n\s*(?:Like|Restack|Share|Unsubscribe|View in browser|©\s*\d{4})\s*(?:\n|$)",
+    re.I)
+# A footer marker earlier than this fraction of the text is a coincidence, not
+# the footer; leave it alone rather than truncate the plan.
+_TAIL_FRAC = 0.80
+
+
+def strip_footer(text: str) -> str:
+    """Drop the Substack footer from the end of ``text``.
+
+    Conservative by construction: only a line-anchored marker, only in the last
+    fifth, and only ever removes a suffix. Returns ``text`` unchanged when no
+    marker qualifies.
+    """
+    cut = None
+    for m in _FOOTER_RE.finditer(text):
+        if m.start() >= len(text) * _TAIL_FRAC:
+            cut = m.start()
+            break
+    return text[:cut].rstrip() if cut is not None else text
+
 
 @dataclass
 class Segments:
@@ -147,7 +174,7 @@ def segment(text: str) -> Segments:
                         missing=SECTION_NAMES, anchored=False,
                         source_len=len(text), forward_start=0)
 
-    forward = text[start:]
+    forward = strip_footer(text[start:])
     # Positions are found in the FORWARD region only. A header in the recap is
     # the quoted prior letter and must never be mistaken for this one.
     found: list[tuple[int, str]] = []
