@@ -42,3 +42,43 @@ def test_append_empty_is_noop_but_safe(tmp_path):
     # No file content required; load should be empty either way.
     assert store.load("2026-06-29", store_root=tmp_path) == []
     assert path.name == "2026-06-29.jsonl"
+
+
+def test_reappending_the_same_items_is_idempotent(tmp_path):
+    """A re-parse of a day the store already holds must not double it. [st-psoj]
+
+    This is the real defect shape: /mancini-parse run twice for one plan-day.
+    Three days in the live store were doubled and one tripled before the blind
+    append was noticed, because parsed/<day>.json replaced correctly and only
+    the store drifted.
+    """
+    items = [_item("a", [1]), _item("b", [2])]
+    store.append(items, "2026-06-29", store_root=tmp_path)
+    store.append(items, "2026-06-29", store_root=tmp_path)
+    records = store.load("2026-06-29", store_root=tmp_path)
+    assert [r["text"] for r in records] == ["a", "b"]
+
+
+def test_a_fresh_ingested_at_does_not_defeat_the_dedupe(tmp_path):
+    """Identity is (text, trigger) — never the envelope.
+
+    A re-parse always stamps a new ingested_at. Were that part of identity,
+    every item would look new and the dedupe would be decorative.
+    """
+    items = [_item("a", [1])]
+    store.append(items, "2026-06-29", ingested_at="2026-06-29T08:00:00Z",
+                 store_root=tmp_path)
+    store.append(items, "2026-06-29", ingested_at="2026-06-29T09:30:00Z",
+                 store_root=tmp_path)
+    records = store.load("2026-06-29", store_root=tmp_path)
+    assert len(records) == 1
+    assert records[0]["ingested_at"] == "2026-06-29T08:00:00Z"
+
+
+def test_same_text_different_trigger_is_a_different_note(tmp_path):
+    """Dedupe must not swallow a genuinely distinct note. Text alone is not
+    identity: the same sentence anchored on different prices is a real second
+    note, and collapsing the two would lose plan content."""
+    store.append([_item("a", [1])], "2026-06-29", store_root=tmp_path)
+    store.append([_item("a", [2])], "2026-06-29", store_root=tmp_path)
+    assert len(store.load("2026-06-29", store_root=tmp_path)) == 2

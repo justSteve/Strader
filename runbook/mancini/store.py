@@ -32,6 +32,19 @@ def _day_path(day: str, store_root: Path) -> Path:
     return store_root / f"{day}.jsonl"
 
 
+def _identity(record: dict[str, Any]) -> str:
+    """What makes two stored commentary rows the same note. [st-psoj]
+
+    The note's own content — text plus the trigger it fires on — and nothing
+    from the envelope. Two extractions of the same paragraph on the same day are
+    the same note however many times the parse ran.
+    """
+    return json.dumps(
+        {"text": record.get("text", ""), "trigger": record.get("trigger")},
+        sort_keys=True, ensure_ascii=False,
+    )
+
+
 def append(
     items: Iterable[Commentary],
     day: str,
@@ -40,15 +53,29 @@ def append(
     ingested_at: str = "",
     store_root: Path | str | None = None,
 ) -> Path:
-    """Append commentary items to the day's JSONL file.
+    """Append commentary items to the day's JSONL file, skipping ones it holds.
 
     Returns the path written. Creates the store directory if needed. Each line
     is a JSON object: the commentary fields plus ``date``/``instrument``/
     ``ingested_at`` envelope metadata so a single line is self-describing.
+
+    Appending is **idempotent** [st-psoj]. A re-parse of a day the store already
+    holds — a correction run of /mancini-parse, most often — used to write every
+    item a second time, and three days in the store were doubled and one tripled
+    before anyone looked. `parsed/<day>.json` is written with replace semantics
+    and stayed correct throughout, so the two artifacts silently disagreed about
+    how many forward notes a day had. Genuinely new items still append, which is
+    what makes this a dedupe and not a truncate.
+
+    Identity is ``(text, trigger)``. Deliberately NOT the whole record: a
+    re-parse stamps a fresh ``ingested_at``, so including the envelope would
+    make every item look new and restore the bug.
     """
     root = Path(store_root) if store_root is not None else DEFAULT_STORE_ROOT
     root.mkdir(parents=True, exist_ok=True)
     path = _day_path(day, root)
+
+    seen = {_identity(rec) for rec in load(day, store_root=root)}
 
     lines: list[str] = []
     for item in items:
@@ -58,6 +85,10 @@ def append(
             "ingested_at": ingested_at,
             **item.to_dict(),
         }
+        ident = _identity(record)
+        if ident in seen:
+            continue
+        seen.add(ident)
         # sort_keys for deterministic, diff-friendly output.
         lines.append(json.dumps(record, sort_keys=True, ensure_ascii=False))
 
