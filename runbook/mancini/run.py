@@ -36,6 +36,7 @@ from . import listlevels
 from . import parse as parse_mod
 from . import schema
 from . import store as store_mod
+from . import attribution
 from . import validate as validate_mod
 from .schema import ParseResult
 
@@ -698,6 +699,24 @@ def main(argv: list[str] | None = None) -> int:
             print(f"FAILED: interpretive parse omitted {len(missing)} listed "
                   f"level(s): {miss_str}. Keeping last-good.", file=sys.stderr)
             return 4
+
+    # 2b. Mark which words of each callout are Mancini's [st-9r51]. This has to
+    # happen HERE and not in the tracker: the letter is in hand at parse time
+    # and nowhere downstream, and the answer must be persisted with the parse it
+    # describes. Deterministic and non-fatal — a callout whose attribution could
+    # not be computed reads as unknown, which is what a pre-08-28 parse reads as
+    # anyway, and is never worth failing a validated parse over.
+    try:
+        attribution.annotate(result.levels, raw)
+        attr_counts: dict[str, int] = {}
+        for lv in result.levels:
+            attr_counts[lv.callout_attribution] = (
+                attr_counts.get(lv.callout_attribution, 0) + 1)
+        logger.info("callout attribution: %s",
+                    ", ".join(f"{k or 'none'}={v}"
+                              for k, v in sorted(attr_counts.items())))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("callout attribution failed (non-fatal): %s", e)
 
     # 3. Persist: commentary store + last-good full result.
     store_path = store_mod.append(

@@ -151,3 +151,16 @@ keys. `kind` and `trigger.type` are closed enums — `schema.LEVEL_KINDS` and
 The harness stamps `model` and `parsed_at` itself; do not set them. `run.py`
 records `model` as `in-session:<label>` so the store shows which route produced
 a given plan-day, and hybrid (levels-only) runs record `deterministic-lists`.
+
+It also stamps each level's `callout_quotes` and `callout_attribution`
+(`attribution.annotate`, [st-9r51]) — **do not set these either.** They record
+which words of your callout are Mancini's and which are yours, and they are
+worth nothing if the writer of the prose also grades it. Write the callout the
+way the rules above say; the harness marks it `quoted`, `mixed` or `gloss`
+against the letter afterwards.
+
+`gloss` is not a defect to avoid. A callout like "bull-case target" is a true
+and useful classification that Mancini never wrote in those words, and it should
+stay that way rather than be padded with borrowed phrasing to score better. What
+the field exists to prevent is the opposite: a characterisation the sentinel
+then attributes to Mancini in an alert. Keep quoting him where he said it.

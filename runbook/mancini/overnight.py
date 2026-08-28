@@ -60,6 +60,12 @@ class LevelInteraction:
     # ever sees it, and no amount of fixing build_state alone recovers it.
     label: str = ""
     source_quote: str = ""
+    # Which words of the callout are quotation vs extractor gloss [st-9r51].
+    # Same drop-site reasoning as label/source_quote above: the sentinel decides
+    # whether it may attribute the callout to Mancini, so the attribution has to
+    # survive construction here or the decision cannot be made downstream.
+    callout_quotes: list[str] = field(default_factory=list)
+    callout_attribution: str = ""
     state: str = "untouched"       # untouched | tested-held | broken | reclaimed
     touches: int = 0
     defenses: int = 0              # touched-and-held closes
@@ -150,6 +156,8 @@ def compute_interactions(levels: Sequence[Level], candles: Sequence[dict],
             price=lv.price, kind=lv.kind,
             major=schema.is_major(lv.label),
             label=lv.label, source_quote=lv.source_quote,
+            callout_quotes=list(getattr(lv, "callout_quotes", []) or []),
+            callout_attribution=getattr(lv, "callout_attribution", "") or "",
         )
         is_sup = lv.kind == "support"
         for c in candles:

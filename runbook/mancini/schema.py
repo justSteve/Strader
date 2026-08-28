@@ -71,6 +71,12 @@ class Level:
     kind: str  # one of LEVEL_KINDS
     label: str = ""
     source_quote: str = ""  # verbatim newsletter text this price came from
+    # Which words of callout(label) are Mancini's [st-9r51]. Filled by
+    # attribution.annotate() at parse time, where the letter is in hand; the
+    # extractor never sets them. Absent on parses published before 2026-08-28,
+    # so both default to "not computed" and every consumer must tolerate that.
+    callout_quotes: list[str] = field(default_factory=list)
+    callout_attribution: str = ""  # one of attribution.ATTRIBUTIONS
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -82,6 +88,8 @@ class Level:
             kind=str(d.get("kind", "")),
             label=str(d.get("label", "")),
             source_quote=str(d.get("source_quote", "")),
+            callout_quotes=[str(q) for q in d.get("callout_quotes", [])],
+            callout_attribution=str(d.get("callout_attribution", "")),
         )
 
 

@@ -42,6 +42,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import overnight
+from . import schema
 from .schema import ParseResult
 
 logger = logging.getLogger("runbook.mancini")
@@ -78,6 +79,12 @@ def build_state(result: ParseResult, candles: list[dict],
             "kind": it.kind,
             "major": it.major,
             "label": it.label,
+            # `callout` is `label` with the `major` prefix stripped — the alert
+            # text itself, so the sentinel never has to re-derive it and never
+            # renders "major · " into an alert. [st-9r51]
+            "callout": schema.callout(it.label),
+            "callout_quotes": it.callout_quotes,
+            "callout_attribution": it.callout_attribution,
             "source_quote": it.source_quote,
             "state": it.state,
             "first_touch": it.first_touch,
