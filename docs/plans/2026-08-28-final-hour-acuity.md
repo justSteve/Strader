@@ -48,9 +48,12 @@ accrues going forward.
 
 ## The program
 
-**Stage 0 — base rates.** Done tonight (above).
+**Stage 0 — base rates.** Done 2026-08-28 (above).
 
-**Stage 1 — score the outcome in premium, not points.** For every OPRA day,
+**Stage 1 — score the outcome in premium, not points.** *Done 2026-08-29 —
+`docs/measurement/final-hour-premium-vs-es-2026-08-29.md`: the ITM single
+follows the ES move at +0.91; ≥5 ES pts right pays +47% median, ≥10 pays +72%;
+a 0.30 stop fires before the first +25% print on 82% of right days.* For every OPRA day,
 reconstruct the mark path of a hypothetical 14:00 CT 0DTE single on each side
 (the first strike ~10 pts out), from the trade prints. Score it three ways:
 result at the close, best mark before the close, and result under Steve's own
