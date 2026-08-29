@@ -61,7 +61,10 @@ cut rule (a ~3% drawdown exit, the 08-26 yardstick). This gives the actual
 shape of "right delta call → win huge or marginal; wrong → quick shallow loss"
 as a distribution, and it is the denominator every later stage divides by.
 
-**Stage 2 — extract the 14:00 state with no lookahead.** One row per day per
+**Stage 2 — extract the 14:00 state with no lookahead.** *Done 2026-08-29 —
+`scripts/measurement/final_hour_lens.py`, 858 rows at 14:00/14:30/14:45 with
+each lens' pre-registered call and the outcome incl. heat;
+`docs/measurement/final-hour-lens-calls-2026-08-29.md`.* One row per day per
 lens, computed only from data stamped before 14:00 CT (and again at 14:30 and
 14:45, since the flush Steve stages for often starts after 14:30):
 - footprint: box range, box delta, absorption, last-30 drift, sell/buy node
@@ -74,7 +77,11 @@ lens, computed only from data stamped before 14:00 CT (and again at 14:30 and
 Each lens then emits its own call — *pin / break down / break up* — by a
 rule written before the scoring, so the rule is testable rather than fitted.
 
-**Stage 3 — score and split.** Each lens' call against the realized final
+**Stage 3 — score and split.** *Done 2026-08-29, same write-up: no lens carries a
+14:00 direction call (pooled edge 0 / +1 pts, both flip sign across the
+2025/2026 split); footprint up at 14:45 is the one rule that held on both
+halves (+20 / +27, n=40, ~3-pt median); every down rule failed a half; GEX at
+17 days is recorded, not scored.* Each lens' call against the realized final
 hour (direction of the net move, the 10-pt excursion, and the Stage-1 premium
 result), then the confluence call when the lenses agree. Validate by time
 split — 2025 half vs. 2026 half — because the last time a cut looked good on
