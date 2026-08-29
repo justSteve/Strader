@@ -64,7 +64,7 @@ page.md             the page, rendered to /var/moo/desk/desk-footprint-icm-<day>
 
 ## Measured, 2026-08-29 (the three trial runs)
 
-| Day | Model calls | Cost at list | Model time | Checker | Planted | Classes (A/B/C/D, agree) |
+| Day | Model calls | List-price equivalent (no charge — `claude -p` on the Pro plan) | Model time | Checker | Planted | Classes (A/B/C/D, agree) |
 |---|---|---|---|---|---|---|
 | planted fixture | 1 per day, inside the claims stage | ~$0.09 | ~22 s | pass | PASSED both days | the three expected rows |
 | 2026-08-27 (COO working session, 3 wakes) | 6 | $0.65 | 213 s | 6/6 pass | PASSED | 2/2/0/0, 1 |

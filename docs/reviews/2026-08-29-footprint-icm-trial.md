@@ -5,7 +5,7 @@
 ## The verdict, five lines
 
 1. The pattern works as a provenance check. Every one of the twelve model calls across the two days passed the word-for-word check; the planted test — the withdrawn 2026-08-25 sentence and the uncited sentence that replaced it, fed through as a fake reply — was caught on both days, with the sourced half correctly cited to the Target-1 rule.
-2. It costs $0.65 to $0.70 a day at list prices and about three and a half minutes of model time; the whole run, replay included, is under five minutes. All four stop conditions hold.
+2. It runs at no marginal charge — the model calls go through `claude -p` on Steve's Pro plan, so they draw on plan quota, not a bill (Steve, 2026-08-29). The list-price equivalent is $0.65 to $0.70 a day, a size-of-run number only; about three and a half minutes of model time; the whole run, replay included, is under five minutes. All four stop conditions hold.
 3. What it found on the real days is narrower than "unsourced synthesis in the live path". On 08-25 the analyst's rule-shaped claims rested on the letter ("the recovery threshold his letter names"), which the lane could not check because the day's letter parse is not in its source list. On 08-27 the live side was a COO working session, and its two class-A rows are that session's engineering talk.
 4. The lane named no setup on any wake of either day, and said why each time: the six setup names are defined in the recognizer's code in terms of volume-bar beats (flush, stall, flip, confirm) that the EVENT lines do not carry. That is a finding about the inputs, and it is the first entry in the gap map the playbook refactor asked for.
 5. Nothing here needs a ruling. The recommendation is to schedule the lane daily after 15:06 CT and admit the day's letter parse as a source; both are follow-on beads.
@@ -62,7 +62,7 @@ Steve sequenced the refactor after this trial so its UNSOURCED map would set the
 
 ## Follow-on beads
 
-- **Footprint ICM Trigger** — a `SCHEDULE.md` entry at 15:40 CT weekdays, after `strader-capture-evening-timer`, installed by `schedule-generate.sh --install`; the cron wrapper on the postmortem pattern with per-day logging and a non-zero exit alerted; the no-screen `claude -p` hazards on record. Recommend Go; the daily cost is about $0.70.
+- **Footprint ICM Trigger** — a `SCHEDULE.md` entry at 15:40 CT weekdays, after `strader-capture-evening-timer`, installed by `schedule-generate.sh --install`; the cron wrapper on the postmortem pattern with per-day logging and a non-zero exit alerted; the no-screen `claude -p` hazards on record. Recommend Go; no marginal charge (Pro plan), about $0.70 a day list-price equivalent, and twelve Opus calls out of the afternoon's rate-limit window.
 - **Letter As A Source** — gap 1 above: generate rows for the day's parse into the context folder with status "letter"; the checker already handles any row.
 - **Percentile Key Rename** — Strader's: the three colliding keys are renamed in the lane's renderer and should not have to be.
 
