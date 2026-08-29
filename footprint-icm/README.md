@@ -52,8 +52,28 @@ page.md             the page, rendered to /var/moo/desk/desk-footprint-icm-<day>
 | 10 | `bin/render_events.py` | no | the plain-words event table, the whole-window slice, and one alert-only slice per delivered wake; renames the three colliding percentile keys (`effort_pct_dev`, `effect_pct_dev`, `pctl_dev`) |
 | 20 | `bin/excerpts.py` | no | builds `context/` in the run folder from `20-classify/context/manifest.yaml` (the source list — Strader's, status words trusted / exploratory / code); refuses a path outside `knowledge/` (plus the recognizer docstring, decision 1), a refused file or status, a pin whose lines moved at HEAD, a quote not in its own lines; `--verify` fails on any hand-added or edited file; derives the compare stage's tripwire words from the rows' quotes plus the two planted sentences |
 | 20 | `bin/checker.py` | no | the line shapes (LABEL / IMPLICATION / CLAIM); a cite must resolve to a row and its `because` words must be in that row's excerpt word for word; UNSOURCED and NO-RULE-IN-CANON stand alone; a CLAIM's quote must be in the live reply word for word. The two planted bad examples fail; the good one passes (`tests/footprint_icm/test_checker.py`) |
-| 20 | `20-classify/prompt.md` | yes | *(Day 3)* LABEL and IMPLICATION lines over a slice, run once per delivered wake and once over the window |
-| 40 | `bin/compare.py` | code half now; the CLAIM transcriber on Day 3 | the page: per wake, what was shown, what was said, the number check; coverage; provenance |
+| 20 | `bin/classify.py` + `20-classify/prompt.md` | yes | assembles the model's whole input from the run folder (SOURCES = the generated excerpts, EVENTS = the slice), calls `bin/run_stage.sh` once per delivered wake (alert lines delivered so far only) and once over the window, runs the checker; a failure stops the run |
+| 40 | `bin/claims.py` + `40-compare/prompt.md` | yes | transcribes the live replies into CLAIM lines (quote from the reply, cite and because from a source, or UNSOURCED), then the planted fixture `40-compare/fixtures/withdrawn-phrasing.md` the same way; checker on both |
+| 40 | `bin/compare.py` | no | assigns the classes (A unsourced rule, B label or regime differs, C figure not in the log, D omission, agree), the planted verdict, UNEXTRACTED sentences; renders the page with the prompts and the source list verbatim |
+
+`bin/run_stage.sh` is how a model is called: `claude -p --setting-sources "" --tools ""
+--strict-mcp-config --no-session-persistence` from the stage folder, after checking no
+`CLAUDE.md` sits in any parent and no auto-memory exists for it. Without
+`--strict-mcp-config` the first 08-27 call wrote a 39,751-token cache for a
+5,000-token input; with it the same input measures 4,827 tokens.
+
+## Measured, 2026-08-29 (the three trial runs)
+
+| Day | Model calls | Cost at list | Model time | Checker | Planted | Classes (A/B/C/D, agree) |
+|---|---|---|---|---|---|---|
+| planted fixture | 1 per day, inside the claims stage | ~$0.09 | ~22 s | pass | PASSED both days | the three expected rows |
+| 2026-08-27 (COO working session, 3 wakes) | 6 | $0.65 | 213 s | 6/6 pass | PASSED | 2/2/0/0, 1 |
+| 2026-08-25 (analyst session, 3 wakes, 1 push) | 6 | $0.70 | 202 s | 6/6 pass | PASSED | 4/7/2/0, 0 |
+
+Stop conditions 1, 2 and 4 hold on both days; condition 3 (a row a reader can
+verify by opening the cite) is met on 08-25 by the claim "the divergence was
+the tell" cited to `orb-gex-sign` with the words "confirms breakout
+conviction; divergence warns". Write-up: `docs/reviews/2026-08-29-footprint-icm-trial.md`.
 
 ## The rule for "what the analyst was shown"
 

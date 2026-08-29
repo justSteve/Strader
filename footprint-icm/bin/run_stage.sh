@@ -61,12 +61,16 @@ cat > check.json <<EOF
  "auto_memory_absent": true, "checked_at": "$(TZ=America/Chicago date -Iseconds)"}
 EOF
 
-# 3. the call. --tools "" disables every tool; --setting-sources "" loads no
-#    settings file; the working directory is the stage folder. Not --bare:
-#    that skips the login and the call fails "Not logged in" (measured).
+# 3. the call. --tools "" disables every built-in tool; --strict-mcp-config
+#    with no --mcp-config loads no MCP server, so no external tool schema
+#    rides into the context (without it the first 08-27 call wrote a
+#    39,751-token cache for a 5,000-token input — the user-level MCP tools);
+#    --setting-sources "" loads no settings file; the working directory is
+#    the stage folder. Not --bare: that skips the login and the call fails
+#    "Not logged in" (measured).
 printf '%s' "$INPUT" | claude -p \
-    --setting-sources "" --tools "" --model "$MODEL" --no-session-persistence \
-    --system-prompt "$PROMPT" --output-format json > usage.json
+    --setting-sources "" --tools "" --strict-mcp-config --model "$MODEL" \
+    --no-session-persistence --system-prompt "$PROMPT" --output-format json > usage.json
 python3 - "$STAGE" <<'PY'
 import json, sys, pathlib
 p = pathlib.Path(sys.argv[1])

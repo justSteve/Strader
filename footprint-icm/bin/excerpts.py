@@ -62,7 +62,8 @@ PLANTED = (
     "regime changes a setup's management and expectancy, not its validity",
 )
 STOPWORDS = set("""a an and are as at be but by for from has have if in into is it its not of on or
-per that the their then this to was were what where which who will with your""".split())
+per that the their then this to was were what where which who will with your
+here there nothing still never changes happened holding tell""".split())
 
 
 def load_manifest(path: Path = MANIFEST) -> dict:
