@@ -116,3 +116,36 @@ def test_bars_since_always_reports_the_field(tmp_path):
     st = BridgeState(log_dir=tmp_path)
     assert "developing" in st.bars_since(0)
     assert st.bars_since(0)["developing"] is None
+
+
+def _none_side_trades(n: int, size: int = 1) -> list[Trade]:
+    """Reopen-shaped prints: an aggressor side of "N" adds to none_vol and
+    creates no footprint cell (market/orderflow/bars.py _BarAccumulator.add)."""
+    t0 = datetime(2026, 8, 23, 17, 0, tzinfo=CT)
+    return [
+        Trade(ts=t0 + timedelta(seconds=i), symbol="ESU6", instrument_id=1,
+              price=7680.0, size=size, side="N")
+        for i in range(n)
+    ]
+
+
+def test_all_none_side_pending_slice_yields_no_developing_column():
+    """[st-wnuk] 2026-08-23 17:00 CT: the first prints after the Sunday reopen
+    carried no aggressor side, the developing bar had volume and zero cells,
+    poc_price raised 'bar has no cells' and the feeder died — eleven times,
+    until systemd gave up. A bar with nothing to draw is 'not yet', not a
+    fault: the developing column must be absent, and nothing may raise."""
+    pending = _none_side_trades(5)
+    assert developing_payload(pending, BAR_N) is None
+
+
+def test_developing_column_appears_once_a_sided_print_arrives():
+    """The same slice with one sided print after the N run: the column exists
+    and its footprint holds exactly that print, with the N volume counted."""
+    pending = _none_side_trades(5) + _trades(1)[:1]
+    pending[-1] = Trade(ts=pending[-2].ts + timedelta(seconds=1), symbol="ESU6",
+                        instrument_id=1, price=7680.0, size=3, side="B")
+    p = developing_payload(pending, BAR_N)
+    assert p is not None
+    assert p["cells"] and p["poc"] == 7680.0
+    assert p["v"] == 8 and p["nv"] == 5

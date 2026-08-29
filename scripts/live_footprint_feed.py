@@ -337,7 +337,15 @@ def developing_payload(pending: list, bar_n: int) -> dict | None:
     # Guard, not decoration: if the pending slice ever reached a full bar the
     # main loop would have closed it, so more than one bar here means the
     # tee/reclaim invariant broke and the newest is the only honest one.
-    return bar_payload(bars[-1], [], include_steps=False)
+    bar = bars[-1]
+    # No cells yet: every pending trade was side "N" (no aggressor — the
+    # Sunday 17:00 CT reopen prints), so the bar has volume but no footprint
+    # and poc_price would raise. A column with nothing to draw is "not yet",
+    # not a fault; the crash here killed the feeder for the whole Monday
+    # session on 2026-08-23 [st-wnuk].
+    if not bar.cells:
+        return None
+    return bar_payload(bar, [], include_steps=False)
 
 
 # --------------------------------------------------------------------------

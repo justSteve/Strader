@@ -19,6 +19,14 @@
 # exits non-zero at the CT midnight → restart → ExecStartPre renders the new
 # day → the feeder waits for the new day's file (tail_rows honours the pinned
 # day while waiting, st-n0qm.3). A crash restarts in RestartSec.
+#
+# Restart backoff [st-wnuk]: on 2026-08-23 a data-shaped crash at the Sunday
+# reopen hit the start limit inside a minute and the unit stayed dead until a
+# hand reset Monday 04:16 CT. RestartSteps/RestartMaxDelaySec (systemd >= 254)
+# stretch the retry from 10 s toward 5 min, and the burst is sized so the
+# backoff itself can never exhaust it — a transient fault retries until the
+# tape moves on; a permanent one keeps flapping, loudly, instead of going
+# quiet. Health assessors read NRestarts; a climbing count is the alarm.
 Description=Strader live footprint feeder (corpus tail → bars + emissions → bridge)
 Documentation=https://github.com/justSteve/Strader
 PartOf=strader-drill-bridge.service
@@ -26,7 +34,7 @@ After=strader-drill-bridge.service network-online.target
 Wants=strader-drill-bridge.service
 
 StartLimitIntervalSec=600
-StartLimitBurst=10
+StartLimitBurst=30
 
 [Service]
 Type=exec
@@ -36,6 +44,8 @@ ExecStartPre=-/root/projects/Strader/.venv/bin/python /root/projects/Strader/scr
 ExecStart=/root/projects/Strader/.venv/bin/python /root/projects/Strader/scripts/live_footprint_feed.py
 Restart=on-failure
 RestartSec=10s
+RestartSteps=5
+RestartMaxDelaySec=5min
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=strader-footprint-feed
