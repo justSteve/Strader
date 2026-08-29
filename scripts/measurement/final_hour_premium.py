@@ -30,7 +30,7 @@ RUN
     priced from a 14:45 entry, not the 14:00 one. Rows carry "entry_ct"; the
     SPX-at-entry field keeps its Stage 1 name "spx1400" so the summary reads both.
 """
-import json, glob, os, sys, statistics as st
+import json, gzip, glob, os, sys, statistics as st
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from multiprocessing import Pool
@@ -42,6 +42,20 @@ OFFSETS = (-10, 0, 10)   # OTM distance in SPX pts; negative = ITM (Steve leans 
 CUTS = (0.03, 0.10)
 ABS_CUTS = (0.30, 0.50)  # Steve's 08-26 yardstick: 0.30 on a 10.10 single
 TARGETS = (0.25, 0.50, 1.00)
+
+def _open(path):
+    """Plain or gzipped OPRA day-file — the corpus compactor gzips older days
+    (7 of 276 OPRA files on 2026-08-29, five of them August), and the plain
+    glob alone hid them from this scoreboard. Same helper final_hour_lens.py
+    and final_hour_base.py already carry. [co-8p9nn]"""
+    return gzip.open(path, "rt") if path.endswith(".gz") else open(path)
+
+def opra_paths(base):
+    """Every corpus day with an OPRA file, plain or gzipped, that the Stage 0
+    base file scored and did not skip."""
+    found = glob.glob("data/corpus/20*/databento_opra.jsonl") + glob.glob("data/corpus/20*/databento_opra.jsonl.gz")
+    def day_of(p): return os.path.basename(os.path.dirname(p))
+    return sorted(p for p in found if day_of(p) in base and "skip" not in base[day_of(p)])
 
 def parse_sym(sym):
     # "SPXW  250807C06345000"
@@ -63,7 +77,7 @@ def run_day(path):
     t1357 = hm(EH, EM - 3); t1403 = hm(EH, EM + 3); t1400 = hm(EH, EM); t1500 = f"{h15:02d}:00"
     prints = {}  # sym -> [(hms, price)]
     parity = {}  # strike -> {"C": [...], "P": [...]}
-    with open(path) as f:
+    with _open(path) as f:
         for line in f:
             if tag not in line: continue
             i = line.find('"ts_event": "')
@@ -132,8 +146,7 @@ def run_day(path):
 
 if __name__ == "__main__":
     base = {json.loads(l)["day"]: json.loads(l) for l in open(BASE)}
-    paths = sorted(p for p in glob.glob("data/corpus/20*/databento_opra.jsonl")
-                   if os.path.basename(os.path.dirname(p)) in base and "skip" not in base[os.path.basename(os.path.dirname(p))])
+    paths = opra_paths(base)
     n = 0
     with Pool(6) as pool, open(OUT, "w") as out:
         for row in pool.imap_unordered(run_day, paths):

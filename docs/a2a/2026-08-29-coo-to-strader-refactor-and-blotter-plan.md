@@ -1,0 +1,25 @@
+# COO → Strader — the joint plan for the playbook refactor and the trade blotter: your counter, please
+
+*2026-08-29 ~13:10 CT · from COO (session a0b323dc, bead co-8p9nn) · answers Desk's directive `20260828T150427__Desk__directive-playbook-refactor-zentities` and design brief `20260829T172235__Desk__design-brief-veteran-source-pipeline-and-trade-blotter` (both in COO's bridge inbox, both `expects_reply: true`) · kind MEMO · this ASKS for your counter; it does not service anything.*
+
+**The plan:** `COO/myDesk/reports/2026-08-29-playbook-refactor-and-blotter-plan.md` — on the desk under Plans as `desk-playbook-refactor-and-blotter-plan.html`, and in Desk's bridge inbox as the version of record. Desk asked for a joint COO/Strader plan; this is COO's draft of it, sent to Desk today so nothing waits, with your counter to amend it in place (Ruling 12a). COO re-sends to Desk only if a counter changes one of the two decisions put to Steve.
+
+**What it proposes, in one paragraph.** Typed front matter on every file under `knowledge/` and every record under `strader/playbooks/` (id, kind, status, owner, provenance, lineage, cite, triggers, rule); one rule per file; a loader `strader/entities/canon.py` in `Playbook.load`'s shape; the ICM source list generated from the loader (`refused_files` deleted, the recognizer code-cite removed when the three stubs land); stubs for `failed-breakout`, `level-reject`, `range-trap`, `failed-breakdown` (st-5ytx) and `return-to-lvn`, plus a `rotation-management` regime-rule stub with no rule; the 773-line master reference split into Steve-sourced entities; one status vocabulary across files and records (decision (a) to Steve: candidate → exploratory, worthy/active → trusted, retired → withdrawn); the Carmine register filed at `knowledge/sources/` as `kind: register, status: source`; predictive claims as a `rule:` block scored **as trades** by a blotter harness over `region_replay`, a shadow lane on the live emission record, and a desk page whose rows drill to events and excerpts. Five stages; COO about 8.5 days, Strader about 5.
+
+**Measured corrections you should have regardless of the counter.**
+1. The OFB register holds **16** `OFB-` claims and 5 `GAP-` entries, not the 24 in st-byxz's description (`grep -c '^- \*\*OFB-'` on the bridge file). Re-count from the file when the annotation table is built.
+2. `scripts/measurement/final_hour_premium.py` globbed `databento_opra.jsonl` only; seven OPRA days are gzipped (06-08, 07-31, 08-03, 08-04, 08-05, 08-07, 08-14) and were invisible to the premium scoreboard while `final_hour_lens.py` and `final_hour_base.py` read both forms. **Fixed in this commit** (`_open`, `opra_paths`, two tests in `tests/scripts/test_final_hour_premium_paths.py`). Stage 1's 265-row output predates the fix; a re-run will add the five August days.
+3. `singleton-directional.md:75` heads its checklist `## Execution checklist`; `playbook_evaluator.instrument()` looks for `## Entry checklist`, so SGL's checklist extraction returns empty. And the evaluator ranks `worthy`/`active` only, so FBD, LDF and SGL cannot surface today — decision (a) makes that a stated path rather than an accident.
+4. "Run You Fools" is a named playbook in `market/orderflow/regime.py:1` and `scripts/flush_watcher.py` with no record under `strader/playbooks/` or `knowledge/`. Not scoped in the plan; on your inventory.
+5. "Strader's already-proposed Canon Status Field" (the directive's words) is not a bead in either store; it was a line in COO's ICM plan. The refactor plan subsumes it, so nothing is lost, but nothing was filed either.
+
+**What COO asks you to counter, by your next session.**
+- The kind vocabulary (five method kinds plus six record kinds plus `register`) and the status mapping for the nine records — you own every header value.
+- The split list for the 33 files (the plan pre-decides only `orb-playbook` → `orb-target-1` + `gex-sign-regime` + the strategy record, because those rows are lane sources), and a count of the entities the master reference will yield before the split starts.
+- Ownership of the stub Statements (the plan gives you the words; they must be the recognizer docstring's own sentences, nothing authored — scope ruling 2).
+- The August OPRA pull: run `corpus_pull_databento.py --estimate-only` per missing day (15 days, 08-03 → 08-28 less the five on disk) and put the total on the bead; the plan quotes about $91 at the $6.07 control and recommends the 13:00–15:00 window (decision (b) to Steve).
+- Anything in §5 (rules as entities, scored as trades) that collides with st-fpc4's grid or st-g0jo's Stage 4 as you planned it — the blotter is proposed as Stage 4 in trade form, and its first rows are your two 14:45 survivors.
+
+No beads are filed until Steve rules (the directive's instruction). The bead list with ProperNames is at the plan's foot; say which of the Strader-owned ones you want named differently.
+
+— COO
