@@ -24,7 +24,11 @@ WHAT
     that is the OPRA caveat, and it is why ES columns ride alongside.
 
 RUN
-    .venv/bin/python3 scripts/measurement/final_hour_premium.py <base.jsonl> <out.jsonl>
+    .venv/bin/python3 scripts/measurement/final_hour_premium.py <base.jsonl> <out.jsonl> [HH:MM]
+    The optional third argument is the entry time, CT (default 14:00). Stage 3's
+    combination calls fire at 14:30 and 14:45 too, and a call at 14:45 has to be
+    priced from a 14:45 entry, not the 14:00 one. Rows carry "entry_ct"; the
+    SPX-at-entry field keeps its Stage 1 name "spx1400" so the summary reads both.
 """
 import json, glob, os, sys, statistics as st
 from datetime import datetime
@@ -32,6 +36,8 @@ from zoneinfo import ZoneInfo
 from multiprocessing import Pool
 CT = ZoneInfo("America/Chicago")
 BASE, OUT = sys.argv[1], sys.argv[2]
+ENTRY = sys.argv[3] if len(sys.argv) > 3 else "14:00"
+EH, EM = int(ENTRY[:2]), int(ENTRY[3:5])
 OFFSETS = (-10, 0, 10)   # OTM distance in SPX pts; negative = ITM (Steve leans ITM: 08-26 paper 7685P was ~9 ITM)
 CUTS = (0.03, 0.10)
 ABS_CUTS = (0.30, 0.50)  # Steve's 08-26 yardstick: 0.30 on a 10.10 single
@@ -48,10 +54,13 @@ def run_day(path):
     day = os.path.basename(os.path.dirname(path))
     y, m, d = map(int, day.split("-"))
     off = datetime(y, m, d, 12, tzinfo=CT).utcoffset().total_seconds() / 3600
-    h14 = int(14 - off); h15 = int(15 - off)
+    h15 = int(15 - off)
     exp = f"{y%100:02d}{m:02d}{d:02d}"
     tag = f"SPXW  {exp}"
-    t1357 = f"{h14-1:02d}:57"; t1403 = f"{h14:02d}:03"; t1400 = f"{h14:02d}:00"; t1500 = f"{h15:02d}:00"
+    def hm(hh, mm):  # CT clock -> utc "HH:MM"
+        tot = (hh - int(off)) * 60 + mm
+        return f"{tot // 60:02d}:{tot % 60:02d}"
+    t1357 = hm(EH, EM - 3); t1403 = hm(EH, EM + 3); t1400 = hm(EH, EM); t1500 = f"{h15:02d}:00"
     prints = {}  # sym -> [(hms, price)]
     parity = {}  # strike -> {"C": [...], "P": [...]}
     with open(path) as f:
@@ -77,7 +86,7 @@ def run_day(path):
     # strikes whose C-P is small in magnitude (near the money) give the cleanest estimate
     diffs.sort(key=lambda x: abs(x[1]))
     spx = st.median([k + dlt for k, dlt in diffs[:5]])
-    out = {"day": day, "spx1400": round(spx, 2)}
+    out = {"day": day, "entry_ct": ENTRY, "spx1400": round(spx, 2)}
     legs = []
     for otm in OFFSETS:
         legs.append((f"put_{'itm' if otm<0 else 'atm' if otm==0 else 'otm'}{abs(otm)}", "P", int(round((spx - otm) / 5.0)) * 5))

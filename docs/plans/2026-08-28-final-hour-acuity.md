@@ -81,7 +81,11 @@ rule written before the scoring, so the rule is testable rather than fitted.
 14:00 direction call (pooled edge 0 / +1 pts, both flip sign across the
 2025/2026 split); footprint up at 14:45 is the one rule that held on both
 halves (+20 / +27, n=40, ~3-pt median); every down rule failed a half; GEX at
-17 days is recorded, not scored.* Each lens' call against the realized final
+17 days is recorded, not scored. Combinations added the same day —
+`docs/measurement/final-hour-combos-2026-08-29.md`: seven pre-registered
+agree-or-abstain rules; R2 launch-into-no-lid holds on both halves at every T
+(+33 · +45 at 14:45, n=26, ~3-pt median, +43% on a 14:45 ITM call); R1 flush is
+inverse at 14:00/14:30 on both halves.* Each lens' call against the realized final
 hour (direction of the net move, the 10-pt excursion, and the Stage-1 premium
 result), then the confluence call when the lenses agree. Validate by time
 split — 2025 half vs. 2026 half — because the last time a cut looked good on
