@@ -37,7 +37,9 @@ run.json            every stage's record: commits, thresholds, counts, checks, r
 run.log             the stages' stderr and one-line reports
 00-inputs/          events.jsonl, events.rth.jsonl, log.txt, levels.json, live_log.json
 live-lane/          session.json, wakes.jsonl (each wake: alert lines, bar, reply, pushes, tokens)
-40-compare/         numbers.json (the number check per wake)
+10-transcribe/      events.md, window.txt, wake-HHMM.txt (one per delivered wake)
+20-classify/context/  <row-id>.md (generated excerpts) + index.json; never hand-edited
+40-compare/         numbers.json (the number check per wake), tripwire.json (derived words)
 page.md             the page, rendered to /var/moo/desk/desk-footprint-icm-<day>.html
 ```
 
@@ -47,8 +49,10 @@ page.md             the page, rendered to /var/moo/desk/desk-footprint-icm-<day>
 |---|---|---|---|
 | 00 | `bin/inputs.py` | no | replay the day through the engine; refuse if the live log's EVENT lines, thresholds or level count differ; snapshot the anchor file with its fingerprint; regenerate the full log body |
 | 00 | `bin/live_lane.py` | no | find the session that held the watch, its arm and stop, every wake it was sent, the reply, pushes and tokens; refuse if the transcript's wake set differs from the one the rule derives from the log |
-| 10 | `bin/render_events.py` | no | *(Day 2)* the plain-words event table and the per-wake alert-only slices |
-| 20 | `20-classify/` | yes | *(Day 3)* LABEL and IMPLICATION lines, each quoting its source; `bin/checker.py` fails the run on any quote the cited lines do not contain |
+| 10 | `bin/render_events.py` | no | the plain-words event table, the whole-window slice, and one alert-only slice per delivered wake; renames the three colliding percentile keys (`effort_pct_dev`, `effect_pct_dev`, `pctl_dev`) |
+| 20 | `bin/excerpts.py` | no | builds `context/` in the run folder from `20-classify/context/manifest.yaml` (the source list — Strader's, status words trusted / exploratory / code); refuses a path outside `knowledge/` (plus the recognizer docstring, decision 1), a refused file or status, a pin whose lines moved at HEAD, a quote not in its own lines; `--verify` fails on any hand-added or edited file; derives the compare stage's tripwire words from the rows' quotes plus the two planted sentences |
+| 20 | `bin/checker.py` | no | the line shapes (LABEL / IMPLICATION / CLAIM); a cite must resolve to a row and its `because` words must be in that row's excerpt word for word; UNSOURCED and NO-RULE-IN-CANON stand alone; a CLAIM's quote must be in the live reply word for word. The two planted bad examples fail; the good one passes (`tests/footprint_icm/test_checker.py`) |
+| 20 | `20-classify/prompt.md` | yes | *(Day 3)* LABEL and IMPLICATION lines over a slice, run once per delivered wake and once over the window |
 | 40 | `bin/compare.py` | code half now; the CLAIM transcriber on Day 3 | the page: per wake, what was shown, what was said, the number check; coverage; provenance |
 
 ## The rule for "what the analyst was shown"

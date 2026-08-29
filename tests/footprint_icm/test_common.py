@@ -81,6 +81,15 @@ def test_minute_of_line_reads_the_three_scorer_shapes_and_nothing_else():
     assert minute_of_line("Traceback (most recent call last):") is None
 
 
+def test_normalize_drops_emphasis_but_keeps_identifiers():
+    from common import contains_verbatim, normalize
+    assert normalize("**bold** and _soft_ and `code`") == "bold and soft and code"
+    assert normalize("failed_breakdown / level_reclaim") == "failed_breakdown / level_reclaim"
+    assert normalize("“curly” — dash\n  across\tlines") == '"curly" - dash across lines'
+    assert contains_verbatim("trades tell us **where\naggression** happened", "where aggression happened")
+    assert not contains_verbatim("some words", "")
+
+
 def test_parse_knobs_line():
     assert parse_knobs_line("# knobs: absorption_effect_pct=10.0  climax_min_atoms=60  x=y") == {
         "absorption_effect_pct": "10.0", "climax_min_atoms": "60", "x": "y"}

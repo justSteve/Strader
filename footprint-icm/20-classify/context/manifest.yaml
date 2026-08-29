@@ -1,0 +1,99 @@
+# The source list for stage 20 — the only hand-edited file under context/. [st-h0xx]
+#
+# Every row names lines of one file at one commit. bin/excerpts.py turns each
+# row into a generated excerpt file in the run folder, refuses when the lines
+# at HEAD no longer match the pinned commit ("canon moved, re-pin"), refuses a
+# path outside allowed_paths, a file in refused_files, or a status the lane
+# does not admit. The classify stage can cite a row id and nothing else, and
+# bin/checker.py fails the run when a label's quoted words are not in the
+# row's excerpt word for word.
+#
+# Who edits this: Strader curates it below Steve (his direct edits stand).
+# COO seeded it 2026-08-29 from the lines the plan measured on 2026-08-28. A
+# change is a commit with a bead id and a ledger row, never a silent edit.
+#
+# Status words (Steve, 2026-08-28: say "trusted", not "canon"):
+#   trusted      — a rule Steve runs, in knowledge/
+#   exploratory  — in knowledge/ but marked a candidate, not settled method;
+#                  the prompt says the status aloud when it cites such a row
+#   code         — a definition that exists only in code (decision 1, Steve
+#                  2026-08-28: admissible for the three setup names with no
+#                  knowledge file, marked "code, not canon"; retires when the
+#                  playbook refactor gives them entities)
+#   under-review, tabled, withdrawn — refused by bin/excerpts.py
+version: 1
+
+allowed_paths:
+  - knowledge/
+  - market/orderflow/recognizer.py      # decision 1; lines 1-38 only
+
+refused_files:
+  - knowledge/counter-dictum-program.md                 # its body says "Do not cite it" (line 22)
+  - knowledge/carmine-rosato-investitrade-lvn-method.md  # line 18 marks its method paragraph PROVENANCE UNDER REVIEW
+
+refused_statuses: [under-review, tabled, withdrawn]
+
+rows:
+  - id: orb-target-1
+    path: knowledge/orb-playbook.md
+    commit: 3b276c2
+    lines: [[35, 37]]
+    status: trusted
+    quote: "skip the trade or downgrade the expectation"
+    note: the one management rule in canon — Target 1, keyed to a GEX wall between price and the target
+
+  - id: orb-gex-sign
+    path: knowledge/orb-playbook.md
+    commit: 3b276c2
+    lines: [[50, 53]]
+    status: trusted
+    quote: "positive (mean-revert regime) is hostile to continuation"
+    note: the one regime rule in canon — GEX sign
+
+  - id: srs-exploratory
+    path: knowledge/selective-range-scalping.md
+    commit: 3b276c2
+    lines: [[8, 8], [12, 14]]
+    status: exploratory
+    quote: "Nothing here is settled method"
+    note: the file's own statement of its status; any rotation claim leaning on it carries that status aloud
+
+  - id: tsf-ceiling
+    path: knowledge/trapped-seller-fuel.md
+    commit: 270cd2a
+    lines: [[23, 36]]
+    status: trusted
+    quote: "trades tell us where aggression happened, not who is still holding or where anyone's stop sits"
+    note: what trades can and cannot tell you — the ceiling on any claim about who is trapped
+
+  - id: tsf-never-advice
+    path: knowledge/trapped-seller-fuel.md
+    commit: 270cd2a
+    lines: [[81, 81]]
+    status: trusted
+    quote: "never fires advice"
+    note: a feature reports; it does not advise
+
+  - id: rutl-conditions
+    path: knowledge/reclaim-under-the-lid.md
+    commit: 270cd2a
+    lines: [[25, 57]]
+    status: trusted
+    quote: "A level with history"
+    note: the six conditions of a reclaim under the lid, in order
+
+  - id: rutl-not-fbd
+    path: knowledge/reclaim-under-the-lid.md
+    commit: 270cd2a
+    lines: [[63, 72]]
+    status: trusted
+    quote: "Not a failed breakdown"
+    note: why a reclaim is continuation from below, not a failed breakdown
+
+  - id: recognizer-setups
+    path: market/orderflow/recognizer.py
+    commit: 57eec8c
+    lines: [[1, 38]]
+    status: code
+    quote: "At a SUPPORT (break is down) that is failed_breakdown / level_reclaim"
+    note: the only written definition of the six setup names; code, not canon (decision 1)

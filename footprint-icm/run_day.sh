@@ -8,6 +8,9 @@
 #                     the anchor set, regenerate the log body
 #   00  live_lane.py  what the live analyst was shown and said, from the
 #                     transcript; asserts the wake set against the rule
+#   10  render_events.py  the events in plain words, per-wake slices (code)
+#   20  excerpts.py   the classify stage's context folder from the source
+#                     list, pinned to commits; then verified untouched
 #   40  compare.py    the page (number check; classes once the model stages
 #                     exist)
 # Every stage writes its record into /var/moo/state/footprint-icm/<day>/run.json.
@@ -36,7 +39,10 @@ stage() {
 }
 
 echo "footprint-icm run $DAY $(TZ=America/Chicago date '+%Y-%m-%d %H:%M CT')" >> "$LOGF"
-stage 00-inputs   "$PY" "$HERE/bin/inputs.py" "$DAY"
-stage 00-live     "$PY" "$HERE/bin/live_lane.py" "$DAY"
-stage 40-compare  "$PY" "$HERE/bin/compare.py" "$DAY" "$@"
+stage 00-inputs      "$PY" "$HERE/bin/inputs.py" "$DAY"
+stage 00-live        "$PY" "$HERE/bin/live_lane.py" "$DAY"
+stage 10-transcribe  "$PY" "$HERE/bin/render_events.py" "$DAY"
+stage 20-context     "$PY" "$HERE/bin/excerpts.py" "$DAY"
+stage 20-verify      "$PY" "$HERE/bin/excerpts.py" --verify "$RUN"
+stage 40-compare     "$PY" "$HERE/bin/compare.py" "$DAY" "$@"
 echo "done $DAY — run.json: $RUN/run.json; page: /var/moo/desk/desk-footprint-icm-$DAY.html" | tee -a "$LOGF"

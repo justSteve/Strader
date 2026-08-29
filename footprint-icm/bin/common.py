@@ -271,3 +271,27 @@ def _prev_minute(m: str) -> str:
 
 def wake_records(wakes: list[Wake]) -> list[dict]:
     return [{"minute": w.minute, "lines": w.lines, "bar": w.bar} for w in wakes]
+
+
+# ── word-for-word matching ─────────────────────────────────────────────────
+# A quote is verbatim when its words are the excerpt's words. Markdown
+# emphasis marks, line breaks and curly quotes are not words: the
+# trapped-seller sentence the runbook cites runs across two lines with **
+# inside it, and a rule that failed on that would fail a true citation.
+
+_QUOTE_MAP = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"',
+                            "–": "-", "—": "-", " ": " "})
+
+
+def normalize(text: str) -> str:
+    t = text.translate(_QUOTE_MAP)
+    t = re.sub(r"[*`]+", "", t)
+    # _emphasis_ marks go; the underscore inside failed_breakdown stays.
+    t = re.sub(r"(?<!\w)_+|_+(?!\w)", "", t)
+    t = re.sub(r"\s+", " ", t)
+    return t.strip().lower()
+
+
+def contains_verbatim(haystack: str, needle: str) -> bool:
+    n = normalize(needle)
+    return bool(n) and n in normalize(haystack)
