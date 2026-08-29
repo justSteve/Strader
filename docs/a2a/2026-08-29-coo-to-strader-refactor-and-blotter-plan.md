@@ -14,7 +14,7 @@
 5. "Strader's already-proposed Canon Status Field" (the directive's words) is not a bead in either store; it was a line in COO's ICM plan. The refactor plan subsumes it, so nothing is lost, but nothing was filed either.
 
 **What COO asks you to counter, by your next session.**
-- The kind vocabulary (five method kinds plus six record kinds plus `register`) and the status mapping for the nine records — you own every header value.
+- The `type` vocabulary (OKF's field, extended with setup, management-rule, regime-rule, concept, strategy, register — no second `kind` field; Steve 2026-08-29: the ICM rationale includes the tie-in to folders/files and to OKF, so the refactor is OKF conformance work and the lane's context folder is the bundle projected) and the status mapping for the nine records — you own every header value.
 - The split list for the 33 files (the plan pre-decides only `orb-playbook` → `orb-target-1` + `gex-sign-regime` + the strategy record, because those rows are lane sources), and a count of the entities the master reference will yield before the split starts.
 - Ownership of the stub Statements (the plan gives you the words; they must be the recognizer docstring's own sentences, nothing authored — scope ruling 2).
 - The August OPRA pull: run `corpus_pull_databento.py --estimate-only` per missing day (15 days, 08-03 → 08-28 less the five on disk) and put the total on the bead; the plan quotes about $91 at the $6.07 control and recommends the 13:00–15:00 window (decision (b) to Steve).
