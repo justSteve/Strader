@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import gzip
 import json
-import os
+import math
 import statistics as st
 import sys
 from pathlib import Path
@@ -79,6 +79,16 @@ def quotes_for(day: str, wanted: set[str]) -> dict[str, list[tuple[str, float, f
     for v in out.values():
         v.sort()
     return out
+
+
+def _finite(xs):
+    """Drop non-finite values rather than letting one nan poison a median."""
+    return [x for x in xs if x is not None and isinstance(x, (int, float)) and math.isfinite(x)]
+
+
+def _med_pct(spreads, mids):
+    vals = _finite([s / m for s, m in zip(spreads, mids) if m])
+    return round(st.median(vals), 4) if vals else None
 
 
 def mins(hms: str, base: str) -> float:
@@ -143,7 +153,7 @@ def main() -> int:
                     "peak_bid_min": round(mins(t_peak_bid, base), 2),
                     "close_bid": round(close_bid, 3),
                     "median_spread": round(st.median(spreads), 3),
-                    "median_spread_pct_mid": round(st.median(s / m for s, m in zip(spreads, mids) if m), 4),
+                    "median_spread_pct_mid": _med_pct(spreads, mids),
                     # the number this whole exercise exists for
                     "mult_fill": round(peak_bid / entry_ask, 3) if entry_ask else None,
                     "mult_fill_close": round(close_bid / entry_ask, 3) if entry_ask else None,
@@ -166,15 +176,15 @@ def main() -> int:
         return 0
 
     print(f"\n{len(legs)} legs with both a print bound and a quoted fill\n")
-    ms = [x[2]["median_spread_pct_mid"] for x in legs]
-    es = [x[2]["entry_spread_pct_mid"] for x in legs if x[2]["entry_spread_pct_mid"] is not None]
+    ms = _finite([x[2]["median_spread_pct_mid"] for x in legs])
+    es = _finite([x[2]["entry_spread_pct_mid"] for x in legs])
     print(f"spread as a fraction of mid: entry median {100*st.median(es):.1f}%, "
           f"through the window median {100*st.median(ms):.1f}%")
     print(f"entry: ask median ${st.median(x[2]['entry_ask'] for x in legs):.2f} "
           f"vs the study's print entry ${st.median(x[2]['print_entry'] for x in legs):.2f}")
     print()
-    fills = [x[2]["mult_fill"] for x in legs]
-    prints_ = [x[2]["mult_print"] for x in legs if x[2]["mult_print"] is not None]
+    fills = _finite([x[2]["mult_fill"] for x in legs])
+    prints_ = _finite([x[2]["mult_print"] for x in legs])
     print(f"peak multiple, print-to-print (the bound): median {st.median(prints_):.2f}x")
     print(f"peak multiple, ask-to-bid   (achievable): median {st.median(fills):.2f}x")
     print()
