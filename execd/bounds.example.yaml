@@ -1,0 +1,51 @@
+# execd bounds — Steve's file. [st-eznu, epic st-5qjq]
+#
+# The service reads this at start-up from /etc/execd/bounds.yaml. Stage 3's
+# deploy/install.sh copies this example there once; after that it is Steve's
+# to edit, and the service is restarted to pick up a change.
+#
+# Every value here is his. The SHAPE of the bounds is not configurable — there
+# is no key that switches a bound off, because a bound you can switch off is
+# not a bound. An unknown key is a start-up error rather than a silent default,
+# so a typo cannot leave the service running under limits he did not choose.
+#
+# These are the start values from the design (§3). Delete any line to take the
+# default; delete the file entirely and the service runs on all of them.
+
+# What may be traded at all. Roots, not symbols.
+instruments: [SPX, SPXW]
+
+# Contracts per order. The fire server's cap today.
+qty_cap: 1
+
+# How many may be open at once.
+max_open_positions: 1
+
+# The hard ceiling on the day's damage: REALIZED loss in dollars, and how many
+# entries may be attempted. A winning trade does not buy back an attempt or
+# raise the ceiling — this bounds how much of the day can go wrong, it is not a
+# running P&L. Both are rebuilt from the journal, so a restart does not reset
+# them.
+daily_loss_ceiling_usd: 100.0
+max_attempts: 2
+
+# The session, in Central time. Nothing opens after no_open_after_ct; exits are
+# not gated by any of these.
+open_ct: "08:30"
+close_ct: "15:00"
+no_open_after_ct: "14:50"
+weekdays_only: true
+
+# Price sanity. A limit must sit within this fraction of the live touch, and a
+# quote older than max_quote_age_s is not a live quote.
+price_band_pct: 0.10
+max_quote_age_s: 30.0
+
+# The last gate before a send: if the broker's own preview prices the order
+# more than this above what the intent allows, it is not transmitted.
+preview_cost_tolerance_usd: 5.00
+
+# Every entry must carry the stop_spx and delta the broker-resident protective
+# stop is derived from. Turning this off means fills with no resting stop; it
+# exists as a key only so the refusal has something to name.
+require_protective_stop: true
