@@ -1,0 +1,67 @@
+FINAL-FIFTEEN MOVE DISTRIBUTION — 14:45 -> 15:00 CT, ES trade tape
+source data/measurement/final-fifteen-base-2026-08-30.jsonl
+289 day-files, 286 usable, 3 skipped (thin)
+span 2025-05-27 -> 2026-08-28
+median 14:45 price 6823.88  (first-day 5940 .. last-day 7725)
+
+halves: 2025 n=146  2026 n=140   (reported as a column, never a discard gate)
+
+====================================================================================================
+A. WHERE THE CLOSE LANDED  (close - 14:45 price, signed)
+====================================================================================================
+   threshold |              up |            down |          either |      2025 |      2026
+----------------------------------------------------------------------------------------------------
+    >= 5 pts |   94   32.9% |   61   21.3% |  155   54.2% |    56.2% |    52.1%
+   >= 0.073% |   91   31.8% |   59   20.6% |  150   52.4% |    56.2% |    48.6%   (same bar, per-day pct)
+
+   >= 10 pts |   40   14.0% |   24    8.4% |   64   22.4% |    22.6% |    22.1%
+   >= 0.147% |   45   15.7% |   25    8.7% |   70   24.5% |    26.7% |    22.1%   (same bar, per-day pct)
+
+   >= 15 pts |   16    5.6% |    8    2.8% |   24    8.4% |     6.8% |    10.0%
+   >= 0.220% |   14    4.9% |    8    2.8% |   22    7.7% |     8.2% |     7.1%   (same bar, per-day pct)
+
+   >= 20 pts |    5    1.7% |    3    1.0% |    8    2.8% |     2.1% |     3.6%  <- few days, a story not a base rate
+   >= 0.293% |    4    1.4% |    3    1.0% |    7    2.4% |     2.1% |     2.9%   (same bar, per-day pct)
+
+====================================================================================================
+B. WHAT THE WINDOW TOUCHED  (peak excursion from the 14:45 price)
+   This is the row that prices a long single. The option is paid by the touch, not the close.
+====================================================================================================
+   threshold |        up touch |      down touch |          either |      2025 |      2026
+----------------------------------------------------------------------------------------------------
+    >= 5 pts |  163   57.0% |  146   51.0% |  258   90.2% |    91.8% |    88.6%
+   >= 0.073% |  157   54.9% |  146   51.0% |  254   88.8% |    92.5% |    85.0%   (same bar, per-day pct)
+
+   >= 10 pts |   65   22.7% |   61   21.3% |  123   43.0% |    40.4% |    45.7%
+   >= 0.147% |   68   23.8% |   61   21.3% |  125   43.7% |    45.9% |    41.4%   (same bar, per-day pct)
+
+   >= 15 pts |   32   11.2% |   27    9.4% |   59   20.6% |    21.9% |    19.3%
+   >= 0.220% |   33   11.5% |   28    9.8% |   61   21.3% |    23.3% |    19.3%   (same bar, per-day pct)
+
+   >= 20 pts |    8    2.8% |    9    3.1% |   17    5.9% |     2.7% |     9.3%
+   >= 0.293% |    9    3.1% |    7    2.4% |   16    5.6% |     4.1% |     7.1%   (same bar, per-day pct)
+
+====================================================================================================
+C. SHAPE  (n=286 days)
+====================================================================================================
+  signed move      p10   -8.75  p25   -3.50  median    1.25  p75    6.50  p90   12.25  max   29.00
+  |move|           p10    1.00  p25    2.50  median    5.25  p75    9.25  p90   14.25  max   29.00
+  up excursion     p10    1.75  p25    3.00  median    5.50  p75    9.50  p90   15.75  max   29.75
+  down excursion   p10    0.75  p25    2.25  median    5.25  p75    9.00  p90   14.25  max   32.50
+  window range     p10    7.25  p25    9.25  median   12.25  p75   16.25  p90   21.00  max   40.25
+
+  direction of the close: up 156 (54.5%)  down 127 (44.4%)  unchanged 3
+
+====================================================================================================
+D. ARRIVAL — when the move showed up inside the fifteen minutes
+   Desk expects a first-order effect here: 10 pts at 14:47 leaves 13 minutes of
+   time value on a now-near-the-money option; the same 10 pts at 14:58 pays intrinsic.
+====================================================================================================
+  >=  5 pts touched on 258 days ( 90.2%)  | first touch: median  5.14 min after 14:45, p25  3.63, p75  9.00  | early half 177 (69%), late half 81
+  >= 10 pts touched on 123 days ( 43.0%)  | first touch: median  9.00 min after 14:45, p25  5.52, p75 12.42  | early half 49 (40%), late half 74
+  >= 15 pts touched on  59 days ( 20.6%)  | first touch: median 10.27 min after 14:45, p25  8.10, p75 13.63  | early half 13 (22%), late half 46
+  >= 20 pts touched on  17 days (  5.9%)  | first touch: median 11.33 min after 14:45, p25 10.12, p75 13.10  | early half 3 (18%), late half 14
+
+  Peak-excursion timing — where in the window the extreme actually printed:
+    up peak   median  9.25 min  |  in the final 3 minutes on 107 of 286 days (37%)
+    down peak median  9.75 min  |  in the final 3 minutes on 107 of 286 days (37%)

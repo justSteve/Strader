@@ -49,22 +49,30 @@ RUN
 """
 import json, sys, statistics as st, collections
 
-LENS = sys.argv[1] if len(sys.argv) > 1 else "data/measurement/final-hour-lens-2026-08-29.jsonl"
-PREM_FILES = {  # per-T entry pricing from final_hour_premium.py <base> <out> [HH:MM]
-    "1400": sys.argv[2] if len(sys.argv) > 2 else "data/measurement/final-hour-premium-2026-08-29.jsonl",
-    "1430": "data/measurement/final-hour-premium-1430-2026-08-29.jsonl",
-    "1445": "data/measurement/final-hour-premium-1445-2026-08-29.jsonl",
-}
-rows = [json.loads(l) for l in open(LENS)]
-rows = [r for r in rows if "skip" not in r and r.get("fp")]
-PREM = {}
-for T, path in PREM_FILES.items():
-    PREM[T] = {}
-    try:
-        for l in open(path):
-            r = json.loads(l); PREM[T][r["day"]] = r
-    except FileNotFoundError:
-        pass
+DEFAULT_LENS = "data/measurement/final-hour-lens-2026-08-29.jsonl"
+
+
+def load(lens=DEFAULT_LENS, prem_1400="data/measurement/final-hour-premium-2026-08-29.jsonl"):
+    """Lens rows and the per-T premium joins. Importable so other studies score
+    the SAME pre-registered rule table rather than re-typing it — st-ro04's
+    item 2 conditions the final-fifteen outcome on these rules and must not
+    fork them. [st-ro04]"""
+    prem_files = {  # per-T entry pricing from final_hour_premium.py <base> <out> [HH:MM]
+        "1400": prem_1400,
+        "1430": "data/measurement/final-hour-premium-1430-2026-08-29.jsonl",
+        "1445": "data/measurement/final-hour-premium-1445-2026-08-29.jsonl",
+    }
+    rows = [json.loads(l) for l in open(lens)]
+    rows = [r for r in rows if "skip" not in r and r.get("fp")]
+    prem = {}
+    for T, path in prem_files.items():
+        prem[T] = {}
+        try:
+            for l in open(path):
+                r = json.loads(l); prem[T][r["day"]] = r
+        except FileNotFoundError:
+            pass
+    return rows, prem
 
 def parts(r):
     fp, mc = r["fp"], r.get("mc") or {}
@@ -122,44 +130,51 @@ def line(name, call, sub, total):
     return (f"| {name} | {call} | {n} ({pct(n,total)}) | {pct(hit,n)} | {pct(miss,n)} | {100*(hit-miss)/n:+.0f} | "
             f"{medf(net)} | {medf(heat) if heat else '—'} | {' · '.join(halves)} |")
 
-print("# Final-hour combination calls — scored\n")
-print(f"rows {len(rows)} · days {len(set(r['day'] for r in rows))} · premium days joined " + ", ".join(f"{T} {len(v)}" for T, v in PREM.items()) + "\n")
-for T in ("1400", "1430", "1445"):
-    rs = [r for r in rows if r["T"] == T]
-    c = collections.Counter(r["out"]["realized"] for r in rs); n = len(rs)
-    print(f"## T = {T[:2]}:{T[2:]} CT — {n} days · base up {pct(c['up'],n)} / down {pct(c['down'],n)} / pin {pct(c['pin'],n)}\n")
-    print("| rule | call | fires (coverage) | hit | miss | edge | median net, call's way | heat before +5 on hits | edge by half |")
-    print("|---|---|---|---|---|---|---|---|---|")
-    fired = collections.defaultdict(list)
-    for r in rs:
-        name, call = first_call(parts(r))
-        if name: fired[name].append(r)
-    for name, call, _ in RULES:
-        print(line(name, call, fired[name], n))
-    for name, call, fn in ABLATIONS:
-        sub = [r for r in rs if fn(parts(r))]
-        print(line(name, call, sub, n))
-    # the combined caller
-    called = [(r, first_call(parts(r))[1]) for r in rs]
-    dirs = [(r, cl) for r, cl in called if cl in ("up", "down")]
-    if dirs:
-        hit = sum(1 for r, cl in dirs if r["out"]["realized"] == cl)
-        miss = sum(1 for r, cl in dirs if r["out"]["realized"] == ("down" if cl == "up" else "up"))
-        print(f"\n_combined caller, directional: speaks on {len(dirs)} of {n} days ({pct(len(dirs),n)}), hit {pct(hit,len(dirs))}, miss {pct(miss,len(dirs))}, edge {100*(hit-miss)/len(dirs):+.0f}; silent on {pct(n-len([1 for _,cl in called if cl]),n)}_")
-    prem = PREM.get(T) or {}
-    if prem:
-        print(f"\nPremium — the ITM single bought at {T[:2]}:{T[2:]} on the called side (Stage 1 marks, entry re-priced at T):")
-        rets = collections.defaultdict(list)
-        for r, cl in dirs:
-            if r["day"] not in prem: continue
-            leg = prem[r["day"]].get("call_itm10" if cl == "up" else "put_itm10")
-            if leg and leg.get("ret_close") is not None:
-                rets[first_call(parts(r))[0]].append(leg); rets["all"].append(leg)
-        for k in [x[0] for x in RULES if x[1] != "pin"] + ["all"]:
-            xs = rets.get(k)
-            if not xs or len(xs) < 3: continue
-            rc = [x["ret_close"] for x in xs]
-            print(f"- {k}: {len(xs)} OPRA days, entry median {st.median(x['entry'] for x in xs):.2f}, at close median {100*st.median(rc):+.0f}% / mean {100*st.mean(rc):+.0f}%, "
-                  f">0 on {pct(sum(x>0 for x in rc),len(rc))}, printed +25% on {pct(sum(x['tgt25']['hit'] for x in xs),len(xs))}, "
-                  f"−10% cut fired on {pct(sum(x['cut10']['hit'] for x in xs),len(xs))}")
-    print()
+def main():
+    rows, PREM = load(sys.argv[1] if len(sys.argv) > 1 else DEFAULT_LENS,
+                     *( [sys.argv[2]] if len(sys.argv) > 2 else [] ))
+    print("# Final-hour combination calls — scored\n")
+    print(f"rows {len(rows)} · days {len(set(r['day'] for r in rows))} · premium days joined " + ", ".join(f"{T} {len(v)}" for T, v in PREM.items()) + "\n")
+    for T in ("1400", "1430", "1445"):
+        rs = [r for r in rows if r["T"] == T]
+        c = collections.Counter(r["out"]["realized"] for r in rs); n = len(rs)
+        print(f"## T = {T[:2]}:{T[2:]} CT — {n} days · base up {pct(c['up'],n)} / down {pct(c['down'],n)} / pin {pct(c['pin'],n)}\n")
+        print("| rule | call | fires (coverage) | hit | miss | edge | median net, call's way | heat before +5 on hits | edge by half |")
+        print("|---|---|---|---|---|---|---|---|---|")
+        fired = collections.defaultdict(list)
+        for r in rs:
+            name, call = first_call(parts(r))
+            if name: fired[name].append(r)
+        for name, call, _ in RULES:
+            print(line(name, call, fired[name], n))
+        for name, call, fn in ABLATIONS:
+            sub = [r for r in rs if fn(parts(r))]
+            print(line(name, call, sub, n))
+        # the combined caller
+        called = [(r, first_call(parts(r))[1]) for r in rs]
+        dirs = [(r, cl) for r, cl in called if cl in ("up", "down")]
+        if dirs:
+            hit = sum(1 for r, cl in dirs if r["out"]["realized"] == cl)
+            miss = sum(1 for r, cl in dirs if r["out"]["realized"] == ("down" if cl == "up" else "up"))
+            print(f"\n_combined caller, directional: speaks on {len(dirs)} of {n} days ({pct(len(dirs),n)}), hit {pct(hit,len(dirs))}, miss {pct(miss,len(dirs))}, edge {100*(hit-miss)/len(dirs):+.0f}; silent on {pct(n-len([1 for _,cl in called if cl]),n)}_")
+        prem = PREM.get(T) or {}
+        if prem:
+            print(f"\nPremium — the ITM single bought at {T[:2]}:{T[2:]} on the called side (Stage 1 marks, entry re-priced at T):")
+            rets = collections.defaultdict(list)
+            for r, cl in dirs:
+                if r["day"] not in prem: continue
+                leg = prem[r["day"]].get("call_itm10" if cl == "up" else "put_itm10")
+                if leg and leg.get("ret_close") is not None:
+                    rets[first_call(parts(r))[0]].append(leg); rets["all"].append(leg)
+            for k in [x[0] for x in RULES if x[1] != "pin"] + ["all"]:
+                xs = rets.get(k)
+                if not xs or len(xs) < 3: continue
+                rc = [x["ret_close"] for x in xs]
+                print(f"- {k}: {len(xs)} OPRA days, entry median {st.median(x['entry'] for x in xs):.2f}, at close median {100*st.median(rc):+.0f}% / mean {100*st.mean(rc):+.0f}%, "
+                      f">0 on {pct(sum(x>0 for x in rc),len(rc))}, printed +25% on {pct(sum(x['tgt25']['hit'] for x in xs),len(xs))}, "
+                      f"−10% cut fired on {pct(sum(x['cut10']['hit'] for x in xs),len(xs))}")
+        print()
+
+
+if __name__ == "__main__":
+    main()
