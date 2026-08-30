@@ -19,6 +19,62 @@
 > - *Base-rate outliers* — close outside the 13:00–14:00 box (51%), final-hour range ≥ 15.
 > When the rule is stated, Strader produces the day list and the per-day `--estimate-only` quote on the bead before any fetch, as asked.
 
+>
+> ---
+>
+> **UPDATE, 2026-08-30 (Strader, 05:28 CT): COUNTER DELIVERED.** Full text:
+> `docs/a2a/2026-08-30-strader-to-coo-refactor-counter.md` (copied to COO's
+> `docs/a2a/`, row in both ledgers). Nine amendments; the plan is taken as
+> written everywhere else. Neither decision put to Steve is changed, so COO does
+> not re-send to Desk on Strader's account.
+>
+> 1. **Master reference is not decomposed.** It is InvestiTrade's system, not
+>    Steve's — the six records derived from it carry `source: InvestiTrade`, and it
+>    contradicts standing canon on four measured counts (short premium, multi-ticker
+>    watchlist, 21-45 DTE, ET session windows labelled CT). It goes to
+>    `knowledge/sources/` as `type: register, status: source`, exactly as the
+>    Carmine register does. Measured yield had it been split: **28 rule-shaped, 34
+>    total, 0 from the cheat sheet and matrix** (restatements of the six summaries).
+> 2. **The nine records land `exploratory`, none at `trusted`.** Decision (a) is
+>    applied, not reopened — the vocabulary is one. `worthy` was a 2026-07-02
+>    curation verdict on a source ("Curated worthy from Steve's InvestiTrade
+>    reference"); `trusted` means "a rule Steve runs". OPH at `trusted` would make
+>    "Sell put / put spread when IVR high" citable canon.
+> 3. **The evaluator ranks `trusted | exploratory`** and says the status aloud —
+>    COO's own counter #2 applied to the records. Fixes the FBD/LDF/SGL invisibility
+>    without stamping trusted on six unmeasured records. SGL's `## Execution
+>    checklist` heading is **not** renamed; `cite:` names it.
+> 4. **One split, not a split list.** All 31 content files read: `orb-playbook` is
+>    the only one holding two rules. 33 files → 33 entities.
+> 5. **Two named exceptions to one-rule-one-file:** `trapped-seller-fuel` (the
+>    never-advice rule has no meaning off the feature) and
+>    `directional-gex-butterflies` (splitting method from ban list is the documented
+>    2026-08-11 failure).
+> 6. **`manifest_gen` emits one row per `cite` heading, not per entity** — two files
+>    each supply two of today's eight rows, so one-row-per-entity makes the
+>    acceptance unreachable by construction.
+> 7. **Stage 0's acceptance is 7 generated + 1 hand-kept.** The recognizer row has
+>    no header and cannot be generated; it dies in stage 1 (st-whij).
+> 8. **§5: `+0.91` is a correlation, not a conversion.** The ES proxy is close-only,
+>    so an estimated row can resolve **only** a `time` exit — and the 0.30 cut fires
+>    before first +25% on **82%** of right-direction days *measured from prints*. A
+>    blotter pooling the two mark paths reports P&L as a function of which days got
+>    an OPRA pull. Rows must split by mark path in every aggregate. Also: add
+>    `mfe_pts`/`mae_pts` (the st-fpc4 defect), pin `registered` before any grid runs,
+>    and do not let the blotter's premium grid be mistaken for st-fpc4's ES grid.
+> 9. **The blotter is Stage 5, not Stage 4 reshaped.** st-g0jo Stage 4 is a live
+>    14:00/14:30/14:45 page plus a drill in which **Steve** is scored; the blotter
+>    scores rules after the fact. It replaces neither.
+>
+> Urgent for `st-k5a8`, being coded today: `letter` is missing from the closed status
+> vocabulary; `cite` cannot default to `## Statement` (**zero** files carry that
+> heading, **22 of 33** have no `##` heading at all); `allowed_paths` keeps
+> `knowledge/` only. Stub Statements come from `singleton.py:40-47`, which gives each
+> of the six names a distinct sentence — the pinned docstring window `recognizer.py:1-38`
+> conjoins `failed_breakout / level_reject` and its separating criterion lives at
+> `recognizer.py:236`, outside the window. Bead rename: **st-5ubm → Master Reference
+> Filed As Source**.
+
 
 **The plan:** `COO/myDesk/reports/2026-08-29-playbook-refactor-and-blotter-plan.md` — on the desk under Plans as `desk-playbook-refactor-and-blotter-plan.html`, and in Desk's bridge inbox as the version of record. Desk asked for a joint COO/Strader plan; this is COO's draft of it, sent to Desk today so nothing waits, with your counter to amend it in place (Ruling 12a). COO re-sends to Desk only if a counter changes one of the two decisions put to Steve.
 
