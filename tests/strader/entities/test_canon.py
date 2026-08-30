@@ -1,13 +1,14 @@
 """The knowledge bundle read as data — strader/entities/canon.py. [st-k5a8]
 
 Two kinds of test. The fixture bundles under tmp_path pin the header contract
-(plan §2): what validates, what is refused and why, and what the loader derives
-(cite ranges, statement, quote, admissibility). The last test loads the REAL
-bundle and fails on any file that does not validate — the same discipline
+(plan §2, amended by Strader's counter of 2026-08-30 §6a–c: `letter` is a
+lane-only status, `cite` is required on method types with no default, one
+generated row per cite entry). The last test loads the REAL bundle and fails
+on any file that does not validate — the same discipline
 ``test_the_real_manifest_builds_and_its_pins_hold`` gives the manifest. It is
-marked xfail(strict=True) until the header migration (st-ts3o) lands; when the
-bundle validates it turns into an unexpected pass, which is the reminder to
-remove the mark.
+marked xfail(strict=True) until the header migration (st-ts3o) lands; when
+the bundle validates it turns into an unexpected pass, which is the reminder
+to remove the mark.
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from strader.entities import canon
-from strader.entities.canon import Canon, CanonError, Entity, load_entity
+from strader.entities.canon import Canon, CanonError, load_entity
 
 HEADER = """---
 id: {id}
@@ -31,7 +32,7 @@ lineage:
   supersedes: {supersedes}
   since: 2026-08-30
   commit: {commit}
-{extra}title: "{title}"
+{cite}{extra}title: "{title}"
 description: "A {type} for the tests."
 timestamp: 2026-08-30T05:00:00-05:00
 ---
@@ -52,14 +53,19 @@ price and the target. Second sentence stays in the excerpt.
 Because the wall absorbs the move.
 """
 
+METHOD = {"setup", "management-rule", "regime-rule", "concept", "strategy"}
+
 
 def write(dir_: Path, ident: str, *, type_="management-rule", status="trusted",
           origin="steve-dictation", ref="master reference §Risk rules", supersedes="null",
-          commit="null", extra="", title=None, body=BODY, stem=None) -> Path:
+          commit="null", cite="default", extra="", title=None, body=BODY, stem=None) -> Path:
     dir_.mkdir(parents=True, exist_ok=True)
     title = title or ident.replace("-", " ").title()
+    if cite == "default":
+        cite = 'cite: ["## Statement"]\n' if type_ in METHOD else ""
     text = HEADER.format(id=ident, type=type_, status=status, origin=origin, ref=ref,
-                         supersedes=supersedes, commit=commit, extra=extra, title=title)
+                         supersedes=supersedes, commit=commit, cite=cite, extra=extra,
+                         title=title)
     text += body.format(title=title)
     p = dir_ / f"{stem or ident}.md"
     p.write_text(text, encoding="utf-8")
@@ -85,7 +91,7 @@ def bundle(tmp_path: Path) -> tuple[Path, Path]:
     write(k / "sources", "ofb-register", type_="register", status="source",
           origin="third-party-source", ref="Desk memo 2026-08-26",
           body="\n# Register\n\n- OFB-1 — absorption.\n")
-    write(pb, "orb-playbook", type_="strategy", status="trusted", ref="InvestiTrade",
+    write(pb, "orb-playbook", type_="strategy", status="exploratory", ref="InvestiTrade",
           extra="rules: [orb-target-1, gex-sign-regime]\ncode: ORB\nname: Opening Range Breakout\n",
           body="\n## Thesis\n\nThe first fifteen minutes.\n\n## Statement\n\nOne trade per morning.\n")
     return k, pb
@@ -108,25 +114,71 @@ def test_admissible_is_method_type_with_an_admitting_status(bundle):
     assert {e.id for e in c.admissible()} == {"orb-target-1", "gex-sign-regime",
                                               "srs-scalping", "orb-playbook"}
     # under-review, tabled, source and a convention all refuse
-    assert not c.by_id("lvn-method").admissible
-    assert not c.by_id("counter-dictum").admissible
-    assert not c.by_id("ofb-register").admissible
-    assert not c.by_id("how-we-name-things").admissible
-    assert {e.id for e in c.by_status("exploratory")} == {"srs-scalping"}
+    for ident in ("lvn-method", "counter-dictum", "ofb-register", "how-we-name-things"):
+        assert not c.by_id(ident).admissible
+    assert {e.id for e in c.by_status("exploratory")} == {"srs-scalping", "orb-playbook"}
     assert {e.id for e in c.by_type("register")} == {"ofb-register"}
 
 
-def test_cite_ranges_statement_and_quote(bundle):
+def test_lane_sources_are_admissible_and_under_knowledge_only(bundle):
+    """Counter §6g: the playbook records are registry entities, not lane sources."""
+    k, pb = bundle
+    c = Canon.load((k, pb), repo_root=k.parent)
+    assert {e.id for e in c.lane_sources(roots=(k,))} == {"orb-target-1", "gex-sign-regime",
+                                                          "srs-scalping"}
+    assert "orb-playbook" in {e.id for e in c.admissible()}
+    assert canon.LANE_STATUSES == {"trusted", "exploratory", "letter"}
+    assert "letter" not in canon.FILE_STATUSES
+
+
+def test_a_heading_cite_resolves_to_the_lines_under_it(bundle):
     k, pb = bundle
     e = load_entity(k / "orb-target-1.md")
-    assert e.cite == ("## Statement",)
-    [(start, end)] = e.cite_ranges()
+    [cite] = e.cites()
+    assert cite.slug == "statement" and cite.spec.kind == "heading"
     # line numbers are of the whole file, front matter included
-    assert e.lines[start - 1].startswith("Skip the trade")
-    assert e.lines[end - 1].endswith("stays in the excerpt.")
+    assert e.lines[cite.start - 1].startswith("Skip the trade")
+    assert e.lines[cite.end - 1].endswith("stays in the excerpt.")
     assert "## Why" not in e.statement() and "Intro line" not in e.statement()
     assert e.quote() == ("Skip the trade or downgrade the expectation when a wall sits "
                          "between price and the target.")
+
+
+def test_body_and_line_range_cites_for_files_with_no_headings(bundle):
+    """Counter §6b: 22 of 33 files have no ## heading; cite is a range or the whole body."""
+    k, pb = bundle
+    prose = "\nA rule stated straight after the front matter.\n\nAnd a second paragraph.\n"
+    write(k, "whole-body", type_="concept", cite='cite: ["body"]\n', body=prose)
+    write(k, "some-lines", type_="concept", cite='cite: ["L19-19"]\n', body=prose)
+    wb = load_entity(k / "whole-body.md")
+    [c] = wb.cites()
+    # the body opens with a blank line, which the excerpt trims
+    assert c.slug == "body" and c.start == wb.body_start + 1 and c.end == len(wb.lines)
+    assert wb.excerpt(c).startswith("A rule stated") and wb.excerpt(c).endswith("second paragraph.")
+    assert wb.quote() == "A rule stated straight after the front matter."
+    sl = load_entity(k / "some-lines.md")
+    [c] = sl.cites()
+    assert (c.start, c.end) == (19, 19) and c.slug == "l19-19"
+    assert sl.excerpt(c) == "A rule stated straight after the front matter."
+    # a range that reaches into the front matter is refused
+    write(k, "into-header", type_="concept", cite='cite: ["L5-19"]\n', body=prose)
+    with pytest.raises(CanonError, match="lines outside the body"):
+        load_entity(k / "into-header.md")
+
+
+def test_two_cites_make_two_rows_with_explicit_ids(bundle):
+    """Counter §4/§6c: trapped-seller-fuel keeps two lane rows from one entity."""
+    k, pb = bundle
+    body = ("\n# TSF\n\n## The ceiling\n\nTrades tell us where aggression happened.\n\n"
+            "## How it surfaces\n\nA feature reports; it never fires advice.\n")
+    write(k, "tsf", type_="concept",
+          cite='cite:\n  - {cite: "## The ceiling", id: tsf-ceiling}\n  - "## How it surfaces"\n',
+          body=body)
+    e = load_entity(k / "tsf.md")
+    slugs = [c.slug for c in e.cites()]
+    assert slugs == ["tsf-ceiling", "how-it-surfaces"]
+    assert [e.quote(c) for c in e.cites()] == ["Trades tell us where aggression happened.",
+                                               "A feature reports; it never fires advice."]
 
 
 def test_strategy_lists_its_rules_and_extra_keys_are_kept(bundle):
@@ -197,18 +249,29 @@ def test_missing_fields_are_reported_together_with_the_path(bundle):
     msg = str(exc.value)
     assert str(p) in msg
     assert "missing header field(s): id, status, owner, provenance, lineage, description, timestamp" in msg
+    assert "cite is required on a method entity" in msg
 
 
-def test_a_method_entity_needs_its_cite_heading(bundle):
+def test_cite_is_required_on_method_types_and_every_entry_must_resolve(bundle):
     k, pb = bundle
-    write(k, "no-statement", type_="concept", body="\n# C\n\n## Thesis\n\ntext\n")
-    write(k, "named-cite", type_="concept", extra='cite: ["## Thesis", "## Missing"]\n',
+    write(k, "no-cite", type_="concept", cite="", body="\n# C\n\n## Thesis\n\ntext\n")
+    write(k, "missing-heading", type_="concept", cite='cite: ["## Thesis", "## Missing"]\n',
           body="\n# C\n\n## Thesis\n\ntext\n")
-    assert any("'## Statement' not found" in m for m in problems_of(k, pb, "no-statement"))
-    assert any("'## Missing' not found" in m for m in problems_of(k, pb, "named-cite"))
-    # a convention has no default cite and validates without a Statement
+    write(k, "bad-lines", type_="concept", cite='cite: ["L2-3"]\n')
+    write(k, "bad-form", type_="concept", cite='cite: ["Statement"]\n')
+    write(k, "dup-slug", type_="concept",
+          cite='cite: ["## Statement", {cite: "## Why", id: statement}]\n')
+    assert any("cite is required" in m for m in problems_of(k, pb, "no-cite"))
+    assert any("'## Missing' does not resolve: heading not found" in m
+               for m in problems_of(k, pb, "missing-heading"))
+    assert any("'L2-3' does not resolve: lines outside the body" in m
+               for m in problems_of(k, pb, "bad-lines"))
+    assert any("not a heading ('## Text'), 'body', or 'L<start>-<end>'" in m
+               for m in problems_of(k, pb, "bad-form"))
+    assert any("slug 'statement' is used twice" in m for m in problems_of(k, pb, "dup-slug"))
+    # a convention needs no cite and validates without one
     e = load_entity(k / "how-we-name-things.md")
-    assert e.cite == () and e.cite_ranges() == []
+    assert e.cite == () and e.cites() == []
 
 
 def test_rule_block_shape_and_rules_key_placement(bundle):
@@ -279,4 +342,3 @@ def test_the_real_bundle_is_readable_in_report_mode():
     for path, msgs in c.problems.items():
         assert msgs, path
         assert not any("does not parse" in m for m in msgs), (path, msgs)
-    assert isinstance(next(iter(c.problems.values()))[0], str) if c.problems else True

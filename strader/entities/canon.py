@@ -27,7 +27,12 @@ that OKF already names)::
       supersedes: orb-playbook#Target 1   # an entity id, "path#heading", or null
       since: 2026-09-02
       commit: <sha or null>
-    cite: ["## Statement"]           # headings whose lines are the citable excerpt
+    cite: ["## Statement"]           # required on method types, no default (Strader
+                                     # counter 2026-08-30 §6b: zero files carry a
+                                     # Statement heading, 22 have no ## heading at all).
+                                     # Each entry is one citable excerpt = one generated
+                                     # row: "## Heading" | "body" (the whole body) |
+                                     # "L23-36" (whole-file lines) | {cite: ..., id: slug}
     triggers: []                     # optional: EVENT kinds / emission types
     rule: null                       # optional predictive block (plan §5)
     title: …                         # kept from OKF
@@ -42,7 +47,10 @@ raising — the migration's review sheet and ``python -m strader.entities.canon
 --report`` use that.
 
 What consumes it: the generated source list (``footprint-icm/bin/manifest_gen.py``,
-st-apxk) takes ``Canon.admissible()`` and ``Entity.cite_ranges()``; the stub
+st-apxk) takes ``Canon.lane_sources()`` and ``Entity.cites()`` — one manifest row
+per cite, id ``<entity-id>-<slug>`` (counter §6c), and only entities under
+``knowledge/`` are lane sources; the nine playbook records are registry entities
+and not citable by the lane until one is promoted (counter §6g). The stub
 entities (st-4l6e), the rule registry (st-djb9) and the regenerated
 ``index.md`` read the same catalog. A test loads the real bundle and fails on
 any file that does not validate — the discipline
@@ -87,7 +95,11 @@ VALID_TYPES = METHOD_TYPES | OKF_TYPES | LEGACY_TYPES | {REGISTER_TYPE}
 
 FILE_STATUSES = frozenset({"trusted", "exploratory", "under-review", "tabled", "withdrawn", "source"})
 GENERATED_STATUSES = frozenset({"letter"})           # written by code per day, never in a file
-ADMISSIBLE_STATUSES = frozenset({"trusted", "exploratory"})  # what the lane may cite (+ letter rows)
+ADMISSIBLE_STATUSES = frozenset({"trusted", "exploratory"})  # a file the lane may cite
+# The closed status vocabulary as the lane sees it: file statuses that admit,
+# plus the generated-only `letter` rows (st-jep1). manifest_gen validates its
+# rows against this, the file loader against FILE_STATUSES (counter §6a).
+LANE_STATUSES = ADMISSIBLE_STATUSES | GENERATED_STATUSES
 SOURCE_TYPES = frozenset({REGISTER_TYPE, "reference"})  # the only types that may carry status: source
 
 ORIGINS = frozenset({"steve-dictation", "third-party-source", "empirical-observation", "code"})
@@ -95,11 +107,12 @@ ORIGINS = frozenset({"steve-dictation", "third-party-source", "empirical-observa
 REQUIRED_FIELDS = ("id", "type", "status", "owner", "provenance", "lineage",
                    "title", "description", "timestamp")
 RULE_FIELDS = ("registered", "module", "entry", "exit", "instrument")
-DEFAULT_CITE = ("## Statement",)
+BODY_CITE = "body"
 
 _ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
+_LINES_CITE_RE = re.compile(r"^L(\d+)-(\d+)$")
 
 
 class CanonError(Exception):
@@ -107,6 +120,39 @@ class CanonError(Exception):
 
     The message names every offending path with every problem found in it.
     """
+
+
+# ─── cites ───────────────────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class CiteSpec:
+    """One ``cite`` entry as written: a heading, the whole body, or a line range.
+
+    ``slug`` names the generated manifest row (``<entity-id>-<slug>``): the
+    heading text in kebab case, ``body``, or ``l<start>-<end>`` unless the
+    entry gave an explicit ``id``. The line-range form is pinned to the file
+    as it is; a header rewrite moves it (counter §6f), so the migration writes
+    it only where no heading exists.
+    """
+
+    kind: str            # "heading" | "body" | "lines"
+    value: str           # heading text, "", or "<start>-<end>"
+    level: int | None    # heading level, or None
+    slug: str
+    spec: str            # the entry as written
+
+
+@dataclass(frozen=True)
+class Cite:
+    """One resolved citable excerpt: whole-file, 1-indexed, inclusive lines."""
+
+    spec: CiteSpec
+    start: int
+    end: int
+
+    @property
+    def slug(self) -> str:
+        return self.spec.slug
 
 
 # ─── the entity ──────────────────────────────────────────────────────────────
@@ -125,7 +171,7 @@ class Entity:
     supersedes: str | None
     since: date
     commit: str | None
-    cite: tuple[str, ...]
+    cite: tuple[CiteSpec, ...]
     triggers: tuple[str, ...]
     rule: Mapping | None
     rules: tuple[str, ...]          # strategy only: the rule entities it lists
@@ -156,48 +202,70 @@ class Entity:
                 out.append((i + 1, len(m.group(1)), m.group(2).strip()))
         return out
 
-    def cite_ranges(self) -> list[tuple[int, int]]:
-        """1-indexed inclusive line ranges of the citable excerpt, one per cite heading.
+    def cites(self) -> list[Cite]:
+        """Every cite entry resolved to whole-file lines — one generated row each.
 
-        A range runs from the line after the heading to the line before the next
-        heading of the same or a higher level (or the end of the file), with
-        blank lines trimmed from both ends. Line numbers are of the whole file,
-        front matter included, so they match ``git show`` and the manifest.
+        A heading's range runs from the line after it to the line before the
+        next heading of the same or a higher level (or the end of the file);
+        ``body`` is everything after the front matter; ``L<a>-<b>`` is taken as
+        written. Blank lines are trimmed from both ends. Line numbers are of
+        the whole file, front matter included, so they match ``git show`` and
+        the manifest. Entries that do not resolve are omitted here and reported
+        as problems by the loader.
         """
-        heads = self.headings()
-        ranges: list[tuple[int, int]] = []
-        for want in self.cite:
-            want_level, want_text = _parse_heading_spec(want)
-            for idx, (line, level, text) in enumerate(heads):
-                if text == want_text and (want_level is None or level == want_level):
-                    end = len(self.lines)
-                    for nline, nlevel, _ in heads[idx + 1:]:
-                        if nlevel <= level:
-                            end = nline - 1
-                            break
-                    start = line + 1
-                    while start <= end and not self.lines[start - 1].strip():
-                        start += 1
-                    while end >= start and not self.lines[end - 1].strip():
-                        end -= 1
-                    if start <= end:
-                        ranges.append((start, end))
+        out: list[Cite] = []
+        for spec in self.cite:
+            resolved = self.resolve(spec)
+            if resolved is not None:
+                out.append(Cite(spec, *resolved))
+        return out
+
+    def resolve(self, spec: CiteSpec) -> tuple[int, int] | None:
+        """(start, end) for one cite entry, or None when it does not resolve."""
+        total = len(self.lines)
+        if spec.kind == BODY_CITE:
+            start, end = self.body_start, total
+        elif spec.kind == "lines":
+            a, b = (int(x) for x in spec.value.split("-"))
+            if a < self.body_start or b > total or a > b:
+                return None
+            start, end = a, b
+        else:
+            heads = self.headings()
+            hit = next((i for i, (_, lvl, txt) in enumerate(heads)
+                        if txt == spec.value and (spec.level is None or lvl == spec.level)), None)
+            if hit is None:
+                return None
+            line, level, _ = heads[hit]
+            end = total
+            for nline, nlevel, _ in heads[hit + 1:]:
+                if nlevel <= level:
+                    end = nline - 1
                     break
-        return ranges
+            start = line + 1
+        while start <= end and not self.lines[start - 1].strip():
+            start += 1
+        while end >= start and not self.lines[end - 1].strip():
+            end -= 1
+        return (start, end) if start <= end else None
+
+    def excerpt(self, cite: Cite) -> str:
+        """The excerpt's lines, verbatim."""
+        return "\n".join(self.lines[cite.start - 1:cite.end])
 
     def statement(self) -> str:
-        """The text of the first cite range, verbatim."""
-        ranges = self.cite_ranges()
-        if not ranges:
-            return ""
-        start, end = ranges[0]
-        return "\n".join(self.lines[start - 1:end])
+        """The first cite's excerpt, verbatim (empty when nothing resolves)."""
+        cites = self.cites()
+        return self.excerpt(cites[0]) if cites else ""
 
-    def quote(self) -> str:
-        """The first sentence of the statement — the manifest row's ``quote``."""
-        text = " ".join(self.statement().split())
-        if not text:
-            return ""
+    def quote(self, cite: Cite | None = None) -> str:
+        """The first sentence of an excerpt — the manifest row's ``quote``."""
+        if cite is None:
+            cites = self.cites()
+            if not cites:
+                return ""
+            cite = cites[0]
+        text = " ".join(self.excerpt(cite).split())
         m = re.match(r"(.+?[.!?])(?:\s|$)", text)
         return (m.group(1) if m else text).strip()
 
@@ -312,7 +380,11 @@ def _load(path: Path) -> tuple[Entity | None, list[str]]:
             if lacking:
                 problems.append(f"rule block missing {', '.join(lacking)}")
 
-    cite = _as_tuple(fm.get("cite")) or (DEFAULT_CITE if etype in METHOD_TYPES else ())
+    cite, cite_problems = _parse_cites(fm.get("cite"))
+    problems += cite_problems
+    if etype in METHOD_TYPES and not cite and not cite_problems:
+        problems.append("cite is required on a method entity — a heading, 'body', or "
+                        "'L<start>-<end>'; there is no default")
     body_start = end + 2
     body = "\n".join(lines[end + 1:]).strip()
     entity = Entity(
@@ -326,15 +398,18 @@ def _load(path: Path) -> tuple[Entity | None, list[str]]:
         extra={k: v for k, v in fm.items() if k not in _HEADER_KEYS},
     )
 
-    # Every cite heading must exist in the body; a method entity with no cite
-    # key must carry the default Statement heading, or nothing is citable.
-    found = {(lvl, txt) for _, lvl, txt in entity.headings()}
-    found_text = {txt for _, txt in found}
+    # Every cite entry must resolve to a non-empty excerpt, and every entry
+    # names a distinct generated row.
+    seen: set[str] = set()
     for spec in cite:
-        lvl, txt = _parse_heading_spec(spec)
-        ok = (lvl, txt) in found if lvl is not None else txt in found_text
-        if not ok:
-            problems.append(f"cite heading {spec!r} not found in the body")
+        if spec.slug in seen:
+            problems.append(f"cite slug {spec.slug!r} is used twice; give one entry an explicit id")
+        seen.add(spec.slug)
+        if entity.resolve(spec) is None:
+            what = {"heading": "heading not found in the body",
+                    "lines": "lines outside the body or reversed",
+                    BODY_CITE: "the body is empty"}[spec.kind]
+            problems.append(f"cite {spec.spec!r} does not resolve: {what}")
 
     return (entity if not problems else None), problems
 
@@ -413,8 +488,20 @@ class Canon:
         return [e for e in self._entities if e.is_method]
 
     def admissible(self) -> list[Entity]:
-        """Method entities with an admitting status — what the lane may cite."""
+        """Method entities with an admitting status, wherever they live."""
         return [e for e in self._entities if e.admissible]
+
+    def lane_sources(self, roots: tuple[Path, ...] | list[Path] = (KNOWLEDGE_DIR,)) -> list[Entity]:
+        """What the audit lane may cite: admissible AND under an allowed root.
+
+        The nine playbook records are registry entities but not lane sources
+        until one is promoted (counter §6g) — ``allowed_paths`` keeps
+        ``knowledge/`` only, so an exploratory short-premium record can never
+        reach the classify stage's context folder.
+        """
+        resolved = tuple(Path(r).resolve() for r in roots)
+        return [e for e in self.admissible()
+                if any(e.path.resolve().is_relative_to(r) for r in resolved)]
 
     def by_type(self, etype: str) -> list[Entity]:
         return [e for e in self._entities if e.type == etype]
@@ -472,6 +559,54 @@ def _parse_heading_spec(spec: str) -> tuple[int | None, str]:
     if m:
         return len(m.group(1)), m.group(2).strip()
     return None, spec.strip()
+
+
+def _kebab(text: str) -> str:
+    return re.sub(r"-{2,}", "-", re.sub(r"[^a-z0-9]+", "-", text.lower())).strip("-")
+
+
+def _parse_cite_spec(text: str, slug: str | None) -> tuple[CiteSpec | None, str | None]:
+    """One cite entry -> (CiteSpec, None) or (None, problem)."""
+    raw = text.strip()
+    if raw == BODY_CITE:
+        return CiteSpec(BODY_CITE, "", None, slug or BODY_CITE, raw), None
+    m = _LINES_CITE_RE.match(raw)
+    if m:
+        a, b = m.group(1), m.group(2)
+        return CiteSpec("lines", f"{a}-{b}", None, slug or f"l{a}-{b}", raw), None
+    if raw.startswith("#"):
+        level, heading = _parse_heading_spec(raw)
+        if heading:
+            return CiteSpec("heading", heading, level, slug or _kebab(heading), raw), None
+    return None, (f"cite entry {raw!r} is not a heading ('## Text'), 'body', or "
+                  f"'L<start>-<end>'")
+
+
+def _parse_cites(raw) -> tuple[tuple[CiteSpec, ...], list[str]]:
+    """The ``cite`` key: a list of strings or ``{cite: ..., id: ...}`` mappings."""
+    if raw is None:
+        return (), []
+    items = raw if isinstance(raw, (list, tuple)) else [raw]
+    specs: list[CiteSpec] = []
+    problems: list[str] = []
+    for item in items:
+        slug = None
+        if isinstance(item, dict):
+            slug = item.get("id")
+            item = item.get("cite")
+            if slug is not None and not _ID_RE.match(str(slug)):
+                problems.append(f"cite id {slug!r} is not kebab-case")
+                continue
+            slug = str(slug) if slug is not None else None
+        if not isinstance(item, str) or not item.strip():
+            problems.append(f"cite entry {item!r} is not a string")
+            continue
+        spec, problem = _parse_cite_spec(item, slug)
+        if problem:
+            problems.append(problem)
+        else:
+            specs.append(spec)  # type: ignore[arg-type]
+    return tuple(specs), problems
 
 
 def _as_tuple(value) -> tuple[str, ...]:
