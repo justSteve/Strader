@@ -113,6 +113,16 @@ reading); and **verified how** — `frames` / `arithmetic` / `parity` / `cross-e
 yt-analyst's own ask, and I agree with it: **a finding that reaches
 `knowledge/` stripped of its verification grade is worse than no finding.**
 
+> **Measured 2026-08-30, and it undercuts the premise above.** The grade is not
+> reliably there to travel. Across the 19 cards the convention exists in **eight
+> spellings**, and **only 162 of ~300 finding blocks (54%) carry a marker at
+> all**; just 5% cite a specific frame file. So a scraper over today's cards
+> silently drops ~46% of findings, and — worse — **absence of a marker is
+> indistinguishable from unverified.** The rule stands, but it describes where
+> we are going, not where the corpus is. Until a normalized field exists, an
+> unmarked finding is recorded `unknown`, never `unverified`, and never
+> promoted.
+
 ### 2.4 We do not consume `runs/`
 
 Gitignored, machine-local, pre-curation, and explicitly unverified raw model
@@ -324,11 +334,19 @@ is where they get resolved.
 
 ## 7. Decisions — ruled 2026-08-30
 
-> **Steve ruled on all three, 2026-08-30 14:33 CT.** 1 — authorized, relayed to
-> yt-analyst as his instruction with the consumption shape below. 2 — no SMDX
-> register, recommendation taken. 3 — deferred, reminder carried by
-> `st-frkh`, one-shot, firing on the next session that runs `yta.py` rather
-> than on a date.
+> **Steve ruled on all three, 2026-08-30 14:33 CT.** 1 — authorized. 2 — no SMDX
+> register, recommendation taken. 3 — deferred, reminder carried by `st-frkh`,
+> one-shot, firing on the next session that runs `yta.py` rather than on a date.
+>
+> **Item 1 is not yet unblocked.** yt-analyst filed `dr-shu` open and unclaimed
+> and will not build on a *relayed* authorization — a peer's report of Steve's
+> approval is not Steve's approval, which is the same standard applied in the
+> other direction when his bead claims were checked at source rather than taken
+> on trust. It needs one word from Steve directly. Correct of it, and cheap: the
+> delay costs a turn, not a redesign.
+>
+> **And a fourth decision has surfaced underneath item 1** — see the card-format
+> note below. It is a doctrine change, and it is separate.
 
 **1. Authorize `yta.py export --json`? — AUTHORIZED.** Today Strader would have to screen-scrape
 English prose out of `CARD.md` to get findings, which throws away the
@@ -357,6 +375,27 @@ one our register must restate the finding text, and a restatement drifts while
 an id does not. Everything else is recoverable; that one decides whether this
 is a contract or a convention. Explicitly not requested: anything from `runs/`,
 and any field that would need editing when something else changes.
+
+> **And measuring that shape against the cards produced the real finding
+> (`dr-shu`, verified at source).** Two of the fields **cannot come from an
+> exporter at all.** `kind` appears in 4 cards, 7 times, as prose — it lives in
+> `runs/`, which we ruled out. And cards carry **no ids**: Findings is nested
+> free prose with no record boundary, so a content hash drifts on any card edit
+> (precisely the failure an id exists to prevent) and a positional id breaks on
+> insertion.
+>
+> **So the id and `kind` require `CARD.md` to carry them — a card-format
+> change, therefore a doctrine change, therefore Steve's, and separate from
+> authorizing the exporter.** yt-analyst's recommendation, which I agree with:
+> ship the exporter over what exists, with an explicit `unknown` grade rather
+> than a guessed one, and put the per-finding id and a normalized verification
+> field to Steve as a forward-going card change. **Do not paper over the gap by
+> synthesizing ids in the exporter** — an id that looks stable and is not is the
+> drift failure wearing the costume of the fix.
+>
+> **Consequence for our register: build rows so they can be re-keyed.** The
+> first export will not carry ids, and a register that assumes they are present
+> will have to be rebuilt rather than re-keyed.
 
 **3. `dr-3b6` — DEFERRED, reminder requested.** `dr-3b6` — your Cherry
 Bomb review bead, open since 2026-08-28 — carries three lessons yt-analyst
