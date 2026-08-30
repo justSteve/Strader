@@ -322,9 +322,15 @@ is where they get resolved.
 
 ---
 
-## 7. Two decisions for you
+## 7. Decisions — ruled 2026-08-30
 
-**1. Authorize `yta.py export --json`?** Today Strader would have to screen-scrape
+> **Steve ruled on all three, 2026-08-30 14:33 CT.** 1 — authorized, relayed to
+> yt-analyst as his instruction with the consumption shape below. 2 — no SMDX
+> register, recommendation taken. 3 — deferred, reminder carried by
+> `st-frkh`, one-shot, firing on the next session that runs `yta.py` rather
+> than on a date.
+
+**1. Authorize `yta.py export --json`? — AUTHORIZED.** Today Strader would have to screen-scrape
 English prose out of `CARD.md` to get findings, which throws away the
 verification grade exactly where §4 says it matters most. yt-analyst says a
 `export --json` over the *curated* card sections — id, channel, playlist,
@@ -335,23 +341,40 @@ part. Recommendation: **yes** — file it as a `dr-` bead. It is the difference
 between a convention and a contract, and it closes gaps 7 and 8 at the same
 time.
 
-**2. Does Smart Money Decode X get a Strader register?** Recommendation: **no —
-stays in DReader as reference.** It is structure/BOS/ChoCH material overlapping
-ground our canon covers, and a register we do not curate is worse than no
-register.
+**2. Does Smart Money Decode X get a Strader register? — NO.** It stays in
+DReader as reference. Structure/BOS/ChoCH material overlapping ground our canon
+covers, and a register we do not curate is worse than no register. Nothing
+queued; revisit only if a specific SMDX claim is wanted for a live question.
 
-Silence on either means I take the recommendation. Everything else is claimed
-and moving.
+**The shape asked of the exporter** (input to yt-analyst, not a spec it owes
+us): one record per curated finding, carrying `video_id`, `channel`,
+`playlist` + position, `card_path`, the finding text and its timestamps,
+`kind`, `verification` — with **the frame directory and timestamp where the
+method is frames**, so the check is re-runnable rather than asserted — an
+**`attachment`** field naming what the number was attached to, and
+`card_status`. **The field asked for hardest is a stable finding id**: without
+one our register must restate the finding text, and a restatement drifts while
+an id does not. Everything else is recoverable; that one decides whether this
+is a contract or a convention. Explicitly not requested: anything from `runs/`,
+and any field that would need editing when something else changes.
 
-**A third item is in front of you and it is not mine.** `dr-3b6` — your Cherry
+**3. `dr-3b6` — DEFERRED, reminder requested.** `dr-3b6` — your Cherry
 Bomb review bead, open since 2026-08-28 — carries three lessons yt-analyst
 confirmed but never graduated into doctrine: paraphrase-never-verbatim on the
 wide pass (the one that billed 119K tokens for nothing), grids over ~10 rows
 are frames-only, and the parity check. It also holds two Gemini-vs-frames
 adjudications and a pruning task. It declined to fold the three in on a peer
-conversation, same reason it declined the exporter. Noted here so the asks read
-as one queue rather than arriving separately. *(Verified at source 2026-08-30:
-`dr-4c0` was filed for these first, then closed as a duplicate of `dr-3b6`.)*
+conversation, same reason it declined the exporter. *(Verified at source
+2026-08-30: `dr-4c0` was filed for these first, then closed as a duplicate of
+`dr-3b6`.)*
+
+Carried here by `st-frkh`, because `dr-3b6` is a DReader bead our tap-in does
+not read. **One-shot, and triggered by work rather than by a date** — it fires
+on the next session that runs `yta.py` or starts ingestion work, because the
+costliest open proposal is *paraphrase, never verbatim, on the wide pass* and
+doctrine step 2 hands you the invocation that trips it. A reminder that arrives
+as the money is about to be spent is worth more than a dated one. One plain
+line, then the carrier closes.
 
 ---
 
