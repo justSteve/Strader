@@ -1,7 +1,8 @@
 # The GexBot WebSocket, and what the State move actually costs
 
 *2026-08-30 · Strader · bead st-qcj3 (Quant To State Move) · your ruling: cancel Quant,
-move to State; Quant runs to 2026-09-05.*
+move to State. Cancellation confirmed executed in the portal and easily reversed;
+access runs **through 2026-09-06**.*
 
 Every figure below is measured — from the vendor's own spec and docs in
 `docs/gexbot/`, or from our own capture on disk. Where nothing has been
@@ -23,7 +24,7 @@ would demonstrably improve the *record* we keep. Nothing measured shows it
 would improve a *trade*. Recommend proceeding with the cancellation as ruled.
 
 **But the ruling has a second half you did not ask about, and it is the
-expensive one.** `/hist` is Quant-only too. From 2026-09-05 no GEX day can ever
+expensive one.** `/hist` is Quant-only too. From 2026-09-07 no GEX day can ever
 be backfilled again — a collector outage becomes a permanent hole, forever.
 That is the thing worth spending the last six days on, and §5 is the checklist.
 
@@ -172,17 +173,22 @@ Three things measured today:
 Nothing here needs a decision from you. It is on **st-qcj3 — Quant To State
 Move** and I will run it.
 
-**Before 2026-09-05**
+**Before 2026-09-06**
 
-1. **A final `/hist` sweep by hand on 09-05, before the tier drops.** This is
-   the guaranteed step and the whole point of the bead — it does not depend on
-   the nightly firing.
-2. Move the nightly off cron onto a timer with `Persistent=true`, or accept step
-   1 as the backstop. Five runs remain.
+1. **A final `/hist` sweep by hand on 09-05 or 09-06. This is mandatory, not a
+   backstop.** The last session under Quant is Friday 09-04; `/hist` publishes
+   T+1; the nightly cron is `0 21 * * 1-5`, so the Friday run harvests through
+   09-03 and 09-04's own data does not exist yet when it fires. There is no
+   weekend cron. **The nightly cannot reach the last session of the entitlement
+   by construction** — only the hand sweep can, and 09-06 is the last day the
+   endpoint answers.
+2. Move the nightly off cron onto a timer with `Persistent=true`, or treat all
+   five remaining runs as best-effort. Two of the last fortnight's runs were
+   already lost to a powered-off 21:00 (08-27, 08-29).
 3. Let the last Quant sessions' 1 Hz orderflow capture run out normally — it is
    the last of that data this desk will ever hold.
 
-**On 2026-09-05, after the drop**
+**On 2026-09-07, after the drop**
 
 4. Flip `gexbot_orderflow_1s` and `gexbot_hist_archive` in
    `config/entitlements.yaml` from expect-present to expect-absent, or the probe
@@ -192,9 +198,8 @@ Move** and I will run it.
 5. Drop the `/SPX/orderflow/orderflow` leg from the ten-endpoint package poller
    and stop the 1 Hz orderflow collector. (It auto-skips on entitlement, so
    nothing breaks if this slips — it just runs and logs nothing.)
-6. Re-confirm the registry entry against the portal. Two things have never been
-   written down: whether the cancellation is actually executed rather than only
-   ruled, and **what State bills**.
+6. **What State bills** is still unrecorded — the one open registry question.
+   The cancellation itself is confirmed executed and reversible.
 
 ---
 
@@ -205,7 +210,7 @@ a single recorded session of the WebSocket feed at 1 Hz on the greek ladder,
 sitting beside the same day's 60-second poll — then the question "does the other
 38% carry anything" is a measurement rather than an argument. It is roughly half
 a day of build against an undocumented protobuf schema, and it has to happen
-before 09-05 or not at all.
+before 09-06 or not at all.
 
 I do not recommend it now. The build risk is the undocumented part, the payoff
 is unmeasurable inside six days, and the `/hist` sweep is the thing that is

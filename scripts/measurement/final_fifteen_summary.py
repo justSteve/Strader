@@ -13,8 +13,8 @@ points-only rate flatters the recent half, which is what the pct column exists
 to expose.
 
 The 2025/2026 split is reported as a column, never as a discard gate — Steve
-retired the discard gate 2026-08-30 (relayed via Desk; confirm at first
-contact). Nothing here drops a rule for failing a half.
+retired the discard gate 2026-08-30, confirmed by him directly the same day.
+Nothing here drops a rule for failing a half.
 
 RUN
     .venv/bin/python3 scripts/measurement/final_fifteen_summary.py [base.jsonl]

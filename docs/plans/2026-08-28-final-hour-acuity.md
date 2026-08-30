@@ -90,7 +90,12 @@ hour (direction of the net move, the 10-pt excursion, and the Stage-1 premium
 result), then the confluence call when the lenses agree. Validate by time
 split — 2025 half vs. 2026 half — because the last time a cut looked good on
 one body of days and flipped sign on the next was the day-type gate
-(st-gno7, 2026-08-19). A rule that fails one half is not reported as an edge.
+(st-gno7, 2026-08-19). A rule that fails one half is reported with both halves shown.
+*(Amended 2026-08-30, st-ro04: Steve retired the DISCARD gate — a rule is no
+longer dropped for failing a half. The split is still computed and still
+reported as a column; what is retired is discarding on it. The original wording,
+"a rule that fails one half is not reported as an edge", stood from 2026-08-28
+to 2026-08-30.)*
 st-9i7a (the sell-burst-then-limp-drift signal) and st-vl3c (the three
 footprint constructs) become T-15 features inside this stage rather than
 separate studies.

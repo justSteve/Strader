@@ -24,7 +24,7 @@ WHAT
     useful for a call if the final fifteen actually went up.
 
     The 2025/2026 split is a reported column, never a discard gate (Steve
-    retired the gate 2026-08-30, relayed via Desk — confirm at first contact).
+    retired the gate 2026-08-30, confirmed by him directly the same day).
 
 RUN
     .venv/bin/python3 scripts/measurement/final_fifteen_by_rule.py [base.jsonl] [lens.jsonl]

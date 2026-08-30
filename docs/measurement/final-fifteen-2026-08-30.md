@@ -53,9 +53,8 @@ yardsticks agree, so the points figure is not an artifact of the level rising.
 range (high to low) **12.25 pts**. The close finished up on 156 days (54.5%),
 down on 127 (44.4%), unchanged on 3.
 
-**The 2025/2026 split is reported as a column and discards nothing** — per the
-direction relayed through Desk that the split-half discard gate is retired. See
-the open question at the foot.
+**The 2025/2026 split is reported as a column and discards nothing** — the
+split-half discard gate is retired (Steve, 2026-08-30, confirmed directly).
 
 ---
 
@@ -217,10 +216,11 @@ scripts/measurement/final_fifteen_premium_summary.py -> docs/measurement/final-f
 importable rather than re-typed — item 2 scores the same rules, not a fork.
 Verified: its own output is byte-identical before and after the refactor.
 
-**One question for Steve, and it is the only one.** This ran with the split-half
-discard gate retired — by-half behaviour is reported as a column and no rule was
-dropped for failing a half. That instruction reached here relayed through Desk,
-and a peer relaying an authorisation is a claim to verify rather than an
-authorisation. Nothing above depends on it — no rule was discarded either way —
-but confirming it settles the standing method. **Recommended answer: yes,
-retired as relayed.**
+**The split-half discard gate is retired — confirmed by Steve directly,
+2026-08-30.** This report ran that way: by-half behaviour is a reported column
+and no rule was dropped for failing a half. The instruction had reached here
+relayed through Desk, and a peer relaying an authorisation is a claim to verify
+rather than an authorisation, so it was carried as an open question until Steve
+answered it himself. He has. Nothing in this report changed either way — no rule
+was discarded under either reading — but the standing method is now settled:
+**report both halves, discard on neither.**
