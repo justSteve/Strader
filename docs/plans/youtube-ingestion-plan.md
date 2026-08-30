@@ -207,6 +207,12 @@ Each confirmed 2–3× independently.
   `RESISTANCE ($5730)` → `"RESISTANCE (60720)"`. **ES prices in 2024–25 all
   begin with 5, so this hits every price label on every chart in the Carmine
   corpus.** Any level number from that series is suspect until frame-checked.
+  Two siblings in the same corpus: **`$` reads as `1`** on journal input boxes
+  (`$ 5631.0` → `1 5631.0`, and the same prefix rendered elsewhere as invented
+  ↑/↓ arrows); and **cross-chart axis bleed** — a price range Gemini reports for
+  one chart actually belongs to a different chart minutes away. **So a price
+  label can be wrong in its digits *and* attached to the wrong chart.** Frame
+  provenance has to establish both, not just the number.
 - **Derived numbers presented as on-screen values.** "Max Profit 850 / Max Loss
   650" computed from the host's spoken "$6.50"; the ticket read 740 / −760.
   **These pass arithmetic by construction** — the one case where arithmetic
@@ -217,8 +223,11 @@ Each confirmed 2–3× independently.
   line and Gemini *invents* it.
 - **Regularization.** It repairs an inconsistent on-screen sequence into the
   pattern it expects and reports the repair as transcription. A ladder printing
-  `$100.00` came back `$100.15 → +10¢ → $100.25`. **A sequence that closes too
-  neatly is suspect.**
+  `$100.00` came back `$100.15 → +10¢ → $100.25`. Anything stepped, laddered,
+  numbered or branching is exposed. **This is derived-numbers' sibling and it
+  shares the poison: a regularized sequence is internally consistent by
+  construction, so arithmetic ratifies it.** Heuristic that has held: **a
+  sequence that closes too neatly is suspect.**
 - **Fabricated chrome.** A complete TradingView header — `ES • 1 • CBOE / O
   5834.00 H … Volume 24.49K` — none of it on screen. Headers, legends and
   footers are where it invents plausible filler.
@@ -290,7 +299,7 @@ is where they get resolved.
 
 | Source | Path | Bead | Note |
 |---|---|---|---|
-| Carmine orderflow series (8 eps) | ingested; register pending | `st-snd8` → `st-byxz` | the live one. Apply the footprint parity check and re-verify every ES price label against §4's glyph bug. |
+| Carmine orderflow series (8 eps) | ingested; register pending | `st-snd8` → `st-byxz` | the live one. Apply the footprint parity check, and triage every ES price label against §4's glyph bug — the cards mark which prices were frame-verified, so **use the marking as the filter, never the price**. Provenance must cover attachment as well as digits. |
 | GEXBOT new tools, 2025-10-27 | **vision** | `st-qei0` | product update; may document Orderflow changes newer than the whole series. Bead currently says captions — re-route. |
 | NQ Orderflow live, 2025-05-06 | **vision** | `st-qei0` | live session; the value is entirely on the screen. Transcript is already fetched and is not enough. |
 | Concepts review (1:04:59) | vision, then captions | `st-qei0` | 3,899 s × 91 ≈ 355K tokens, ≈ $0.11 for the wide pass. Worth it once. |
@@ -321,12 +330,45 @@ register.
 Silence on either means I take the recommendation. Everything else is claimed
 and moving.
 
+**A third item is in front of you and it is not mine.** yt-analyst filed
+`dr-4c0` on 2026-08-30 after auditing its own log: three lessons it had
+confirmed but never graduated into doctrine — paraphrase-never-verbatim on the
+wide pass (the one that billed 119K tokens for nothing), grids over ~10 rows
+are frames-only, and the parity check. It declined to fold them in on a peer
+conversation, same reason it declined the exporter. Noted here so the three
+asks read as one queue rather than arriving separately.
+
 ---
 
-## Appendix — the reusable asset
+## Appendix — the reusable asset, and why it is ours
 
 `yt-analyst/LESSONS.md` is 405 lines of dated, independently-confirmed
-observations of exactly how a frontier vision model fails on dense financial
-screenshots. That generalizes well past YouTube — it applies to any chart
-image we ever hand a model, including Steve's own screenshots. Worth a
-`knowledge/` pointer on its own account.
+observations of how a frontier vision model fails on dense financial
+screenshots. The generalization that matters is sharper than "past YouTube":
+
+**These are not video failures. They are dense-financial-screenshot failures.**
+Small-font price glyphs, occlusion truncation reported as complete, fabricated
+platform chrome, invented legend OHLC — none of it is specific to a video
+frame. It applies to any chart image handed to a model, **including the
+screenshots Steve pastes into this session**, which is a live path here and not
+a hypothetical.
+
+And a screenshot is the *harder* case, not the easier one: a hand-uploaded
+image has no wide-pass/zoom structure to fall back on, so **the frame check is
+the only check available** — there is no second sampling to disagree with.
+Which makes the free filters disproportionately valuable there, because they
+need no second image:
+
+- **Footprint parity.** delta = ask − bid, volume = ask + bid, so the two must
+  share parity. One line, no re-read.
+- **The non-monotonic-axis tell.** If a chart's price axis does not increase
+  monotonically, the image is decor and nothing read off its chrome is
+  citable. **A one-glance test on any screenshot** — it was originally a
+  channel-level judgment and generalizes down to the single image.
+- **"Too neat is suspect."** Derived numbers and regularized sequences both
+  pass arithmetic by construction; tidiness is the tell, not inconsistency.
+
+This deserves its own `knowledge/` entry rather than a pointer, and it belongs
+next to `feedback_never_guess_chart_readings` — that rule says crop and verify
+or say "can't read", and this is the measured account of *why*, with the
+mechanisms named. Filing it is a separate bead; flagged, not claimed.
