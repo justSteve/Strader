@@ -10,11 +10,14 @@ narrow, or the sentence stops being worth saying. So:
 
 - The service speaks to the broker over plain HTTPS in stage 2 and never
   imports the hobbled library. The hook keeps its meaning unchanged.
-- Stage 1 has no transport at all — no ``httpx``, no ``requests``, no socket.
-  The only broker in the package is the mock.
-- No module here reads a credential from disk. The token arrives at stage 2 as
-  a passphrase-decrypted blob in memory, and there is nowhere in this package
-  for a plaintext path to hide.
+- **There is still no transport at all** — no ``httpx``, no ``requests``, no
+  socket. The only broker in the package is the mock. ``execd/vault.py`` is
+  stage 2's first piece and carries no transport of its own; the Trader API
+  client (``execd/schwab.py``) is what adds one, and the commit that lands it
+  updates ``FORBIDDEN_TRANSPORTS`` below, deliberately and visibly.
+- No module here names a **plaintext** credential file. The vault owns the
+  encrypted store, which is the point of it; what must never appear is a path
+  to a credential anyone can read.
 
 Every claim above is asserted by reading the source and by watching what a
 full import actually loads, because a claim about what code does not do is
@@ -36,8 +39,9 @@ PACKAGE = REPO / "execd"
 #: Import roots that would put a transmitting broker library inside the service.
 FORBIDDEN_ROOTS = {"schwab", "broker_schwab", "schwab_py"}
 
-#: Stage 1 has no transport. Stage 2 adds exactly one (httpx) to a new module
-#: and updates this set in the same commit — deliberately, not by accident.
+#: The service has no transport yet. Stage 2's Trader API client adds exactly
+#: one (httpx) in a new module and drops it from this set in the same commit —
+#: deliberately and visibly, not as a side effect of an import someone added.
 FORBIDDEN_TRANSPORTS = {"httpx", "requests", "urllib3", "socket", "http.client", "aiohttp"}
 
 
@@ -79,11 +83,12 @@ def test_no_module_imports_the_hobbled_broker_library(path: Path):
 
 
 @pytest.mark.parametrize("path", modules(), ids=lambda p: p.name)
-def test_stage_one_has_no_transport(path: Path):
+def test_the_service_still_has_no_transport(path: Path):
     found = imported_roots(path) & FORBIDDEN_TRANSPORTS
     assert not found, (
-        f"{path.name} imports {sorted(found)}. Stage 1 runs against MockBroker "
-        f"only; the Schwab transport is st-w2nw and lands with this list updated."
+        f"{path.name} imports {sorted(found)}. The service runs against "
+        f"MockBroker only; the Schwab transport is st-w2nw and lands with this "
+        f"list updated in the same commit."
     )
 
 

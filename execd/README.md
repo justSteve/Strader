@@ -118,9 +118,17 @@ read back against Schwab's own order history before there is a second.
 
 ## What comes next
 
+**The vault has landed early** (`execd/vault.py`, stage 2's first piece). It
+holds a JSON payload encrypted with AES-256-GCM under a key derived from
+Steve's passphrase by scrypt — no passphrase on disk, no key file, the work
+factors written into the file and authenticated with the ciphertext so they
+cannot be quietly weakened. It knows nothing about Schwab or token shapes, so
+it is fully tested without a credential in the room. What stage 2 still needs
+is the Trader API client, and that needs recorded responses.
+
 | stage | bead | what lands |
 |---|---|---|
-| 2 | st-w2nw | the Schwab transport: Trader API over HTTPS, the encrypted vault, in-service re-auth. A second `Broker`; nothing else in this package changes. |
+| 2 | st-w2nw | the Schwab transport: Trader API over HTTPS, in-service re-auth. A second `Broker`; nothing else in this package changes. The vault is done. |
 | 3 | st-p8k8 | dedicated user, systemd unit, `deploy/install.sh`, the tailnet page that takes the passphrase, the plaintext token retired |
 | 4 | st-k6gl | one 1-lot live single with Steve at the STOP button |
 | 5 | st-47i2 | FD0 tickets and promoted rules become intents; the paste line retires |
