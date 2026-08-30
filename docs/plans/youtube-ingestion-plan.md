@@ -269,6 +269,19 @@ Each confirmed 2–3× independently.
 A disagreement between our read and Gemini's is **never resolved silently** —
 both versions go to Steve with the frame path.
 
+### What the cheap filters do not buy
+
+**Every zero-cost filter above validates the number.** Parity, arithmetic,
+cross-episode consistency, the glyph tells — all of them are digit-level. So a
+*correctly read* price attached to the wrong chart passes every single one of
+them, and cross-chart axis bleed is precisely that failure.
+
+**They bound to digit error. Attachment is established only by a frame at that
+timestamp.** This is the shape of the gap our register had — digit filters and
+no attribution check — and it is not specific to us: anyone inheriting figures
+from these cards has the same hole unless they check what the number was
+attached to.
+
 ---
 
 ## 5. What is not built
@@ -330,13 +343,15 @@ register.
 Silence on either means I take the recommendation. Everything else is claimed
 and moving.
 
-**A third item is in front of you and it is not mine.** yt-analyst filed
-`dr-4c0` on 2026-08-30 after auditing its own log: three lessons it had
-confirmed but never graduated into doctrine — paraphrase-never-verbatim on the
+**A third item is in front of you and it is not mine.** `dr-3b6` — your Cherry
+Bomb review bead, open since 2026-08-28 — carries three lessons yt-analyst
+confirmed but never graduated into doctrine: paraphrase-never-verbatim on the
 wide pass (the one that billed 119K tokens for nothing), grids over ~10 rows
-are frames-only, and the parity check. It declined to fold them in on a peer
-conversation, same reason it declined the exporter. Noted here so the three
-asks read as one queue rather than arriving separately.
+are frames-only, and the parity check. It also holds two Gemini-vs-frames
+adjudications and a pruning task. It declined to fold the three in on a peer
+conversation, same reason it declined the exporter. Noted here so the asks read
+as one queue rather than arriving separately. *(Verified at source 2026-08-30:
+`dr-4c0` was filed for these first, then closed as a duplicate of `dr-3b6`.)*
 
 ---
 
@@ -364,7 +379,13 @@ need no second image:
 - **The non-monotonic-axis tell.** If a chart's price axis does not increase
   monotonically, the image is decor and nothing read off its chrome is
   citable. **A one-glance test on any screenshot** — it was originally a
-  channel-level judgment and generalizes down to the single image.
+  channel-level judgment and generalizes down to the single image. **This is
+  the one filter that needs no domain knowledge at all**: parity needs a
+  footprint, "too neat" needs a sense of the expected pattern, but "is this
+  price axis monotonic" is answerable by anyone looking at any chart — and it
+  invalidates the whole image's metadata in one glance rather than one claim at
+  a time. If a future session under time pressure applies exactly one thing
+  from this, it should be that.
 - **"Too neat is suspect."** Derived numbers and regularized sequences both
   pass arithmetic by construction; tidiness is the tell, not inconsistency.
 
