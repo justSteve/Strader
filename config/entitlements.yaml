@@ -198,15 +198,16 @@ dated:
     label: Databento — OPRA Equity Options plan
     vendor: Databento
     state: cancelled
-    what: No live OPRA entitlement since the swap. Historical OPRA is ad hoc and USAGE-BILLED via corpus_backfill_databento.py --opra — measured $6.07 per 2 session-hours (2026-08-05 control run). Pull it only when a specific question warrants the spend.
-    cost: usage-billed when pulled
-    cost_note: Was $199/mo flat while the plan was live. That figure is history — never quote it as a current cost.
+    what: "No live OPRA entitlement since the swap. Historical OPRA pulls are usage-billed via corpus_backfill_databento.py --opra — measured $6.07 per 2 session-hours (2026-08-05 control) — BUT THERE IS A HARD DATE WALL, measured 2026-08-30: data timestamped after 2026-08-14T13:30:00Z is refused outright. The 08-14 manifest carries the vendor's own words: '403 license_not_found_unauthorized — A live data license is required to access OPRA.PILLAR data after 2026-08-14T13:30:00.000000000Z' (pull attempt 2026-08-17T11:31Z). That instant is 08:30 CT on 2026-08-14, the RTH open of the corpus's last OPRA day, which fits a plan cancelled 08-04 running to a period end of 08-14. Consequence for st-byif: of the 15 uncovered August candidate days, only 08-06 and 08-10..08-13 (FIVE) sit before the wall; 08-17..08-28 (TEN) are unreachable at any price without a live plan. Consequence for st-ro04's spread hole: every day it measured runs 2025-05-27..2026-08-14, all before the wall, so the quotes leg that would close it is reachable."
+    cost: usage-billed when pulled, and only for sessions before 2026-08-14T13:30Z
+    cost_note: "Was $199/mo flat while the plan was live — history, never quote it as a current cost. Quoted 2026-08-30 for the quotes leg that would close st-ro04's spread hole (real metadata.get_cost returns, nothing pulled): cbbo-1s on the ~32 strikes within +/-40 pts, 13:00-15:00 CT, is $0.0268 a day — $2.68 per 100 days, 1.4 GB. Per-MB rates span 1738x across schemas (trades $0.26077/MB, cmbp-1 $0.00015/MB) and cost is exactly linear in billable bytes with no minimum charge. A get_cost quote succeeding proves NOTHING about reachability: get_cost is metadata and keeps answering after a billing lapse; get_range is what 403s."
     confirmed_on: "2026-08-04"
     confirmed_by: Steve
     source: Databento billing portal
     bead: st-7av4
     evidence: [databento_opra_stream]
-    note: Daily import halted 2026-08-07. Both agents were still assuming this sub active on 2026-08-11 — the incident this registry exists to prevent. confirmed_on is the ~08-04 cancellation recorded in st-7av4; treat it as approximate.
+    needs_steve: "Check the Databento billing portal. Is the OPRA plan lapsed outright, or is the 2026-08-14T13:30Z wall a recency limit that a plan we still hold would clear? It decides whether the OPRA quotes pull is a $2.68 decision or a $199/mo one, and it is the only thing standing between st-ro04's spread hole and being closed."
+    note: Daily import halted 2026-08-07. Both agents were still assuming this sub active on 2026-08-11 — the incident this registry exists to prevent. confirmed_on is the ~08-04 cancellation recorded in st-7av4; treat it as approximate. The date wall in `what` was measured from our own 08-14 manifest on 2026-08-30, not asserted from the portal.
 
   gexbot_tier:
     label: GexBot — QUANT tier, cancelled; State from 2026-09-05
