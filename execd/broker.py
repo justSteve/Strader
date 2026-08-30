@@ -1,7 +1,7 @@
 """The broker seam, and the mock that stands in for one until stage 2. [st-eznu]
 
 Everything the service needs from a broker is the :class:`Broker` protocol
-below — seven methods, all of them data in and data out. Stage 2 (st-w2nw)
+below — eight methods, all of them data in and data out. Stage 2 (st-w2nw)
 lands a second implementation that speaks Schwab's Trader API over HTTPS. The
 service never learns which one it is holding, which is what lets every bound,
 every refusal and the whole protective-stop dance be tested here at full speed
@@ -156,7 +156,7 @@ class Fill:
 
 @runtime_checkable
 class Broker(Protocol):
-    """The only surface the service knows. Seven methods, no credential."""
+    """The only surface the service knows. Eight methods, no credential."""
 
     def quote(self, symbol: str) -> Quote: ...
     def chain(self, root: str, expiry: str | None = None) -> dict[str, Any]: ...

@@ -1,6 +1,6 @@
 """The narrow door — HTTP on the loopback, and nothing else. [st-eznu]
 
-Ten routes, no policy. Every one of them is a translation of an
+Fourteen routes, no policy. Every one of them is a translation of an
 :class:`~execd.service.ExecService` method into JSON and back; the bounds, the
 arming state and the journal all live behind it. That is deliberate: a rule
 that lives in a request handler is a rule that a second entry point can miss,

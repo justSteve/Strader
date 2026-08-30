@@ -878,15 +878,18 @@ than no manual.
   loop** described in Desk's intent v2 are not built. They are planned as paper
   first (`st-p7zw`, `st-kdaq`, `st-uaxf`).
 
-## 12. Where the tree's own docstrings disagree with its code
+## 12. Counts in the tree that were wrong
 
-Recorded rather than silently corrected, because Desk may be reading the source
-directly and should not trust these three lines.
+Found while writing this manual, on 2026-08-30. The two in code were corrected
+in the same commit as this document; the third is left alone deliberately.
 
-| Where | Says | Actually |
-|---|---|---|
-| `execd/api.py:3` | "Ten routes, no policy" | fourteen routes |
-| `execd/broker.py:159` | "Seven methods, no credential" | eight methods |
-| `myDesk/reports/2026-08-30-execution-service-stage-one.md` (COO) | "318 tests for the new service" | 365, measured 2026-08-30 — the page predates the vault's 44 |
+| Where | Said | Actually | Action |
+|---|---|---|---|
+| `execd/api.py:3` | "Ten routes, no policy" | fourteen | **fixed** |
+| `execd/broker.py:4,159` | "seven methods" | eight | **fixed** |
+| `myDesk/reports/2026-08-30-execution-service-stage-one.md` (COO) | "318 tests for the new service" | 365 | **left as written** — it is a point-in-time report Steve has already read, and it was true at 12:15 CT before the vault's 44 tests landed. Rewriting a report after the fact is worse than a stale number in a dated document. |
 
-`execd/README.md` says "Fourteen routes" and is correct.
+`execd/README.md` says "Fourteen routes" and was already correct.
+
+The general lesson for anyone reading this tree: **a count in a docstring is
+not a measurement.** Where a number matters, run the command in §10.
