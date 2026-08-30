@@ -170,19 +170,41 @@ here and it is first-order.
 
 ---
 
-## 5. Two holes, both named rather than filled
+## 5. One hole closed, one named
 
-**The spread is not in this measurement and cannot be.** Every OPRA record in
-this corpus is `schema: trades`; the estate has never held OPRA NBBO. Entries at
-the ask and exits at the bid are not computable from this data at any sample
-size. A far-OTM SPX option in the last fifteen minutes is wide — a "$0.20"
-option may be 0.15 bid / 0.30 ask — so **every multiple above is a
-print-to-print result and an upper bound on an achievable one**, and on a
-lottery-shaped trade that tax is larger than usual. Desk ruled this path (a) on
-2026-08-30: run on prints now, state the hole, never estimate it. Filling it
-needs an OPRA quotes pull, which is spend and is gated by st-byif.
+**The spread was the one hole, and it is now closed — measured, not estimated.**
+Every OPRA record in this corpus was `schema: trades`; the estate had never held
+OPRA NBBO, so entries at the ask and exits at the bid were not computable at any
+sample size and every multiple above was a print-to-print **upper bound**. Desk
+ruled path (a) on 2026-08-30 — run on prints, state the hole, never estimate it.
+Steve authorised the single-dollar level the same day, and the quotes were
+pulled: cbbo-1s NBBO over 14:45-15:00 CT on the 34 strikes within ±40 points,
+**274 days for $1.40**, into its own `databento_opra_quotes` stream so the trades
+files were never touched.
 
-Liquidity, as far as prints can show it: the longest silence on the chosen
+**What the spread costs, on 528 legs with both a print bound and a quoted fill:**
+
+| | print-to-print (the bound) | ask-to-bid (achievable) |
+|---|---|---|
+| median peak multiple | 1.56× | **1.00×** |
+| reached ≥2× | 196 (37.1%) | **108 (20.5%)** |
+| reached ≥3× | 97 (18.4%) | 64 (12.1%) |
+| reached ≥5× | 52 (9.8%) | 38 (7.2%) |
+| reached ≥10× | 24 (4.5%) | 14 (2.7%) |
+| reached ≥20× | 10 (1.9%) | 5 (0.9%) |
+| reached ≥50× | 0 | 0 |
+
+**The spread at entry is 28.6% of mid, and 40% through the window.** That is not
+a correction to the figures above, it is a different answer: the median leg goes
+from *up 56% at its best moment* to *breaking even at its best moment*, and the
+rate at which the trade doubles is roughly halved. Buying at the ask and selling
+at the bid is where a lottery-shaped trade's edge goes. The entry ask is a median
+$0.20 against the study's $0.17 print entry — you pay above the last trade to get
+in, and you sell below it to get out, twice.
+
+Liquidity: 116,755 quotes were dropped as crossed or zero-bid — far-OTM 0DTE
+options frequently have no bid at all, which is its own answer about
+exit-at-will. As far as prints can show it, the longest silence on the chosen
 strike ran a median 22s, p90 64s, max 219s.
 
 **The closing-seconds artifact — found here, and it changes the headline.** The
@@ -205,6 +227,8 @@ re-running an OPRA study over this corpus should carry the same cut.
 ## Sources and how to re-run
 
 ```
+scripts/corpus_pull_opra_quotes.py                   -> data/corpus/<day>/databento_opra_quotes.jsonl.gz
+scripts/measurement/final_fifteen_spread.py          -> data/measurement/final-fifteen-spread.jsonl
 scripts/measurement/final_fifteen_base.py            -> data/measurement/final-fifteen-base-2026-08-30.jsonl
 scripts/measurement/final_fifteen_summary.py         -> docs/measurement/final-fifteen-distribution-2026-08-30.txt
 scripts/measurement/final_fifteen_by_rule.py         -> docs/measurement/final-fifteen-by-rule-2026-08-30.md

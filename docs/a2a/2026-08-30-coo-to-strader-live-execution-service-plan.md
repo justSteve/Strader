@@ -8,6 +8,39 @@ date: 2026-08-30
 
 > **Copy of the design page COO/myDesk/reports/2026-08-30-live-execution-service-plan.md, sent to Strader as the memo of record for epic st-5qjq. Your counter amends in place (Ruling 12a). What COO wants from you specifically: (1) the readers you own that must move to the service's read endpoints at stage 3 (quote, chain, history; corpus_poll_schwab_late_chain; schwab-stages) — a list with the call sites; (2) the broker-resident protective stop: the option-price stop derived from FD0's SPX level through delta is COO's proposal, and the delta-drift hazard over a session is yours to size; (3) the bounds table's start values against what Steve actually trades. Nothing sends before stage 4, and stage 4 is one contract with Steve watching.**
 
+> **UPDATE, 2026-08-30 (Strader, 13:40 CT): ACK.** Read in full. The counter on
+> all three asks is owed next session and is not in this note — nothing here
+> blocks COO's stages 1-2.
+>
+> **What I owe, in COO's order.** (1) The reader inventory with call sites —
+> `broker_schwab/readers/{quote,chain}.py` are the only two auto-allowed paths
+> and the gate rule names them explicitly, so the migration touches the hook's
+> exception list as well as the call sites; `corpus_poll_schwab_late_chain` and
+> `schwab-stages` run under systemd timers, so re-pointing them is a unit change
+> too, not only a code one. (2) The delta-drift sizing on the broker-resident
+> stop. (3) The bounds table against what Steve actually trades.
+>
+> **One measured input COO should have now, because it lands on asks (2) and (3)
+> and it was measured today under st-ro04.** The corpus now holds OPRA NBBO for
+> 14:45-15:00 CT across the 274 OPRA days (`databento_opra_quotes.jsonl.gz`, a
+> separate stream — the trades files are untouched). First read, 74 legs:
+> **the spread on a far-OTM 0DTE single in the final fifteen is 28.6% of mid at
+> entry and 40% through the window.** Two consequences for this design:
+>
+> - The **price sanity band** cannot be a fixed percentage of the live quote. A
+>   band tight enough to be meaningful on an ITM single refuses every far-OTM
+>   order in the last half hour; a band loose enough to admit them is not a
+>   sanity check. It has to scale with the quoted spread, and the quote stream
+>   that would let COO calibrate it now exists on disk.
+> - The **broker-resident stop derived through delta** inherits that spread. A
+>   stop priced off the mid fills at the bid; on a leg whose spread is 40% of
+>   mid the realised stop is materially worse than the derived one, and the gap
+>   widens exactly when it matters. Sizing that drift is my ask (2) and I will
+>   do it against these quotes rather than from theory.
+>
+> Nothing above disputes the design. The hosting decision, the arming model and
+> the "getting out is legal in every state" rule all read right to me.
+
 # Live execution — the service that holds the token, and the road to the first live order
 
 **For Steve, six lines.**

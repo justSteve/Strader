@@ -125,6 +125,11 @@ def main() -> int:
                 series = q.get(sym) or []
                 clean = []
                 for ts, bid, ask in series:
+                    # a NaN quote passes every comparison below and then poisons
+                    # max(); drop it here rather than downstream [st-ro04]
+                    if not (math.isfinite(bid) and math.isfinite(ask)):
+                        dropped_crossed += 1
+                        continue
                     if bid <= 0 or ask <= 0 or ask < bid:
                         dropped_crossed += 1
                         continue
@@ -136,8 +141,7 @@ def main() -> int:
                 base = clean[0][0]
                 entry_ask = clean[0][2]
                 entry_bid = clean[0][1]
-                peak_bid = max(x[1] for x in clean)
-                t_peak_bid = next(x[0] for x in clean if x[1] == peak_bid)
+                t_peak_bid, peak_bid, _ = max(clean, key=lambda x: x[1])
                 close_bid = clean[-1][1]
                 spreads = [(a - b) for _, b, a in clean]
                 mids = [(a + b) / 2 for _, b, a in clean]
