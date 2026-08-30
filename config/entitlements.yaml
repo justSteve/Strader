@@ -209,19 +209,20 @@ dated:
     note: Daily import halted 2026-08-07. Both agents were still assuming this sub active on 2026-08-11 — the incident this registry exists to prevent. confirmed_on is the ~08-04 cancellation recorded in st-7av4; treat it as approximate.
 
   gexbot_tier:
-    label: GexBot — QUANT tier
+    label: GexBot — QUANT tier, cancelled; State from 2026-09-05
     vendor: GexBot
-    state: active
-    what: Superset tier. Every Classic/State/Orderflow endpoint plus four Quant-exclusives — /hist (rolling 90 days), the WebSocket feed (NOT wired), /tickers/quant, and /options/{ticker}/expiries. The orderflow entitlement arrives bundled with Quant by design, not as a separate purchase.
-    cost: $350/mo
-    cost_note: One-month commitment taken 2026-08-05 PM. Downgrade-or-renew decision lands ~2026-09-01 and should be informed by what the Quant month found.
-    confirmed_on: "2026-08-05"
+    state: cancelling — Quant entitlement runs to 2026-09-05, State thereafter
+    what: Quant is a superset tier. Measured from the spec 2.3.0 tier tags, which are cumulative and not disjoint — STATE KEEPS every classic endpoint (gex_full/zero/one, majors, maxchange) and every state endpoint (delta/gamma/vanna/charm x zero/one, majors, maxchange). STATE LOSES four things, all tagged Quant-only, all gone on 2026-09-05:/orderflow/orderflow (also tagged Orderflow, so it is a separate purchasable tier), /hist, /negotiate (POST+PATCH+GET — the entire WebSocket feed, never wired), /tickers/quant and /options/{ticker}/expiries.
+    cost: $350/mo until 2026-09-05
+    cost_note: One-month commitment taken 2026-08-05 PM, cancelled on Steve's ruling of 2026-08-30. What the State tier bills has NEVER been recorded — the vendor publishes no prices in any retrievable document (survey 2026-08-06 §3, "Vendor silence"). Do not quote a State figure until Steve reads one off the portal.
+    confirmed_on: "2026-08-30"
     confirmed_by: Steve
-    source: GexBot account page
-    review_by: "2026-08-29"
-    bead: st-nriv
+    source: Steve's ruling in session 2026-08-30 — NOT a portal reading
+    review_by: "2026-09-05"
+    bead: st-qcj3
     evidence: [gexbot_state_package, gexbot_orderflow_1s, gexbot_hist_archive]
-    note: confirmed_on is the 2026-08-05 upgrade itself, not a later portal re-check. Held STATE tier the morning of 2026-08-05 and QUANT from that afternoon; the gap cost a night of uncollected 1DTE and orderflow legs. Anything in the tree still calling this a State subscription is stale — docs/gexbot/README.md still did as of 2026-08-13.
+    needs_steve: Two things. (1) Has the cancellation actually been executed in the GexBot account page, or is it still only ruled? confirmed_on records the ruling, not a portal state. (2) What does the State tier bill per month, and on what day does it renew?
+    note: "Steve's reason, 2026-08-30: Discord feedback convinced him the Orderflow indicator alone does not justify the price; he asked for the realtime WebSocket to be explored separately — brief at docs/reports/2026-08-30-gexbot-websocket-and-the-state-move.md, whose finding is that the WebSocket cannot be bought on its own at any tier and so is not separable from the $350. THE IRREVERSIBLE PART: /hist is Quant-only, so from 2026-09-05 no GEX day can ever be backfilled again and a collector outage becomes a permanent hole — everything the 90-day window still reaches must be on disk before the drop, and st-qcj3 carries the checklist and the 09-05 final sweep. History: held STATE the morning of 2026-08-05 and QUANT from that afternoon; the gap cost a night of uncollected 1DTE and orderflow legs. On 2026-09-05 the gexbot_orderflow_1s and gexbot_hist_archive probed entries must flip to expect-absent or they alarm every day forever."
 
   gexbot_continuity:
     label: GexBot — subscription continuity
