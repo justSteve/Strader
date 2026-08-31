@@ -121,27 +121,66 @@ class Journal:
 
     # ── derived state ────────────────────────────────────────────────────
     def day_state(self, day: date | None = None) -> DayState:
-        """Rebuild the day from its own record. See the module docstring."""
+        """Rebuild the day from its own record. See the module docstring.
+
+        Three kinds of risk are counted, not one, and the reason is finding 1 of
+        the 2026-08-30 audit (st-v7oa). Counting only fills made the day's state
+        an account of what *filled*, while the service transmits on what was
+        *requested*; a limit resting at the broker held none of the day's budget
+        and so could be repeated without limit.
+
+        **Filled entries** are the ordinary case: an attempt spent and a slot
+        taken, released when the position closes with nothing remaining.
+
+        **Working entries** — placed, acknowledged, not yet resolved — hold an
+        attempt and a slot too, because a resting buy becomes a position the
+        moment the book comes to it and the service is not watching the book.
+        ``entry_resolved`` releases them: filled ones are then counted by their
+        own fill line, cancelled and rejected ones cost nothing, which keeps a
+        broker that refuses twice from spending Steve's day.
+
+        **Adopted positions** — found at the broker and never opened here — hold
+        a slot but not an attempt. They are real risk, so they close the entry
+        door; they are not this service's sends, so they do not spend its
+        budget.
+        """
         opened = 0
         closed = 0
         realized_loss = 0.0
+        pending: set[str] = set()      # entry orders live at the broker
+        adopted: set[str] = set()      # symbols held that this service did not open
         for e in self.read(day):
-            if e.get("event") == "filled" and e.get("kind") == "entry":
+            event = e.get("event")
+            if event == "working" and e.get("kind") == "entry":
+                if order_id := str(e.get("order_id") or ""):
+                    pending.add(order_id)
+            elif event == "entry_resolved":
+                pending.discard(str(e.get("order_id") or ""))
+            elif event == "filled" and e.get("kind") == "entry":
                 opened += 1
-            elif e.get("event") == "closed":
+            elif event == "position_adopted":
+                if symbol := str(e.get("symbol") or ""):
+                    adopted.add(symbol)
+            elif event == "position_gone":
+                adopted.discard(str(e.get("symbol") or ""))
+            elif event == "closed":
                 # A partial close carries what is still open. The loss on the
                 # part that closed debits the ceiling immediately — waiting for
                 # the rest would let a bad day spend more than Steve allowed —
                 # but the position slot is only freed when nothing is left.
+                symbol = str(e.get("symbol") or "")
                 if not e.get("remaining_qty"):
-                    closed += 1
+                    if symbol in adopted:
+                        adopted.discard(symbol)
+                    else:
+                        closed += 1
                 pnl = e.get("pnl_usd")
                 if isinstance(pnl, (int, float)) and pnl < 0:
                     realized_loss += -float(pnl)
         return DayState(
-            open_positions=max(0, opened - closed),
+            open_positions=max(0, opened - closed) + len(pending) + len(adopted),
             realized_loss_usd=round(realized_loss, 2),
-            attempts_used=opened,
+            attempts_used=opened + len(pending),
         )
 
     def __iter__(self) -> Iterator[dict[str, Any]]:  # pragma: no cover - convenience

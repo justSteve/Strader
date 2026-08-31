@@ -291,8 +291,13 @@ class MockBroker:
         return [f for f in self._fills if f.at > since]
 
     # ── test controls ────────────────────────────────────────────────────
-    def trigger_stop(self, order_id: str) -> OrderResult:
-        """Price reached a resting order. Fills it at the price it carries."""
+    def fill_resting(self, order_id: str) -> OrderResult:
+        """A resting order traded. Fills it at the price it carries.
+
+        The one control behind both kinds of rest: a protective stop the market
+        reached, and a buy limit the book finally came to. They are the same
+        event to the broker and the service has to survive both, so a test asks
+        for it by the same name."""
         order = self._orders.get(order_id)
         if order is None:
             raise BrokerError(f"no such order: {order_id}")
@@ -303,6 +308,21 @@ class MockBroker:
         self._orders[order_id] = filled
         self._apply_fill(filled)
         return filled
+
+    def trigger_stop(self, order_id: str) -> OrderResult:
+        """Price reached a resting stop. The stop-shaped name for
+        :meth:`fill_resting`, kept because that is what the stop tests read."""
+        return self.fill_resting(order_id)
+
+    def reject_resting(self, order_id: str, message: str = "rejected") -> OrderResult:
+        """A resting order the broker later killed — expired, cancelled at the
+        exchange, or pulled by risk. The service must give the slot back."""
+        order = self._orders.get(order_id)
+        if order is None:
+            raise BrokerError(f"no such order: {order_id}")
+        rejected = replace(order, status=OrderStatus.REJECTED, message=message)
+        self._orders[order_id] = rejected
+        return rejected
 
     def working_orders(self, symbol: str | None = None) -> list[OrderResult]:
         return [o for o in self._orders.values()

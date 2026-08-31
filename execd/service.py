@@ -15,15 +15,26 @@ preview whose cost agrees with the intent. An exit clears that the contract is
 one this service trades and that the side really closes. Nothing that exists to
 keep Steve out of risk may keep him in it.
 
-**A fill without a protective stop is a state this service does not reach.**
-The stop's inputs are checked before the entry is previewed, so an intent that
-could not produce a resting stop is refused while refusing is still free. The
-stop is placed the moment the fill comes back, and the placement is journaled
-whether it succeeds or fails — a failure there is loud, because the position
-is live and unprotected until the SPX-mark loop or Steve deals with it.
+**A fill without a protective stop is a state this service does not reach
+quietly.** The stop's inputs are checked before the entry is previewed, so an
+intent that could not produce a resting stop is refused while refusing is still
+free. The stop is placed the moment the fill comes back, and the placement is
+journaled whether it succeeds or fails — a failure there is loud, because the
+position is live and unprotected until the SPX-mark loop or Steve deals with it.
+It used to say "does not reach", flatly; the 2026-08-30 audit found the way
+through, which was to not notice the fill at all, and the word is now the one
+the code earns. Every remaining route to an unprotected position — a fill too
+cheap to leave room for a stop, a broker that refuses the stop, an adopted
+position with no stop inputs, a stop cancelled by request — writes a
+``stop_unprotected`` line, and that line is the guarantee.
 
 **The day's ceiling is read from the journal, not remembered.** A restart
 recovers it. See ``execd.journal``.
+
+**What is open is read from the broker, not believed.** The journal is the
+authority on what this service intended and the broker is the authority on what
+is held; treating the first as both is the defect :meth:`ExecService.reconcile`
+exists to close. See its docstring. [st-v7oa]
 """
 
 from __future__ import annotations
@@ -60,6 +71,21 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _ts_of(entry: dict[str, Any]) -> datetime | None:
+    """The moment a journal line was written, or ``None`` if it cannot be read.
+
+    A recovered position keeps the age it actually has: the settle window that
+    protects it from a lagging positions feed must not restart just because the
+    service did."""
+    raw = entry.get("ts")
+    if not isinstance(raw, str):
+        return None
+    try:
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
 @dataclass
 class ServiceConfig:
     state_dir: Path
@@ -70,6 +96,43 @@ class ServiceConfig:
     def __post_init__(self) -> None:
         self.state_dir = Path(self.state_dir)
         self.bounds = self.bounds.validated()
+
+
+@dataclass
+class WorkingEntry:
+    """An entry the broker acknowledged and has not resolved. [st-v7oa]
+
+    A limit that rests is the normal answer from a real broker, not an edge
+    case, and until this existed the service handed the caller its order id and
+    forgot it: no slot taken, no attempt debited, no protective stop owed, and
+    nothing that ever looked at it again. It is not a position — nothing is held
+    — but it is the only thing between the caller and one, so it holds a slot
+    and an attempt until :meth:`ExecService.reconcile` learns what became of it.
+    """
+
+    order_id: str
+    symbol: str
+    qty: int
+    intent_id: str
+    right: str
+    limit: float | None = None
+    stop_spx: float | None = None
+    delta: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "order_id": self.order_id, "symbol": self.symbol, "qty": self.qty,
+            "intent_id": self.intent_id, "right": self.right, "limit": self.limit,
+            "stop_spx": self.stop_spx, "delta": self.delta,
+        }
+
+
+#: How long a position must be absent from the broker's own account before the
+#: service believes it is gone. A positions endpoint that has not caught up with
+#: a fill it reported seconds ago is an ordinary thing for a REST broker to do,
+#: and treating that lag as a close would drop a live position and cancel the
+#: stop under it. Absence has to persist to mean anything. [st-v7oa]
+POSITION_SETTLE_S = 90.0
 
 
 @dataclass
@@ -86,6 +149,9 @@ class OpenPosition:
     stop_order_id: str | None = None
     stop_price: float | None = None
     entry_order_id: str = ""
+    opened_at: datetime | None = None
+    #: first time the broker failed to report this position, or ``None``
+    missing_since: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -94,6 +160,7 @@ class OpenPosition:
             "stop_spx": self.stop_spx, "delta": self.delta,
             "stop_order_id": self.stop_order_id, "stop_price": self.stop_price,
             "entry_order_id": self.entry_order_id,
+            "opened_at": self.opened_at.isoformat() if self.opened_at else None,
         }
 
 
@@ -110,6 +177,7 @@ class ExecService:
         self.arming = Arming(state / "STOP", clock=clock)
         self._lock = threading.RLock()
         self._open: dict[str, OpenPosition] = {}
+        self._working: dict[str, WorkingEntry] = {}
         self._last_fill_poll = clock()
         self._recover()
 
@@ -166,6 +234,7 @@ class ExecService:
                     max(0.0, self.bounds.daily_loss_ceiling_usd - day.realized_loss_usd), 2),
             },
             "positions": [p.to_dict() for p in self._open.values()],
+            "working": [w.to_dict() for w in self._working.values()],
             "bounds": self.bounds.to_dict(),
             "journal": str(self.journal.path_for()),
         }
@@ -216,6 +285,12 @@ class ExecService:
                                     order_id=replay.get("order", {}).get("order_id"))
                 return {**replay, "replayed": True}
 
+            # The broker's account of what is open, before the bounds are asked
+            # to judge against it. Without this the day's state is the journal's
+            # belief, and the journal does not know what filled while nothing
+            # was watching. [st-v7oa]
+            self.reconcile()
+
             self.journal.record("request", kind="place", intent_id=intent.intent_id,
                                 intent=intent.to_dict())
             if intent.is_entry:
@@ -235,6 +310,16 @@ class ExecService:
             for pos in self._open.values():
                 if pos.stop_order_id == order_id:
                     pos.stop_order_id = None
+                    # Cancelling a protective stop leaves a live position naked.
+                    # It is a legal thing to ask for and it is not a quiet one.
+                    self.journal.record("stop_unprotected", symbol=pos.symbol,
+                                        intent_id=pos.intent_id, qty=pos.qty,
+                                        order_id=order_id,
+                                        detail="the protective stop was cancelled by "
+                                               "request — the position is unprotected")
+            if order_id in self._working:
+                self._resolve_working(order_id, outcome="canceled",
+                                      detail="cancelled by request")
             return {"refused": None, "order": result.to_dict()}
 
     def flatten(self, reason: str = "flatten") -> dict[str, Any]:
@@ -245,6 +330,9 @@ class ExecService:
             if (r := self.arming.permits_exit()) is not None:
                 self.journal.record("refused", kind="flatten", refused=r.to_dict())
                 raise Refused(r)
+            # "Close everything" has to mean everything the broker holds, not
+            # everything this service happens to remember. [st-v7oa]
+            self.reconcile()
             self.journal.record("request", kind="flatten", reason=reason,
                                 positions=[p.symbol for p in self._open.values()])
             closed: list[dict[str, Any]] = []
@@ -282,40 +370,243 @@ class ExecService:
         """Pick up fills the service did not initiate — a resting protective
         stop that triggered while nothing was watching."""
         with self._lock:
-            since = self._last_fill_poll
-            now = self.clock()
+            return self._pick_up_fills()
+
+    def _pick_up_fills(self) -> dict[str, Any]:
+        """The fill sweep, without the lock, so ``reconcile`` can run it first.
+
+        Order matters: a stop that fired at the broker has to be booked — with
+        its P&L, against the day's ceiling — before the position sweep notices
+        the position is gone. Reversed, a losing trade would vanish from the
+        ceiling it was supposed to debit."""
+        since = self._last_fill_poll
+        now = self.clock()
+        try:
+            fills = self.broker.fills_since(since)
+        except BrokerError as exc:
+            self.journal.record("error", kind="poll_fills", detail=str(exc))
+            return {"picked_up": [], "error": str(exc)}
+        self._last_fill_poll = now
+        picked: list[dict[str, Any]] = []
+        for fill in fills:
+            pos = self._open.get(fill.symbol)
+            if pos is None or fill.side is not Side.SELL_TO_CLOSE:
+                continue
+            if pos.stop_order_id and fill.order_id != pos.stop_order_id:
+                continue
+            closed_qty = min(fill.qty or pos.qty, pos.qty)
+            remaining = pos.qty - closed_qty
+            pnl = self._pnl_usd(pos, fill.price, closed_qty)
+            self.journal.record("closed", symbol=pos.symbol, qty=closed_qty,
+                                remaining_qty=remaining, intent_id=pos.intent_id,
+                                kind="protective-stop", entry_price=pos.entry_price,
+                                exit_price=fill.price, pnl_usd=pnl,
+                                order_id=fill.order_id, reason="resting-stop")
+            if remaining:
+                # The stop that fired took part of the position; what is
+                # left needs one of its own or it is running naked.
+                pos.qty = remaining
+                self._rest_stop_at(pos, pos.stop_price)
+            else:
+                self._open.pop(pos.symbol, None)
+            picked.append({"symbol": pos.symbol, "exit_price": fill.price,
+                           "pnl_usd": pnl, "remaining_qty": remaining,
+                           "order_id": fill.order_id})
+        return {"picked_up": picked}
+
+    # ── the second record ────────────────────────────────────────────────
+    def reconcile(self) -> dict[str, Any]:
+        """Ask the broker what is actually working and actually held. [st-v7oa]
+
+        The journal is the authority on what this service *intended*. It is not
+        the authority on what is *open* — only the broker is, and until this
+        method existed nothing on the write path ever asked it, though
+        ``Broker.orders`` and ``Broker.positions`` were in the protocol from the
+        first commit. Three things get settled here:
+
+        1. **Working entries.** Filled ones become tracked positions and get the
+           protective stop they were owed; cancelled and rejected ones give
+           their slot back; ones the broker cannot account for keep theirs,
+           because holding a slot refuses new risk and forgetting one creates
+           it.
+        2. **Positions the service does not know about** — opened elsewhere, or
+           lost with a journal — are adopted so that ``flatten`` and the exit
+           sizing can see them. An adopted position carries no ``stop_spx``, so
+           it is journaled as unprotected rather than quietly watched.
+        3. **Sizes that disagree.** The broker's number wins and the resting
+           stop is resized to it, because a stop larger than the position sells
+           what Steve does not own.
+
+        Silent when nothing has changed — a journal that records every heartbeat
+        is a journal nobody reads. Never raises: a broker that cannot be reached
+        leaves every belief in place and says so.
+        """
+        with self._lock:
             try:
-                fills = self.broker.fills_since(since)
+                broker_orders = {o.order_id: o for o in self.broker.orders()}
+                broker_positions = {p.symbol: p for p in self.broker.positions()}
             except BrokerError as exc:
-                self.journal.record("error", kind="poll_fills", detail=str(exc))
-                return {"picked_up": [], "error": str(exc)}
-            self._last_fill_poll = now
-            picked: list[dict[str, Any]] = []
-            for fill in fills:
-                pos = self._open.get(fill.symbol)
-                if pos is None or fill.side is not Side.SELL_TO_CLOSE:
-                    continue
-                if pos.stop_order_id and fill.order_id != pos.stop_order_id:
-                    continue
-                closed_qty = min(fill.qty or pos.qty, pos.qty)
-                remaining = pos.qty - closed_qty
-                pnl = self._pnl_usd(pos, fill.price, closed_qty)
-                self.journal.record("closed", symbol=pos.symbol, qty=closed_qty,
-                                    remaining_qty=remaining, intent_id=pos.intent_id,
-                                    kind="protective-stop", entry_price=pos.entry_price,
-                                    exit_price=fill.price, pnl_usd=pnl,
-                                    order_id=fill.order_id, reason="resting-stop")
-                if remaining:
-                    # The stop that fired took part of the position; what is
-                    # left needs one of its own or it is running naked.
-                    pos.qty = remaining
-                    self._rest_stop_at(pos, pos.stop_price)
-                else:
-                    self._open.pop(pos.symbol, None)
-                picked.append({"symbol": pos.symbol, "exit_price": fill.price,
-                               "pnl_usd": pnl, "remaining_qty": remaining,
-                               "order_id": fill.order_id})
-            return {"picked_up": picked}
+                self.journal.record("error", kind="reconcile", detail=str(exc))
+                return {"promoted": [], "released": [], "adopted": [],
+                        "corrected": [], "error": str(exc)}
+
+            # Fills first. A stop that fired has to be booked against the day's
+            # ceiling before the position sweep sees the position is gone.
+            self._pick_up_fills()
+            promoted, released = self._reconcile_working(broker_orders)
+            adopted, corrected, gone = self._reconcile_positions(broker_positions)
+            return {"promoted": promoted, "released": released,
+                    "adopted": adopted, "corrected": corrected, "gone": gone,
+                    "error": None}
+
+    def _reconcile_working(
+        self, broker_orders: dict[str, OrderResult]
+    ) -> tuple[list[str], list[str]]:
+        promoted: list[str] = []
+        released: list[str] = []
+        for order_id, work in list(self._working.items()):
+            order = broker_orders.get(order_id)
+            if order is None:
+                # The broker has no record of an order we were told it took.
+                # Keep the slot — that only refuses new risk — and say so once.
+                if not self._already_flagged_unknown(order_id):
+                    self.journal.record("reconcile_unknown", order_id=order_id,
+                                        symbol=work.symbol, intent_id=work.intent_id,
+                                        detail="the broker does not report this order — "
+                                               "its slot is held until it can be accounted for")
+                continue
+            if order.is_working:
+                continue
+            if order.is_filled:
+                promoted.append(work.symbol)
+                self._promote(work, order)
+            else:
+                released.append(order_id)
+                self._resolve_working(order_id, outcome=order.status.value.lower(),
+                                      detail=order.message)
+        return promoted, released
+
+    def _promote(self, work: WorkingEntry, order: OrderResult) -> None:
+        """A working entry filled while nothing was watching. Book it, then owe
+        it the same protective stop a synchronous fill would have got."""
+        fill_px = order.fill_price if order.fill_price is not None else (work.limit or 0.0)
+        qty = order.filled_qty or work.qty
+        try:
+            spx = self.spx_mark()
+        except BrokerError:
+            spx = None
+        pos = self._open.get(work.symbol)
+        if pos is None:
+            pos = OpenPosition(
+                symbol=work.symbol, qty=qty, entry_price=fill_px,
+                intent_id=work.intent_id, right=work.right,
+                stop_spx=work.stop_spx, delta=work.delta,
+                entry_order_id=order.order_id, opened_at=self.clock(),
+            )
+            self._open[pos.symbol] = pos
+        else:
+            # The position grew. Its resting stop is now smaller than what is
+            # held, which is the same silent hole in the other direction, so the
+            # old one comes off before a correctly sized one goes on.
+            self._cancel_protective_stop(pos)
+            pos.qty += qty
+        self.journal.record("filled", kind="entry", intent_id=work.intent_id,
+                            symbol=pos.symbol, qty=qty, price=fill_px,
+                            cost_usd=round(fill_px * CONTRACT_MULTIPLIER * qty, 2),
+                            spx=spx, stop_spx=work.stop_spx, delta=work.delta,
+                            order_id=order.order_id, found_by="reconcile")
+        self._resolve_working(order.order_id, outcome="filled")
+        if spx is None:
+            self.journal.record("stop_unprotected", symbol=pos.symbol,
+                                intent_id=pos.intent_id, qty=pos.qty,
+                                detail="no index mark at reconcile — cannot derive a stop")
+            return
+        self._place_protective_stop(pos, spx)
+
+    def _resolve_working(self, order_id: str, outcome: str, detail: str = "") -> None:
+        work = self._working.pop(order_id, None)
+        if work is None:
+            return
+        self.journal.record("entry_resolved", order_id=order_id, outcome=outcome,
+                            symbol=work.symbol, intent_id=work.intent_id,
+                            detail=detail)
+
+    def _already_flagged_unknown(self, order_id: str) -> bool:
+        return any(e.get("order_id") == order_id
+                   for e in self.journal.events("reconcile_unknown"))
+
+    def _reconcile_positions(
+        self, broker_positions: dict[str, Position]
+    ) -> tuple[list[str], list[str], list[str]]:
+        adopted: list[str] = []
+        corrected: list[str] = []
+        gone: list[str] = []
+        now = self.clock()
+
+        for symbol, held in broker_positions.items():
+            if held.qty <= 0:      # a short is not this service's to manage
+                continue
+            pos = self._open.get(symbol)
+            if pos is None:
+                try:
+                    right = parse_occ(symbol).right
+                except ValueError:
+                    continue       # not an option this service can reason about
+                pos = OpenPosition(
+                    symbol=symbol, qty=held.qty, entry_price=held.avg_price,
+                    intent_id=f"adopted:{symbol}", right=right, opened_at=now,
+                )
+                self._open[symbol] = pos
+                adopted.append(symbol)
+                self.journal.record("position_adopted", symbol=symbol, qty=held.qty,
+                                    entry_price=held.avg_price,
+                                    detail="the broker holds a position this service "
+                                           "did not open")
+                self.journal.record("stop_unprotected", symbol=symbol,
+                                    intent_id=pos.intent_id, qty=held.qty,
+                                    detail="adopted position carries no stop_spx or "
+                                           "delta — no resting stop can be derived")
+            elif pos.qty != held.qty:
+                self.journal.record("position_corrected", symbol=symbol,
+                                    tracked_qty=pos.qty, broker_qty=held.qty,
+                                    intent_id=pos.intent_id,
+                                    detail="the broker's size is the one that is real")
+                corrected.append(symbol)
+                self._cancel_protective_stop(pos)
+                pos.qty = held.qty
+                self._rest_stop_at(pos, pos.stop_price)
+
+        for symbol, pos in list(self._open.items()):
+            if symbol in broker_positions:
+                pos.missing_since = None
+                continue
+            if pos.missing_since is None:
+                pos.missing_since = now
+            settled_for = (now - pos.missing_since).total_seconds()
+            if settled_for < POSITION_SETTLE_S:
+                # Absent once is a slow endpoint. Absent for a while is a close.
+                continue
+            gone.append(symbol)
+            self.journal.record("position_gone", symbol=symbol, qty=pos.qty,
+                                intent_id=pos.intent_id, missing_for_s=settled_for,
+                                detail="the broker has not reported this position for "
+                                       f"{settled_for:.0f}s — closed somewhere this "
+                                       "service did not see")
+            # A stop still resting under a position that is gone would open a
+            # short if it triggered. Pull it before dropping the record of it.
+            self._cancel_protective_stop(pos)
+            self._open.pop(symbol, None)
+        return adopted, corrected, gone
+
+    def _broker_qty(self, symbol: str) -> int | None:
+        """What the broker says is held, or ``None`` if it could not be asked."""
+        try:
+            for p in self.broker.positions():
+                if p.symbol == symbol:
+                    return max(0, p.qty)
+        except BrokerError:
+            return None
+        return 0
 
     # ── internals: the entry ─────────────────────────────────────────────
     def _entry_refusal(self, intent: OrderIntent) -> Refusal | None:
@@ -385,6 +676,20 @@ class ExecService:
                                 order_id=order.order_id, detail=order.message)
             return out
         if not order.is_filled:
+            # Acknowledged, not filled. Held, not forgotten: it takes a slot and
+            # an attempt until reconcile() learns what the broker did with it.
+            work = WorkingEntry(
+                order_id=order.order_id, symbol=intent.symbol,
+                qty=order.qty, intent_id=intent.intent_id, right=intent.occ.right,
+                limit=intent.limit, stop_spx=intent.stop_spx, delta=intent.delta,
+            )
+            self._working[work.order_id] = work
+            self.journal.record("working", kind="entry", intent_id=intent.intent_id,
+                                symbol=work.symbol, qty=work.qty,
+                                order_id=work.order_id, status=order.status.value,
+                                limit=work.limit, stop_spx=work.stop_spx,
+                                delta=work.delta, spx=spx)
+            out["working"] = work.to_dict()
             return out
 
         fill_px = order.fill_price if order.fill_price is not None else (intent.limit or 0.0)
@@ -392,7 +697,7 @@ class ExecService:
             symbol=intent.symbol, qty=order.filled_qty, entry_price=fill_px,
             intent_id=intent.intent_id, right=intent.occ.right,
             stop_spx=intent.stop_spx, delta=intent.delta,
-            entry_order_id=order.order_id,
+            entry_order_id=order.order_id, opened_at=self.clock(),
         )
         self._open[pos.symbol] = pos
         # stop_spx and delta go on the FILL line, not only on the stop line: if
@@ -424,10 +729,26 @@ class ExecService:
 
     # ── internals: the exit ──────────────────────────────────────────────
     def _exit_refusal(self, intent: OrderIntent) -> Refusal | None:
+        """The size an exit is checked against comes from the broker when this
+        service has no position of its own to check it against. [st-v7oa]
+
+        ``check_exit`` lets an unknown size through on purpose — refusing on
+        ignorance is how an exit gate traps someone — but "unknown" used to mean
+        "did not look", and an unbounded SELL_TO_CLOSE against a long-premium
+        account is a naked short. Now it means the broker was asked and could
+        not answer, which is journaled and still sent."""
         if (r := self.arming.permits_exit()) is not None:
             return r
         held = self._open.get(intent.symbol)
-        return check_exit(intent, self.bounds, held_qty=held.qty if held else None)
+        if held is not None:
+            return check_exit(intent, self.bounds, held_qty=held.qty)
+        qty = self._broker_qty(intent.symbol)
+        if qty is None:
+            self.journal.record("exit_unverified", symbol=intent.symbol,
+                                intent_id=intent.intent_id, qty=intent.qty,
+                                detail="the broker could not be asked what is held — "
+                                       "sending unverified rather than trapping a position")
+        return check_exit(intent, self.bounds, held_qty=qty)
 
     def _place_exit(self, intent: OrderIntent) -> dict[str, Any]:
         if (refusal := self._exit_refusal(intent)) is not None:
@@ -594,6 +915,7 @@ class ExecService:
                     intent_id=str(e.get("intent_id", "")), right=right,
                     stop_spx=e.get("stop_spx"), delta=e.get("delta"),
                     entry_order_id=str(e.get("order_id", "")),
+                    opened_at=_ts_of(e) or self.clock(),
                 )
             elif e.get("event") == "stop_placed":
                 pos = self._open.get(str(e.get("symbol", "")))
@@ -604,6 +926,40 @@ class ExecService:
                         pos.stop_spx = e.get("stop_spx")
                     if e.get("delta") is not None:
                         pos.delta = e.get("delta")
+            elif e.get("event") == "working" and e.get("kind") == "entry":
+                symbol = str(e.get("symbol", ""))
+                order_id = str(e.get("order_id", ""))
+                if not symbol or not order_id:
+                    continue
+                try:
+                    right = parse_occ(symbol).right
+                except ValueError:
+                    continue
+                self._working[order_id] = WorkingEntry(
+                    order_id=order_id, symbol=symbol,
+                    qty=int(e.get("qty", 0) or 0),
+                    intent_id=str(e.get("intent_id", "")), right=right,
+                    limit=e.get("limit"), stop_spx=e.get("stop_spx"),
+                    delta=e.get("delta"),
+                )
+            elif e.get("event") == "entry_resolved":
+                self._working.pop(str(e.get("order_id", "")), None)
+            elif e.get("event") == "position_adopted":
+                symbol = str(e.get("symbol", ""))
+                if not symbol or symbol in self._open:
+                    continue
+                try:
+                    right = parse_occ(symbol).right
+                except ValueError:
+                    continue
+                self._open[symbol] = OpenPosition(
+                    symbol=symbol, qty=int(e.get("qty", 0) or 0),
+                    entry_price=float(e.get("entry_price", 0.0) or 0.0),
+                    intent_id=f"adopted:{symbol}", right=right,
+                    opened_at=_ts_of(e) or self.clock(),
+                )
+            elif e.get("event") == "position_gone":
+                self._open.pop(str(e.get("symbol", "")), None)
             elif e.get("event") == "closed":
                 symbol = str(e.get("symbol", ""))
                 remaining = e.get("remaining_qty")
@@ -612,5 +968,10 @@ class ExecService:
                     pos.qty = int(remaining)
                 else:
                     self._open.pop(symbol, None)
-        if self._open:
-            self.journal.record("recovered", positions=[p.to_dict() for p in self._open.values()])
+        if self._open or self._working:
+            self.journal.record("recovered",
+                                positions=[p.to_dict() for p in self._open.values()],
+                                working=[w.to_dict() for w in self._working.values()])
+        # The journal is what this service believed when it died. The broker is
+        # what is true now, and a restart is exactly when those differ. [st-v7oa]
+        self.reconcile()

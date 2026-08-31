@@ -86,9 +86,12 @@ contract is one this service trades, that the side really closes, and that it
 is not larger than the position (selling more than you hold is an opening sale
 wearing an exit's label). Nothing that exists to keep Steve out of risk may
 keep him in it, so `flatten` works while STOPped, while stood down, after the
-bell and with the ceiling breached, and an exit whose size the service does not
-know goes through rather than being refused on ignorance. The one thing that
-refuses an exit is having no credential to send it with.
+bell and with the ceiling breached. An exit for a contract the service is not
+tracking is sized against the broker's own position; only when the broker
+cannot be reached at all does the order go through unsized, journaled as
+`exit_unverified`, because refusing on ignorance is how an exit gate traps
+someone. The one thing that refuses an exit is having no credential to send it
+with.
 
 **A fill without a protective stop is a state this service does not reach
 quietly.** The stop's inputs are checked before the entry is previewed. On the
@@ -106,13 +109,37 @@ realized-loss ceiling and the attempts used are rebuilt by reading the file
 (`execd/journal.py`), so a restart recovers them. Losses only debit; a winner
 does not buy back an attempt. On this box, restarts are not hypothetical.
 
+**What is open is read from the broker, not believed.** The journal is the
+authority on what this service *intended*; only the broker knows what is *held*,
+and `ExecService.reconcile` asks it — at start-up, before every entry, before an
+exit is sized, and before a flatten. An entry the broker acknowledges without
+filling is a `working` entry: it holds a position slot and an attempt until
+reconcile learns what became of it, so an order resting at the broker can no
+longer be repeated without limit. Filled ones become tracked positions and get
+the protective stop they were owed; cancelled and rejected ones give the slot
+back; ones the broker cannot account for keep it, because holding a slot only
+refuses new risk while forgetting one creates it. Positions found at the broker
+that this service never opened are adopted so `flatten` can close them, and a
+tracked size that disagrees with the broker's is corrected to the broker's. A
+position must be absent from the broker's account for `POSITION_SETTLE_S` before
+it is believed closed — a positions endpoint lagging a fill it just reported is
+ordinary, and treating that as a close would cancel the stop under a live trade.
+
+This is the fix for finding 1 of the 2026-08-30 independent audit
+(`st-v7oa`): the service transmitted on what was *requested* and counted on what
+*filled*, and those are the same event only against a mock that fills
+synchronously. `tests/execd/test_reconcile.py` is what it has to mean.
+
 ## The journal
 
 Append-only JSONL, one file per Central trading day under
 `<state-dir>/journal/`, every line stamped with the git sha of the copy that
 wrote it and fsync'd before the call returns. `request`, `refused` with its
-bound, `preview`, `placed`, `filled`, `stop_placed`, `exit_triggered`,
-`closed` with its P&L, `canceled`, `unlock`, `stand_down`, `stop`, `recovered`.
+bound, `preview`, `placed`, `working`, `entry_resolved`, `filled`,
+`stop_placed`, `stop_unprotected`, `exit_triggered`, `closed` with its P&L,
+`canceled`, `position_adopted`, `position_corrected`, `position_gone`,
+`reconcile_unknown`, `exit_unverified`, `unlock`, `stand_down`, `stop`,
+`recovered`.
 It is the audit "trust the process" rests on, and on the first live day it is
 read back against Schwab's own order history before there is a second.
 
