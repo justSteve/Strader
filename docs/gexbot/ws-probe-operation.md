@@ -110,6 +110,29 @@ on the payload rather than on debugging auth:
 
 Artifacts: `data/probes/gexbot-ws/20260830T150431/`.
 
+## Day 1 is armed (2026-08-31)
+
+A transient one-shot timer fires the first capture at the open, so day 1 of five
+is banked whether or not anyone is at the screen:
+
+```bash
+systemctl list-timers strader-ws-probe-day1 --no-pager   # Mon 2026-08-31 08:32 CDT, 300s capture
+systemctl stop strader-ws-probe-day1.timer               # cancel
+journalctl -u strader-ws-probe-day1 --no-pager           # after it runs
+```
+
+Log tees to `/var/moo/logs/gexbot-ws-probe-day1.log`; artifacts land in the usual
+run directory.
+
+**Do not fire a manual probe while it is running** — a successful POST negotiate
+closes existing connections on the same slot, so two probes fight. It starts
+08:32 and is done by roughly 08:37; after that the socket is free.
+
+It is transient (`systemd-run`), not a catalogued standing timer, and it fires
+once. **Clean it up when the window closes** — `systemctl stop
+strader-ws-probe-day1.timer` — so it does not linger as an orphan unit that no
+`SCHEDULE.md` entry explains.
+
 ## Tests
 
 ```bash
