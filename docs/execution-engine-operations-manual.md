@@ -625,7 +625,9 @@ a file that is absent falls back to the start values.
 The *shape* of the bounds is not configurable. There is no key that switches a
 bound off, because a bound you can switch off is not a bound.
 `require_protective_stop` exists as a key only so the refusal has something to
-name.
+name; setting it `false` is one of the conditions `problems()` raises on, so
+such a file does not load. Until 2026-08-31 it did load, and it switched off the
+one bound the design calls not optional — finding 8 of case st-5qjq.
 
 ### 5.11 The broker seam
 

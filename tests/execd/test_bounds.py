@@ -268,6 +268,15 @@ class TestConfiguration:
         with pytest.raises(ValueError, match="bounds:"):
             Bounds(**kw).validated()
 
+    def test_the_protective_stop_cannot_be_switched_off(self):
+        """Finding 8, case st-5qjq. The docstring said the shape of the bounds
+        is not configurable and then shipped one key that switched one off — the
+        key for the bound the design calls not optional."""
+        with pytest.raises(ValueError, match="cannot be turned off"):
+            Bounds(require_protective_stop=False).validated()
+        with pytest.raises(ValueError, match="cannot be turned off"):
+            Bounds.from_dict({"require_protective_stop": False})
+
     def test_to_dict_names_every_bound_the_service_enforces(self):
         assert set(Bounds().to_dict()) == {
             "instruments", "qty_cap", "max_open_positions", "daily_loss_ceiling_usd",

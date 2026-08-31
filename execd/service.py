@@ -620,9 +620,11 @@ class ExecService:
         return self._protective_stop_refusal(intent)
 
     def _protective_stop_refusal(self, intent: OrderIntent) -> Refusal | None:
-        """Everything the resting stop needs, checked while refusing is free."""
-        if not self.bounds.require_protective_stop:
-            return None
+        """Everything the resting stop needs, checked while refusing is free.
+
+        Unconditional: ``Bounds.problems`` refuses to load a file that turns
+        ``require_protective_stop`` off, so there is no state in which this is
+        skipped."""
         try:
             spx = self.spx_mark()
         except BrokerError as exc:

@@ -46,6 +46,6 @@ max_quote_age_s: 30.0
 preview_cost_tolerance_usd: 5.00
 
 # Every entry must carry the stop_spx and delta the broker-resident protective
-# stop is derived from. Turning this off means fills with no resting stop; it
-# exists as a key only so the refusal has something to name.
+# stop is derived from. This key exists only so the refusal has something to
+# name: `false` is not a setting, it is a bounds file that will not load.
 require_protective_stop: true

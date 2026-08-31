@@ -132,6 +132,19 @@ class Bounds:
             out.append(f"price_band_pct must be within (0, 1), not {self.price_band_pct}")
         if self.max_quote_age_s <= 0:
             out.append("max_quote_age_s must be positive")
+        if not self.require_protective_stop:
+            # The module docstring says the shape of the bounds is not
+            # configurable, "because a bound you can switch off is not a bound",
+            # and then shipped exactly one key that switched one off — the key
+            # for the bound the design calls not optional. The 2026-08-30 audit
+            # found the contradiction (finding 8). The key stays, so the refusal
+            # has something to name and ``to_dict`` can report it; ``false`` is
+            # now a bounds file that will not load.
+            out.append(
+                "require_protective_stop cannot be turned off — the broker-resident "
+                "stop is what survives this box dying, and a bound you can switch "
+                "off is not a bound"
+            )
         try:
             o, c, n = self.open_time, self.close_time, self.no_open_after
         except ValueError as exc:
