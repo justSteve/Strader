@@ -48,7 +48,7 @@ from typing import Any, Callable
 from .arming import Arming
 from .bounds import (
     CT, Bounds, DayState, QuoteView, Refusal, check_entry, check_exit,
-    check_preview_cost, session_close,
+    check_preview_cost, check_risk_budget, session_close,
 )
 from .broker import Broker, BrokerError, OrderResult, OrderStatus, Position, Quote
 from .intent import OrderIntent, OrderType, Side, parse_occ
@@ -644,7 +644,22 @@ class ExecService:
                 f"a {intent.occ.right_word} stop at {intent.stop_spx:g} is already "
                 f"triggered with SPX at {spx:g} — the sign is transposed",
             )
-        return None
+
+        # Derive the stop the entry would rest, here, before anything is sent.
+        # It was previously derived only after the fill, which meant an intent
+        # priced too cheaply to leave room for a stop became a live position
+        # with no stop under it and a journal line about it (finding 12), and
+        # nothing ever compared the position's own worst case to the day's
+        # ceiling (finding 6). Both are answered by the same arithmetic, and the
+        # right time for both is while refusing is still free. [st-2j80]
+        worst_fill = intent.limit if intent.limit is not None else 0.0
+        try:
+            stop_price = protective_stop_price(worst_fill, intent.delta, spx,
+                                               intent.stop_spx)
+        except ValueError as exc:
+            return Refusal("protective_stop",
+                           f"no resting stop can be derived for this entry: {exc}")
+        return check_risk_budget(intent, self.bounds, self.day_state(), stop_price)
 
     def _place_entry(self, intent: OrderIntent) -> dict[str, Any]:
         if (refusal := self._entry_refusal(intent)) is not None:

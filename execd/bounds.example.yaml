@@ -21,12 +21,21 @@ qty_cap: 1
 # How many may be open at once.
 max_open_positions: 1
 
-# The hard ceiling on the day's damage: REALIZED loss in dollars, and how many
-# entries may be attempted. A winning trade does not buy back an attempt or
-# raise the ceiling — this bounds how much of the day can go wrong, it is not a
-# running P&L. Both are rebuilt from the journal, so a restart does not reset
-# them.
-daily_loss_ceiling_usd: 100.0
+# The hard ceiling on the day's damage, and how many entries may be attempted.
+# A winning trade does not buy back an attempt or raise the ceiling — this
+# bounds how much of the day can go wrong, it is not a running P&L. Both are
+# rebuilt from the journal, so a restart does not reset them.
+#
+# It bounds two things. Loss ALREADY REALIZED: once it reaches the ceiling, no
+# new entry. And the worst case of the entry IN FRONT OF IT: an entry is priced
+# at its limit, walked down to the stop it would rest, and refused if that
+# exceeds the headroom left. The second is what makes the sum of the day's
+# worst cases fit inside the ceiling rather than merely the first one.
+#
+# So this number has to be larger than one position can lose or it can never
+# bind at all: a $2.10 SPX call with a twelve-point stop risks $205 whatever
+# the ceiling says.
+daily_loss_ceiling_usd: 500.0
 max_attempts: 2
 
 # The session, in Central time. Nothing opens after no_open_after_ct; exits are

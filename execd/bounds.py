@@ -92,7 +92,11 @@ class Bounds:
     instruments: tuple[str, ...] = ("SPX", "SPXW")
     qty_cap: int = 1
     max_open_positions: int = 1
-    daily_loss_ceiling_usd: float = 100.0
+    #: Steve, 2026-08-31, ruling on st-2j80. It was $100, which was smaller than
+    #: what a single SPX contract costs, so it could not bound a trade: a $2.10
+    #: call with a twelve-point stop risks $205 whatever the ceiling says. A
+    #: ceiling below the price of one position is a number, not a bound.
+    daily_loss_ceiling_usd: float = 500.0
     max_attempts: int = 2
     open_ct: str = "08:30"
     close_ct: str = "15:00"
@@ -368,6 +372,45 @@ def check_exit(intent: OrderIntent, bounds: Bounds,
             "qty",
             f"closing {intent.qty} against a position of {held_qty} would leave "
             f"a short — this service is long premium only",
+        )
+    return None
+
+
+def check_risk_budget(
+    intent: OrderIntent, bounds: Bounds, state: DayState, stop_price: float
+) -> Refusal | None:
+    """What this one entry can lose, against what the day has left. [st-2j80]
+
+    Every other ceiling check looks backwards at loss already realized. None of
+    them looked at the position standing in front of them, so two attempts could
+    each realize more than the whole day's ceiling and every bound would have
+    passed — finding 6 of the 2026-08-30 audit.
+
+    The worst case is the distance from the fill to the resting stop, and the
+    fill is bounded above by the limit, because a buy never pays more than its
+    limit. So the entry is priced at its limit, which is the most it can cost
+    and therefore the most it can lose.
+
+    Checked against the *remaining* headroom rather than the whole ceiling. That
+    is what makes the ceiling hold across attempts: a day that has already lost
+    $205 of a $500 ceiling may only put $295 more at risk, so the sum of the
+    worst cases can never exceed what Steve allowed.
+
+    This is a bound on *intent*, not a guarantee. A gap through the stop, or a
+    market close filled worse than the stop, can still realize more than the
+    number computed here. It bounds what the service knowingly puts at risk,
+    which is the part it controls.
+    """
+    from .stops import risk_usd      # local: bounds stays importable on its own
+
+    risk = risk_usd(intent.limit or 0.0, stop_price, intent.qty)
+    headroom = round(bounds.daily_loss_ceiling_usd - state.realized_loss_usd, 2)
+    if risk > headroom:
+        return Refusal(
+            "ceiling",
+            f"this entry risks ${risk:.2f} to its stop at ${stop_price:.2f}, and "
+            f"the day has ${headroom:.2f} of its ${bounds.daily_loss_ceiling_usd:.2f} "
+            f"ceiling left",
         )
     return None
 

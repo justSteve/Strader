@@ -465,13 +465,13 @@ class TestTheDailyCeiling:
 
     def test_the_loss_ceiling_refuses_before_the_attempts_run_out(self, armed):
         armed.journal.record("filled", kind="entry", symbol=PUT, qty=1, price=2.0)
-        armed.journal.record("closed", symbol=PUT, pnl_usd=-100.0)
+        armed.journal.record("closed", symbol=PUT, pnl_usd=-500.0)
         out = armed.place(entry(intent_id="after-loss"))
         assert out["refused"]["bound"] == "ceiling"
-        assert "$100.00" in out["refused"]["reason"]
+        assert "$500.00" in out["refused"]["reason"]
 
     def test_the_ceiling_survives_a_restart(self, broker, clock, tmp_path):
-        """A restart that reset the budget would hand Steve a fresh $100 of
+        """A restart that reset the budget would hand Steve a fresh $500 of
         loss and two fresh attempts. This box restarts."""
         config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
         first = ExecService(broker, config, clock=clock)
@@ -484,12 +484,40 @@ class TestTheDailyCeiling:
         assert second.day_state().attempts_used == 1
         assert second.status()["day"]["attempts_left"] == 1
 
+    def test_an_entry_that_can_lose_more_than_the_day_has_left_never_sends(
+            self, armed, broker):
+        """Finding 6, and it is checked while refusing is still free — the
+        broker sees nothing. A $2.10 limit down to its $0.05 stop is $205, and
+        the day has $150 left."""
+        armed.journal.record("filled", kind="entry", symbol=PUT, qty=1, price=2.0)
+        armed.journal.record("closed", symbol=PUT, pnl_usd=-350.0)
+        out = armed.place(entry(intent_id="over-budget"))
+        assert out["refused"]["bound"] == "ceiling"
+        assert "$205.00" in out["refused"]["reason"]
+        assert sent_orders(broker) == []
+
+    def test_the_same_entry_passes_with_the_day_untouched(self, armed):
+        assert armed.place(entry(intent_id="in-budget"))["refused"] is None
+
+    def test_a_fill_too_cheap_to_leave_room_for_a_stop_is_refused_before_it_sends(
+            self, armed, broker):
+        """Finding 12. The stop price was derived only after the fill, so a
+        contract this cheap became a live position with no stop under it and a
+        journal line about it. It is now refused while nothing is at risk."""
+        cheap = "SPXW  260826C06500000"
+        broker.set_quote(cheap, bid=0.05, ask=0.05)
+        out = armed.place(entry(intent_id="too-cheap", symbol=cheap, limit=0.05,
+                                stop_spx=SPX_NOW - 12, delta=0.30))
+        assert out["refused"]["bound"] == "protective_stop"
+        assert "no resting stop can be derived" in out["refused"]["reason"]
+        assert sent_orders(broker) == []
+
     def test_status_reports_the_headroom(self, armed):
         armed.journal.record("filled", kind="entry", symbol=PUT, qty=1, price=2.0)
         armed.journal.record("closed", symbol=PUT, pnl_usd=-35.0)
         day = armed.status()["day"]
         assert day["realized_loss_usd"] == 35.0
-        assert day["loss_headroom_usd"] == 65.0
+        assert day["loss_headroom_usd"] == 465.0
 
 
 class TestRecoveryAfterRestart:

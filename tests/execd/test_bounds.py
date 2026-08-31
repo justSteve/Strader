@@ -19,7 +19,8 @@ import pytest
 
 from execd.bounds import (
     Bounds, DayState, QuoteView, check_entry, check_exit, check_instrument,
-    check_preview_cost, check_price_band, check_window, load_bounds, session_close,
+    check_preview_cost, check_price_band, check_risk_budget, check_window,
+    load_bounds, session_close,
 )
 from execd.intent import OrderIntent, OrderType, Side
 
@@ -106,11 +107,11 @@ class TestEachBoundRefusesByName:
         assert r.bound == "ceiling" and "attempts" in r.reason
 
     def test_ceiling_refuses_at_the_daily_loss_limit(self):
-        r = refusal(entry(), state=DayState(realized_loss_usd=100.0))
-        assert r.bound == "ceiling" and "$100.00 ceiling" in r.reason
+        r = refusal(entry(), state=DayState(realized_loss_usd=500.0))
+        assert r.bound == "ceiling" and "$500.00 ceiling" in r.reason
 
     def test_ceiling_allows_a_dollar_short_of_the_limit(self):
-        assert refusal(entry(), state=DayState(realized_loss_usd=99.0)) is None
+        assert refusal(entry(), state=DayState(realized_loss_usd=499.0)) is None
 
     def test_price_band_refuses_a_limit_far_above_the_offer(self):
         r = refusal(entry(limit=4.00))
@@ -138,6 +139,45 @@ class TestEachBoundRefusesByName:
 
     def test_preview_cost_tolerates_the_commission(self):
         assert check_preview_cost(entry(limit=2.10), 210.65, Bounds()) is None
+
+
+class TestTheRiskBudget:
+    """Finding 6 of the 2026-08-30 audit: every ceiling check looked backwards
+    at loss already realized, and none looked at the position standing in front
+    of it, so two attempts could each realize more than the whole day's ceiling
+    with every bound passing. Steve raised the ceiling to $500 on 2026-08-31
+    (st-2j80) because $100 was smaller than one contract's premium and so could
+    never bind at all."""
+
+    def test_an_entry_that_can_lose_more_than_the_day_has_left_is_refused(self):
+        # $2.10 fill down to a $0.05 stop is $205 on one contract.
+        r = check_risk_budget(entry(limit=2.10), Bounds(),
+                              DayState(realized_loss_usd=400.0), stop_price=0.05)
+        assert r.bound == "ceiling"
+        assert "$205.00" in r.reason and "$100.00" in r.reason
+
+    def test_an_entry_inside_the_headroom_passes(self):
+        assert check_risk_budget(entry(limit=2.10), Bounds(), NO_STATE,
+                                 stop_price=0.05) is None
+
+    def test_the_headroom_shrinks_with_the_day(self):
+        """What makes the ceiling hold across attempts: the sum of the worst
+        cases can never exceed what Steve allowed."""
+        spent = DayState(realized_loss_usd=205.0)
+        assert check_risk_budget(entry(limit=2.10), Bounds(), spent, 0.05) is None
+        assert check_risk_budget(entry(limit=2.10, qty=2), Bounds(qty_cap=2),
+                                 spent, 0.05).bound == "ceiling"
+
+    def test_a_contract_too_dear_for_the_whole_ceiling_is_refused_on_day_one(self):
+        # $8.40 to a $0.05 stop is $835, over the ceiling before anything is lost.
+        r = check_risk_budget(entry(limit=8.40), Bounds(), NO_STATE, stop_price=0.05)
+        assert r.bound == "ceiling" and "$835.00" in r.reason
+
+    def test_a_tighter_stop_buys_a_dearer_contract(self):
+        """The bound is on the distance to the stop, not on the premium: the
+        same $8.40 contract is fine if the stop is close enough."""
+        assert check_risk_budget(entry(limit=8.40), Bounds(), NO_STATE,
+                                 stop_price=4.00) is None
 
 
 class TestOrderOfChecks:
@@ -233,7 +273,7 @@ class TestConfiguration:
         b = Bounds()
         assert b.instruments == ("SPX", "SPXW")
         assert (b.qty_cap, b.max_open_positions) == (1, 1)
-        assert (b.daily_loss_ceiling_usd, b.max_attempts) == (100.0, 2)
+        assert (b.daily_loss_ceiling_usd, b.max_attempts) == (500.0, 2)
         assert (b.open_ct, b.close_ct, b.no_open_after_ct) == ("08:30", "15:00", "14:50")
 
     def test_steves_file_overrides_the_start_values(self, tmp_path):

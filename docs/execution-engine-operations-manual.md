@@ -470,7 +470,8 @@ names the most fundamental thing wrong:
 | 9 | `ceiling` | `attempts_used >= max_attempts` |
 | 10 | `ceiling` | `realized_loss_usd >= daily_loss_ceiling_usd` |
 | 11 | `price_band` | no quote; or quote older than `max_quote_age_s`; or not two-sided; or limit above `ask*(1+band)`; or limit below `bid*(1-band)` |
-| 12 | `protective_stop` | no `$SPX` mark; or the stop sign is transposed (`stop_is_consistent` false) |
+| 12 | `protective_stop` | no `$SPX` mark; or the stop sign is transposed (`stop_is_consistent` false); or the limit is too cheap for `protective_stop_price` to derive a stop at all |
+| 12a | `ceiling` | the entry's own worst case — limit down to its derived stop, `check_risk_budget` — exceeds `daily_loss_ceiling_usd` minus loss already realized |
 | 13 | `preview_cost` | the broker's preview total exceeds `max_cost_usd + preview_cost_tolerance_usd`; or the broker would not accept the order |
 
 Steps 12 and 13 run inside `ExecService`, not `check_entry` — 12 in
@@ -603,7 +604,7 @@ restarted to pick up a change.
 | `instruments` | `[SPX, SPXW]` |
 | `qty_cap` | `1` |
 | `max_open_positions` | `1` |
-| `daily_loss_ceiling_usd` | `100.0` |
+| `daily_loss_ceiling_usd` | `500.0` (Steve, 2026-08-31, st-2j80 — was `100.0`) |
 | `max_attempts` | `2` |
 | `open_ct` | `"08:30"` |
 | `close_ct` | `"15:00"` |
@@ -621,6 +622,25 @@ non-positive ceiling, `max_attempts < 1`, `price_band_pct` outside `(0,1)`, a
 non-positive `max_quote_age_s`, `open_ct >= close_ct`, and a
 `no_open_after_ct` outside the window. A file that exists but is wrong **raises**;
 a file that is absent falls back to the start values.
+
+**The ceiling bounds the position in front of it, not only the day behind it.**
+Until 2026-08-31, `check_entry` refused a new entry once *realized* loss reached
+the ceiling and never asked what the entry it was about to admit could lose, so
+two attempts could each realize more than the whole day's ceiling with every
+bound passing — finding 6 of case st-5qjq. `check_risk_budget` now prices the
+entry at its limit, which is the most a buy can pay and therefore the most it
+can lose, walks it down to the stop the entry would rest, and refuses if that
+exceeds the headroom left. Checked against the *remaining* headroom, which is
+what makes the sum of the day's worst cases fit inside the ceiling.
+
+The same ruling raised the ceiling from $100 to $500. At $100 the bound could
+never bind: a $2.10 SPX call with a twelve-point stop risks $205 whatever the
+ceiling says, so the only entries that fit were ones too cheap to be real
+trades. At $500, measured against the service's own stop arithmetic, a $2.10
+call risks $205 and sends, a $5.00 call with a ten-point stop risks $400 and
+sends, and an $8.40 call with a twenty-point stop risks $835 and is refused —
+the same contract with an eight-point stop risks $400 and sends. The bound is on
+the distance to the stop, not on the premium.
 
 The *shape* of the bounds is not configurable. There is no key that switches a
 bound off, because a bound you can switch off is not a bound.

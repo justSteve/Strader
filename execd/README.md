@@ -72,7 +72,7 @@ breaks the suite.
 | `protective_stop` | an entry must carry `stop_spx` and `delta`, and the sign must not be transposed |
 | `window` | 08:30–15:00 CT, weekdays; nothing opens after 14:50 |
 | `positions` | 1 open at a time |
-| `ceiling` | $100 realized loss, 2 attempts — rebuilt from the journal, so a restart does not reset it |
+| `ceiling` | $500 realized loss, 2 attempts — rebuilt from the journal, so a restart does not reset it; and the entry's own worst case, limit down to its derived stop, must fit the headroom left |
 | `price_band` | a limit within 10% of the touch, against a quote under 30s old |
 | `preview_cost` | the broker's own preview must agree with the intent before anything is sent |
 
@@ -108,6 +108,17 @@ position would sell contracts Steve no longer owns.
 realized-loss ceiling and the attempts used are rebuilt by reading the file
 (`execd/journal.py`), so a restart recovers them. Losses only debit; a winner
 does not buy back an attempt. On this box, restarts are not hypothetical.
+
+**The ceiling bounds the position in front of it, not only the day behind it.**
+Every ceiling check used to look backwards at loss already realized, so two
+attempts could each realize more than the whole day's ceiling with every bound
+passing. `check_risk_budget` prices an entry at its limit — the most a buy can
+pay, so the most it can lose — walks it down to the stop it would rest, and
+refuses if that exceeds the headroom left. The same arithmetic, run before the
+send rather than after the fill, is why a contract too cheap to leave room for a
+stop is now refused instead of becoming a live unprotected position. Steve
+raised the ceiling from $100 to $500 on 2026-08-31 to make the bound bindable:
+below the price of one position it is a number, not a bound.
 
 **What is open is read from the broker, not believed.** The journal is the
 authority on what this service *intended*; only the broker knows what is *held*,
