@@ -58,6 +58,16 @@ INPUT=$(cat)
 # the top level, that is a harness shape this hook was not written for — block
 # loudly rather than allow silently. Silent allow on an unrecognised payload is
 # exactly how five gates sat dormant from May to August without a single symptom.
+# jq is this hook's parser. Without it every gate below would see an empty
+# command and allow — the May–August dormancy, again. Fail closed.
+# [finding 14, case st-5qjq; approved by Steve 2026-09-01, st-kh0l]
+if ! command -v jq >/dev/null 2>&1; then
+  echo "SCHWAB GATE: jq is not on PATH — blocking rather than failing open." >&2
+  echo "             Install jq or fix PATH; nothing runs through this hook" >&2
+  echo "             until its parser is back. [finding 14, case st-5qjq]" >&2
+  exit 2
+fi
+
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 
 if [ -z "$COMMAND" ]; then

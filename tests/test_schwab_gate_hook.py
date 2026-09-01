@@ -155,3 +155,31 @@ def test_command_is_read_from_the_nested_key():
     assert ".tool_input.command" in lines[0], (
         f"hook reads the bare '.command' key again — this is st-ad6p: {lines[0]}"
     )
+
+
+def test_the_hook_blocks_when_jq_is_missing(tmp_path):
+    """Finding 14, case st-5qjq (approved by Steve 2026-09-01): with jq absent
+    from PATH both substitutions yielded empty strings and the hook took its
+    allow branch — every gate dormant, no symptom, the May-August shape again.
+    The guard fires before anything else needs PATH, so an empty one proves it.
+    """
+    import os
+
+    empty = tmp_path / "no-tools"
+    empty.mkdir()
+    proc = subprocess.run(
+        ["/bin/bash", str(GATE)],
+        input=json.dumps(nested("python3 scripts/hello_schwab.py")),
+        capture_output=True, text=True, cwd=REPO,
+        env={**os.environ, "PATH": str(empty)},
+    )
+    assert proc.returncode == BLOCK
+    assert "jq" in proc.stderr
+
+
+def test_the_guard_does_not_block_a_healthy_path():
+    """The guard must be invisible when jq is present: the same payload that
+    blocks above on a jq-less PATH is judged by the gates, not the guard."""
+    code = run(nested("ls -la scripts/run.sh"))
+    assert code == ALLOW
+

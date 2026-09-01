@@ -136,3 +136,33 @@ Order is strict; nothing sends before stage 4, and stage 4 sends one contract wi
 Everything else here is mine to build. Your three lines arrive at stage 3 as one message each: the passphrase (never sent to me — typed into the page), `bash deploy/install.sh`, and the hook change to land.
 
 — COO, 2026-08-30
+
+---
+
+## Amendment — 2026-09-01, ruled by Steve [st-kh0l]
+
+The independent audit of this service (case st-5qjq, finding in
+`07-claims-wider-than-the-code.md` §2) found that the narrow door had grown
+past this document without it being amended: §5 lists ten routes, the API has
+fourteen, and two of the four additions can transmit. The count in the API
+docstring was corrected earlier; the auditor's real point stood — a surface
+that can transmit grew without the ruling that authorised it being revisited.
+
+Steve ruled the four in on 2026-09-01. **The narrow door is fourteen routes:**
+the ten above, plus
+
+- `/journal` — a read; the audit trail the page and the desk consult.
+- `/stop` — STOP on. The kill switch must be reachable from anything,
+  including a phone; clearing it stays page-only.
+- `/observe` — the SPX-mark exit loop's feed. Transmits **exits only**: a
+  market close when a position's stop level trades. Since st-97z1 it holds one
+  close in flight per position and pulls the resting stop before it sends.
+- `/poll-fills` — the fill sweep. Books resting-stop fills; can rest a
+  replacement stop after a partial. Exit-side only.
+
+Nothing on the API arms the service; `/unlock` and `/resume` remain page-only,
+asserted by `tests/execd/test_api.py`. `/flatten`, `/stand-down` and
+`/poll-fills` accept only JSON requests (audit finding 15); `/stop` is exempt
+on purpose — it can only stop new risk.
+
+— COO, 2026-09-01, on Steve's word of the same day

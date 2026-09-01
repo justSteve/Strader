@@ -381,11 +381,20 @@ version. Every journal line carries this sha.
 | POST | `/preview` | an intent object | `{"refused": null, "preview": {...}, "would_send": bool}` |
 | POST | `/place` | an intent object | §5.6 |
 | POST | `/cancel` | `{"order_id": "..."}` | `{"refused": null, "order": {...}}` |
-| POST | `/flatten` | `{"reason": "..."}` optional | `{"refused": null, "closed": [...], "errors": [...]}` |
-| POST | `/stand-down` | — | the status object |
+| POST | `/flatten` | `{"reason": "..."}` optional; **JSON required** | `{"refused": null, "closed": [...], "errors": [...]}` |
+| POST | `/stand-down` | `{}`; **JSON required** | the status object |
 | POST | `/stop` | — | the status object. **Ungated on purpose.** |
-| POST | `/observe` | `{"spx": 6320.5}` | `{"spx": …, "fired": [...]}` |
-| POST | `/poll-fills` | — | `{"picked_up": [...]}` or `{"picked_up": [], "error": "..."}` |
+| POST | `/observe` | `{"spx": 6320.5}` | `{"spx": …, "fired": [...], "pending": [...]}` |
+| POST | `/poll-fills` | `{}`; **JSON required** | `{"picked_up": [...]}` or `{"picked_up": [], "error": "..."}` |
+
+**JSON required** (since 2026-09-01, audit finding 15): the three
+state-changing routes that need no body refuse a request that does not carry
+`Content-Type: application/json` (an empty `{}` body is fine) with a `400`. A
+cross-origin HTML form post needs no CORS preflight and could otherwise fire
+them from any page a browser on this box rendered; a form cannot produce the
+JSON content type without a preflight the loopback never answers. `/stop` is
+exempt by design — a hostile page firing it can only stop new risk, and
+reaching it from a phone must not depend on a header.
 
 Status codes: `200` acted or answered a read · `400` not a valid intent
 (malformed, not refused), body `{"error": "bad_request", "detail": "..."}` ·
@@ -821,7 +830,11 @@ narrow, tested exception to the fourth.
    `lib/schwab-py/schwab/client/base.py` now says exactly that.
 2. **The gate key.** Any live Schwab client refuses to build unless
    `~/.schwab_gate_key` exists (`broker_schwab/client.py:31-36`) — a file only
-   Steve creates.
+   Steve creates. Stated honestly (audit st-5qjq, finding 18): the key has
+   existed since 2026-05-21 because the live read feed depends on it, so this
+   layer is in its permissive position and stops nothing while that is true.
+   It is a layer against accidental client construction on a box where the
+   key has been removed, not a standing barrier on this one.
 3. **The hook.** Any agent script importing the Schwab code is blocked before it
    runs, except the two quote and chain readers
    (`.claude/hooks/scripts/schwab-gate.sh:74-92`).

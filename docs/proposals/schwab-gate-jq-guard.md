@@ -1,7 +1,12 @@
-# Proposed hook change: schwab-gate must block, not allow, when jq is missing
+# Hook change: schwab-gate must block, not allow, when jq is missing
 
-**Status: prepared, not landed.** Hooks are Steve's to land
-(`.claude/rules/scope-and-permissions.md`). One word applies it.
+**Status: LANDED 2026-09-01 on Steve's word** ("Both recommendations are
+accepted"), same day it was prepared. The guard is in
+`.claude/hooks/scripts/schwab-gate.sh` ahead of the first `jq` call, and the
+pinning tests are in `tests/test_schwab_gate_hook.py`
+(`test_the_hook_blocks_when_jq_is_missing`, plus a control asserting the
+guard is invisible on a healthy PATH). This document stays as the record of
+what was proposed and why.
 
 **Finding 14 of the 2026-08-30 independent audit (case st-5qjq, `05-the-wall.md`
 §3), verified in the hook source 2026-09-01:** both `jq` invocations in
