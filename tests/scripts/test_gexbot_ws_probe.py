@@ -259,3 +259,85 @@ def test_histogram_buckets_to_whole_seconds_with_sub_second_first():
     assert hist["2s"] == 1
     assert hist["3s"] == 1
     assert list(hist)[0] == "<1s"
+
+
+# ------------------------------------------------------- envelope unwrap ----
+# Added 2026-09-01 after the first two sessions reported every frame
+# "uncompressed", which read as falsifying the vendor's documented
+# "Zstandard-compressed Protocol Buffers". The vendor was right: the frame is a
+# plain protobuf envelope and the zstd sits one level in, where a frame-level
+# magic check cannot see it. These pin the corrected shape.
+
+def _zstd(blob: bytes) -> bytes:
+    import zstandard
+    return zstandard.ZstdCompressor().compress(blob)
+
+
+def _envelope(type_name: bytes, inner: bytes) -> bytes:
+    return (_field(1, 2) + _varint(len(type_name)) + type_name
+            + _field(2, 2) + _varint(len(inner)) + inner)
+
+
+def test_unwrap_reads_the_envelope_and_decompresses_the_inner_message():
+    from scripts.gexbot_ws_probe import unwrap
+
+    message = _field(1, 0) + _varint(1788269524) + _field(2, 2) + _varint(3) + b"SPX"
+    frame = _envelope(b"proto.greek", _zstd(message))
+    raw, how, name = unwrap(frame)
+    assert how == "envelope+zstd"
+    assert name == "proto.greek"
+    assert raw == message
+
+
+def test_unwrap_does_not_call_an_envelope_uncompressed():
+    """The exact regression: a frame whose zstd is one level in."""
+    from scripts.gexbot_ws_probe import unwrap
+
+    frame = _envelope(b"proto.greek", _zstd(b"\x08\x01"))
+    assert unwrap(frame)[1] != "uncompressed"
+
+
+def test_unwrap_still_handles_a_bare_zstd_frame():
+    from scripts.gexbot_ws_probe import unwrap
+
+    raw, how, name = unwrap(_zstd(b"\x08\x01"))
+    assert how == "zstd-frame"
+    assert raw == b"\x08\x01"
+    assert name is None
+
+
+def test_unwrap_leaves_a_plain_message_alone():
+    from scripts.gexbot_ws_probe import unwrap
+
+    plain = _field(1, 0) + _varint(7)
+    assert unwrap(plain) == (plain, "uncompressed", None)
+
+
+def test_walk_recurses_into_a_nested_message():
+    inner = _field(1, 0) + _varint(42)
+    outer = _field(3, 2) + _varint(len(inner)) + inner
+    out = walk_protobuf(outer)
+    assert out["ok"] is True
+    assert out["fields"][3]["message"][1]["sample"] == 42
+
+
+def test_walk_reports_ascii_payloads_as_text():
+    msg = _field(1, 2) + _varint(11) + b"proto.greek"
+    out = walk_protobuf(msg)
+    assert out["fields"][1]["sample_text"] == "proto.greek"
+
+
+def test_walk_recursion_is_depth_capped():
+    """A long ASCII string can parse as a plausible message by chance."""
+    inner = _field(1, 0) + _varint(1)
+    nested = inner
+    for _ in range(6):
+        nested = _field(1, 2) + _varint(len(nested)) + nested
+    out = walk_protobuf(nested, max_depth=2)
+    assert out["ok"] is True
+    depth = 0
+    node = out["fields"][1]
+    while "message" in node:
+        depth += 1
+        node = node["message"][1]
+    assert depth <= 2

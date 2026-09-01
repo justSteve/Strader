@@ -240,7 +240,7 @@ def read_varint(buf: bytes, pos: int) -> tuple[int, int]:
         shift += 7
 
 
-def walk_protobuf(buf: bytes) -> dict[str, Any]:
+def walk_protobuf(buf: bytes, depth: int = 0, max_depth: int = 3) -> dict[str, Any]:
     """Walk a protobuf message's top level without a schema.
 
     Protobuf is NOT self-describing — the wire format carries field NUMBERS and
@@ -252,6 +252,15 @@ def walk_protobuf(buf: bytes) -> dict[str, Any]:
     A message that consumes exactly to EOF with only valid wire types is
     well-formed; random bytes essentially never are, which makes this a usable
     detector as well as a describer.
+
+    RECURSES into length-delimited fields. Measured on days 1 and 2 the payload
+    is a two-field ENVELOPE — an 11-byte field 1 and a ~1.1 KB field 2 — so a
+    top-level-only walk answers "it is a wrapper" and stops exactly where the
+    question gets interesting. A nested field that itself walks clean to EOF is
+    reported under ``message``; one that does not is a string or a blob, which
+    is equally an answer. Depth-capped because a long ASCII string can parse as
+    a plausible message by chance, and unbounded recursion on chance matches
+    turns a describer into a fiction.
     """
     fields: dict[int, dict[str, Any]] = {}
     pos = 0
@@ -280,6 +289,19 @@ def walk_protobuf(buf: bytes) -> dict[str, Any]:
                     raise ValueError(f"length-delimited field overruns buffer at {pos}")
                 entry["bytes"] += length
                 entry.setdefault("sample_len", length)
+                blob = buf[pos:pos + length]
+                if "sample_bytes" not in entry:
+                    entry["sample_bytes"] = blob[:24].hex()
+                    printable = all(32 <= b < 127 for b in blob) if blob else False
+                    if printable:
+                        entry["sample_text"] = blob.decode("ascii", "replace")
+                if depth < max_depth and length and "message" not in entry:
+                    inner = walk_protobuf(blob, depth + 1, max_depth)
+                    if inner["ok"] and inner["fields"]:
+                        entry["message"] = {
+                            n: {k: v for k, v in meta.items() if k != "count"}
+                            for n, meta in sorted(inner["fields"].items())
+                        }
                 pos += length
             elif wire == 5:
                 if pos + 4 > len(buf):
@@ -295,21 +317,81 @@ def walk_protobuf(buf: bytes) -> dict[str, Any]:
     return {"ok": True, "fields": fields, "error": None, "consumed": pos}
 
 
-def decompress(payload: bytes) -> tuple[bytes | None, str]:
-    """Try zstd, then raw. Returns (decompressed_or_None, how)."""
+ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
+
+
+def _unzstd(blob: bytes) -> bytes | None:
+    """Decompress a zstd frame, streaming when it carries no content size."""
     import zstandard
 
-    if payload[:4] == b"\x28\xb5\x2f\xfd":
+    try:
+        return zstandard.ZstdDecompressor().decompress(blob)
+    except zstandard.ZstdError:
+        # GexBot's frames omit the content size in the header, so the one-shot
+        # API refuses them. Streaming has no such requirement.
         try:
-            return zstandard.ZstdDecompressor().decompress(payload), "zstd"
-        except zstandard.ZstdError as exc:
-            # Streaming frames carry no content size; retry unbounded.
-            try:
-                dctx = zstandard.ZstdDecompressor()
-                return dctx.stream_reader(payload).read(), "zstd-stream"
-            except zstandard.ZstdError:
-                return None, f"zstd-failed: {exc}"
-    return payload, "uncompressed"
+            return zstandard.ZstdDecompressor().stream_reader(blob).read()
+        except zstandard.ZstdError:
+            return None
+
+
+def unwrap(payload: bytes) -> tuple[bytes | None, str, str | None]:
+    """Return (message_bytes, how, type_name) for one wire frame.
+
+    CORRECTED 2026-09-01, and the correction matters more than the fix. The
+    first version tested only the FRAME's leading bytes for the zstd magic,
+    found plain protobuf, and reported "uncompressed" for every frame across
+    two sessions — which read as falsifying the vendor's documented
+    "Zstandard-compressed Protocol Buffers". The vendor was right and the
+    probe was wrong.
+
+    The real shape, measured on 221 frames: the frame is a plain two-field
+    protobuf ENVELOPE — field 1 an ASCII type name (``proto.greek``), field 2
+    a zstd frame holding the actual message. So the compression is one level
+    in, exactly where a frame-level magic check cannot see it.
+
+    Worth stating as a rule: a negative result from a detector that only looks
+    at offset zero is a statement about the detector until something has
+    looked inside.
+    """
+    if payload[:4] == ZSTD_MAGIC:
+        raw = _unzstd(payload)
+        return (raw, "zstd-frame", None) if raw else (None, "zstd-failed", None)
+
+    env = walk_protobuf(payload, max_depth=0)
+    if env["ok"] and set(env["fields"]) == {1, 2}:
+        name = env["fields"][1].get("sample_text")
+        inner = env["fields"][2].get("sample_bytes", "")
+        if inner.startswith("28b52ffd"):
+            blob = _envelope_field(payload, 2)
+            raw = _unzstd(blob) if blob else None
+            if raw:
+                return raw, "envelope+zstd", name
+            return None, "envelope+zstd-failed", name
+    return payload, "uncompressed", None
+
+
+def _envelope_field(payload: bytes, want: int) -> bytes | None:
+    """Slice one top-level length-delimited field out of the envelope."""
+    pos = 0
+    while pos < len(payload):
+        try:
+            key, pos = read_varint(payload, pos)
+            if key & 0x07 != 2:
+                return None
+            length, pos = read_varint(payload, pos)
+        except ValueError:
+            return None
+        if key >> 3 == want:
+            return payload[pos:pos + length]
+        pos += length
+    return None
+
+
+def decompress(payload: bytes) -> tuple[bytes | None, str]:
+    """Back-compatible shim: the two-value form the analysis loop expects."""
+    raw, how, _name = unwrap(payload)
+    return raw, how
 
 
 # ---------------------------------------------------------------- capture ----
