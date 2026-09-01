@@ -105,16 +105,22 @@ def create_app(service: ExecService) -> Flask:
 
     @app.post("/flatten")
     def flatten():
+        _require_json()
         return _answer(service.flatten(reason=str(_body().get("reason", "flatten"))))
 
     @app.post("/stand-down")
     def stand_down():
+        _require_json()
         return jsonify(service.stand_down())
 
     @app.post("/stop")
     def stop():
         """STOP on. Ungated on purpose — the switch that stops new risk must
-        never be the one that is hard to reach. Clearing it is page-only."""
+        never be the one that is hard to reach. Clearing it is page-only.
+
+        Deliberately exempt from ``_require_json``: a hostile page firing this
+        route can only stop new risk, and Steve's phone reaching it must not
+        depend on getting a header right (finding 15 records the trade)."""
         return jsonify(service.stop())
 
     @app.post("/observe")
@@ -126,12 +132,30 @@ def create_app(service: ExecService) -> Flask:
 
     @app.post("/poll-fills")
     def poll_fills():
+        _require_json()
         return jsonify(service.poll_fills())
 
     return app
 
 
 # ── helpers ───────────────────────────────────────────────────────────────
+
+def _require_json() -> None:
+    """Refuse a state-changing request that did not arrive as JSON.
+
+    Finding 15 of the 2026-08-30 audit: four POST routes acted on a body-less
+    request, and a cross-origin HTML form post — which needs no CORS preflight
+    — could therefore fire them from any page a browser on this box rendered,
+    ``/flatten`` among them. A form cannot send ``application/json`` without
+    triggering a preflight the loopback server never answers, so requiring the
+    JSON content type closes the form-post path. Routes that carry a required
+    JSON body (``/place``, ``/observe``, …) were never reachable this way;
+    ``/stop`` is exempt on purpose — see its docstring."""
+    if not request.is_json:
+        raise ValueError(
+            "this route changes state and acts only on a JSON request — "
+            "send Content-Type: application/json (an empty {} body is fine)")
+
 
 def _body() -> dict[str, Any]:
     data = request.get_json(silent=True)

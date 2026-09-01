@@ -194,10 +194,31 @@ class ExecService:
 
     # ── arming (page-only; none of these has an API route) ───────────────
     def unlock(self, credential: Any, until: datetime | None = None) -> dict[str, Any]:
+        """Arm the service — for today, and never past today's close.
+
+        ``session_close`` rolls to the *next* day's close when now is already
+        past it, which is right for "when does this session end" and wrong as
+        an arming expiry: unlocking at 15:30 CT used to arm the service until
+        15:00 tomorrow (finding 16 of the 2026-08-30 audit). After the close
+        there is nothing today to arm for, so the unlock is refused; an
+        explicit ``until`` is capped at today's close for the same reason.
+        Exits and flatten need no arming window — only entries do."""
         with self._lock:
-            expiry = until or session_close(self.clock(), self.bounds)
+            now = self.clock()
+            close = session_close(now, self.bounds)
+            if close.astimezone(CT).date() != now.astimezone(CT).date():
+                refusal = Refusal(
+                    "window",
+                    f"the session closed at {self.bounds.close_ct} CT — an unlock "
+                    f"now would arm the service until tomorrow's close, and "
+                    f"there is nothing today to arm for")
+                self.journal.record("refused", kind="unlock",
+                                    refused=refusal.to_dict())
+                raise Refused(refusal)
+            expiry = min(until, close) if until is not None else close
             state = self.arming.unlock(credential, expiry)
-            self.journal.record("unlock", state=state.value, until=expiry)
+            self.journal.record("unlock", state=state.value, until=expiry,
+                                capped=bool(until is not None and until > close))
             return self.status()
 
     def stand_down(self) -> dict[str, Any]:
@@ -310,24 +331,43 @@ class ExecService:
 
     def cancel(self, order_id: str) -> dict[str, Any]:
         """Cancelling is getting out of the way of an order, so it is an exit-
-        class action: legal whenever there is a credential."""
+        class action: legal whenever there is a credential — with one refusal.
+
+        The resting stop under a live position is not an order in the way, it
+        is the position's only protection if this box dies. Cancelling it alone
+        opens risk, which no exit-class credential may do (finding 5 of the
+        2026-08-30 audit — it used to succeed, silently). The ways out that
+        exist all handle the stop properly: an exit and flatten cancel it in
+        the same motion they close the position it protects."""
         with self._lock:
             if (r := self.arming.permits_exit()) is not None:
                 self.journal.record("refused", kind="cancel", order_id=order_id,
                                     refused=r.to_dict())
                 raise Refused(r)
+            for pos in self._open.values():
+                if pos.stop_order_id == order_id:
+                    refusal = Refusal(
+                        "protective_stop",
+                        f"{order_id} is the resting stop under a live "
+                        f"{pos.symbol} position — cancelling it alone leaves "
+                        f"the position unprotected; close it with an exit or "
+                        f"flatten, which take the stop off in the same motion")
+                    self.journal.record("refused", kind="cancel", order_id=order_id,
+                                        refused=refusal.to_dict())
+                    raise Refused(refusal)
             result = self.broker.cancel(order_id)
             self.journal.record("canceled", order_id=order_id, order=result.to_dict())
             for pos in self._open.values():
-                if pos.stop_order_id == order_id:
-                    pos.stop_order_id = None
-                    # Cancelling a protective stop leaves a live position naked.
-                    # It is a legal thing to ask for and it is not a quiet one.
-                    self.journal.record("stop_unprotected", symbol=pos.symbol,
-                                        intent_id=pos.intent_id, qty=pos.qty,
-                                        order_id=order_id,
-                                        detail="the protective stop was cancelled by "
-                                               "request — the position is unprotected")
+                if pos.exit_order_id == order_id:
+                    # The close was pulled by hand; the position is live again
+                    # and gets its protection back, and the SPX loop may fire.
+                    self.journal.record("exit_resolved", symbol=pos.symbol,
+                                        order_id=order_id, outcome="canceled",
+                                        reason=pos.exit_reason,
+                                        detail="cancelled by request")
+                    pos.exit_order_id = None
+                    pos.exit_reason = None
+                    self._rest_stop_at(pos, pos.stop_price)
             if order_id in self._working:
                 self._resolve_working(order_id, outcome="canceled",
                                       detail="cancelled by request")
