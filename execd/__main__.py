@@ -41,7 +41,30 @@ def installed_sha() -> str:
     except (OSError, subprocess.SubprocessError):
         return "unknown"
     sha = (out.stdout or "").strip()
-    return sha if out.returncode == 0 and sha else "unknown"
+    if out.returncode != 0 or not sha:
+        return "unknown"
+    # A dirty tree stamped with a clean sha is a journal attributing orders to
+    # code that was never committed (audit finding 22, st-kh0l). The suffix is
+    # the same one git describe uses, for the same reason.
+    try:
+        status = subprocess.run(["git", "-C", str(REPO), "status", "--porcelain"],
+                                capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return f"{sha}-unverified"
+    if status.returncode != 0:
+        return f"{sha}-unverified"
+    return f"{sha}-dirty" if status.stdout.strip() else sha
+
+
+def may_mock_unlock(broker: object) -> bool:
+    """May ``--mock-unlock`` arm this broker? Only the mock, ever.
+
+    Structural, not positional: today the flag already sits behind the
+    ``--mock`` requirement, but stage 2 removes that requirement, and a flag
+    that arms a REAL broker with no passphrase must be impossible then, not
+    merely unlikely (audit finding 17, st-kh0l). The check is on the object,
+    so reordering ``main`` cannot quietly widen it."""
+    return isinstance(broker, MockBroker)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -84,6 +107,11 @@ def main(argv: list[str] | None = None) -> int:
     service = ExecService(broker, config)
 
     if args.mock_unlock:
+        if not may_mock_unlock(broker):
+            print("execd: --mock-unlock arms only the mock broker. A real broker "
+                  "is armed by Steve's passphrase on the page, never by a flag.",
+                  file=sys.stderr)
+            return 2
         service.unlock({"mock": True})
         print("execd: armed with a MOCK credential — no broker is reachable.",
               file=sys.stderr)

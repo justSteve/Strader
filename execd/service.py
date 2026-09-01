@@ -40,7 +40,7 @@ exists to close. See its docstring. [st-v7oa]
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -735,7 +735,16 @@ class ExecService:
         if (r := self.arming.permits_entry()) is not None:
             return r
         quote = self._quote_view(intent.symbol)
-        r = check_entry(intent, self.bounds, self.day_state(), quote,
+        state = self.day_state()
+        # The journal's count is today's file; what the service is actually
+        # holding can be older. A position carried past midnight fell out of
+        # the day's count at rollover and its slot came free while it was
+        # still open (audit finding 9, st-kh0l). The larger of the two numbers
+        # is the honest one — max, not sum, so nothing counts twice.
+        live = len(self._open) + len(self._working)
+        if live > state.open_positions:
+            state = replace(state, open_positions=live)
+        r = check_entry(intent, self.bounds, state, quote,
                         self.clock(), killed=self.arming.killed)
         if r is not None:
             return r
@@ -804,6 +813,16 @@ class ExecService:
             return self._refuse(intent, r, kind="place")
 
         spx = self.spx_mark()
+        # The STOP file was checked when the bounds ran, three broker
+        # round-trips ago. It is one touch from Steve's phone, and the touch
+        # that lands while an entry is being priced must win (audit finding
+        # 10, st-kh0l): last look, immediately before the send.
+        if self.arming.killed:
+            return self._refuse(
+                intent,
+                Refusal("stop", "STOP came on while this entry was being "
+                                "priced — not sending"),
+                kind="place")
         order = self.broker.place(intent)
         self.journal.record("placed", intent_id=intent.intent_id, kind="entry",
                             spx=spx, order=order.to_dict())

@@ -42,11 +42,20 @@ FORBIDDEN_ROOTS = {"schwab", "broker_schwab", "schwab_py"}
 #: The service has no transport yet. Stage 2's Trader API client adds exactly
 #: one (httpx) in a new module and drops it from this set in the same commit —
 #: deliberately and visibly, not as a side effect of an import someone added.
-FORBIDDEN_TRANSPORTS = {"httpx", "requests", "urllib3", "socket", "http.client", "aiohttp"}
+#: ``urllib`` and ``http`` are the whole stdlib roots, not just the submodules:
+#: the audit (finding 13, st-kh0l) showed ``from http import client`` arrives
+#: at the AST as root ``http`` and sailed past a set that only named
+#: ``http.client``, and ``urllib.request`` was not named at all.
+FORBIDDEN_TRANSPORTS = {"httpx", "requests", "urllib3", "socket", "aiohttp",
+                        "urllib", "http", "http.client", "ftplib", "telnetlib",
+                        "xmlrpc"}
 
 
 def modules() -> list[Path]:
-    return sorted(PACKAGE.glob("*.py"))
+    # Recursive on purpose: a module in a subdirectory is still inside the
+    # wall. The non-recursive glob was finding 13 of the 2026-08-30 audit —
+    # a subpackage would have escaped every static check in this file.
+    return sorted(p for p in PACKAGE.glob("**/*.py") if "__pycache__" not in p.parts)
 
 
 def imported_roots(path: Path) -> set[str]:
@@ -107,11 +116,19 @@ def test_importing_the_whole_package_loads_no_broker_library():
     """The static check above reads the source; this one watches what actually
     loads, so a dynamic import (``importlib``, a late ``__getattr__``) cannot
     slip past it."""
+    # The module list is derived from the files on disk, not maintained by
+    # hand: the audit found the hand-kept list had drifted (vault.py was never
+    # probed — finding 13). A module added tomorrow is probed tomorrow.
+    names = sorted(
+        "execd" + str(p.relative_to(PACKAGE))[:-3].replace("/", ".").replace("\\", ".")
+        .replace("__init__", "").rstrip(".")
+        for p in modules()
+    )
+    module_names = sorted({("execd." + n.removeprefix("execd")).rstrip(".").replace("..", ".")
+                           for n in names})
     probe = (
         "import importlib, sys, json\n"
-        "for name in ('execd', 'execd.intent', 'execd.bounds', 'execd.arming',\n"
-        "             'execd.broker', 'execd.journal', 'execd.stops',\n"
-        "             'execd.service', 'execd.api', 'execd.__main__'):\n"
+        f"for name in {module_names!r}:\n"
         "    importlib.import_module(name)\n"
         "print(json.dumps(sorted(m for m in sys.modules if m.split('.')[0] in "
         f"{sorted(FORBIDDEN_ROOTS)!r})))\n"

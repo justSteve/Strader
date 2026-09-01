@@ -135,3 +135,94 @@ class TestCancelGuardsTheStop:
         result = armed.cancel(out["order"]["order_id"])
         assert result["order"]["status"] == "CANCELED"
         assert armed.status()["day"]["attempts_used"] == 0
+
+
+class TestStopHasTheLastLook:
+    """Finding 10: the STOP file was checked when the bounds ran, then the
+    entry spent three broker round-trips being priced. A touch that lands
+    during the pricing must win — it is re-checked immediately before the
+    send, and nothing is transmitted."""
+
+    def test_a_stop_touched_during_pricing_blocks_the_send(self, armed, broker):
+        real_preview = broker.preview
+
+        def touch_and_preview(intent):
+            armed.arming.stop()          # the phone touch, mid-pricing
+            return real_preview(intent)
+
+        broker.preview = touch_and_preview
+        out = armed.place(entry(intent_id="lastlook-1"))
+        assert out["refused"]["bound"] == "stop"
+        assert "while this entry was being priced" in out["refused"]["reason"]
+        assert [kw for kw in broker.calls_to("place")] == []
+
+
+class TestMidnightDoesNotFreeASlot:
+    """Finding 9, the rollover half: the day's count is rebuilt from today's
+    journal file, so a position carried past midnight fell out of it and its
+    slot came free while it was still open. The service now takes the larger
+    of the journal's count and what it is actually holding."""
+
+    def test_yesterdays_open_position_still_holds_its_slot(self, armed, clock):
+        armed.place(entry(intent_id="wed-1"))
+        clock.set_ct(10, 0, day=27)                  # Thursday, new journal file
+        assert armed.day_state().open_positions == 0  # the journal's honest count
+        armed.unlock({"token": "x"})                  # re-arm for the new session
+        out = armed.place(entry(intent_id="thu-1", symbol=CALL))
+        assert out["refused"]["bound"] == "positions"
+
+    def test_a_fresh_day_with_nothing_held_is_unaffected(self, armed, clock, broker):
+        armed.place(entry(intent_id="wed-2"))
+        armed.flatten(reason="eod")
+        clock.set_ct(10, 0, day=27)
+        broker.set_quote(CALL, bid=2.00, ask=2.10)   # yesterday's quote is stale
+        broker.set_quote("$SPX", bid=SPX_NOW - 0.25, ask=SPX_NOW + 0.25, last=SPX_NOW)
+        armed.unlock({"token": "x"})
+        assert armed.place(entry(intent_id="thu-2"))["refused"] is None
+
+
+class TestMockUnlockIsStructural:
+    """Finding 17: --mock-unlock was safe only because --mock was required,
+    and stage 2 removes that requirement. The guard is now on the broker
+    object itself, so reordering main() cannot quietly widen it."""
+
+    def test_only_the_mock_broker_may_be_flag_armed(self):
+        from execd.__main__ import may_mock_unlock
+
+        assert may_mock_unlock(MockBroker()) is True
+        assert may_mock_unlock(object()) is False
+
+
+class TestTheShaTellsTheTruth:
+    """Finding 22: a dirty working tree was stamped with a clean sha, so a
+    journal line could attribute an order to code that was never committed."""
+
+    @pytest.fixture
+    def repo(self, tmp_path, monkeypatch):
+        import subprocess
+
+        def git(*args):
+            subprocess.run(["git", "-C", str(tmp_path), *args],
+                           check=True, capture_output=True)
+
+        git("init", "-q")
+        git("config", "user.email", "t@t")
+        git("config", "user.name", "t")
+        (tmp_path / "f.txt").write_text("clean\n")
+        git("add", "f.txt")
+        git("commit", "-qm", "init")
+        import execd.__main__ as main_mod
+        monkeypatch.setattr(main_mod, "REPO", tmp_path)
+        return tmp_path
+
+    def test_a_clean_tree_stamps_a_bare_sha(self, repo):
+        from execd.__main__ import installed_sha
+
+        sha = installed_sha()
+        assert sha != "unknown" and "-" not in sha
+
+    def test_a_dirty_tree_says_so(self, repo):
+        from execd.__main__ import installed_sha
+
+        (repo / "f.txt").write_text("edited, never committed\n")
+        assert installed_sha().endswith("-dirty")
