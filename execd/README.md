@@ -104,6 +104,22 @@ an exit fills only partly, the resting stop — sized for the whole position —
 cancelled and re-rested at the smaller size, because a stop larger than the
 position would sell contracts Steve no longer owns.
 
+**One close in flight per position, and the stop comes off before the close
+goes on.** The SPX-mark loop and the broker-resident stop are designed to fire
+at the same price, so the service never lets both a close and the stop rest at
+the broker at once: `_market_close` cancels the stop first, and every failure
+branch afterwards puts it back — a cancel that finds the stop already filled
+books that fill and sends nothing, a broker that cannot be reached leaves the
+stop standing as the protection it is, a rejected close re-rests it. A close
+that comes back WORKING is remembered on the position (`exit_order_id`), in the
+journal (`exit_unfilled`), and across a restart, and while it is in flight the
+loop reports it as pending instead of firing again — re-sending the close every
+tick until one filled was finding 2 of the 2026-08-30 audit, an oversell that
+grew once a second. `flatten` is the one caller allowed to jump the queue: it
+cancels an in-flight close and replaces it, because "get me out" must not wait
+behind an earlier, slower exit. One residual is recorded on `st-97z1`: a
+*partial* manual exit leaves the full-size stop standing while it rests.
+
 **The day is derived from the journal, not remembered.** Open positions, the
 realized-loss ceiling and the attempts used are rebuilt by reading the file
 (`execd/journal.py`), so a restart recovers them. Losses only debit; a winner
@@ -147,10 +163,10 @@ Append-only JSONL, one file per Central trading day under
 `<state-dir>/journal/`, every line stamped with the git sha of the copy that
 wrote it and fsync'd before the call returns. `request`, `refused` with its
 bound, `preview`, `placed`, `working`, `entry_resolved`, `filled`,
-`stop_placed`, `stop_unprotected`, `exit_triggered`, `closed` with its P&L,
-`canceled`, `position_adopted`, `position_corrected`, `position_gone`,
-`reconcile_unknown`, `exit_unverified`, `unlock`, `stand_down`, `stop`,
-`recovered`.
+`stop_placed`, `stop_unprotected`, `exit_triggered`, `exit_unfilled`,
+`exit_resolved`, `closed` with its P&L, `canceled`, `position_adopted`,
+`position_corrected`, `position_gone`, `reconcile_unknown`, `exit_unverified`,
+`unlock`, `stand_down`, `stop`, `recovered`.
 It is the audit "trust the process" rests on, and on the first live day it is
 read back against Schwab's own order history before there is a second.
 

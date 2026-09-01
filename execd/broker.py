@@ -194,6 +194,9 @@ class MockBroker:
         self.reject_next: str | None = None    # message for the next place()
         self.fail_next: str | None = None      # BrokerError from the next call
         self.rest_limits: bool = False         # standing: limits rest instead of filling
+        self.rest_market: bool = False         # standing: market orders rest too —
+        #   a real broker acknowledges a market order before reporting its fill,
+        #   and the service has to survive that gap (finding 2, st-97z1)
         self.partial_fill_qty: int | None = None   # next fill takes only this many
 
     # ── setup ────────────────────────────────────────────────────────────
@@ -254,6 +257,9 @@ class MockBroker:
             return self._store(self._new_order(intent, OrderStatus.WORKING,
                                                price=intent.limit))
 
+        if intent.order_type is OrderType.MARKET and self.rest_market:
+            return self._store(self._new_order(intent, OrderStatus.WORKING))
+
         price = self._expected_price(intent)
         filled_qty = intent.qty
         if self.partial_fill_qty is not None:
@@ -303,8 +309,16 @@ class MockBroker:
             raise BrokerError(f"no such order: {order_id}")
         if order.status is not OrderStatus.WORKING:
             raise BrokerError(f"order {order_id} is {order.status.value}, not working")
+        price = order.price
+        if price is None:
+            # A resting market order carries no price of its own; it fills at
+            # the book — the bid for a sell, the offer for a buy.
+            q = self._quotes.get(order.symbol)
+            if q is None:
+                raise BrokerError(f"no quote for {order.symbol}")
+            price = q.bid if order.side is Side.SELL_TO_CLOSE else q.ask
         filled = replace(order, status=OrderStatus.FILLED, filled_qty=order.qty,
-                         fill_price=order.price)
+                         fill_price=price)
         self._orders[order_id] = filled
         self._apply_fill(filled)
         return filled

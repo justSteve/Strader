@@ -605,9 +605,12 @@ class TestTheJournalReproducesTheDay:
         armed.observe(SPX_NOW - 12.5)
         armed.stand_down()
         events = [e["event"] for e in armed.journal.read()]
+        # The stop's cancel precedes the close's placement since st-97z1: the
+        # two are designed to fire at the same price, so they must never both
+        # be live at the broker.
         assert events == [
             "unlock", "request", "preview", "placed", "filled", "stop_placed",
-            "exit_triggered", "placed", "closed", "canceled", "stand_down",
+            "exit_triggered", "canceled", "placed", "closed", "stand_down",
         ]
 
     def test_every_line_carries_the_installed_sha(self, armed):

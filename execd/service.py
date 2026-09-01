@@ -152,6 +152,16 @@ class OpenPosition:
     opened_at: datetime | None = None
     #: first time the broker failed to report this position, or ``None``
     missing_since: datetime | None = None
+    #: the close this service has sent and not yet seen resolve. While this is
+    #: set the SPX-mark loop does not fire again — re-sending a market close
+    #: every tick until one fills was finding 2 of the 2026-08-30 audit, an
+    #: oversell that grew once a second. [st-97z1]
+    exit_order_id: str | None = None
+    exit_reason: str | None = None
+
+    @property
+    def exit_in_flight(self) -> bool:
+        return bool(self.exit_order_id)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -161,6 +171,7 @@ class OpenPosition:
             "stop_order_id": self.stop_order_id, "stop_price": self.stop_price,
             "entry_order_id": self.entry_order_id,
             "opened_at": self.opened_at.isoformat() if self.opened_at else None,
+            "exit_order_id": self.exit_order_id, "exit_reason": self.exit_reason,
         }
 
 
@@ -339,7 +350,9 @@ class ExecService:
             errors: list[dict[str, Any]] = []
             for pos in list(self._open.values()):
                 try:
-                    closed.append(self._market_close(pos, reason=reason))
+                    # force: an exit already in flight is cancelled and replaced
+                    # rather than waited on — "get me out" does not queue.
+                    closed.append(self._market_close(pos, reason=reason, force=True))
                 except (BrokerError, Refused) as exc:
                     self.journal.record("error", kind="flatten", symbol=pos.symbol,
                                         detail=str(exc))
@@ -356,15 +369,32 @@ class ExecService:
         the broker is the one that survives it not being."""
         with self._lock:
             fired: list[dict[str, Any]] = []
+            pending: list[dict[str, Any]] = []
             for pos in list(self._open.values()):
                 if pos.stop_spx is None:
+                    continue
+                if pos.exit_in_flight:
+                    # A close is already working at the broker. Firing again
+                    # would sell the position twice — finding 2 was exactly
+                    # this, once a second. [st-97z1]
+                    pending.append({"symbol": pos.symbol,
+                                    "order_id": pos.exit_order_id,
+                                    "reason": pos.exit_reason})
                     continue
                 if exit_triggered(pos.right, spx, pos.stop_spx):
                     self.journal.record("exit_triggered", symbol=pos.symbol,
                                         spx=spx, stop_spx=pos.stop_spx,
                                         intent_id=pos.intent_id)
-                    fired.append(self._market_close(pos, reason="spx-stop"))
-            return {"spx": spx, "fired": fired}
+                    try:
+                        fired.append(self._market_close(pos, reason="spx-stop"))
+                    except (BrokerError, Refused) as exc:
+                        # One position's trouble must not stop the loop watching
+                        # the others. The stop was re-rested before this raised.
+                        self.journal.record("error", kind="spx-stop",
+                                            symbol=pos.symbol, detail=str(exc))
+                        fired.append({"symbol": pos.symbol, "closed": False,
+                                      "error": str(exc)})
+            return {"spx": spx, "fired": fired, "pending": pending}
 
     def poll_fills(self) -> dict[str, Any]:
         """Pick up fills the service did not initiate — a resting protective
@@ -392,16 +422,24 @@ class ExecService:
             pos = self._open.get(fill.symbol)
             if pos is None or fill.side is not Side.SELL_TO_CLOSE:
                 continue
-            if pos.stop_order_id and fill.order_id != pos.stop_order_id:
+            if fill.order_id == pos.exit_order_id:
+                # The close this service sent and was waiting on. [st-97z1]
+                kind = pos.exit_reason or "exit"
+                why = "in-flight-close"
+                pos.exit_order_id = None
+                pos.exit_reason = None
+            elif pos.stop_order_id and fill.order_id != pos.stop_order_id:
                 continue
+            else:
+                kind, why = "protective-stop", "resting-stop"
             closed_qty = min(fill.qty or pos.qty, pos.qty)
             remaining = pos.qty - closed_qty
             pnl = self._pnl_usd(pos, fill.price, closed_qty)
             self.journal.record("closed", symbol=pos.symbol, qty=closed_qty,
                                 remaining_qty=remaining, intent_id=pos.intent_id,
-                                kind="protective-stop", entry_price=pos.entry_price,
+                                kind=kind, entry_price=pos.entry_price,
                                 exit_price=fill.price, pnl_usd=pnl,
-                                order_id=fill.order_id, reason="resting-stop")
+                                order_id=fill.order_id, reason=why)
             if remaining:
                 # The stop that fired took part of the position; what is
                 # left needs one of its own or it is running naked.
@@ -454,8 +492,9 @@ class ExecService:
             # ceiling before the position sweep sees the position is gone.
             self._pick_up_fills()
             promoted, released = self._reconcile_working(broker_orders)
+            exits = self._reconcile_exits(broker_orders)
             adopted, corrected, gone = self._reconcile_positions(broker_positions)
-            return {"promoted": promoted, "released": released,
+            return {"promoted": promoted, "released": released, "exits": exits,
                     "adopted": adopted, "corrected": corrected, "gone": gone,
                     "error": None}
 
@@ -522,6 +561,49 @@ class ExecService:
                                 detail="no index mark at reconcile — cannot derive a stop")
             return
         self._place_protective_stop(pos, spx)
+
+    def _reconcile_exits(self, broker_orders: dict[str, OrderResult]) -> list[dict[str, Any]]:
+        """What became of the closes this service sent. [st-97z1]
+
+        The asymmetry with working *entries* is deliberate and worth reading.
+        An entry order the broker cannot account for keeps its slot, because
+        holding a slot only refuses new risk. An exit order the broker cannot
+        account for is **cleared**, because a close that jams keeps Steve in
+        risk — the SPX loop must be free to fire again. The cost of clearing
+        wrongly is a possible double-sell if the lost order later surfaces;
+        the cost of holding wrongly is a position nothing is closing. The
+        second is worse, and the journal records the choice either way."""
+        resolved: list[dict[str, Any]] = []
+        for pos in list(self._open.values()):
+            order_id = pos.exit_order_id
+            if not order_id:
+                continue
+            order = broker_orders.get(order_id)
+            if order is not None and order.is_working:
+                continue
+            if order is not None and order.is_filled:
+                # The fill sweep usually books this first; this branch is the
+                # backstop for a fill the sweep's window missed.
+                pos.exit_order_id = None
+                reason = pos.exit_reason or "exit"
+                pos.exit_reason = None
+                resolved.append(self._settle(pos, order, reason=reason))
+                continue
+            outcome = order.status.value.lower() if order is not None else "unknown"
+            detail = (order.message if order is not None
+                      else "the broker does not report this order — clearing it "
+                           "so the exit path is free to fire again")
+            self.journal.record("exit_resolved", symbol=pos.symbol,
+                                order_id=order_id, outcome=outcome,
+                                reason=pos.exit_reason, detail=detail)
+            pos.exit_order_id = None
+            pos.exit_reason = None
+            # The close is not happening; the position is live again and needs
+            # its broker-resident protection back.
+            self._rest_stop_at(pos, pos.stop_price)
+            resolved.append({"symbol": pos.symbol, "order_id": order_id,
+                             "outcome": outcome, "closed": False})
+        return resolved
 
     def _resolve_working(self, order_id: str, outcome: str, detail: str = "") -> None:
         work = self._working.pop(order_id, None)
@@ -771,16 +853,90 @@ class ExecService:
         if (refusal := self._exit_refusal(intent)) is not None:
             return self._refuse(intent, refusal, kind="place")
         pos = self._open.get(intent.symbol)
+
+        if pos is not None and pos.exit_in_flight:
+            return self._refuse(intent, Refusal(
+                "exit_in_flight",
+                f"a close for {intent.symbol} is already working at the broker "
+                f"(order {pos.exit_order_id}) — cancel it or use flatten, which "
+                f"replaces it, rather than stacking a second sell on it"),
+                kind="place")
+
+        # A full-size exit and the resting stop must not both be live at the
+        # broker — same discipline as _market_close, same finding 3. A partial
+        # exit leaves the stop standing and _settle resizes it on the fill;
+        # the window where a partial rests unfilled beside a full-size stop is
+        # a known residual, recorded on st-97z1.
+        if pos is not None and intent.qty >= pos.qty and pos.stop_order_id:
+            stop_id = pos.stop_order_id
+            result = self.broker.cancel(stop_id)   # a BrokerError propagates: 502, nothing sent
+            if result.is_filled:
+                pos.stop_order_id = None
+                settled = self._settle(pos, result, reason="resting-stop")
+                return {"refused": None, "order": None, "closed": settled,
+                        "note": "the resting stop had already filled — "
+                                "the position was closed before this exit was sent"}
+            pos.stop_order_id = None
+            self.journal.record("canceled", kind="protective-stop",
+                                symbol=pos.symbol, order_id=stop_id)
+
         order = self.broker.place(intent)
         self.journal.record("placed", intent_id=intent.intent_id, kind="exit",
                             order=order.to_dict())
         out = {"refused": None, "order": order.to_dict(), "closed": None}
-        if order.is_filled and pos is not None:
-            out["closed"] = self._settle(pos, order, reason=intent.source or "exit")
+        if pos is None:
+            return out
+        if order.status is OrderStatus.REJECTED:
+            self._rest_stop_at(pos, pos.stop_price)
+            return out
+        if not order.is_filled:
+            pos.exit_order_id = order.order_id
+            pos.exit_reason = intent.source or "exit"
+            self.journal.record("exit_unfilled", symbol=pos.symbol,
+                                reason=pos.exit_reason, order_id=order.order_id,
+                                status=order.status.value, intent_id=pos.intent_id)
+            return out
+        out["closed"] = self._settle(pos, order, reason=intent.source or "exit")
         return out
 
-    def _market_close(self, pos: OpenPosition, reason: str) -> dict[str, Any]:
-        """The service's own exit: market, one intent id per position per reason."""
+    def _market_close(self, pos: OpenPosition, reason: str,
+                      force: bool = False) -> dict[str, Any]:
+        """The service's own exit: market, one close in flight per position.
+
+        Two rules, both from the 2026-08-30 audit. [st-97z1]
+
+        **One close at a time (finding 2).** A close that is already working at
+        the broker is reported, not re-sent — re-sending it every tick until one
+        filled was an oversell that grew once a second. ``force`` (flatten's
+        privilege) cancels the in-flight close first instead of waiting behind
+        it, because "get me out" must not queue behind an earlier, slower exit.
+
+        **The resting stop comes off before the close goes on (finding 3).**
+        The SPX loop and the resting stop are designed to fire at the same
+        price, so a close sent while the stop still rests is asking for both to
+        fill — a one-contract short on a long-premium-only account. Cancelling
+        first is safe in every branch: if the cancel reports the stop already
+        FILLED, the stop won the race, the position is already closed at the
+        broker, and no close is sent at all; if the broker cannot be reached,
+        nothing is sent and the standing stop is the protection working; if the
+        close is afterwards rejected or cannot be sent, the stop is re-rested
+        and the failure is loud. Every caller journals its intent to close
+        before this runs (``exit_triggered``, the flatten request line, the
+        place request line), so the cancel always has its why one line above.
+        """
+        if pos.exit_in_flight:
+            if not force:
+                return {"symbol": pos.symbol, "order_id": pos.exit_order_id,
+                        "status": "PENDING", "closed": False,
+                        "reason": pos.exit_reason}
+            settled = self._cancel_in_flight_exit(pos)
+            if settled is not None:      # it had already filled — that IS the close
+                return settled
+            if pos.exit_in_flight:       # could not be cancelled; nothing sane to send
+                return {"symbol": pos.symbol, "order_id": pos.exit_order_id,
+                        "status": "PENDING", "closed": False,
+                        "reason": pos.exit_reason}
+
         intent = OrderIntent(
             intent_id=f"{pos.intent_id}:exit:{reason}", symbol=pos.symbol,
             side=Side.SELL_TO_CLOSE, qty=pos.qty, order_type=OrderType.MARKET,
@@ -788,15 +944,78 @@ class ExecService:
         )
         if (r := check_exit(intent, self.bounds, held_qty=pos.qty)) is not None:
             raise Refused(r)
-        order = self.broker.place(intent)
+
+        if pos.stop_order_id:
+            stop_id = pos.stop_order_id
+            try:
+                result = self.broker.cancel(stop_id)
+            except BrokerError as exc:
+                self.journal.record("error", kind="cancel-stop", symbol=pos.symbol,
+                                    order_id=stop_id, detail=str(exc))
+                return {"symbol": pos.symbol, "order_id": None, "status": "DEFERRED",
+                        "closed": False,
+                        "detail": "the resting stop could not be cancelled — "
+                                  "nothing sent, the stop is still the protection"}
+            if result.is_filled:
+                # The race, and the stop won it: price reached the level at the
+                # broker before the cancel arrived. The position is already
+                # closed there; book that instead of also selling it.
+                pos.stop_order_id = None
+                return self._settle(pos, result, reason="resting-stop")
+            pos.stop_order_id = None
+            self.journal.record("canceled", kind="protective-stop",
+                                symbol=pos.symbol, order_id=stop_id)
+
+        try:
+            order = self.broker.place(intent)
+        except BrokerError as exc:
+            self.journal.record("error", kind="close", symbol=pos.symbol,
+                                reason=reason, detail=str(exc))
+            self._rest_stop_at(pos, pos.stop_price)   # the protection goes back on
+            raise
         self.journal.record("placed", intent_id=intent.intent_id, kind="exit",
                             reason=reason, order=order.to_dict())
+        if order.status is OrderStatus.REJECTED:
+            self.journal.record("rejected", intent_id=intent.intent_id,
+                                order_id=order.order_id, detail=order.message)
+            self._rest_stop_at(pos, pos.stop_price)
+            return {"symbol": pos.symbol, "order_id": order.order_id,
+                    "status": order.status.value, "closed": False}
         if not order.is_filled:
+            pos.exit_order_id = order.order_id
+            pos.exit_reason = reason
             self.journal.record("exit_unfilled", symbol=pos.symbol, reason=reason,
-                                order_id=order.order_id, status=order.status.value)
+                                order_id=order.order_id, status=order.status.value,
+                                intent_id=pos.intent_id)
             return {"symbol": pos.symbol, "order_id": order.order_id,
                     "status": order.status.value, "closed": False}
         return self._settle(pos, order, reason=reason)
+
+    def _cancel_in_flight_exit(self, pos: OpenPosition) -> dict[str, Any] | None:
+        """Pull the close that is working so a forced one can replace it.
+
+        Returns the settle dict if the in-flight close turns out to have already
+        filled (there is nothing left to force), else ``None`` — with the exit
+        fields cleared on success and left standing when the broker could not
+        be reached, which the caller reads as "leave it alone"."""
+        order_id = pos.exit_order_id or ""
+        try:
+            result = self.broker.cancel(order_id)
+        except BrokerError as exc:
+            self.journal.record("error", kind="cancel-exit", symbol=pos.symbol,
+                                order_id=order_id, detail=str(exc))
+            return None
+        if result.is_filled:
+            reason = pos.exit_reason or "exit"
+            pos.exit_order_id = None
+            pos.exit_reason = None
+            return self._settle(pos, result, reason=reason)
+        self.journal.record("exit_resolved", symbol=pos.symbol, order_id=order_id,
+                            outcome="canceled", reason=pos.exit_reason,
+                            detail="cancelled to make way for a forced close")
+        pos.exit_order_id = None
+        pos.exit_reason = None
+        return None
 
     def _settle(self, pos: OpenPosition, order: OrderResult, reason: str) -> dict[str, Any]:
         """Book the close, then deal with the resting stop.
@@ -977,12 +1196,26 @@ class ExecService:
                 )
             elif e.get("event") == "position_gone":
                 self._open.pop(str(e.get("symbol", "")), None)
+            elif e.get("event") == "exit_unfilled":
+                # A close was in flight when the service died. It must come
+                # back known, or the SPX loop re-fires into it. [st-97z1]
+                pos = self._open.get(str(e.get("symbol", "")))
+                if pos is not None:
+                    pos.exit_order_id = str(e.get("order_id", "")) or None
+                    pos.exit_reason = e.get("reason")
+            elif e.get("event") == "exit_resolved":
+                pos = self._open.get(str(e.get("symbol", "")))
+                if pos is not None and pos.exit_order_id == e.get("order_id"):
+                    pos.exit_order_id = None
+                    pos.exit_reason = None
             elif e.get("event") == "closed":
                 symbol = str(e.get("symbol", ""))
                 remaining = e.get("remaining_qty")
                 pos = self._open.get(symbol)
                 if remaining and pos is not None:
                     pos.qty = int(remaining)
+                    pos.exit_order_id = None
+                    pos.exit_reason = None
                 else:
                     self._open.pop(symbol, None)
         if self._open or self._working:
