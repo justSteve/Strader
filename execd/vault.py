@@ -22,9 +22,12 @@ running service that has been locked holds no way back in.
 **One honest limit.** Python strings cannot be reliably wiped from memory: the
 passphrase you pass in may survive in the interpreter's heap until it is reused.
 The derived key is held in a ``bytearray`` and zeroed after use, which is worth
-doing and is not the same as a guarantee. The credential is protected *at rest*
-here; protecting it in memory from a root process on the same box is the
-process boundary the design already names as a residual (§5).
+doing and is not the same as a guarantee — in particular, handing the key to
+``AESGCM`` requires ``bytes(key)``, an immutable copy the wipe cannot reach, so
+what the zeroing buys is one fewer lingering copy, not zero copies (audit
+finding, 06 §2). The credential is protected *at rest* here; protecting it in
+memory from a root process on the same box is the process boundary the design
+already names as a residual (§5).
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ import base64
 import json
 import os
 import secrets
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,6 +60,42 @@ SCRYPT_P = 1
 KEY_LEN = 32
 SALT_LEN = 16
 NONCE_LEN = 12
+
+# The box these parameters must fit. scrypt allocates 128·n·r bytes BEFORE the
+# ciphertext can be authenticated — the derivation is what produces the key the
+# tag check needs — so the work factors in the file are attacker-writable input
+# to an allocation, not yet authenticated data. Finding 7 of the 2026-08-30
+# audit (st-5t6z): a file rewritten with n=2^24 asks this box for 16 GB, and
+# this box has been OOM-killed twice this month; the tag check never runs
+# because the process is dead. The AAD still protects against *lowering* the
+# factors (the cheap derivation completes and then fails the tag); these bounds
+# are the guard in the other direction, and they are generous — the ceiling is
+# 32× the work and 16× the memory of today's defaults. The floor is not a
+# security bound — the AAD already catches lowered factors, after a cheap
+# derivation — it only rejects nonsense before scrypt sees it.
+SCRYPT_N_MIN = 2 ** 10
+SCRYPT_N_MAX = 2 ** 20
+SCRYPT_R_MAX = 16
+SCRYPT_P_MAX = 4
+SCRYPT_MEM_CAP_BYTES = 512 * 1024 * 1024   # 128·n·r must stay under this
+
+
+def _kdf_param_problems(n: int, r: int, p: int, dklen: int) -> list[str]:
+    """Why these scrypt parameters will not be run, or an empty list."""
+    out: list[str] = []
+    if not (SCRYPT_N_MIN <= n <= SCRYPT_N_MAX) or (n & (n - 1)):
+        out.append(f"n={n} must be a power of two within "
+                   f"[{SCRYPT_N_MIN}, {SCRYPT_N_MAX}]")
+    if not (1 <= r <= SCRYPT_R_MAX):
+        out.append(f"r={r} must be within [1, {SCRYPT_R_MAX}]")
+    if not (1 <= p <= SCRYPT_P_MAX):
+        out.append(f"p={p} must be within [1, {SCRYPT_P_MAX}]")
+    if dklen != KEY_LEN:
+        out.append(f"dklen={dklen} must be {KEY_LEN}")
+    if not out and 128 * n * r > SCRYPT_MEM_CAP_BYTES:
+        out.append(f"n={n}, r={r} needs {128 * n * r} bytes, over the "
+                   f"{SCRYPT_MEM_CAP_BYTES}-byte cap")
+    return out
 
 #: Short enough not to be a nuisance he has to type from a phone, long enough
 #: that scrypt at these parameters makes guessing pointless. Enforced on write
@@ -124,6 +164,10 @@ class VaultInfo:
 class Vault:
     def __init__(self, path: str | Path, *, n: int = SCRYPT_N,
                  r: int = SCRYPT_R, p: int = SCRYPT_P) -> None:
+        if problems := _kdf_param_problems(n, r, p, KEY_LEN):
+            # Refused at construction so a vault this service writes is always
+            # one it will be able to open.
+            raise VaultError("scrypt parameters refused: " + "; ".join(problems))
         self.path = Path(path)
         self.n, self.r, self.p = n, r, p
 
@@ -177,8 +221,12 @@ class Vault:
     # ── the key ──────────────────────────────────────────────────────────
     def _derive(self, passphrase: str, salt: bytes, *, n: int, r: int,
                 p: int) -> bytearray:
+        # NFC first: "café" typed on a phone and "café" typed on a keyboard can
+        # arrive as different byte sequences for the same characters, and a
+        # vault with no recovery path must not care which keyboard he used.
+        normalized = unicodedata.normalize("NFC", passphrase)
         kdf = Scrypt(salt=salt, length=KEY_LEN, n=n, r=r, p=p)
-        return bytearray(kdf.derive(passphrase.encode("utf-8")))
+        return bytearray(kdf.derive(normalized.encode("utf-8")))
 
     @staticmethod
     def _wipe(key: bytearray) -> None:
@@ -265,8 +313,17 @@ class Vault:
         kdf = env["kdf"]
         try:
             n, r, p = int(kdf["n"]), int(kdf["r"]), int(kdf["p"])
+            dklen = int(kdf.get("dklen", KEY_LEN))
         except (KeyError, TypeError, ValueError):
             raise VaultCorrupt("vault key-derivation parameters are unreadable") from None
+        # Bounded BEFORE the derivation runs. The parameters come out of the
+        # file, the file is writable by anything on this box, and scrypt
+        # allocates 128·n·r bytes before the AAD can say whether the header is
+        # authentic. See the constants above.
+        if problems := _kdf_param_problems(n, r, p, dklen):
+            raise VaultCorrupt(
+                "vault key-derivation parameters are outside what this service "
+                "will run: " + "; ".join(problems))
         salt = _unb64(kdf.get("salt"), "kdf.salt")
         nonce = _unb64(env.get("nonce"), "nonce")
         ciphertext = _unb64(env.get("ciphertext"), "ciphertext")

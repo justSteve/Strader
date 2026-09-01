@@ -128,11 +128,13 @@ class TestTamperingWithTheFile:
 
     def test_the_work_factors_cannot_be_quietly_weakened(self, vault):
         """Without the header in the authenticated data, someone could rewrite
-        n down to 1 and the vault would still open for whoever held the
-        passphrase — having silently become cheap to attack."""
+        the factors and the vault would still open for whoever held the
+        passphrase — having silently become cheap to attack. The rewritten
+        value here stays inside the bounds on purpose, so it is the AAD and
+        nothing earlier that catches it."""
         vault.store(TOKEN, PASS)
         env = json.loads(vault.path.read_text())
-        env["kdf"]["n"] = 2
+        env["kdf"]["n"] = 2 ** 12
         vault.path.write_text(json.dumps(env))
         with pytest.raises(BadPassphrase):
             vault.load(PASS)
@@ -181,6 +183,78 @@ class TestTamperingWithTheFile:
         vault.path.write_text("[1, 2, 3]")
         with pytest.raises(VaultCorrupt, match="object"):
             vault.load(PASS)
+
+
+class TestTheWorkFactorsAreBounded:
+    """Finding 7 of the 2026-08-30 audit (st-5t6z). scrypt allocates 128·n·r
+    bytes BEFORE the ciphertext can be authenticated — the derivation produces
+    the key the tag check needs — so the factors in the file are
+    attacker-writable input to an allocation. A file rewritten with n=2^24 asks
+    this box for 16 GB, and this box has been OOM-killed twice this month. The
+    bounds run before the derivation does."""
+
+    def _mangled(self, vault, **kdf_edits):
+        vault.store(TOKEN, PASS)
+        env = json.loads(vault.path.read_text())
+        env["kdf"].update(kdf_edits)
+        vault.path.write_text(json.dumps(env))
+
+    def test_a_raised_n_is_refused_before_scrypt_ever_runs(self, vault, monkeypatch):
+        self._mangled(vault, n=2 ** 24)
+
+        def never(*_a, **_kw):
+            raise AssertionError("Scrypt was constructed — the allocation happened")
+
+        import execd.vault as vault_module
+        monkeypatch.setattr(vault_module, "Scrypt", never)
+        with pytest.raises(VaultCorrupt, match="n=16777216"):
+            vault.load(PASS)
+
+    def test_the_memory_cap_catches_factors_that_are_individually_legal(self, vault):
+        # n and r both inside their own ranges; together they ask for 2 GiB.
+        self._mangled(vault, n=2 ** 20, r=16)
+        with pytest.raises(VaultCorrupt, match="cap"):
+            vault.load(PASS)
+
+    @pytest.mark.parametrize("edits,match", [
+        ({"n": 2}, "power of two"),
+        ({"n": 3000}, "power of two"),
+        ({"r": 0}, "r=0"),
+        ({"r": 64}, "r=64"),
+        ({"p": 99}, "p=99"),
+        ({"dklen": 16}, "dklen=16"),
+    ])
+    def test_nonsense_parameters_are_corrupt_not_a_crash(self, vault, edits, match):
+        self._mangled(vault, **edits)
+        with pytest.raises(VaultCorrupt, match=match):
+            vault.load(PASS)
+
+    def test_the_writer_refuses_parameters_the_reader_would(self, tmp_path):
+        """A vault this service writes is always one it can open again."""
+        with pytest.raises(VaultError, match="refused"):
+            Vault(tmp_path / "token.enc", n=2 ** 24)
+
+
+class TestUnicodeNormalization:
+    """A passphrase has no recovery path, so the vault must not care which
+    keyboard produced it: composed and decomposed forms of the same characters
+    are the same passphrase (NFC before the bytes reach scrypt)."""
+
+    COMPOSED = "caf\u00e9 con leche por favor"        # é as one code point
+    DECOMPOSED = "cafe\u0301 con leche por favor"     # e + combining accent
+
+    def test_the_two_forms_really_are_different_strings(self):
+        """Guards the tests below against an editor quietly normalizing
+        the source — if these ever compare equal, the tests prove nothing."""
+        assert self.COMPOSED != self.DECOMPOSED
+
+    def test_stored_composed_opens_decomposed(self, vault):
+        vault.store(TOKEN, self.COMPOSED)
+        assert vault.load(self.DECOMPOSED) == TOKEN
+
+    def test_stored_decomposed_opens_composed(self, vault):
+        vault.store(TOKEN, self.DECOMPOSED)
+        assert vault.load(self.COMPOSED) == TOKEN
 
 
 class TestNothingLeaksToDisk:
