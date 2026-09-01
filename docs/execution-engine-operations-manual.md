@@ -808,11 +808,17 @@ server's footing. Nothing about that ruling changes the wall.
 Four independent layers stop an order going out, and execd is a deliberate,
 narrow, tested exception to the fourth.
 
-1. **The broker library has no order functions.** The repo's copy of schwab-py
-   is a fork with `place_order`, `replace_order`, `cancel_order`,
-   `preview_order` and every account and transaction call removed —
-   "unrecoverable from within this codebase"
-   (`lib/schwab-py/schwab/client/base.py:131-141`).
+1. **The broker library has no write path as shipped.** The repo's copy of
+   schwab-py is a fork with `place_order`, `replace_order`, `cancel_order`,
+   `preview_order` and every account and transaction call removed, and — since
+   2026-09-01, st-c1af — the generic `_post_request` / `_put_request` /
+   `_delete_request` methods removed as well; they had zero callers and let
+   any holder of a `Client` issue an arbitrary authenticated request, which
+   made the old "unrecoverable from within this codebase" claim true of the
+   method table but not of the capability (audit st-5qjq, request 3). The
+   authenticated session object still exists, so this layer raises effort and
+   visibility rather than making an order impossible; the DEFENSE NOTE in
+   `lib/schwab-py/schwab/client/base.py` now says exactly that.
 2. **The gate key.** Any live Schwab client refuses to build unless
    `~/.schwab_gate_key` exists (`broker_schwab/client.py:31-36`) — a file only
    Steve creates.
