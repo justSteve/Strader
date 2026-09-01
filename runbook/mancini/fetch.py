@@ -28,6 +28,7 @@ import logging
 import os
 import shutil
 import subprocess
+from typing import Callable
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,12 @@ ACCOUNT = "stradermailh27ssjitr7spy"
 CONTAINER = "mancini"
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 CACHE = REPO_ROOT / "data" / "mancini-letters"
+
+#: How far back from the newest blob to look for an actual letter. The
+#: container is an email ingress, so receipts and announcements land in it too
+#: (st-znw6). Bounded so a container full of non-letters cannot walk — and
+#: download — the whole history looking for one.
+MAX_CANDIDATES = 8
 
 #: Explicit override, checked first. Point it at an az binary when neither PATH
 #: nor the fallbacks below are right (a native Linux az, a second WSL install).
@@ -111,11 +118,99 @@ def _az(*args: str) -> str:
     return proc.stdout.replace("\r", "")
 
 
-def fetch_latest() -> tuple[str, str]:
-    """Download (or serve from cache) the newest letter blob.
+def is_letter(raw: str) -> tuple[bool, str]:
+    """Does this blob's text actually contain a trade plan? [st-znw6]
 
-    Returns (blob_name, raw_text). Raises RuntimeError when the container is
-    unreachable or empty — the caller decides whether that halts the run.
+    Returns (verdict, reason). The test is the one the pipeline already
+    computes: clean the text and ask ``segment()`` whether it found the level
+    ladder. ``anchored`` is exactly "this reads like a Mancini letter", so the
+    check costs nothing new and cannot disagree with the parse that follows.
+
+    Deliberately NOT a filename pattern and NOT a size threshold. Both are
+    guesses about a format we do not control — Substack decides what lands in
+    that container, and the day it changes its receipt template a size rule
+    fails silently while this one keeps working.
+
+    Imported lazily so a caller that only wants ``resolve_az`` does not pay for
+    the HTML parser, and so this module keeps no import-time dependency on the
+    rest of the package.
+    """
+    from runbook.mancini.clean import clean_newsletter
+    from runbook.mancini.segment import segment
+
+    try:
+        seg = segment(clean_newsletter(raw))
+    except Exception as exc:  # noqa: BLE001 — an unparseable blob is not a letter
+        return False, f"clean/segment raised {type(exc).__name__}: {exc}"
+    if not seg.anchored:
+        return False, f"no level ladder found (anchored=False, {seg.source_len} clean chars)"
+    if seg.missing:
+        # Anchored but incomplete: still a letter, still parseable. Say so and
+        # let it through — the parse reports missing sections itself, and
+        # refusing here would silently prefer an older complete letter over
+        # today's partial one, which is the wrong trade on a plan-day.
+        logger.warning("%s is anchored but missing sections: %s",
+                       "candidate", ", ".join(seg.missing))
+    return True, f"anchored, {seg.source_len} clean chars, {len(seg.forward_text)} forward"
+
+
+def _download(name: str, key: str) -> Path:
+    """Fetch one blob into the cache, or serve it from there."""
+    CACHE.mkdir(parents=True, exist_ok=True)
+    path = CACHE / name
+    if not path.exists():
+        _az("storage", "blob", "download", "--account-name", ACCOUNT,
+            "--account-key", key, "--container-name", CONTAINER,
+            "--name", name, "--file", str(path), "--no-progress", "-o", "none")
+        logger.info("downloaded %s (%.0f KB)", name, path.stat().st_size / 1024)
+    else:
+        logger.info("cache hit: %s", name)
+    return path
+
+
+def select_letter(names: list[str], read: "Callable[[str], str]",
+                  max_attempts: int = MAX_CANDIDATES) -> tuple[str, str]:
+    """Newest-first, return the first blob that is actually a letter. [st-znw6]
+
+    ``read`` takes a blob name and returns its raw text — injected so the
+    selection logic is testable without Azure, which is the whole reason this
+    is a separate function.
+
+    Why this exists: the container is an email ingress, not a letter store, so
+    anything Substack sends lands in it. On 2026-09-01 a subscription RECEIPT
+    arrived as ``2026-09-01-065032.txt`` and sorted after Monday evening's real
+    letter — 683 clean chars, no ladder. The old ``names[-1]`` would have run
+    the morning parse against a billing email and produced nothing.
+
+    Every skip is logged with its reason. A silent skip is how this class of
+    bug hides, and this one hid until a receipt happened to arrive on a
+    plan-day.
+    """
+    tried: list[str] = []
+    for name in reversed(names[-max_attempts:]):
+        raw = read(name)
+        ok, reason = is_letter(raw)
+        if ok:
+            if tried:
+                logger.warning("skipped %d non-letter blob(s) before %s: %s",
+                               len(tried), name, "; ".join(tried))
+            logger.info("selected %s (%s)", name, reason)
+            return name, raw
+        tried.append(f"{name} ({reason})")
+        logger.warning("skipping %s — %s", name, reason)
+    raise RuntimeError(
+        f"no letter among the newest {min(max_attempts, len(names))} blobs in "
+        f"{ACCOUNT}/{CONTAINER}: {'; '.join(tried)}"
+    )
+
+
+def fetch_latest() -> tuple[str, str]:
+    """Download (or serve from cache) the newest blob that is actually a letter.
+
+    Returns (blob_name, raw_text) — text stays RAW so the caller's clean and
+    segment steps are unchanged. Raises RuntimeError when the container is
+    unreachable, empty, or holds no letter in its newest
+    ``MAX_CANDIDATES`` blobs.
     """
     key = _az("storage", "account", "keys", "list", "--account-name", ACCOUNT,
               "--query", "[0].value", "-o", "tsv", "--only-show-errors").strip()
@@ -125,14 +220,8 @@ def fetch_latest() -> tuple[str, str]:
     names = sorted(n for n in out.split() if n.endswith(".txt"))
     if not names:
         raise RuntimeError(f"no letter blobs in {ACCOUNT}/{CONTAINER}")
-    newest = names[-1]
-    CACHE.mkdir(parents=True, exist_ok=True)
-    path = CACHE / newest
-    if not path.exists():
-        _az("storage", "blob", "download", "--account-name", ACCOUNT,
-            "--account-key", key, "--container-name", CONTAINER,
-            "--name", newest, "--file", str(path), "--no-progress", "-o", "none")
-        logger.info("downloaded %s (%.0f KB)", newest, path.stat().st_size / 1024)
-    else:
-        logger.info("cache hit: %s", newest)
-    return newest, path.read_text(encoding="utf-8", errors="replace")
+
+    def read(name: str) -> str:
+        return _download(name, key).read_text(encoding="utf-8", errors="replace")
+
+    return select_letter(names, read)
