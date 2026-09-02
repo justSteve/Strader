@@ -583,8 +583,9 @@ def render_report(result: dict[str, Any], run_dir: Path, negotiated: dict[str, A
         "# GexBot WebSocket — what the payload actually is",
         "",
         f"Probe `st-8qqw`, run `{run_dir.name}`. Group `{result['group']}`, "
-        f"{result['duration_s']:.0f}s capture. **Measured, not documentary** — this is "
-        "the first time this estate has opened the socket.",
+        f"{result['duration_s']:.0f}s capture. **Measured, not documentary.** "
+        "Wire format decoded and confirmed against simultaneous REST polls: "
+        "`docs/measurement/gexbot-websocket-wire-format-2026-09-02.md`.",
         "",
         f"Artifacts: `{run_dir}` (frames.bin, frames.jsonl, negotiate.json, probe.log).",
         "",
