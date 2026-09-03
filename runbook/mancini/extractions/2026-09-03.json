@@ -1,0 +1,127 @@
+{
+  "date": "2026-09-03",
+  "instrument": "ES",
+  "session_bias": "Buy-dips lean. ES put in a Failed Breakdown of the 7622 daily low and ripped back into the 7659-7733 range it has held for two weeks. General lean is filling that range to the upside with 7704, 7714, 7733 targets, then a breakout of the yellow bull flag toward 7758, 7771 and 7797+. Bear case begins only below 7618.",
+  "levels": [
+    {"price": 7672, "kind": "support", "label": "in an extreme bull case ES won’t even lose 7672; traps of this level are a riskier trade option", "intent": "trade", "conviction": "low", "setup": "failed_breakdown", "source_quote": "In an extreme bull case, ES won’t even lose 7672 and traps of this level are a riskier trade option."},
+    {"price": 7659, "kind": "support", "label": "major · first support; heavily tested and used up now — he won’t touch it directly; safer to wait for the zone to flush and recover", "intent": "avoid", "conviction": "unstated", "setup": "none", "source_quote": "First support as of writing is 7659 again. This level is heavily tested and used up now and I won’t touch it personally."},
+    {"price": 7650, "kind": "support", "label": "safer entry after 7659 flushes and recovers — a Level Reclaim, not a Failed Breakdown (no significant low here)", "intent": "trade", "conviction": "unstated", "setup": "level_reclaim", "source_quote": "a safer entry is to wait for the zone to flush and recover (ideally to 7650). This is not a Failed Breakdown (there is no significant low here) but it would be Level Reclaim."},
+    {"price": 7638, "kind": "support", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7638 (Major)"},
+    {"price": 7627, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7627"},
+    {"price": 7618, "kind": "support", "label": "major · today’s daily low — a Failed Breakdown here would be highly actionable; not a ton of interest between 7650 and here", "intent": "trade", "conviction": "high", "setup": "failed_breakdown", "source_quote": "7618 is the daily low today. A Failed breakdown here would be highly actionable."},
+    {"price": 7611, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7611"},
+    {"price": 7604, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7604"},
+    {"price": 7596, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7596"},
+    {"price": 7587, "kind": "support", "label": "major · support of the yellow bull flag; nothing below 7618 until here — bid if it is a slow, controlled sell into the zone; if knifing full power wait for the zone to flush and recover", "intent": "trade", "conviction": "unstated", "setup": "bid_direct", "source_quote": "7587 is currently the support of the yellow bull flag shown in the above chart. One could try a bid here if it is a slow, controlled sell into the zone. If we are knifing full power though, at least wait for the zone to flush and recover."},
+    {"price": 7583, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7583"},
+    {"price": 7574, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7574"},
+    {"price": 7569, "kind": "support", "label": "major · another spot of interest below 7587", "intent": "watch", "conviction": "unstated", "setup": "none", "source_quote": "7569 is another spot of interest below there."},
+    {"price": 7554, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7554"},
+    {"price": 7544, "kind": "support", "label": "major · the August 3rd low of day — watch for traps of this level", "intent": "watch", "conviction": "unstated", "setup": "failed_breakdown", "source_quote": "watch for traps of 7544 (the August 3rd low of day)"},
+    {"price": 7538, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7538"},
+    {"price": 7528, "kind": "support", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7528 (major)"},
+    {"price": 7518, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7518"},
+    {"price": 7505, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7505"},
+    {"price": 7499, "kind": "support", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7499 (major)"},
+    {"price": 7480, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7480"},
+    {"price": 7472, "kind": "support", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7472 (major)"},
+    {"price": 7464, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7464"},
+    {"price": 7455, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7455"},
+    {"price": 7445, "kind": "support", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7445 (major)"},
+    {"price": 7436, "kind": "support", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7436"},
+    {"price": 7427, "kind": "support", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7427 (major)"},
+
+    {"price": 7681, "kind": "resistance", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7681 (major)"},
+    {"price": 7695, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7695"},
+    {"price": 7704, "kind": "resistance", "label": "major · range target; recoveries of 7704 are actionable to add on strength — ideally see acceptance before entry (dip, return to the zone, rip through); a very complex entry", "intent": "trade", "conviction": "unstated", "setup": "level_reclaim", "source_quote": "In terms of spots to add on strength, this is a very complex entry, but recoveries of 7704 are actionable. Ideally we can see acceptance here before entry (dip, return to the zone, rip through)."},
+    {"price": 7714, "kind": "resistance", "label": "range-fill target", "intent": "watch", "conviction": "unstated", "setup": "none", "source_quote": "7704, 7714, 7733 targets"},
+    {"price": 7722, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7722"},
+    {"price": 7733, "kind": "resistance", "label": "major · resistance of the yellow declining bull flag and top of the 7659-7733 range; one spot to try a short if we bounce — above here we rip and nothing to short until 7797", "intent": "offered", "conviction": "unstated", "setup": "none", "source_quote": "7733 is one spot to try. This is resistance of then yellow declining bull flag in the above chart. Above here, we rip and nothing to short until 7797."},
+    {"price": 7745, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7745"},
+    {"price": 7758, "kind": "resistance", "label": "major · bull-case target after the flag breakout", "intent": "watch", "conviction": "unstated", "setup": "breakout_target", "source_quote": "breakout the flag and rip to 7758, 7771, then 7797"},
+    {"price": 7764, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7764"},
+    {"price": 7771, "kind": "resistance", "label": "major · bull-case target after the flag breakout", "intent": "watch", "conviction": "unstated", "setup": "breakout_target", "source_quote": "breakout the flag and rip to 7758, 7771, then 7797"},
+    {"price": 7783, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7783"},
+    {"price": 7792, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7792"},
+    {"price": 7797, "kind": "resistance", "label": "major · breakout target — backtest of the early August breakdown; nothing to short until here", "intent": "watch", "conviction": "unstated", "setup": "breakout_target", "source_quote": "then 7797 to backtest the early August breakdown"},
+    {"price": 7805, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7805"},
+    {"price": 7812, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7812"},
+    {"price": 7820, "kind": "resistance", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7820 (major)"},
+    {"price": 7828, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7828"},
+    {"price": 7835, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7835"},
+    {"price": 7855, "kind": "resistance", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7855 (major)"},
+    {"price": 7867, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7867"},
+    {"price": 7874, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7874"},
+    {"price": 7882, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7882"},
+    {"price": 7890, "kind": "resistance", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7890 (major)"},
+    {"price": 7900, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7900"},
+    {"price": 7911, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7911"},
+    {"price": 7925, "kind": "resistance", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7925 (major)"},
+    {"price": 7942, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7942"},
+    {"price": 7949, "kind": "resistance", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7949 (major)"},
+    {"price": 7961, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7961"},
+    {"price": 7972, "kind": "resistance", "label": "", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7972"},
+    {"price": 7985, "kind": "resistance", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "7985 (major)"},
+    {"price": 8000, "kind": "resistance", "label": "major", "intent": "unstated", "conviction": "unstated", "setup": "none", "source_quote": "8000 (major)"},
+
+    {"price": 7622, "kind": "support", "label": "yesterday’s daily low — swept by 4 points and reclaimed today (the Failed Breakdown that produced the rip)", "intent": "unstated", "conviction": "unstated", "setup": "failed_breakdown", "source_quote": "Today ES put in a Failed Breakdown of yesterday’s 7622 daily low. We swept it by 4 points, recovered, and ripped."},
+    {"price": 7613, "kind": "trigger", "label": "likely trigger down for the 7618 breakdown short — beneath the lows of a final bounce or Failed Breakdown", "intent": "offered", "conviction": "unstated", "setup": "breakdown_short", "source_quote": "Likely 7613 trigger down."}
+  ],
+  "commentary": [
+    {
+      "text": "Bull case: ES continues holding 7659 (or a quick trap below), heads up the range to 7704 and 7733, perhaps dips there, then breaks out of the flag and rips to 7758, 7771, then 7797 to backtest the early August breakdown.",
+      "tags": ["bull_case", "breakout_target", "structure"],
+      "trigger": {"type": "price_zone", "anchor_prices": [7659, 7704, 7733, 7758, 7771, 7797], "condition_text": "ES holds 7659 (or quick trap below) and works up the 7659-7733 range"},
+      "source_quote": "The bull case now is that ES can continue holding 7659 (or quick trap below). From there we can head up the range to 7704, 7733. Perhaps dip there, then we can breakout the flag and rip to 7758, 7771, then 7797 to backtest the early August breakdown."
+    },
+    {
+      "text": "Adding on strength: recoveries of 7704 are actionable, ideally with acceptance before entry (dip, return to the zone, rip through); under the non-acceptance protocol wait for very strong momentum. A very complex entry.",
+      "tags": ["bull_case", "long_entry", "level_reclaim"],
+      "trigger": {"type": "price_cross", "anchor_prices": [7704], "condition_text": "recovery of 7704 with acceptance"},
+      "source_quote": "In terms of spots to add on strength, this is a very complex entry, but recoveries of 7704 are actionable. Ideally we can see acceptance here before entry (dip, return to the zone, rip through). If you are using the non-acceptance protocol, wait for very strong momentum."
+    },
+    {
+      "text": "Extreme bull case: ES does not even lose 7672; traps of that level are a riskier trade option.",
+      "tags": ["bull_case", "failed_breakdown", "risk"],
+      "trigger": {"type": "price_zone", "anchor_prices": [7672], "condition_text": "trap of 7672"},
+      "source_quote": "In an extreme bull case, ES won’t even lose 7672 and traps of this level are a riskier trade option."
+    },
+    {
+      "text": "Bear case begins below 7618 as a breakdown short (a low win rate, high R/R setup he does not take himself). Ideally a final bounce or a Failed Breakdown first, then short beneath the lows of that bounce; likely 7613 trigger down.",
+      "tags": ["bear_case", "short_entry", "breakdown_short", "risk"],
+      "trigger": {"type": "price_cross", "anchor_prices": [7618, 7613], "condition_text": "loss of 7618, trigger 7613"},
+      "source_quote": "Bear case tomorrow: Begins below 7618. These types of level loss shorts below a support are called breakdown trades. My core edge is failed breakdowns, and the reason is this is an edge is the vast majority of break downs (80%) trap. I do not take these trades personally."
+    },
+    {
+      "text": "Summary lean: ES is back in the 7659-7733 range; general lean is to keep filling it to the upside with 7704, 7714, 7733 targets, then break out to 7797+.",
+      "tags": ["summary", "breakout_target"],
+      "trigger": {"type": "price_zone", "anchor_prices": [7659, 7733, 7704, 7714, 7797], "condition_text": "range fill to the upside"},
+      "source_quote": "My general lean is we can continue filling this range to the upside with 7704, 7714, 7733 targets. Then we can breakout to 7797+"
+    },
+    {
+      "text": "First support 7659 is heavily tested and used up; he will not touch it directly. The safer entry is to wait for the zone to flush and recover, ideally to 7650, as a Level Reclaim (not a Failed Breakdown — there is no significant low there).",
+      "tags": ["no_entry", "long_entry", "level_reclaim"],
+      "trigger": {"type": "price_zone", "anchor_prices": [7659, 7650], "condition_text": "7659 flushes and recovers to 7650"},
+      "source_quote": "First support as of writing is 7659 again. This level is heavily tested and used up now and I won’t touch it personally. While one can try and bid it again, a safer entry is to wait for the zone to flush and recover (ideally to 7650). This is not a Failed Breakdown (there is no significant low here) but it would be Level Reclaim."
+    },
+    {
+      "text": "Not a ton of interest below 7650 until 7618, today’s daily low; a Failed Breakdown of 7618 would be highly actionable.",
+      "tags": ["long_entry", "failed_breakdown"],
+      "trigger": {"type": "price_zone", "anchor_prices": [7618], "condition_text": "Failed Breakdown of the 7618 daily low"},
+      "source_quote": "There is not a ton of interest below there until ~7618. 7618 is the daily low today. A Failed breakdown here would be highly actionable."
+    },
+    {
+      "text": "Nothing below 7618 until 7587, the support of the yellow bull flag: a bid there only on a slow, controlled sell into the zone; if knifing full power, wait for the zone to flush and recover. 7569 is the next spot of interest, then watch for traps of 7544 (the August 3rd low of day).",
+      "tags": ["long_entry", "bid_direct", "failed_breakdown"],
+      "trigger": {"type": "price_zone", "anchor_prices": [7587, 7569, 7544], "condition_text": "slow sell into 7587, or flush and recover; traps of 7544"},
+      "source_quote": "Nothing below there until 7587. 7587 is currently the support of the yellow bull flag shown in the above chart. One could try a bid here if it is a slow, controlled sell into the zone. If we are knifing full power though, at least wait for the zone to flush and recover. . 7569 is another spot of interest below there. Below that, watch for traps of 7544 (the August 3rd low of day)."
+    },
+    {
+      "text": "Short entries he offers but does not take: since ES has drifted down slowly for a week, 7733 (resistance of the yellow declining bull flag) is one back-testable spot to try on a bounce; above it ES rips and there is nothing to short until 7797.",
+      "tags": ["short_entry", "structure"],
+      "trigger": {"type": "price_zone", "anchor_prices": [7733, 7797], "condition_text": "bounce into 7733"},
+      "source_quote": "However, since ES has been drifting down slowly the last week or so, there are some back-testable zones if we bounce. 7733 is one spot to try. This is resistance of then yellow declining bull flag in the above chart. Above here, we rip and nothing to short until 7797."
+    }
+  ],
+  "raw_excerpt": "Supports are: 7672, 7659 (major), 7650, 7638 (Major), 7627, 7618 (major), 7611, 7604, 7596, 7587 (major), 7583, 7574, 7569 (major), 7554, 7544 (major), 7538, 7528 (major), 7518, 7505, 7499 (major) 7480, 7472 (major), 7464, 7455, 7445 (major), 7436, 7427 (major). Resistances are: 7681 (major), 7695, 7704 (major), 7714, 7722, 7733 (major), 7745, 7758 (major), 7764, 7771 (major), 7783, 7792, 7797 (major), 7805, 7812, 7820 (major), 7828, 7835, 7855 (major), 7867, 7874, 7882, 7890 (major), 7900, 7911, 7925 (major), 7942, 7949 (major), 7961, 7972, 7985 (major), 8000 (major)."
+}
