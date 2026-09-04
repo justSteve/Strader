@@ -19,7 +19,10 @@
 # --no-model skips the two model stages; the page then carries the live side
 # and the number check only. Every stage writes its record into
 # /var/moo/state/footprint-icm/<day>/run.json. Exit 0 on a full run; 2 on a
-# refusal (the stage names the check); 1 on a crash.
+# refusal (the stage names the check); 3 when a stage's subprocess hit its
+# deadline (ICM_STAGE_TIMEOUT, default 2400 s per model call — the stage
+# kills the call's whole process group first, so nothing runs on); 1 on a
+# crash.
 set -uo pipefail
 
 DAY="${1:?usage: run_day.sh <YYYY-MM-DD> [--no-publish] [--no-model]}"

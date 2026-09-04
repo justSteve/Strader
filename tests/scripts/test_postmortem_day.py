@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
+import time
 from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -120,3 +122,37 @@ def test_backfill_one_day_never_raises(tmp_path, monkeypatch):
     row = m.backfill_one(date(2026, 8, 18), root=tmp_path, knobs=m.pm.Knobs(),
                          now=datetime(2026, 8, 19, 0, 0, tzinfo=CT))
     assert row["status"].startswith("error: RuntimeError")
+
+
+def _gone(pid: int, secs: float = 5.0) -> bool:
+    deadline = time.monotonic() + secs
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return True
+        time.sleep(0.05)
+    return False
+
+
+def test_publish_deadline_kills_the_renderer_and_everything_under_it(tmp_path, monkeypatch):
+    """desk-html.sh runs desk-translate and marked underneath it; before
+    2026-09-04 the timeout killed the shell and left them running (the ICM
+    lane's 09-02/03 orphan shape). The ledger still stands: publish returns 3."""
+    m = _load()
+    marker, pidfile = tmp_path / "orphan-marker", tmp_path / "gc.pid"
+    stub = tmp_path / "desk-html.sh"
+    stub.write_text(f'#!/usr/bin/env bash\n( echo $BASHPID > "{pidfile}"; sleep 3; '
+                    f'touch "{marker}" ) &\nsleep 60\n')
+    stub.chmod(0o755)
+    monkeypatch.setattr(m, "DESK_HTML", stub)
+    monkeypatch.setattr(m, "DESK_DIR", tmp_path / "desk")
+    monkeypatch.setattr(m, "DESK_RENDER_TIMEOUT_S", 1)
+    md = tmp_path / "page.md"
+    md.write_text("# page\n")
+    t0 = time.monotonic()
+    rc = m.publish(md, "desk-postmortem-test.html", also_latest=False, register_name=None)
+    assert rc == 3 and time.monotonic() - t0 < 15
+    assert _gone(int(pidfile.read_text()))
+    time.sleep(3.5)
+    assert not marker.exists()

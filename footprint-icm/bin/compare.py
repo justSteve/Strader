@@ -57,6 +57,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+from strader.procs import run_bounded  # noqa: E402
 from common import (  # noqa: E402
     COO_ROOT, CT, DESK_DIR, DESK_HTML, DESK_REGISTER, LANE, LaneError, git_short, log,
     minute_of_line, normalize, read_json, run_dir, update_run_json, write_json,
@@ -522,6 +523,13 @@ def render_page(day: _date, run: dict, wakes: list[dict], results: list[dict],
     return "\n".join(out)
 
 
+# The renderer (node + marked; the plain-words model pass is off here) and
+# the register script run in their own process groups and the group is
+# killed on the deadline, so neither can outlive the stage as an orphan.
+DESK_RENDER_TIMEOUT_S = 900
+DESK_REGISTER_TIMEOUT_S = 30
+
+
 def publish(md: Path, day: _date) -> int:
     if not DESK_HTML.exists():
         log.warning("desk-html.sh absent at %s — page not rendered", DESK_HTML)
@@ -531,8 +539,13 @@ def publish(md: Path, day: _date) -> int:
     # rewrites the quoted replies. Everything else in the environment is
     # inherited — the renderer finds node and marked through it.
     env = {**os.environ, "DESK_TRANSLATE_NO_MODEL": "1"}
-    proc = subprocess.run([str(DESK_HTML), str(md), str(target)], capture_output=True,
-                          text=True, timeout=900, env=env)
+    try:
+        proc = run_bounded([str(DESK_HTML), str(md), str(target)], capture_output=True,
+                           text=True, timeout=DESK_RENDER_TIMEOUT_S, env=env)
+    except subprocess.TimeoutExpired:
+        log.warning("desk-html.sh timed out after %d s — killed with its process group; "
+                    "page not rendered", DESK_RENDER_TIMEOUT_S)
+        return 3
     if proc.returncode != 0:
         log.warning("desk-html.sh rc=%d: %s", proc.returncode, proc.stderr.strip()[-300:])
         return 3
@@ -542,8 +555,8 @@ def publish(md: Path, day: _date) -> int:
     try:
         desk_md.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(md, desk_md)
-        out = subprocess.run([str(DESK_REGISTER), DESK_CATEGORY, str(DESK_REGISTER_REL)],
-                             capture_output=True, text=True, timeout=30)
+        out = run_bounded([str(DESK_REGISTER), DESK_CATEGORY, str(DESK_REGISTER_REL)],
+                          capture_output=True, text=True, timeout=DESK_REGISTER_TIMEOUT_S)
         if out.returncode:
             log.warning("desk-register rc=%d: %s", out.returncode, out.stderr.strip()[-200:])
     except (OSError, subprocess.SubprocessError) as e:

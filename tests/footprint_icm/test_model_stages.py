@@ -7,7 +7,10 @@ still runs for real against the real source list.
 """
 import json
 import os
+import subprocess
+import sys
 import textwrap
+import time
 from datetime import date
 from pathlib import Path
 
@@ -135,6 +138,77 @@ def test_classify_refuses_a_touched_context_folder(state_dir, stub):
     (rd / "20-classify/context/extra.md").write_text("a rule\n")
     with pytest.raises(common.LaneError, match="not what excerpts.py generated"):
         classify.main([DAY.isoformat()])
+
+
+def _slow_stage(tmp_path):
+    """A run_stage stand-in with the 09-02/03 shape: the shell's real work is
+    a grandchild (here a subshell) that would finish on its own long after
+    the deadline — and the shell itself never returns."""
+    marker, pidfile = tmp_path / "orphan-marker", tmp_path / "gc.pid"
+    script = tmp_path / "slow_run_stage.sh"
+    script.write_text(f'#!/usr/bin/env bash\n( echo $BASHPID > "{pidfile}"; sleep 3; '
+                      f'touch "{marker}" ) &\nsleep 60\n')
+    script.chmod(0o755)
+    return script, marker, pidfile
+
+
+def _gone(pid: int, secs: float = 5.0) -> bool:
+    deadline = time.monotonic() + secs
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return True
+        time.sleep(0.05)
+    return False
+
+
+def test_classify_deadline_kills_the_model_call_with_its_children(state_dir, stub, tmp_path, monkeypatch):
+    prepare_run(state_dir)
+    script, marker, pidfile = _slow_stage(tmp_path)
+    monkeypatch.setattr(classify, "RUN_STAGE", script)
+    monkeypatch.setattr(common, "STAGE_TIMEOUT_S", 1.0)
+    t0 = time.monotonic()
+    with pytest.raises(common.StageTimeout, match=r"model call wake-1247 timed out after 1 s"):
+        classify.main([DAY.isoformat()])
+    assert time.monotonic() - t0 < 15
+    assert _gone(int(pidfile.read_text()))
+    time.sleep(3.5)
+    assert not marker.exists()
+
+
+def test_classify_script_exits_3_and_says_timed_out(state_dir, stub, tmp_path):
+    """The exit code run_day.sh forwards and the wrapper maps to 'a stage
+    timed out' — 2 is a refusal, 1 the crash the orphan used to produce."""
+    prepare_run(state_dir)
+    script, marker, pidfile = _slow_stage(tmp_path)
+    env = {**os.environ, "ICM_STATE_DIR": str(state_dir), "ICM_RUN_STAGE": str(script),
+           "ICM_STAGE_TIMEOUT": "1"}
+    r = subprocess.run([sys.executable, str(Path(classify.__file__)), DAY.isoformat()],
+                       env=env, capture_output=True, text=True, timeout=60)
+    assert r.returncode == 3, r.stderr
+    assert "[REFUSED] 20-classify: model call wake-1247 timed out after 1 s" in r.stderr
+    assert "process group was killed" in r.stderr
+    assert _gone(int(pidfile.read_text()))
+    time.sleep(3.5)
+    assert not marker.exists()
+
+
+def test_write_json_leaves_the_old_file_whole_when_the_write_dies(state_dir, tmp_path, monkeypatch):
+    p = tmp_path / "run.json"
+    common.write_json(p, {"a": 1})
+    real = Path.write_text
+
+    def boom(self, *a, **k):
+        if self.name.endswith(".tmp"):
+            real(self, "{garbage", encoding="utf-8")
+            raise OSError("disk went away mid-write")
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(Path, "write_text", boom)
+    with pytest.raises(OSError):
+        common.write_json(p, {"a": 2})
+    assert json.loads(p.read_text()) == {"a": 1}
 
 
 def test_claims_feed_replies_and_planted_fixture_and_check_quotes(state_dir, stub):

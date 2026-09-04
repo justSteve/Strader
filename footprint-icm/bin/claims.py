@@ -24,14 +24,13 @@ import json
 import logging
 import os
 import shutil
-import subprocess
 import sys
 from datetime import date as _date, datetime
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from common import CT, LANE, LaneError, log, read_json, run_dir, update_run_json  # noqa: E402
+from common import CT, LANE, LaneError, StageTimeout, log, read_json, run_dir, update_run_json  # noqa: E402
 import checker  # noqa: E402
 import excerpts  # noqa: E402
 from classify import RUN_STAGE, call_stage, sources_text  # noqa: E402
@@ -149,6 +148,9 @@ def main(argv=None) -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
+    except StageTimeout as e:
+        print(f"[REFUSED] 40-claims: {e}", file=sys.stderr)
+        raise SystemExit(3)
     except LaneError as e:
         print(f"[REFUSED] 40-claims: {e}", file=sys.stderr)
         raise SystemExit(2)

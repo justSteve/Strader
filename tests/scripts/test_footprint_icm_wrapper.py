@@ -101,6 +101,20 @@ def test_a_refusal_is_alerted_with_the_day_and_return_code(h):
     assert "rc=2" in alert["message"]
 
 
+def test_a_stage_timeout_is_reported_as_such_not_as_an_unexpected_failure(h):
+    """rc=3 is what a stage exits after killing its subprocess's process group
+    on the per-call deadline (footprint-icm/bin/common.py StageTimeout)."""
+    h.stub('echo "[REFUSED] 20-classify: model call window timed out after 2400 s — '
+           'its process group was killed" >&2; exit 3')
+    r = h.run()
+    assert r.returncode == 3
+    hb = h.heartbeat()
+    assert hb["status"] == "failed" and hb["rc"] == 3 and "timed out" in hb["detail"]
+    assert "unexpected" not in hb["detail"]
+    [alert] = h.alerts()
+    assert alert["returncode"] == 3 and "timed out" in alert["message"]
+
+
 def test_a_hung_run_is_cut_at_the_timeout_and_alerted_as_124(h):
     h.stub("sleep 30")
     r = h.run(timeout_secs=2)

@@ -28,14 +28,15 @@ import json
 import logging
 import os
 import shutil
-import subprocess
 import sys
 from datetime import date as _date, datetime
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from common import CT, LANE, LaneError, log, read_json, run_dir, update_run_json  # noqa: E402
+import common  # noqa: E402
+from common import (CT, LANE, LaneError, StageTimeout, log, read_json, run_dir,  # noqa: E402
+                    run_stage_process, update_run_json)
 import checker  # noqa: E402
 import excerpts  # noqa: E402
 
@@ -63,12 +64,18 @@ def assemble(day: _date, slice_name: str, slice_text: str, sources: str) -> str:
             f"## ANSWER\n\nWrite the LABEL and IMPLICATION lines now.\n")
 
 
-def call_stage(stage_dir: Path, model: str | None) -> dict:
+def call_stage(stage_dir: Path, model: str | None, timeout: float | None = None) -> dict:
+    """One model call through run_stage.sh, in its own process group and
+    under ``common.STAGE_TIMEOUT_S``: the deadline kills ``claude -p`` with
+    the shell around it (2026-09-02/03 it outlived the shell by 13 minutes
+    and the run was reported as an unexpected failure)."""
     env = {**os.environ}
     if model:
         env["ICM_MODEL"] = model
-    proc = subprocess.run(["bash", str(RUN_STAGE), str(stage_dir)], capture_output=True,
-                          text=True, env=env, timeout=900)
+    cap = common.STAGE_TIMEOUT_S if timeout is None else timeout
+    proc = run_stage_process(["bash", str(RUN_STAGE), str(stage_dir)], timeout=cap,
+                             what=f"model call {stage_dir.name}",
+                             capture_output=True, text=True, env=env)
     if proc.returncode != 0:
         raise LaneError(f"run_stage.sh rc={proc.returncode} for {stage_dir.name}: "
                         f"{(proc.stderr or proc.stdout).strip()[-400:]}")
@@ -154,6 +161,9 @@ def main(argv=None) -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
+    except StageTimeout as e:
+        print(f"[REFUSED] 20-classify: {e}", file=sys.stderr)
+        raise SystemExit(3)
     except LaneError as e:
         print(f"[REFUSED] 20-classify: {e}", file=sys.stderr)
         raise SystemExit(2)

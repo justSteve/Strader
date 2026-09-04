@@ -54,6 +54,7 @@ from market.orderflow.anchors import (  # noqa: E402
     PARSED as PARSED_DIR, mancini_kinds_for, mancini_levels_for)
 from market.orderflow.replay import has_es_day                          # noqa: E402
 from market.orderflow.run_log import run_log_path                       # noqa: E402
+from strader.procs import run_bounded                                   # noqa: E402
 
 logger = logging.getLogger("postmortem_day")
 CT = ZoneInfo("America/Chicago")
@@ -64,6 +65,12 @@ DESK_REGISTER = COO_ROOT / "tmuxMOO" / "bin" / "desk-register.sh"
 DESK_DIR = Path("/var/moo/desk")
 DESK_TRADING_REL = Path("myDesk") / "trading"          # relative to COO_ROOT (the manifest's convention)
 DESK_LATEST_NAME = "postmortem-latest.md"
+# desk-html.sh runs desk-translate (up to three `claude -p` rounds of 150 s)
+# and marked; ~2.5 min per page measured. The deadline kills the renderer's
+# whole process group — before 2026-09-04 it killed the shell and left the
+# model call running (the same orphan shape the ICM lane showed on 09-02/03).
+DESK_RENDER_TIMEOUT_S = 900
+DESK_REGISTER_TIMEOUT_S = 30
 LETTERS_DIR = REPO_ROOT / "data" / "mancini-letters"
 
 
@@ -146,8 +153,12 @@ def publish(md_path: Path, html_name: str, *, also_latest: bool,
         return 3
     target = DESK_DIR / html_name
     try:
-        proc = subprocess.run([str(DESK_HTML), str(md_path), str(target)],
-                              capture_output=True, text=True, timeout=900)
+        proc = run_bounded([str(DESK_HTML), str(md_path), str(target)],
+                           capture_output=True, text=True, timeout=DESK_RENDER_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        logger.warning("desk-html.sh timed out after %d s — killed with its process group; "
+                       "page not rendered", DESK_RENDER_TIMEOUT_S)
+        return 3
     except (OSError, subprocess.SubprocessError) as e:
         logger.warning("desk-html.sh failed to run: %s", e)
         return 3
@@ -162,8 +173,8 @@ def publish(md_path: Path, html_name: str, *, also_latest: bool,
         try:
             desk_md.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(md_path, desk_md)
-            out = subprocess.run([str(DESK_REGISTER), "Trading", str(DESK_TRADING_REL / register_name)],
-                                 capture_output=True, text=True, timeout=30)
+            out = run_bounded([str(DESK_REGISTER), "Trading", str(DESK_TRADING_REL / register_name)],
+                              capture_output=True, text=True, timeout=DESK_REGISTER_TIMEOUT_S)
             if out.returncode:
                 logger.warning("desk-register rc=%d: %s", out.returncode, out.stderr.strip()[:200])
         except (OSError, subprocess.SubprocessError) as e:

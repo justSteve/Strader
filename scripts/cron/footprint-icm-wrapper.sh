@@ -29,8 +29,13 @@
 # which the check reports as not ok.
 #
 # TIMEOUT. The two model stages run once per delivered wake plus once for the
-# window; a hung call would hold the cron slot forever. `timeout` bounds the
-# whole run (default 60 min, ICM_TIMEOUT_SECS) and rc=124 is alerted as such.
+# window; a hung call would hold the cron slot forever. Each model call is
+# bounded inside the stage (ICM_STAGE_TIMEOUT, default 2400 s; the stage kills
+# the call's whole process group and exits 3, reported here as "a stage timed
+# out"), and `timeout` bounds the whole run (default 60 min, ICM_TIMEOUT_SECS)
+# with rc=124 alerted as such. Before 2026-09-04 the stage's own cap killed
+# only the shell around `claude -p`; the call ran on for 13 minutes as an
+# orphan and the run was alerted as "unexpected failure" (09-02 and 09-03).
 #
 # NO MARGINAL CHARGE. The model calls go through `claude -p` on Steve's Pro
 # plan (plan quota, not a bill); usage.json's dollar figure is a list-price
@@ -61,9 +66,14 @@ TIMEOUT_SECS="${ICM_TIMEOUT_SECS:-3600}"
 LOG="$LOG_DIR/$DAY.log"
 mkdir -p "$LOG_DIR" "$(dirname "$HB")"
 
+# The one heartbeat writer [co-8b60y] — jq-built, atomic, the four states —
+# with this lane's `day` and `rc` fields kept. hb_init arms the EXIT trap, so a
+# death between the writes below still ends as `failed` with the exit code.
+# shellcheck source=heartbeat-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/heartbeat-lib.sh"
+hb_init "$HB" "day $DAY"
 write_hb() {  # status, detail, rc
-    printf '{"ts": "%s", "status": "%s", "detail": "%s", "day": "%s", "rc": %s}\n' \
-        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "${2//\"/\\\"}" "$DAY" "$3" > "$HB.tmp" && mv -f "$HB.tmp" "$HB"
+    hb_write "$HB" "$1" "$2" "$(jq -nc --arg day "$DAY" --argjson rc "${3:-0}" '{day:$day, rc:$rc}' 2>/dev/null)"
 }
 
 alert() {  # message, rc
@@ -96,7 +106,8 @@ PYEOF
     else
         case $rc in
             2)   why="a stage refused (no live record for the day, or a check failed) — see run.log" ;;
-            124) why="timed out after ${TIMEOUT_SECS}s — a model stage hung" ;;
+            3)   why="a stage timed out — its subprocess and everything under it were killed; see run.log" ;;
+            124) why="timed out after ${TIMEOUT_SECS}s — a model stage hung past the whole-run bound" ;;
             *)   why="unexpected failure; see $LOG" ;;
         esac
         write_hb failed "rc=$rc: $why" "$rc"

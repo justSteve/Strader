@@ -37,7 +37,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import subprocess
 import sys
 from datetime import date as _date, datetime
 from pathlib import Path
@@ -45,8 +44,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from common import (  # noqa: E402
-    CT, LaneError, PARSED, ROOT, git_short, hhmm, live_log_path, log, minute_of_line,
-    parse_live_log, read_json, run_dir, sha256_of, update_run_json, write_json,
+    CT, LaneError, PARSED, ROOT, StageTimeout, git_short, hhmm, live_log_path, log,
+    minute_of_line, parse_live_log, read_json, run_dir, run_stage_process, sha256_of,
+    update_run_json, write_json,
 )
 
 sys.path.insert(0, str(ROOT))
@@ -61,6 +61,7 @@ from market.orderflow.tape_events import knobs_to_dict, load_knobs  # noqa: E402
 
 PY = ROOT / ".venv/bin/python"
 SCORER = ROOT / "scripts/live_effort_effect.py"
+SCORER_TIMEOUT_S = 600      # a full-day catch-up ran 6-13 s on every recorded day
 
 
 def replay_events(day: _date, knobs) -> tuple[list[dict], list[dict]]:
@@ -80,7 +81,8 @@ def regenerate_log_body(day: _date, out: Path) -> dict:
     annotation and differs on every run."""
     cmd = [str(PY), str(SCORER), "--date", day.isoformat(), "--catch-up-only"]
     t0 = datetime.now(CT)
-    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT), timeout=600)
+    proc = run_stage_process(cmd, timeout=SCORER_TIMEOUT_S, what="scorer --catch-up-only",
+                             capture_output=True, text=True, cwd=str(ROOT))
     secs = (datetime.now(CT) - t0).total_seconds()
     if proc.returncode != 0:
         raise LaneError(f"scorer --catch-up-only rc={proc.returncode}: "
@@ -229,6 +231,9 @@ def main(argv=None) -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
+    except StageTimeout as e:
+        print(f"[REFUSED] 00-inputs: {e}", file=sys.stderr)
+        raise SystemExit(3)
     except LaneError as e:
         print(f"[REFUSED] 00-inputs: {e}", file=sys.stderr)
         raise SystemExit(2)

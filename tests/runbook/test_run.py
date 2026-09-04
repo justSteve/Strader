@@ -8,7 +8,9 @@ monkeypatched. Without the flag the run takes the hybrid branch by design, and
 halt/keep-last-good error paths, hybrid mode, and the brief render.
 """
 import json
+import os
 import shutil
+import time
 
 import pytest
 
@@ -327,6 +329,40 @@ def test_desk_html_real_failure_warns(monkeypatch, _isolate_desk, tmp_path, capl
         assert run_mod._render_desk_html(doc) is None
     assert any(r.levelname == "WARNING" and "rc=2" in r.getMessage()
                for r in caplog.records)
+
+
+def test_desk_html_deadline_kills_the_renderer_and_everything_under_it(monkeypatch, _isolate_desk,
+                                                                        tmp_path, caplog):
+    """The renderer's real work is a grandchild (marked, the plain-words model
+    pass). Before 2026-09-04 the 60 s timeout killed the shell and left it
+    running — the orphan shape the ICM lane showed on 09-02/03. [co-8b60y]"""
+    doc = tmp_path / "plan.md"
+    doc.write_text("# plan\n")
+    marker, pidfile = tmp_path / "orphan-marker", tmp_path / "gc.pid"
+    stub = tmp_path / "desk-html.sh"
+    stub.write_text(f'#!/usr/bin/env bash\n( echo $BASHPID > "{pidfile}"; sleep 3; '
+                    f'touch "{marker}" ) &\nsleep 60\n')
+    stub.chmod(0o755)
+    monkeypatch.setattr(run_mod, "DESK_HTML_SCRIPT", stub)
+    monkeypatch.setattr(run_mod, "DESK_RENDER_TIMEOUT_S", 1)
+    t0 = time.monotonic()
+    with caplog.at_level("INFO", logger="runbook.mancini"):
+        assert run_mod._render_desk_html(doc) is None
+    assert time.monotonic() - t0 < 15
+    assert any(r.levelname == "WARNING" and "timed out after 1 s" in r.getMessage()
+               for r in caplog.records)
+    deadline = time.monotonic() + 5
+    gc = int(pidfile.read_text())
+    while time.monotonic() < deadline:
+        try:
+            os.kill(gc, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("the grandchild survived the deadline")
+    time.sleep(3.5)
+    assert not marker.exists()
 
 
 def test_no_desk_flag_suppresses_publication(tmp_path, monkeypatch, _isolate_desk):

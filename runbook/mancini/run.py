@@ -27,9 +27,12 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import subprocess
 import sys
 from datetime import date as date_cls, datetime, timezone
 from pathlib import Path
+
+from strader.procs import run_bounded
 
 from . import clean
 from . import listlevels
@@ -59,6 +62,12 @@ DESK_REFRESH = Path("/root/projects/COO/myDesk/trading/trading-desk-refresh.sh")
 # in reply to st-qx4 — moving it breaks a bookmark no error will explain.
 DESK_HTML = Path("/tmp/desk-mancini-latest-es-plan.html")
 DESK_HTML_SCRIPT = Path("/root/projects/COO/tmuxMOO/bin/desk-html.sh")
+# Deadlines for the two COO scripts a parse shells out to. Both run in their
+# own process group and the group is killed on the deadline, so a stuck
+# renderer (node, or the plain-words model pass under it) cannot outlive the
+# parse as an orphan — the shape that hid the ICM lane's 09-02/03 failures.
+DESK_RENDER_TIMEOUT_S = 60
+DESK_REFRESH_TIMEOUT_S = 120
 
 
 def _read_newsletter(file_arg: str | None) -> str:
@@ -387,14 +396,16 @@ def _render_desk_html(doc: Path) -> Path | None:
 
     Non-fatal by contract — a parse must never die over a browser page.
     """
-    import subprocess
-
     if not DESK_HTML_SCRIPT.exists():
         logger.warning("desk html skipped: renderer absent (%s)", DESK_HTML_SCRIPT)
         return None
     try:
-        proc = subprocess.run([str(DESK_HTML_SCRIPT), str(doc), str(DESK_HTML)],
-                              capture_output=True, text=True, timeout=60)
+        proc = run_bounded([str(DESK_HTML_SCRIPT), str(doc), str(DESK_HTML)],
+                           capture_output=True, text=True, timeout=DESK_RENDER_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        logger.warning("desk html skipped: renderer timed out after %d s and was killed "
+                       "with its process group", DESK_RENDER_TIMEOUT_S)
+        return None
     except (OSError, subprocess.SubprocessError) as e:
         logger.warning("desk html skipped: renderer failed to run (%s)", e)
         return None
@@ -435,9 +446,17 @@ def _emit_desk_plan(result: ParseResult, extra_sections: list[str] | None = None
                    encoding="utf-8")
     logger.info("desk plan doc: %s", doc)
     if DESK_REFRESH.exists():
-        proc = subprocess.run(["bash", str(DESK_REFRESH)],
-                              capture_output=True, text=True)
-        if proc.returncode != 0:
+        try:
+            proc = run_bounded(["bash", str(DESK_REFRESH)],
+                               capture_output=True, text=True, timeout=DESK_REFRESH_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            logger.warning("trading-desk-refresh timed out after %d s and was killed with "
+                           "its process group — doc written, stable title not updated",
+                           DESK_REFRESH_TIMEOUT_S)
+            proc = None
+        if proc is None:
+            pass
+        elif proc.returncode != 0:
             logger.warning("trading-desk-refresh failed (rc=%d): %s",
                            proc.returncode, proc.stderr.strip()[:300])
         else:

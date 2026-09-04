@@ -33,6 +33,8 @@ from datetime import date as _date, datetime, time as _time, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from strader.procs import run_bounded
+
 CT = ZoneInfo("America/Chicago")
 ROOT = Path(__file__).resolve().parents[2]            # /root/projects/Strader
 LANE = ROOT / "footprint-icm"
@@ -59,10 +61,37 @@ LEVELS_RE = re.compile(r"(\d+) levels loaded")
 
 log = logging.getLogger("footprint-icm")
 
+# One subprocess's deadline for a model call, in seconds. Measured normal
+# calls run 9-88 s (08-25 through 09-01, run.log). The 27-minute calls of
+# 09-02 and 09-03 were the CLI retrying an API it could not reach through the
+# outage (usage.json: is_error, "Connection refused", duration_ms 1667906),
+# so the default sits above that envelope: a dead network ends as the CLI's
+# own error text through run_stage.sh, not as a kill. ICM_STAGE_TIMEOUT
+# overrides (tests). The wrapper's whole-run bound stays 3600 s, so a second
+# stuck call in one run is cut there as rc=124.
+STAGE_TIMEOUT_S = float(os.environ.get("ICM_STAGE_TIMEOUT", "2400"))
+
 
 class LaneError(Exception):
     """A check the lane refuses to continue past. ``run_day.sh`` stops at the
     first one; the message names the check and the numbers."""
+
+
+class StageTimeout(LaneError):
+    """A stage's subprocess hit its deadline. Its whole process group was
+    killed before this was raised, so nothing runs on after the report. The
+    stage scripts exit 3 on it (2 is a refusal, 1 a crash) so the wrapper
+    can say "timed out" instead of "unexpected failure"."""
+
+
+def run_stage_process(cmd, *, timeout: float, what: str, **kw) -> subprocess.CompletedProcess:
+    """``subprocess.run`` for a stage's child, in its own process group; on
+    the deadline the group is killed and ``StageTimeout`` names ``what``."""
+    try:
+        return run_bounded(cmd, timeout=timeout, **kw)
+    except subprocess.TimeoutExpired as e:
+        raise StageTimeout(f"{what} timed out after {timeout:.0f} s — "
+                           f"its process group was killed") from e
 
 
 # ── run folder and run.json ────────────────────────────────────────────────
@@ -75,9 +104,13 @@ def run_dir(day: _date, create: bool = True) -> Path:
 
 
 def write_json(path: Path, obj) -> None:
+    """Write via a sibling temp file and rename, so a kill mid-write leaves
+    the previous file whole (run.json is merged by every stage)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(obj, indent=1, sort_keys=True, default=str) + "\n",
-                    encoding="utf-8")
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(obj, indent=1, sort_keys=True, default=str) + "\n",
+                   encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def read_json(path: Path):
