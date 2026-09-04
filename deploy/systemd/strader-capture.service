@@ -34,8 +34,17 @@ Documentation=https://github.com/justSteve/Strader
 After=network-online.target
 Wants=network-online.target
 
-StartLimitIntervalSec=300
-StartLimitBurst=10
+# Restart backoff [co-8b60y, 2026-09-04]: the streamer now rides out a network
+# outage itself (reconnects with a 0 → 5 min backoff, one manifest note per
+# outage) and exits 1 only on an error a retry cannot fix — a bad key, a bug.
+# Under the old RestartSec=2s / burst 10 per 300 s, a 42-hour outage produced
+# 1,624 restarts and never tripped the limit (each run lived ~90 s). The
+# pattern strader-footprint-feed.service uses [st-wnuk]: RestartSteps and
+# RestartMaxDelaySec (systemd >= 254; this box runs 255) stretch the retry
+# from 30 s toward 5 min, and the burst is sized so the backoff itself can
+# never exhaust it — at most 20 starts fit in 600 s at the 30 s floor.
+StartLimitIntervalSec=600
+StartLimitBurst=30
 
 [Service]
 Type=exec
@@ -45,11 +54,13 @@ ExecStart=/root/projects/Strader/.venv/bin/python \
     /root/projects/Strader/scripts/corpus_stream_databento.py \
     --streams es,es-mbp1 --until-ct 15:05 --now
 
-# A crash is the case worth restarting. RestartSec is short because the gap is
-# lost tape: MBP-1 depth has no working backfill (st-xxo0), so every second down
-# is a hole nothing refills.
+# A crash is the case worth restarting. The 30 s floor is the price of not
+# storming: MBP-1 depth has no working backfill (st-xxo0), so the gap is lost
+# tape, but a crash loop at 2 s lost the same tape 1,624 times over.
 Restart=on-failure
-RestartSec=2s
+RestartSec=30s
+RestartSteps=5
+RestartMaxDelaySec=5min
 
 # journald replaces tmux scrollback as the output surface:
 #     journalctl -fu strader-capture

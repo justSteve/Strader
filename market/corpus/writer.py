@@ -65,6 +65,8 @@ def update_manifest(
     errors: list[str] | None = None,
     note: str | None = None,
     resolve_errors: bool = False,
+    note_key: str | None = None,
+    touch_last_pull: bool = True,
 ) -> None:
     """Maintain `manifest.json` summarizing what landed in the per-day dir.
 
@@ -74,6 +76,16 @@ def update_manifest(
     stream's rows from a source that does not share the failure — the batch
     pull after a live-capture outage. The history is not lost: the count and
     the sample stay, and the full text is in the journal.
+
+    ``note_key`` makes the note a keyed line: the first call with a given
+    (stream, key) appends it, every later call rewrites that line in place —
+    the live streamer keeps one line per outage this way, rewritten with the
+    attempt count, instead of one line per attempt. (co-8b60y)
+
+    ``touch_last_pull=False`` leaves ``last_pull_utc`` where it was. The gate
+    reads that field as "the tape reaches here"; a bookkeeping call that
+    landed no rows must not advance it. The field is still set the first time
+    a stream's entry is created, so readers never meet an entry without it.
 
     The file is written to a temporary name and renamed into place, so a kill
     mid-write leaves the previous manifest intact rather than a truncated one.
@@ -110,11 +122,23 @@ def update_manifest(
         }
         s["errors"] = []
         s.pop("errors_dropped", None)
-    s["last_pull_utc"] = utc_now_iso()
+    if touch_last_pull or "last_pull_utc" not in s:
+        s["last_pull_utc"] = utc_now_iso()
 
     if note:
         notes = manifest.setdefault("notes", [])
-        notes.append({"ts": utc_now_iso(), "stream": stream, "note": note})
+        entry: dict[str, Any] = {"ts": utc_now_iso(), "stream": stream, "note": note}
+        if note_key:
+            entry["key"] = note_key
+        existing = next(
+            (i for i, n in enumerate(notes)
+             if note_key and n.get("stream") == stream and n.get("key") == note_key),
+            None,
+        )
+        if existing is None:
+            notes.append(entry)
+        else:
+            notes[existing] = entry
         if len(notes) > MAX_MANIFEST_NOTES:
             excess = len(notes) - MAX_MANIFEST_NOTES
             manifest["notes_dropped"] = int(manifest.get("notes_dropped", 0) or 0) + excess

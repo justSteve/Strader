@@ -6,14 +6,14 @@
 # strader-capture-evening.service (15:06 → end of day). One process per
 # calendar day directory: the evening run ends at 23:59:59 in yesterday's
 # directory, this one opens today's at 00:00. Supervision copied from the
-# session unit for the reasons written there.
+# session unit for the reasons written there (restart backoff: co-8b60y).
 Description=Strader Databento live capture — early session (00:00 → 02:50 CT)
 Documentation=https://github.com/justSteve/Strader
 After=network-online.target
 Wants=network-online.target
 
-StartLimitIntervalSec=300
-StartLimitBurst=10
+StartLimitIntervalSec=600
+StartLimitBurst=30
 
 [Service]
 Type=exec
@@ -24,7 +24,9 @@ ExecStart=/root/projects/Strader/.venv/bin/python \
     --streams es,es-mbp1 --now --until-ct 02:50
 
 Restart=on-failure
-RestartSec=2s
+RestartSec=30s
+RestartSteps=5
+RestartMaxDelaySec=5min
 
 StandardOutput=journal
 StandardError=journal

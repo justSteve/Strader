@@ -7,15 +7,15 @@
 # volume profile had to banner an 11-hour hole every morning: the evening
 # session was never captured, though the plan covers it and the disk holds it.
 # The weekday-dependent stop time lives in scripts/cron/capture-evening.sh; the
-# supervision (Restart=on-failure, SIGINT, journald) is copied from the session
-# unit for the same reasons written there.
+# supervision (Restart=on-failure with the stretching backoff, SIGINT, journald)
+# is copied from the session unit for the same reasons written there.
 Description=Strader Databento live capture — evening session (15:06 CT → end of day)
 Documentation=https://github.com/justSteve/Strader
 After=network-online.target
 Wants=network-online.target
 
-StartLimitIntervalSec=300
-StartLimitBurst=10
+StartLimitIntervalSec=600
+StartLimitBurst=30
 
 [Service]
 Type=exec
@@ -24,7 +24,9 @@ Environment=PYTHONPATH=/root/projects/Strader
 ExecStart=/usr/bin/bash /root/projects/Strader/scripts/cron/capture-evening.sh
 
 Restart=on-failure
-RestartSec=2s
+RestartSec=30s
+RestartSteps=5
+RestartMaxDelaySec=5min
 
 StandardOutput=journal
 StandardError=journal

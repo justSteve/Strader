@@ -32,6 +32,62 @@ def _manifest() -> dict:
     return json.loads(paths.manifest_path(DAY).read_text())
 
 
+class TestKeyedNotes:
+    """One line per outage, rewritten in place [co-8b60y a1]."""
+
+    def test_a_keyed_note_is_rewritten_not_appended(self, corpus):
+        writer.update_manifest(DAY, STREAM, note="outage since T, 1 attempt(s)",
+                               note_key="outage:T")
+        writer.update_manifest(DAY, STREAM, note="outage since T, 2 attempt(s)",
+                               note_key="outage:T")
+        writer.update_manifest(DAY, STREAM, note="outage T–U, 2 attempt(s), reconnected",
+                               note_key="outage:T")
+        notes = _manifest()["notes"]
+        assert len(notes) == 1
+        assert notes[0]["note"] == "outage T–U, 2 attempt(s), reconnected"
+        assert notes[0]["key"] == "outage:T"
+        assert notes[0]["stream"] == STREAM
+
+    def test_the_key_is_scoped_to_the_stream(self, corpus):
+        writer.update_manifest(DAY, STREAM, note="a", note_key="outage:T")
+        writer.update_manifest(DAY, "databento_glbx_es_mbp1", note="b", note_key="outage:T")
+        notes = _manifest()["notes"]
+        assert [n["note"] for n in notes] == ["a", "b"]
+
+    def test_different_keys_and_plain_notes_still_append(self, corpus):
+        writer.update_manifest(DAY, STREAM, note="a", note_key="outage:T1")
+        writer.update_manifest(DAY, STREAM, note="b", note_key="outage:T2")
+        writer.update_manifest(DAY, STREAM, note="plain")
+        writer.update_manifest(DAY, STREAM, note="plain")
+        notes = _manifest()["notes"]
+        assert [n["note"] for n in notes] == ["a", "b", "plain", "plain"]
+        assert "key" not in notes[2]
+
+    def test_a_rewritten_note_keeps_the_list_under_the_cap(self, corpus):
+        for i in range(200):
+            writer.update_manifest(DAY, STREAM, note=f"attempt {i}", note_key="outage:T")
+        m = _manifest()
+        assert len(m["notes"]) == 1
+        assert m.get("notes_dropped") is None
+
+
+class TestLastPull:
+    """last_pull_utc means 'the tape reaches here' [co-8b60y a1]."""
+
+    def test_a_bookkeeping_call_does_not_advance_it(self, corpus, monkeypatch):
+        stamps = iter(["2026-09-03T18:00:00Z", "2026-09-03T18:00:00Z",
+                       "2026-09-03T20:05:00Z", "2026-09-03T20:05:00Z"])
+        monkeypatch.setattr(writer, "utc_now_iso", lambda: next(stamps))
+        writer.update_manifest(DAY, STREAM, increment_cycles=5)
+        assert _stream()["last_pull_utc"] == "2026-09-03T18:00:00Z"
+        writer.update_manifest(DAY, STREAM, note="reconnect attempt", touch_last_pull=False)
+        assert _stream()["last_pull_utc"] == "2026-09-03T18:00:00Z"
+
+    def test_a_new_entry_always_gets_the_field(self, corpus):
+        writer.update_manifest(DAY, STREAM, note="live stream start", touch_last_pull=False)
+        assert _stream()["last_pull_utc"]
+
+
 class TestBoundedLists:
     def test_errors_keep_the_first_fifty_and_count_the_rest(self, corpus):
         for i in range(1, 6467):

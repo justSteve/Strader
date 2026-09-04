@@ -45,6 +45,20 @@ only to plans actually held — it was written when OPRA was one of them.
 `--probe`, `--max-ticks`, and `--max-seconds` are for mechanical validation
 and scope control, not cost gating.
 
+Outages (revised 2026-09-04, co-8b60y)
+--------------------------------------
+A worker never gives up on the network. When the connection drops or cannot
+be made it reconnects with a backoff of 0, 2, 4, … 256, 300 s (capped at five
+minutes) for as long as the window is open, and the manifest carries ONE
+error entry and ONE note per outage — the note rewritten in place with the
+attempt count, then closed as "reconnected" or "stream ended without
+reconnecting". The old rule gave up after six attempts (~90 s) and exited 1,
+which the unit restarted two seconds later: a 42-hour outage produced 1,624
+restarts and 6,466 error entries per stream. The only errors that end a
+worker are the ones a retry cannot fix — a bad key, a rejected subscription,
+a bug in this file (`is_transport_error`). Those exit 1 so the unit's
+stretching restart (30 s → 5 min) handles them, loudly.
+
 Persistence (two layers)
 ------------------------
 1. Lossless archive (source of truth) — the raw DBN byte stream is teed to
@@ -75,6 +89,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import signal
 import sys
 import threading
@@ -197,6 +212,76 @@ def default_specs(schema: str | None = None) -> dict[str, StreamSpec]:
 
 
 # --------------------------------------------------------------------------
+# Error classification — the network, or something a retry cannot fix
+# --------------------------------------------------------------------------
+
+#: Longest wait between reconnect attempts inside one outage, in seconds.
+MAX_BACKOFF_S = 300
+
+#: Gateway texts that mean the network or the gateway is unreachable. Every
+#: one of these was read in databento 0.78.0's live client (session.py,
+#: protocol.py), which wraps the underlying OSError/timeout into a BentoError
+#: with `from None` — so the text is the only signal that survives. Measured
+#: 2026-09-02..04: 5,544 copies per stream of "Connection to
+#: glbx-mdp3.lsg.databento.com:13000 timed out after 10.0 second(s)."
+_TRANSPORT_TEXT = re.compile(
+    r"timed out|timeout|connection lost|connection closed|connection to .+ failed"
+    r"|since last message|no data received|queue is not enabled"
+    r"|name resolution|address family|network is unreachable|connection refused"
+    r"|connection reset|broken pipe|\beof\b",
+    re.IGNORECASE,
+)
+#: Gateway texts that say the credentials or the request are wrong. A CRAM
+#: rejection arrives as BentoError(<gateway's error text>) and a gateway
+#: ErrorMsg record's text is attached to the disconnect the same way. The
+#: exact phrasings are the gateway's and were not measured here; the patterns
+#: are the vocabulary of the API's documented failures, checked only after the
+#: transport patterns above have been ruled out.
+_FATAL_TEXT = re.compile(
+    r"authentication (?:failed|error|rejected)|auth failed|invalid (?:api )?key"
+    r"|api key|unauthori[sz]ed|forbidden|not authori[sz]ed|not entitled|entitlement"
+    r"|permission|not subscribed|subscription|invalid (?:dataset|schema|symbol"
+    r"|stype|request)|unknown dataset|unsupported|bad request|malformed",
+    re.IGNORECASE,
+)
+
+
+def is_transport_error(exc: BaseException) -> bool:
+    """True when the failure is the network or the gateway being unreachable —
+    the worker keeps trying. False when a retry cannot help — a bad key, a
+    rejected subscription, a wrong argument, a bug — the worker gives up and
+    the unit restarts it on its stretching schedule.
+
+    OSError covers sockets, DNS (gaierror), SSL and timeouts (TimeoutError is
+    an OSError since 3.3). A BentoError is judged by its text, transport
+    patterns first — "Authentication with … timed out" is a timeout, not a
+    rejection. A BentoError whose text matches neither list is treated as
+    transport: the cost of a wrong "give up" is the restart storm this
+    function exists to end, and the outage note names the text so an unknown
+    shape is still visible. Anything else — ValueError from the client's key
+    validation, an AttributeError in our own row code — is not the network.
+    """
+    if isinstance(exc, (OSError, EOFError)):
+        return True
+    if any(k.__name__ == "BentoError" for k in type(exc).__mro__):
+        text = str(exc)
+        if _TRANSPORT_TEXT.search(text):
+            return True
+        if _FATAL_TEXT.search(text):
+            return False
+        return True
+    return False
+
+
+def backoff_seconds(attempt: int) -> int:
+    """Wait before reconnect attempt ``attempt + 1`` of an outage: the first
+    retry is immediate, then 2, 4, 8 … doubling to ``MAX_BACKOFF_S``."""
+    if attempt <= 1:
+        return 0
+    return min(2 ** (attempt - 1), MAX_BACKOFF_S)
+
+
+# --------------------------------------------------------------------------
 # Worker
 # --------------------------------------------------------------------------
 
@@ -210,6 +295,26 @@ class WorkerStatus:
     last_symbol: str = ""
     last_price: float = 0.0
     last_ts: str = ""
+
+
+@dataclass
+class Outage:
+    """One stretch without a working connection: from the first drop until
+    the first record after it. Its manifest note is keyed on ``since`` so
+    every attempt rewrites the same line instead of adding one."""
+    since: str                  # UTC ISO of the first drop
+    ordinal: int = 1            # the worker's Nth outage this run
+    attempts: int = 1           # connection attempts that failed so far
+    reason: str = ""            # the latest failure's text
+
+    @property
+    def key(self) -> str:
+        # The ordinal, not the timestamp: two outages can open in one second
+        # (drop, one record, drop) and must not share a line.
+        return f"outage:{self.ordinal}:{self.since}"
+
+    def open_note(self) -> str:
+        return f"outage since {self.since}, {self.attempts} attempt(s): {self.reason}"
 
 
 def _client_factory_default():
@@ -233,7 +338,6 @@ class StreamWorker(threading.Thread):
         *,
         flush_interval: float = 2.0,
         max_ticks: int | None = None,
-        max_reconnects: int = 5,
         probe: bool = False,
         raw: bool = True,
         client_factory: Callable[[], object] = _client_factory_default,
@@ -245,7 +349,6 @@ class StreamWorker(threading.Thread):
         self.manifest_lock = manifest_lock
         self.flush_interval = flush_interval
         self.max_ticks = max_ticks
-        self.max_reconnects = max_reconnects
         self.probe = probe
         self.raw = raw                  # tee lossless raw DBN alongside JSONL
         self.client_factory = client_factory
@@ -257,19 +360,26 @@ class StreamWorker(threading.Thread):
         self._fh = None
         self._raw_fh = None             # raw DBN handle for the current segment
         self._done = threading.Event()  # this stream finished on its own terms
+        self._outage: Outage | None = None
+        self._outages_seen = 0
+        self._gave_up = False
 
     # -- lifecycle -------------------------------------------------------
 
     @property
     def gave_up(self) -> bool:
-        """True once this stream exhausted its reconnect budget and stopped
-        unasked — as opposed to stop_event (scheduled/signalled stop) or
-        _done (own tick cap). reconnects only exceeds max_reconnects in the
-        give-up branch, which breaks the loop immediately after, so this is
-        stable once the thread has exited. main() needs the distinction: a
-        stream that quietly dies must not look like a clean scheduled stop,
-        or systemd's Restart=on-failure never sees a reason to fire."""
-        return self.status.reconnects > self.max_reconnects
+        """True once this stream stopped on an error a retry cannot fix (see
+        ``is_transport_error``) — as opposed to stop_event (scheduled or
+        signalled stop) or _done (own tick cap). A network outage never sets
+        it. main() needs the distinction: a stream that dies on a bad key must
+        not look like a clean scheduled stop, or systemd's Restart=on-failure
+        never sees a reason to fire."""
+        return self._gave_up
+
+    @property
+    def outage(self) -> Outage | None:
+        """The outage in progress, or None while the connection is working."""
+        return self._outage
 
     def shutdown(self) -> None:
         """Unblock the record iterator from another thread."""
@@ -292,10 +402,19 @@ class StreamWorker(threading.Thread):
             if self._fh is not None:
                 self._fh.close()
             if not self.probe:
+                # Errors were committed when they happened (_drop, _give_up,
+                # _on_raw_error); re-sending status.errors here is what put a
+                # second copy of every reconnect line into the manifest.
+                if self._outage is not None:
+                    o = self._outage
+                    self._commit_counts(
+                        note=f"outage since {o.since}, {o.attempts} attempt(s), "
+                             f"stream ended without reconnecting: {o.reason}",
+                        note_key=o.key,
+                    )
                 self._commit_counts(
                     note=f"live stream ended — {self.status.ticks} ticks, "
                          f"{self.status.reconnects} reconnect(s)",
-                    errors=self.status.errors or None,
                 )
 
     # -- streaming -------------------------------------------------------
@@ -315,11 +434,10 @@ class StreamWorker(threading.Thread):
                     self._client = client
                 if self.raw and not self.probe:
                     self._open_raw(client)
-                if not self.probe:
-                    note = (None if not first else
-                            f"live stream start — {self.spec.dataset} "
-                            f"{self.spec.schema} {self.spec.symbols}")
-                    self._commit_counts(note=note)
+                if not self.probe and first:
+                    self._commit_counts(
+                        note=f"live stream start — {self.spec.dataset} "
+                             f"{self.spec.schema} {self.spec.symbols}")
                 first = False
                 self._consume(client)
                 # Clean end of iterator without an exception => either we
@@ -328,11 +446,15 @@ class StreamWorker(threading.Thread):
                 # is a drop we should reconnect on.
                 if self.stop_event.is_set() or self._done.is_set():
                     break
-                self._note_reconnect("stream ended unexpectedly")
-            except Exception as e:  # connection drop, auth blip, etc.
+                self._drop("stream ended unexpectedly")
+            except Exception as e:
                 if self.stop_event.is_set():
                     break
-                self._note_reconnect(f"{type(e).__name__}: {e}")
+                if is_transport_error(e):
+                    self._drop(f"{type(e).__name__}: {e}")
+                else:
+                    self._give_up(e)
+                    break
             finally:
                 with self._client_lock:
                     if self._client is not None:
@@ -343,18 +465,11 @@ class StreamWorker(threading.Thread):
                     self._client = None
                 self._close_raw()
 
-            if self.status.reconnects > self.max_reconnects:
-                self.status.errors.append(
-                    f"giving up after {self.status.reconnects} reconnects")
-                print(f"[ALERT] {self.spec.name}: giving up after "
-                      f"{self.status.reconnects} reconnects", file=sys.stderr)
-                break
-            # Retry the first drop immediately (transient blips recover
-            # fast); back off exponentially thereafter, capped at 30s.
-            backoff = 0 if self.status.reconnects <= 1 else \
-                min(2 ** (self.status.reconnects - 1), 30)
-            if backoff:
-                self.stop_event.wait(backoff)
+            # Only a drop reaches here (a clean stop and a give-up both break
+            # above), so an outage is always open at this point. Wait out its
+            # backoff — interruptible, so a window close during a five-minute
+            # wait still ends the worker promptly.
+            self.stop_event.wait(backoff_seconds(self._outage.attempts))
 
     def _consume(self, client) -> None:
         last_flush = time.monotonic()
@@ -366,6 +481,10 @@ class StreamWorker(threading.Thread):
         for rec in records:
             if self.stop_event.is_set() or self._done.is_set():
                 break
+            if self._outage is not None:
+                # The first record after a drop is the recovery — a connection
+                # that authenticates and then yields nothing has not recovered.
+                self._recover()
 
             self.status.ticks += 1
             self.status.last_symbol = rec.symbol or "?"
@@ -503,28 +622,77 @@ class StreamWorker(threading.Thread):
         msg = f"raw DBN write error: {type(exc).__name__}: {exc}"
         self.status.errors.append(msg)
         print(f"[ALERT] {self.spec.name}: {msg}", file=sys.stderr)
+        if not self.probe:
+            self._commit_counts(errors=[msg])
 
-    def _note_reconnect(self, reason: str) -> None:
+    def _drop(self, reason: str) -> None:
+        """A connection failed or ended. The first drop opens an outage and
+        writes its ONE error entry — ``reconnect #N: … (possible gap)``, the
+        prefix runbook/datastream/gate.py recognises as transport — and its
+        ONE note; every later attempt rewrites that note with the count."""
         self.status.reconnects += 1
-        msg = f"reconnect #{self.status.reconnects}: {reason} (possible gap)"
+        if self._outage is None:
+            self._outages_seen += 1
+            self._outage = Outage(since=utc_now_iso(), ordinal=self._outages_seen,
+                                  attempts=1, reason=reason)
+            err = f"reconnect #{self.status.reconnects}: {reason} (possible gap)"
+            self.status.errors.append(err)
+            print(f"[ALERT] {self.spec.name}: {err}", file=sys.stderr)
+            if not self.probe:
+                self._commit_counts(note=self._outage.open_note(),
+                                    note_key=self._outage.key, errors=[err])
+            return
+        o = self._outage
+        o.attempts += 1
+        o.reason = reason
+        print(f"[ALERT] {self.spec.name}: reconnect #{self.status.reconnects}: "
+              f"{reason} — outage since {o.since}, attempt {o.attempts}, "
+              f"next try in {backoff_seconds(o.attempts)}s", file=sys.stderr)
+        if not self.probe:
+            self._commit_counts(note=o.open_note(), note_key=o.key)
+
+    def _recover(self) -> None:
+        """First record after an outage: close its note as reconnected."""
+        o = self._outage
+        self._outage = None
+        end = utc_now_iso()
+        msg = f"outage {o.since}–{end}, {o.attempts} attempt(s), reconnected"
+        print(f"[INFO] {self.spec.name}: {msg}", file=sys.stderr, flush=True)
+        if not self.probe:
+            self._commit_counts(note=msg, note_key=o.key)
+
+    def _give_up(self, exc: BaseException) -> None:
+        """An error a retry cannot fix. One ``fatal:`` error entry — NOT the
+        transport prefix, so the gate keeps reading it as a real error until
+        the batch pull resolves it — and the thread ends; main() exits 1."""
+        self._gave_up = True
+        msg = f"fatal: {type(exc).__name__}: {exc} — not the network, giving up"
         self.status.errors.append(msg)
         print(f"[ALERT] {self.spec.name}: {msg}", file=sys.stderr)
         if not self.probe:
-            self._commit_counts(note=msg)
+            self._commit_counts(errors=[msg])
 
     def _commit_counts(self, note: str | None = None,
-                       errors: list[str] | None = None) -> None:
-        """Persist tick delta + optional note to the shared manifest."""
-        delta = self.status.ticks - self._committed
+                       errors: list[str] | None = None,
+                       note_key: str | None = None) -> None:
+        """Persist tick delta + optional note/errors to the shared manifest.
+
+        ``last_pull_utc`` advances only when ticks actually landed: the gate
+        reads it as "the tape reaches here", and a reconnect attempt that
+        pulled nothing must not move it past the close."""
         with self.manifest_lock:
+            ticks = self.status.ticks
+            delta = ticks - self._committed
             update_manifest(
                 d=self.d,
                 stream=self.spec.name,
                 increment_cycles=delta,
                 note=note,
+                note_key=note_key,
                 errors=errors,
+                touch_last_pull=delta > 0,
             )
-        self._committed = self.status.ticks
+            self._committed = ticks
 
 
 # --------------------------------------------------------------------------
@@ -582,8 +750,6 @@ def main() -> int:
                         help="Seconds between file flushes (default 2)")
     parser.add_argument("--status-interval", type=float, default=10.0,
                         help="Seconds between status lines (default 10)")
-    parser.add_argument("--max-reconnects", type=int, default=5,
-                        help="Give up a stream after this many reconnects (default 5)")
     parser.add_argument("--no-raw", action="store_true",
                         help="Disable the lossless raw-DBN archive tee (JSONL only)")
     parser.add_argument("--probe", type=int, default=None, metavar="SECONDS",
@@ -663,7 +829,6 @@ def main() -> int:
             spec, d, stop_event, manifest_lock,
             flush_interval=args.flush_interval,
             max_ticks=args.max_ticks,
-            max_reconnects=args.max_reconnects,
             probe=probe,
             raw=not args.no_raw,
         )
@@ -716,8 +881,13 @@ def main() -> int:
 
     gave_up = [w.spec.name for w in workers if w.gave_up]
     if gave_up:
-        print(f"[ALERT] stream(s) exhausted their reconnect budget and were "
-              f"not recovered this run: {', '.join(gave_up)}", file=sys.stderr)
+        print(f"[ALERT] stream(s) stopped on an error that is not the network "
+              f"and were not recovered this run: {', '.join(gave_up)}",
+              file=sys.stderr)
+    still_out = [w.spec.name for w in workers if w.outage is not None]
+    if still_out:
+        print(f"[ALERT] stream(s) still in an outage when the window closed: "
+              f"{', '.join(still_out)}", file=sys.stderr)
 
     if probe:
         secs = max(time.monotonic() - started, 1e-6)
