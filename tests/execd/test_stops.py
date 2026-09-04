@@ -10,8 +10,9 @@ from __future__ import annotations
 import pytest
 
 from execd.stops import (
-    PREMIUM_TICK_PTS, exit_triggered, premium_at_stop, protective_stop_price,
-    risk_usd, stop_distance_spx, stop_is_consistent,
+    PREMIUM_TICK_PTS, PREMIUM_TICK_PTS_ABOVE_3, TICK_BOUNDARY_PTS, exit_triggered,
+    premium_at_stop, protective_stop_price, risk_usd, stop_distance_spx,
+    stop_is_consistent, tick_for,
 )
 
 
@@ -47,6 +48,53 @@ class TestRounding:
 
     def test_a_price_already_on_a_tick_is_left_alone(self):
         assert protective_stop_price(5.00, 0.30, 6380.0, 6368.0) == 1.40
+
+
+class TestTheTickAboveThree:
+    """SPX options quote in 0.10 at and above $3.00 — measured 2026-09-04
+    (st-pohq, docs/measurement/spx-option-tick-2026-09-04.md): 205 of 205
+    quoted sides at or above $3.00 on the 0.10 grid. A stop at 3.05 is a stop
+    the exchange refuses under a live position."""
+
+    def test_the_grid_changes_at_three(self):
+        assert tick_for(2.95) == PREMIUM_TICK_PTS
+        assert tick_for(TICK_BOUNDARY_PTS) == PREMIUM_TICK_PTS_ABOVE_3
+        assert tick_for(57.80) == PREMIUM_TICK_PTS_ABOVE_3
+
+    def test_a_stop_that_rounds_across_three_lands_on_the_coarse_grid(self):
+        # 5.00 fill, 0.30 delta, 6.63 SPX points → 5.00 - 1.989 = 3.011 → 3.10, not 3.05
+        assert protective_stop_price(5.00, 0.30, 6380.0, 6373.37) == 3.10
+
+    def test_a_stop_just_under_three_rounds_up_onto_the_boundary(self):
+        # 5.00 - (6.8 × 0.30) = 2.96 → 3.00 (on both grids)
+        assert protective_stop_price(5.00, 0.30, 6380.0, 6373.2) == 3.00
+
+    def test_a_stop_already_on_the_coarse_grid_is_left_alone(self):
+        # 5.00 - (6.0 × 0.30) = 3.20
+        assert protective_stop_price(5.00, 0.30, 6380.0, 6374.0) == 3.20
+
+    def test_a_stop_below_three_still_uses_the_fine_grid(self):
+        # 2.10 - (1.3 × 0.31) = 1.697 → 1.70, unchanged by the rule above
+        assert protective_stop_price(2.10, 0.31, 6380.0, 6378.7) == 1.70
+
+    @pytest.mark.parametrize("fill,delta,spx,stop_spx", [
+        (5.00, 0.30, 6380.0, 6373.37), (12.50, 0.55, 7747.0, 7740.0),
+        (57.80, 0.84, 7747.0, 7700.0), (3.10, 0.20, 6380.0, 6379.9),
+        (8.00, 0.45, 6380.0, 6370.0), (3.05, 0.30, 6380.0, 6379.9),
+    ])
+    def test_every_stop_at_or_above_three_sits_on_the_coarse_grid(self, fill, delta, spx, stop_spx):
+        price = protective_stop_price(fill, delta, spx, stop_spx)
+        tick = tick_for(price)
+        assert round(price * 100) % round(tick * 100) == 0, (price, tick)
+        assert price < fill
+
+    def test_the_cap_below_a_fill_above_three_is_one_coarse_tick_down(self):
+        # A distance too small to matter: the cap applies, one 0.10 tick under 3.10.
+        assert protective_stop_price(3.10, 0.30, 6380.0, 6379.99) == 3.00
+
+    def test_the_cap_below_a_fill_straddling_the_boundary(self):
+        # A 3.05 fill (an average of partials) caps at 2.95, which is on the fine grid.
+        assert protective_stop_price(3.05, 0.30, 6380.0, 6379.99) == 2.95
 
 
 class TestTheClamps:

@@ -461,9 +461,9 @@ LIMIT and `None` otherwise.
 `execd/bounds.py`. Pure functions over frozen data: an intent, the day's state,
 a quote, a clock reading. No I/O, no broker, no credential.
 
-There are **twelve distinct bound names** — `armed`, `instrument`, `side`,
+There are **thirteen distinct bound names** — `armed`, `instrument`, `side`,
 `order_type`, `qty`, `stop`, `protective_stop`, `window`, `positions`,
-`ceiling`, `price_band`, `preview_cost`. The table below has fourteen rows
+`ceiling`, `tick`, `price_band`, `preview_cost`. The table below has fifteen rows
 because `ceiling` and `protective_stop` each refuse on two separate conditions.
 
 **Order of checks for an entry** (`check_entry`), and the order is asserted in
@@ -483,6 +483,7 @@ names the most fundamental thing wrong:
 | 8 | `positions` | `open_positions >= max_open_positions` |
 | 9 | `ceiling` | `attempts_used >= max_attempts` |
 | 10 | `ceiling` | `realized_loss_usd >= daily_loss_ceiling_usd` |
+| 10a | `tick` | the limit (or a stop price) is off the exchange's grid — 0.05 below $3.00, 0.10 at and above it (measured 2026-09-04, st-pohq); an off-grid price is a rejected order, not a tighter one |
 | 11 | `price_band` | no quote; or quote older than `max_quote_age_s`; or not two-sided; or limit above `ask*(1+band)`; or limit below `bid*(1-band)` |
 | 12 | `protective_stop` | no `$SPX` mark; or the stop sign is transposed (`stop_is_consistent` false); or the limit is too cheap for `protective_stop_price` to derive a stop at all |
 | 12a | `ceiling` | the entry's own worst case — limit down to its derived stop, `check_risk_budget` — exceeds `daily_loss_ceiling_usd` minus loss already realized |
@@ -491,9 +492,10 @@ names the most fundamental thing wrong:
 Steps 12 and 13 run inside `ExecService`, not `check_entry` — 12 in
 `_protective_stop_refusal`, 13 in `_place_entry` after the broker preview.
 
-**An exit clears three things only** (`check_exit`): the instrument, that the
-side really is `SELL_TO_CLOSE`, and — *only when the service knows the size* —
-that `qty <= held_qty`. When `held_qty` is `None` the order goes through, because
+**An exit clears four things only** (`check_exit`): the instrument, that the
+side really is `SELL_TO_CLOSE`, — *only when the service knows the size* —
+that `qty <= held_qty`, and that any price it carries is on the tick grid (an
+off-grid stop is no stop, and refusing it cannot trap him). When `held_qty` is `None` the order goes through, because
 refusing on ignorance is how an exit gate traps someone. Not the window, not the
 ceiling, not the STOP file, not stand-down. The one thing that refuses an exit
 is LOCKED, and that is a statement about capability, not policy.

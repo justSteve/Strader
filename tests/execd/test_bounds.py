@@ -207,6 +207,46 @@ class TestOrderOfChecks:
         assert r.bound == "ceiling"
 
 
+class TestTheTick:
+    """SPX options quote in 0.05 below $3.00 and 0.10 at and above it —
+    measured 2026-09-04 (st-pohq). An off-grid price is an order the exchange
+    rejects, so it is refused here, entry and exit alike."""
+
+    def test_an_entry_limit_off_the_coarse_grid_is_refused(self):
+        r = refusal(entry(limit=3.05), quote=QuoteView(3.00, 3.10, 1.0))
+        assert r.bound == "tick" and "3.05" in r.reason and "0.10" in r.reason
+
+    def test_an_entry_limit_on_the_coarse_grid_passes(self):
+        assert refusal(entry(limit=3.10), quote=QuoteView(3.00, 3.10, 1.0)) is None
+
+    def test_an_entry_limit_on_the_fine_grid_below_three_passes(self):
+        assert refusal(entry(limit=2.05)) is None
+
+    def test_an_entry_limit_off_the_fine_grid_is_refused(self):
+        r = refusal(entry(limit=2.07))
+        assert r.bound == "tick" and "0.05" in r.reason
+
+    def test_the_tick_is_checked_before_the_band(self):
+        # 3.05 is inside the band around a 3.00/3.10 quote; the grid refuses it first.
+        r = refusal(entry(limit=3.05), quote=QuoteView(3.00, 3.10, 1.0))
+        assert r.bound == "tick"
+
+    @staticmethod
+    def _stop_exit(stop_price: float) -> OrderIntent:
+        return OrderIntent(intent_id="t-stop", symbol=CALL, side=Side.SELL_TO_CLOSE, qty=1,
+                           order_type=OrderType.STOP, stop_price=stop_price, source="test")
+
+    def test_an_exit_stop_off_the_grid_is_refused_because_it_is_no_stop(self):
+        r = check_exit(self._stop_exit(3.05), Bounds())
+        assert r.bound == "tick" and "stop_price" in r.reason
+
+    def test_an_exit_stop_on_the_grid_passes(self):
+        assert check_exit(self._stop_exit(3.10), Bounds()) is None
+
+    def test_a_market_exit_carries_no_price_and_passes(self):
+        assert check_exit(exit_intent(), Bounds()) is None
+
+
 class TestExitsClearAlmostNothing:
     """Read ``check_exit``'s docstring before relaxing any of these."""
 

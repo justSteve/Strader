@@ -93,6 +93,7 @@ breaks the suite.
 | `window` | 08:30–15:00 CT, weekdays; nothing opens after 14:50 |
 | `positions` | 1 open at a time |
 | `ceiling` | $500 realized loss, 2 attempts — rebuilt from the journal, so a restart does not reset it; and the entry's own worst case, limit down to its derived stop, must fit the headroom left |
+| `tick` | a limit or stop price on the exchange's grid — 0.05 below $3.00, 0.10 at and above (measured, st-pohq); off-grid is a rejected order, and an off-grid stop is no stop |
 | `price_band` | a limit within 10% of the touch, against a quote under 30s old |
 | `preview_cost` | the broker's own preview must agree with the intent before anything is sent |
 

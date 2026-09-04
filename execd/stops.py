@@ -20,25 +20,55 @@ The first is a floor under the second, not a substitute for it. Delta moves,
 so the option-price stop drifts away from the SPX level it was derived from as
 the day goes on; the live loop is what stays accurate. Belt, then braces.
 
-**Rounding.** The stop price is rounded *up* to the 0.05 tick — toward the
-fill, i.e. the tighter of the two valid ticks. Rounding down would let the
-realized loss sit up to one tick ($5 a contract) beyond the budget the stop
-distance was derived from, and the budget is a ceiling rather than a target.
-This is the same asymmetry FD0 applies to a buy limit and for the same kind of
-reason (``compose.py:463-472``): one tick against you is cheap, the bound
-being wrong is not.
+**Rounding.** The stop price is rounded *up* to the tick — toward the fill,
+i.e. the tighter of the two valid ticks. Rounding down would let the realized
+loss sit up to one tick beyond the budget the stop distance was derived from,
+and the budget is a ceiling rather than a target. This is the same asymmetry
+FD0 applies to a buy limit and for the same kind of reason
+(``compose.py:463-472``): one tick against you is cheap, the bound being wrong
+is not.
+
+**The tick is not one number.** SPX options quote in $0.05 below $3.00 and in
+$0.10 at and above it. Measured, not remembered (st-pohq, 2026-09-04,
+``docs/measurement/spx-option-tick-2026-09-04.md``): in a live $SPX chain of
+160 contracts, every one of the 205 quoted sides at or above $3.00 sat on the
+0.10 grid and none needed 0.05; below $3.00 half of them did. A stop resting
+at 3.05 is a stop the exchange refuses under a live position, which is the
+one state this module exists to prevent — so :func:`tick_for` picks the grid
+by the price, and a stop that rounds across $3.00 is re-rounded onto the
+coarser grid.
 """
 
 from __future__ import annotations
 
 import math
 
-PREMIUM_TICK_PTS = 0.05
+PREMIUM_TICK_PTS = 0.05          # the finer grid, below $3.00
+PREMIUM_TICK_PTS_ABOVE_3 = 0.10  # at and above $3.00
+TICK_BOUNDARY_PTS = 3.00
 CONTRACT_MULTIPLIER = 100
 
 
-def _round_up_to_tick(pts: float, tick: float = PREMIUM_TICK_PTS) -> float:
+def tick_for(pts: float) -> float:
+    """The quoting increment in force at this premium."""
+    return PREMIUM_TICK_PTS_ABOVE_3 if float(pts) >= TICK_BOUNDARY_PTS else PREMIUM_TICK_PTS
+
+
+def _ceil_to(pts: float, tick: float) -> float:
     return round(math.ceil(round(pts / tick, 6)) * tick, 2)
+
+
+def _floor_to(pts: float, tick: float) -> float:
+    return round(math.floor(round(pts / tick, 6)) * tick, 2)
+
+
+def _round_up_to_tick(pts: float, tick: float = PREMIUM_TICK_PTS) -> float:
+    """Up to the finer grid first; if that lands at or above the boundary,
+    up again to the coarser one. 2.96 → 3.00, 3.01 → 3.10, 3.10 → 3.10."""
+    price = _ceil_to(pts, tick)
+    if price >= TICK_BOUNDARY_PTS:
+        price = _ceil_to(price, max(tick, PREMIUM_TICK_PTS_ABOVE_3))
+    return price
 
 
 def stop_distance_spx(spx_now: float, stop_spx: float) -> float:
@@ -80,9 +110,13 @@ def protective_stop_price(fill_px: float, delta_abs: float, spx_now: float,
     # Two clamps, both for real cases. A stop distance wide enough to take the
     # option to zero is a stop that would never trigger, so it rests one tick
     # above nothing and the position runs to expiry or the live loop instead.
-    # A stop at or above the fill would fire on the first tick of spread noise.
+    # A stop at or above the fill would fire on the first tick of spread noise;
+    # the cap is one tick below the fill, on the grid in force there.
     price = max(price, tick)
-    price = min(price, round(fill_px - tick, 2))
+    fill_tick = max(tick, tick_for(fill_px))
+    cap = round(fill_px - fill_tick, 2)
+    cap = _floor_to(cap, max(tick, tick_for(cap))) if cap > 0 else cap
+    price = min(price, cap)
     if price < tick:
         raise ValueError(
             f"a {fill_px:.2f} fill leaves no room for a stop above the {tick:.2f} tick"

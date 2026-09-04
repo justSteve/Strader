@@ -276,6 +276,29 @@ def check_price_band(
     return None
 
 
+def check_tick(intent: OrderIntent) -> Refusal | None:
+    """A price off the exchange's grid is an order the exchange rejects.
+
+    SPX options quote in 0.05 below $3.00 and 0.10 at and above it — measured
+    2026-09-04 (st-pohq): every quoted side at or above $3.00 in a live chain
+    sat on the 0.10 grid. A 3.05 limit is not a tighter price, it is a
+    rejected order; under a live position a 3.05 stop is a position with no
+    stop. Refused here, before the broker sees it."""
+    from .stops import tick_for      # local: bounds stays importable on its own
+
+    for label, price in (("limit", intent.limit), ("stop_price", intent.stop_price)):
+        if price is None:
+            continue
+        tick = tick_for(price)
+        if round(price * 100) % round(tick * 100) != 0:
+            return Refusal(
+                "tick",
+                f"{label} {price:.2f} is not on the {tick:.2f} grid SPX options quote in "
+                f"{'at and above' if tick > 0.05 else 'below'} $3.00",
+            )
+    return None
+
+
 def check_entry(
     intent: OrderIntent,
     bounds: Bounds,
@@ -339,6 +362,9 @@ def check_entry(
             f"${bounds.daily_loss_ceiling_usd:.2f} ceiling",
         )
 
+    if (r := check_tick(intent)) is not None:
+        return r
+
     if (r := check_price_band(intent, bounds, quote)) is not None:
         return r
 
@@ -373,6 +399,11 @@ def check_exit(intent: OrderIntent, bounds: Bounds,
             f"closing {intent.qty} against a position of {held_qty} would leave "
             f"a short — this service is long premium only",
         )
+    # The one price check an exit keeps: an off-grid price does not trap him,
+    # it is simply an order the exchange will not take, and a stop the exchange
+    # will not take is no protection at all.
+    if (r := check_tick(intent)) is not None:
+        return r
     return None
 
 
