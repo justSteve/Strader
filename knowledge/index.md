@@ -71,6 +71,7 @@ in it covered external domain knowledge or facts about the operator.
 ### reference
 
 - [Carmine Rosato — InvestiTrade LVN Method](carmine-rosato-investitrade-lvn-method.md) — Carmine Rosato / InvestiTrade — order-flow + supply/demand "Low Volume Node" method Steve models; LVN = zone left by a fast departure
+- [SPXW Final-Fifteen Strike Concentration](spxw-final-fifteen-strike-concentration.md) — Measured 08-30: the 32 strikes within ±40 pts of ES carry ~3/4 of SPXW print volume in the last fifteen minutes while quotes spread across the whole surface — narrowing is a quote-schema lever, not a trades lever
 - [Zone Framework Equivalence](zone-framework-equivalence.md) — Supply/Demand (Seiden), ICT, SMC, and Carmine's LVN are one event in four dialects — a fast departure leaving unfilled orders + trapped traders
 
 ### rule
