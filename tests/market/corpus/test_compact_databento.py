@@ -63,6 +63,115 @@ def test_compact_day_idempotent(tmp_path):
     assert second == []
 
 
+# --- atomic, verified archives [co-8b60y] ------------------------------------
+# A kill mid-compress used to leave a truncated .zst under the final name that
+# the next run treated as done. Measured 2026-09-04: a zstd frame cut in half
+# decompresses to zero bytes WITHOUT raising, so only a byte-count comparison
+# against the source proves an archive whole.
+
+DBN = b"\x00\x01DBN-fake-stream\xff" * 20000
+
+
+def _raising_jobs(monkeypatch, fail_after_bytes=None):
+    """Swap the zstd job for one that writes a partial archive then raises —
+    the shape of a process dying mid-copy."""
+    def torn(src, dst):
+        with dst.open("wb") as f:
+            f.write(b"\x28\xb5\x2f\xfd" + b"\x00" * 100)   # zstd magic + junk
+        raise OSError("simulated kill mid-compress")
+    monkeypatch.setattr(compact, "JOBS", ((("databento_*.dbn", ".zst", torn),)
+                                         + tuple(j for j in compact.JOBS if j[1] == ".gz")))
+
+
+def test_mid_compress_failure_leaves_no_archive_and_source_intact(tmp_path, monkeypatch):
+    src = tmp_path / "databento_glbx_es.0.dbn"
+    src.write_bytes(DBN)
+    _raising_jobs(monkeypatch)
+    import pytest as _pt
+    with _pt.raises(OSError):
+        compact.compact_day(tmp_path)
+    assert src.exists() and src.read_bytes() == DBN
+    assert not (tmp_path / "databento_glbx_es.0.dbn.zst").exists()
+    assert list(tmp_path.glob("*.tmp")) == []
+
+    # a second run with a working compressor completes the job
+    monkeypatch.undo()
+    res = compact.compact_day(tmp_path)
+    assert [r["name"] for r in res] == ["databento_glbx_es.0.dbn"]
+    assert not src.exists()
+    zst = tmp_path / "databento_glbx_es.0.dbn.zst"
+    compact.verify_archive(zst, len(DBN))       # whole
+
+
+def test_leftover_tmp_is_removed_and_never_treated_as_done(tmp_path):
+    src = tmp_path / "databento_glbx_es.0.dbn"
+    src.write_bytes(DBN)
+    planted = tmp_path / "databento_glbx_es.0.dbn.zst.tmp"
+    planted.write_bytes(b"half an archive")
+    res = compact.compact_day(tmp_path)
+    assert not planted.exists()
+    assert [r["name"] for r in res] == ["databento_glbx_es.0.dbn"]
+    assert (tmp_path / "databento_glbx_es.0.dbn.zst").exists()
+    assert not src.exists()
+    # the planted junk never became the archive
+    assert (tmp_path / "databento_glbx_es.0.dbn.zst").read_bytes() != b"half an archive"
+
+
+def test_truncated_zst_is_detected_by_verify(tmp_path):
+    import zstandard
+    whole = zstandard.ZstdCompressor(level=10).compress(DBN)
+    good = tmp_path / "good.dbn.zst"
+    good.write_bytes(whole)
+    compact.verify_archive(good, len(DBN))
+    torn = tmp_path / "torn.dbn.zst"
+    torn.write_bytes(whole[: len(whole) // 2])
+    import pytest as _pt
+    with _pt.raises(compact.ArchiveVerifyError):
+        compact.verify_archive(torn, len(DBN))
+    # and gzip: a cut stream raises EOFError, which verify reports the same way
+    import gzip as _gz
+    gz = tmp_path / "x.jsonl.gz"
+    whole_gz = _gz.compress(b"x\n" * 50000)
+    gz.write_bytes(whole_gz[: len(whole_gz) // 2])
+    with _pt.raises(compact.ArchiveVerifyError):
+        compact.verify_archive(gz, 100000)
+    gz.write_bytes(whole_gz)
+    compact.verify_archive(gz, 100000)
+
+
+def test_torn_archive_under_the_final_name_is_repacked_not_trusted(tmp_path):
+    """The pre-2026-09-04 failure: a truncated .zst exists beside its source
+    (a killed run that had already renamed — or the old direct write). The
+    archive must be re-verified against the source and packed again."""
+    import zstandard
+    src = tmp_path / "databento_glbx_es.0.dbn"
+    src.write_bytes(DBN)
+    whole = zstandard.ZstdCompressor(level=10).compress(DBN)
+    dst = tmp_path / "databento_glbx_es.0.dbn.zst"
+    dst.write_bytes(whole[: len(whole) // 2])
+    res = compact.compact_day(tmp_path)
+    assert len(res) == 1 and res[0]["resumed"] is False
+    compact.verify_archive(dst, len(DBN))
+    assert not src.exists()
+
+
+def test_whole_archive_beside_its_source_is_resumed_without_recompressing(tmp_path, monkeypatch):
+    """A run killed between the rename and the unlink. The archive is whole;
+    finish the job (remove the source) and do not compress again."""
+    import zstandard
+    src = tmp_path / "databento_glbx_es.0.dbn"
+    src.write_bytes(DBN)
+    dst = tmp_path / "databento_glbx_es.0.dbn.zst"
+    dst.write_bytes(zstandard.ZstdCompressor(level=10).compress(DBN))
+    calls = []
+    monkeypatch.setattr(compact, "JOBS", ((
+        "databento_*.dbn", ".zst", lambda s, d: calls.append(s)),))
+    res = compact.compact_day(tmp_path)
+    assert calls == []
+    assert len(res) == 1 and res[0]["resumed"] is True
+    assert not src.exists() and dst.exists()
+
+
 # --- readers survive compaction [st-itky] -----------------------------------
 # The compactor REMOVES the uncompressed source unless --keep. Before this,
 # read_corpus_day opened the plain path directly and every es_day_path().exists()
