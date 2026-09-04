@@ -98,14 +98,21 @@ def run_slice(day: _date, name: str, slice_path: Path, model: str | None) -> dic
     stage = rd / "20-classify" / name
     stage.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(PROMPT, stage / "prompt.md")
-    (stage / "input.txt").write_text(
-        assemble(day, name, slice_path.read_text(encoding="utf-8"), sources_text(ctx)),
-        encoding="utf-8")
+    slice_text = slice_path.read_text(encoding="utf-8")
+    (stage / "input.txt").write_text(assemble(day, name, slice_text, sources_text(ctx)),
+                                     encoding="utf-8")
+    # Prompt rule 1 is one LABEL per alert minute, so a slice that carries an
+    # alert and an output with no LABEL is an empty, refused or truncated reply.
+    # It fails the checker here — rc 2 into the wrapper's alert — instead of
+    # passing as a clean run with zero labels [st-k75z].
+    alert_minutes = sum(1 for l in slice_text.splitlines() if "sig=alert" in l)
     meter = call_stage(stage, model)
     verdict = checker.check_lines((stage / "output.md").read_text(encoding="utf-8").splitlines(),
-                                  checker.load_context(ctx))
+                                  checker.load_context(ctx),
+                                  require="LABEL" if alert_minutes else None)
     (stage / "check.json").write_text(json.dumps(verdict, indent=1) + "\n", encoding="utf-8")
     rec = {"slice": name, "input_chars": len((stage / "input.txt").read_text()),
+           "alert_minutes": alert_minutes,
            "labels": verdict["counts"]["LABEL"], "implications": verdict["counts"]["IMPLICATION"],
            "unsourced": verdict["unsourced"], "ok": verdict["ok"],
            "failures": len(verdict["failures"]), **meter}

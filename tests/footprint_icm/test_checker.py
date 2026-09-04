@@ -108,3 +108,33 @@ def test_cli_writes_check_json_and_exits_2_on_failure(context, tmp_path, state_d
     assert doc["ok"] is False and len(doc["failures"]) == 1
     out.write_text(GOOD + "\n")
     assert checker.main([str(out), "--context", str(ctx)]) == 0
+
+
+def test_a_required_line_type_that_never_appears_fails_on_line_0(context):
+    """[st-k75z] an empty, refused or truncated reply used to pass as a clean
+    run with zero labels — ``ok`` was ``not failures`` and nothing else."""
+    for out in ([], ["", "# nothing fired"], ["   "]):
+        v = checker.check_lines(out, context, require="LABEL")
+        assert not v["ok"]
+        assert len(v["failures"]) == 1
+        assert v["failures"][0]["line_no"] == 0 and "no LABEL line" in v["failures"][0]["reason"]
+    # an IMPLICATION-only output does not satisfy a LABEL requirement
+    v = checker.check_lines([GOOD], context, require="LABEL")
+    assert not v["ok"] and v["counts"] == {"LABEL": 0, "IMPLICATION": 1, "CLAIM": 0}
+    # present -> clean; nothing required -> a quiet slice may legitimately be empty
+    assert checker.check_lines(['LABEL 12:47 level_reject regime=unstated cite=UNSOURCED'],
+                               context, require="LABEL")["ok"]
+    assert checker.check_lines([], context)["ok"]
+    with pytest.raises(common.LaneError, match="require='BOGUS'"):
+        checker.check_lines([], context, require="BOGUS")
+
+
+def test_cli_require_flag_exits_2_on_a_missing_line_type(context, tmp_path, state_dir):
+    excerpts.build(DAY)
+    ctx = common.run_dir(DAY) / "20-classify/context"
+    out = tmp_path / "output.md"
+    out.write_text(GOOD + "\n")
+    assert checker.main([str(out), "--context", str(ctx)]) == 0
+    assert checker.main([str(out), "--context", str(ctx), "--require", "CLAIM"]) == 2
+    doc = json.loads((tmp_path / "check.json").read_text())
+    assert doc["failures"][0]["line_no"] == 0 and "no CLAIM line" in doc["failures"][0]["reason"]

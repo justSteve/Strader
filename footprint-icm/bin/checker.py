@@ -19,6 +19,10 @@ The run fails, naming the line, when:
     ``common.normalize``)
   * an UNSOURCED or NO-RULE-IN-CANON line carries ``because`` words
   * a CLAIM's ``quote`` does not appear word for word in the live reply
+  * ``require`` names a line type (LABEL or CLAIM) and the output holds none —
+    the caller says the input carried work for it (alert minutes, replies), so
+    an empty, refused or truncated reply is a failed run, never a clean run
+    with zero labels [st-k75z]
 
 What this cannot decide: whether the quoted words support the label. That
 is what a reader opening the cite verifies; the trial's stop condition 3
@@ -70,8 +74,13 @@ def load_context(ctx: Path) -> dict[str, dict]:
     return rows
 
 
-def check_lines(lines: list[str], context: dict[str, dict], live: str | None = None) -> dict:
-    """Every line judged. Returns {"ok", "lines", "failures": [...]}."""
+def check_lines(lines: list[str], context: dict[str, dict], live: str | None = None,
+                *, require: str | None = None) -> dict:
+    """Every line judged. Returns {"ok", "lines", "failures": [...]}.
+
+    ``require="LABEL"`` / ``"CLAIM"``: at least one such line must be present,
+    else the verdict fails on line 0. Pass it when the input carried work for
+    that line type; leave it None for a slice with nothing to label."""
     failures: list[dict] = []
     parsed: list[dict] = []
 
@@ -127,8 +136,14 @@ def check_lines(lines: list[str], context: dict[str, dict], live: str | None = N
             parsed.append({"type": "CLAIM", **d})
             continue
         fail(n, line, "matches no line shape (LABEL / IMPLICATION / CLAIM)")
-    return {"ok": not failures, "lines": parsed, "failures": failures,
-            "counts": {t: sum(1 for p in parsed if p["type"] == t) for t in ("LABEL", "IMPLICATION", "CLAIM")},
+    counts = {t: sum(1 for p in parsed if p["type"] == t) for t in ("LABEL", "IMPLICATION", "CLAIM")}
+    if require is not None:
+        if require not in counts:
+            raise LaneError(f"require={require!r} is not one of {tuple(counts)}")
+        if counts[require] == 0:
+            fail(0, "", f"no {require} line in the output — the input carried work for it, so an "
+                        f"empty, refused or truncated reply is not a clean run [st-k75z]")
+    return {"ok": not failures, "lines": parsed, "failures": failures, "counts": counts,
             "unsourced": sum(1 for p in parsed if p.get("cite") in (UNSOURCED, NO_RULE))}
 
 
@@ -138,10 +153,13 @@ def main(argv=None) -> int:
     ap.add_argument("--context", type=Path, required=True)
     ap.add_argument("--live", type=Path, help="the live reply a CLAIM quotes from")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--require", choices=("LABEL", "CLAIM"),
+                    help="fail unless at least one line of this type is present [st-k75z]")
     args = ap.parse_args(argv)
     context = load_context(args.context)
     live = args.live.read_text(encoding="utf-8") if args.live else None
-    verdict = check_lines(args.output.read_text(encoding="utf-8").splitlines(), context, live)
+    verdict = check_lines(args.output.read_text(encoding="utf-8").splitlines(), context, live,
+                          require=args.require)
     (args.output.parent / "check.json").write_text(json.dumps(verdict, indent=1) + "\n",
                                                     encoding="utf-8")
     for f in verdict["failures"]:

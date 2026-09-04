@@ -95,8 +95,11 @@ def run_one(day: _date, name: str, replies: str, live: str, model: str | None) -
         assemble(day, sources_text(ctx), audit_labels_text(rd), replies, name == "planted"),
         encoding="utf-8")
     meter = call_stage(stage, model)
+    # Prompt rule 4 is one CLAIM per claim in the replies; replies in and no
+    # CLAIM out is an empty, refused or truncated reply, failed here [st-k75z].
     verdict = checker.check_lines((stage / "output.md").read_text(encoding="utf-8").splitlines(),
-                                  checker.load_context(ctx), live)
+                                  checker.load_context(ctx), live,
+                                  require="CLAIM" if replies.strip() else None)
     (stage / "check.json").write_text(json.dumps(verdict, indent=1) + "\n", encoding="utf-8")
     if not verdict["ok"]:
         for f in verdict["failures"]:

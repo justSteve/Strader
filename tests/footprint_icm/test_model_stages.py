@@ -310,3 +310,34 @@ def test_setup_and_regime_mapping_are_derived_from_the_recognizer_names():
     assert compare.regime_of("we are trending") == "trending"
     assert compare.regime_of("choppy, rotational tape") == "rotation"
     assert compare.regime_of("nothing here") is None
+
+
+def test_classify_refuses_an_empty_reply_on_an_alert_slice(state_dir, stub):
+    """[st-k75z] a refused or blank model reply on a slice that carries an alert
+    used to pass as a clean run with zero labels; now it fails the checker and
+    the run, which is the wrapper's existing rc-2 alert path."""
+    rd = prepare_run(state_dir)
+    canned = json.loads(stub.read_text())
+    canned["wake-1247"] = ""
+    stub.write_text(json.dumps(canned))
+    with pytest.raises(common.LaneError, match="folder is not bounding the model"):
+        classify.main([DAY.isoformat()])
+    doc = json.loads((rd / "20-classify/wake-1247/check.json").read_text())
+    assert doc["ok"] is False
+    assert doc["failures"][0]["line_no"] == 0 and "no LABEL line" in doc["failures"][0]["reason"]
+    run = common.read_json(rd / "run.json")["classify"]
+    first = run["slices"][0]
+    assert first["slice"] == "wake-1247" and first["alert_minutes"] >= 1 and first["labels"] == 0
+
+
+def test_claims_refuse_an_empty_reply_when_replies_exist(state_dir, stub):
+    """[st-k75z] the same hole on the compare stage: replies in, no CLAIM out."""
+    rd = prepare_run(state_dir)
+    canned = json.loads(stub.read_text())
+    canned["claims"] = ""
+    stub.write_text(json.dumps(canned))
+    with pytest.raises(common.LaneError):
+        claims.main([DAY.isoformat(), "--only", "claims"])
+    doc = json.loads((rd / "40-compare/claims/check.json").read_text())
+    assert doc["ok"] is False
+    assert doc["failures"][0]["line_no"] == 0 and "no CLAIM line" in doc["failures"][0]["reason"]
