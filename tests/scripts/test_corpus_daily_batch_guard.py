@@ -92,3 +92,69 @@ def test_mbp1_gap_alert_fires_only_when_there_are_no_rows_at_all(tmp_path, monke
         day=date(2026, 8, 19))
     assert cd.stream_healthy_in_manifest(day, cd.MBP1_STREAM) is False
     assert cd.stream_has_rows_in_manifest(day, cd.MBP1_STREAM)[0] is True
+
+
+# --- resolving transport notes after a batch pull [co-8b60y] -----------------
+# The 2026-09-03 case: the live capture logged 6,466 reconnect notes per stream
+# during a 42-hour outage and captured no rows; the batch pull then replaced
+# the day's rows from the history host. The notes describe a transport that is
+# no longer the source of the rows, so they move into errors_resolved and the
+# day reads clean. A real error is never resolved this way.
+
+def _redirect_writer(tmp_path: Path, monkeypatch, day: date) -> Path:
+    import market.corpus.writer as writer
+    p = tmp_path / day.isoformat() / "manifest.json"
+    monkeypatch.setattr(writer, "manifest_path", lambda dd: p)
+    monkeypatch.setattr(writer, "day_dir", lambda dd, create=False: p.parent)
+    return p
+
+
+def test_reconnect_notes_are_resolved_after_a_successful_batch_pull(tmp_path, monkeypatch):
+    notes = [f"reconnect #{i}: BentoError: Connection to glbx-mdp3 timed out (possible gap)"
+             for i in range(1, 8)]
+    day = _manifest(tmp_path, monkeypatch, {"databento_glbx_es": {
+        "cycles": 323929, "errors": notes, "errors_dropped": 6459,
+        "last_pull_utc": "2026-09-04T13:12:29Z"}}, day=date(2026, 9, 3))
+    p = _redirect_writer(tmp_path, monkeypatch, day)
+    assert cd.resolve_transport_notes(day, "databento_glbx_es") == 6466
+    st = json.loads(p.read_text())["streams"]["databento_glbx_es"]
+    assert st["errors"] == [] and "errors_dropped" not in st
+    assert st["errors_resolved"]["count"] == 6466
+    assert st["errors_resolved"]["sample"] == notes[:3]
+    assert cd.stream_healthy_in_manifest(day, "databento_glbx_es") is True
+
+
+def test_a_real_error_is_left_in_place(tmp_path, monkeypatch):
+    day = _manifest(tmp_path, monkeypatch, {"databento_glbx_es": {
+        "cycles": 10, "errors": ["reconnect #1: gap", "disk full: write failed"],
+        "last_pull_utc": "2026-09-04T13:12:29Z"}}, day=date(2026, 9, 3))
+    p = _redirect_writer(tmp_path, monkeypatch, day)
+    assert cd.resolve_transport_notes(day, "databento_glbx_es") == 0
+    st = json.loads(p.read_text())["streams"]["databento_glbx_es"]
+    assert len(st["errors"]) == 2 and "errors_resolved" not in st
+
+
+def test_nothing_to_resolve_is_a_no_op(tmp_path, monkeypatch):
+    day = _manifest(tmp_path, monkeypatch, {"databento_glbx_es": {
+        "cycles": 10, "errors": [], "last_pull_utc": "2026-09-04T13:12:29Z"}}, day=date(2026, 9, 3))
+    _redirect_writer(tmp_path, monkeypatch, day)
+    assert cd.resolve_transport_notes(day, "databento_glbx_es") == 0
+
+
+def test_main_resolves_after_the_pull_it_ran(tmp_path, monkeypatch):
+    """The orchestrator path: a stream with no rows and reconnect notes → the
+    pull runs, returns 0, and the notes are resolved in the same run."""
+    day = _manifest(tmp_path, monkeypatch, {
+        "databento_glbx_es": {"cycles": 0, "errors": ["reconnect #1: gap"],
+                              "last_pull_utc": "2026-09-03T12:00:00Z"}}, day=date(2026, 9, 3))
+    p = _redirect_writer(tmp_path, monkeypatch, day)
+    monkeypatch.setattr(cd, "run_pull", lambda script, d, extra=None, pass_date=True: (0, ""))
+    monkeypatch.setattr(cd, "run_token_health", lambda: None)
+    monkeypatch.setattr(cd, "mbp1_authorization", lambda: (False, "test"))
+    for name in ("run_gexbot_hist", "run_internals", "run_schwab_batch", "run_gate", "write_health"):
+        if hasattr(cd, name):
+            monkeypatch.setattr(cd, name, lambda *a, **k: None)
+    monkeypatch.setattr(cd, "emit_alert", lambda *a, **k: None)
+    cd.main(["--date", day.isoformat()])
+    st = json.loads(p.read_text())["streams"]["databento_glbx_es"]
+    assert st["errors"] == [] and st["errors_resolved"]["count"] == 1

@@ -123,18 +123,31 @@ DEFAULT_MAX_AGE_HOURS = 36.0
 #: that lands a few minutes early without excusing a feed that died at lunchtime.
 DEFAULT_CLOSE_SLACK_MIN = 10.0
 
-#: Most reconnect-shaped errors a covered day may carry and still pass. Each one
-#: bounds a possible gap at the heartbeat timeout (seconds); more than this
-#: suggests a flapping feed whose day deserves a human look. [st-mmh9]
+#: Reconnect-shaped errors above this count on a covered day are reported as a
+#: WARNING naming the count — a flapping feed deserves a look — but they do not
+#: fail the day. Revised 2026-09-04 (co-8b60y): under the original rule
+#: [st-mmh9] the count was fatal, and a 42-hour network outage left 2026-09-03
+#: carrying 6,466 reconnect notes per stream; the tape was then backfilled in
+#: full and the day still read UNHEALTHY, which halted the 08:15 parse and
+#: failed the 08:25 heartbeat on data that was present. Nothing ever removes a
+#: note from a manifest, so a fatal count is a permanent verdict on a day whose
+#: data may be whole. Coverage and cycles are the questions the gate exists to
+#: ask; the note count is a fact about the transport, and it is surfaced as one.
 MAX_RECOVERED_RECONNECTS = 3
 
 
 def _is_reconnect_error(err: Any) -> bool:
-    """True for the collector's heartbeat-lapse entries, e.g.
+    """True for the collector's transport entries: the heartbeat-lapse line
     ``reconnect #1: BentoError: Gateway timeout: 40 second(s) since last
-    message (possible gap)``. The ``reconnect #`` prefix is the stable contract
-    with corpus_stream_databento.py's error logging."""
-    return isinstance(err, str) and err.startswith("reconnect #")
+    message (possible gap)`` and the budget line ``giving up after 6
+    reconnects`` that closes a run which never got through. Both prefixes are
+    the stable contract with corpus_stream_databento.py's error logging
+    (``_note_reconnect`` and the give-up branch). Measured 2026-09-04: the
+    2026-09-03 manifest held 5,544 of the first and 922 of the second per
+    stream, and a rule that knew only the first read the day as carrying 922
+    real errors."""
+    return isinstance(err, str) and (err.startswith("reconnect #")
+                                     or err.startswith("giving up after "))
 
 
 @dataclass
@@ -206,6 +219,7 @@ def evaluate(
     """Pure evaluation of a manifest dict. No I/O."""
     now = now or datetime.now(timezone.utc)
     reasons: list[str] = []
+    warnings: list[str] = []
     checked: dict[str, Any] = {}
 
     streams = manifest.get("streams") or {}
@@ -232,10 +246,12 @@ def evaluate(
 
         covers_day = (None if last_dt is None or deadline is None
                       else last_dt >= deadline)
+        resolved = st.get("errors_resolved") or {}
         checked[name] = {
             "present": True,
             "cycles": cycles,
             "errors": len(errors),
+            "errors_resolved": int(resolved.get("count", 0) or 0) if isinstance(resolved, dict) else 0,
             "last_pull_utc": last_pull,
             "age_hours": round(age_hours, 2) if age_hours is not None else None,
             "covers_day": covers_day,
@@ -244,12 +260,20 @@ def evaluate(
         if cycles <= 0:
             reasons.append(f"stream '{name}' has no cycles (cycles={cycles})")
         if errors:
-            # Recovered reconnects on a verifiably covered day demote to a
-            # warning; anything else in the list stays fatal. [st-mmh9]
+            # Reconnect-shaped entries on a verifiably covered day are notes
+            # about the transport, not holes in the tape: the day has rows and
+            # a last write past its close. They pass, and above the ceiling
+            # they pass with a warning that names the count. Anything that is
+            # not reconnect-shaped stays fatal. [st-mmh9; revised co-8b60y]
             if (covers_day is True and cycles > 0
-                    and len(errors) <= MAX_RECOVERED_RECONNECTS
                     and all(_is_reconnect_error(e) for e in errors)):
                 checked[name]["recovered_reconnects"] = len(errors)
+                if len(errors) > MAX_RECOVERED_RECONNECTS:
+                    warnings.append(
+                        f"stream '{name}' reconnected {len(errors)} times on a "
+                        f"covered day (ceiling {MAX_RECOVERED_RECONNECTS}) — the tape "
+                        f"is whole, the feed was flapping; worth a look, not a halt"
+                    )
             else:
                 reasons.append(f"stream '{name}' reported {len(errors)} error(s)")
         if last_dt is None:
@@ -280,7 +304,6 @@ def evaluate(
     # Configured-but-empty streams outside the required set: a collector ran
     # against this day and produced nothing but errors. Not fatal (see the
     # module docstring) but never silent again. [co-03ojd.7 J-F3]
-    warnings: list[str] = []
     for name, st in streams.items():
         if name in required_streams or not isinstance(st, dict):
             continue

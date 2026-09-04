@@ -47,6 +47,16 @@ def _json_fallback(o: Any) -> Any:
     return str(o)
 
 
+#: How many error strings a stream's manifest entry keeps. The FIRST ones stay —
+#: they say when and how the trouble began — and the rest become a count.
+#: Measured 2026-09-04 (co-8b60y): a 42-hour outage appended 6,466 copies of one
+#: sentence per stream and a 4.4 MB manifest; the count says the same thing.
+MAX_MANIFEST_ERRORS = 50
+#: How many notes the day keeps. The LAST ones stay — the newest note is the
+#: one that says what finally happened — and older ones become a count.
+MAX_MANIFEST_NOTES = 50
+
+
 def update_manifest(
     d: date | None,
     stream: str,
@@ -54,8 +64,20 @@ def update_manifest(
     increment_cycles: int = 0,
     errors: list[str] | None = None,
     note: str | None = None,
+    resolve_errors: bool = False,
 ) -> None:
-    """Maintain `manifest.json` summarizing what landed in the per-day dir."""
+    """Maintain `manifest.json` summarizing what landed in the per-day dir.
+
+    ``resolve_errors=True`` moves the stream's outstanding errors into an
+    ``errors_resolved`` record (count, when, a three-line sample) and clears
+    the list. The caller that may say this is one that has just replaced the
+    stream's rows from a source that does not share the failure — the batch
+    pull after a live-capture outage. The history is not lost: the count and
+    the sample stay, and the full text is in the journal.
+
+    The file is written to a temporary name and renamed into place, so a kill
+    mid-write leaves the previous manifest intact rather than a truncated one.
+    """
     path = manifest_path(d)
     if path.exists():
         manifest = json.loads(path.read_text())
@@ -70,13 +92,41 @@ def update_manifest(
     s = manifest["streams"].setdefault(stream, {"cycles": 0, "errors": []})
     s["cycles"] += increment_cycles
     if errors:
-        s["errors"].extend(errors)
+        kept = s.setdefault("errors", [])
+        room = MAX_MANIFEST_ERRORS - len(kept)
+        if room > 0:
+            kept.extend(errors[:room])
+        dropped = len(errors) - max(room, 0)
+        if dropped > 0:
+            s["errors_dropped"] = int(s.get("errors_dropped", 0) or 0) + dropped
+    if resolve_errors and (s.get("errors") or s.get("errors_dropped")):
+        outstanding = list(s.get("errors") or [])
+        total = len(outstanding) + int(s.get("errors_dropped", 0) or 0)
+        s["errors_resolved"] = {
+            "count": total,
+            "resolved_utc": utc_now_iso(),
+            "sample": outstanding[:3],
+            "note": note or "",
+        }
+        s["errors"] = []
+        s.pop("errors_dropped", None)
     s["last_pull_utc"] = utc_now_iso()
 
     if note:
-        manifest["notes"].append({"ts": utc_now_iso(), "stream": stream, "note": note})
+        notes = manifest.setdefault("notes", [])
+        notes.append({"ts": utc_now_iso(), "stream": stream, "note": note})
+        if len(notes) > MAX_MANIFEST_NOTES:
+            excess = len(notes) - MAX_MANIFEST_NOTES
+            manifest["notes_dropped"] = int(manifest.get("notes_dropped", 0) or 0) + excess
+            manifest["notes"] = notes[excess:]
 
-    path.write_text(json.dumps(manifest, indent=2, default=_json_fallback))
+    _write_atomic(path, json.dumps(manifest, indent=2, default=_json_fallback))
+
+
+def _write_atomic(path: Path, text: str) -> None:
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text)
+    tmp.replace(path)
 
 
 def _today_central_iso() -> str:

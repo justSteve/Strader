@@ -59,6 +59,7 @@ from market.corpus.paths import (  # noqa: E402
     manifest_path,
     most_recent_session_day,
 )
+from market.corpus.writer import update_manifest  # noqa: E402
 from runbook.datastream import gate  # noqa: E402
 from strader import entitlements  # noqa: E402
 
@@ -175,6 +176,31 @@ def _stream_state(day: _date, stream: str) -> dict | None:
         return None
     st = (manifest.get("streams") or {}).get(stream)
     return st if isinstance(st, dict) else None
+
+
+def resolve_transport_notes(day: _date, stream: str) -> int:
+    """After a batch pull has replaced a stream's rows from the history host,
+    the live capture's reconnect notes on that stream describe a transport
+    that is no longer the source of the rows. Move them into the manifest's
+    ``errors_resolved`` record so the day reads clean and the compactor packs
+    it; the count and a sample stay. Returns the number resolved. Only
+    reconnect-shaped notes are resolved — a real error stays where it is.
+    [co-8b60y]"""
+    st = _stream_state(day, stream) or {}
+    errs = list(st.get("errors") or [])
+    dropped = int(st.get("errors_dropped", 0) or 0)
+    if not errs and not dropped:
+        return 0
+    if not all(gate._is_reconnect_error(e) for e in errs):
+        logger.warning("%s: %d error(s) on %s are not all reconnect notes — left in place",
+                       stream, len(errs), day)
+        return 0
+    total = len(errs) + dropped
+    update_manifest(day, stream, resolve_errors=True,
+                    note=f"batch pull complete; {total} live-capture reconnect note(s) resolved")
+    logger.info("%s: %d reconnect note(s) resolved for %s after the batch pull",
+                stream, total, day)
+    return total
 
 
 def run_pull(script: str, day: _date, extra: list[str] | None = None,
@@ -306,6 +332,8 @@ def main(argv: list[str] | None = None) -> int:
         rc, _ = run_pull(script, day, window)
         if rc != 0:
             pull_failed = True
+        else:
+            resolve_transport_notes(day, stream)
 
     # --- MBP-1 (registry-authorized, not gate-required) [st-xxo0] -------------
     mbp1_ok, mbp1_reason = mbp1_authorization()
@@ -343,6 +371,8 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("%s: %s", MBP1_STREAM, mbp1_reason)
         rc, _ = run_pull(MBP1_SCRIPT, day,
                          ["--start-ct", "08:30", "--end-ct", "15:00"])
+        if rc == 0 and stream_has_rows_in_manifest(day, MBP1_STREAM)[0]:
+            resolve_transport_notes(day, MBP1_STREAM)
         if rc != 0 or not stream_has_rows_in_manifest(day, MBP1_STREAM)[0]:
             # No rows from either source. Live capture is the only other source
             # of MBP-1 depth, so a day with no rows after the backfill attempt is

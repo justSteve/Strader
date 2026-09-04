@@ -251,13 +251,65 @@ def test_a_mixed_error_list_stays_fatal():
     assert not res.ok
 
 
-def test_a_flapping_feed_stays_fatal():
-    """More reconnects than the ceiling is a feed whose day needs a human."""
+def test_a_flapping_feed_on_a_covered_day_passes_with_a_warning_naming_the_count():
+    """Revised 2026-09-04 (co-8b60y). More reconnects than the ceiling used to
+    be fatal; a 42-hour outage then left a fully backfilled day carrying 6,466
+    notes per stream and reading UNHEALTHY forever, halting the morning chain
+    on data that was present. The count is now a warning the operator reads,
+    not a verdict on the tape."""
     errs = [f"reconnect #{i}: BentoError: Gateway timeout: 40 second(s) "
             f"since last message (possible gap)" for i in range(1, 5)]
     assert len(errs) > gate.MAX_RECOVERED_RECONNECTS
     res = gate.evaluate(_manifest(es_errors=errs), now=NOW)
+    assert res.ok, res.reasons
+    assert res.degraded and res.status == "DEGRADED"
+    assert res.checked["databento_glbx_es"]["recovered_reconnects"] == 4
+    assert any("reconnected 4 times" in w for w in res.warnings), res.warnings
+
+
+def test_the_2026_09_03_manifest_shape_passes_once_backfilled():
+    """The measured shape: 5,544 reconnect lines and 922 give-up lines per
+    stream, then a batch pull that covers the day. Both line shapes are the
+    transport talking; neither is a hole in a covered tape."""
+    errs = [f"reconnect #{i % 7 + 1}: BentoError: Connection to glbx-mdp3.lsg.databento.com:13000 "
+            f"timed out after 10.0 second(s). (possible gap)" for i in range(5544)]
+    errs += ["giving up after 6 reconnects"] * 922
+    assert len(errs) == 6466
+    res = gate.evaluate(_manifest(es_errors=errs, es_cycles=323929), now=NOW)
+    assert res.ok, res.reasons[:2]
+    assert res.checked["databento_glbx_es"]["recovered_reconnects"] == 6466
+    assert len(res.warnings) == 1 and "6466" in res.warnings[0]
+
+
+def test_the_give_up_line_alone_is_reconnect_shaped():
+    assert gate._is_reconnect_error("giving up after 6 reconnects")
+    assert gate._is_reconnect_error("reconnect #3: BentoError: x (possible gap)")
+    assert not gate._is_reconnect_error("disk full: write failed")
+    assert not gate._is_reconnect_error(None)
+
+
+def test_a_flapping_feed_on_an_uncovered_day_still_fails():
+    """Leniency is about coverage, never about the count: a feed that flapped
+    and then died before the close still has a hole in it."""
+    errs = [f"reconnect #{i}: BentoError: Gateway timeout (possible gap)" for i in range(1, 9)]
+    res = gate.evaluate(_manifest(es_end="10:00", es_errors=errs), now=NOW)
     assert not res.ok
+
+
+def test_at_or_below_the_ceiling_there_is_no_warning():
+    errs = [f"reconnect #{i}: BentoError: Gateway timeout (possible gap)" for i in range(1, 4)]
+    assert len(errs) == gate.MAX_RECOVERED_RECONNECTS
+    res = gate.evaluate(_manifest(es_errors=errs), now=NOW)
+    assert res.ok and not res.warnings and res.status == "HEALTHY"
+
+
+def test_resolved_errors_are_reported_and_do_not_count_against_the_day():
+    m = _manifest()
+    m["streams"]["databento_glbx_es"]["errors_resolved"] = {
+        "count": 6466, "resolved_utc": "2026-06-30T11:40:00Z", "sample": ["reconnect #1: x"]}
+    res = gate.evaluate(m, now=NOW)
+    assert res.ok and res.status == "HEALTHY"
+    assert res.checked["databento_glbx_es"]["errors_resolved"] == 6466
 
 
 def test_a_reconnect_with_no_date_stays_fatal():
