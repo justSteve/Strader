@@ -1,0 +1,710 @@
+{
+  "date": "2026-09-04",
+  "instrument": "ES",
+  "session_bias": "ES broke out of the week-long range today (7722 was the range resistance) after Wednesday's Failed Breakdown of Tuesday's low. Lean is continuation to 7771 / 7770 and 7797 to backtest the early August breakdown, react there, then 7828 and all-time highs. Ultra bull case defends 7722 on dips (or quick trap below); mild bull case defends 7670 lowest. Bear case only begins below 7618 (likely 7613 trigger down). Minimal spots to add on strength without chasing; he waits for red and the next Failed Breakdown.",
+  "levels": [
+    {
+      "price": 7758,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7758"
+    },
+    {
+      "price": 7745,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7745 (major)",
+      "label": "major"
+    },
+    {
+      "price": 7733,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7733"
+    },
+    {
+      "price": 7722,
+      "kind": "support",
+      "intent": "offered",
+      "conviction": "unstated",
+      "setup": "backtest_long",
+      "source_quote": "7722 (major)",
+      "label": "major · first support of interest down to backtest the bull flag — the range resistance we broke out of today. He won’t long this personally (not a Failed Breakdown) but for those wanting to engage a backtest, one can try here; if knifing lower full speed, at least wait for it to trap and recover instead of knife catching. Ultra bull case: bulls defend 7722 on any dips (or quick trap below)"
+    },
+    {
+      "price": 7714,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7714"
+    },
+    {
+      "price": 7704,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7704"
+    },
+    {
+      "price": 7695,
+      "kind": "support",
+      "intent": "offered",
+      "conviction": "unstated",
+      "setup": "level_reclaim",
+      "source_quote": "7695 (major)",
+      "label": "major · next support down; a nice shelf of highs all night last night that broke out this morning. Not interested in engaging here (no significant low) — if you want to trade it, at least let the shelf flush and recover for a Level Reclaim long, not a Failed Breakdown"
+    },
+    {
+      "price": 7682,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7682"
+    },
+    {
+      "price": 7670,
+      "kind": "support",
+      "intent": "trade",
+      "conviction": "medium",
+      "setup": "failed_breakdown",
+      "source_quote": "7670 (major)",
+      "label": "major · a clear shelf of lows meeting the criteria for a significant low, built between 3pm yesterday and 7:30am; flushed around 1:30AM to 7662 to set another low. The Failed Breakdown of this entire structure (ideally even 7662) is actionable — just wait for 7670 to recover to long it. Mild bull case: ES defends 7670 lowest (or quick trap below)"
+    },
+    {
+      "price": 7658,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7658"
+    },
+    {
+      "price": 7649,
+      "kind": "support",
+      "intent": "offered",
+      "conviction": "low",
+      "setup": "bid_direct",
+      "source_quote": "7649 (major)",
+      "label": "major · bottom of the 7659-49 zone that has been key inside the range for the last week — a weak support, he won’t touch it but one can bid here if desperate. Not a ton of interest below there until ~7618"
+    },
+    {
+      "price": 7638,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7638"
+    },
+    {
+      "price": 7628,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7628"
+    },
+    {
+      "price": 7618,
+      "kind": "support",
+      "intent": "trade",
+      "conviction": "high",
+      "setup": "failed_breakdown",
+      "source_quote": "7618 (major)",
+      "label": "major · the daily low yesterday. A Failed Breakdown here would be highly actionable; nothing below there until 7587. Bear case begins below 7618 — the breakdown short for those who take them, ideally after a final bounce here or a Failed Breakdown, shorting beneath the lows of that bounce"
+    },
+    {
+      "price": 7603,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7603"
+    },
+    {
+      "price": 7596,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7596"
+    },
+    {
+      "price": 7587,
+      "kind": "support",
+      "intent": "offered",
+      "conviction": "unstated",
+      "setup": "bid_direct",
+      "source_quote": "7587 (major)",
+      "label": "major · currently the support of the yellow bull flag; support is technically way down here. One could try a bid if it is a slow, controlled sell into the zone — if knifing full power, at least wait for the zone to flush and recover"
+    },
+    {
+      "price": 7575,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7575"
+    },
+    {
+      "price": 7568,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7568 (major)",
+      "label": "major"
+    },
+    {
+      "price": 7553,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7553"
+    },
+    {
+      "price": 7549,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7549 (major)",
+      "label": "major"
+    },
+    {
+      "price": 7538,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7538"
+    },
+    {
+      "price": 7528,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7528"
+    },
+    {
+      "price": 7518,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7518 (major)",
+      "label": "major"
+    },
+    {
+      "price": 7499,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7499"
+    },
+    {
+      "price": 7481,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7481"
+    },
+    {
+      "price": 7475,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7475 (major)",
+      "label": "major"
+    },
+    {
+      "price": 7464,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7464"
+    },
+    {
+      "price": 7445,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7445 (major)",
+      "label": "major"
+    },
+    {
+      "price": 7430,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7430 (major)",
+      "label": "major"
+    },
+    {
+      "price": 7770,
+      "kind": "resistance",
+      "intent": "watch",
+      "conviction": "unstated",
+      "setup": "breakout_target",
+      "source_quote": "7770 (major)",
+      "label": "major · first of the next set of targets (7770, 7797) to backtest the early August breakdown — react there"
+    },
+    {
+      "price": 7782,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7782"
+    },
+    {
+      "price": 7792,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7792"
+    },
+    {
+      "price": 7797,
+      "kind": "resistance",
+      "intent": "offered",
+      "conviction": "unstated",
+      "setup": "breakout_target",
+      "source_quote": "7797 (major)",
+      "label": "major · second target to backtest the early August breakdown, react there. For those who don’t mind the low win rate associated with shorts, 7797 would be the spot to try — he has not had a single short in over a year"
+    },
+    {
+      "price": 7805,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7805"
+    },
+    {
+      "price": 7811,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7811"
+    },
+    {
+      "price": 7820,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7820"
+    },
+    {
+      "price": 7828,
+      "kind": "resistance",
+      "intent": "watch",
+      "conviction": "unstated",
+      "setup": "breakout_target",
+      "source_quote": "7828 (major)",
+      "label": "major · after reacting at 7770 / 7797 we head to 7828, then all time highs from there"
+    },
+    {
+      "price": 7836,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7836"
+    },
+    {
+      "price": 7846,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7846"
+    },
+    {
+      "price": 7859,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7859"
+    },
+    {
+      "price": 7875,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7875"
+    },
+    {
+      "price": 7888,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7888-91 (major)",
+      "label": "major · bottom of the 7888-91 zone"
+    },
+    {
+      "price": 7891,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7888-91 (major)",
+      "label": "major · top of the 7888-91 zone"
+    },
+    {
+      "price": 7906,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7906"
+    },
+    {
+      "price": 7914,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7914"
+    },
+    {
+      "price": 7928,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7928 (major)",
+      "label": "major"
+    },
+    {
+      "price": 7945,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7945"
+    },
+    {
+      "price": 7953,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7953"
+    },
+    {
+      "price": 7964,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7964 (major)",
+      "label": "major"
+    },
+    {
+      "price": 7978,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "7978"
+    },
+    {
+      "price": 8004,
+      "kind": "resistance",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "8004 (major)",
+      "label": "major"
+    },
+    {
+      "price": 7662,
+      "kind": "support",
+      "intent": "trade",
+      "conviction": "medium",
+      "setup": "failed_breakdown",
+      "source_quote": "We flushed the shelf around 1:30AM to 7662 to set another low. The Failed Breakdown of this entire structure (ideally even 7662) is actionable.",
+      "label": "the 1:30AM flush low under the 7670 shelf; the Failed Breakdown of the entire structure (ideally even 7662) is actionable — wait for 7670 to recover to long it"
+    },
+    {
+      "price": 7659,
+      "kind": "support",
+      "intent": "unstated",
+      "conviction": "unstated",
+      "setup": "none",
+      "source_quote": "inside the range the 7659-49 zone has been key for the last week",
+      "label": "top of the 7659-49 zone that has been key inside the range for the last week; the shelf was lost earlier this week, recovered, then ran"
+    },
+    {
+      "price": 7613,
+      "kind": "trigger",
+      "intent": "offered",
+      "conviction": "unstated",
+      "setup": "breakdown_short",
+      "source_quote": "Likely 7613 trigger down.",
+      "label": "bear case — likely trigger down for the 7618 breakdown short, beneath the lows of the final bounce; he does not take these"
+    },
+    {
+      "price": 7771,
+      "kind": "target",
+      "intent": "watch",
+      "conviction": "unstated",
+      "setup": "breakout_target",
+      "source_quote": "My general lean is we continue to 7771, 7797.",
+      "label": "summary lean — we continue to 7771, 7797"
+    }
+  ],
+  "commentary": [
+    {
+      "text": "The bull case is simply that ES can continue pushing after today's breakout of the week-long range. In an ultra bull case, bulls defend 7722 on any dips (or a quick trap below).",
+      "tags": [
+        "bull_case",
+        "structure"
+      ],
+      "trigger": {
+        "type": "price_zone",
+        "anchor_prices": [
+          7722
+        ],
+        "condition_text": "ES holds 7722 on dips, or quick trap below and recover"
+      },
+      "source_quote": "The bull case is simply that we can continue pushing. Ideally, bulls want to defend 7722 on any dips in an ultra bull case (or quick trap below)."
+    },
+    {
+      "text": "In a more mild bull case, ES defends 7670 lowest (or a quick trap below).",
+      "tags": [
+        "bull_case",
+        "failed_breakdown",
+        "structure"
+      ],
+      "trigger": {
+        "type": "price_zone",
+        "anchor_prices": [
+          7670
+        ],
+        "condition_text": "ES defends 7670 lowest, or quick trap below and recover"
+      },
+      "source_quote": "In a more mild bull case, ES will defend 7670 lowest (or quick trap below)."
+    },
+    {
+      "text": "Next set of targets are 7770, 7797 to backtest the early August breakdown. React there, then ES heads to 7828, then all time highs.",
+      "tags": [
+        "bull_case",
+        "breakout_target"
+      ],
+      "trigger": {
+        "type": "price_cross",
+        "anchor_prices": [
+          7770,
+          7797,
+          7828
+        ],
+        "condition_text": "ES continues higher: 7770, 7797, react, then 7828 and all time highs"
+      },
+      "source_quote": "Next set of targets are 7770, 7797 to backtest the early August breakdown. React there, then we head to 7828, then all time highs from there."
+    },
+    {
+      "text": "Given the recent strength, there are minimal spots to add on strength that would not constitute chasing.",
+      "tags": [
+        "bull_case",
+        "no_entry",
+        "risk"
+      ],
+      "trigger": {
+        "type": "unconditional",
+        "anchor_prices": [],
+        "condition_text": "no clean add-on-strength spot; adding here is chasing"
+      },
+      "source_quote": "Given the recent strength, there is minimal spots to add on strength here that would not constitute chasing."
+    },
+    {
+      "text": "7722 is first support of interest down, a backtest of the bull flag. He won't long it personally (not a Failed Breakdown), but for those wanting to engage a backtest one can try here. If ES is knifing lower full speed, at least wait for it to trap and recover instead of knife catching.",
+      "tags": [
+        "backtest_long",
+        "long_entry",
+        "risk"
+      ],
+      "trigger": {
+        "type": "price_cross",
+        "anchor_prices": [
+          7722
+        ],
+        "condition_text": "ES dips to 7722; slow sell = backtest bid, fast knife = wait for trap and recover"
+      },
+      "source_quote": "As of writing, 7722 is first support of interest down to backtest the bull flag. I won’t long this personally (since Its not a Failed Breakdown) but for those wanting to engage a backtest, one can try here. If we are knifing lower full speed though, at least wait for it to trap and recover though instead of knife catching."
+    },
+    {
+      "text": "7695 is next support down, a shelf of highs from overnight that broke out this morning. He is not interested in engaging (no significant low); if you trade it, let the shelf flush and recover for a Level Reclaim long, not a Failed Breakdown.",
+      "tags": [
+        "level_reclaim",
+        "long_entry"
+      ],
+      "trigger": {
+        "type": "price_cross",
+        "anchor_prices": [
+          7695
+        ],
+        "condition_text": "7695 shelf flushes then recovers = Level Reclaim long"
+      },
+      "source_quote": "7695 is next support down. This was a nice shelf of highs all night last night that broke out this morning. I’m not interested in engaging here either (there is no significant low) but if you want to trade it at least let the shelf flush and recovery for Level Reclaim long"
+    },
+    {
+      "text": "7670 is a clear shelf of lows meeting the criteria for a significant low (3pm yesterday to 7:30am), flushed around 1:30AM to 7662. The Failed Breakdown of this entire structure, ideally even 7662, is actionable. Wait for 7670 to recover to long it.",
+      "tags": [
+        "failed_breakdown",
+        "long_entry"
+      ],
+      "trigger": {
+        "type": "price_cross",
+        "anchor_prices": [
+          7670,
+          7662
+        ],
+        "condition_text": "ES flushes the 7670 shelf (ideally 7662) then recovers 7670 = Failed Breakdown long"
+      },
+      "source_quote": "7670 is below. There is a clear shelf of lows here meeting the criteria for a significant low. Specifically between 3pm yesterday and 730am we build a shelf here. We flushed the shelf around 1:30AM to 7662 to set another low. The Failed Breakdown of this entire structure (ideally even 7662) is actionable. Just wait for 7670 to recover to long this."
+    },
+    {
+      "text": "7649 is a weak support. He won't touch it, but one can bid there if desperate. There is not a ton of interest below there until ~7618.",
+      "tags": [
+        "bid_direct",
+        "no_entry",
+        "risk"
+      ],
+      "trigger": {
+        "type": "price_cross",
+        "anchor_prices": [
+          7649,
+          7618
+        ],
+        "condition_text": "ES reaches 7649; weak bid only, little interest until 7618"
+      },
+      "source_quote": "7649 is below there. This is a weak support, I won’t touch it but one can bid here if desperate. There is not a ton of interest below there until ~7618."
+    },
+    {
+      "text": "7618 is yesterday's daily low. A Failed Breakdown here would be highly actionable. Nothing below there until 7587.",
+      "tags": [
+        "failed_breakdown",
+        "long_entry"
+      ],
+      "trigger": {
+        "type": "price_cross",
+        "anchor_prices": [
+          7618,
+          7587
+        ],
+        "condition_text": "ES sweeps 7618 then recovers = highly actionable Failed Breakdown long"
+      },
+      "source_quote": "7618 is the daily low yesterday. A Failed breakdown here would be highly actionable. Nothing below there until 7587."
+    },
+    {
+      "text": "7587 is currently the support of the yellow bull flag. One could try a bid here if it is a slow, controlled sell into the zone. If ES is knifing full power, at least wait for the zone to flush and recover.",
+      "tags": [
+        "bid_direct",
+        "long_entry",
+        "structure"
+      ],
+      "trigger": {
+        "type": "price_cross",
+        "anchor_prices": [
+          7587
+        ],
+        "condition_text": "slow controlled sell into 7587 = bid; fast knife = wait for flush and recover"
+      },
+      "source_quote": "7587 is currently the support of the yellow bull flag shown in the above chart. One could try a bid here if it is a slow, controlled sell into the zone. If we are knifing full power though, at least wait for the zone to flush and recover."
+    },
+    {
+      "text": "Bear case begins below 7618. This is a breakdown trade, which he does not take personally (80% of breakdowns trap; expect over 60% to fail). For the 7618 short, ideally a final bounce here or a Failed Breakdown, then short beneath the lows of that bounce. Likely 7613 trigger down.",
+      "tags": [
+        "bear_case",
+        "breakdown_short",
+        "short_entry",
+        "risk"
+      ],
+      "trigger": {
+        "type": "price_cross",
+        "anchor_prices": [
+          7618,
+          7613
+        ],
+        "condition_text": "ES loses 7618 after a final bounce; 7613 the likely trigger down"
+      },
+      "source_quote": "Bear case tomorrow: Begins below 7618. These types of level loss shorts below a support are called breakdown trades. My core edge is failed breakdowns, and the reason is this is an edge is the vast majority of break downs (80%) trap. I do not take these trades personally. [...] For the 7618 short, ideally one can put in a final bounce or here, OR a Failed Breakdown then one can short beneath the lows of that bounce. Likely 7613 trigger down."
+    },
+    {
+      "text": "Short entries are given for those who like them (substantially lower win rate and R/R; he has not had a single short in over a year). 7797 would be the spot to try.",
+      "tags": [
+        "short_entry",
+        "no_entry",
+        "risk"
+      ],
+      "trigger": {
+        "type": "price_cross",
+        "anchor_prices": [
+          7797
+        ],
+        "condition_text": "ES reaches 7797; short offered for those who take them"
+      },
+      "source_quote": "For those who don’t mind the low win rate associated with shorts, 7797 would be spots to try."
+    },
+    {
+      "text": "Summary: ES broke out of the week-long range today (resistance was 7722). Support is technically way down at 7587; inside the range the 7659-49 zone has been key for the last week. General lean is ES continues to 7771, 7797.",
+      "tags": [
+        "summary",
+        "structure",
+        "regime"
+      ],
+      "trigger": {
+        "type": "price_zone",
+        "anchor_prices": [
+          7722,
+          7587,
+          7659,
+          7649,
+          7771,
+          7797
+        ],
+        "condition_text": "general lean: continuation to 7771, 7797"
+      },
+      "source_quote": "Resistance is now up at 7722 and we broke out today. Support is technically way down at 7587, but inside the range the 7659-49 zone has been key for the last week. My general lean is we continue to 7771, 7797."
+    },
+    {
+      "text": "After the rip there is nothing to do but wait for the next Failed Breakdown: wait for red, an elevator-down sell, calls for tops, then long the Failed Breakdown.",
+      "tags": [
+        "regime",
+        "no_entry",
+        "failed_breakdown"
+      ],
+      "trigger": {
+        "type": "unconditional",
+        "anchor_prices": [],
+        "condition_text": "no setup until the next red sell produces a Failed Breakdown"
+      },
+      "source_quote": "My task as a Failed Breakdown trader is very specific: I wait for red. I wait for an elevator down sell, I wait for social media commentary to call for tops etc, then I long the Failed Breakdown, and we rip. After the rip though, there is unfortunately nothing for me to do but wait for the next one."
+    }
+  ],
+  "raw_excerpt": "Supports are: 7758, 7745 (major), 7733, 7722 (major), 7714, 7704, 7695 (major), 7682, 7670 (major), 7658, 7649 (major), 7638, 7628, 7618 (major), 7603, 7596, 7587 (major), 7575, 7568 (major), 7553, 7549 (major), 7538, 7528, 7518 (major), 7499, 7481, 7475 (major), 7464, 7445 (major), 7430 (major).\n\n--- BID DIRECT ---\nIn terms of lvls I’d bid direct: I am holding a 10% long runner from the 730AM 7622 Failed Breakdown, discussed above and that we had yesterday. The current rally in ES was caused by the same thing that causes all rallies: A Failed Breakdown yesterday if 7622. In this case - yesterday morning - ES swept Tuesday’s 7622 low by 4 points, recovered, and ripped. As I discussed extensively yesterday, when ES is in a grind lower mode like we were the last week or so, Failed Breakdowns follow a typical template. We will usually have multiple in a row that only go a level or two, then fail. This is fine, points are points. We saw this for much the week. Then when price is ready, we get a big one that sustains. Since we don’t predict, we can never know which is which nor do we care. We take them all, and the market pays what it wants. The broad picture though remained unchanged from yesterday. ES had been rangebound for a week. The range is heavily contained by the yellow bull flag in the above chart. Resistance was at 7722, and we brokeout today. Support is technically way down at 7587, but inside the range the 7659-49 zone has been key for the last week. We lost that shelf earlier this week and recovered it, then ran. Readers know what I’m going to say here though. My task as a Failed Breakdown trader is very specific: I wait for red. I wait for an elevator down sell, I wait for social media commentary to call for tops etc, then I long the Failed Breakdown, and we rip. After the rip though, there is unfortunately nothing for me to do but wait for the next one. As of writing, 7722 is first support of interest down to backtest the bull flag. I won’t long this personally (since Its not a Failed Breakdown) but for those wanting to engage a backtest, one can try here. If we are knifing lower full speed though, at least wait for it to trap and recover though instead of knife catching. 7695 is next support down. This was a nice shelf of highs all night last night that broke out this morning. I’m not interested in engaging here either (there is no significant low) but if you want to trade it at least let the shelf flush and recovery for Level Reclaim long (again this would not be a Failed Breakdown since there is no significant low. 7670 is below. There is a clear shelf of lows here meeting the criteria for a significant low. Specifically between 3pm yesterday and 730am we build a shelf here. We flushed the shelf around 1:30AM to 7662 to set another low. The Failed Breakdown of this entire structure (ideally even 7662) is actionable. Just wait for 7670 to recover to long this. 7649 is below there. This is a weak support, I won’t touch it but one can bid here if desperate. There is not a ton of interest below there until ~7618. 7618 is the daily low yesterday. A Failed breakdown here would be highly actionable. Nothing below there until 7587. 7587 is currently the support of the yellow bull flag shown in the above chart. One could try a bid here if it is a slow, controlled sell into the zone. If we are knifing full power though, at least wait for the zone to flush and recover.\n\n--- RESISTANCES ---\nResistances are: 7770 (major), 7782, 7792, 7797 (major), 7805, 7811, 7820, 7828 (major), 7836, 7846, 7859, 7875, 7888-91 (major), 7906, 7914, 7928 (major), 7945, 7953, 7964 (major), 7978, 8004 (major). As readers know I don’t short ES - I only get my points on the long side, but I still give short entries here for those who like them and don’t mind having a substantially lower win rate and lower R/R - SPX is a structurally bullish asset class green 75% of years over the last 100 years with a 1% annualized monthly return and even in bear markets it is extremely hard to short since the sells are short lived, news driven (often random) and resolve in violent rip. I have not had a single short in over a year now - phasing them out after 15 years - and my performance has never been better as my Failed Breakdown strategy outperforms even the strongest shorting strategies in downtrends and uptrends. For those who don’t mind the low win rate associated with shorts, 7797 would be spots to try.\n\n--- BULL CASE ---\nBull case tomorrow: Yesterday, ES put in a Failed Breakdown of Tuesday’s daily low, and we ripped since then. On a more broad perspective, ES had been rangebound for a week. The range is heavily contained by the yellow bull flag in the above chart. Resistance was up at 7722 and we broke out today. Support is technically way down at 7587, but inside the range the 7659-49 zone has been key for the last week. The bull case is simply that we can continue pushing. Ideally, bulls want to defend 7722 on any dips in an ultra bull case (or quick trap below). In a more mild bull case, ES will defend 7670 lowest (or quick trap below). Next set of targets are 7770, 7797 to backtest the early August breakdown. React there, then we head to 7828, then all time highs from there. Given the recent strength, there is minimal spots to add on strength here that would not constitute chasing.\n\n--- BEAR CASE ---\nBear case tomorrow: Begins below 7618. These types of level loss shorts below a support are called breakdown trades. My core edge is failed breakdowns, and the reason is this is an edge is the vast majority of break downs (80%) trap. I do not take these trades personally. They take great skill to execute, and even when done well by a trader who has mastered these setups, one should expect over 60% to fail (they are low win rate, high R/R trades. 2 or 3 in a row will fail, then the 4th will pay out huge). *If you don’t like these odds and cant tolerate being trapped - simply don’t take them. I consider breakdown trades to be an advanced setup type so if a newer subscriber, there is nothing wrong with passing on these. For the 7618 short, ideally one can put in a final bounce or here, OR a Failed Breakdown then one can short beneath the lows of that bounce. Likely 7613 trigger down.\n\n--- SUMMARY ---\nIn summary for tomorrow: Yesterday, ES put in a Failed Breakdown of Tuesday’s daily low, and we ripped since then. On a more broad perspective, ES had been rangebound for a week. The range is heavily contained by the yellow bull flag in the above chart. Resistance is now up at 7722 and we broke out today. Support is technically way down at 7587, but inside the range the 7659-49 zone has been key for the last week. My general lean is we continue to 7771, 7797.\n\nAs always no crystal balls, no guessing, no predicting. I’ll be trading the above plan following whatever path price chooses. Reacting level to level, one move at a time, take profits, reset bias from scratch. Not choosing the path for price ahead of time, and hoping it agrees with me. *You don’t need an opinion on where price is going to make money*.\n"
+}
