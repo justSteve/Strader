@@ -52,6 +52,14 @@ LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
+# Heartbeat [co-8b60y]: /var/moo/state/strader-schwab-<stage>.json — running at
+# start, ok/failed on exit by the trap heartbeat-lib.sh arms. One file per stage
+# so a failed 07:00 is not hidden by a good 08:30. Read by COO's
+# heartbeat-check.sh at /tap-in.
+# shellcheck source=heartbeat-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/heartbeat-lib.sh"
+hb_init "$(hb_path "strader-schwab-$STAGE")" "stage $STAGE"
+
 {
     log "=== schwab-stages start stage=$STAGE $(date +%Y-%m-%dT%H:%M:%S%z) ==="
 
@@ -85,5 +93,7 @@ emit_alert(
 PYEOF
     fi
 
+    if (( rc == 0 )); then HB_DETAIL="$STAGE snapshot landed"
+    else HB_DETAIL="Schwab $STAGE snapshot rc=$rc (token? see the alert) — $LOG"; fi
     exit $rc
 } >> "$LOG" 2>&1

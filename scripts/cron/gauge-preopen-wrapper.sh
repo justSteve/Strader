@@ -97,6 +97,13 @@ LOG="$LOG_DIR/$DATE.log"
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
+# Heartbeat [co-8b60y]: /var/moo/state/strader-gauge-preopen.json — one per
+# 5-minute tick, ok/failed on exit by the trap heartbeat-lib.sh arms. The
+# cadence check knows the 8-15 Mon-Fri window, so a quiet weekend is not stale.
+# shellcheck source=heartbeat-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/heartbeat-lib.sh"
+hb_init "$(hb_path strader-gauge-preopen)" "supervision tick"
+
 hm_to_min() { local h=${1%%:*} m=${1##*:}; echo $(( 10#$h * 60 + 10#$m )); }
 
 # Session clock. Cron runs local America/Chicago, but the zone is forced so the
@@ -147,7 +154,9 @@ live_gauge_pids() {
     if [[ -n "${LIVE_PIDS// }" ]]; then
         if (( IN_SESSION )); then
             log "OK: live gauge already running (pid ${LIVE_PIDS%% })— nothing to do."
+            HB_DETAIL="live gauge running (pid ${LIVE_PIDS%% })"
         else
+            HB_DETAIL="gauge still running (pid ${LIVE_PIDS%% }) outside the window — not killed from cron"
             log "WARN: gauge still running (pid ${LIVE_PIDS%% }) at $NOW_HM CT (dow $NOW_DOW), OUTSIDE the $SESSION_START–$SESSION_END window — it should have self-exited at $SESSION_END. Not killing from cron; that is Steve's call. A pre-st-5n8 process has no stop condition and will run until killed."
         fi
         exit 0
@@ -160,6 +169,7 @@ live_gauge_pids() {
     # here is what produced the 26-hour 7/24 run.
     if (( ! IN_SESSION )); then
         log "OK: $NOW_HM CT (dow $NOW_DOW) is outside the session window $SESSION_START–$SESSION_END Mon–Fri — no gauge expected, not launching."
+        HB_DETAIL="outside the session window — no gauge expected"
         exit 0
     fi
 
@@ -252,9 +262,11 @@ live_gauge_pids() {
     NEWPID="$(live_gauge_pids | tr '\n' ' ')"
     if [[ -n "${NEWPID// }" ]]; then
         log "OK: launched live gauge (pid ${NEWPID%% }) in $SESSION window '$WIN_NAME' ($WID)."
+        HB_DETAIL="launched live gauge (pid ${NEWPID%% })"
         exit 0
     fi
     log "ERROR: window $WID created but no live gauge process after 1s — the gauge likely crashed on startup; check pane $WID (remain-on-exit is 'failed', so a crash stays frozen there)."
+    HB_DETAIL="gauge crashed on launch; pane $WID frozen — $LOG"
     exit 4
 
 } >> "$LOG" 2>&1

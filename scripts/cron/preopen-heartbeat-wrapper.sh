@@ -27,6 +27,14 @@ LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
+# Heartbeat [co-8b60y]: /var/moo/state/strader-preopen-heartbeat.json — this
+# job's own liveness, distinct from the pre-open assertion it runs. Written on
+# every exit by the trap heartbeat-lib.sh arms; rc 1 (the check ran and found
+# a failure) and rc 2 (the check itself broke) both read failed with the reason.
+# shellcheck source=heartbeat-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/heartbeat-lib.sh"
+hb_init "$(hb_path strader-preopen-heartbeat)" "pre-open assertion"
+
 {
     log "=== preopen-heartbeat start $(date +%Y-%m-%dT%H:%M:%S%z) ==="
 
@@ -64,5 +72,10 @@ emit_alert(
 PYEOF
     fi
 
+    case $rc in
+        0) HB_DETAIL="pull, parse and gate all present before the bell" ;;
+        1) HB_DETAIL="the pre-open check found a failure (alert in data/corpus/_health.jsonl) — $LOG" ;;
+        *) HB_DETAIL="the pre-open check itself could not run (rc=$rc) — $LOG" ;;
+    esac
     exit $rc
 } >> "$LOG" 2>&1

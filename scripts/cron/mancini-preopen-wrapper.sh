@@ -81,6 +81,13 @@ LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
+# Heartbeat [co-8b60y]: /var/moo/state/strader-mancini-preopen.json — running
+# at start, ok/failed on exit by the trap heartbeat-lib.sh arms. Read by COO's
+# heartbeat-check.sh at /tap-in, beside the alert this wrapper already emits.
+# shellcheck source=heartbeat-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/heartbeat-lib.sh"
+hb_init "$(hb_path strader-mancini-preopen)" "prepare-only"
+
 {
     log "=== mancini-preopen start $(date +%Y-%m-%dT%H:%M:%S%z) ==="
     log "repo=$STRADER_REPO az=${STRADER_AZ_BIN:-<resolve_az search>} args=${*:-<none>}"
@@ -104,6 +111,8 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
     PYTHONPATH="$STRADER_REPO" "$PY" -m runbook.mancini.run --from-blob --prepare-only $CLIP_ARG "$@"
     rc=$?
     log "=== mancini-preopen end $(date +%Y-%m-%dT%H:%M:%S%z) (rc=$rc) ==="
+    if (( rc == 0 )); then HB_DETAIL="prepare-only pass landed"
+    else HB_DETAIL="mancini prepare rc=$rc (2 = gate or fetch refused; see the alert) — $LOG"; fi
 
     if (( rc != 0 )); then
         # Same alert kind and health-log contract the inline corpus_daily step used.

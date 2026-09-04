@@ -38,6 +38,13 @@ LOG_DIR="${STRADER_TRACKER_LOGDIR:-/var/moo/logs/level-tracker}"
 mkdir -p "$LOG_DIR" 2>/dev/null
 LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
+# Heartbeat [co-8b60y]: /var/moo/state/strader-level-tracker.json — `running`
+# for the whole session loop (SCHEDULE.md max_run_min 480), ok/failed on exit
+# by the trap heartbeat-lib.sh arms. Read by COO's heartbeat-check.sh.
+# shellcheck source=heartbeat-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/heartbeat-lib.sh"
+hb_init "$(hb_path strader-level-tracker)" "session loop"
+
 {
     echo "[$(date +%H:%M:%S)] === level-tracker start $(date +%Y-%m-%dT%H:%M:%S%z) ==="
     if [[ ! -x "$PY" ]]; then
@@ -48,5 +55,7 @@ LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
     PYTHONPATH="$STRADER_REPO" "$PY" -m runbook.mancini.tracker --loop "$@"
     rc=$?
     echo "[$(date +%H:%M:%S)] === level-tracker end (rc=$rc) ==="
+    if (( rc == 0 )); then HB_DETAIL="session loop ended cleanly"
+    else HB_DETAIL="tracker loop rc=$rc (1 = a second loop was refused, or the loop failed) — $LOG"; fi
     exit $rc
 } >> "$LOG" 2>&1

@@ -43,6 +43,12 @@ mkdir -p "$(dirname "$LOG")"
 
 log() { echo "$*"; }
 
+# Heartbeat [co-8b60y]: /var/moo/state/strader-premarket-vp.json — running at
+# start, ok/failed on exit by the trap heartbeat-lib.sh arms.
+# shellcheck source=heartbeat-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/heartbeat-lib.sh"
+hb_init "$(hb_path strader-premarket-vp)" "premarket profile"
+
 {
     log "=== premarket-vp start $(date +%Y-%m-%dT%H:%M:%S%z) ==="
 
@@ -71,5 +77,7 @@ emit_alert(
 PYEOF
     fi
 
+    if (( rc == 0 )); then HB_DETAIL="profile page published"
+    else HB_DETAIL="profile rc=$rc — the previous page stands and is stale; $LOG"; fi
     exit $rc
 } >> "$LOG" 2>&1

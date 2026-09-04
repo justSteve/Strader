@@ -39,6 +39,18 @@ PY="${STRADER_PY:-$REPO/.venv/bin/python}"
 LOG="${STRADER_LOG_DIR:-$REPO/logs}/postmortem.log"
 mkdir -p "$(dirname "$LOG")"
 
+# Heartbeat [co-8b60y]: /var/moo/state/strader-postmortem-{morning,close}.json
+# (the catalog's ids for the next-morning and same-day passes) — running at
+# start, ok/failed on exit by the trap heartbeat-lib.sh arms.
+case "$PASS" in
+    next-morning) HB_JOB=strader-postmortem-morning ;;
+    same-day)     HB_JOB=strader-postmortem-close ;;
+    *)            HB_JOB="strader-postmortem-$PASS" ;;
+esac
+# shellcheck source=heartbeat-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/heartbeat-lib.sh"
+hb_init "$(hb_path "$HB_JOB")" "$PASS pass"
+
 alert() {  # $1 message, $2 pass, $3 rc
     PM_MSG="$1" PM_PASS="$2" PM_RC="$3" PYTHONPATH="$REPO" "$PY" - <<'PYEOF' || echo "WARN: alert emission failed"
 import os, sys
@@ -72,6 +84,9 @@ PYEOF
             *) why="unexpected failure; see logs/postmortem.log" ;;
         esac
         alert "day post-mortem $PASS pass rc=$rc: $why" "$PASS" "$rc"
+        HB_DETAIL="$why"
+    else
+        HB_DETAIL="$PASS pass landed; page desk-postmortem-latest.html"
     fi
     exit $rc
 } >> "$LOG" 2>&1

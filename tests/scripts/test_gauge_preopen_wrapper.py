@@ -68,6 +68,7 @@ class Harness:
             "STRADER_GAUGE_MATCH": str(self.stub),
             "STRADER_GAUGE_LAUNCH": f"exec {VENV_PY} {self.stub}",
             "STRADER_GAUGE_LOGDIR": str(self.logdir),
+            "HB_STATE_DIR": str(self.logdir / "state"),   # the heartbeat, never the live /var/moo/state
             "STRADER_GAUGE_NOW": now,
             "STRADER_DESK_BOOTSTRAP": str(bootstrap) if bootstrap else "/nonexistent/desk.sh",
         })
