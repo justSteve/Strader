@@ -1,22 +1,28 @@
-"""``python -m execd`` — run the service. [st-eznu]
+"""``python -m execd`` — run the service. [st-eznu, st-w2nw]
 
-Stage 1 has one broker, the mock, so ``--mock`` is required and its absence is
-a loud refusal rather than a default: a process called ``execd`` that started
-quietly and turned out to be talking to nothing would be worse than one that
-would not start. The Schwab transport arrives in stage 2 (st-w2nw) and takes
-the flag's place; nothing about the bounds, the journal or the API changes when
-it does, which is the point of the broker seam.
+Two brokers, and the choice is explicit or the process refuses to start: a
+process called ``execd`` that started quietly and turned out to be talking to
+nothing — or to the wrong thing — would be worse than one that would not
+start.
 
     .venv/bin/python -m execd --mock --state-dir /tmp/execd --mock-unlock
+    .venv/bin/python -m execd --schwab --vault /etc/execd/vault.json --state-dir /var/lib/execd
 
-The service binds the loopback and nothing else. Steve's page — the surface
-that takes the passphrase — is stage 3 and lives on the tailnet; there is no
-route here that arms anything.
+``--schwab`` (stage 2, st-w2nw) starts the service LOCKED against the real
+Trader API. Nothing arms it but Steve's passphrase: on its tailnet page in
+stage 3, or — until the page exists — typed at this console with
+``--unlock-stdin``, which reads one line from standard input and never sees
+argv or the environment. ``--mock-unlock`` cannot arm a real broker: the
+guard is on the broker object, not on the flag order.
+
+The service binds the loopback and nothing else. There is no route here that
+arms anything.
 """
 
 from __future__ import annotations
 
 import argparse
+import getpass
 import subprocess
 import sys
 from pathlib import Path
@@ -24,9 +30,12 @@ from pathlib import Path
 from .api import BIND_HOST, BIND_PORT, create_app
 from .bounds import load_bounds
 from .broker import MockBroker
+from .schwab import Credential, SchwabBroker
 from .service import ExecService, ServiceConfig
+from .vault import BadPassphrase, Vault, VaultError
 
 REPO = Path(__file__).resolve().parent.parent
+DEFAULT_VAULT = "/etc/execd/vault.json"
 
 
 def installed_sha() -> str:
@@ -59,19 +68,26 @@ def installed_sha() -> str:
 def may_mock_unlock(broker: object) -> bool:
     """May ``--mock-unlock`` arm this broker? Only the mock, ever.
 
-    Structural, not positional: today the flag already sits behind the
-    ``--mock`` requirement, but stage 2 removes that requirement, and a flag
-    that arms a REAL broker with no passphrase must be impossible then, not
-    merely unlikely (audit finding 17, st-kh0l). The check is on the object,
-    so reordering ``main`` cannot quietly widen it."""
+    Structural, not positional: a flag that arms a REAL broker with no
+    passphrase must be impossible, not merely unlikely (audit finding 17,
+    st-kh0l). The check is on the object, so reordering ``main`` cannot
+    quietly widen it."""
     return isinstance(broker, MockBroker)
 
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="execd", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--mock", action="store_true",
-                   help="run against the deterministic MockBroker (required in stage 1)")
+    which = p.add_mutually_exclusive_group()
+    which.add_argument("--mock", action="store_true",
+                       help="run against the deterministic MockBroker")
+    which.add_argument("--schwab", action="store_true",
+                       help="run against the Schwab Trader API; starts locked (stage 2)")
+    p.add_argument("--vault", default=DEFAULT_VAULT,
+                   help="the encrypted credential, for --schwab (default: %(default)s)")
+    p.add_argument("--unlock-stdin", action="store_true",
+                   help="read the passphrase from standard input and arm at start — the "
+                        "console path until the page exists (stage 3); never from an agent")
     p.add_argument("--state-dir", default="/var/lib/execd",
                    help="journal and STOP file live here (default: %(default)s)")
     p.add_argument("--bounds", default=None,
@@ -84,13 +100,22 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+def _read_passphrase() -> str:
+    if sys.stdin.isatty():
+        return getpass.getpass("execd vault passphrase: ")
+    line = sys.stdin.readline()
+    return line.rstrip("\r\n")
 
-    if not args.mock:
-        print("execd: stage 1 ships the mock broker only. Run with --mock.\n"
-              "       The Schwab transport is st-w2nw (stage 2); nothing here can "
-              "reach a broker until it lands.", file=sys.stderr)
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        args = build_parser().parse_args(argv)
+    except SystemExit as exc:      # argparse's own refusal (e.g. --mock with --schwab)
+        return 2 if exc.code else 0
+
+    if not args.mock and not args.schwab:
+        print("execd: choose a broker — --mock (deterministic, no network) or --schwab "
+              "(the Trader API, starts locked). Neither is a default.", file=sys.stderr)
         return 2
 
     if args.host != BIND_HOST:
@@ -100,23 +125,53 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 2
 
+    if args.schwab and not Path(args.vault).is_file():
+        print(f"execd: --schwab needs the vault at {args.vault} and there is none. "
+              f"scripts/execd_vault_init.py writes one (Steve's passphrase).", file=sys.stderr)
+        return 2
+
     bounds = load_bounds(args.bounds)
     config = ServiceConfig(state_dir=Path(args.state_dir), bounds=bounds,
                            sha=installed_sha())
-    broker = MockBroker()
+    broker = MockBroker() if args.mock else SchwabBroker(underlying=config.index_symbol)
     service = ExecService(broker, config)
+    if isinstance(broker, SchwabBroker):
+        broker.bind(service.arming)
 
     if args.mock_unlock:
         if not may_mock_unlock(broker):
             print("execd: --mock-unlock arms only the mock broker. A real broker "
-                  "is armed by Steve's passphrase on the page, never by a flag.",
+                  "is armed by Steve's passphrase, never by a flag.",
                   file=sys.stderr)
             return 2
         service.unlock({"mock": True})
         print("execd: armed with a MOCK credential — no broker is reachable.",
               file=sys.stderr)
 
-    print(f"execd {config.sha} on {BIND_HOST}:{args.port} — broker=mock, "
+    if args.unlock_stdin:
+        if not isinstance(broker, SchwabBroker):
+            print("execd: --unlock-stdin is for --schwab; the mock takes --mock-unlock.",
+                  file=sys.stderr)
+            return 2
+        try:
+            payload = Vault(args.vault).load(_read_passphrase())
+            Credential.from_payload(payload)
+        except BadPassphrase:
+            print("execd: the vault did not open.", file=sys.stderr)
+            return 3
+        except (VaultError, ValueError) as exc:
+            print(f"execd: the vault opened but cannot be used: {exc}", file=sys.stderr)
+            return 3
+        try:
+            service.unlock(payload)
+        except Exception as exc:  # a Refused (after the close) is reported, not hidden
+            print(f"execd: unlock refused — {exc}", file=sys.stderr)
+            return 3
+        print(f"execd: armed until {service.arming.expires_at}; "
+              f"refresh wall {broker.token_status().get('refresh_wall')}", file=sys.stderr)
+
+    name = "mock" if args.mock else "schwab"
+    print(f"execd {config.sha} on {BIND_HOST}:{args.port} — broker={name}, "
           f"state={config.state_dir}, arming={service.arming.state.value}", file=sys.stderr)
     create_app(service).run(host=BIND_HOST, port=args.port, threaded=True)
     return 0

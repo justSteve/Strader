@@ -30,7 +30,7 @@ been launched; one is the credential lifecycle that all of them depend on.
 |---|---|---|---|
 | **Intent desk** — speak the day, get a paste line | `strader/intent/` | works | No. Ends at the clipboard. |
 | **FD0** — budget-derived stop, exit block, attempt ledger | `strader/execution/` | works, as a library | No. Renders text. |
-| **execd** — the live execution service | `execd/` | stage 1 of 5, mock broker only | **Not yet.** No transport in the package. |
+| **execd** — the live execution service | `execd/` | stages 1–2 of 5: mock broker, and the Schwab transport (`execd/schwab.py`) | **Built, not yet proven against the account.** The app lacked the Accounts and Trading product on 2026-09-04 (401 on every `/trader` path); nothing sends before stage 4. |
 | **Fire server** — ARM → FIRE page on the tailnet | `scripts/fire_server.py` | built, never launched, dry run | No. Journals `transmitted: false`. |
 | **Schwab read feed + token** | `strader/execution/feed.py`, `broker_schwab/`, `scripts/refresh_schwab_token.py` | works, read-only | No. Order calls are removed from the library. |
 
@@ -336,9 +336,11 @@ Source: `execd/`, 2,631 lines across 11 modules. Tests: `tests/execd/`,
 stops 23 · vault 44 · wall 38`). Epic `st-5qjq`; stage 1 is `st-eznu`. Design of
 record: `docs/a2a/2026-08-30-coo-to-strader-live-execution-service-plan.md`.
 
-**Stage 1 cannot reach a broker.** The only broker in the package is
-`MockBroker`. There is no HTTP client, no credential on disk, and no import of
-the repo's hobbled `schwab` library. See §8.
+**Two brokers.** `MockBroker` (stage 1) and `SchwabBroker` (stage 2,
+`execd/schwab.py`, the one module in the package with a transport — `httpx`).
+No credential on disk here (the vault holds it), no import of the repo's hobbled
+`schwab` library. See §5.11 and §8. Stage 2 landed 2026-09-04 with **540 tests
+passing** in `tests/execd/` (schwab 89, wall 42).
 
 ### 5.1 Running it
 
@@ -348,15 +350,18 @@ the repo's hobbled `schwab` library. See §8.
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--mock` | **required** | Run against `MockBroker`. Its absence exits **2** with a message; it is not a default. |
+| `--mock` / `--schwab` | **one required** | Run against `MockBroker`, or against the Schwab Trader API (starts LOCKED). Neither is a default; both or neither exits **2**. |
+| `--vault FILE` | `/etc/execd/vault.json` | The encrypted credential, for `--schwab`. Missing file exits **2**. |
+| `--unlock-stdin` | off | With `--schwab`: read the passphrase from standard input (no echo on a terminal), open the vault, arm. The console path until the page exists (stage 3). Wrong passphrase exits **3**. |
 | `--state-dir DIR` | `/var/lib/execd` | The journal directory and the STOP file live here. |
 | `--bounds FILE` | `/etc/execd/bounds.yaml`, then the start values | Bounds YAML. |
 | `--port N` | `8778` | Loopback port. |
 | `--host H` | `127.0.0.1` | Suppressed from `--help`. Any other value exits **2**: `execd: refusing to bind <h> — this API is loopback-only.` |
 | `--mock-unlock` | off | Arms the service with `{"mock": True}` so the API can be exercised. Without it the service comes up **LOCKED** and refuses everything. |
 
-Exit codes: `2` for a missing `--mock` or a non-loopback `--host`; otherwise the
-process runs until killed.
+Exit codes: `2` for no broker flag, both flags, a missing vault, `--mock-unlock`
+against `--schwab`, or a non-loopback `--host`; `3` when the vault does not open
+or the unlock is refused; otherwise the process runs until killed.
 
 On start it prints to stderr:
 `execd <sha> on 127.0.0.1:<port> — broker=mock, state=<dir>, arming=<state>`.
@@ -677,8 +682,36 @@ the next call), `rest_limits` (standing: limits rest instead of filling),
 `trigger_stop(order_id)`, `working_orders(symbol)`, `calls_to(method)`,
 `set_quote`, `set_chain`, `set_position`.
 
-`COMMISSION_PER_CONTRACT_USD = 0.65` — Schwab's published options rate; stage 2
-reads the real one.
+`COMMISSION_PER_CONTRACT_USD = 0.65` — Schwab's published options rate; the
+Schwab transport reads the preview's `projectedCommission` instead.
+
+**`SchwabBroker`** (`execd/schwab.py`, stage 2). The same eight methods over
+the Trader API and the market-data API, `httpx` with an access token in a
+header. It holds no credential of its own: `bind(service.arming)` gives it
+`Arming.credential`, asked on every call, so a lock is a lock on the
+transport. The vault payload is `{"app": {"key", "secret"}, "token":
+<schwab-py wrapped>}`; the access token it derives is cached in memory and
+refreshed from the refresh token near expiry, never written anywhere; past the
+seven-day wall it refuses before calling. It sends GET, POST and DELETE and
+never PUT (a source test keeps it so — the replace verb is how a chase would
+sneak in). A GET meeting a 401 refreshes once and retries once; a POST meeting
+one is reported, never repeated. `place` is a 201 with the order id in the
+`Location` header followed by a read of the order (a 400 is a rejection,
+returned, not raised; a 201 without a Location is held WORKING under a
+synthetic id so reconcile finds it); `cancel` is a DELETE followed by the same
+read, so cancelling a stop that already filled reports the fill. `positions()`
+reports options on the index only and counts what it left out in
+`excluded_positions`. No token, key or account identifier reaches a message;
+the account hash reads `<account>` in every path quoted.
+
+**Recorded versus spec-derived.** The market-data shapes were recorded live on
+2026-09-04 (`tests/fixtures/schwab/`, `_capture.json`). The Trader API shapes
+could not be: the app answered every `/trader` path with HTTP 401 `no apiproduct
+match found` — the Accounts and Trading product was not on the app — so
+account numbers, positions, orders and preview are written to the API
+specification, say so in their docstrings, and their test fixtures are marked
+`SPEC`. `scripts/record_schwab_shapes.py` re-records them once the product is
+on the app; that re-run is the acceptance for this part of stage 2.
 
 ### 5.12 Recovery
 
@@ -728,7 +761,7 @@ service's page and never writes down.
 | Stage | Bead | What lands |
 |---|---|---|
 | 1 | `st-eznu` | **done** — everything in §5 against `MockBroker` |
-| 2 | `st-w2nw` | the Schwab transport: Trader API over HTTPS, in-service re-auth. A second `Broker`; nothing else changes. The vault is done; the client is blocked on recorded response shapes. |
+| 2 | `st-w2nw` | **built 2026-09-04** — the Schwab transport, the vault, the OAuth helpers the page will call (`authorize_url`, `code_from_received_url`, `exchange`, `refresh`). Open on it: the Trader API shapes are spec-derived until the Accounts and Trading product is on the app and the recorder is re-run. |
 | 3 | `st-p8k8` | dedicated user, systemd unit, `deploy/install.sh`, the tailnet page that takes the passphrase, the plaintext token retired |
 | 4 | `st-k6gl` | one 1-lot live single with Steve at the STOP button |
 | 5 | `st-47i2` | FD0 tickets and promoted rules become intents; the paste line retires |
@@ -778,6 +811,14 @@ prompt. The script then checks the grant's shape *and* makes one cheap
 market-data call — both must pass before it reports done. It keeps the last ten
 backups beside the token. An agent can run everything up to the login link; the
 login itself is Steve's, because it needs a browser session.
+
+**Inside execd** (stage 2, for the stage 3 page): `execd.schwab.authorize_url`
+builds the login link, `code_from_received_url` takes the pasted redirect (and
+refuses a state that does not match the link shown), `exchange` trades the
+code for a wrapped token with `creation_timestamp` = now — the start of the
+seven-day clock — and the page stores it in the vault with the passphrase Steve
+just typed. `refresh` renews the access token and preserves the timestamp.
+Nothing here writes the vault; the page does, with his passphrase present.
 
 ---
 
@@ -849,11 +890,14 @@ actually loads:
 - `FORBIDDEN_ROOTS = {schwab, broker_schwab, schwab_py}` — execd will speak
   plain HTTPS in stage 2 and never import the hobbled library, so the hook keeps
   its meaning unchanged.
-- `FORBIDDEN_TRANSPORTS = {httpx, requests, urllib3, socket, http.client, aiohttp}`
-  — **there is no transport at all today.** Stage 2's Trader API client
-  (`execd/schwab.py`) adds exactly one (`httpx`) in a new module and **drops it
-  from this set in the same commit**, deliberately and visibly, not as a side
-  effect of an import someone added.
+- `FORBIDDEN_TRANSPORTS = {httpx, requests, urllib3, socket, aiohttp, urllib,
+  http, http.client, ftplib, telnetlib, xmlrpc}` with **one exemption by file
+  name and library name**: `TRANSPORT_MODULE = "schwab.py"`, `TRANSPORT_ALLOWED
+  = {httpx}`. Every other module still imports no transport; a test asserts the
+  exempted module really imports `httpx`, so the exemption cannot outlive the
+  file it names; and a test imports every module and asserts the only broker
+  classes are `MockBroker` in `broker.py` and `SchwabBroker` in `schwab.py`.
+  `urllib` stays banned as a whole root even in `schwab.py`.
 - No module under `execd/` names a **plaintext** credential file. The vault owns
   the encrypted store; what must never appear is a path anyone can read.
 
@@ -911,7 +955,9 @@ than no manual.
 - **No live chain snapshot for `price`.** It reads a hand-made JSON file.
 - **No `vertical` or `condor` pricing**, though both are in the `Vehicle` type.
 - **No TOS fixtures**, so every paste shape reports `inferred`.
-- **No transport in execd.** Mock broker only.
+- **No recorded Trader API shapes in execd.** The transport is built; account
+  numbers, positions, orders and preview are written to the spec because the app
+  lacked the Accounts and Trading product on 2026-09-04.
 - **No systemd unit, no `deploy/install.sh`, no tailnet page** for execd —
   stage 3.
 - **`data/intent/` does not exist.** The desk has never been run for real.

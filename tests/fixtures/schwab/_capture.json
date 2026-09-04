@@ -1,0 +1,52 @@
+{
+  "captures": {
+    "chain": {
+      "bytes": 58029,
+      "captured_at_utc": "2026-09-04T12:58:54+00:00",
+      "elapsed_ms": 280,
+      "market_state": "pre-open, Fri 2026-09-04 08:0x CT (RTH opens 08:30 CT)",
+      "method": "GET",
+      "params": {
+        "contractType": "ALL",
+        "fromDate": "2026-09-04",
+        "strategy": "SINGLE",
+        "strikeCount": 24,
+        "symbol": "$SPX",
+        "toDate": "2026-09-07"
+      },
+      "path": "/marketdata/v1/chains",
+      "status": 200
+    },
+    "quotes_index": {
+      "bytes": 1550,
+      "captured_at_utc": "2026-09-04T12:58:53+00:00",
+      "elapsed_ms": 531,
+      "market_state": "pre-open, Fri 2026-09-04 08:0x CT (RTH opens 08:30 CT)",
+      "method": "GET",
+      "params": {
+        "indicative": "false",
+        "symbols": "$SPX,/ES"
+      },
+      "path": "/marketdata/v1/quotes",
+      "status": 200
+    },
+    "quotes_option": {
+      "bytes": 1501,
+      "captured_at_utc": "2026-09-04T12:58:54+00:00",
+      "elapsed_ms": 236,
+      "market_state": "pre-open, Fri 2026-09-04 08:0x CT (RTH opens 08:30 CT)",
+      "method": "GET",
+      "params": {
+        "symbols": "SPXW  260904C07690000"
+      },
+      "path": "/marketdata/v1/quotes",
+      "status": 200
+    }
+  },
+  "identifiers_scrubbed": {
+    "account_hashes": 0,
+    "account_numbers": 0
+  },
+  "label": "pre-open, Fri 2026-09-04 08:0x CT (RTH opens 08:30 CT)",
+  "recorded_by": "scripts/record_schwab_shapes.py"
+}

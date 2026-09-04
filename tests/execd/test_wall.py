@@ -10,11 +10,13 @@ narrow, or the sentence stops being worth saying. So:
 
 - The service speaks to the broker over plain HTTPS in stage 2 and never
   imports the hobbled library. The hook keeps its meaning unchanged.
-- **There is still no transport at all** — no ``httpx``, no ``requests``, no
-  socket. The only broker in the package is the mock. ``execd/vault.py`` is
-  stage 2's first piece and carries no transport of its own; the Trader API
-  client (``execd/schwab.py``) is what adds one, and the commit that lands it
-  updates ``FORBIDDEN_TRANSPORTS`` below, deliberately and visibly.
+- **Exactly one module carries a transport**: ``execd/schwab.py`` imports
+  ``httpx`` and nothing else in the package imports any transport at all
+  (stage 2, st-w2nw). The exemption is by file name and by library name, and
+  a test asserts the exempted module really does import it, so the exemption
+  cannot become a blanket by drift. ``urllib`` stays banned as a whole root
+  even there — ``urllib.parse`` would be harmless, and ``urllib.request``
+  arriving under the same root is exactly what the audit found (finding 13).
 - No module here names a **plaintext** credential file. The vault owns the
   encrypted store, which is the point of it; what must never appear is a path
   to a credential anyone can read.
@@ -49,6 +51,11 @@ FORBIDDEN_ROOTS = {"schwab", "broker_schwab", "schwab_py"}
 FORBIDDEN_TRANSPORTS = {"httpx", "requests", "urllib3", "socket", "aiohttp",
                         "urllib", "http", "http.client", "ftplib", "telnetlib",
                         "xmlrpc"}
+
+#: The one module allowed one transport. Stage 2 (st-w2nw): the Trader API
+#: client and nothing else. Widening this is a design change, not a fix.
+TRANSPORT_MODULE = "schwab.py"
+TRANSPORT_ALLOWED = {"httpx"}
 
 
 def modules() -> list[Path]:
@@ -92,13 +99,23 @@ def test_no_module_imports_the_hobbled_broker_library(path: Path):
 
 
 @pytest.mark.parametrize("path", modules(), ids=lambda p: p.name)
-def test_the_service_still_has_no_transport(path: Path):
+def test_only_the_transport_module_has_a_transport(path: Path):
     found = imported_roots(path) & FORBIDDEN_TRANSPORTS
+    if path.name == TRANSPORT_MODULE:
+        found -= TRANSPORT_ALLOWED
     assert not found, (
-        f"{path.name} imports {sorted(found)}. The service runs against "
-        f"MockBroker only; the Schwab transport is st-w2nw and lands with this "
-        f"list updated in the same commit."
+        f"{path.name} imports {sorted(found)}. The only transport in this "
+        f"package is {sorted(TRANSPORT_ALLOWED)} in {TRANSPORT_MODULE} (st-w2nw); "
+        f"a second one is a design change, not a fix."
     )
+
+
+def test_the_exemption_is_not_vacuous():
+    """The exempted module must actually import what it is exempted for —
+    otherwise a rename leaves a hole that names a file no longer there."""
+    path = PACKAGE / TRANSPORT_MODULE
+    assert path.is_file(), f"{TRANSPORT_MODULE} is exempted but does not exist"
+    assert imported_roots(path) & TRANSPORT_ALLOWED == TRANSPORT_ALLOWED
 
 
 @pytest.mark.parametrize("path", modules(), ids=lambda p: p.name)
@@ -141,17 +158,27 @@ def test_importing_the_whole_package_loads_no_broker_library():
     )
 
 
-def test_the_mock_is_the_only_broker_in_stage_one():
-    from execd import broker
+def test_there_are_exactly_two_brokers_and_each_lives_where_it_says():
+    """The mock in ``broker.py``, the Trader API client in ``schwab.py``, and
+    no third — a broker class appearing anywhere else is a transport that
+    escaped the exemption above."""
+    import importlib
 
-    concrete = [name for name, obj in vars(broker).items()
-                if isinstance(obj, type) and name.endswith("Broker")
-                and name not in ("Broker",)]
-    assert concrete == ["MockBroker"]
+    found: dict[str, str] = {}
+    for path in modules():
+        if path.name == "__init__.py":
+            continue
+        mod = importlib.import_module(f"execd.{path.stem}")
+        for name, obj in vars(mod).items():
+            if isinstance(obj, type) and name.endswith("Broker") and name != "Broker" \
+                    and obj.__module__ == mod.__name__:
+                found[name] = path.name
+    assert found == {"MockBroker": "broker.py", "SchwabBroker": "schwab.py"}
 
 
-def test_the_service_refuses_to_start_without_the_mock_flag(tmp_path):
-    """``python -m execd`` with no broker must not start quietly."""
+def test_the_service_refuses_to_start_without_a_broker_flag(tmp_path):
+    """``python -m execd`` with no broker must not start quietly. Neither
+    broker is a default."""
     from execd.__main__ import main
 
     assert main(["--state-dir", str(tmp_path)]) == 2

@@ -1,0 +1,85 @@
+{
+  "$SPX": {
+    "assetMainType": "INDEX",
+    "fundamental": {
+      "avg10DaysVolume": 0.0,
+      "avg1YearVolume": 0.0,
+      "divAmount": 0.0,
+      "divFreq": 0,
+      "divPayAmount": 0.0,
+      "divYield": 0.0,
+      "eps": 0.0,
+      "fundLeverageFactor": 0.0,
+      "peRatio": 0.0
+    },
+    "quote": {
+      "52WeekHigh": 7816.7,
+      "52WeekLow": 6316.91,
+      "closePrice": 7747.71,
+      "highPrice": 0.0,
+      "lastPrice": 7747.71,
+      "lowPrice": 0.0,
+      "netChange": 0.0,
+      "netPercentChange": 0.0,
+      "openPrice": 0.0,
+      "securityStatus": "Closed",
+      "totalVolume": 2743361691,
+      "tradeTime": 1788468548887
+    },
+    "realtime": true,
+    "reference": {
+      "description": "S & P 500 INDEX",
+      "ethOptionEligible": true,
+      "exchange": "0",
+      "exchangeName": "Index",
+      "hasBinaryOptions": false,
+      "optionable": true
+    },
+    "ssid": 1819771877,
+    "symbol": "$SPX"
+  },
+  "/ESU26": {
+    "assetMainType": "FUTURE",
+    "quote": {
+      "askPrice": 7739.25,
+      "askSize": 23,
+      "askTime": 1788526733732,
+      "bidPrice": 7739.0,
+      "bidSize": 5,
+      "bidTime": 1788526734814,
+      "closePrice": 7754.75,
+      "futurePercentChange": -0.20310132,
+      "highPrice": 7764.5,
+      "lastPrice": 7739.0,
+      "lastSize": 1,
+      "lowPrice": 7731.25,
+      "mark": 7739.0,
+      "netChange": -15.75,
+      "openInterest": 1985823,
+      "openPrice": 7749.75,
+      "quoteTime": 1788526734814,
+      "quotedInSession": true,
+      "securityStatus": "Normal",
+      "settleTime": 1788476599344,
+      "tick": 0.25,
+      "tickAmount": 12.5,
+      "totalVolume": 162953,
+      "tradeTime": 1788526733632
+    },
+    "realtime": true,
+    "reference": {
+      "description": "E-mini S&P 500 Index Futures,Sep-2026,ETH",
+      "exchange": "@",
+      "exchangeName": "XCME",
+      "futureExpirationDate": 1789704000000,
+      "futureIsActive": true,
+      "futureMultiplier": 50.0,
+      "futurePriceFormat": "D,D",
+      "futureSettlementPrice": 7754.75,
+      "futureTradingHours": "CME_EQUITIES()",
+      "product": "/ES"
+    },
+    "ssid": 92551848,
+    "symbol": "/ESU26"
+  }
+}

@@ -6,11 +6,24 @@ the token is hidden from agents, pasting is not the long-term transport.*
 This is that service. Epic **st-5qjq**; design of record
 `docs/a2a/2026-08-30-coo-to-strader-live-execution-service-plan.md`.
 
-**Stage 1 (st-eznu) is what is here, and it cannot reach a broker.** The only
-broker in the package is `MockBroker`. There is no HTTP client, no credential
-on disk, and no import of the repo's hobbled `schwab` library —
-`tests/execd/test_wall.py` asserts all three by reading the source and by
+**Stages 1 and 2 are what is here.** Two brokers: `MockBroker` (stage 1,
+st-eznu) and `SchwabBroker` (stage 2, st-w2nw) — the Trader API over plain
+HTTPS in `execd/schwab.py`, the one module in the package that imports a
+transport. There is still no credential on disk here (the vault holds it,
+encrypted) and no import of the repo's hobbled `schwab` library —
+`tests/execd/test_wall.py` asserts all of it by reading the source and by
 watching what a full import actually loads.
+
+**What stage 2 could and could not record.** The market-data shapes the
+client reads were recorded against the live API on 2026-09-04
+(`tests/fixtures/schwab/`). The Trader API shapes — account numbers,
+positions, orders, preview — could not be: measured that morning, the app
+registered for this box answered every `/trader` path with HTTP 401
+`no apiproduct match found`, which is Schwab saying the **Accounts and
+Trading product is not on the app**. That is Steve's developer-portal change.
+Until it lands and `scripts/record_schwab_shapes.py` is re-run, those parts
+of the client are written to the API specification and say so in their
+docstrings; the tests mark their fixtures `SPEC`.
 
 ---
 
@@ -18,19 +31,26 @@ watching what a full import actually loads.
 
 ```bash
 .venv/bin/python -m execd --mock --state-dir /var/lib/execd --mock-unlock
+.venv/bin/python -m execd --schwab --vault /etc/execd/vault.json --state-dir /var/lib/execd --unlock-stdin
 ```
 
-`--mock` is required, and its absence is a refusal rather than a default: a
-process called `execd` that started quietly and turned out to be talking to
-nothing would be worse than one that will not start. `--mock-unlock` arms it
-with a fake credential so the API can be exercised locally; without it the
-service comes up **locked** and refuses everything, which is what it will do
-in production until Steve enters his passphrase on its page (stage 3).
+A broker flag is required, and its absence is a refusal rather than a default:
+a process called `execd` that started quietly and turned out to be talking to
+nothing — or to the wrong thing — would be worse than one that will not start.
+
+`--mock-unlock` arms the mock with a fake credential so the API can be
+exercised locally. It cannot arm the real broker: the guard is on the broker
+object, not the flag order. `--schwab` comes up **locked** and stays locked
+until Steve's passphrase opens the vault — on the tailnet page in stage 3, or
+until then with `--unlock-stdin`, which reads it from standard input at the
+console and never from argv or the environment. `scripts/execd_vault_init.py`
+writes the vault from today's `.env` and token file; it asks for the passphrase
+twice and is Steve's to run.
 
 It binds `127.0.0.1:8778` and refuses to bind anything else.
 
 ```bash
-.venv/bin/python -m pytest tests/execd -q      # the whole stage-1 acceptance
+.venv/bin/python -m pytest tests/execd -q      # the whole acceptance, no network
 ```
 
 ## The narrow door
@@ -170,21 +190,48 @@ bound, `preview`, `placed`, `working`, `entry_resolved`, `filled`,
 It is the audit "trust the process" rests on, and on the first live day it is
 read back against Schwab's own order history before there is a second.
 
-## What comes next
+## The Schwab transport
 
-**The vault has landed early** (`execd/vault.py`, stage 2's first piece). It
-holds a JSON payload encrypted with AES-256-GCM under a key derived from
-Steve's passphrase by scrypt — no passphrase on disk, no key file, the work
-factors written into the file and authenticated with the ciphertext so they
-cannot be quietly weakened. It knows nothing about Schwab or token shapes, so
-it is fully tested without a credential in the room. What stage 2 still needs
-is the Trader API client, and that needs recorded responses.
+`execd/schwab.py`. `SchwabBroker` is the second `Broker`; the service never
+learns which one it holds. What it does that the mock does not:
+
+- **Asks for the credential on every call** through the arming state
+  (`bind(service.arming)`), so a lock is a lock on the transport with no second
+  flag to forget. The vault payload is `{"app": {"key", "secret"}, "token":
+  <schwab-py wrapped>}`. The access token it derives lives in memory only and
+  is refreshed from the refresh token when it nears expiry; refreshing never
+  touches the vault, because the refresh token does not change on refresh.
+  Past the seven-day wall it refuses before making a call.
+- **Sends GET, POST and DELETE, never PUT.** Schwab's replace-order verb is
+  absent from the module and a test reads the source to keep it so, which is
+  what keeps a bounded chase (st-kdaq) from arriving as a one-line change.
+- **Retries nothing that sends.** A GET that meets a 401 refreshes once and
+  retries once; a POST that meets one is reported, and the service's reconcile
+  finds out what went in.
+- **Reports positions in the index's options only.** The service adopts every
+  position it is shown so `flatten` reaches it; a share position in the same
+  account is not this service's to flatten, so it is not shown. What was left
+  out is counted in `excluded_positions` for the status page.
+- **Never puts a secret in a message.** No token, key or account identifier
+  reaches a log or an exception; the account hash is `<account>` in every path
+  it quotes.
+
+A `place` is a 201 with the order id in the `Location` header, followed by a
+read of the order; a 400 is returned as a rejection, not raised. A `cancel`
+is a DELETE followed by the same read, so cancelling a stop that already
+filled reports the fill — the race the exit path is written to survive.
+
+`scripts/record_schwab_shapes.py` is the recorder: read-only, plain HTTPS,
+scrubs account identifiers at capture, writes `tests/fixtures/schwab/` with a
+`_capture.json` that says when and in what market state.
+
+## What comes next
 
 | stage | bead | what lands |
 |---|---|---|
-| 2 | st-w2nw | the Schwab transport: Trader API over HTTPS, in-service re-auth. A second `Broker`; nothing else in this package changes. The vault is done. |
-| 3 | st-p8k8 | dedicated user, systemd unit, `deploy/install.sh`, the tailnet page that takes the passphrase, the plaintext token retired |
-| 4 | st-k6gl | one 1-lot live single with Steve at the STOP button |
+| 2 | st-w2nw | **built** — the transport, the vault, the OAuth helpers for the page. Open on it: the Trader API shapes are spec-derived until the Accounts and Trading product is on the app and the recorder is re-run. |
+| 3 | st-p8k8 | dedicated user, systemd unit, `deploy/install.sh`, the tailnet page that takes the passphrase and runs the weekly re-auth, the plaintext token retired |
+| 4 | st-k6gl | a full rehearsal with sending disabled, then one 1-lot live single with Steve at the STOP button |
 | 5 | st-47i2 | FD0 tickets and promoted rules become intents; the paste line retires |
 
 Order is strict. Nothing sends before stage 4.
