@@ -215,6 +215,98 @@ def test_a_present_stream_gone_quiet_is_stale(tmp_path):
     assert live.state == "STALE" and not live.ok
 
 
+# ─── compaction: the packed sibling is the same evidence [st-5wk8] ───────────
+
+
+def test_a_compacted_day_is_evidence_the_stream_landed(tmp_path):
+    """The 07:30 compaction packs .jsonl -> .jsonl.gz. Before this fix every
+    finished session read STALE, and on a Saturday the whole week did."""
+    corpus = tmp_path / "corpus"
+    corpus_day(corpus, "2026-08-13", "es.jsonl.gz")
+    reg = ent.load_registry(write_registry(tmp_path, STREAMS))
+    live, _ = ent.run_probes(reg, repo_root=tmp_path, corpus_root=corpus, now=NOW)
+    assert (live.state, live.ok) == ("OK", True)
+    assert ".gz" in live.detail, "the packed form must be named — gzipped MB read differently"
+
+
+def test_a_zstd_capture_part_also_counts(tmp_path):
+    corpus = tmp_path / "corpus"
+    corpus_day(corpus, "2026-08-13", "es.jsonl.zst")
+    reg = ent.load_registry(write_registry(tmp_path, STREAMS))
+    live, _ = ent.run_probes(reg, repo_root=tmp_path, corpus_root=corpus, now=NOW)
+    assert (live.state, live.ok) == ("OK", True)
+
+
+def test_an_empty_raw_file_does_not_mask_a_packed_day(tmp_path):
+    """2026-08-30 left a 0-byte databento_glbx_es.jsonl. It is a handle that
+    opened and delivered nothing — it must not out-rank five healthy packed
+    days behind it, and it must not itself read as evidence."""
+    corpus = tmp_path / "corpus"
+    corpus_day(corpus, "2026-08-13", "es.jsonl.gz")
+    empty = corpus / "2026-08-14"
+    empty.mkdir(parents=True, exist_ok=True)
+    (empty / "es.jsonl").write_text("")
+    reg = ent.load_registry(write_registry(tmp_path, STREAMS))
+    live, _ = ent.run_probes(reg, repo_root=tmp_path, corpus_root=corpus, now=NOW)
+    assert (live.state, live.ok) == ("OK", True)
+    assert "2026-08-13" in live.detail, "the empty newer day must not win"
+
+
+def test_a_halted_stream_stays_absent_when_only_old_packed_days_exist(tmp_path):
+    """Widening to .gz must not resurrect a halted stream: the packed OPRA days
+    are real, but they are outside the window and absence stays correct."""
+    corpus = tmp_path / "corpus"
+    corpus_day(corpus, "2026-08-13", "es.jsonl")
+    corpus_day(corpus, "2026-08-01", "opra.jsonl.gz")
+    reg = ent.load_registry(write_registry(tmp_path, STREAMS))
+    _, halted = ent.run_probes(reg, repo_root=tmp_path, corpus_root=corpus, now=NOW)
+    assert (halted.state, halted.ok) == ("ABSENT", True)
+
+
+# ─── closed archives: a feed that ended is not a feed gone stale [st-qcj3] ───
+
+CLOSED = """
+probed:
+  archive:
+    label: GexBot /hist archive
+    vendor: GexBot
+    what: closed after the tier drop
+    kind: path_present
+    path: hist
+    expect: present
+    expect_within_days: 4
+    final_day: "2026-08-01"
+"""
+
+
+def test_a_closed_archive_ending_on_its_final_day_is_ok_not_stale(tmp_path):
+    (tmp_path / "hist" / "2026-07-31").mkdir(parents=True)
+    (tmp_path / "hist" / "2026-08-01").mkdir(parents=True)
+    reg = ent.load_registry(write_registry(tmp_path, CLOSED))
+    line, = ent.run_probes(reg, repo_root=tmp_path, corpus_root=tmp_path, now=NOW)
+    assert (line.state, line.ok) == ("OK", True)
+    assert "closed" in line.detail and "2026-08-01" in line.detail
+
+
+def test_a_closed_archive_that_moved_past_its_final_day_alarms(tmp_path):
+    """The registry and the disk disagreeing is the fact worth seeing — either
+    the entitlement did not really end or someone wrote into the record."""
+    (tmp_path / "hist" / "2026-08-01").mkdir(parents=True)
+    (tmp_path / "hist" / "2026-08-05").mkdir(parents=True)
+    reg = ent.load_registry(write_registry(tmp_path, CLOSED))
+    line, = ent.run_probes(reg, repo_root=tmp_path, corpus_root=tmp_path, now=NOW)
+    assert line.state == "ALARM" and not line.ok
+    assert "GREW" in line.detail
+
+
+def test_the_live_registry_closes_the_hist_archive_on_the_day_we_swept(tmp_path):
+    """Pins the registry itself: /hist is Quant-only and Quant ended, so the
+    archive must be declared closed or it alarms every day forever."""
+    reg = ent.load_registry()
+    entry, = [e for e in ent.entries(reg, "probed") if e["id"] == "gexbot_hist_archive"]
+    assert entry["final_day"] == "2026-09-04"
+
+
 # ─── dated assertions ────────────────────────────────────────────────────────
 
 DATED = """

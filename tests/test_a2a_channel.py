@@ -9,7 +9,6 @@ channel was built to end (st-75z0).
 from __future__ import annotations
 
 import importlib.util
-import json
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -18,7 +17,6 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 TOOL = REPO / "tools" / "a2a_inbox.py"
-STUB = REPO / ".claude" / "hooks" / "scripts" / "gc-mail-stub.sh"
 INBOX = REPO / "docs" / "a2a" / "inbox.md"
 
 
@@ -221,52 +219,18 @@ def test_session_clock_reads_handoff_headings():
     assert len(a2a.session_times(REPO)) > 10
 
 
-# --- gc-mail stub ---------------------------------------------------------
-
-
-def _run_stub(command: str) -> int:
-    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
-    return subprocess.run(
-        ["bash", str(STUB)], input=payload, capture_output=True, text=True
-    ).returncode
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "gc mail send coo",
-        "gc",
-        "/usr/local/bin/gc doctor",
-        "cat foo.txt && gc mail check",
-        "ls | gc mail",
-        "echo hi; gc mail count",
-        "sudo gc mail",
-    ],
-)
-def test_gc_invocation_is_blocked(command):
-    assert _run_stub(command) == 2
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        'git commit -m "gc mail is dead"',
-        "grep -rn gc docs/",
-        "gcc --version",
-        "gcloud auth list",
-        "python3 tools/a2a_inbox.py",
-        "python3 tools/gc.py",
-    ],
-)
-def test_non_gc_commands_pass(command):
-    assert _run_stub(command) == 0
-
-
-def test_stub_points_at_the_replacement_channel():
-    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "gc mail send coo"}})
-    out = subprocess.run(["bash", str(STUB)], input=payload, capture_output=True, text=True)
-    assert "docs/a2a/" in out.stderr
-    assert out.stdout == ""  # hook messaging goes to stderr, never stdout
+# --- gc-mail stub: RETIRED 2026-09-05 -------------------------------------
+#
+# Fourteen tests lived here pinning `.claude/hooks/scripts/gc-mail-stub.sh` —
+# a PreToolUse hook that refused any `gc` invocation and named docs/a2a/ as the
+# replacement channel. The stub was deregistered and deleted on 2026-09-05 with
+# Steve's word (9791a83, st-voc5) because the `gc` binary it guarded is itself
+# gone, and the tests were left behind pointing at the missing file: 14 red on
+# a green tree, which is how a suite stops being read. They are removed rather
+# than rewritten because there is no longer a mechanism to test — nothing in
+# .claude/settings.json blocks `gc`, and nothing needs to. The channel rule
+# survives in prose, not in a hook: docs/a2a/inbox.md is the only channel.
+# [st-5wk8 session, follows st-voc5]
 
 
 # --- peer-ledger receipt backstop [st-1eaw] -------------------------------

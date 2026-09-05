@@ -266,6 +266,39 @@ def _corpus_days(corpus_root: Path) -> list[str]:
                   if d.is_dir() and len(d.name) == 10 and d.name[4] == "-" and d.name[:4].isdigit())
 
 
+# The 07:30 compaction packs each finished session's raw .jsonl to .jsonl.gz,
+# so the bare name is evidence only until compaction runs. Accept the packed
+# sibling under the same age arithmetic or every completed day reads STALE and
+# the day counts downstream become floors rather than counts [st-5wk8]. The
+# numbered .dbn.zst capture parts are deliberately NOT accepted: a day holding
+# only those means compaction did not finish, which should still surface.
+COMPACTED_SUFFIXES = (".gz", ".zst")
+
+
+def _stream_forms(filename: str) -> tuple[str, ...]:
+    """The bare name first, then the forms compaction leaves behind."""
+    return (filename, *(filename + s for s in COMPACTED_SUFFIXES))
+
+
+def _newest_stream_day(corpus_root: Path, days: list[str],
+                       filename: str) -> tuple[str | None, Path | None]:
+    """Newest corpus day holding a NON-EMPTY form of ``filename``.
+
+    Size matters: a 0-byte file is a collector that opened the handle and
+    delivered nothing, not evidence the entitlement is live (2026-08-30 left
+    exactly that, and it masked five healthy packed days behind it).
+    """
+    for day in reversed(days):
+        for name in _stream_forms(filename):
+            candidate = corpus_root / day / name
+            try:
+                if candidate.is_file() and candidate.stat().st_size > 0:
+                    return day, candidate
+            except OSError:      # transient DrvFs / unmounted 9p — treat as absent
+                continue
+    return None, None
+
+
 def _probe_corpus_stream(entry: dict, corpus_root: Path, now: datetime) -> tuple[str, str, str, bool]:
     filename = str(entry.get("filename", ""))
     expect = str(entry.get("expect", "present")).lower()
@@ -273,12 +306,7 @@ def _probe_corpus_stream(entry: dict, corpus_root: Path, now: datetime) -> tuple
     days = _corpus_days(corpus_root)
     today = _ct_date(now)   # corpus dirs are named in Central, not UTC
 
-    hit_day = hit_path = None
-    for day in reversed(days):
-        p = corpus_root / day / filename
-        if p.exists():
-            hit_day, hit_path = day, p
-            break
+    hit_day, hit_path = _newest_stream_day(corpus_root, days, filename)
 
     if hit_day is None:
         if expect == "absent":
@@ -287,7 +315,9 @@ def _probe_corpus_stream(entry: dict, corpus_root: Path, now: datetime) -> tuple
 
     age_days = (today - datetime.strptime(hit_day, "%Y-%m-%d").date()).days
     size_mb = hit_path.stat().st_size / 1e6
-    detail = f"last {hit_day} ({age_days}d ago) · {size_mb:,.1f} MB"
+    # Name the packed form: 3.8 MB gzipped and 3.8 MB raw are different volumes.
+    form = "" if hit_path.name == filename else f" [{hit_path.name[len(filename):]}]"
+    detail = f"last {hit_day} ({age_days}d ago) · {size_mb:,.1f} MB{form}"
 
     if expect == "absent":
         if age_days <= window:
@@ -314,6 +344,23 @@ def _probe_path_present(entry: dict, root: Path, now: datetime) -> tuple[str, st
     newest = (days or children)[-1] if children else None
     unit = "days" if days else "entries"
     detail = f"{len(days or children)} {unit} · newest {newest}" if newest else "present, empty"
+
+    # A CLOSED archive is not a stale one. When the entitlement that fed a
+    # directory ends, its newest day stops advancing by design, and ageing it
+    # against a freshness window turns into a permanent false alarm that costs
+    # the report its meaning. `final_day` says the feed is closed and names the
+    # last day it delivered; the check then becomes an integrity check — the
+    # newest day must still BE that day [st-qcj3].
+    final_day = str(entry.get("final_day") or "").strip()
+    if final_day and days and expect != "absent":
+        newest_day = days[-1]
+        if newest_day == final_day:
+            return ("OK", "closed",
+                    f"{detail} — closed archive, complete through {final_day}", True)
+        verdict = "GREW" if newest_day > final_day else "SHRANK"
+        return ("ALARM", "closed",
+                f"{detail} — closed archive {verdict} past its final day "
+                f"{final_day}; the registry and the disk disagree", False)
 
     if days:
         gap = (_ct_date(now) - datetime.strptime(days[-1], "%Y-%m-%d").date()).days

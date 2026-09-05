@@ -11,5 +11,7 @@ begins with `VAR=value` matches no allow rule and prompts Steve every time —
 - Node scripts needing `NODE_PATH`: `bash tools/nodecheck.sh <script> …`.
 - `TZ=America/Chicago date …` is the one allowed exception.
 - Do not request blanket assignment prefixes, `kill`/`pkill` (live feeds run
-  here — a human should see a kill), or `gc …` (deprecated; the hook blocks
-  it). Loops and conditionals prompt; put a repeated loop in `tools/`.
+  here — a human should see a kill), or `gc …` (dead: the binary is gone and
+  its blocking hook was deleted 2026-09-05, so a `gc` call now fails with a
+  bare 127 and no explanation — `docs/a2a/inbox.md` is the channel). Loops and
+  conditionals prompt; put a repeated loop in `tools/`.

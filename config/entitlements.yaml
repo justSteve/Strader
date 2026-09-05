@@ -144,7 +144,7 @@ probed:
   gexbot_orderflow_1s:
     label: GexBot orderflow 1Hz
     vendor: GexBot
-    what: The Orderflow endpoint. Direct observable of the QUANT tier — on State it auto-skips on entitlement.
+    what: The Orderflow endpoint. Direct observable of the QUANT tier, which ENDS 2026-09-06 — from 2026-09-07 the leg 403s and this capture is expected to be permanently quiet on State.
     kind: json_file
     path: data/corpus/_gexbot_of1s_health.json
     status_field: status
@@ -152,19 +152,27 @@ probed:
     fields: [message, in_window]
     checked_at_field: checked_at
     stale_after_hours: 30
-    note: If this goes permanently quiet inside RTH, suspect the tier before the code — that is exactly how the State/Quant night was lost.
+    note: READ THIS ENTRY WITH ITS DATE. Through 2026-09-06 a quiet RTH here meant "suspect the tier before the code" — that is exactly how the State/Quant night was lost, and it was the right reading then. From 2026-09-07 the reading inverts - quiet IS the tier, and only a re-subscription to Orderflow makes the old reading correct again. The status values this entry should accept on State are deliberately NOT guessed here - the poller's first denied session is the measurement, and this entry gets fixed from it rather than from a prediction [st-qcj3].
 
   gexbot_hist_archive:
     label: GexBot /hist archive
     vendor: GexBot
-    what: Quant-only historical endpoint, rolling 90-day window. Days age out permanently once the tier drops.
+    what: Quant-only historical endpoint, rolling 90-day window. CLOSED 2026-09-06 with the tier — /hist is unreachable on State, so no GEX day can ever be backfilled again and this archive is now the permanent record.
     kind: path_present
     path: data/corpus/gexbot-hist
     expect: present
     # Staleness is measured on the newest harvested DAY, not the directory mtime —
     # a manifest rewrite freshens the folder while the archive itself falls behind.
-    # 4 days tolerates a weekend plus the T+1 harvest lag.
+    # 4 days tolerated a weekend plus the T+1 harvest lag while the feed was live.
     expect_within_days: 4
+    # The feed is closed, so the newest day stops advancing by design and ageing
+    # it would alarm every day forever. final_day turns the check into an
+    # integrity check instead: the archive must still end exactly here. The
+    # final sweep ran 2026-09-05 (Saturday) against the whole 90-day window —
+    # 15/15 packages for 2026-09-04, 0 failed; the only no-file dates in the
+    # window are 2026-05-25, 2026-06-19 and 2026-07-03, all market holidays the
+    # vendor itself returns no file for [st-qcj3].
+    final_day: "2026-09-04"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DATED — Steve's assertions, each stamped with when and from where.

@@ -1,6 +1,6 @@
 """GexBot stream pull — one cycle. [st-1yp]
 
-Hits 10 endpoints in sequence respecting the 1 req/sec/metric rate limit:
+Hits 9 endpoints in sequence respecting the 1 req/sec/metric rate limit:
   /SPX/state/gamma_zero         0DTE — the primary late-day read
   /SPX/state/vanna_zero
   /SPX/state/charm_zero
@@ -10,7 +10,12 @@ Hits 10 endpoints in sequence respecting the 1 req/sec/metric rate limit:
   /SPX/state/vanna_one
   /SPX/state/charm_one
   /SPX/state/delta_one
-  /SPX/orderflow/orderflow      (OPTIONAL — Quant/Orderflow tiers only, st-fyey)
+
+The tenth leg, /SPX/orderflow/orderflow, was dropped 2026-09-05: it is tagged
+Quant-only and the Quant entitlement ended 2026-09-06, so on State it is ~390
+denied requests per session day for a body we can never use. The OPTIONAL
+machinery below is deliberately KEPT — re-subscribing to Orderflow is one line
+back into ENDPOINTS_DEFAULT and nothing else changes. [st-qcj3, st-fyey]
 
 The State package defines eight categories — {gamma,delta,vanna,charm} x
 {_zero,_one} — and until 2026-08-06 this collector took only the four _zero
@@ -54,7 +59,7 @@ ENDPOINTS_DEFAULT = [
     "/SPX/state/vanna_one",
     "/SPX/state/charm_one",
     "/SPX/state/delta_one",
-    "/SPX/orderflow/orderflow",
+    # "/SPX/orderflow/orderflow",  # Quant-only; entitlement ended 2026-09-06 [st-qcj3]
 ]
 
 # Endpoints gated behind tiers we may not be subscribed to. 401/403 here is a
