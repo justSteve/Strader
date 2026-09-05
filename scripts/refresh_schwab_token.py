@@ -4,15 +4,29 @@ Bullet-proof Schwab OAuth token regeneration.
 
 Schwab refresh tokens expire after 7 days. When that happens, the next API
 call fails with `invalid_grant`. This script walks you through the manual
-copy-paste OAuth flow and writes a fresh token to SCHWAB_TOKEN_PATH.
+copy-paste OAuth flow and writes a fresh token.
+
+TWO APPS (st-p9mx). Steve has two Schwab registrations and each carries its own
+grant with its own seven-day wall. Without --trading this mints app 1's, the
+market-data app; with --trading it mints app 2's, the Accounts and Trading app
+that execd sends orders through. Each is verified against the endpoint family
+it exists for — probing the wrong family is the 2026-05-20 outage, in which a
+perfectly good market-data token was restored over because the check hit
+/trader/v1. Re-authorise BOTH in one sitting: a still-valid grant costs nothing
+to renew, and renewing them together keeps the two walls on the same day rather
+than giving Steve two re-auth days a week.
 
 USAGE:
-    .venv/bin/python scripts/refresh_schwab_token.py
+    .venv/bin/python scripts/refresh_schwab_token.py              # app 1, market data
+    .venv/bin/python scripts/refresh_schwab_token.py --trading    # app 2, trading
 
 REQUIREMENTS:
     1. `touch ~/.schwab_gate_key` to authorize agent-driven auth flows
-    2. .env with SCHWAB_API_KEY, SCHWAB_APP_SECRET,
-       SCHWAB_CALLBACK_URL, SCHWAB_TOKEN_PATH
+    2. .env pointing at the credential vault file, which holds
+       SCHWAB_API_KEY, SCHWAB_APP_SECRET and — for --trading —
+       SCHWAB_TRADING_API_KEY, SCHWAB_TRADING_APP_SECRET;
+       .env itself carries SCHWAB_CALLBACK_URL, SCHWAB_TOKEN_PATH and
+       optionally SCHWAB_TRADING_CALLBACK_URL, SCHWAB_TRADING_TOKEN_PATH
 
 THE FLOW:
     a) Script prints an authorization URL.
@@ -41,6 +55,8 @@ daily health check uses.
 """
 from __future__ import annotations
 
+import argparse
+import json
 import os
 import shutil
 import sys
@@ -56,7 +72,8 @@ from schwab import auth as schwab_auth  # noqa: E402
 
 from strader.config import ConfigError  # noqa: E402
 from strader.schwab_token import STATUS_OK, assess_token  # noqa: E402
-from strader.settings import load_schwab_auth  # noqa: E402
+from strader.settings import (load_schwab_auth,  # noqa: E402
+                              load_schwab_trading_auth)
 
 
 GATE_KEY = Path.home() / ".schwab_gate_key"
@@ -235,6 +252,35 @@ def _grant_gate(token_path: Path):
     return health
 
 
+def _verify_trading_grant(token_path: Path) -> None:
+    """One cheap TRADER API call, for app 2 (st-p9mx).
+
+    The mirror image of :func:`_verify_client`, and it must be a trader
+    endpoint for exactly the reason that one must be a market-data endpoint: a
+    probe against the wrong family proves nothing about the grant just written.
+    App 2 exists to reach ``/trader/v1``; if that family answers, the grant is
+    good, and if it does not, no market-data 200 would redeem it.
+
+    It goes over ``httpx`` rather than through the client above because the
+    repo's schwab-py fork is hobbled — the account and order methods are
+    physically removed (``lib/schwab-py`` DEFENSE NOTE), so the library cannot
+    make this call at all. Read-only, and it prints no part of the token.
+    """
+    import httpx
+
+    wrapped = json.loads(Path(token_path).read_text(encoding="utf-8"))
+    access = (wrapped.get("token") or {}).get("access_token")
+    if not access:
+        raise RuntimeError("the written grant carries no access token")
+    r = httpx.get("https://api.schwabapi.com/trader/v1/accounts/accountNumbers",
+                  headers={"Authorization": f"Bearer {access}",
+                           "Accept": "application/json"}, timeout=15.0)
+    if r.status_code != 200:
+        raise RuntimeError(f"trader/v1 accountNumbers answered HTTP {r.status_code} "
+                           f"— the Accounts and Trading product is not on this app")
+    return None
+
+
 def _verify_client(client) -> None:
     """Make one cheap MARKET-DATA API call to confirm the new token works.
 
@@ -253,7 +299,14 @@ def _verify_client(client) -> None:
     return None
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    args = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    args.add_argument("--trading", action="store_true",
+                      help="mint the TRADING app's grant (app 2, Accounts and "
+                           "Trading) instead of the market-data app's")
+    opts = args.parse_args(argv)
+    trading = opts.trading
+
     if not GATE_KEY.exists():
         print(f"[GATE] {GATE_KEY} not found.", file=sys.stderr)
         print(f"       Authorize this run with:  touch {GATE_KEY}",
@@ -261,14 +314,23 @@ def main() -> int:
         return 1
 
     try:
-        cfg = load_schwab_auth()
+        cfg = load_schwab_trading_auth() if trading else load_schwab_auth()
     except ConfigError as e:
         print(f"[ENV] {e}", file=sys.stderr)
         return 2
-    api_key = cfg["SCHWAB_API_KEY"]
-    app_secret = cfg["SCHWAB_APP_SECRET"]
-    callback_url = cfg["SCHWAB_CALLBACK_URL"]
-    token_path_str = cfg.get("SCHWAB_TOKEN_PATH", "./tokens/schwab_token.json")
+    if trading:
+        api_key = cfg["SCHWAB_TRADING_API_KEY"]
+        app_secret = cfg["SCHWAB_TRADING_APP_SECRET"]
+        callback_url = cfg["SCHWAB_TRADING_CALLBACK_URL"]
+        token_path_str = cfg.get("SCHWAB_TRADING_TOKEN_PATH",
+                                 "./tokens/schwab_trading_token.json")
+    else:
+        api_key = cfg["SCHWAB_API_KEY"]
+        app_secret = cfg["SCHWAB_APP_SECRET"]
+        callback_url = cfg["SCHWAB_CALLBACK_URL"]
+        token_path_str = cfg.get("SCHWAB_TOKEN_PATH", "./tokens/schwab_token.json")
+
+    print(f"App:           {'trading (app 2)' if trading else 'market data (app 1)'}")
 
     token_path = (PROJECT_ROOT / token_path_str).resolve() \
         if not Path(token_path_str).is_absolute() \
@@ -361,7 +423,13 @@ def main() -> int:
         return 5
 
     try:
-        _verify_client(client)
+        # Each app is probed against the family it exists for. Probing the
+        # wrong one is the 2026-05-20 outage: a good market-data token was
+        # restored over because the check hit /trader/v1 and 401'd.
+        if trading:
+            _verify_trading_grant(token_path)
+        else:
+            _verify_client(client)
     except Exception as e:
         # IMPORTANT: do NOT auto-restore on verify failure. The freshly
         # issued token may still be valid for the actual use case (market
@@ -392,12 +460,16 @@ def main() -> int:
     print(f"✓ New token written to {token_path}")
     print(f"✓ Grant is complete — refresh token present, "
           f"{health.days_left:.1f}d to the wall")
-    print(f"✓ Live API call to marketdata/v1 get_market_hours returned 200")
+    print("✓ Live API call to trader/v1 accountNumbers returned 200" if trading
+          else "✓ Live API call to marketdata/v1 get_market_hours returned 200")
     for path in swept:
         print(f"  (shredded superseded copy {path.name})")
     print()
     print(f"Re-auth by {health.reauth_by_iso} — the Schwab refresh token hard-")
     print("expires 7 days after mint whether or not it is used.")
+    print("Re-authorise BOTH apps in this sitting (the other one is "
+          f"{'market data: run without --trading' if trading else 'trading: run with --trading'})"
+          " so the two walls stay on the same day.")
     return 0
 
 

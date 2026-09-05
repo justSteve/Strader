@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """Write (or check) the execution service's credential vault. [st-w2nw, st-p8k8]
 
-The service (``execd``) holds the Schwab credential encrypted at rest under a
-passphrase only Steve knows (``execd/vault.py``). This script is how the vault
-gets written the first time, from the pieces that exist today:
+The service (``execd``) holds the **trading** Schwab credential encrypted at
+rest under a passphrase only Steve knows (``execd/vault.py``). This script is
+how the vault gets written the first time, from the pieces that exist today:
 
-- the app key and secret from the repo's ``.env`` (validated by
-  ``strader.settings`` — the same loader every reader uses);
-- the current token file at ``SCHWAB_TOKEN_PATH`` in schwab-py's wrapped shape.
+- the trading app's key and secret from the vault file named by the repo's
+  ``.env`` (validated by ``strader.settings`` — the same loader every reader
+  uses);
+- its token at ``SCHWAB_TRADING_TOKEN_PATH`` in schwab-py's wrapped shape.
+
+This is app 2 of two (st-p9mx). App 1 carries market data, cannot trade —
+Schwab refuses the ``/trader/v1`` family on it — and is deliberately **not** in
+this vault: the service must be able to read quotes before Steve has typed
+anything, because the 07:00 premarket jobs run before he is awake.
+``scripts/execd_market_credential.py`` writes that one, unencrypted and 0600,
+and the split is what makes that safe.
 
 It asks for the passphrase twice, on the terminal, with no echo. Nothing
 about the passphrase or the credential is printed, logged, or written
@@ -38,13 +46,13 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-from execd.schwab import Credential  # noqa: E402
+from execd.schwab import VAULT_VERSION, Credential, trading_payload  # noqa: E402
 from execd.vault import BadPassphrase, Vault, VaultError  # noqa: E402
-from strader.settings import load_schwab  # noqa: E402
+from strader.settings import load_schwab_trading  # noqa: E402
 
 
 def _token_path(cfg: dict[str, str]) -> Path:
-    raw = cfg.get("SCHWAB_TOKEN_PATH") or "./tokens/schwab_token.json"
+    raw = cfg.get("SCHWAB_TRADING_TOKEN_PATH") or "./tokens/schwab_trading_token.json"
     p = Path(raw)
     return p if p.is_absolute() else (REPO / raw).resolve()
 
@@ -56,16 +64,19 @@ def _ask(prompt: str) -> str:
 
 
 def init(vault_path: Path) -> int:
-    cfg = load_schwab()
+    cfg = load_schwab_trading()
     tpath = _token_path(cfg)
     if not tpath.exists():
-        print(f"no token at {tpath}; run scripts/refresh_schwab_token.py first", file=sys.stderr)
+        print(f"no token at {tpath}; run scripts/refresh_schwab_token.py --trading first",
+              file=sys.stderr)
         return 1
     wrapped = json.loads(tpath.read_text(encoding="utf-8"))
-    payload = {"app": {"key": cfg["SCHWAB_API_KEY"], "secret": cfg["SCHWAB_APP_SECRET"]},
+    trading = {"app": {"key": cfg["SCHWAB_TRADING_API_KEY"],
+                       "secret": cfg["SCHWAB_TRADING_APP_SECRET"]},
                "token": wrapped}
+    payload = {"version": VAULT_VERSION, "trading": trading}
     try:
-        cred = Credential.from_payload(payload)
+        cred = Credential.from_payload(trading)
     except ValueError as exc:
         print(f"the token file is not usable as a credential: {exc}", file=sys.stderr)
         return 1
@@ -111,7 +122,7 @@ def check(vault_path: Path) -> int:
         print(f"the vault is not readable: {exc}", file=sys.stderr)
         return 1
     try:
-        cred = Credential.from_payload(payload)
+        cred = Credential.from_payload(trading_payload(payload))
     except ValueError as exc:
         print(f"the vault opened but its payload is not a credential: {exc}", file=sys.stderr)
         return 1

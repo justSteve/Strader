@@ -117,6 +117,92 @@ def test_gexbot_rejects_whitespace_and_tree_copies(tmp_path):
     assert "GEXBOT_API_KEY: secret value found in .env" in str(ei.value)
 
 
+# ── the second Schwab app (st-p9mx) ──────────────────────────────────────
+#
+# App 1 (the unlabelled SCHWAB_* pair) carries market data and cannot trade;
+# app 2 (SCHWAB_TRADING_*) carries Accounts and Trading. The env names stay
+# asymmetric on purpose — renaming app 1's pair would touch both readers, four
+# crons, the corpus token check, the gate hook and the vault file — so the
+# disambiguation lives in these loaders instead, and nothing that picks an app
+# ever reads an unlabelled name.
+
+@pytest.fixture
+def _no_schwab_in_environ(monkeypatch):
+    """The convenience loaders read the process environment; a real
+    SCHWAB_TRADING_* on this box would otherwise mask a missing vault entry."""
+    for key in ("SCHWAB_API_KEY", "SCHWAB_APP_SECRET", "SCHWAB_CALLBACK_URL",
+                "SCHWAB_TOKEN_PATH", "SCHWAB_TRADING_API_KEY",
+                "SCHWAB_TRADING_APP_SECRET", "SCHWAB_TRADING_CALLBACK_URL",
+                "SCHWAB_TRADING_TOKEN_PATH"):
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_trading_pair_loads_from_the_vault(tmp_path):
+    env = _env(tmp_path, "SCHWAB_TRADING_API_KEY=t-key\nSCHWAB_TRADING_APP_SECRET=t-sek\n")
+    cfg = load(settings.SCHWAB_TRADING_FIELDS, env_path=env, environ={})
+    assert cfg["SCHWAB_TRADING_API_KEY"] == "t-key"
+    assert cfg["SCHWAB_TRADING_APP_SECRET"] == "t-sek"
+
+
+def test_the_two_pairs_are_independent(tmp_path):
+    """Loading one app must never fall back to the other's key. A cross-read
+    here would send orders through the app that cannot trade, or market reads
+    through the one that can."""
+    env = _env(tmp_path, "SCHWAB_API_KEY=m-key\nSCHWAB_APP_SECRET=m-sek\n"
+                         "SCHWAB_TRADING_API_KEY=t-key\nSCHWAB_TRADING_APP_SECRET=t-sek\n")
+    market = load(settings.SCHWAB_FIELDS, env_path=env, environ={})
+    trading = load(settings.SCHWAB_TRADING_FIELDS, env_path=env, environ={})
+    assert market["SCHWAB_API_KEY"] == "m-key"
+    assert trading["SCHWAB_TRADING_API_KEY"] == "t-key"
+    assert "SCHWAB_API_KEY" not in trading
+    assert "SCHWAB_TRADING_API_KEY" not in market
+
+
+def test_a_missing_trading_pair_is_refused_not_silently_the_market_one(tmp_path):
+    env = _env(tmp_path, "SCHWAB_API_KEY=m-key\nSCHWAB_APP_SECRET=m-sek\n")
+    with pytest.raises(ConfigError) as ei:
+        load(settings.SCHWAB_TRADING_FIELDS, env_path=env, environ={})
+    assert "SCHWAB_TRADING_API_KEY" in str(ei.value)
+
+
+def test_trading_secrets_in_the_tree_are_refused(tmp_path):
+    """The same defence the market pair has: a secret pasted into .env fails at
+    start-up naming the field, rather than later as a broker error."""
+    vault = _vault(tmp_path, "SCHWAB_TRADING_API_KEY=t-key\n")
+    p = tmp_path / ".env"
+    p.write_text(f"{SECRETS_POINTER}={vault}\nSCHWAB_TRADING_APP_SECRET=in-the-tree\n")
+    with pytest.raises(ConfigError) as ei:
+        load(settings.SCHWAB_TRADING_FIELDS, env_path=p, environ={})
+    assert "SCHWAB_TRADING_APP_SECRET" in str(ei.value)
+
+
+def test_market_loader_is_the_unlabelled_pair(tmp_path, _no_schwab_in_environ):
+    env = _env(tmp_path, "SCHWAB_API_KEY=m-key\nSCHWAB_APP_SECRET=m-sek\n")
+    cfg = settings.load_schwab_market(env_path=env)
+    assert cfg["SCHWAB_API_KEY"] == "m-key"
+    assert settings.load_schwab(env_path=env) == cfg, "load_schwab is the market app"
+
+
+def test_trading_auth_falls_back_to_the_shared_callback(tmp_path, _no_schwab_in_environ):
+    """The common case: one callback URL registered on both apps. The resolved
+    value comes back under the trading name so no caller has to know which of
+    the two it got."""
+    env = _env(tmp_path,
+               "SCHWAB_TRADING_API_KEY=t-key\nSCHWAB_TRADING_APP_SECRET=t-sek\n",
+               "SCHWAB_CALLBACK_URL=https://127.0.0.1:8182\n")
+    cfg = settings.load_schwab_trading_auth(env_path=env)
+    assert cfg["SCHWAB_TRADING_CALLBACK_URL"] == "https://127.0.0.1:8182"
+
+
+def test_trading_auth_prefers_its_own_callback_when_set(tmp_path, _no_schwab_in_environ):
+    env = _env(tmp_path,
+               "SCHWAB_TRADING_API_KEY=t-key\nSCHWAB_TRADING_APP_SECRET=t-sek\n",
+               "SCHWAB_CALLBACK_URL=https://127.0.0.1:8182\n"
+               "SCHWAB_TRADING_CALLBACK_URL=https://127.0.0.1:8183\n")
+    cfg = settings.load_schwab_trading_auth(env_path=env)
+    assert cfg["SCHWAB_TRADING_CALLBACK_URL"] == "https://127.0.0.1:8183"
+
+
 @pytest.mark.skipif(not DEFAULT_ENV_PATH.exists(), reason="no real .env in this environment")
 def test_real_env_passes_strict_loader():
     """Integration: the repo's actual .env plus the vault it points at must

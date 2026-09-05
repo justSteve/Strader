@@ -62,7 +62,9 @@ import httpx
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-from strader.settings import load_schwab  # noqa: E402  (reads .env; imports no broker code)
+from execd.schwab import App, app_for  # noqa: E402  (the path -> app mapping, shared with the service)
+from strader.settings import (load_schwab_market,  # noqa: E402  (reads .env; imports no broker code)
+                              load_schwab_trading)
 
 API = "https://api.schwabapi.com"
 TOKEN_ENDPOINT = f"{API}/v1/oauth/token"
@@ -72,6 +74,12 @@ TIMEOUT_S = 20.0
 
 
 # ── token ────────────────────────────────────────────────────────────────
+
+
+def _trading_token_path(cfg: dict[str, str]) -> Path:
+    raw = cfg.get("SCHWAB_TRADING_TOKEN_PATH") or "./tokens/schwab_trading_token.json"
+    p = Path(raw)
+    return p if p.is_absolute() else (REPO / raw).resolve()
 
 
 def _token_path(cfg: dict[str, str]) -> Path:
@@ -183,10 +191,18 @@ class Scrubber:
 
 
 class Recorder:
-    def __init__(self, client: httpx.Client, token: str, out: Path, label: str,
+    """Records a GET per endpoint, presenting the app's own bearer.
+
+    ``tokens`` is keyed by :class:`execd.schwab.App`, and the app is derived
+    from the request path with the service's own :func:`~execd.schwab.app_for`
+    — the same mapping, imported rather than restated, so the recorder cannot
+    capture a shape through a different app than the service will use to read
+    it (st-p9mx)."""
+
+    def __init__(self, client: httpx.Client, tokens: dict, out: Path, label: str,
                  scrubber: Scrubber) -> None:
         self.client = client
-        self.token = token
+        self.tokens = tokens
         self.out = out
         self.label = label
         self.scrubber = scrubber
@@ -196,10 +212,16 @@ class Recorder:
     def get(self, name: str, path: str, params: dict[str, Any] | None = None,
             *, write: bool = True) -> Any:
         url = f"{API}{path}"
+        app = app_for(path)
+        token = self.tokens.get(app)
+        if not token:
+            self.failures.append(f"{name}: no {app.value} credential")
+            print(f"  {name:<22} skipped: no {app.value} credential loaded")
+            return None
         started = time.monotonic()
         try:
             r = self.client.get(url, params=params,
-                                headers={"Authorization": f"Bearer {self.token}",
+                                headers={"Authorization": f"Bearer {token}",
                                          "Accept": "application/json"})
         except httpx.HTTPError as exc:
             self.failures.append(f"{name}: transport error {type(exc).__name__}")
@@ -297,32 +319,62 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--days", type=int, default=60, help="order-history window, days back (Schwab max 60 per call)")
     p.add_argument("--underlying", default="$SPX")
     p.add_argument("--market-only", action="store_true",
-                   help="record the market-data endpoints only (quotes, chain). Measured "
-                        "2026-09-04: the app answered 401 'no apiproduct match found' on every "
-                        "/trader path — the Accounts and Trading product was not on the app.")
+                   help="record the market-data endpoints only (quotes, chain), through "
+                        "app 1. Use this when app 2's grant is not in hand; the /trader "
+                        "shapes stay spec-derived until it is.")
     args = p.parse_args(argv)
 
-    cfg = load_schwab()
-    api_key, app_secret = cfg["SCHWAB_API_KEY"], cfg["SCHWAB_APP_SECRET"]
-    tpath = _token_path(cfg)
+    # Two apps, two credentials (st-p9mx). App 1 answers /marketdata and cannot
+    # trade; app 2 answers /trader. The Recorder presents each app's own bearer,
+    # picking by path through the service's own mapping, so a shape can never be
+    # captured through a different app than the one that will read it live.
+    market_cfg = load_schwab_market()
+    tpath = _token_path(market_cfg)
     if not tpath.exists():
-        print(f"no token at {tpath}; run scripts/refresh_schwab_token.py first", file=sys.stderr)
+        print(f"no market token at {tpath}; run scripts/refresh_schwab_token.py first",
+              file=sys.stderr)
         return 1
-    wrapped = load_token(tpath)
+    market_wrapped = load_token(tpath)
+
+    trading_wrapped = trading_tpath = None
+    trading_cfg: dict[str, str] = {}
+    if not args.market_only:
+        try:
+            trading_cfg = load_schwab_trading()
+        except Exception as exc:            # ConfigError, and anything the loader raises
+            print(f"no trading credential ({exc}); re-run with --market-only for the "
+                  f"market-data shapes alone", file=sys.stderr)
+            return 1
+        trading_tpath = _trading_token_path(trading_cfg)
+        if not trading_tpath.exists():
+            print(f"no trading token at {trading_tpath}; run "
+                  f"scripts/refresh_schwab_token.py --trading first", file=sys.stderr)
+            return 1
+        trading_wrapped = load_token(trading_tpath)
 
     with httpx.Client(timeout=TIMEOUT_S) as client:
-        tok = wrapped["token"]
-        if int(tok.get("expires_at", 0)) - int(time.time()) < REFRESH_LEEWAY_S:
-            wrapped = refresh_access_token(client, wrapped, api_key, app_secret)
-            write_token(tpath, wrapped)
-            print(f"[token] file rewritten in place ({tpath.name}); creation_timestamp preserved")
-        else:
-            left = int(tok["expires_at"]) - int(time.time())
-            print(f"[token] access token valid for {left}s; no refresh needed")
-        access = wrapped["token"]["access_token"]
+
+        def fresh(wrapped, path, key, secret, which):
+            tok = wrapped["token"]
+            if int(tok.get("expires_at", 0)) - int(time.time()) < REFRESH_LEEWAY_S:
+                wrapped = refresh_access_token(client, wrapped, key, secret)
+                write_token(path, wrapped)
+                print(f"[token] {which} file rewritten in place ({path.name}); "
+                      f"creation_timestamp preserved")
+            else:
+                left = int(tok["expires_at"]) - int(time.time())
+                print(f"[token] {which} access token valid for {left}s; no refresh needed")
+            return wrapped["token"]["access_token"]
+
+        tokens = {App.MARKET: fresh(market_wrapped, tpath, market_cfg["SCHWAB_API_KEY"],
+                                    market_cfg["SCHWAB_APP_SECRET"], "market")}
+        if trading_wrapped is not None and trading_tpath is not None:
+            tokens[App.TRADING] = fresh(trading_wrapped, trading_tpath,
+                                        trading_cfg["SCHWAB_TRADING_API_KEY"],
+                                        trading_cfg["SCHWAB_TRADING_APP_SECRET"], "trading")
 
         scrub = Scrubber()
-        rec = Recorder(client, access, args.out, args.label, scrub)
+        rec = Recorder(client, tokens, args.out, args.label, scrub)
         print(f"[record] label={args.label!r} out={args.out}")
 
         now = datetime.now(timezone.utc)
@@ -331,9 +383,11 @@ def main(argv: list[str] | None = None) -> int:
             nums = rec.get("account_numbers", "/trader/v1/accounts/accountNumbers", write=False)
             if not isinstance(nums, list) or not nums:
                 print("accountNumbers did not answer with a list; no other /trader path is "
-                      "safe to record. If the status was 401 'no apiproduct match found', the "
-                      "app lacks the Accounts and Trading product — Steve's developer portal. "
-                      "Re-run with --market-only for the market-data shapes.", file=sys.stderr)
+                      "safe to record. A 401 'no apiproduct match found' here means the "
+                      "TRADING credential is app 1's, not app 2's — app 1 will never carry "
+                      "the Accounts and Trading product. Check SCHWAB_TRADING_API_KEY and "
+                      "SCHWAB_TRADING_TOKEN_PATH, or re-run with --market-only.",
+                      file=sys.stderr)
                 rec.finish()
                 return 1
             scrub.learn(nums)

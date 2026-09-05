@@ -831,3 +831,185 @@ class TestMain:
     def test_mock_unlock_cannot_arm_the_real_broker(self):
         from execd.__main__ import may_mock_unlock
         assert may_mock_unlock(SchwabBroker()) is False
+
+
+# ── two apps, chosen by the endpoint family ──────────────────────────────
+#
+# st-p9mx. Steve has two Schwab registrations: app 1 carries market data and
+# cannot trade (the portal refuses to add the Accounts and Trading product, so
+# every /trader/v1 call on it answers 401 "no apiproduct match found"), app 2
+# carries trading. The transport picks between them by reading the request
+# path, and these tests pin that mapping by watching which bearer token
+# actually reached which path — a behavioural check rather than a reading of
+# the source, so a path computed at run time cannot slip past it.
+
+MARKET_ACCESS = "ACCESS-MARKET"
+MARKET_REFRESH = "REFRESH-MARKET"
+
+
+def market_payload() -> dict[str, Any]:
+    """A second credential, distinguishable from :func:`payload` in every field
+    the transport touches."""
+    p = payload()
+    p["app"] = {"key": "MARKETKEY-VALUE", "secret": "MARKETSECRET-VALUE"}
+    p["token"]["token"]["access_token"] = MARKET_ACCESS
+    p["token"]["token"]["refresh_token"] = MARKET_REFRESH
+    return p
+
+
+@pytest.fixture
+def two_app_broker(fake: FakeSchwab, cred: dict[str, Any]):
+    """The production shape: a trading source and a market source, each with
+    its own token. Returns (broker, market_payload)."""
+    market = market_payload()
+    fake.valid_access.add(MARKET_ACCESS)
+    b = SchwabBroker(lambda: cred, market_credential_source=lambda: market,
+                     clock=lambda: NOW, transport=httpx.MockTransport(fake.handler))
+    return b, market
+
+
+def bearers_by_family(fake: FakeSchwab) -> dict[str, set[str]]:
+    """Every Authorization header the fake saw, grouped by endpoint family.
+    The OAuth endpoint is excluded: it authenticates with the app pair, not a
+    bearer, and it is covered by its own tests."""
+    out: dict[str, set[str]] = {}
+    for _method, path, _params, _body, auth in fake.calls:
+        if path.startswith("/v1/oauth/"):
+            continue
+        family = "/trader/" if path.startswith("/trader/") else (
+            "/marketdata/" if path.startswith("/marketdata/") else path)
+        out.setdefault(family, set()).add(auth)
+    return out
+
+
+class TestAppForPath:
+    def test_the_two_families_map_to_the_two_apps(self):
+        assert S.app_for("/trader/v1/accounts/accountNumbers") is S.App.TRADING
+        assert S.app_for("/marketdata/v1/quotes") is S.App.MARKET
+
+    def test_an_unmapped_family_is_refused_not_defaulted(self):
+        """The safe direction. A family added by hand next year stops on its
+        first call and is given an app deliberately."""
+        with pytest.raises(BrokerError) as exc:
+            S.app_for("/v1/userpreference")
+        assert "no Schwab app is mapped" in str(exc.value)
+
+    def test_every_prefix_in_the_table_is_absolute(self):
+        """A prefix without its leading slash would match nothing, silently."""
+        for prefix, _app in S.APP_BY_PREFIX:
+            assert prefix.startswith("/") and prefix.endswith("/")
+
+
+class TestEndpointFamilyBindsTheApp:
+    def test_market_data_carries_the_market_token(self, two_app_broker, fake):
+        b, _market = two_app_broker
+        b.quote("$SPX")
+        b.chain("SPXW")
+        families = bearers_by_family(fake)
+        assert set(families) == {"/marketdata/"}
+        assert families["/marketdata/"] == {f"Bearer {MARKET_ACCESS}"}
+
+    def test_trader_calls_carry_the_trading_token(self, two_app_broker, fake):
+        b, _market = two_app_broker
+        b.account_hash()
+        b.positions()
+        b.orders()
+        families = bearers_by_family(fake)
+        assert set(families) == {"/trader/"}
+        assert families["/trader/"] == {"Bearer ACCESS-STORED"}
+
+    def test_a_mixed_run_never_crosses_the_two(self, two_app_broker, fake):
+        """The one that matters: the same broker, both families, one sweep."""
+        b, _market = two_app_broker
+        b.quote("$SPX")
+        b.positions()
+        b.chain("SPXW")
+        b.preview(intent())
+        b.place(intent())
+        b.orders()
+        families = bearers_by_family(fake)
+        assert families["/marketdata/"] == {f"Bearer {MARKET_ACCESS}"}
+        assert families["/trader/"] == {"Bearer ACCESS-STORED"}
+        assert MARKET_ACCESS not in "".join(
+            auth for _m, path, _p, _b, auth in fake.calls if path.startswith("/trader/"))
+
+    def test_the_market_token_never_reaches_a_trader_path_even_when_it_is_the_only_one(
+            self, fake):
+        """No market-only construction can produce a trader call: the trading
+        source is unbound, so the call is refused rather than served by the
+        credential that happens to be present."""
+        market = market_payload()
+        fake.valid_access.add(MARKET_ACCESS)
+        b = SchwabBroker(market_credential_source=lambda: market,
+                         clock=lambda: NOW, transport=httpx.MockTransport(fake.handler))
+        assert b.quote("$SPX").symbol == "$SPX"
+        with pytest.raises(BrokerError) as exc:
+            b.positions()
+        assert "trading credential" in str(exc.value)
+        assert not [c for c in fake.calls if c[1].startswith("/trader/")]
+
+
+class TestReadsWorkWhileLocked:
+    """st-p8k8's open design point, settled by the split: the 07:00 premarket
+    jobs run before Steve is awake to type a passphrase, and they only ever
+    read market data."""
+
+    def test_quote_and_chain_answer_with_the_trading_side_locked(self, fake):
+        market = market_payload()
+        fake.valid_access.add(MARKET_ACCESS)
+
+        def locked() -> Any:
+            raise Locked("no passphrase yet")
+
+        b = SchwabBroker(locked, market_credential_source=lambda: market,
+                         clock=lambda: NOW, transport=httpx.MockTransport(fake.handler))
+        assert b.quote("$SPX").last > 0
+        assert b.chain("SPXW")["root"] == "SPXW"
+
+    def test_every_trader_call_still_refuses_while_locked(self, fake):
+        market = market_payload()
+        fake.valid_access.add(MARKET_ACCESS)
+
+        def locked() -> Any:
+            raise Locked("no passphrase yet")
+
+        b = SchwabBroker(locked, market_credential_source=lambda: market,
+                         clock=lambda: NOW, transport=httpx.MockTransport(fake.handler))
+        for call in (b.positions, b.orders, b.account_hash,
+                     lambda: b.preview(intent()), lambda: b.place(intent()),
+                     lambda: b.cancel("4242")):
+            with pytest.raises(BrokerError) as exc:
+                call()
+            assert "locked" in str(exc.value)
+            assert_no_secret(str(exc.value))
+        assert not [c for c in fake.calls if c[1].startswith("/trader/")]
+
+
+class TestTwoWalls:
+    def test_token_status_reports_both_apps(self, two_app_broker):
+        b, _market = two_app_broker
+        st = b.token_status()
+        assert st["armed"] is True
+        assert st["market"]["armed"] is True
+        assert st["refresh_wall"] and st["market"]["refresh_wall"]
+        assert_no_secret(json.dumps(st))
+
+    def test_a_locked_trading_side_still_reports_the_market_wall(self, fake):
+        market = market_payload()
+
+        def locked() -> Any:
+            raise Locked("no passphrase yet")
+
+        b = SchwabBroker(locked, market_credential_source=lambda: market,
+                         clock=lambda: NOW, transport=httpx.MockTransport(fake.handler))
+        st = b.token_status()
+        assert st["armed"] is False
+        assert st["market"]["armed"] is True
+
+    def test_each_app_caches_its_own_access_token(self, two_app_broker, fake):
+        """One shared cache would hand the second app the first app's bearer."""
+        b, _market = two_app_broker
+        b.quote("$SPX")
+        b.positions()
+        assert b._access[S.App.MARKET][1] == MARKET_ACCESS
+        assert b._access[S.App.TRADING][1] == "ACCESS-STORED"

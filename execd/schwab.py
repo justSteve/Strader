@@ -22,17 +22,43 @@ product is on the app, and the spec-derived fixtures in the tests are replaced
 by the recorded ones in that commit. Until then a mis-named field is a
 possibility this module is honest about rather than one it hides.
 
-**The credential.** This class never holds one of its own. It is given a
-callable — :meth:`execd.arming.Arming.credential` in production — and asks
-for the credential on every call, so a lock on the arming state is a lock on
-the transport with no second flag to forget. The payload it expects is the
-vault's: ``{"app": {"key": ..., "secret": ...}, "token": {schwab-py wrapped}}``.
-The access token it derives is cached in memory for as long as it is valid
-and is refreshed from the refresh token when it is not; refreshing never
-touches the vault, because the refresh token is the durable half and it does
-not change on refresh. The weekly re-authorisation — a new refresh token —
+**Two apps, two credentials, chosen by the endpoint family** (st-p9mx). Steve
+has two Schwab registrations. App 1 carries market data and *cannot trade* —
+developer.schwab.com refuses to add the Accounts and Trading product to it, so
+every ``/trader/v1`` call on it answers 401 ``no apiproduct match found``, and
+Steve confirmed on 2026-09-05 that the refusal is permanent. App 2 carries
+Accounts and Trading. So this module holds two credential sources and picks
+between them with :func:`app_for`, which reads the *request path* — there is no
+parameter saying which app to use, because a parameter is the thing that can
+drift. An unmapped path is refused rather than defaulted, so a new endpoint
+family fails loudly on its first call instead of quietly borrowing whichever
+credential was to hand.
+
+That split is what lets the two live at different tiers. The trading credential
+is the vault's, held by :class:`~execd.arming.Arming`, and LOCKED means it is
+not in memory. The market credential needs no such protection — it cannot place
+an order, by Schwab's enforcement rather than our promise — so the service may
+hold it from start-up, and :meth:`quote` and :meth:`chain` answer while the
+service is LOCKED. That is what settles st-p8k8's open question about the 07:00
+premarket jobs, which run before Steve is awake to type a passphrase. Schwab's
+401 is an observation with a date on it, not a guarantee, so the code holds the
+same boundary independently: nothing routes a ``/trader/v1`` call to the market
+credential, and ``tests/execd/test_schwab.py`` pins the mapping by watching
+which bearer token reaches which path.
+
+**The credential.** This class never holds one of its own. It is given
+callables — :meth:`execd.arming.Arming.credential` for trading in production —
+and asks on every call, so a lock on the arming state is a lock on the trading
+half with no second flag to forget. The payload each expects is the vault's:
+``{"app": {"key": ..., "secret": ...}, "token": {schwab-py wrapped}}``. The
+access token derived from each is cached in memory per app for as long as it is
+valid and refreshed from that app's refresh token when it is not; refreshing
+never touches the vault, because the refresh token is the durable half and it
+does not change on refresh. The weekly re-authorisation — a new refresh token —
 happens on Steve's page (stage 3) with his passphrase present, through
-:func:`authorize_url` and :func:`exchange`.
+:func:`authorize_url` and :func:`exchange`. Two grants mean two seven-day walls:
+they are re-authorised in one sitting so they expire on the same day, and
+:meth:`token_status` reports both.
 
 **What this module refuses to do.** It sends GET, POST and DELETE. There is no
 PUT — Schwab's replace-order verb — anywhere in it, so a bounded chase
@@ -52,6 +78,7 @@ import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
+from enum import Enum
 from typing import Any, Callable, Mapping
 
 import httpx
@@ -81,6 +108,58 @@ TIMEOUT_S = 15.0
 ORDERS_LOOKBACK = timedelta(days=2)
 
 CONTRACT_MULTIPLIER = 100
+
+
+class App(str, Enum):
+    """Which of Steve's two Schwab registrations a call belongs to."""
+
+    MARKET = "market"
+    TRADING = "trading"
+
+
+#: Path prefix → app. The whole mapping, in one place, so the answer to "which
+#: app does this call use" is a lookup rather than a reading of call sites.
+APP_BY_PREFIX: tuple[tuple[str, App], ...] = (
+    ("/trader/", App.TRADING),
+    ("/marketdata/", App.MARKET),
+)
+
+
+#: The vault payload's version. v1 was one app at the top level
+#: (``{"app": ..., "token": ...}``); v2 names the app it belongs to, because
+#: there are two of them now (st-p9mx).
+VAULT_VERSION = 2
+
+
+def trading_payload(vault_payload: Any) -> Any:
+    """The trading credential out of a vault payload, v1 or v2.
+
+    A vault Steve wrote before the split keeps opening: v1 had exactly one
+    credential and it was the trading one, so an envelope with no ``trading``
+    key *is* the trading credential. The market credential is deliberately not
+    in here — a credential that must load without the passphrase cannot live
+    behind it."""
+    if isinstance(vault_payload, Mapping) and "trading" in vault_payload:
+        return vault_payload["trading"]
+    return vault_payload
+
+
+def app_for(path: str) -> App:
+    """The app a request path belongs to, or a refusal.
+
+    Derived, never passed in: acceptance (b) of st-p9mx is that a call cannot
+    drift to the wrong app, and an argument is precisely what drifts. An
+    unmapped family raises rather than falling back — a ``/v1/userpreference``
+    added by hand next year should stop on its first call and be given an app
+    deliberately, not inherit one by accident."""
+    for prefix, app in APP_BY_PREFIX:
+        if path.startswith(prefix):
+            return app
+    raise BrokerError(
+        f"no Schwab app is mapped to {path} — every request family must be "
+        f"given one deliberately (execd.schwab.APP_BY_PREFIX)"
+    )
+
 
 _STATUS = {
     "FILLED": OrderStatus.FILLED,
@@ -320,10 +399,16 @@ def build_order(intent: OrderIntent) -> dict[str, Any]:
 class SchwabBroker:
     """The :class:`~execd.broker.Broker` protocol over the Trader API.
 
-    :param credential_source: returns the vault payload, or raises
-        :class:`~execd.arming.Locked`. Bound after construction with
-        :meth:`bind` in production because the service owns the arming state
-        and is built after its broker.
+    :param credential_source: the TRADING credential — returns the vault
+        payload, or raises :class:`~execd.arming.Locked`. Bound after
+        construction with :meth:`bind` in production because the service owns
+        the arming state and is built after its broker.
+    :param market_credential_source: the MARKET credential, held from start-up
+        and outside the arming lock (see the module docstring). When it is not
+        given, market calls fall back to ``credential_source`` — which is what
+        a one-app test or a mock wants, and is safe in the only direction that
+        matters: nothing ever routes a ``/trader/v1`` call to the market
+        credential, whatever is or is not bound.
     :param underlying: the index whose options this service trades. Positions
         in anything else are not this service's to see — see :meth:`positions`.
     :param transport: an ``httpx`` transport, for tests. Production uses the
@@ -331,47 +416,70 @@ class SchwabBroker:
     """
 
     def __init__(self, credential_source: Callable[[], Any] | None = None, *,
+                 market_credential_source: Callable[[], Any] | None = None,
                  clock: Callable[[], datetime] = _utcnow,
                  underlying: str = "$SPX", account_index: int = 0,
                  transport: httpx.BaseTransport | None = None,
                  timeout_s: float = TIMEOUT_S) -> None:
         self.credential_source = credential_source
+        self.market_credential_source = market_credential_source
         self.clock = clock
         self.underlying = underlying
         self.account_index = account_index
         self._client = httpx.Client(base_url=API, timeout=timeout_s, transport=transport)
         self._lock = threading.RLock()
-        # in-memory only, keyed on the refresh token they were derived from
-        self._access: tuple[str, str, int] | None = None   # (refresh, access, expires_at)
-        self._hash: tuple[str, str] | None = None          # (refresh, account hash)
+        # in-memory only, per app, keyed on the refresh token they were derived
+        # from: two apps mean two access tokens with two lifetimes.
+        self._access: dict[App, tuple[str, str, int]] = {}   # app → (refresh, access, expires_at)
+        self._hash: tuple[str, str] | None = None            # (refresh, account hash)
         #: positions the last sweep saw and did not report, by asset type —
         #: for the status page, so an excluded holding is visible, not silent.
         self.excluded_positions: dict[str, int] = {}
 
     def bind(self, arming: Any) -> "SchwabBroker":
+        """Wire the TRADING credential to the arming state. The market
+        credential is deliberately not touched: it is held from start-up so the
+        premarket reads work while the service is LOCKED."""
         self.credential_source = arming.credential
+        return self
+
+    def bind_market(self, source: Callable[[], Any]) -> "SchwabBroker":
+        """Wire the market credential. Separate from :meth:`bind` because these
+        two are wired at different moments by different things — this one at
+        start-up from a file the service user owns, the other from the vault
+        when Steve enters his passphrase."""
+        self.market_credential_source = source
         return self
 
     def close(self) -> None:
         self._client.close()
 
     # ── credential and access token ──────────────────────────────────────
-    def _credential(self) -> Credential:
-        if self.credential_source is None:
-            raise BrokerError("no credential source is bound to the Schwab transport")
+    def _source_for(self, app: App) -> Callable[[], Any] | None:
+        if app is App.TRADING:
+            return self.credential_source
+        return self.market_credential_source or self.credential_source
+
+    def _credential(self, app: App = App.TRADING) -> Credential:
+        source = self._source_for(app)
+        if source is None:
+            raise BrokerError(f"no {app.value} credential source is bound to the "
+                              f"Schwab transport")
         try:
-            payload = self.credential_source()
+            payload = source()
         except Locked:
-            raise BrokerError("the service is locked — no credential in memory") from None
+            raise BrokerError(f"the service is locked — no {app.value} credential "
+                              f"in memory") from None
         try:
             return Credential.from_payload(payload)
         except ValueError as exc:
-            raise BrokerError(f"the credential in memory is unusable: {exc}") from None
+            raise BrokerError(f"the {app.value} credential in memory is unusable: "
+                              f"{exc}") from None
 
-    def _bearer(self, cred: Credential, *, force: bool = False) -> str:
+    def _bearer(self, app: App, cred: Credential, *, force: bool = False) -> str:
         now = int(time.time())
         with self._lock:
-            cached = self._access
+            cached = self._access.get(app)
             if (not force and cached is not None and cached[0] == cred.refresh_token
                     and cached[2] - now > ACCESS_LEEWAY_S):
                 return cached[1]
@@ -381,32 +489,45 @@ class SchwabBroker:
             if (not force and stored_access and stored_exp - now > ACCESS_LEEWAY_S
                     and (cached is None or cached[0] != cred.refresh_token)):
                 # A fresh unlock whose stored access token is still good.
-                self._access = (cred.refresh_token, str(stored_access), stored_exp)
+                self._access[app] = (cred.refresh_token, str(stored_access), stored_exp)
                 return str(stored_access)
             if cred.refresh_wall <= datetime.fromtimestamp(now, tz=timezone.utc):
-                raise BrokerError("the refresh token is past its seven-day wall — "
-                                  "re-authorise on the page")
+                raise BrokerError(f"the {app.value} refresh token is past its "
+                                  f"seven-day wall — re-authorise on the page")
             wrapped = refresh(self._client, cred, now=now)
-            self._access = (cred.refresh_token, str(wrapped["token"]["access_token"]),
-                            int(wrapped["token"]["expires_at"]))
-            return self._access[1]
+            self._access[app] = (cred.refresh_token,
+                                 str(wrapped["token"]["access_token"]),
+                                 int(wrapped["token"]["expires_at"]))
+            return self._access[app][1]
 
-    def token_status(self) -> dict[str, Any]:
-        """For the status page: when the wall is, and whether an access token
-        is in hand. No values."""
+    def _app_status(self, app: App) -> dict[str, Any]:
         try:
-            cred = self._credential()
+            cred = self._credential(app)
         except BrokerError as exc:
             return {"armed": False, "detail": str(exc)}
-        cached = self._access
+        cached = self._access.get(app)
+        fresh = bool(cached and cached[0] == cred.refresh_token)
         return {
             "armed": True,
             "refresh_wall": cred.refresh_wall.isoformat(),
             "refresh_wall_in_s": int((cred.refresh_wall - self.clock()).total_seconds()),
-            "access_cached": bool(cached and cached[0] == cred.refresh_token),
+            "access_cached": fresh,
             "access_expires_at": (datetime.fromtimestamp(cached[2], tz=timezone.utc).isoformat()
-                                  if cached and cached[0] == cred.refresh_token else None),
+                                  if fresh and cached else None),
         }
+
+    def token_status(self) -> dict[str, Any]:
+        """For the status page: when each wall is, and whether an access token
+        is in hand. No values.
+
+        The top level is the TRADING app, because that is what "armed" means to
+        the page and to everything that reads this; the market app's own line
+        hangs under ``market``. Two grants expire independently, so the page
+        shows the nearer of the two walls — and the re-auth discipline is to
+        renew both in one sitting, which keeps them on the same day."""
+        status = self._app_status(App.TRADING)
+        status["market"] = self._app_status(App.MARKET)
+        return status
 
     # ── requests ─────────────────────────────────────────────────────────
     def _scrub(self, text: str) -> str:
@@ -416,15 +537,19 @@ class SchwabBroker:
     def _request(self, method: str, path: str, *, params: Mapping[str, Any] | None = None,
                  json: Any = None, ok: tuple[int, ...] = (200,)) -> httpx.Response:
         """One call, with one retry on a 401 after a forced refresh. Nothing
-        else is retried — a send that timed out is reported, not repeated."""
+        else is retried — a send that timed out is reported, not repeated.
+
+        The app is read off the path (:func:`app_for`), not taken as an
+        argument: there is no way for a caller to name the wrong one."""
         assert method in ("GET", "POST", "DELETE"), method
-        cred = self._credential()
-        token = self._bearer(cred)
+        app = app_for(path)
+        cred = self._credential(app)
+        token = self._bearer(app, cred)
         r = self._send(method, path, token, params, json)
         if r.status_code == 401 and method == "GET":
             # A GET is safe to repeat. A POST is not — a 401 there is reported,
             # and the service's reconcile discovers whether anything went in.
-            token = self._bearer(cred, force=True)
+            token = self._bearer(app, cred, force=True)
             r = self._send(method, path, token, params, json)
         if r.status_code not in ok:
             raise BrokerError(f"schwab {method} {self._scrub(path)}: HTTP {r.status_code} "
@@ -450,8 +575,9 @@ class SchwabBroker:
     def account_hash(self) -> str:
         """Spec-derived: ``GET /trader/v1/accounts/accountNumbers`` →
         ``[{accountNumber, hashValue}]``. Cached per credential; the plain
-        number is never kept."""
-        cred = self._credential()
+        number is never kept — and cached against the TRADING credential, which
+        is the only one that can ask the question at all."""
+        cred = self._credential(App.TRADING)
         with self._lock:
             if self._hash and self._hash[0] == cred.refresh_token:
                 return self._hash[1]
@@ -579,9 +705,10 @@ class SchwabBroker:
         the slot and reconcile finds it by the broker's own listing rather than
         the service believing nothing went in."""
         h = self.account_hash()
-        cred = self._credential()
-        token = self._bearer(cred)
         path = f"/trader/v1/accounts/{h}/orders"
+        app = app_for(path)
+        cred = self._credential(app)
+        token = self._bearer(app, cred)
         r = self._send("POST", path, token, None, build_order(intent))
         if r.status_code == 400:
             return OrderResult(
@@ -620,9 +747,10 @@ class SchwabBroker:
         error here: the read that follows says what actually happened, which
         is the race the stop logic is written to survive."""
         h = self.account_hash()
-        cred = self._credential()
-        token = self._bearer(cred)
         path = f"/trader/v1/accounts/{h}/orders/{order_id}"
+        app = app_for(path)
+        cred = self._credential(app)
+        token = self._bearer(app, cred)
         r = self._send("DELETE", path, token, None, None)
         if r.status_code in (401, 403) or r.status_code >= 500:
             raise BrokerError(f"schwab DELETE {self._scrub(path)}: HTTP {r.status_code} "

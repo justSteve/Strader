@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -30,12 +31,30 @@ from pathlib import Path
 from .api import BIND_HOST, BIND_PORT, create_app
 from .bounds import load_bounds
 from .broker import MockBroker
-from .schwab import Credential, SchwabBroker
+from .schwab import Credential, SchwabBroker, trading_payload
 from .service import ExecService, ServiceConfig
 from .vault import BadPassphrase, Vault, VaultError
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_VAULT = "/etc/execd/vault.json"
+
+
+def load_market_credential(path: str | Path) -> dict:
+    """The market-data app's credential, read at start-up and held outside the
+    arming lock (st-p9mx).
+
+    It is a plain 0600 file owned by the service user, not a vault entry, and
+    that is the design rather than an omission: it must be readable before Steve
+    types anything, because the 07:00 premarket jobs run before he is awake. It
+    is safe to hold that way because the credential cannot trade — Schwab
+    refuses the whole ``/trader/v1`` family on that registration — and because
+    nothing in this service routes a trading call to it.
+
+    ``scripts/execd_market_credential.py`` writes the file. Raises so the
+    caller can decide whether to start without it."""
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    Credential.from_payload(raw)      # shape-checked here, not on the first quote
+    return raw
 
 
 def installed_sha() -> str:
@@ -84,7 +103,11 @@ def build_parser() -> argparse.ArgumentParser:
     which.add_argument("--schwab", action="store_true",
                        help="run against the Schwab Trader API; starts locked (stage 2)")
     p.add_argument("--vault", default=DEFAULT_VAULT,
-                   help="the encrypted credential, for --schwab (default: %(default)s)")
+                   help="the encrypted trading credential, for --schwab (default: %(default)s)")
+    p.add_argument("--market-credential", default=None,
+                   help="the market-data app's credential file (0600, owned by the "
+                        "service user). Held outside the arming lock so quotes and "
+                        "chains answer while the service is LOCKED; it cannot trade")
     p.add_argument("--unlock-stdin", action="store_true",
                    help="read the passphrase from standard input and arm at start — the "
                         "console path until the page exists (stage 3); never from an agent")
@@ -137,6 +160,21 @@ def main(argv: list[str] | None = None) -> int:
     service = ExecService(broker, config)
     if isinstance(broker, SchwabBroker):
         broker.bind(service.arming)
+        if args.market_credential:
+            try:
+                market = load_market_credential(args.market_credential)
+                broker.bind_market(lambda: market)
+            except (OSError, ValueError) as exc:
+                print(f"execd: the market credential at {args.market_credential} "
+                      f"is unusable: {exc}", file=sys.stderr)
+                return 2
+        else:
+            # Not fatal — stage-2 console trials predate the file — but say what
+            # is lost, because the loss is silent otherwise: reads fall back to
+            # the trading credential and so stop working when the service locks.
+            print("execd: no --market-credential; quotes and chains will use the "
+                  "trading credential and will fail while the service is LOCKED.",
+                  file=sys.stderr)
 
     if args.mock_unlock:
         if not may_mock_unlock(broker):
@@ -154,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
                   file=sys.stderr)
             return 2
         try:
-            payload = Vault(args.vault).load(_read_passphrase())
+            payload = trading_payload(Vault(args.vault).load(_read_passphrase()))
             Credential.from_payload(payload)
         except BadPassphrase:
             print("execd: the vault did not open.", file=sys.stderr)

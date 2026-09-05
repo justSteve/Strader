@@ -52,7 +52,7 @@ in the repo outside `.venv` and `lib`.
 | `python -m execd --mock …` | long-running server | execd. Its operator surface is HTTP, not argv. §5. |
 | `python -m strader.execution.feed --preflight --token PATH` | one-shot check | Go/no-go preflight. §6. |
 | `python scripts/fire_server.py [--port N]` | long-running server | Fire server. §7. |
-| `python scripts/refresh_schwab_token.py` | interactive chore | Weekly re-auth. Takes no arguments; has no `--help`. §6. |
+| `python scripts/refresh_schwab_token.py [--trading]` | interactive chore | Weekly re-auth. Without the flag it mints app 1 (market data); with it, app 2 (trading). Do both in one sitting. §5.12a, §6. |
 | `python scripts/schwab_token_health.py --no-bead --no-push` | one-shot check | Token staleness. Exit 0 healthy, 1 action needed. §6. |
 
 All of these are run through the repo venv: `/root/projects/Strader/.venv/bin/python`.
@@ -351,7 +351,8 @@ passing** in `tests/execd/` (schwab 89, wall 42).
 | Flag | Default | Effect |
 |---|---|---|
 | `--mock` / `--schwab` | **one required** | Run against `MockBroker`, or against the Schwab Trader API (starts LOCKED). Neither is a default; both or neither exits **2**. |
-| `--vault FILE` | `/etc/execd/vault.json` | The encrypted credential, for `--schwab`. Missing file exits **2**. |
+| `--vault FILE` | `/etc/execd/vault.json` | The encrypted **trading** credential, for `--schwab`. Missing file exits **2**. |
+| `--market-credential FILE` | none | The market-data app's credential (0600, service-owned), held outside the arming lock so quotes answer while LOCKED. Written by `scripts/execd_market_credential.py`. Absent: a warning, and reads fall back to the trading credential, so they stop working when the service locks. Unreadable or malformed exits **2**. |
 | `--unlock-stdin` | off | With `--schwab`: read the passphrase from standard input (no echo on a terminal), open the vault, arm. The console path until the page exists (stage 3). Wrong passphrase exits **3**. |
 | `--state-dir DIR` | `/var/lib/execd` | The journal directory and the STOP file live here. |
 | `--bounds FILE` | `/etc/execd/bounds.yaml`, then the start values | Bounds YAML. |
@@ -690,11 +691,12 @@ Schwab transport reads the preview's `projectedCommission` instead.
 **`SchwabBroker`** (`execd/schwab.py`, stage 2). The same eight methods over
 the Trader API and the market-data API, `httpx` with an access token in a
 header. It holds no credential of its own: `bind(service.arming)` gives it
-`Arming.credential`, asked on every call, so a lock is a lock on the
-transport. The vault payload is `{"app": {"key", "secret"}, "token":
-<schwab-py wrapped>}`; the access token it derives is cached in memory and
-refreshed from the refresh token near expiry, never written anywhere; past the
-seven-day wall it refuses before calling. It sends GET, POST and DELETE and
+`Arming.credential` for the trading app, asked on every call, so a lock is a
+lock on the transport. Each credential's payload is `{"app": {"key",
+"secret"}, "token": <schwab-py wrapped>}`; the access token derived from each
+is cached in memory per app and refreshed from that app's refresh token near
+expiry, never written anywhere; past the seven-day wall it refuses before
+calling. It sends GET, POST and DELETE and
 never PUT (a source test keeps it so — the replace verb is how a chase would
 sneak in). A GET meeting a 401 refreshes once and retries once; a POST meeting
 one is reported, never repeated. `place` is a 201 with the order id in the
@@ -708,12 +710,64 @@ the account hash reads `<account>` in every path quoted.
 
 **Recorded versus spec-derived.** The market-data shapes were recorded live on
 2026-09-04 (`tests/fixtures/schwab/`, `_capture.json`). The Trader API shapes
-could not be: the app answered every `/trader` path with HTTP 401 `no apiproduct
-match found` — the Accounts and Trading product was not on the app — so
-account numbers, positions, orders and preview are written to the API
-specification, say so in their docstrings, and their test fixtures are marked
-`SPEC`. `scripts/record_schwab_shapes.py` re-records them once the product is
-on the app; that re-run is the acceptance for this part of stage 2.
+could not be: app 1 answered every `/trader` path with HTTP 401 `no apiproduct
+match found` — the Accounts and Trading product was not on it — so account
+numbers, positions, orders and preview are written to the API specification,
+say so in their docstrings, and their test fixtures are marked `SPEC`.
+`scripts/record_schwab_shapes.py` in full mode — that is, without
+`--market-only` — re-records them against app 2; that re-run is the
+acceptance for this part of stage 2. The recorder presents each app's own
+bearer and picks by path through the service's own `app_for`, imported
+rather than restated, so a shape cannot be captured through a different app
+than the one that will read it live.
+
+### 5.12a Two Schwab apps, chosen by the endpoint family (st-p9mx)
+
+Steve has two registrations at developer.schwab.com and the split is permanent:
+the portal **will not** add the Accounts and Trading product to app 1, so every
+`/trader/v1` call on it answers 401 `no apiproduct match found` for good, and
+app 2 holds that product. Confirmed by Steve 2026-09-05.
+
+| | App 1 — market data | App 2 — trading |
+|---|---|---|
+| Serves | `/marketdata/v1` — quotes, chains, history | `/trader/v1` — accounts, preview, place, cancel, orders, positions |
+| Env names | `SCHWAB_API_KEY`, `SCHWAB_APP_SECRET`, `SCHWAB_TOKEN_PATH` | `SCHWAB_TRADING_API_KEY`, `SCHWAB_TRADING_APP_SECRET`, `SCHWAB_TRADING_TOKEN_PATH` |
+| Loader | `strader.settings.load_schwab_market` | `strader.settings.load_schwab_trading` |
+| At rest | plain JSON, 0600, service state dir — `scripts/execd_market_credential.py` | encrypted vault under Steve's passphrase — `scripts/execd_vault_init.py` |
+| In the service | held from start-up, outside arming | held by `Arming`; **LOCKED means it is not in memory** |
+| Re-auth | `scripts/refresh_schwab_token.py` | `scripts/refresh_schwab_token.py --trading`, then the page at stage 3 |
+
+**How a call picks its app.** `execd.schwab.app_for(path)` reads the request
+path; there is no argument saying which app to use, because an argument is what
+drifts. An unmapped family raises rather than defaulting, so a request family
+added by hand next year stops on its first call instead of quietly borrowing
+whichever credential was to hand. `tests/execd/test_schwab.py` pins the mapping
+behaviourally — it watches which bearer token actually reached which path, so a
+path computed at run time cannot slip past it.
+
+**Why the market credential is allowed outside the vault.** This is the answer
+to the design point st-p8k8 left open on 2026-09-04: the service comes back
+LOCKED after every restart, but the 07:00 CT premarket jobs run before Steve is
+awake to type a passphrase. The question was hard while one credential served
+both families — a token left loadable without a passphrase was a token that
+could place an order. With the split it is not: app 1 cannot trade, by Schwab's
+enforcement rather than our promise, so holding it outside the lock costs no
+capability. **`/quote` and `/chain` therefore answer while the service is
+LOCKED, and every `/trader/v1` method still refuses.** Schwab's 401 is an
+observation with a date on it rather than a guarantee, so the code holds the
+same boundary independently and a test asserts it.
+
+**Two grants, two seven-day walls — one sitting.** Each app has its own OAuth
+grant and its own wall. Left alone they drift apart and become two re-auth days
+a week in two different places. The rule is to renew **both** in one sitting
+whichever one is due: renewing a still-valid grant costs nothing and resets its
+clock, so one sitting a week holds both walls on the same day.
+`broker.token_status()` reports both — the trading app at the top level, the
+market app under `market` — and the page shows the nearer of the two. Each app's
+re-auth is verified against the family it exists for: app 1 with a market-data
+call, app 2 with `/trader/v1/accounts/accountNumbers`. Probing the wrong family
+is the 2026-05-20 outage, in which a good market-data token was restored over
+because the check hit `/trader/v1` and 401'd.
 
 ### 5.12 Recovery
 

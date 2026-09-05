@@ -36,7 +36,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from strader.schwab_token import assess_token, TokenHealth  # noqa: E402
-from strader.settings import load_schwab  # noqa: E402
+from strader.config import ConfigError  # noqa: E402
+from strader.settings import (load_schwab_market,  # noqa: E402
+                              load_schwab_trading)
 
 # Health/heartbeat live next to the corpus, unified with corpus_daily.py's stream.
 CORPUS_ROOT = REPO_ROOT / "data" / "corpus"          # == market.corpus.paths.CORPUS_ROOT
@@ -54,13 +56,34 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _resolve_token_path() -> Path:
-    """Same resolution refresh_schwab_token.py uses: SCHWAB_TOKEN_PATH from the
-    validated config, resolved relative to the repo root when not absolute."""
-    cfg = load_schwab()
-    raw = cfg.get("SCHWAB_TOKEN_PATH") or "./tokens/schwab_token.json"
+def _resolve(raw: str) -> Path:
     p = Path(raw)
     return p if p.is_absolute() else (REPO_ROOT / p).resolve()
+
+
+def _resolve_token_path() -> Path:
+    """Same resolution refresh_schwab_token.py uses: SCHWAB_TOKEN_PATH from the
+    validated config, resolved relative to the repo root when not absolute.
+
+    This is app 1, the market-data app — the one every reader and cron uses."""
+    cfg = load_schwab_market()
+    return _resolve(cfg.get("SCHWAB_TOKEN_PATH") or "./tokens/schwab_token.json")
+
+
+def _resolve_trading_token_path() -> Path | None:
+    """App 2's token, or ``None`` when the trading app is not configured yet.
+
+    Absence is not a fault here. The second registration (st-p9mx) arrives with
+    Steve's credentials, and until it does there is one grant to watch, not
+    two."""
+    try:
+        cfg = load_schwab_trading()
+    except ConfigError:
+        # The pair is not in the vault yet. Not configured is not unhealthy.
+        return None
+    path = _resolve(cfg.get("SCHWAB_TRADING_TOKEN_PATH")
+                    or "./tokens/schwab_trading_token.json")
+    return path if path.exists() else None
 
 
 def _write_heartbeat(health: TokenHealth) -> None:
@@ -180,15 +203,38 @@ def main(argv: list[str] | None = None) -> int:
     try:
         token_path = _resolve_token_path()
         health = assess_token(token_path, warn_days_left=warn, critical_days_left=crit)
+        # Two apps mean two grants and two independent seven-day walls
+        # (st-p9mx). The verdict is the NEARER wall, because that is the one
+        # that ends a trading day, and the discipline is to re-authorise both
+        # in one sitting so they land on the same day anyway.
+        trading_path = _resolve_trading_token_path()
+        trading_health = None
+        if trading_path is not None:
+            trading_health = assess_token(trading_path, warn_days_left=warn,
+                                          critical_days_left=crit)
+            if (trading_health.days_left is not None and health.days_left is not None
+                    and trading_health.days_left < health.days_left):
+                health = trading_health
+            elif not trading_health.ok and health.ok:
+                health = trading_health
         _write_heartbeat(health)
     except Exception as e:  # this checker itself failed — infra error, exit 2
         print(f"[schwab-token-health] INTERNAL ERROR: {type(e).__name__}: {e}", file=sys.stderr)
         return 2
 
     if args.json:
-        print(json.dumps(health.to_dict(), indent=2))
+        out = health.to_dict()
+        if trading_health is not None:
+            out["apps"] = {"market": assess_token(
+                               token_path, warn_days_left=warn,
+                               critical_days_left=crit).to_dict(),
+                           "trading": trading_health.to_dict()}
+        print(json.dumps(out, indent=2))
     else:
         print(f"schwab token: {health.status.upper()} — {health.message}")
+        if trading_health is not None:
+            print("  (nearer of two walls: app 1 market data, app 2 trading — "
+                  "re-authorise both in one sitting)")
 
     if health.actionable or args.force_alert:
         _emit_banner(health)
