@@ -81,4 +81,4 @@ in it covered external domain knowledge or facts about the operator.
 
 ### runbook
 
-- [Schwab Auth Pattern](schwab-auth-pattern.md) — Schwab API auth pattern — token-file auth, no trailing slash on callback, schwab-py exempt from fork doctrine
+- [Schwab Auth Pattern](schwab-auth-pattern.md) — Token-file auth through the hobbled-readonly schwab-py fork (submodule, editable) behind the gate key; seven-day refresh token renewed by Steve with the refresh script and its two-check grant validation; callback URL has no trailing slash (rewritten 2026-09-05)

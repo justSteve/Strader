@@ -10,6 +10,7 @@ avoid_conditions: [ivr-low, vol-low, news-scheduled, gex-neg, room-to-travel]
 indicators: [iv-rank, delta, dte, gex]
 rationale: "Sell defined-risk premium when implied volatility is rich and likely to revert. The edge is IV overpricing realized volatility most of the time; the enemy is a directional break, so this wants pinning tape, not trend."
 updated: 2026-07-02
+note: "Catalogue import from InvestiTrade (st-c71), not one of Steve's plays — he trades long premium only; retained as-is by Steve 2026-09-05 (Desk UPDATE on st-2opj), not a live strategy record."
 ---
 ## Thesis
 

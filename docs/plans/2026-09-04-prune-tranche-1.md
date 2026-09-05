@@ -50,13 +50,15 @@ correction Steve gave that no longer loads is a defect, not clutter.*
   thresholds get tuned, which is what `calibrate_oflow_thresholds.py` is for. st-gk8z
   carries the real decision: port the five kinds to the 1 Hz sentinel, or drop the promise.
 
-## Held for Steve — Desk carries these with recommendations
+## Held for Steve — ANSWERED 2026-09-05 (Desk UPDATE on 20260904T153000; gate 1 cleared)
 
-1. unsure 1 — the 2026-05-17 indicator/entity stratum (Desk recommends archive; "Decision 2", unanswered since 08-12).
-2. st-sl1f — one word releases its 18 files into step 8.
-3. unsure 13 — `strader/playbooks/options-premium-harvest.md` (strategy content; contradiction flagged).
-4. unsure 12 — `knowledge/schwab-auth-pattern.md` (his canon; Desk recommends rewrite to reality).
-5. `.claude/settings.json` patch — dead MCP allows and the `gc-mail-stub.sh` hook (a bead for him to land).
+1. unsure 1 — the 2026-05-17 indicator/entity stratum: **archive** (Decision 2 answered).
+2. st-sl1f: **released** — its 18 re-confirmed files fold into step 8; bead closed into this one.
+3. unsure 13 — `strader/playbooks/options-premium-harvest.md`: **retain as-is**; one frontmatter `note:` line added so the canon loader's reading of it does not confuse a future session (content untouched).
+4. unsure 12 — `knowledge/schwab-auth-pattern.md`: **rewrite to reality** — done 2026-09-05, memory twin collapsed to a pointer in the same step.
+5. `.claude/settings.json` patch: **applied 2026-09-05 on Steve's direct word** (st-voc5, commit 9791a83) — TradingView, fetch and checkpoint allows dropped, `gc-mail-stub.sh` deregistered and deleted. Desk's UPDATE asked to hold the `mcp__github__*` line pending COO's answer on the GitHub MCP; it went with the patch on Steve's word and is a no-op either way (no server configured). If COO says adopt, the line returns with the server config in one commit.
+
+Next gate: 2 — COO's SERVICED on the three routed questions.
 
 ## Related beads
 
