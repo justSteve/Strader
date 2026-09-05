@@ -6,10 +6,6 @@
           {
             "command": "/root/projects/Strader/.claude/hooks/scripts/schwab-gate.sh",
             "type": "command"
-          },
-          {
-            "command": "/root/projects/Strader/.claude/hooks/scripts/gc-mail-stub.sh",
-            "type": "command"
           }
         ],
         "matcher": "Bash"
@@ -73,13 +69,9 @@
       "Bash(python3 -m pytest *)",
       "Bash(.venv/bin/python3 broker_schwab/readers/quote.py *)",
       "Bash(.venv/bin/python3 broker_schwab/readers/chain.py *)",
-      "mcp__fetch__fetch",
-      "mcp__github__*",
-      "mcp__tradingview__*",
       "Read(*)",
       "Glob(*)",
       "Grep(*)",
-      "Skill(checkpoint)",
       "Skill(tap-in)",
       "Skill(handoff)",
       "Bash(column *)",
