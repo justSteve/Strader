@@ -70,20 +70,24 @@ def _resolve_token_path() -> Path:
     return _resolve(cfg.get("SCHWAB_TOKEN_PATH") or "./tokens/schwab_token.json")
 
 
-def _resolve_trading_token_path() -> Path | None:
-    """App 2's token, or ``None`` when the trading app is not configured yet.
+def _trading_token_state() -> tuple[Path | None, str]:
+    """App 2's token path, with a word for why there is none.
 
-    Absence is not a fault here. The second registration (st-p9mx) arrives with
-    Steve's credentials, and until it does there is one grant to watch, not
-    two."""
+    Three states, and they are not the same thing. No credentials means the
+    second registration has not reached the vault yet. Credentials but no token
+    means they have, and nobody has done the browser login that mints the first
+    grant — which is a thing to go and do, not a thing to wait for. Neither is
+    a fault, and saying "not configured" for both would tell Steve the wrong one
+    (st-p9mx)."""
     try:
         cfg = load_schwab_trading()
     except ConfigError:
-        # The pair is not in the vault yet. Not configured is not unhealthy.
-        return None
+        return None, "no credentials in the vault"
     path = _resolve(cfg.get("SCHWAB_TRADING_TOKEN_PATH")
                     or "./tokens/schwab_trading_token.json")
-    return path if path.exists() else None
+    if not path.exists():
+        return None, "credentials present, no grant yet — run reauthAccount"
+    return path, "ok"
 
 
 def _write_heartbeat(health: TokenHealth) -> None:
@@ -207,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
         # (st-p9mx). The verdict is the NEARER wall, because that is the one
         # that ends a trading day, and the discipline is to re-authorise both
         # in one sitting so they land on the same day anyway.
-        trading_path = _resolve_trading_token_path()
+        trading_path, trading_note = _trading_token_state()
         trading_health = None
         if trading_path is not None:
             trading_health = assess_token(trading_path, warn_days_left=warn,
@@ -229,12 +233,16 @@ def main(argv: list[str] | None = None) -> int:
                                token_path, warn_days_left=warn,
                                critical_days_left=crit).to_dict(),
                            "trading": trading_health.to_dict()}
+        else:
+            out["trading_note"] = trading_note
         print(json.dumps(out, indent=2))
     else:
         print(f"schwab token: {health.status.upper()} — {health.message}")
         if trading_health is not None:
             print("  (nearer of two walls: app 1 market data, app 2 trading — "
                   "re-authorise both in one sitting)")
+        else:
+            print(f"  (app 2, Accounts and Trading: {trading_note})")
 
     if health.actionable or args.force_alert:
         _emit_banner(health)
