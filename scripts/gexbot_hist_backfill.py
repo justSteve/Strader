@@ -62,12 +62,12 @@ def _present(path: Path) -> bool:
 
 
 def _load_api_key() -> str:
-    for line in (REPO / ".env").read_text().splitlines():
-        line = line.strip()
-        if line.startswith("GEXBOT_API_KEY="):
-            key = line.partition("=")[2].split("#", 1)[0].strip()
-            return key if key.startswith("gexbot_custom_") else f"gexbot_custom_{key}"
-    raise RuntimeError("GEXBOT_API_KEY not found in .env")
+    """The GexBot bearer via the shared loader (value in the vault file the repo
+    ``.env`` points at, never in the tree — strader/config.py), prefixed the way
+    the API wants it."""
+    from strader.settings import load_gexbot
+    key = load_gexbot(REPO / ".env")["GEXBOT_API_KEY"]
+    return key if key.startswith("gexbot_custom_") else f"gexbot_custom_{key}"
 
 
 def manifest_append(entry: dict) -> None:

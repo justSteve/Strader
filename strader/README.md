@@ -43,6 +43,16 @@ exists because of the 2026-06-30 `.env` → `invalid_client` incident (an inline
 2. **Fail-fast validation** — every declared `Field` is validated at load; all
    problems are raised together in one `ConfigError` before any value reaches an
    API. `no_comment_residue` catches the exact original failure.
+3. **Secrets out of the tree** (2026-09-05, credential estate convention of
+   2026-08-25) — a `Field(secret=True)` value is read from the vault file named
+   by `STRADER_SECRETS_FILE` in `.env` (default `/home/vault/Strader/env`, which
+   must be mode 0600), never from `.env` itself. Precedence is vault file >
+   `.env` > process environment. A secret found in `.env` is refused at load
+   with a message naming the field. `.env` keeps the pointer and the
+   non-secret settings; `.env.template` shows the layout. Every reader of a
+   secret goes through `strader.settings` (`load_schwab`, `load_databento`,
+   `load_gexbot`); `tests/scripts/test_*_env_routing.py` pin that no private
+   `.env` parser comes back.
 
 ```python
 from strader.config import Field, load, non_empty, no_comment_residue, no_whitespace, is_https_url

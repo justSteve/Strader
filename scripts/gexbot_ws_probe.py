@@ -142,17 +142,20 @@ def redact(text: str) -> str:
 
 
 def load_env() -> dict[str, str]:
-    """Read KEY=VALUE from .env beside the repo root. Existing environment wins."""
-    env: dict[str, str] = {}
-    path = ROOT / ".env"
-    if not path.exists():
-        return env
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            k, _, v = line.partition("=")
-            env[k.strip()] = v.split("#", 1)[0].strip()
-    return env
+    """The GexBot key through the shared loader: ``{"GEXBOT_API_KEY": ...}``, or
+    ``{}`` when it is missing or malformed so the caller's existing "not in .env"
+    branch fires. The value lives in the vault file the repo ``.env`` points at
+    (strader/config.py, convention 2026-08-25), never in the tree."""
+    import sys
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from strader.config import ConfigError
+    from strader.settings import load_gexbot
+    try:
+        return load_gexbot(ROOT / ".env")
+    except ConfigError as e:
+        log.error("GEXBOT_API_KEY unavailable: %s", e)
+        return {}
 
 
 def bearer(api_key: str) -> str:

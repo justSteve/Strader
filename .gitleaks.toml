@@ -1,0 +1,26 @@
+# gitleaks — the factory gate for this repo. Credential estate convention
+# 2026-08-25 (Steve to COO), point 5: a secret value cannot land in-tree.
+# Extends the default rule set. Allowlists name KNOWN NON-SECRETS only — never a
+# real value; a real value that trips the gate gets moved to the vault, not
+# allowlisted. Installed 2026-09-05 [co-4q6cg].
+title = "gitleaks gate"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "third-party and generated trees, market data, virtual environments"
+paths = [
+  '''(^|/)\.venv/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)__pycache__/''',
+  '''^data/''',
+  '''^lib/schwab-py/''',
+]
+
+[[allowlists]]
+description = "measurement label keys — reach{N}_..._adverse{M} strings the generic-api-key rule mistakes for a token (docs/measurement, scripts/measurement); baseline history scan 2026-09-05"
+regexTarget = "match"
+regexes = [
+  '''reach(\d+|\{N\})_[A-Za-z0-9_{}]+''',
+]

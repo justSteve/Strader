@@ -39,13 +39,20 @@ LOCAL_ADDR_V4 = "0.0.0.0"
 
 
 def load_env() -> dict[str, str]:
-    env: dict[str, str] = {}
-    for line in (ROOT / ".env").read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            k, _, v = line.partition("=")
-            env[k.strip()] = v.split("#", 1)[0].strip()
-    return env
+    """The GexBot key through the shared loader: ``{"GEXBOT_API_KEY": ...}``, or
+    ``{}`` when it is missing or malformed so the caller's existing "no key"
+    branch fires. The value lives in the vault file the repo ``.env`` points at
+    (strader/config.py, convention 2026-08-25), never in the tree."""
+    import sys
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from strader.config import ConfigError
+    from strader.settings import load_gexbot
+    try:
+        return load_gexbot(ROOT / ".env")
+    except ConfigError as e:
+        print(f"GEXBOT_API_KEY unavailable: {e}", file=sys.stderr)
+        return {}
 
 
 def make_headers(api_key: str | None) -> dict[str, str]:

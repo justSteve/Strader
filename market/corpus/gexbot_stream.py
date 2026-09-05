@@ -64,12 +64,10 @@ OPTIONAL_ENDPOINTS = {"/SPX/orderflow/orderflow"}
 
 
 def _load_api_key() -> str:
-    env_path = Path(__file__).resolve().parent.parent.parent / ".env"
-    for line in env_path.read_text().splitlines():
-        s = line.strip()
-        if s.startswith("GEXBOT_API_KEY="):
-            return s.partition("=")[2].split("#", 1)[0].strip()
-    raise RuntimeError("GEXBOT_API_KEY not found in .env")
+    """The GexBot bearer via the shared loader — the value lives in the vault
+    file the repo ``.env`` points at, not in the tree (strader/config.py)."""
+    from strader.settings import load_gexbot
+    return load_gexbot()["GEXBOT_API_KEY"]
 
 
 def _make_headers(api_key: str) -> dict[str, str]:

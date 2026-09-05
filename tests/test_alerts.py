@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from strader import alerts
+from strader import alerts, config
 
 
 @pytest.fixture()
@@ -17,9 +17,27 @@ def rig(tmp_path, monkeypatch):
     return tmp_path
 
 
+@pytest.fixture(autouse=True)
+def _no_default_vault(tmp_path, monkeypatch):
+    """These tests must never read the box's real /home/vault through the
+    loader's default path."""
+    monkeypatch.setattr(config, "DEFAULT_SECRETS_PATH", tmp_path / "no-default-vault")
+
+
 def _env(tmp_path, **kv):
+    """The layout strader/config.py enforces since 2026-09-05: the in-tree .env
+    holds the non-secret setting (ALERT_BACKEND) and a pointer; the credentials
+    sit in a 0600 vault file the pointer names. A credential written into .env
+    itself is refused by the loader, which is the point."""
+    vault = tmp_path / "vault" / "env"
+    vault.parent.mkdir(exist_ok=True)
+    secrets = {k: v for k, v in kv.items() if k != "ALERT_BACKEND"}
+    settings = {k: v for k, v in kv.items() if k == "ALERT_BACKEND"}
+    vault.write_text("".join(f"{k}={v}\n" for k, v in secrets.items()))
+    vault.chmod(0o600)
     p = tmp_path / ".env"
-    p.write_text("\n".join(f"{k}={v}" for k, v in kv.items()) + "\n")
+    p.write_text(f"STRADER_SECRETS_FILE={vault}\n"
+                 + "".join(f"{k}={v}\n" for k, v in settings.items()))
     return p
 
 

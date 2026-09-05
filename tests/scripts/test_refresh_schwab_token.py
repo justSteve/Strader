@@ -193,15 +193,36 @@ def test_sweep_removes_rescue_copies_including_the_legacy_bare_name(tmp_path):
     assert p.exists()
 
 
-def test_sweep_keeps_rejected_evidence_and_backups(tmp_path):
+def test_sweep_keeps_rejected_evidence_but_shreds_backups(tmp_path):
     """Rejected copies are forensic evidence of a defective mint, not a stale
     credential — sweeping them would delete the only record of what Schwab
-    returned. Backups are the restore path and are pruned by count, not here."""
+    returned. Backups ARE swept on success (2026-09-05, credential estate point
+    3): once the new grant passed both gates, the old grant is a superseded but
+    still-live refresh token, and it must not stay in the tree."""
     p = _write(tmp_path / "schwab_token.json", _healthy())
     rejected = _write(p.with_suffix(p.suffix + ".rejected-20260812T100120Z"), _defective())
     bak = _write(p.with_suffix(p.suffix + ".bak-20260812T100000Z"), _healthy())
-    assert rst._sweep_rescues(p) == []
-    assert rejected.exists() and bak.exists() and p.exists()
+    assert rst._sweep_rescues(p) == [bak]
+    assert rejected.exists() and p.exists()
+    assert not bak.exists()
+
+
+def test_shred_overwrites_before_unlinking(tmp_path, monkeypatch):
+    """The bytes are zeroed before the name goes, so a recovered inode holds
+    no grant. Observed through the write, not assumed."""
+    p = _write(tmp_path / "schwab_token.json.bak-20260812T100000Z", _healthy())
+    size = p.stat().st_size
+    seen = {}
+    real_unlink = Path.unlink
+
+    def spy_unlink(self, *a, **k):
+        seen["content_at_unlink"] = self.read_bytes()
+        return real_unlink(self, *a, **k)
+
+    monkeypatch.setattr(Path, "unlink", spy_unlink)
+    rst._shred(p)
+    assert not p.exists()
+    assert seen["content_at_unlink"] == b"\0" * size
 
 
 def test_prune_copies_is_anchored_per_kind(tmp_path):

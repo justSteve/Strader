@@ -57,3 +57,18 @@ def load_databento(env_path: str | os.PathLike[str] = DEFAULT_ENV_PATH) -> dict[
     library — which reads ``DATABENTO_API_KEY`` from the environment — also sees
     the authoritative value."""
     return load(DATABENTO_FIELDS, env_path=env_path)
+
+
+# GexBot bearer for the GEX / orderflow feeds. Every reader comes through here
+# (st-cir's rule for Databento, extended to GexBot 2026-09-05 when the value
+# moved to the vault): no private ``.env`` parse anywhere in market/ or scripts/.
+# tests/scripts/test_gexbot_env_routing.py pins that.
+GEXBOT_FIELDS: tuple[Field, ...] = (
+    Field("GEXBOT_API_KEY", secret=True, validators=(non_empty, no_comment_residue, no_whitespace)),
+)
+
+
+def load_gexbot(env_path: str | os.PathLike[str] = DEFAULT_ENV_PATH) -> dict[str, str]:
+    """Validated config for GexBot access (the raw key; readers add the
+    ``gexbot_custom_`` prefix if it is not already there)."""
+    return load(GEXBOT_FIELDS, env_path=env_path)

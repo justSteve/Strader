@@ -23,6 +23,8 @@ from typing import Literal
 
 import httpx
 
+from strader.settings import load_gexbot
+
 BASE_URL = "https://api.gex.bot/v2"
 USER_AGENT = "Strader-Distill/0.1 (st-rks)"
 TIMEOUT_S = 5.0
@@ -44,11 +46,14 @@ class Distillation:
 
 
 def load_api_key(env_path: Path) -> str:
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
-        if line.startswith("GEXBOT_API_KEY="):
-            return line.partition("=")[2].split("#", 1)[0].strip()
-    raise RuntimeError(f"GEXBOT_API_KEY not found in {env_path}")
+    """The GexBot bearer, through the shared fail-fast loader.
+
+    ``env_path`` is the repo ``.env`` — the pointer file. The value itself comes
+    from the vault file it names, never from the tree (strader/config.py,
+    convention 2026-08-25). Raises ``strader.config.ConfigError`` when the key
+    is missing, malformed, or sitting in ``.env``.
+    """
+    return load_gexbot(env_path)["GEXBOT_API_KEY"]
 
 
 def make_client(api_key: str) -> httpx.Client:

@@ -7,7 +7,7 @@ envFile loader injects vars without stripping inline comments), and Schwab
 rejected the malformed client_id. Diagnosis took an hour; a startup validator
 would have turned it into a one-line error.
 
-Two defenses live here:
+Three defenses live here:
 
 1. **Authoritative parse.** ``.env`` is parsed strictly (inline comments and
    surrounding quotes stripped) and its values *override* any pre-existing —
@@ -15,6 +15,11 @@ Two defenses live here:
 2. **Fail-fast validation.** Every declared field is validated at load time and
    *all* problems are reported in one :class:`ConfigError`, before a single value
    can reach an external API.
+3. **Secrets out of the tree.** A ``Field(secret=True)`` value comes from the
+   vault file named by ``STRADER_SECRETS_FILE`` (default ``/home/vault/Strader/env``,
+   mode 0600, outside every project tree), never from the in-tree ``.env`` — a
+   secret found there is refused at load. Convention of 2026-08-25 (Steve to
+   COO, credential estate), enforced where the value is consumed. [co-4q6cg]
 
 Usage::
 
@@ -33,6 +38,7 @@ Usage::
 from __future__ import annotations
 
 import os
+import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, MutableMapping
@@ -43,6 +49,52 @@ Validator = Callable[[str], "str | None"]
 # Repo root = parent of the strader package.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ENV_PATH = PROJECT_ROOT / ".env"
+
+# ─── The vault: where secret values live ─────────────────────────────────────
+#
+# The in-tree .env holds settings and ONE pointer; the values a Field marks
+# ``secret=True`` live in the file the pointer names. Precedence when a name
+# appears in more than one place: vault file > .env > process environment.
+# Without a pointer, the default vault path is used if it exists, so a fresh
+# checkout on this box works with no .env edit; with a pointer, the file must
+# exist. Either way the file must be readable by its owner only.
+
+SECRETS_POINTER = "STRADER_SECRETS_FILE"
+DEFAULT_SECRETS_PATH = Path("/home/vault/Strader/env")
+
+
+def resolve_secrets_path(
+    dotenv: Mapping[str, str],
+    environ: Mapping[str, str],
+    env_path: str | os.PathLike[str] = DEFAULT_ENV_PATH,
+) -> tuple[Path | None, bool]:
+    """The secrets file to read, and whether it was named explicitly.
+
+    Explicit (``STRADER_SECRETS_FILE`` in ``.env`` or the environment): that path,
+    relative paths resolved beside ``.env``; it must exist. Implicit: the default
+    vault path, only if it is present. ``(None, False)`` means no secrets file.
+    """
+    raw = dotenv.get(SECRETS_POINTER) or environ.get(SECRETS_POINTER)
+    if raw:
+        p = Path(raw).expanduser()
+        if not p.is_absolute():
+            p = Path(env_path).resolve().parent / p
+        return p, True
+    if DEFAULT_SECRETS_PATH.exists():
+        return DEFAULT_SECRETS_PATH, False
+    return None, False
+
+
+def secrets_file_problem(path: Path) -> str | None:
+    """Why a secrets file cannot be used, or None. It must exist and be mode
+    0600 or tighter — a vault file readable by group or other is not a vault."""
+    if not path.exists():
+        return f"{SECRETS_POINTER}: {path} does not exist"
+    mode = stat.S_IMODE(path.stat().st_mode)
+    if mode & 0o077:
+        return (f"{SECRETS_POINTER}: {path} is mode {mode:04o}; a secrets file must be "
+                f"0600 (chmod 600 it — group/other must not read it)")
+    return None
 
 
 class ConfigError(Exception):
@@ -161,10 +213,12 @@ def load(
 ) -> dict[str, str]:
     """Load and validate configuration, returning a name→value dict.
 
-    ``.env`` is authoritative: a value present in the file overrides any
-    pre-existing (possibly polluted) value in ``environ``. Fields absent from
-    the file fall back to ``environ``. Every field is validated; any failures
-    are collected and raised together as :class:`ConfigError`.
+    Precedence is vault file > ``.env`` > ``environ``: a value in a file
+    overrides any pre-existing (possibly polluted) value in the process
+    environment, and the vault file overrides ``.env``. A ``secret=True`` field
+    found in ``.env`` is refused — secret values do not live in the tree. Every
+    field is validated; all failures are collected and raised together as
+    :class:`ConfigError`.
     """
     environ = os.environ if environ is None else environ
     dotenv = parse_dotenv(env_path)
@@ -172,12 +226,28 @@ def load(
     resolved: dict[str, str] = {}
     problems: list[str] = []
 
+    secrets_path, _explicit = resolve_secrets_path(dotenv, environ, env_path)
+    secrets: dict[str, str] = {}
+    if secrets_path is not None:
+        problem = secrets_file_problem(secrets_path)
+        if problem:
+            problems.append(problem)
+        else:
+            secrets = parse_dotenv(secrets_path)
+    where = f"{Path(env_path).name}, the secrets file or environment"
+
     for f in fields:
-        # .env wins over the (possibly polluted) process environment.
-        value = dotenv.get(f.name, environ.get(f.name))
+        if f.secret and f.name in dotenv:
+            problems.append(
+                f"{f.name}: secret value found in {Path(env_path).name} — secret values live "
+                f"only in the vault file named by {SECRETS_POINTER}; move it there and leave "
+                f"no value in the tree (convention 2026-08-25)")
+            continue
+        # vault file > .env > the (possibly polluted) process environment.
+        value = secrets.get(f.name, dotenv.get(f.name, environ.get(f.name)))
         if value is None:
             if f.required:
-                problems.append(f"{f.name}: missing (not in {Path(env_path).name} or environment)")
+                problems.append(f"{f.name}: missing (not in {where})")
             continue
         field_problems = [msg for v in f.validators if (msg := v(value))]
         for msg in field_problems:

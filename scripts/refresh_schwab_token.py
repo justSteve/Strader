@@ -41,6 +41,7 @@ daily health check uses.
 """
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -61,10 +62,14 @@ from strader.settings import load_schwab_auth  # noqa: E402
 GATE_KEY = Path.home() / ".schwab_gate_key"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-#: How many timestamped backups to keep. Ten weekly re-auths is roughly two
-#: months of history — enough to reach back past a bad patch, small enough that
-#: the directory stays readable.
-KEEP_BACKUPS = 10
+#: How many timestamped backups may exist WHILE re-auths are failing. On a
+#: successful re-auth every backup is swept (``_sweep_rescues``): the grant it
+#: holds is superseded, and a superseded Schwab grant is still a live refresh
+#: token for up to seven days — a credential nobody tracks, sitting in the
+#: tree. Credential estate convention 2026-08-25, point 3 (co-4q6cg). Two is
+#: enough to survive st-r1b5's failure (a defective mint overwriting the only
+#: backup) without growing a pile.
+KEEP_BACKUPS = 2
 
 
 class DefectiveGrant(Exception):
@@ -169,24 +174,45 @@ def _stash(token_path: Path, suffix: str) -> Path | None:
     return dest
 
 
-def _sweep_rescues(token_path: Path) -> list[Path]:
-    """Remove verify-failure rescue copies once a re-auth has SUCCEEDED.
+def _shred(path: Path) -> None:
+    """Overwrite then unlink. Best effort — a journaling filesystem may keep a
+    copy of the old blocks — but it is strictly better than unlink alone for a
+    file whose whole content is a credential."""
+    try:
+        size = path.stat().st_size
+        with open(path, "r+b") as fh:
+            fh.write(b"\0" * size)
+            fh.flush()
+            os.fsync(fh.fileno())
+    except OSError:
+        pass
+    path.unlink()
 
-    A ``.new`` rescue holds the grant from an earlier attempt whose probe call
-    failed. The moment a later run mints a grant that passes both the shape gate
-    and the live call, every such copy is superseded by definition — an older
-    credential nobody tracks, sitting at 0600 in the tokens directory for
-    months. Rejected copies are deliberately NOT swept: those are forensic
-    evidence of a defective mint (st-r1b5), and they are few and small.
+
+def _sweep_rescues(token_path: Path) -> list[Path]:
+    """Remove superseded copies once a re-auth has SUCCEEDED.
+
+    Two kinds are swept. A ``.new`` rescue holds the grant from an earlier
+    attempt whose probe call failed. A ``.bak`` holds the grant that was live
+    before this run — the restore path if THIS run had failed. The moment a run
+    mints a grant that passes both the shape gate and the live call, every such
+    copy is superseded by definition, and a superseded Schwab grant is still a
+    usable refresh token for up to seven days: a credential nobody tracks,
+    sitting at 0600 in the tokens directory. Rotation hygiene (credential estate
+    convention 2026-08-25, point 3) says shred it here, on the success path —
+    the only place where "this copy is definitely stale" is a fact rather than a
+    guess. Rejected copies are deliberately NOT swept: those are forensic
+    evidence of a defective mint (st-r1b5), hold no working grant, and are few.
     """
     removed: list[Path] = []
     stale = sorted(token_path.parent.glob(f"{token_path.name}.new-*"))
+    stale += sorted(token_path.parent.glob(f"{token_path.name}.bak-*"))
     legacy = token_path.with_suffix(token_path.suffix + ".new")  # pre-2026-08-16 name
     if legacy.exists():
         stale.append(legacy)
     for path in stale:
         try:
-            path.unlink()
+            _shred(path)
             removed.append(path)
         except OSError:
             pass  # a copy we cannot remove is not worth failing a good re-auth
@@ -368,10 +394,7 @@ def main() -> int:
           f"{health.days_left:.1f}d to the wall")
     print(f"✓ Live API call to marketdata/v1 get_market_hours returned 200")
     for path in swept:
-        print(f"  (removed superseded rescue copy {path.name})")
-    if bak:
-        print(f"  (backup retained at {bak.name} — pruned to the last "
-              f"{KEEP_BACKUPS})")
+        print(f"  (shredded superseded copy {path.name})")
     print()
     print(f"Re-auth by {health.reauth_by_iso} — the Schwab refresh token hard-")
     print("expires 7 days after mint whether or not it is used.")
