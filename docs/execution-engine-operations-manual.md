@@ -52,7 +52,8 @@ in the repo outside `.venv` and `lib`.
 | `python -m execd --mock …` | long-running server | execd. Its operator surface is HTTP, not argv. §5. |
 | `python -m strader.execution.feed --preflight --token PATH` | one-shot check | Go/no-go preflight. §6. |
 | `python scripts/fire_server.py [--port N]` | long-running server | Fire server. §7. |
-| `python scripts/refresh_schwab_token.py [--trading]` | interactive chore | Weekly re-auth. Without the flag it mints app 1 (market data); with it, app 2 (trading). Do both in one sitting. §5.12a, §6. |
+| `reauthData` / `reauthAccount` | interactive chore | The shell handles for the weekly re-auth — app 1 (market data) and app 2 (trading). Each prints both walls before and after and names the other. `reauth` alone no longer runs anything; it says which two exist. §5.12a. |
+| `python scripts/refresh_schwab_token.py [--trading]` | interactive chore | What those handles call. Without the flag it mints app 1 (market data); with it, app 2 (trading). Do both in one sitting. §5.12a, §6. |
 | `python scripts/schwab_token_health.py --no-bead --no-push` | one-shot check | Token staleness. Exit 0 healthy, 1 action needed. §6. |
 
 All of these are run through the repo venv: `/root/projects/Strader/.venv/bin/python`.
