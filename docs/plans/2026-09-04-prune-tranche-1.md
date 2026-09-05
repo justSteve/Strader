@@ -12,7 +12,13 @@ correction Steve gave that no longer loads is a defect, not clutter.*
 2. COO's SERVICED row on the three routed questions
    (`COO/docs/a2a/2026-09-04-strader-to-coo-three-prune-questions.md`).
 3. `git tag pre-prune-YYYY-MM-DD` on the commit before the first move.
-4. Report to Desk before any archive or delete executes.
+   **CLEARED 2026-09-05** — `pre-prune-2026-09-05`.
+4. ~~Report to Desk before any archive or delete executes.~~ **Desk relaxed its
+   own ordering in the 09-05 15:01 RULING: "Gate 3 is yours: cut `pre-prune` and
+   execute. Report to Desk when done."** The report moves after execution. Noted
+   rather than silently followed, because it is the verdict's author loosening a
+   gate the verdict set, and the tag is now the only thing standing between the
+   plan and an irreversible move.
 5. Steve sees category counts plus unsure items only — never individual files.
 
 ## Sequence
@@ -27,7 +33,7 @@ correction Steve gave that no longer loads is a defect, not clutter.*
 | 6 | unsure 15 | Re-index the four behavioural corrections cut on 08-17 (`no_manufactured_precedent`, `no_self_confirming_callbacks`, `steve_risk_authority_not_pa_arbiter`, `corrections_persist_immediately`): graduate to `knowledge/` where canon-shaped, else back into `MEMORY.md`. Never delete | Steve's corrections; that they no longer load is the defect |
 | 7 | unsure 16 | Archive `runbook/mancini/commentary/2026-05-19.jsonl`, `2026-07-01.jsonl`, `data/calls/` | unless someone names them golden before the tag; git keeps them |
 | 8 | the table | The audit's 39 delete and 18 archive rows that stand as dispositioned, plus st-sl1f's 18 re-confirmed files once Steve releases that bead | each with its evidence row in the audit |
-| 9 | unsure 9–11 | Per COO's answers: delete `.claude/agents/strader.md` + `intent.yaml` if nothing reads them (measured: nothing in COO code does); delete `.beads.gate.lock` if `bd` does not use it (measured: empty stray swept in by `36f0a81`, zero refs); `.env.template` per COO's field comparison against `strader/config.py` | COO authorizes dispositions |
+| 9 | unsure 9–11 | **AMENDED 2026-09-05 to COO's measurements (gate 2).** (9) **Delete** `.claude/agents/strader.md` + `intent.yaml` — but not for the reason we gave. No COO registry reads them, *and* the harness itself reads `.claude/agents/*.md` in whatever project it opens, so ours is not unread: it declares six `mcp__tradingview__*` tools for a server removed in `63cac42` (2026-05-14). It defines a subagent that cannot work. (10) **`.beads.gate.lock` — UNTRACK, DO NOT DELETE.** Our "empty stray, zero refs" reading was wrong. The `bd` binary carries a `workspacegate` package writing `<gated-path>.gate.lock`; twelve exist across six repos; our two share an mtime to the nanosecond. Deleting makes `bd` write it back. `36f0a81` was still a wide-`git add` accident, so the fix is `git rm --cached` plus a `.gitignore` line. COO's *absence* of one is COO's bug, not our stray. (11) `.env.template` — **fix-in-place, COO holds the edit**; applied 2026-09-05 10:32 CT (four Twilio field names added to the vault-key comment block). | COO authorizes dispositions; (10) reverses ours |
 
 ## Keeps — ruled or measured
 
@@ -49,6 +55,15 @@ correction Steve gave that no longer loads is a defect, not clutter.*
   still imports the monitor's detector unmodified; the runbook says replay is how its
   thresholds get tuned, which is what `calibrate_oflow_thresholds.py` is for. st-gk8z
   carries the real decision: port the five kinds to the 1 Hz sentinel, or drop the promise.
+
+## Gate 2 — CLEARED 2026-09-05 10:25 CT
+
+COO's SERVICED row on the three routed questions landed
+(`20260905T102500__COO__github-mcp-answered-and-three-prune-questions-serviced`).
+One answer **reverses a disposition of ours** — see step 9 (10) above. Taking a
+peer's reversal on its measurement rather than defending our own reading is the
+point of routing the questions; recorded here so the change of mind is visible
+in the plan and not only in a memo.
 
 ## Held for Steve — ANSWERED 2026-09-05 (Desk UPDATE on 20260904T153000; gate 1 cleared)
 
