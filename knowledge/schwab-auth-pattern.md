@@ -10,6 +10,18 @@ metadata:
   rewritten: "2026-09-05, st-maav — Steve's answer to the legacy audit (Desk UPDATE on 20260904T153000). The 2026-05-12 page said schwab-py was installed from PyPI and exempt from fork doctrine, and named schwab-generate-token.py; none of that is true today."
 ---
 
+> **INCOMPLETE as of 2026-09-05 ~11:00 CT — this page describes ONE app, and
+> there are two.** Steve found that morning that developer.schwab.com will not
+> add the Accounts-and-Trading product to the app this page documents; a second
+> app of his already holds it, and the 401 `no apiproduct match found` on the
+> first is permanent, not a bug. Market data stays on app 1 — everything below
+> is still accurate for it. Every `/trader/v1` call moves to app 2, which means
+> a second credential pair and a SECOND seven-day wall. `st-p9mx` (COO) carries
+> the build and was in flight when this note was written; the page gets the
+> second app once that lands and can be described as shipped rather than
+> planned. Do not infer the credential names from this note — they were not
+> settled when it was written.
+
 **The library.** `lib/schwab-py` is a git submodule on the `hobbled-readonly` branch of the justSteve/schwab-py fork, installed editable into `.venv` (measured 2026-09-05: pip reports version 1.5.1 with editable project location `lib/schwab-py`). Account, order and transaction methods are physically removed — the DEFENSE NOTE in `lib/schwab-py/schwab/client/base.py` — and since 2026-09-01 the generic POST/PUT/DELETE path is gone too. It is a fork under [[fork-doctrine]], not an exemption from it. Upstream changes arrive as a reviewed diff onto the fork, never a pip upgrade.
 
 **The client.** `broker_schwab/client.py` is the only factory. It refuses to build a client unless `~/.schwab_gate_key` exists (Steve creates it once; agents never touch it), reads `SCHWAB_API_KEY`, `SCHWAB_APP_SECRET` and `SCHWAB_TOKEN_PATH` (default `./tokens/schwab_token.json`, gitignored) from `.env`, and calls `client_from_token_file`. Never `easy_client`: it tries to open a browser and fails headless.

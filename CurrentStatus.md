@@ -101,7 +101,7 @@ receipt [st-75z0]:
 
 ## Attention Items
 
-0c. **Schwab refresh token expires 2026-09-05 12:32 CT** (`st-6z7d`; health probe critical + actionable at 08:25). Steve's re-auth via `scripts/refresh_schwab_token.py`; next session is Tue 09-08 (Labor Day Monday). A lapsed token is a live failure — report at once.
+0c. **Schwab token healthy.** Steve re-authed it himself the morning of 2026-09-05; `data/corpus/_schwab_token_health.json` at 13:51Z reads status ok, 7.0d left, wall 2026-09-12, `actionable: false`. `st-6z7d` closed on that evidence. This line records state, not a countdown — a token that has actually LAPSED is a live failure and gets reported at once whatever the date.
 
 0d. **Prune tranche 1 (`st-rfjg`) is staged, not executed.** Gate 1 cleared 09-05 (Steve's five answers via Desk); gate 2 is COO's SERVICED on the three routed questions; then a `pre-prune` tag and a report to Desk. `st-2opj` stays open until it executes. The 09-03 outage aftermath (`st-e12g`): overnight/evening ES windows unfilled, DNS/network root cause unknown (also hit the 21:00 /hist harvest on 09-02 and 09-03).
 
