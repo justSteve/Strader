@@ -1,5 +1,39 @@
 {
   "captures": {
+    "account_numbers": {
+      "bytes": 109,
+      "captured_at_utc": "2026-09-06T01:51:41+00:00",
+      "elapsed_ms": 312,
+      "market_state": "post-close, Fri 2026-09-05 20:5x CT (market closed)",
+      "method": "GET",
+      "params": {},
+      "path": "/trader/v1/accounts/accountNumbers",
+      "status": 200
+    },
+    "account_positions": {
+      "bytes": 2127,
+      "captured_at_utc": "2026-09-06T01:51:42+00:00",
+      "elapsed_ms": 294,
+      "market_state": "post-close, Fri 2026-09-05 20:5x CT (market closed)",
+      "method": "GET",
+      "params": {
+        "fields": "positions"
+      },
+      "path": "/trader/v1/accounts/HASH-1",
+      "status": 200
+    },
+    "accounts_positions": {
+      "bytes": 2129,
+      "captured_at_utc": "2026-09-06T01:51:41+00:00",
+      "elapsed_ms": 425,
+      "market_state": "post-close, Fri 2026-09-05 20:5x CT (market closed)",
+      "method": "GET",
+      "params": {
+        "fields": "positions"
+      },
+      "path": "/trader/v1/accounts",
+      "status": 200
+    },
     "chain": {
       "bytes": 58029,
       "captured_at_utc": "2026-09-04T12:58:54+00:00",
@@ -15,6 +49,30 @@
         "toDate": "2026-09-07"
       },
       "path": "/marketdata/v1/chains",
+      "status": 200
+    },
+    "order_by_id": {
+      "bytes": 1221,
+      "captured_at_utc": "2026-09-06T01:51:44+00:00",
+      "elapsed_ms": 294,
+      "market_state": "post-close, Fri 2026-09-05 20:5x CT (market closed)",
+      "method": "GET",
+      "params": {},
+      "path": "/trader/v1/accounts/HASH-1/orders/1007760611832",
+      "status": 200
+    },
+    "orders": {
+      "bytes": 66528,
+      "captured_at_utc": "2026-09-06T01:51:44+00:00",
+      "elapsed_ms": 2316,
+      "market_state": "post-close, Fri 2026-09-05 20:5x CT (market closed)",
+      "method": "GET",
+      "params": {
+        "fromEnteredTime": "2026-07-08T01:51:41Z",
+        "maxResults": 200,
+        "toEnteredTime": "2026-09-06T01:51:41Z"
+      },
+      "path": "/trader/v1/accounts/HASH-1/orders",
       "status": 200
     },
     "quotes_index": {
@@ -44,9 +102,9 @@
     }
   },
   "identifiers_scrubbed": {
-    "account_hashes": 0,
-    "account_numbers": 0
+    "account_hashes": 1,
+    "account_numbers": 1
   },
-  "label": "pre-open, Fri 2026-09-04 08:0x CT (RTH opens 08:30 CT)",
+  "label": "mixed \u2014 each capture carries its own market_state; market data pre-open 2026-09-04, Trader API post-close 2026-09-05",
   "recorded_by": "scripts/record_schwab_shapes.py"
 }

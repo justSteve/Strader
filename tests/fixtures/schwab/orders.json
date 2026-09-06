@@ -1,0 +1,3624 @@
+[
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-28T20:22:18+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "SIGQ",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-28T19:50:29+0000",
+    "filledQuantity": 0.0,
+    "orderId": 1007761791087,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.HS67730000",
+          "description": "S & P 500 INDEX 08/28/2026 $7730 Call",
+          "instrumentId": 255112813,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260828C07730000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260828C07730000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 0.5,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "EXPIRED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-28T19:15:52+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-28T19:15:51+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 129420125576,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 255112813,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.4,
+            "quantity": 1.0,
+            "time": "2026-08-28T19:15:52+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007760611832,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.HS67730000",
+          "description": "S & P 500 INDEX 08/28/2026 $7730 Call",
+          "instrumentId": 255112813,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260828C07730000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260828C07730000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 0.45,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-28T19:21:16+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "WEXM",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-28T19:12:14+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 129421727041,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256473338,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 3.23,
+            "quantity": 1.0,
+            "time": "2026-08-28T19:21:16+0000"
+          },
+          {
+            "instrumentId": 254734112,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.85,
+            "quantity": 2.0,
+            "time": "2026-08-28T19:21:16+0000"
+          },
+          {
+            "instrumentId": 256627212,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.22,
+            "quantity": 1.0,
+            "time": "2026-08-28T19:21:16+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007760611230,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.HS67715000",
+          "description": "S & P 500 INDEX 08/28/2026 $7715 Call",
+          "instrumentId": 256473338,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260828C07715000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260828C07715000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "BUY_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.HS67725000",
+          "description": "S & P 500 INDEX 08/28/2026 $7725 Call",
+          "instrumentId": 254734112,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260828C07725000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260828C07725000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.HS67735000",
+          "description": "S & P 500 INDEX 08/28/2026 $7735 Call",
+          "instrumentId": 256627212,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260828C07735000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260828C07735000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_CREDIT",
+    "price": 1.75,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-28T18:59:21+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-28T18:59:20+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 129417352566,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256473338,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 1.92,
+            "quantity": 1.0,
+            "time": "2026-08-28T18:59:21+0000"
+          },
+          {
+            "instrumentId": 254734112,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.57,
+            "quantity": 2.0,
+            "time": "2026-08-28T18:59:21+0000"
+          },
+          {
+            "instrumentId": 256627212,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.22,
+            "quantity": 1.0,
+            "time": "2026-08-28T18:59:21+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007760205139,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.HS67715000",
+          "description": "S & P 500 INDEX 08/28/2026 $7715 Call",
+          "instrumentId": 256473338,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260828C07715000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260828C07715000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "SELL_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.HS67725000",
+          "description": "S & P 500 INDEX 08/28/2026 $7725 Call",
+          "instrumentId": 254734112,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260828C07725000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260828C07725000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.HS67735000",
+          "description": "S & P 500 INDEX 08/28/2026 $7735 Call",
+          "instrumentId": 256627212,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260828C07735000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260828C07735000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_DEBIT",
+    "price": 1.0,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-27T19:32:02+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-27T19:31:52+0000",
+    "filledQuantity": 0.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 129295781390,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256641132,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-27T19:32:02+0000"
+          }
+        ],
+        "executionType": "CANCELED",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007744155422,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.HR67710000",
+          "description": "S & P 500 INDEX 08/27/2026 $7710 Call",
+          "instrumentId": 256641132,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260827C07710000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260827C07710000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 11.0,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "CANCELED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-27T19:06:12+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-27T19:06:12+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 129292482332,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256582559,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 28.97,
+            "quantity": 1.0,
+            "time": "2026-08-27T19:06:12+0000"
+          },
+          {
+            "instrumentId": 256713468,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 19.19,
+            "quantity": 2.0,
+            "time": "2026-08-27T19:06:12+0000"
+          },
+          {
+            "instrumentId": 255869088,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 10.41,
+            "quantity": 1.0,
+            "time": "2026-08-27T19:06:12+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007743422991,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TR67745000",
+          "description": "S & P 500 INDEX 08/27/2026 $7745 Put",
+          "instrumentId": 256582559,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260827P07745000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260827P07745000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "BUY_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TR67735000",
+          "description": "S & P 500 INDEX 08/27/2026 $7735 Put",
+          "instrumentId": 256713468,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260827P07735000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260827P07735000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TR67725000",
+          "description": "S & P 500 INDEX 08/27/2026 $7725 Put",
+          "instrumentId": 255869088,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260827P07725000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260827P07725000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_CREDIT",
+    "price": 1.0,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-27T18:59:04+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-27T18:59:03+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 129290663667,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256582559,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 30.22,
+            "quantity": 1.0,
+            "time": "2026-08-27T18:59:04+0000"
+          },
+          {
+            "instrumentId": 255869088,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 11.56,
+            "quantity": 1.0,
+            "time": "2026-08-27T18:59:04+0000"
+          },
+          {
+            "instrumentId": 256713468,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 20.39,
+            "quantity": 2.0,
+            "time": "2026-08-27T18:59:04+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007743422416,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TR67745000",
+          "description": "S & P 500 INDEX 08/27/2026 $7745 Put",
+          "instrumentId": 256582559,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260827P07745000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260827P07745000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "SELL_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TR67735000",
+          "description": "S & P 500 INDEX 08/27/2026 $7735 Put",
+          "instrumentId": 256713468,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260827P07735000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260827P07735000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TR67725000",
+          "description": "S & P 500 INDEX 08/27/2026 $7725 Put",
+          "instrumentId": 255869088,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260827P07725000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260827P07725000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_DEBIT",
+    "price": 1.0,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-27T18:58:26+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-27T18:57:48+0000",
+    "filledQuantity": 0.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 129290663364,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256582559,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-27T18:58:26+0000"
+          },
+          {
+            "instrumentId": 256713468,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 2.0,
+            "time": "2026-08-27T18:58:26+0000"
+          },
+          {
+            "instrumentId": 255869088,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-27T18:58:26+0000"
+          }
+        ],
+        "executionType": "CANCELED",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007743422339,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TR67745000",
+          "description": "S & P 500 INDEX 08/27/2026 $7745 Put",
+          "instrumentId": 256582559,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260827P07745000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260827P07745000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "SELL_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TR67735000",
+          "description": "S & P 500 INDEX 08/27/2026 $7735 Put",
+          "instrumentId": 256713468,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260827P07735000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260827P07735000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TR67725000",
+          "description": "S & P 500 INDEX 08/27/2026 $7725 Put",
+          "instrumentId": 255869088,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260827P07725000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260827P07725000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_DEBIT",
+    "price": 0.6,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "CANCELED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-21T16:03:08+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-21T16:02:41+0000",
+    "filledQuantity": 0.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 128786111547,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 251291436,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-21T16:03:08+0000"
+          },
+          {
+            "instrumentId": 251364449,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 2.0,
+            "time": "2026-08-21T16:03:08+0000"
+          },
+          {
+            "instrumentId": 251462638,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-21T16:03:08+0000"
+          }
+        ],
+        "executionType": "CANCELED",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007675901264,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.HL67660000",
+          "description": "S & P 500 INDEX 08/21/2026 $7660 Call",
+          "instrumentId": 251291436,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260821C07660000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260821C07660000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "SELL_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.HL67670000",
+          "description": "S & P 500 INDEX 08/21/2026 $7670 Call",
+          "instrumentId": 251364449,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260821C07670000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260821C07670000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.HL67680000",
+          "description": "S & P 500 INDEX 08/21/2026 $7680 Call",
+          "instrumentId": 251462638,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260821C07680000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260821C07680000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_DEBIT",
+    "price": 0.9,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "CANCELED",
+    "tag": "API_TOS:Empty"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-18T19:19:19+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "SIGQ",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-18T19:19:19+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 128476761843,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256447263,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 1.53,
+            "quantity": 1.0,
+            "time": "2026-08-18T19:19:19+0000"
+          },
+          {
+            "instrumentId": 256544079,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.07,
+            "quantity": 1.0,
+            "time": "2026-08-18T19:19:19+0000"
+          },
+          {
+            "instrumentId": 256072146,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.2,
+            "quantity": 2.0,
+            "time": "2026-08-18T19:19:19+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007636052000,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TI67695000",
+          "description": "S & P 500 INDEX 08/18/2026 $7695 Put",
+          "instrumentId": 256447263,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260818P07695000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260818P07695000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "BUY_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TI67680000",
+          "description": "S & P 500 INDEX 08/18/2026 $7680 Put",
+          "instrumentId": 256072146,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260818P07680000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260818P07680000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TI67665000",
+          "description": "S & P 500 INDEX 08/18/2026 $7665 Put",
+          "instrumentId": 256544079,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260818P07665000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260818P07665000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_CREDIT",
+    "price": 1.2,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-18T19:19:19+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "SIGQ",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-18T19:19:00+0000",
+    "filledQuantity": 0.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 128476761835,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256447263,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-18T19:19:19+0000"
+          },
+          {
+            "instrumentId": 256072146,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 2.0,
+            "time": "2026-08-18T19:19:19+0000"
+          },
+          {
+            "instrumentId": 256544079,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-18T19:19:19+0000"
+          }
+        ],
+        "executionType": "CANCELED",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007635097980,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TI67695000",
+          "description": "S & P 500 INDEX 08/18/2026 $7695 Put",
+          "instrumentId": 256447263,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260818P07695000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260818P07695000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "BUY_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TI67680000",
+          "description": "S & P 500 INDEX 08/18/2026 $7680 Put",
+          "instrumentId": 256072146,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260818P07680000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260818P07680000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TI67665000",
+          "description": "S & P 500 INDEX 08/18/2026 $7665 Put",
+          "instrumentId": 256544079,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260818P07665000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260818P07665000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_CREDIT",
+    "price": 1.4,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "REPLACED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-18T19:16:42+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-18T19:16:40+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 128476760900,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256447263,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 1.92,
+            "quantity": 1.0,
+            "time": "2026-08-18T19:16:42+0000"
+          },
+          {
+            "instrumentId": 256544079,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.07,
+            "quantity": 1.0,
+            "time": "2026-08-18T19:16:42+0000"
+          },
+          {
+            "instrumentId": 256072146,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.22,
+            "quantity": 2.0,
+            "time": "2026-08-18T19:16:42+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007635097890,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TI67695000",
+          "description": "S & P 500 INDEX 08/18/2026 $7695 Put",
+          "instrumentId": 256447263,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260818P07695000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260818P07695000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "SELL_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TI67680000",
+          "description": "S & P 500 INDEX 08/18/2026 $7680 Put",
+          "instrumentId": 256072146,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260818P07680000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260818P07680000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TI67665000",
+          "description": "S & P 500 INDEX 08/18/2026 $7665 Put",
+          "instrumentId": 256544079,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260818P07665000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260818P07665000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_DEBIT",
+    "price": 1.55,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-14T18:29:15+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-14T18:29:15+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 128229663190,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256559253,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 5.7,
+            "quantity": 1.0,
+            "time": "2026-08-14T18:29:15+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007603223023,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TE67785000",
+          "description": "S & P 500 INDEX 08/14/2026 $7785 Put",
+          "instrumentId": 256559253,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260814P07785000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260814P07785000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 5.7,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-14T18:28:59+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-14T18:28:59+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 128229662848,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256559253,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 6.1,
+            "quantity": 1.0,
+            "time": "2026-08-14T18:28:59+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007603222994,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TE67785000",
+          "description": "S & P 500 INDEX 08/14/2026 $7785 Put",
+          "instrumentId": 256559253,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260814P07785000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260814P07785000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 6.1,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-14T18:02:52+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "SIGQ",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-14T18:02:52+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 128224560085,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256559253,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 6.0,
+            "quantity": 1.0,
+            "time": "2026-08-14T18:02:52+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007602716206,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TE67785000",
+          "description": "S & P 500 INDEX 08/14/2026 $7785 Put",
+          "instrumentId": 256559253,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260814P07785000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260814P07785000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 5.9,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-14T18:02:52+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-14T18:02:17+0000",
+    "filledQuantity": 0.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 128224560078,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256559253,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-14T18:02:52+0000"
+          }
+        ],
+        "executionType": "CANCELED",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007602716144,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TE67785000",
+          "description": "S & P 500 INDEX 08/14/2026 $7785 Put",
+          "instrumentId": 256559253,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260814P07785000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260814P07785000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 7.1,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "REPLACED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-14T17:56:04+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-14T17:56:03+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 128223249718,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256559253,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 8.3,
+            "quantity": 1.0,
+            "time": "2026-08-14T17:56:04+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007602229629,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TE67785000",
+          "description": "S & P 500 INDEX 08/14/2026 $7785 Put",
+          "instrumentId": 256559253,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260814P07785000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260814P07785000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 8.3,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-13T20:22:33+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "JNST",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-13T19:52:27+0000",
+    "filledQuantity": 0.0,
+    "orderId": 1007589437636,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TD67780000",
+          "description": "S & P 500 INDEX 08/13/2026 $7780 Put",
+          "instrumentId": 256715124,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260813P07780000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260813P07780000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 0.3,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "EXPIRED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-13T19:52:28+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-13T19:35:11+0000",
+    "filledQuantity": 0.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 128124658817,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256715124,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-13T19:52:28+0000"
+          }
+        ],
+        "executionType": "CANCELED",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007589436535,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TD67780000",
+          "description": "S & P 500 INDEX 08/13/2026 $7780 Put",
+          "instrumentId": 256715124,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260813P07780000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260813P07780000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 0.5,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "REPLACED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-13T19:12:47+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-13T19:12:47+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 128115616522,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256715124,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.2,
+            "quantity": 1.0,
+            "time": "2026-08-13T19:12:47+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007588754431,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TD67780000",
+          "description": "S & P 500 INDEX 08/13/2026 $7780 Put",
+          "instrumentId": 256715124,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260813P07780000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260813P07780000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 0.2,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-11T18:57:34+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-11T18:57:19+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 127860979028,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256689091,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 34.37,
+            "quantity": 1.0,
+            "time": "2026-08-11T18:57:34+0000"
+          },
+          {
+            "instrumentId": 256563079,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 6.9,
+            "quantity": 1.0,
+            "time": "2026-08-11T18:57:34+0000"
+          },
+          {
+            "instrumentId": 256420081,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 19.56,
+            "quantity": 2.0,
+            "time": "2026-08-11T18:57:34+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007554990517,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67760000",
+          "description": "S & P 500 INDEX 08/11/2026 $7760 Put",
+          "instrumentId": 256689091,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07760000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07760000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "BUY_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67745000",
+          "description": "S & P 500 INDEX 08/11/2026 $7745 Put",
+          "instrumentId": 256420081,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07745000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07745000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67730000",
+          "description": "S & P 500 INDEX 08/11/2026 $7730 Put",
+          "instrumentId": 256563079,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07730000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07730000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_CREDIT",
+    "price": 2.15,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-11T18:57:19+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-11T18:56:02+0000",
+    "filledQuantity": 0.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 127860978864,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256689091,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-11T18:57:19+0000"
+          },
+          {
+            "instrumentId": 256420081,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 2.0,
+            "time": "2026-08-11T18:57:19+0000"
+          },
+          {
+            "instrumentId": 256563079,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-11T18:57:19+0000"
+          }
+        ],
+        "executionType": "CANCELED",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007554990415,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67760000",
+          "description": "S & P 500 INDEX 08/11/2026 $7760 Put",
+          "instrumentId": 256689091,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07760000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07760000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "BUY_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67745000",
+          "description": "S & P 500 INDEX 08/11/2026 $7745 Put",
+          "instrumentId": 256420081,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07745000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07745000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67730000",
+          "description": "S & P 500 INDEX 08/11/2026 $7730 Put",
+          "instrumentId": 256563079,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07730000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07730000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_CREDIT",
+    "price": 3.0,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "REPLACED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-11T18:41:00+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-11T18:40:59+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 127857235825,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256689091,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 38.68,
+            "quantity": 1.0,
+            "time": "2026-08-11T18:41:00+0000"
+          },
+          {
+            "instrumentId": 256420081,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 23.88,
+            "quantity": 2.0,
+            "time": "2026-08-11T18:41:00+0000"
+          },
+          {
+            "instrumentId": 256563079,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 10.48,
+            "quantity": 1.0,
+            "time": "2026-08-11T18:41:00+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007554372845,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67760000",
+          "description": "S & P 500 INDEX 08/11/2026 $7760 Put",
+          "instrumentId": 256689091,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07760000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07760000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "BUY_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67745000",
+          "description": "S & P 500 INDEX 08/11/2026 $7745 Put",
+          "instrumentId": 256420081,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07745000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07745000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67730000",
+          "description": "S & P 500 INDEX 08/11/2026 $7730 Put",
+          "instrumentId": 256563079,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07730000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07730000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_CREDIT",
+    "price": 1.4,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-11T18:39:53+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-11T18:39:42+0000",
+    "filledQuantity": 0.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 127857234926,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256689091,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-11T18:39:53+0000"
+          },
+          {
+            "instrumentId": 256420081,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 2.0,
+            "time": "2026-08-11T18:39:53+0000"
+          },
+          {
+            "instrumentId": 256563079,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-11T18:39:53+0000"
+          }
+        ],
+        "executionType": "CANCELED",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007554372707,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67760000",
+          "description": "S & P 500 INDEX 08/11/2026 $7760 Put",
+          "instrumentId": 256689091,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07760000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07760000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "BUY_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67745000",
+          "description": "S & P 500 INDEX 08/11/2026 $7745 Put",
+          "instrumentId": 256420081,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07745000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07745000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67730000",
+          "description": "S & P 500 INDEX 08/11/2026 $7730 Put",
+          "instrumentId": 256563079,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07730000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07730000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_CREDIT",
+    "price": 1.85,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "CANCELED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-11T18:32:19+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "WEXM",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-11T18:31:36+0000",
+    "filledQuantity": 2.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 127856128287,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256563079,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 10.49,
+            "quantity": 2.0,
+            "time": "2026-08-11T18:32:19+0000"
+          },
+          {
+            "instrumentId": 256420081,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 23.56,
+            "quantity": 4.0,
+            "time": "2026-08-11T18:32:19+0000"
+          },
+          {
+            "instrumentId": 256689091,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 38.33,
+            "quantity": 2.0,
+            "time": "2026-08-11T18:32:19+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 2.0
+      }
+    ],
+    "orderId": 1007553801891,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67760000",
+          "description": "S & P 500 INDEX 08/11/2026 $7760 Put",
+          "instrumentId": 256689091,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07760000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07760000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "SELL_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67745000",
+          "description": "S & P 500 INDEX 08/11/2026 $7745 Put",
+          "instrumentId": 256420081,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07745000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07745000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 4.0
+      },
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67730000",
+          "description": "S & P 500 INDEX 08/11/2026 $7730 Put",
+          "instrumentId": 256563079,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07730000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07730000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 2.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_DEBIT",
+    "price": 1.7,
+    "quantity": 2.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-11T18:31:36+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-11T18:30:52+0000",
+    "filledQuantity": 0.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 127856127833,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256689091,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 2.0,
+            "time": "2026-08-11T18:31:36+0000"
+          },
+          {
+            "instrumentId": 256420081,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 4.0,
+            "time": "2026-08-11T18:31:36+0000"
+          },
+          {
+            "instrumentId": 256563079,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 2.0,
+            "time": "2026-08-11T18:31:36+0000"
+          }
+        ],
+        "executionType": "CANCELED",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 2.0
+      }
+    ],
+    "orderId": 1007553801761,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67760000",
+          "description": "S & P 500 INDEX 08/11/2026 $7760 Put",
+          "instrumentId": 256689091,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07760000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07760000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "SELL_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67745000",
+          "description": "S & P 500 INDEX 08/11/2026 $7745 Put",
+          "instrumentId": 256420081,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07745000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07745000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 4.0
+      },
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67730000",
+          "description": "S & P 500 INDEX 08/11/2026 $7730 Put",
+          "instrumentId": 256563079,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07730000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07730000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 2.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_DEBIT",
+    "price": 1.6,
+    "quantity": 2.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "REPLACED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-11T18:30:53+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "SIGQ",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-11T18:30:23+0000",
+    "filledQuantity": 0.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 127854881717,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 256689091,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 2.0,
+            "time": "2026-08-11T18:30:53+0000"
+          },
+          {
+            "instrumentId": 256420081,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 4.0,
+            "time": "2026-08-11T18:30:53+0000"
+          },
+          {
+            "instrumentId": 256563079,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 2.0,
+            "time": "2026-08-11T18:30:53+0000"
+          }
+        ],
+        "executionType": "CANCELED",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 2.0
+      }
+    ],
+    "orderId": 1007553801682,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67760000",
+          "description": "S & P 500 INDEX 08/11/2026 $7760 Put",
+          "instrumentId": 256689091,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07760000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07760000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "SELL_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67745000",
+          "description": "S & P 500 INDEX 08/11/2026 $7745 Put",
+          "instrumentId": 256420081,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07745000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07745000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 4.0
+      },
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.TB67730000",
+          "description": "S & P 500 INDEX 08/11/2026 $7730 Put",
+          "instrumentId": 256563079,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260811P07730000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260811P07730000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 2.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_DEBIT",
+    "price": 1.0,
+    "quantity": 2.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "REPLACED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-07T14:35:23+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-07T14:35:23+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 127535259583,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 254566096,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 2.85,
+            "quantity": 1.0,
+            "time": "2026-08-07T14:35:23+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007510922982,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.T767710000",
+          "description": "S & P 500 INDEX 08/07/2026 $7710 Put",
+          "instrumentId": 254566096,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260807P07710000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260807P07710000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 2.75,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-07T14:34:29+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "SIGQ",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-07T14:34:29+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 127535258100,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 254566096,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 3.1,
+            "quantity": 1.0,
+            "time": "2026-08-07T14:34:29+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007510922835,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.T767710000",
+          "description": "S & P 500 INDEX 08/07/2026 $7710 Put",
+          "instrumentId": 254566096,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260807P07710000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260807P07710000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 3.1,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-04T19:15:24+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-04T19:15:22+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 127198060202,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 255200357,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 1.45,
+            "quantity": 1.0,
+            "time": "2026-08-04T19:15:24+0000"
+          },
+          {
+            "instrumentId": 255038608,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.11,
+            "quantity": 1.0,
+            "time": "2026-08-04T19:15:24+0000"
+          },
+          {
+            "instrumentId": 256129153,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.18,
+            "quantity": 2.0,
+            "time": "2026-08-04T19:15:24+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007467090444,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.T467740000",
+          "description": "S & P 500 INDEX 08/04/2026 $7740 Put",
+          "instrumentId": 255200357,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260804P07740000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260804P07740000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "BUY_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.T467705000",
+          "description": "S & P 500 INDEX 08/04/2026 $7705 Put",
+          "instrumentId": 256129153,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260804P07705000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260804P07705000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.T467670000",
+          "description": "S & P 500 INDEX 08/04/2026 $7670 Put",
+          "instrumentId": 255038608,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260804P07670000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260804P07670000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_CREDIT",
+    "price": 1.2,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-04T18:54:41+0000",
+    "complexOrderStrategyType": "BUTTERFLY",
+    "destinationLinkName": "JNST",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-04T18:54:41+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 127193019265,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 255200357,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 5.17,
+            "quantity": 1.0,
+            "time": "2026-08-04T18:54:41+0000"
+          },
+          {
+            "instrumentId": 255038608,
+            "legId": 3,
+            "mismarkedQuantity": 0.0,
+            "price": 0.17,
+            "quantity": 1.0,
+            "time": "2026-08-04T18:54:41+0000"
+          },
+          {
+            "instrumentId": 256129153,
+            "legId": 2,
+            "mismarkedQuantity": 0.0,
+            "price": 0.52,
+            "quantity": 2.0,
+            "time": "2026-08-04T18:54:41+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007466038909,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.T467740000",
+          "description": "S & P 500 INDEX 08/04/2026 $7740 Put",
+          "instrumentId": 255200357,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260804P07740000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260804P07740000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      },
+      {
+        "instruction": "SELL_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.T467705000",
+          "description": "S & P 500 INDEX 08/04/2026 $7705 Put",
+          "instrumentId": 256129153,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260804P07705000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260804P07705000"
+        },
+        "legId": 2,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 2.0
+      },
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.T467670000",
+          "description": "S & P 500 INDEX 08/04/2026 $7670 Put",
+          "instrumentId": 255038608,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260804P07670000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260804P07670000"
+        },
+        "legId": 3,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "NET_DEBIT",
+    "price": 4.4,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:Empty"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-03T15:15:32+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-03T15:15:31+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 126983599041,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 254383170,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 3.1,
+            "quantity": 1.0,
+            "time": "2026-08-03T15:15:32+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007436617312,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.T367560000",
+          "description": "S & P 500 INDEX 08/03/2026 $7560 Put",
+          "instrumentId": 254383170,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260803P07560000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260803P07560000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 3.1,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-03T15:15:31+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-03T15:15:17+0000",
+    "filledQuantity": 0.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 126983599034,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 254383170,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 0.0,
+            "quantity": 1.0,
+            "time": "2026-08-03T15:15:31+0000"
+          }
+        ],
+        "executionType": "CANCELED",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007436617281,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.T367560000",
+          "description": "S & P 500 INDEX 08/03/2026 $7560 Put",
+          "instrumentId": 254383170,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260803P07560000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260803P07560000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 3.4,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "REPLACED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-08-03T15:13:53+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-08-03T15:13:53+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 126983597489,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 254383170,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 3.6,
+            "quantity": 1.0,
+            "time": "2026-08-03T15:13:53+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007436617142,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.T367560000",
+          "description": "S & P 500 INDEX 08/03/2026 $7560 Put",
+          "instrumentId": 254383170,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "PUT",
+          "symbol": "SPXW  260803P07560000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260803P07560000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 3.7,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:TRADE_ALL"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-07-27T15:07:22+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "DFIN",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-07-27T15:06:57+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 126287395899,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 255150261,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 8.5,
+            "quantity": 1.0,
+            "time": "2026-07-27T15:07:22+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007342701402,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.GR67435000",
+          "description": "S & P 500 INDEX 07/27/2026 $7435 Call",
+          "instrumentId": 255150261,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260727C07435000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260727C07435000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 8.5,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-07-27T15:06:07+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-07-27T15:06:05+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 126287394696,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 255150261,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 9.8,
+            "quantity": 1.0,
+            "time": "2026-07-27T15:06:07+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007342701311,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.GR67435000",
+          "description": "S & P 500 INDEX 07/27/2026 $7435 Call",
+          "instrumentId": 255150261,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260727C07435000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260727C07435000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 9.8,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-07-27T14:40:50+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "WEXM",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-07-27T14:40:38+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 126277485768,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 255150261,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 6.0,
+            "quantity": 1.0,
+            "time": "2026-07-27T14:40:50+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007341638573,
+    "orderLegCollection": [
+      {
+        "instruction": "SELL_TO_CLOSE",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.GR67435000",
+          "description": "S & P 500 INDEX 07/27/2026 $7435 Call",
+          "instrumentId": 255150261,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260727C07435000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260727C07435000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "CLOSING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 6.0,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:POS_STMT"
+  },
+  {
+    "accountNumber": 90000001,
+    "cancelable": false,
+    "closeTime": "2026-07-27T14:39:01+0000",
+    "complexOrderStrategyType": "NONE",
+    "destinationLinkName": "CDRG",
+    "duration": "DAY",
+    "editable": false,
+    "enteredTime": "2026-07-27T14:39:01+0000",
+    "filledQuantity": 1.0,
+    "orderActivityCollection": [
+      {
+        "activityId": 126277483927,
+        "activityType": "EXECUTION",
+        "executionLegs": [
+          {
+            "instrumentId": 255150261,
+            "legId": 1,
+            "mismarkedQuantity": 0.0,
+            "price": 6.7,
+            "quantity": 1.0,
+            "time": "2026-07-27T14:39:01+0000"
+          }
+        ],
+        "executionType": "FILL",
+        "orderRemainingQuantity": 0.0,
+        "quantity": 1.0
+      }
+    ],
+    "orderId": 1007341638383,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY_TO_OPEN",
+        "instrument": {
+          "assetType": "OPTION",
+          "cusip": "0SPXW.GR67435000",
+          "description": "S & P 500 INDEX 07/27/2026 $7435 Call",
+          "instrumentId": 255150261,
+          "optionDeliverables": [
+            {
+              "deliverableUnits": 100.0,
+              "symbol": "$SPX"
+            }
+          ],
+          "putCall": "CALL",
+          "symbol": "SPXW  260727C07435000",
+          "type": "VANILLA",
+          "underlyingSymbol": "SPXW",
+          "uniformSymbol": "SPXW  260727C07435000"
+        },
+        "legId": 1,
+        "orderLegType": "OPTION",
+        "positionEffect": "OPENING",
+        "quantity": 1.0
+      }
+    ],
+    "orderStrategyType": "SINGLE",
+    "orderType": "LIMIT",
+    "price": 6.7,
+    "quantity": 1.0,
+    "remainingQuantity": 0.0,
+    "requestedDestination": "AUTO",
+    "session": "NORMAL",
+    "status": "FILLED",
+    "tag": "API_TOS:TRADE_ALL"
+  }
+]
