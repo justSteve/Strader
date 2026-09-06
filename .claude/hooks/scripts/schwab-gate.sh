@@ -6,7 +6,8 @@
 #
 # ============================================================================
 # REWRITTEN AND INSTALLED 2026-08-13 — st-ad6p, approved by Steve.
-# Prior version preserved as schwab-gate.sh.pre-st-ad6p.bak.
+# Prior version is in git history under tag pre-prune-2026-09-05 (the .bak file
+# was removed 2026-09-06).
 # Behaviour is pinned by tests/test_schwab_gate_hook.py — run it before editing.
 #
 # TWO CHANGES. The first is the bug; the second is what makes the fix safe to
@@ -30,10 +31,11 @@
 #    Replaced with reachability: block a .py if it imports schwab directly OR
 #    imports broker_schwab (whose client.py is the single module that reaches the
 #    API), except the two pre-approved readers. Location stops mattering; what
-#    the code touches is what matters. Measured 2026-08-13 — the 11 files this
-#    catches under scripts/ are: refresh_schwab_token, stream_to_excel,
-#    corpus_pull_internals, desk/continuation_meter, eod_view_schwab, gex_now,
-#    gex_series, hello_schwab, mi_gauge, poll_to_excel, premarket_volume_profile.
+#    the code touches is what matters. The 2026-08-13 list of 11 files under
+#    scripts/ is retired — three were deleted in the 2026-09-06 prune (st-rfjg).
+#    Coverage is now proven by tests/test_schwab_gate_hook.py::
+#    test_every_reaching_file_in_the_tree_blocks, which sweeps every tracked .py
+#    (16 reaching files as of 2026-09-06).
 #
 # KNOWN LIMIT, stated rather than papered over: this checks the named file's own
 # imports, not a full transitive closure. A script importing a local module that
