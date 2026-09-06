@@ -138,9 +138,14 @@ def test_every_catalogued_strader_cron_writes_the_path_it_is_catalogued_under():
     """COO/SCHEDULE.md names the heartbeat path per job; each wrapper's hb_path
     argument must be that job id, or the checker reads MISSING forever."""
     catalog = Path("/root/projects/COO/SCHEDULE.md")
-    if not catalog.exists():
-        pytest.skip("COO checkout not present")
-    text = catalog.read_text()
+    # READABILITY, not existence. `Path.exists()` re-raises EACCES rather than
+    # returning False, and on a CI runner /root is 0700 owned by another user —
+    # so this guard raised PermissionError instead of skipping. The question the
+    # test actually asks is "can I read the catalog", and that is one try. [st-v55j]
+    try:
+        text = catalog.read_text()
+    except OSError as e:
+        pytest.skip(f"COO catalog not readable here ({e.__class__.__name__})")
     # The fenced block starts at a line of its own; the prose above it also
     # says "```json```" in passing.
     block = text.split("\n```json\n", 1)[1].split("\n```", 1)[0]

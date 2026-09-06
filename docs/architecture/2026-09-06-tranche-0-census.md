@@ -52,6 +52,23 @@ architecture premise — it is a tranche-4 decision, taken where
 whether the catalog should grow an entities section or the seam should go.
 Prune step 4 stays held; Desk's F4 needs its premise restated.
 
+**RULED 2026-09-06 (Desk, `20260906T093000`).** All three measurements agreed.
+Desk: "My prune verdict was wrong about the file (it is not empty) and my F4 was
+wrong about the tree (nothing imports it). Neither memo wins; the premise
+moves." Two consequences, both now in force:
+
+- **Prune step 4 is struck** from `st-rfjg`.
+- **F4 now reads, verbatim:** *`strader.feeds` is built and unwired. Nine of the
+  eleven module-level reach-ins are `market.entities.*`, which the catalog does
+  not cover. Whether the catalog grows an entities section or the seam is
+  retired is decided in tranche 4 (`st-hona`), at the `market/entities →
+  core/marketdata` move, by whoever owns that move — not before, and not by
+  inference from either earlier memo.*
+
+The `available()` fix and the on-disk assertion below were accepted in the same
+ruling: "That a deleted module reads like an uninstalled one is exactly the
+class of rot the catalog needed a test against."
+
 **One defect fixed on the way past.** The catalog carried
 `ingest_mancini -> market.ingest.mancini`, a module this morning's prune
 removed. `available()` reports an unimportable module as `False` by design — a

@@ -38,6 +38,13 @@ REPO = Path(__file__).resolve().parents[2]
 WRAPPER = REPO / "scripts" / "cron" / "mancini-preopen-wrapper.sh"
 DAY = datetime.date.today().isoformat()
 
+#: The interpreter the shipping block is handed as $PY. The wrapper itself
+#: resolves the repo venv in production; here we prefer it when it exists so the
+#: test matches the live invocation, and fall back to the interpreter running
+#: the tests so the block is still genuinely exercised elsewhere.
+_VENV_PY = REPO / ".venv" / "bin" / "python"
+_PY = _VENV_PY if _VENV_PY.exists() else Path(sys.executable)
+
 
 def _wrapper_text() -> str:
     if not WRAPPER.exists():
@@ -152,7 +159,13 @@ def shell(tmp_path):
                "STRADER_REPO": str(REPO),
                # keeps emit_alert's health log out of the real corpus
                "STRADER_CORPUS_ROOT": str(tmp_path / "corpus"),
-               "PY": str(REPO / ".venv" / "bin" / "python"),
+               # The repo venv on Steve's box; the running interpreter anywhere
+               # else. Hardcoding .venv made all three of these tests resolve to
+               # "skip probe-failed" on any box without one — CI included, where
+               # the package is pip-installed into the runner's own Python — and
+               # a probe that cannot run reads exactly like a probe that ran and
+               # declined. [st-v55j]
+               "PY": str(_PY),
                **env_overrides}
         return subprocess.run(
             ["bash", "-c", 'log() { echo "$*"; }; source "$1"', "_", str(block)],

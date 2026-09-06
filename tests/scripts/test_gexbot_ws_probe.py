@@ -269,7 +269,10 @@ def test_histogram_buckets_to_whole_seconds_with_sub_second_first():
 # magic check cannot see it. These pin the corrected shape.
 
 def _zstd(blob: bytes) -> bytes:
-    import zstandard
+    # importorskip, not import: `zstandard` is an optional compression dep that
+    # CI does not install, and the three tests that need it are the only ones in
+    # this file that do. A hard import failed them instead of skipping. [st-v55j]
+    zstandard = pytest.importorskip("zstandard")
     return zstandard.ZstdCompressor().compress(blob)
 
 

@@ -136,15 +136,26 @@ was ever in the pinned set. Gate suite 33 → 37 green, before and after the del
    parametrised over both gexbot units. **Test kept and strengthened;
    `test_capture_supervisor_wrapper.py` deleted with its wrapper.**
 
-### Held back, deliberately — step 4
+### Step 4 — STRUCK by Desk, 2026-09-06
 
-`strader/feeds/__init__.py` was NOT archived. Desk's 2026-09-05 16:00
-architecture work order treats that seam as load-bearing (F4) while this plan's
-step 4 archives it as "an empty module is not the intent". We asked Desk to rule
-the contradiction explicitly on 09-05 and no answer has arrived. Acting either
-way pre-empts the ruling we asked for, and the file is empty — nothing is
-gained by guessing. The architecture-doc paragraph that step 4 pairs with it is
-held for the same reason.
+`strader/feeds/__init__.py` was NOT archived, and now never will be under this
+plan. Desk's 2026-09-05 16:00 architecture work order treated that seam as
+load-bearing (F4) while this plan's step 4 archived it as "an empty module is
+not the intent". We measured rather than guessing, asked Desk to rule the
+contradiction explicitly, and held both halves pending the answer.
+
+**The answer arrived 2026-09-06 (`20260906T093000`): step 4 is struck.** Desk
+accepted all three measurements — "My prune verdict was wrong about the file (it
+is not empty) and my F4 was wrong about the tree (nothing imports it). Neither
+memo wins; the premise moves." The seam's fate is a tranche-4 decision
+(`st-hona`), taken at the `market/entities → core/marketdata` move. F4's
+restated text is carried in
+`docs/architecture/2026-09-06-tranche-0-census.md` §1, which is its single home.
+
+Correction to this section's own earlier wording: it said "the file is empty".
+That was false — it is 65 lines (a `CARRIED` catalog, a lazy `carried()`
+accessor, an `available()` health map), which is one of the three findings that
+moved the premise. Holding was still right; the reason given for it was not.
 
 ### Comments repointed in files that survived
 

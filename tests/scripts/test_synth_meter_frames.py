@@ -22,14 +22,30 @@ import synth_meter_frames as sm  # noqa: E402
 LIVE_JOURNAL = ROOT / "data" / "exec" / "continuation-meter-2026-08-04.jsonl"
 FLUSH_DAY = _date(2026, 7, 22)
 
+#: Neither the corpus day nor the live journal is tracked in git — the corpus is
+#: local data, not source. Every test here that needs one was therefore a hard
+#: error on any fresh checkout, CI included, where it read as a broken test
+#: rather than as absent data. They skip now, and say which file is missing.
+#: `test_replay_uses_the_real_watcher_not_a_paraphrase` needs neither and still
+#: runs everywhere, which is the one assertion in this file that guards against
+#: the synthetic replay drifting off the real watcher. [st-v55j]
+_CORPUS_DAY = ROOT / "data" / "corpus" / FLUSH_DAY.isoformat() / "databento_glbx_es.jsonl"
+
+
+def _require(path: Path, what: str) -> None:
+    if not (path.exists() or path.with_suffix(path.suffix + ".gz").exists()):
+        pytest.skip(f"{what} not present here: {path}")
+
 
 @pytest.fixture(scope="module")
 def frames():
+    _require(_CORPUS_DAY, "corpus day")
     return sm.synth_frames(FLUSH_DAY)
 
 
 def _live_frame() -> dict:
     """A real frame the live meter wrote, with a populated move."""
+    _require(LIVE_JOURNAL, "live meter journal")
     for line in LIVE_JOURNAL.read_text().splitlines():
         f = json.loads(line)
         if f.get("move"):
@@ -97,6 +113,7 @@ def test_replay_uses_the_real_watcher_not_a_paraphrase():
 def test_known_flush_day_is_caught():
     """The whole point of the bead: a detector validated only on days it
     should ignore is not validated."""
+    _require(_CORPUS_DAY, "corpus day")
     r = sm.replay(FLUSH_DAY)
     assert r["fired"], "2026-07-22 is a known flush day and must fire"
     assert r["fires"][0]["lag_min"] > 0
