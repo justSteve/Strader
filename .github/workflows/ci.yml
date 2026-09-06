@@ -44,7 +44,13 @@ jobs:
         # flask IS installed: the fire server (scripts/fire_server.py) is pure
         # stdlib+flask, its 16 rail tests are exactly the kind CI should run,
         # and the dep is tiny. [st-fixci]
-        run: python -m pip install --upgrade pip && pip install -e ".[dev]" httpx flask
+        # cryptography IS installed: execd/vault.py is the credential vault and
+        # it is NOT a feed/broker lib — it is a plain wheel. Without it
+        # tests/scripts/test_execd_two_apps.py could not be collected, which
+        # was one of the three errors that had master red. The two-app split is
+        # exactly the kind of security-shaped logic CI should be running.
+        # [st-v55j]
+        run: python -m pip install --upgrade pip && pip install -e ".[dev]" httpx flask cryptography
 
       - name: Run tests
         # strader package + the carried-infra suites that run without the live

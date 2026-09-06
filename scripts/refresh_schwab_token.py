@@ -68,7 +68,15 @@ from pathlib import Path
 # needed since the local wrapper was renamed schwab/ → broker_schwab/ (st-8cx).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from schwab import auth as schwab_auth  # noqa: E402
+# NOTE: `schwab` is imported INSIDE main(), at its single use site, not here.
+# It is the
+# only symbol in this file that needs the broker lib, and importing it at
+# module level made the whole module — grant gate, backup hygiene, token
+# assessment — unimportable anywhere the lib is absent. CI is exactly such a
+# box (it installs neither databento nor schwab-py, by design), so
+# tests/scripts/test_refresh_schwab_token.py could not even be collected and
+# master was red from 2026-08-12. Nothing about the re-auth flow changes: the
+# lib is imported before it is used, on the one path that uses it. [st-v55j]
 
 from strader.config import ConfigError  # noqa: E402
 from strader.schwab_token import STATUS_OK, assess_token  # noqa: E402
@@ -357,6 +365,8 @@ def main(argv: list[str] | None = None) -> int:
     if bak:
         print(f"[backup] existing token saved to {bak.name}")
     print()
+
+    from schwab import auth as schwab_auth  # deferred: see the note by the imports
 
     try:
         client = schwab_auth.client_from_manual_flow(
