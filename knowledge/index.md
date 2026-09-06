@@ -75,6 +75,14 @@ in it covered external domain knowledge or facts about the operator.
 - [SPXW Final-Fifteen Strike Concentration](spxw-final-fifteen-strike-concentration.md) — Measured 08-30: the 32 strikes within ±40 pts of ES carry ~3/4 of SPXW print volume in the last fifteen minutes while quotes spread across the whole surface — narrowing is a quote-schema lever, not a trades lever
 - [Zone Framework Equivalence](zone-framework-equivalence.md) — Supply/Demand (Seiden), ICT, SMC, and Carmine's LVN are one event in four dialects — a fast departure leaving unfilled orders + trapped traders
 
+### register
+
+Numbered claim registers for **external** sources. Status `source`: the emitter
+lane refuses them, and every line is a claim with attribution, never doctrine.
+Later sources annotate each id converge / diverge / extend / silent.
+
+- [Orderflow Baseline v1 (OFB)](sources/orderflow-baseline-v1.md) — S1, Carmine Rosato: 16 claims, 5 gaps, evidence-classed; the sample behind it is seven curated winning trades. Annotated by OpenMobius's Order Flow school 2026-09-06 (`docs/comparison-sets/openmobius/`)
+
 ### rule
 
 - [Channel Family Taxonomy](channel-family-taxonomy.md) — The ten channel families a study design must traverse before measuring, with a written verdict per family — a family with no entry is a finding, not a silence

@@ -1,0 +1,2918 @@
+{
+  "concepts": [
+    {
+      "global_card_id": "currency_futures_pairing_strategy",
+      "global_canonical": "Currency Futures Pairing Strategy",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "DXY Pairing Strategy",
+        "Strongest vs Weakest Currency Pairing",
+        "Futures Currency Trading Strategy",
+        "Currency Futures Pairing Strategy (alt)",
+        "Forex Futures Trading Rules"
+      ],
+      "definition": "A pairing framework that screens currencies and currency futures off the state of the US dollar (DXY). The core is to pair the strongest currency against the weakest to maximise trend expansion: when the dollar is trending, pair it with the currency at the opposite extreme (or trade the strongest/weakest currency future outright); when the dollar is consolidating, ignore it and pair two non-dollar currencies moving in opposite directions, isolating the highest-probability expansion pair. The purpose is to strip out dollar noise and settle on one best instrument.",
+      "definition_per_source": {
+        "Education - ICT": "根据美元趋势状态，通过配对强弱货币期货来捕捉趋势的交易方法。美元趋势时配对相反方向货币；美元盘整时配对两个趋势相反的货币，或单独交易最强趋势货币。",
+        "Education - ICT (Updated)": "一个货币/货币期货筛选框架，配对最强与最弱货币以最大化趋势扩张。DXY 趋势时与反方向极端货币配对；DXY 盘整时忽略美元，配对两个方向相反的非美货币，隔离出最高概率的扩张对。"
+      },
+      "identification_rules": [
+        "Assess the dollar (DXY) first: classify it as trending bullish, trending bearish, or consolidating.",
+        "Dollar trending up: find the weakest (most bearish) foreign currency to pair against it, forming a bearish combination (e.g. DXY + weak EUR → short EUR/USD).",
+        "Dollar trending down: find the strongest (most bullish) foreign currency to pair against it, forming a bullish combination (e.g. DXY + strong JPY → short USD/JPY).",
+        "Dollar consolidating: ignore the dollar and pair the strongest non-dollar currency against the weakest (e.g. bullish EUR vs bearish JPY → long EUR/JPY).",
+        "If every currency trends the same way with no opposite extreme: pair a trending currency with a consolidating one. A trend is still available, but the expansion is weaker — a second-best option.",
+        "Futures-only traders: when the dollar trends, trade the single strongest or weakest currency future outright in the opposite direction; when it consolidates, go long the strongest and short the weakest as separate trades.",
+        "The Updated project stresses that the point of pairing is to decide WHICH instrument to apply the entry model to, ensuring the chosen instrument draws maximum directional force from both legs of the pair."
+      ],
+      "common_mistakes": [
+        "Still trying to pair two currencies while the dollar is trending, which muddles the signal (stressed by the ICT project).",
+        "Pairing two same-direction trending currencies of equal strength, which produces consolidation rather than a trend.",
+        "Pairing a strong or weak currency with a consolidating one when a genuine opposite extreme exists, producing a weaker trend than the optimal pair.",
+        "Insisting on pairing against the dollar while it consolidates, instead of switching to non-dollar crosses.",
+        "Failing to tell strong from weak while the dollar consolidates, and pairing arbitrarily (stressed by the ICT project).",
+        "Overlooking the special case where every currency trends the same way, and missing the chance to pair against a consolidating one (stressed by the ICT project)."
+      ],
+      "trading_implication": "By removing dollar noise, the framework narrows the currency and currency-futures universe to a single highest-probability expansion pair, trading the relative strength between currencies directly. Strong against weak gives the cleanest directional trend; trending against consolidating gives a weaker one. Operationally the ICT project reduces a dollar trend to one futures trade (the strongest or weakest currency), and during consolidation either trades a single trending currency or runs a hedged pair — long the weak, short the strong — to sharpen the signal and raise the probability. The Updated project stresses instead that the framework's job is to decide which instrument the entry model gets applied to, so the chosen instrument draws maximum directional force from both legs.",
+      "merge_notes": "两源本质一致，差异在侧重点：ICT (Updated) 引入并强调‘趋势扩张/expansion’与‘最优 vs 次优配对’的明确分层（强对弱 = 最佳，趋势对盘整 = 次优可接受），并将框架定位为‘决定在哪个标的上应用入场模型’的筛选器；原 ICT 卡更聚焦于消除美元噪音与对冲组合的实操，未显式使用 expansion 术语。两者在期货单独交易的处理上完全一致。",
+      "source_cards": [
+        {
+          "project": "Education - ICT",
+          "card_id": "futures_currency_trading_strategy",
+          "source_canonical_term": "Futures Currency Trading Strategy",
+          "source_school": "Price Action",
+          "source_merge_strategy": "single_source"
+        },
+        {
+          "project": "Education - ICT (Updated)",
+          "card_id": "currency_futures_pairing_strategy",
+          "source_canonical_term": "Currency Futures Pairing Strategy",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "single_source"
+        }
+      ],
+      "merge_strategy": "cross_project_synthesis",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": "claude-opus-4-8",
+      "card_id": "currency_futures_pairing_strategy",
+      "canonical_term": "Currency Futures Pairing Strategy",
+      "_source_file": "currency_futures_pairing_strategy.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "doomsday_chariot_distribution",
+      "global_canonical": "末日战车与高位派发",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "Doomsday Chariot",
+        "Distribution at the Highs"
+      ],
+      "definition": "After a near-vertical daily-timeframe advance (the \"doomsday chariot\"), price cannot sustain itself — extension from the moving average is extreme and the move has left a mass of LVNs behind it. The first pullback to the EMA60 produces a bull trap, and each subsequent bounce is lower than the last, building the structure of institutions distributing at the highs into a crash whose depth often exceeds the rally that preceded it.",
+      "definition_per_source": {
+        "Teach-Wuyuan": "日线级90度急涨（末日战车）后，价格因乖离率极大且留下大量LVN而无法持续；第一次回踩EMA60诱多反弹，随后反弹越反越低，形成机构在高位派发出货的暴跌结构，跌幅常大于涨幅。"
+      },
+      "identification_rules": [
+        "The daily chart shows a near-90-degree one-way advance (for example a close at 67 gapping straight to an open at 75), with almost no liquidity in between.",
+        "The advance leaves a mass of daily-timeframe LVNs (low-volume nodes); the price vacuum has not been filled.",
+        "Extension from the moving averages is extreme and RSI reaches an overbought extreme (84, even near 89).",
+        "RSI and MACD print bearish divergence at the top, but a very large up candle can dissolve it temporarily and price can keep grinding higher.",
+        "The first pullback to the daily EMA60 does not kill anyone immediately — it offers a bounce that traps longs.",
+        "Each subsequent bounce is lower than the one before, gradually building a distribution structure at the highs that ends in a crash."
+      ],
+      "common_mistakes": [
+        "Still chasing longs at the end of a 90-degree advance while extension and RSI are at extremes, and getting stuck at the highs with a drawdown too large to sit through.",
+        "Mistaking the first bounce off the EMA60 for a trend-continuation entry, missing that it is a bull trap.",
+        "Deciding a bearish divergence has failed and going unconditionally bullish because a large up candle dissolved it, and ignoring the risk that any event can trigger the crash."
+      ],
+      "trading_implication": "This flags an institutional bull trap during distribution at the highs: do not chase longs at the end of a vertical advance and do not hold them long. Even if price can push further in the short term (to 100, to 102), once a fundamental event triggers it — a rate hike, say — the retracement is very deep and the fall is often larger than the rally, which most people cannot sit through. Longs should take profit while they have it. The supply zone at the end of the advance can be considered for a right-side short entry, but only with attention to whether the liquidity above has been swept.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "term_987d18b3",
+          "source_canonical_term": "末日战车与高位派发",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "single_source"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "card_id": "doomsday_chariot_distribution",
+      "canonical_term": "末日战车与高位派发",
+      "global_canonical_en": "Doomsday Chariot and Distribution at the Highs",
+      "_source_file": "doomsday_chariot_distribution.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "frvp",
+      "global_canonical": "固定范围成交量分布图",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "FRVP",
+        "Fixed Range Volume Profile",
+        "Fixed Range Volume Profile chart",
+        "Fixed Range Volume Distribution",
+        "Dynamic Volume Distribution Chart"
+      ],
+      "definition": "A tool that lets you hand-select any price range, lock it, and generate the volume distribution across it. You click a start point and drag to the end (connecting a low to a high), and the tool outputs POC (the high-volume node), VAH and VAL. It is used to identify where retail volume is concentrated and where the LVN vacuums are, and to judge support and resistance within that range. It suits the odd timeframes that VRVP and SVP do not cover conveniently, such as the 2-hour.",
+      "definition_per_source": {
+        "Teach-Wuyuan": "可手动框选任意价格区间、自动锁定该段并生成成交量正态分布的工具。用户先点起点再拉到终点（连接低高点）后，系统自动输出 POC（高成交节点）、VAH 与 VAL，用于识别散户密集成交区与 LVN 真空缺口，并判断该区间的支撑与阻力，适用于 VRVP/SVP 不便覆盖的冷门级别（如 2 小时）。"
+      },
+      "identification_rules": [
+        "Open Fixed Range Volume Profile in the indicator list and hand-select the target segment: click the start, then drag the endpoint to the segment's extreme, connecting the low to the high. The tool locks the range and outputs its volume distribution.",
+        "The widest and tallest bar of the distribution is the POC — the high-volume node, the band where retail volume is concentrated, the zone where buyers and sellers are in balance.",
+        "Read the VAH and VAL prices the tool generates: above VAH is treated as territory where a new high is possible; once price closes back below VAH, a retest of VAH turns it into resistance; VAL is the support reference beneath the range.",
+        "Where the middle of the distribution is stretched thin, that is an LVN gap — a vacuum flagged as likely to be filled next.",
+        "On higher timeframes the width setting has to be adjusted (from 80 to 150, for instance) or the distribution renders too narrow to read; the larger the timeframe the more VRVP is preferable, with fixed-range reserved for precise selection of odd or local segments."
+      ],
+      "common_mistakes": [
+        "Drawing the range imprecisely, which distorts the distribution — it demands a steady hand and a good eye.",
+        "Using fixed-range on too high a timeframe without adjusting the width, so the display is unreadably narrow or coarse.",
+        "Treating it as a tool that stands alone, ignoring that it is only reliable when cross-checked against multiple timeframes and other methods (SMC, BTM), corresponding with the previous range's POC and value range.",
+        "VAH and VAL cover a wider observation space and need more corroboration; judging on them alone goes wrong easily.",
+        "Going long or short off a feel for a few price numbers — the instructor puts his own accuracy at about a third — which does not suit a trader chasing precision.",
+        "Ordinary traders studying volume-profile indicators deeply; the instructor says outright that VP indicators are unnecessary for most people, and SVP especially is hard to use."
+      ],
+      "trading_implication": "It fixes the value area for any chosen segment without switching timeframes, and judges support and resistance from it: the POC, where retail volume peaks, acts as a buying zone or a break-even zone and price tends to react as it approaches. A close above VAH allows a long on the pullback to VAH; once price closes back below, a VAH retest becomes resistance and VAL is the support reference on further downside. The LVN gap in the middle points at the direction of the next fill. The instructor stresses that when one price satisfies an order block, a moving average (EMA60) and VAH/VAL at the same time it constitutes strong support or resistance — the more indicators converge, the more decisive the entry. It is commonly used to frame a large up or down candle and infer where the bounce or the fill will land.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "term_2fddb67f",
+          "source_canonical_term": "固定范围成交量分布图",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "llm_synthesis"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "card_id": "frvp",
+      "canonical_term": "固定范围成交量分布图",
+      "global_canonical_en": "Fixed Range Volume Profile",
+      "_source_file": "frvp.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "high_volume_node",
+      "global_canonical": "High Volume Node",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "HVN",
+        "High Volume Node",
+        "High Volume Node (HVN)",
+        "Dense Volume Zone",
+        "Volume Peak Zone",
+        "Balanced Value Area"
+      ],
+      "definition": "The price band carrying the highest volume in a volume profile — the value area where buyers and sellers are relatively balanced and retail orders cluster and contest each other. Price approaching it tends to chop sideways rather than break through immediately, and it commonly acts as support or resistance.",
+      "definition_per_source": {
+        "Teach-Wuyuan": "成交量分布图中成交量最高的价位区域，代表多空相对平衡的密集成交价值区，散户在此密集挂单与博弈。价格接近时倾向横向震荡，难以立即突破，常构成支撑或阻力。"
+      },
+      "identification_rules": [
+        "In VRVP, SVP or a fixed-range volume profile, find the price band with the longest (peak) volume bar — that is the high-volume node.",
+        "Within that band long and short volume are roughly balanced; it is a dense band where price stalls and chops repeatedly.",
+        "In a fixed-range profile, drawing from the high to the low of a segment makes the tool generate the price where volume is most concentrated — the retail order band.",
+        "On higher timeframes VRVP is preferable; a fixed-range profile needs its width adjusted (to 150, say) so nodes render clearly at that scale."
+      ],
+      "common_mistakes": [
+        "Assuming that after a decline the trapped longs have all been liquidated, when in fact many are still carrying the position, resting orders in the high-volume band waiting to get out flat.",
+        "Expecting price to break easily through the dense volume band above and let them out flat, when market makers deliberately stop just short of the price that would.",
+        "Misusing the fixed-range tool on a high timeframe with the wrong width setting, so the nodes cannot be read; higher timeframes should use VRVP.",
+        "Forgetting that dragging the chart changes which candles VRVP can see, which moves the POC and the nodes — the reading lags."
+      ],
+      "trading_implication": "The high-volume node is the balanced value area where retail volume concentrates; price approaching it is unlikely to break through immediately and tends to consolidate sideways. A dense band above price becomes the break-even pressure for trapped longs and the first resistance; a dense band below can provide support. The instructor's read is that retail contests inside the node while institutions (market makers) act on the low-volume nodes either side of it, using them to keep retail from getting out flat. Identifying HVNs lets you anticipate support, resistance and the consolidation range without switching timeframes.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "high_volume_node",
+          "source_canonical_term": "High Volume Node",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "single_source"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "illustrated_by_cases": [
+        "Teach-Wuyuan__local_6fc325bb_case_004_黄金两小时背离与抄底误区分析",
+        "Teach-Wuyuan__local_844bc47f_case_002_黄金1小时清洗_回归_再平衡过程",
+        "Teach-Wuyuan__local_844bc47f_case_007_黄金天图级别三角形破位与fvg引力缺口",
+        "Teach-Wuyuan__local_d48a97df_case_001_黄金1小时图vrvp流动性与缺口分布分析",
+        "Teach-Wuyuan__local_d48a97df_case_006_黄金顶级交易者放弃hvn震荡区只做关键位"
+      ],
+      "card_id": "high_volume_node",
+      "canonical_term": "High Volume Node",
+      "_source_file": "high_volume_node.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "hvn_lvn",
+      "global_canonical": "High Volume Node / Low Volume Node",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "Imbalance Value Area",
+        "High and Low Volume Nodes (HVN/LVN)"
+      ],
+      "definition": "The two classes of price node in a volume profile. A high-volume node (HVN) is the dense, highest-volume balanced value area, where price tends to chop sideways and struggles to break through immediately. A low-volume node (LVN) is a thin vacuum or imbalance, usually left where a fast advance or fast drop never traded properly, and institutions tend to rest orders there and fill the gaps back in one by one later.",
+      "definition_per_source": {
+        "Teach-Wuyuan (high_volume_node_low_volume_node)": "成交量分布（VP）中的两类节点：高成交量节点（HVN）是某价位成交量密集的平衡价值区；低成交量节点（LVN）是成交量稀薄的真空缺口，常因急速拉涨或下杀留下，机构倾向日后逐一回补。",
+        "Teach-Wuyuan (hvn_lvn)": "通过成交量分布识别的两类价位节点：HVN为成交量分布柱最长的高峰区，即资产平衡价值区；LVN为成交量分布柱最短的低峰区，即资产不平衡区，机构常在此挂单进场。"
+      },
+      "identification_rules": [
+        "Read the volume bars at each price with a VP tool (VRVP or SVP): where the bars are tall, dense, longest and widest is the HVN — the balanced value area.",
+        "Where the VP bars are visibly indented, volume is thin and the bars are shortest, that vacuum price is the LVN — the imbalance, the liquidity gap.",
+        "A fast advance or fast drop through a segment with no structural support, which never traded properly, leaves a mass of LVN gaps behind it; the hvn_lvn project stresses that LVNs commonly appear alongside FVG imbalances.",
+        "Wicks and fast moves leave liquidity gaps (LVNs) that institutions tend to fill back in one at a time.",
+        "Compare the thickness of adjacent volume bars — the thicker side indicates where bids or offers are dense; telling them apart takes sustained close observation (stressed by the hvn_lvn project).",
+        "With VRVP, set the row count around 150 (200 to 300 on higher timeframes); the larger the number the finer the gaps. Do not widen the visible range too far, or you see only volume already traded in the past, cannot see where positions are being added or trimmed, and the POC lags and distorts as the visible candles change (stressed by the hvn_lvn project)."
+      ],
+      "common_mistakes": [
+        "Ignoring the VP indicator and going long against institutions at an HVN price (such as a gap at 4500 where institutions have rested offers), and getting run over.",
+        "Ignoring the mass of LVN gaps left mid-decline where there was no structural support, and not expecting institutions to fill them back one by one.",
+        "Contesting alongside retail inside the HVN band, which carries no trading value (the European session is the worst of it for retail order placement); and assuming that a longer volume bar means institutional orders are more likely, when the opposite holds — the longer the bar the less likely an institutional order rests there (stressed by the hvn_lvn project).",
+        "Mistaking an FVG imbalance for a supply or demand zone, conflating FVG with the supply concept (stressed by the hvn_lvn project).",
+        "Setting the VRVP values or the visible range too wide, so only past traded volume is visible, the add/trim zones are not, and the POC lags (stressed by the hvn_lvn project)."
+      ],
+      "trading_implication": "Both sources agree that VP reads high and low volume nodes directly without repeatedly switching timeframes. Price approaching an HVN tends to chop sideways and struggles to break through; retail clusters its orders there, institutions may rest orders at that price (offers at the 4500 gap, for example), and going long against them there gets you run over. The LVN is the vacuum where institutions act — price does not stay in it long; they sweep retail stops there, fill the gap, and the market bounces or reverses. An LVN gap left by a fast move is very likely to be filled, which makes it both a target and a directional read. The hvn_lvn project adds that higher-timeframe traders may decline to trade inside the HVN band at all, since a bounce into an HVN often continues lower and forms a secondary test; institutional entries sit at the LVN inside a rally (the long footprint) or inside a decline (the short footprint).",
+      "merge_notes": "两卡同属 Teach-Wuyuan 项目，核心理解高度一致。差异主要在 hvn_lvn 卡补充了更细的操作维度：将 LVN 与 FVG 失衡区关联、提供 VRVP 行数（约150，大级别200-300）的具体参数设置、提出上涨/下跌段 LVN 作为机构做多/做空足迹的进场判读，以及 HVN 反弹形成 ST 的延伸概念；high_volume_node_low_volume_node 卡则更聚焦缺口回补这一核心应用。",
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "high_volume_node_low_volume_node",
+          "source_canonical_term": "High Volume Node / Low Volume Node",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "single_source"
+        },
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "hvn_lvn",
+          "source_canonical_term": "高成交量节点与低成交量节点（HVN/LVN）",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "single_source"
+        }
+      ],
+      "merge_strategy": "cross_project_synthesis",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": "claude-opus-4-8",
+      "card_id": "hvn_lvn",
+      "canonical_term": "High Volume Node / Low Volume Node",
+      "_source_file": "hvn_lvn.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "intermarket_analysis",
+      "global_canonical": "Intermarket Analysis",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "Currency Pairing"
+      ],
+      "definition": "A method of comparing correlated currency futures (DXY, EUR, GBP, JPY, CAD, CHF, NZD, AUD) to rank relative strength and weakness, then pairing the strongest with the weakest currency to select the forex pair with the highest expansion potential for the trading day.",
+      "definition_per_source": {
+        "Education - ICT (Updated)": "A method of comparing correlated currency futures (DXY, EUR, GBP, JPY, CAD, CHF, NZD, AUD) to rank relative strength and weakness, then pairing the strongest with the weakest currency to select the forex pair with the highest expansion potential for the trading day."
+      },
+      "identification_rules": [
+        "First assess DXY's state: trending bullish, trending bearish, or consolidating.",
+        "If DXY is bullish-trending, find the weakest foreign currency future and trade that pair (e.g., DXY strong + EUR weakest → short EUR/USD).",
+        "If DXY is bearish-trending, find the strongest foreign currency future and trade that pair (e.g., DXY weak + JPY strongest → short USD/JPY).",
+        "If DXY is consolidating (typically after large expansion or hitting an HTF key level), ignore the dollar and pair the strongest foreign currency against the weakest foreign currency (exotic pair).",
+        "Rank each currency's candle closure on the daily as bullish, bearish, or consolidating, then select extremes; avoid pairing a trending currency with a consolidating one as it yields weaker expansion.",
+        "Identify currencies to avoid: those with the same directional bias as the anchor currency (e.g., if shorting USD, avoid foreign currencies that are also bearish like JPY when it lacks bullishness)."
+      ],
+      "common_mistakes": [
+        "Pairing a trending currency with a consolidating currency, resulting in a weak trend rather than strong expansion.",
+        "Trading a pair where the foreign currency lacks relative strength/weakness versus the dollar (e.g., trading USD/JPY when JPY is not bullish in a bearish-dollar environment).",
+        "Assuming only one 'best' pair exists per day instead of recognizing multiple valid options and focusing on which to avoid.",
+        "Continuing to pair against the dollar when DXY is consolidating instead of switching to exotic cross-pair analysis."
+      ],
+      "trading_implication": "Used as a pre-trade filter to select which forex or currency-futures market will produce the cleanest expansion day. Pairing extremes (strongest vs. weakest) maximizes directional momentum, while pairing with a consolidating currency yields muted trends. Often multiple valid pairs exist on a given day; the primary value is eliminating pairs that will not expand (e.g., avoiding USD/JPY when JPY shows no relative strength). Works alongside candle 2 closures, fair value gaps, and HTF key levels to confirm the chosen pair's setup.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Education - ICT (Updated)",
+          "card_id": "intermarket_analysis",
+          "source_canonical_term": "Intermarket Analysis",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "single_source"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "illustrated_by_cases": [
+        "Education_-_ICT_(Updated)__27S9gjgcSlI_case_007_eur_usd_vs_dxy_inversely_correla",
+        "Education_-_ICT_(Updated)__HrjYoxAUb3s_case_001_dxy_bearish_pairing_usd_jpy_vs_e",
+        "Education_-_ICT_(Updated)__HrjYoxAUb3s_case_002_dxy_bearish_cad_futures_outperfo",
+        "Education_-_ICT_(Updated)__HrjYoxAUb3s_case_003_dxy_consolidation_euro_cad_exoti",
+        "Education_-_ICT_(Updated)__c_mh19e3mhI_case_003_week_of_jul_31_aug_4_daily_relat",
+        "Education_-_ICT_(Updated)__c_mh19e3mhI_case_005_es_nq_ratio_reversal_at_9_30_and",
+        "Education_-_ICT_(Updated)__nWHint4Yano_case_002_multiple_expansion_days_with_thu",
+        "Education_-_ICT_(Updated)__nWHint4Yano_case_003_dollar_bullish_with_bearish_eurg",
+        "Education_-_ICT_(Updated)__uPUNOi_R9fA_case_005_thursday_counter_on_tsla_with_in",
+        "Education_-_ICT__HrjYoxAUb3s_case_001_美元看跌时的eur_usd和usd_jpy配对案例",
+        "Education_-_ICT__HrjYoxAUb3s_case_002_美元看跌时的多货币对比分析"
+      ],
+      "card_id": "intermarket_analysis",
+      "canonical_term": "Intermarket Analysis",
+      "_source_file": "intermarket_analysis.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "liquidity_gap",
+      "global_canonical": "流动性缺口",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "Liquidity Gap",
+        "Vacuum Zone"
+      ],
+      "definition": "A thin, low-volume vacuum band left behind after a fast advance or fast drop (a wick, for instance); institutions commonly drive price back to fill it. The instructor shows it with SVP and VRVP, including gaps above prices that were not wicked.",
+      "definition_per_source": {
+        "Teach-Wuyuan": "价格急速拉涨或下跌（如插针）后留下的低成交量真空价位区，机构常驱动价格回补该区域。讲师用SVP/VRVP工具显示，包括非插针点位上方的缺口。"
+      },
+      "identification_rules": [
+        "On an SVP or VRVP volume profile, find the price band where volume is extremely low, close to a vacuum — that is the liquidity gap.",
+        "Prices crossed by a fast, large advance or decline (wicks included) often did not trade properly and leave a gap.",
+        "Where a wick pierced through, a liquidity gap is left, corresponding to a level that needs filling.",
+        "Gaps often line up with key prices — a prior high, the daily 1.618 extension (44–48, above 36)."
+      ],
+      "common_mistakes": [
+        "Chasing longs near the gap in size that cannot survive the drawdown when it fills (unable to sit through one or two hundred dollars of decline).",
+        "Being frightened by a wick and not entering where structure confirms, missing the bounce after the liquidity sweep.",
+        "Reading a wick as a trend reversal rather than institutions clearing liquidity before continuing in the original direction."
+      ],
+      "trading_implication": "A liquidity gap left by a large advance or decline is very likely to be filled; institutions sweep the liquidity below (running retail stops) before moving the other way. The instructor uses this to anticipate that price will fill the gap above or below (44–48, above 36) and warns that a sustained advance into a gap price needs attention for resistance and fill risk. SVP and VRVP locate the exact price that needs filling, which keeps you from chasing blindly near the gap.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "term_ac1b1a6e",
+          "source_canonical_term": "流动性缺口",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "single_source"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "illustrated_by_cases": [
+        "Teach-Wuyuan__local_b3289191_case_013_白银周五一小时欧币加做多与减仓"
+      ],
+      "card_id": "liquidity_gap",
+      "canonical_term": "流动性缺口",
+      "global_canonical_en": "Liquidity Gap",
+      "_source_file": "liquidity_gap.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "low_volume_node",
+      "global_canonical": "Low Volume Node",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "LVN",
+        "Low Volume Node",
+        "Low Volume Node (LVN / Low Volume Node)",
+        "Low Volume Node (LVN)",
+        "Low Volume Vacuum Zone"
+      ],
+      "definition": "The price band in a volume profile (VRVP, SVP or fixed-range) carrying very low volume — a vacuum where little traded and no volume accumulated, usually left by a large fast advance or decline or by a wick crossing it. With no resting orders to resist, price tends to cross it quickly rather than stay in it; institutions commonly launch their moves from it, and the liquidity gap left behind tends to get filled.",
+      "definition_per_source": {
+        "Teach-Wuyuan": "成交量分布（VRVP/SVP/固定范围）中成交量极低的价位区间，即买卖稀少、缺乏成交堆积的真空区，常由价格大幅快速拉涨/下跌或插针（长影线）穿越留下。该区域缺乏挂单阻力，价格倾向快速穿越而非停留；机构常在此发动攻击，留下的流动性缺口往往会被价格回补填平。"
+      },
+      "identification_rules": [
+        "On a VRVP, SVP or fixed-range volume profile, find the band where the volume bars are visibly indented, short, and far below their neighbours — that is the LVN.",
+        "Prices a wick swept through did not trade properly on the way, and the liquidity gap that leaves is an LVN.",
+        "A large, fast one-way segment (on higher timeframes too, the 6-hour included) leaves thin-volume prices behind it that constitute LVN gaps.",
+        "Connect the high and low of a segment with a fixed-range profile; the shortest bars in the middle of the distribution are that segment's LVN.",
+        "In an SVP distribution, the low-volume peaks outside VAH and VAL, or where two ranges join, are LVNs.",
+        "Confluence across tools — a VRVP and SVP volume gap, the 0.5/1.0 extension, this timeframe's EMA60 — landing on the same price pins the LVN precisely."
+      ],
+      "common_mistakes": [
+        "Without a proper volume tool, relying on the folk rule that \"a wick gets filled\" and being unable to say which price it fills to.",
+        "Seeing an LVN and assuming price fills it immediately, ignoring that a live uptrend may push further before filling; shorting against the trend dies mid-slope.",
+        "Chasing after a fast rally has left a mass of LVNs, without realising price will very likely come back down to fill them.",
+        "Missing that a large one-way move is running inside an LVN vacuum, and mistaking speed for a sustainable trend.",
+        "Mistaking the dense high-volume band (HVN, where retail contests) for the vacuum where institutions act.",
+        "Entering near an LVN on impulse straight after hearing the idea, without waiting for a close on this timeframe to confirm the break."
+      ],
+      "trading_implication": "The LVN is the vacuum of least resistance, and the target where institutions and market makers act and harvest liquidity; price entering it tends to cross quickly or fill it in. An LVN left by a wick or a fast move is very likely to be filled, which gives a fill target above or below and a reference for a support-resistance flip or a counter-entry. The 1.0 extension of an ABC often lands in an LVN gap and is treated as a key price. Confluence with the EMA60, an order block or a break block strengthens the read and lets you judge the likely attack price without switching timeframes; an LVN broken through usually means continuation, and one that caps price may mean a reversal.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "low_volume_node",
+          "source_canonical_term": "Low Volume Node",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "llm_synthesis"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "illustrated_by_cases": [
+        "Teach-Wuyuan__local_3a0f0488_case_005_4509流动性圈口套人行动",
+        "Teach-Wuyuan__local_3b3bc764_case_010_下周黄金5344至5462关键阻力区预测",
+        "Teach-Wuyuan__local_3b3bc764_case_015_下周黄金svp三时段支撑与5230阻力分析",
+        "Teach-Wuyuan__local_650683bc_case_017_原油流动性缺口回补与六小时分析",
+        "Teach-Wuyuan__local_650683bc_case_019_原油30分钟ema100强验证发现",
+        "Teach-Wuyuan__local_6fc325bb_case_003_黄金两小时空单趋势实战复盘",
+        "Teach-Wuyuan__local_6fef25fa_case_014_原油末日战车风险与多周期分析",
+        "Teach-Wuyuan__local_9a34c399_case_009_5分钟底背离插针进场_57进场_案例",
+        "Teach-Wuyuan__local_b3289191_case_019_a股个股_600309等_用tradingview分析",
+        "Teach-Wuyuan__local_d48a97df_case_003_黄金6小时缺口回补与暴跌针点对应",
+        "Teach-Wuyuan__local_d48a97df_case_005_黄金往期暴跌_230美金_390美金_缺口回补复盘"
+      ],
+      "card_id": "low_volume_node",
+      "canonical_term": "Low Volume Node",
+      "_source_file": "low_volume_node.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "multi_confluence_validation",
+      "global_canonical": "三线共振/综合验证",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "Confluence Support",
+        "Multiple Validation",
+        "Finding Confluence",
+        "Composite Validation",
+        "Multi-point Validation",
+        "Multi-timeframe Point Validation",
+        "Multi-timeframe Confluence Support",
+        "Multi-timeframe Confluence Support (alt)",
+        "Three-Model Confluence",
+        "Three-System Confluence",
+        "Horizontal-Line and Multi-point Validation",
+        "Horizontal-Line Validation"
+      ],
+      "definition": "Overlapping several mutually independent methods — moving averages, order blocks and break blocks, FVG, volume profile / SVP / POC, historical horizontal lines — at the same price to form confluence, then validating it with overbought/oversold divergence and multiple historical touches. The more confluent points and the more validating methods, the stronger the support or resistance and the more certain the entry. Key prices derived by correct methods should converge, and the first pullback into them validates at a very high rate.",
+      "definition_per_source": {
+        "Teach-Wuyuan (三模型共振)": "讲师核心方法论：均线（通用线）、成交量分布/订单块、FVG三套系统在同一价位重叠共振，再叠加RSI/MACD超买超卖或量能背离，则该位置支撑/阻力性极强，大概率过不去或跌不破，进场可行性最高。",
+        "Teach-Wuyuan (三线共振/综合验证)": "用多种相互独立方法（订单块、破坏块、均线、SVP三时段、POC，或小级别EMA60与上一级别EMA20）在同一价位重叠形成共振的验证手法。共振点与验证方法越多越强，正确方法算出的进场点应趋于一致；两级别均线在同一价位叠加显著强于单一级别支撑，第一次回踩验证准确率极高。",
+        "Teach-Wuyuan (水平线验证与多点验证)": "通过统计某价位或某级别均线被历史高低点反复触碰并产生有效反应的点数来确认其有效性：被多点（至少三点）验证的水平线或级别均线，比仅穿梭一两次或单点验证者更可靠；单点验证不可靠，需逐级向上扩找到能多点验证的级别，以确认真实趋势级别与有效支撑阻力。"
+      },
+      "identification_rules": [
+        "Within one price band, derive support or resistance independently by at least two methods (EMA20/60/100, order block or break block, FVG, the three SVP sessions, POC); if they land close together, treat it as a confluence point.",
+        "The three-model project stresses: the same price carrying this timeframe's moving average, the volume profile or order block, and an FVG — three systems overlapping — with RSI/MACD overbought/oversold or a divergence as a fourth filter.",
+        "FVG direction matters: an FVG left by a rally is a long on the pullback; one left by a decline is a short on the pullback.",
+        "Where the volume profiles of all three SVP sessions coincide at one price, that is triple-line confluence and strong support.",
+        "The more confluent points and validating methods, the stronger and more reliable the level; if two methods produce key prices far apart, one of them is wrong.",
+        "Step the timeframes before price arrives to line up several moving averages (5m → 15m → 30m), confirming that the lower timeframe's EMA60 and the higher timeframe's EMA20 fall in the same band, and that the higher timeframe's extension has mean-reverted.",
+        "The higher timeframe must still be trending with you, or it is not a valid confluence point; a single-timeframe moving-average touch, or moving averages that do not coincide, is not confluence.",
+        "Check whether extension is excessive at the same time — price far from the moving-average cost band raises the probability of reversion (stressed by the three-model project).",
+        "Multi-point validation (the horizontal-line project): count how many valid validation points a timeframe's moving average or a price has earned. A single point is unreliable; step up from the lowest timeframe (1m → 2m → …) until you find the timeframe with at least three validation points — test, test, test.",
+        "The more validation points, and the longer price runs above that timeframe's moving average without breaking it, the more established the trend on that timeframe; once the timeframe is confirmed, use its moving average — the EMA60 especially — for the stop and for holding.",
+        "Having found a candidate ignition point, scroll back along the horizontal line through history and check whether the price has been touched repeatedly and produced clear support or resistance reactions (including early sweeps); several reactions make it a valid horizontal line.",
+        "How trend lines and horizontal lines get drawn varies by person; any drawing anchored at multi-point-validated locations and internally consistent is reasonable."
+      ],
+      "common_mistakes": [
+        "Forcing a long on a single system and a single validation point while price sits at resistance and overbought — wrong direction and wrong location.",
+        "Relying on a one-click indicator to draw every FVG: the indicator cannot extend them, so when price returns later that resistance or support is missed.",
+        "Treating every FVG as an entry, when it is only an opportunity — moving averages and overbought/oversold must be layered on to confirm.",
+        "Betting at a confluence point without layering on divergence or an excessive-extension condition.",
+        "Entering the moment price touches the confluence point instead of waiting for a close to confirm the break.",
+        "Shorting a confluence point against a live uptrend, which can die in a continued advance; and shorting a higher-timeframe uptrend from a lower-timeframe downtrend without first stepping the timeframes to find the confluence below.",
+        "Assuming price must pull back precisely to the confluence price; it may consolidate inside the break block or the flip zone and go straight up without the pullback.",
+        "Judging by subjective methods such as wave structure, which different people draw differently and which cannot produce a consistent, checkable result.",
+        "Misusing the fixed-range profile on a high timeframe with the wrong width, making it unreadable; higher timeframes should prefer VRVP.",
+        "Trading a single timeframe, which forces a very wide stop, gambles on an extreme R multiple, and misses the confluence entry.",
+        "Treating an ordinary moving-average touch with no confluence as an ignition point, when it is only a single-timeframe reaction and lacks force.",
+        "Leaving the stop at the nearer moving average when two confluent moving averages are very close together, which is easily swept by a few ticks; it belongs beyond the farther one.",
+        "Placing the stop badly: validate on the lower timeframe with a tighter stop rather than absorbing pointless wick losses; not using a close-based stop and sizing too large means a wick cannot be survived.",
+        "Staring at one timeframe (fixed on the 1-minute, or the 4-hour) and hammering away without checking several to find the real one, which leads to shorting on the wrong timeframe (shorting the 1-minute far too early and getting killed) or capturing only a tiny move.",
+        "Choosing the wrong validation timeframe (the 4-hour rather than the 6-hour) and getting stopped out by an inducement wick on that timeframe.",
+        "Picking a price crossed only once or twice and never multi-point validated as the key horizontal line, or drawing the ignition line in the wrong place; and reading only the currently visible range without scrolling back, missing early support or sweep validation."
+      ],
+      "trading_implication": "A confluence point is a high-probability support or resistance band where price reacts clearly, and it is the reference for a with-trend entry and for adding. The three-model project holds that three systems plus a divergence is the most certain configuration: short the upper edge, buy the lower edge, even grid it, and take the bet once the corresponding timeframe's FVG closes without breaking — a small stop and a high reward-to-risk (its examples mostly run 1:2). The triple-line project holds that SMC can be assisted by moving averages and a moving-average system by volume profile, and that liquidity and SVP methods do not require switching timeframes (the 5-minute and the 1-hour support are essentially the same); step the timeframes before price arrives to find the confluence entry below, and place the stop outside the confluence zone or beyond the farther of two confluent moving averages, since the first test very probably holds. The horizontal-line project holds that multi-point validation should establish the market's real timeframe before deciding which timeframe to trade; once confirmed, enter on the first pullback to the moving average and hold long-term with the EMA60 as the stop — the higher the timeframe and the more validation points, the more volatility can be absorbed and the more a second entry can be added, cross-checked against the BTM moving-average system.",
+      "merge_notes": "三卡均来自 Teach-Wuyuan 同一讲师体系但侧重不同：term_2e8641a2 侧重均线+VP/OB+FVG三套系统加指标背离的静态共振；term_9bc020a8 侧重多独立方法跨级别（EMA60/上级EMA20）扩缩级共振与顺势趋势前提；term_f40b1023 独有'多点验证（至少三点历史触碰）'用于先判定真实趋势级别再交易的逻辑，并强调单点验证不可靠需逐级向上扩级——此'级别判定'维度是其他两卡未明确展开的差异点。",
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "term_2e8641a2",
+          "source_canonical_term": "三模型共振",
+          "source_school": "Indicator Based",
+          "source_merge_strategy": "single_source"
+        },
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "term_9bc020a8",
+          "source_canonical_term": "三线共振/综合验证",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "llm_synthesis"
+        },
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "term_f40b1023",
+          "source_canonical_term": "水平线验证与多点验证",
+          "source_school": "Indicator Based",
+          "source_merge_strategy": "llm_synthesis"
+        }
+      ],
+      "merge_strategy": "cross_project_synthesis",
+      "merged_at": "2026-06-26T19:32:15.363778+00:00",
+      "merge_model": "claude-opus-4-8",
+      "illustrated_by_cases": [
+        "Teach-Wuyuan__local_3b3bc764_case_014_1月30日无法找到对应级别的极端行情"
+      ],
+      "card_id": "multi_confluence_validation",
+      "canonical_term": "三线共振/综合验证",
+      "global_canonical_en": "Multi-Method Confluence Validation",
+      "_source_file": "multi_confluence_validation.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "point_of_control",
+      "global_canonical": "Point of Control",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "POC",
+        "Balance Point Between Buyers and Sellers",
+        "Highest Volume Price",
+        "Control Point",
+        "POC (Point of Control)",
+        "Point of Control (Control Point, POC)",
+        "Control Point (POC)",
+        "Median Value-Balance Zone",
+        "Value Balance Point"
+      ],
+      "definition": "The price carrying the highest volume in a volume profile — the value-balance point where trade between buyers and sellers is densest, drawn on the chart as the horizontal line at the peak of the volume histogram. It marks the market's most active trading area and commonly forms a consolidation or rotation range. Price above the POC is read as strength and below it as weakness, and the POC can act as dynamic support or resistance in the way a moving average does.",
+      "definition_per_source": {
+        "SMC-Strong-Weak-Supplement": "成交量分布图（volume profile）可见范围内成交量最高的价位，由成交量柱峰值处的水平线标示。它标记交易活动最密集的区域，更多表现为交易区间或盘整区，而非确定性的支撑/阻力。",
+        "Teach-Wuyuan": "成交量分布中成交量最高的价位，即多空成交最密集的平衡点，代表价值平衡区。在 SVP 正态分布区间中位于 VAH 与 VAL 之间的中值位置。价格在 POC 上方视为强势、下方视为弱势，可像均线一样充当动态支撑或阻力位使用。"
+      },
+      "identification_rules": [
+        "In the horizontal histogram of a volume-profile tool (VRVP, SVP or fixed-range), the price at the longest bar — the peak, the highest volume — is the POC.",
+        "Zooming or changing the chart's visible range makes VRVP's POC update to the new highest-volume price; Teach-Wuyuan stresses that SVP's POC is set by the system per trading session and does not move when the chart is dragged, which makes it more stable.",
+        "The POC usually falls inside the dense high-volume node (HVN) — the market's value-balance area; within an SVP distribution it sits at the range's midpoint, between VAH and VAL.",
+        "Read whether price is above the POC (the strong side) or below it (the weak side) to judge strength; this holds inside a consolidation range too.",
+        "Price crossing the POC in either direction has to break and be re-confirmed in the \"breaking ground\" manner before it counts as a turn — the same logic as retesting a broken moving average (Teach-Wuyuan's own methodology).",
+        "Extending the previous range's POC as a horizontal line locates candidate support/resistance validation prices in the next range; after a range breaks, a retest back to the POC is usually the key level for a bounce or a rejection.",
+        "Several trading sessions can be overlaid; a price that recurs across multiple SVP segments (three in confluence, say) is stronger support or resistance.",
+        "Volume profiles on different timeframes give different POCs; the timeframe a POC was read on has to be stated."
+      ],
+      "common_mistakes": [
+        "Reading the POC as the highest PRICE, when it is the highest-VOLUME price.",
+        "Reading the POC as strong support or resistance; it behaves more often as a trading or consolidation range (stressed by the SMC project).",
+        "Forgetting that dragging or zooming the chart changes VRVP's POC as the visible candles change — the reading lags and applying it directly misreads the market.",
+        "Not distinguishing timeframes: different timeframes give different POCs, and mixing them produces wrong support and resistance.",
+        "Entering the moment price touches the POC, without waiting for a close to break \"breaking-ground\" style and re-confirm.",
+        "Reading only this range's POC and ignoring the one left by the previous range, which is why the real support cannot be found.",
+        "Shorting an uptrend against the trend in anticipation of a pullback; price may keep climbing before it comes down, and the position dies on the way.",
+        "Ignoring the sideways-chop character of the dense HVN, assuming price will break through it immediately, and holding blindly inside the contested band while institutions hunt stops there (a liquidity sweep).",
+        "Trading a single VP/POC read without combining it with divergence, gaps and moving averages."
+      ],
+      "trading_implication": "The POC marks where trading activity is densest, and price commonly consolidates or stalls there. The SMC project stresses that key breakout levels tend to appear immediately above or below the high-volume area, while a low-volume area can mean price moves fast. Teach-Wuyuan uses the POC as the balance line between buyers and sellers: price above it leans long, below it leans short; a POC above price acts as resistance and below it as support; and a break has to be re-confirmed \"breaking-ground\" style. SVP's POC judges support and resistance without switching timeframes, since the 5-minute and 1-hour key levels are essentially the same. After a range breaks, a retest of the POC is a with-trend entry; the POC left by the previous range gets validated in the next one, and institutional wicks often stab exactly to the previous range's POC to fill the gap. Price approaching the dense HVN tends to chop sideways, and institutions hunt stops there. In an uptrend, look for longs near the POC with the trend, judged together with VAH/VAL, divergence and gaps.",
+      "merge_notes": "两源对 POC 性质的侧重不同：SMC 项目将 POC 主要视为盘整/交易区间，明确淡化其作为强支撑阻力的角色；Teach-Wuyuan 则积极将 POC 当作动态支撑/阻力（类均线）并发展出《破土》突破确认、跨区间遗留 POC 验证等独有方法论。此外，对工具稳定性的判断有差异：SMC（VRVP）认为 POC 随可见范围缩放自动更新，Teach-Wuyuan 强调 SVP 的 POC 按交易时段固定、不随拖图改变。",
+      "source_cards": [
+        {
+          "project": "SMC-Strong-Weak-Supplement",
+          "card_id": "point_of_control",
+          "source_canonical_term": "Point of Control",
+          "source_school": "Volume Analysis",
+          "source_merge_strategy": "single_source"
+        },
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "point_of_control",
+          "source_canonical_term": "Point of Control",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "llm_synthesis"
+        }
+      ],
+      "merge_strategy": "cross_project_synthesis",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": "claude-opus-4-8",
+      "illustrated_by_cases": [
+        "Teach-Wuyuan__local_3a0f0488_case_003_黄金多级别扩级寻找支撑_5分钟到12小时",
+        "Teach-Wuyuan__local_3b3bc764_case_004_学员套单12小时级别抢救案例",
+        "Teach-Wuyuan__local_3b3bc764_case_011_黄金6小时级别完美验证波段",
+        "Teach-Wuyuan__local_3b3bc764_case_015_下周黄金svp三时段支撑与5230阻力分析",
+        "Teach-Wuyuan__local_6fef25fa_case_009_黄金_3_月_2_日订单块连续交易实例",
+        "Teach-Wuyuan__local_6fef25fa_case_012_黄金一小时_vrvp_与_vah_回测做多",
+        "Teach-Wuyuan__local_6fef25fa_case_013_白银与黄金缺口对比及区间运行",
+        "Teach-Wuyuan__local_6fef25fa_case_015_非农之夜黄金梭哈实操复盘",
+        "Teach-Wuyuan__local_d48a97df_case_001_黄金1小时图vrvp流动性与缺口分布分析",
+        "Teach-Wuyuan__local_d48a97df_case_003_黄金6小时缺口回补与暴跌针点对应",
+        "Teach-Wuyuan__local_d48a97df_case_004_黄金一小时空头趋势与做市商破底翻预判",
+        "Teach-Wuyuan__local_d48a97df_case_005_黄金往期暴跌_230美金_390美金_缺口回补复盘",
+        "Teach-Wuyuan__local_d48a97df_case_006_黄金顶级交易者放弃hvn震荡区只做关键位",
+        "Teach-Wuyuan__local_d48a97df_case_008_黄金1小时飞波扩展与回撤实战推算阻力与进场"
+      ],
+      "card_id": "point_of_control",
+      "canonical_term": "Point of Control",
+      "_source_file": "point_of_control.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "session_volume_profile",
+      "global_canonical": "Session Volume Profile",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "SVP",
+        "SVP HD",
+        "VAH/VAL/POC",
+        "Volume Value Area",
+        "Session Volume Profile (SVP)",
+        "SVP / Session Volume Profile",
+        "Session Volume Profile",
+        "Trading Session Volume Profile"
+      ],
+      "definition": "A tool that anchors automatically by trading session and cuts the market into independent volume-profile blocks. Each block gives, as a distribution, the POC (the highest-volume balance price between buyers and sellers), the VAH (value area high) and the VAL (value area low), so that session's support, resistance and institutional entry zones can be read directly without switching chart timeframes — and without lag.",
+      "definition_per_source": {
+        "Teach-Wuyuan": "按交易时段自动锚定并将行情切分成独立成交量分布块的工具，每块以正态分布给出 POC（成交量最高的多空平衡价位）、VAH（价值区高点）与 VAL（价值区低点），无需切换图表级别即可直接读取该时段的支撑、阻力与机构进场区域，且不出现延迟。"
+      },
+      "identification_rules": [
+        "Load SVP on the chart (TradingView, SVP HD included); the system anchors automatically and cuts the market into independent volume-profile blocks per trading session, rather like order blocks, with no range to draw by hand.",
+        "Each block marks its POC (the highest-volume balance price between buyers and sellers), VAH (the upper edge of the high-volume peak, usually at the top of the range) and VAL (the lowest price in the volume area, usually at the bottom).",
+        "Price running above the POC is judged strong and below it weak; a POC above price acts as resistance and below it as support. Price approaching VAH tends to fall back and approaching VAL tends to rise.",
+        "The high-volume node (HVN) is the dense band; the low-volume node (LVN) is the thin band, which is where institutions may enter.",
+        "After a close confirms a break of VAH, a pullback to VAH that holds can be bought; \"extend VAH/VAL to the right\" can be enabled to carry the previous block's prices into the current one, so a level flips to resistance once lost and to support once broken (the support-resistance flip).",
+        "Zooming the chart shows several session ranges; where several sessions coincide at one price it constitutes stronger support or resistance (multi-line confluence).",
+        "Once a new range forms it retests the previous range's POC, VAH and VAL; a large wick often stabs to the price the previous range left behind to complete the fill.",
+        "In the style settings, VAH, VAL and POC can be shown or hidden, and the row count set — 150 is common, 200 to 300 on higher timeframes — to control how fine the distribution is; the value-area volume is usually set to 70.",
+        "It pairs with the fixed-range volume profile: connecting a segment's start and peak locks that range's high-volume node automatically."
+      ],
+      "common_mistakes": [
+        "Assuming price approaching VAH is an immediate short and approaching VAL an immediate long; it indicates the approximate band of high and low volume nodes, not a precise entry.",
+        "Placing orders against the institutional direction at a high-volume node (the dense retail band); institutions do the opposite and sweep the stops resting there.",
+        "Using SVPs from different timeframes interchangeably, ignoring that each timeframe's value area differs.",
+        "Assuming price will stay inside the current range and missing the cross-range fill logic; it commonly goes to fill the gap left by the previous range.",
+        "Trading SVP alone without combining divergence, thinning-volume gaps, moving averages and order blocks to judge the fill level and the direction.",
+        "Entering straight off the read without waiting for a close to confirm the break.",
+        "Shorting against an uptrend because an LVN or a large extension is visible; price may keep climbing before it falls.",
+        "Not placing the stop above the previous order block's VAH — institutions may sweep a little higher before reversing down, taking the stop out.",
+        "Confusing SVP with VRVP, and forgetting VRVP's drawback that dragging the chart moves the POC and that it lags on TradingView.",
+        "Beginners loading too many indicators at once and losing the thread, or drawing the range wrong by hand; and overusing the fixed-range profile on too high a timeframe with the wrong width, which renders badly.",
+        "Not treating the moving average — the market's cost price — as final when VP and the moving-average system conflict."
+      ],
+      "trading_implication": "SVP divides by price area rather than by timeframe, so support and resistance can be read without stepping through charts; 5-minute and 1-hour support come out close to identical, and there is no lag, which makes it particularly suited to identifying institutional entries at fine scale. Institutional orders sit at low-volume nodes (LVN); retail clusters at high-volume nodes. Short near this block's VAH with the stop above the previous block's VAH; price commonly reaches the POC first before VAH is worth considering. Where prices from several sessions coincide, support or resistance is strong. A new range retesting the previous range's POC anticipates the next support and fill zone. VP is a corroborating tool: where it conflicts with the moving average (the market's cost price), the moving average governs, and pairing it with order blocks and moving averages for multiple validation raises the hit rate.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "session_volume_profile",
+          "source_canonical_term": "Session Volume Profile",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "llm_synthesis"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "illustrated_by_cases": [
+        "Teach-Wuyuan__local_3a0f0488_case_003_黄金多级别扩级寻找支撑_5分钟到12小时",
+        "Teach-Wuyuan__local_3b3bc764_case_009_周五黄金fvg测试与需求区回踩多单",
+        "Teach-Wuyuan__local_3b3bc764_case_014_1月30日无法找到对应级别的极端行情",
+        "Teach-Wuyuan__local_3b3bc764_case_015_下周黄金svp三时段支撑与5230阻力分析",
+        "Teach-Wuyuan__local_6fef25fa_case_009_黄金_3_月_2_日订单块连续交易实例",
+        "Teach-Wuyuan__local_844bc47f_case_011_黄金昨晚4530多单与借王权加仓案例",
+        "Teach-Wuyuan__local_b3289191_case_019_a股个股_600309等_用tradingview分析",
+        "Teach-Wuyuan__local_d48a97df_case_001_黄金1小时图vrvp流动性与缺口分布分析"
+      ],
+      "card_id": "session_volume_profile",
+      "canonical_term": "Session Volume Profile",
+      "_source_file": "session_volume_profile.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "strategy_indicator_flaw",
+      "global_canonical": "策略指标缺陷",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "Paid OB/FVG Strategy Flaw",
+        "Point-and-Click Tool Flaw"
+      ],
+      "definition": "The flaw in the paid automatic OB/FVG strategy indicators on the market: they do not label which timeframe an order block belongs to, so the user cannot set the stop correctly for that timeframe — and long-term reliance on them erodes both market understanding and basic skill.",
+      "definition_per_source": {
+        "Teach-Wuyuan": "指市面上付费的OB/FVG自动策略指标不标注订单块所属时间级别的缺陷，使用者无法据级别正确设置止损，且长期依赖会削弱对市场的认知与基本功。"
+      },
+      "identification_rules": [
+        "The strategy marks supply and resistance zones as coloured blocks on the chart but does not state which timeframe the zone belongs to.",
+        "Because an order block's stop must follow the timeframe it sits on, no timeframe label means no correct stop by timeframe.",
+        "If a paid strategy CAN label an order block's timeframe, it is usable and does not fall under this flaw."
+      ],
+      "common_mistakes": [
+        "Entering off a paid strategy that does not label the timeframe, leaving nowhere to put the stop and no way into the trade.",
+        "Looking for the labour-saving method before looking for a standard order block, which lowers the probability of being validated.",
+        "Over-relying on point-and-click tools, so the first thought is whether a tool or a signal exists rather than how to analyse it yourself, which degrades market understanding."
+      ],
+      "trading_implication": "The instructor argues from this for marking order blocks by hand: first it keeps you flexible and drills the fundamentals along the way, and second it deepens market understanding. An order block, once it appears, is a permanent mark — colour it yourself (red for down, green for up) with a number for its timeframe, switch to that timeframe when entering to find support and resistance, and take the stop from the labelled timeframe rather than guessing with a 1-hour or 2-hour close.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "term_34c11899",
+          "source_canonical_term": "策略指标缺陷",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "single_source"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "card_id": "strategy_indicator_flaw",
+      "canonical_term": "策略指标缺陷",
+      "global_canonical_en": "The Flaw in Packaged OB/FVG Strategy Indicators",
+      "_source_file": "strategy_indicator_flaw.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "us_dollar_index_dxy_bias_framework",
+      "global_canonical": "US Dollar Index (DXY) Bias Framework",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "DXY Bias",
+        "Dollar Bias Pairing Framework"
+      ],
+      "definition": "A currency pair selection framework using the DXY's trend state to determine which forex pair or currency future to trade: a trending DXY is paired with the strongest opposing currency, while a consolidating DXY shifts focus to pairing non-dollar currencies of opposite bias.",
+      "definition_per_source": {
+        "Education - ICT (Updated)": "A currency pair selection framework using the DXY's trend state to determine which forex pair or currency future to trade: a trending DXY is paired with the strongest opposing currency, while a consolidating DXY shifts focus to pairing non-dollar currencies of opposite bias."
+      },
+      "identification_rules": [
+        "Classify DXY as bullish trending, bearish trending, or consolidating by reviewing its daily candle closures and trend structure.",
+        "If DXY is bullish trending, scan the other major currencies and select the most bearish one to pair against it (e.g. trade EUR/USD when EUR is the weakest).",
+        "If DXY is bearish trending, scan the other major currencies and select the most bullish one to pair against it (e.g. trade USD/JPY when JPY is the strongest).",
+        "If DXY is consolidating (often after large expansion or at a higher time frame key level), exclude DXY and pair the strongest non-dollar currency with the weakest non-dollar currency.",
+        "If no clearly opposing currency exists, pair a trending currency with a consolidating one, accepting a weaker resulting trend.",
+        "For futures-only traders when DXY is trending, simply trade the single currency future most opposite to DXY's direction."
+      ],
+      "common_mistakes": [
+        "Pairing the dollar with another trending currency in the same relative direction, which produces a consolidating pair instead of an expansive trend.",
+        "Pairing a trending currency with a consolidating one when a true opposite exists, settling for a weaker trend than necessary.",
+        "Continuing to pair against DXY when DXY itself is consolidating, instead of rotating to non-dollar crosses.",
+        "Forcing a trade on a currency (e.g. JPY) that is not sufficiently strong or weak relative to the others on that day."
+      ],
+      "trading_implication": "The framework prioritizes maximum expansion by pairing the strongest with the weakest currency, treating each forex pair as a fraction of two relative strengths. When DXY trends, it is always one side of the pair; when DXY consolidates or retraces (anticipated after expansion into HTF key levels), the trader rotates into exotic or cross pairs. Multiple acceptable choices typically exist on a given dollar-bias day; the priority is eliminating currencies that are too neutral (e.g. JPY when not bullish enough) rather than finding a single perfect asset.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Education - ICT (Updated)",
+          "card_id": "us_dollar_index_dxy_bias_framework",
+          "source_canonical_term": "US Dollar Index (DXY) Bias Framework",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "single_source"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "card_id": "us_dollar_index_dxy_bias_framework",
+      "canonical_term": "US Dollar Index (DXY) Bias Framework",
+      "_source_file": "us_dollar_index_dxy_bias_framework.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "vah_val",
+      "global_canonical": "价值区高点与低点（VAH/VAL）",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "VAH/VAL",
+        "Value Area Upper/Lower Edge",
+        "Value Area High and Low"
+      ],
+      "definition": "VAH is the highest price inside the volume value area and VAL the lowest. Both are marked automatically by VRVP or SVP under the default 70% value-area setting. They are valid only inside a consolidation range, and they bound the price range within which retail contests.",
+      "definition_per_source": {
+        "Teach-Wuyuan": "VAH 是成交量价值区内的最高价位，VAL 是价值区内的最低价位。二者由 VRVP 或 SVP 在默认 70% 数值区设置下自动标注，仅在盘整区间内有效，用于界定散户博弈的价格区间边界。"
+      },
+      "identification_rules": [
+        "Set the value-area volume on VRVP or SVP to the default 70% (75 or 80 also work); the system frames the upper and lower edges of the value area, which are VAH and VAL.",
+        "VAH is the highest price inside the value area and VAL the lowest — not the absolute high or low of the candles in that segment.",
+        "Both are valid only inside that consolidation range, so a definite consolidation range has to be fixed before reading them.",
+        "VAH and VAL can be coloured (purple for VAH, green for VAL) and extended to the right as support and resistance references for later price.",
+        "VRVP recalculates as the visible candles change with dragging, which makes it lag; SVP blocks automatically by trading session and does not lag, which suits stable marking better."
+      ],
+      "common_mistakes": [
+        "Dragging the chart carelessly or shrinking the range too far, so the visible candles change, the POC and value area move with them, and the read is wrong.",
+        "Assuming VAH must be shorted and VAL must be bought, treating the range edges as precise entries.",
+        "Mistaking the dense retail value-area band (the VAH/VAL zone) for the institutional entry, when institutions actually act at the low-volume nodes.",
+        "Trading one VP indicator alone, without combining divergence, thinning-volume gaps and moving averages.",
+        "Ignoring VRVP's lag on TradingView (the display varies with connection speed) instead of switching to SVP, which does not lag."
+      ],
+      "trading_implication": "Price approaching VAH raises the case for a short and approaching VAL the case for a long; the range commonly behaves as easy-to-fall near VAH and easy-to-rise near VAL. VAH and VAL mark the dense retail order band, not a precise entry — the genuine institutional entries are mostly at low-volume nodes. After a break, the retest can be traded with the trend (long the retest after VAH breaks), and once lost, VAL and VAH flip roles and become established resistance. A short's stop belongs above the previous order block's VAH, to survive an institutional sweep upward.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "vah_val",
+          "source_canonical_term": "价值区高点与低点（VAH/VAL）",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "single_source"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "card_id": "vah_val",
+      "canonical_term": "价值区高点与低点（VAH/VAL）",
+      "global_canonical_en": "Value Area High and Low (VAH/VAL)",
+      "_source_file": "vah_val.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "value_area_high",
+      "global_canonical": "Value Area High",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "VAH",
+        "Value Area High (VAH)",
+        "High-Volume Peak Upper Edge"
+      ],
+      "definition": "The value area high is the upper edge of the value area in an SVP or VRVP volume profile — the top price of the high-volume peak, usually appearing at the top of a consolidation range. With the lower edge (VAL) and the balance point (POC) it bounds price's value range.",
+      "definition_per_source": {
+        "Teach-Wuyuan": "价值区高点是 SVP/VRVP 成交量分布中价值区域的上沿，即高成交量峰值的顶部价位，通常出现在盘整区间的顶部，与下沿 VAL 和平衡点 POC 共同界定价格的价值区间。"
+      },
+      "identification_rules": [
+        "Open SVP (session volume profile); the system anchors by trading session automatically and divides the market into distribution ranges.",
+        "Within a divided volume-profile range, the high-volume peak price at the upper edge is the VAH, corresponding to the top of the range.",
+        "VAH and VAL (the range's low) very probably appear at the two ends of the whole consolidation range, with the balance-value point, the POC, in between.",
+        "Zoom the chart to view different trading sessions; where several sessions coincide at one price (triple-line confluence), that VAH or support is stronger."
+      ],
+      "common_mistakes": [
+        "Entering the moment price touches VAH without waiting for a close to confirm the break; a close through it is what says price has moved into the next range.",
+        "Hearing \"retest\" and shorting against the trend on impulse, ignoring the overall uptrend, so price climbs further before it falls and the position is stuck.",
+        "Ignoring the dynamic, range-by-range nature of SVP: price often goes to fill the previous range's VAH or POC, so the range that holds the live support and resistance is misjudged."
+      ],
+      "trading_implication": "VAH marks the upper edge of the value area. After price breaks the range, every session that broke it retests the prior VAH; if the retest holds, the level becomes a support-resistance flip and can be bought. The instructor stresses that reading VAH from liquidity needs no timeframe switching — the 5-minute and the 1-hour show essentially the same price — but it has to be combined with a confirming close and with the trend direction, avoiding counter-trend shorts inside an uptrend.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "value_area_high",
+          "source_canonical_term": "Value Area High",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "single_source"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "illustrated_by_cases": [
+        "Teach-Wuyuan__local_3b3bc764_case_015_下周黄金svp三时段支撑与5230阻力分析",
+        "Teach-Wuyuan__local_6fef25fa_case_012_黄金一小时_vrvp_与_vah_回测做多",
+        "Teach-Wuyuan__local_d48a97df_case_001_黄金1小时图vrvp流动性与缺口分布分析",
+        "Teach-Wuyuan__local_d48a97df_case_003_黄金6小时缺口回补与暴跌针点对应",
+        "Teach-Wuyuan__local_d48a97df_case_006_黄金顶级交易者放弃hvn震荡区只做关键位"
+      ],
+      "card_id": "value_area_high",
+      "canonical_term": "Value Area High",
+      "_source_file": "value_area_high.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "value_area_low",
+      "global_canonical": "Value Area Low",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "VAL",
+        "Value Area Low (VAL)",
+        "Low-Volume Peak"
+      ],
+      "definition": "The lowest price inside the volume value area, appearing at the bottom of the range opposite VAH — the lower edge of the distribution. Institutions commonly hunt stops and rest orders there, and price reaching it often finds support and reacts.",
+      "definition_per_source": {
+        "Teach-Wuyuan": "成交量价格区内的最低价位，与VAH相对出现在区间底部，是正态分布价值区的下沿。机构常在此猎取止损与挂单，价格触及时常获支撑并产生反应。"
+      },
+      "identification_rules": [
+        "On a VRVP or SVP volume profile, the lowest price of the value area the system marks out is the VAL.",
+        "VAL and VAH very probably appear at the two ends of a consolidation range, VAH at the top and VAL at the bottom.",
+        "Several trading sessions can be overlaid in SVP; where one price coincides across three sessions (triple-line confluence at 5166, for example), that VAL is stronger support.",
+        "It can be judged without switching timeframes: the VAL seen on the 5-minute is often the same price as on the 1-hour and 4-hour, because it divides by area rather than by timeframe."
+      ],
+      "common_mistakes": [
+        "Entering the moment price reaches VAL without confirmation; watch instead for a close that breaks it, after which price may move on to the next range.",
+        "Shorting VAL against an uptrend; price may keep climbing before it falls, and the counter-trend trader dies on the way.",
+        "Deciding on impulse that the market must fall and shorting, ignoring that price may run up a little further before coming down."
+      ],
+      "trading_implication": "Price approaching VAL tends to find support and bounce, which raises the case for a long. The instructor's example is around 5166, where liquidity alone — with no moving average on the chart — was enough to call it strong support and buy the bounce. A VAL where several trading sessions coincide is stronger. Against the BTM moving-average system, which requires constant timeframe switching, judging support and resistance from VAL (from liquidity) requires none: the 5-minute and the 1-hour show essentially the same support.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "value_area_low",
+          "source_canonical_term": "Value Area Low",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "single_source"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "illustrated_by_cases": [
+        "Teach-Wuyuan__local_d48a97df_case_004_黄金一小时空头趋势与做市商破底翻预判"
+      ],
+      "card_id": "value_area_low",
+      "canonical_term": "Value Area Low",
+      "_source_file": "value_area_low.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "vrvp",
+      "global_canonical": "可见范围成交量分布图",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "VRVP",
+        "VP",
+        "VRVP liquidity tool",
+        "Volume Profile (vrvp)",
+        "Visible Range Volume Profile",
+        "Volume Profile",
+        "Visible Range Volume Profile (VRVP)",
+        "VWAP",
+        "VRVP (Visible Range Volume Profile)",
+        "Volume Trace",
+        "Volume Profile tools (VRVP/HVN/LVN)",
+        "Volume Profile (VRVP / Visible Range Volume Profile)",
+        "Volume Profile chart"
+      ],
+      "definition": "An indicator overlaid on the right of the chart that draws volume horizontally by price across the currently visible candles. It marks POC (the highest-volume price, the balance point between buyers and sellers), VAH (value area high) and VAL (value area low), and shows the high-volume nodes (HVN, the dense value area), the low-volume nodes (LVN, the vacuums) and liquidity gaps above — including gaps that were not left by wicks. It is used to judge support, resistance and institutional order zones without switching timeframes.",
+      "definition_per_source": {
+        "Teach-Wuyuan": "叠加在图表右侧、按价位横向绘制当前可见K线范围内各价位成交量的指标，标注POC（成交量最高、多空平衡点）、VAH（价值区高点）、VAL（价值区低点），并直接显示高成交量节点（HVN，密集成交价值区）、低成交量节点（LVN，真空区）与上方乃至非插针点的流动性缺口，用于不切级别判断支撑阻力与机构挂单区。"
+      },
+      "identification_rules": [
+        "Cumulative volume per price is overlaid as horizontal bars on the right (or left) of the chart; the longer the bar (the denser the colour, red), the more volume traded at that price.",
+        "The price with the longest bar and the highest volume is the POC, the most concentrated balance price between buyers and sellers within the visible range.",
+        "The dense band of long bars is the high-volume node (HVN), the value area where retail volume concentrates; it commonly appears mid-chart where up and down candles interleave with a top and a bottom — a sideways chop.",
+        "The band where volume is thin, the bars shortest, or there is a blank indentation, is the low-volume node (LVN) or vacuum; it usually corresponds to a large advance, a large decline or a wick, and it locates the liquidity gaps above, wick-made or not.",
+        "The upper and lower edges of the value area are VAH and VAL, marked automatically inside a consolidation range.",
+        "The volume bars distinguish up/down VOLUME (dark — the historical footprint of trades already done) from the up/down VALUE AREA (bright — resting orders still being contested).",
+        "The row count is a dynamic parameter (80/120/150/200/250/300) that has to change with the chart's timeframe; the higher the count the finer the resolution. Width is usually 25–30 so it does not obscure price, and value-area volume is commonly 70 (the instructor prefers 80).",
+        "Dragging or zooming the chart changes the number of visible candles, so the POC and other readings change with it — there is lag.",
+        "Use VRVP on higher timeframes; at fine scale switch to SVP or the fixed-range profile to avoid the lag.",
+        "Cross-validate the HVNs and LVNs VRVP finds against EMAs (the EMA60), order blocks, break blocks and the 0.5 retracement to confirm a key level."
+      ],
+      "common_mistakes": [
+        "Dragging or zooming carelessly, so the visible candles change, the POC moves, the reading lags and distorts, and a lagged number gets traded as if it were fixed support or resistance.",
+        "Applying one set of VP parameters to every timeframe, ignoring that the row count must change with the timeframe, which misreads the value area.",
+        "Entering against the trend in the high-volume gap zone where institutions have rested orders (4500, for example), which is trading against institutions and gets the stop hunted.",
+        "Treating the dense band at a high-volume node as an absolute top or bottom, forgetting that market makers deliberately stop just short so retail cannot get out flat.",
+        "Reading the interleaving inside the HVN chop as clear direction, when it is retail gambling there and carries no trading value; find the LVN and follow institutions instead.",
+        "Entering against a live trend purely on an LVN's need to be filled, which can die inside a sustained advance or decline.",
+        "Confusing the VALUE AREA (resting orders still being contested) with the VOLUME (history already traded).",
+        "Trading a single VP indicator without cross-validating divergence, moving averages, gap location and retracements — the instructor requires at least two methods to validate a level.",
+        "Still using VRVP at fine scale, so the POC keeps moving; or misusing the fixed-range profile on too high a timeframe instead of VRVP, so the area is too large and the width setting makes it unreadable.",
+        "Using VP as though it were as objective and rigid as a moving average, when it is inherently a forward-looking, zone-based anticipation."
+      ],
+      "trading_implication": "VRVP judges support, resistance and institutional entry zones without switching timeframes. The POC acts as support and resistance the way a moving average does: strength above it, weakness below. The high-volume node (HVN) is the dense band where retail contests and gets trapped; price reaching it tends to stall sideways, and the genuine top or bottom usually forms after a wick sweeps through the HVN. The low-volume node (LVN) is the vacuum where institutions act; the gap is very likely filled back the other way, and liquidity taken by a wick will be filled. Near VAH consider shorts, near VAL consider longs. The liquidity gaps above are directly visible, wick-made or not, which anticipates the fill zone and the institutional order price so the institutional direction can be followed — validated against RSI divergence, moving averages and order blocks in confluence.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "term_3aa145a5",
+          "source_canonical_term": "可见范围成交量分布图",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "llm_synthesis"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "illustrated_by_cases": [
+        "Teach-Wuyuan__local_3a0f0488_case_003_黄金多级别扩级寻找支撑_5分钟到12小时",
+        "Teach-Wuyuan__local_3a0f0488_case_005_4509流动性圈口套人行动",
+        "Teach-Wuyuan__local_3a0f0488_case_006_4小时级别1_1结构与免杀区博弈",
+        "Teach-Wuyuan__local_3b3bc764_case_001_上周学员账户大起大落与陨落",
+        "Teach-Wuyuan__local_3b3bc764_case_002_黄金历史波幅对比_2011年vs当前",
+        "Teach-Wuyuan__local_3b3bc764_case_004_学员套单12小时级别抢救案例",
+        "Teach-Wuyuan__local_3b3bc764_case_006_白银日线震荡组与深插针案例",
+        "Teach-Wuyuan__local_3b3bc764_case_007_原油难做的品种对比分析",
+        "Teach-Wuyuan__local_3b3bc764_case_009_周五黄金fvg测试与需求区回踩多单",
+        "Teach-Wuyuan__local_3b3bc764_case_010_下周黄金5344至5462关键阻力区预测",
+        "Teach-Wuyuan__local_3b3bc764_case_011_黄金6小时级别完美验证波段",
+        "Teach-Wuyuan__local_3b3bc764_case_012_黄金6小时破坏块支阻互换实战",
+        "Teach-Wuyuan__local_3b3bc764_case_014_1月30日无法找到对应级别的极端行情",
+        "Teach-Wuyuan__local_3b3bc764_case_015_下周黄金svp三时段支撑与5230阻力分析",
+        "Teach-Wuyuan__local_650683bc_case_003_黄金月线下方价值买区研判",
+        "Teach-Wuyuan__local_650683bc_case_004_黄金月线_周线见顶信号分析",
+        "Teach-Wuyuan__local_650683bc_case_007_黄金四小时供应区5185_5238博弈复盘",
+        "Teach-Wuyuan__local_650683bc_case_012_白银日线熊旗与等距1_1跌幅分歧",
+        "Teach-Wuyuan__local_650683bc_case_013_白银做多区间79_4与双属性分析",
+        "Teach-Wuyuan__local_650683bc_case_014_白银影线吸筹与90_1阻力大山",
+        "Teach-Wuyuan__local_650683bc_case_016_原油月线震荡周期与日线55抄底",
+        "Teach-Wuyuan__local_650683bc_case_017_原油流动性缺口回补与六小时分析",
+        "Teach-Wuyuan__local_6fef25fa_case_012_黄金一小时_vrvp_与_vah_回测做多",
+        "Teach-Wuyuan__local_6fef25fa_case_014_原油末日战车风险与多周期分析",
+        "Teach-Wuyuan__local_6fef25fa_case_015_非农之夜黄金梭哈实操复盘",
+        "Teach-Wuyuan__local_844bc47f_case_007_黄金天图级别三角形破位与fvg引力缺口",
+        "Teach-Wuyuan__local_844bc47f_case_009_黄金5分钟做空考题_4529至4520",
+        "Teach-Wuyuan__local_844bc47f_case_011_黄金昨晚4530多单与借王权加仓案例",
+        "Teach-Wuyuan__local_9a34c399_case_009_5分钟底背离插针进场_57进场_案例",
+        "Teach-Wuyuan__local_9a34c399_case_013_15分钟级别ema60验证示例",
+        "Teach-Wuyuan__local_d48a97df_case_001_黄金1小时图vrvp流动性与缺口分布分析",
+        "Teach-Wuyuan__local_d48a97df_case_003_黄金6小时缺口回补与暴跌针点对应",
+        "Teach-Wuyuan__local_d48a97df_case_005_黄金往期暴跌_230美金_390美金_缺口回补复盘",
+        "Teach-Wuyuan__local_d48a97df_case_006_黄金顶级交易者放弃hvn震荡区只做关键位"
+      ],
+      "card_id": "vrvp",
+      "canonical_term": "可见范围成交量分布图",
+      "global_canonical_en": "Visible Range Volume Profile",
+      "_source_file": "vrvp.json",
+      "_school": "Order Flow"
+    },
+    {
+      "global_card_id": "vrvp_svp_volume_profile",
+      "global_canonical": "成交量分布体系（VRVP/SVP/Volume Profile）",
+      "type": "merged_concept",
+      "school": "Order Flow",
+      "aliases": [
+        "VP course",
+        "Session Volume Profile",
+        "Visible Range Volume Profile (system)",
+        "Volume Profile / Volume Trace Analysis System",
+        "Volume Profile",
+        "The Volume Profile System",
+        "Volume Trace Analysis"
+      ],
+      "definition": "The family of indicators that tallies volume down the price axis by PRICE rather than by time. It comprises VRVP (tallied across the visible candles), SVP (tallied by trading session) and the fixed-range volume profile. Each produces POC, VAH, VAL and the value-area distribution automatically, and marks the high and low volume nodes (HVN/LVN) and the liquidity gaps, for judging support, resistance and value areas.",
+      "definition_per_source": {
+        "Teach-Wuyuan": "按价位（而非时间）在价格纵轴上统计成交量分布的指标体系，包含 VRVP（按可见 K 线范围统计）、SVP（按交易时段统计）与固定范围成交量分布图三类工具，自动给出 POC、VAH、VAL 等价值区与正态分布区间，并标注高/低成交量节点（HVN/LVN）与流动性缺口，用于判断支撑阻力与价值区域。"
+      },
+      "identification_rules": [
+        "Load SVP HD, VRVP or the fixed-range volume profile in TradingView and enable the VAH, VAL and POC value-area options.",
+        "VRVP draws horizontal volume bars on the right of the chart, tallied across the visible candles; the dense band is the value area.",
+        "SVP tallies volume by the trading sessions the system divides automatically and marks that session's VAH (value area high), VAL (value area low) and POC (highest-volume price).",
+        "The fixed-range profile requires connecting a range's start and end by hand (from a low on the 1-hour chart to its peak, for instance); it then locks the range and shows the high-volume nodes across its prices.",
+        "The widest and longest volume bar is the POC; the value area's upper edge is VAH and its lower edge VAL.",
+        "Bands of wider or longer bars are high-volume nodes (HVN, the value area, the dense zone); narrow or blank bands are low-volume nodes (LVN, the vacuums) — the liquidity gaps.",
+        "It can be overlaid with EMA20/60/100 and FVG, treating the value area's edges as support and resistance.",
+        "Timeframes can be switched (5-minute, 15-minute, daily, monthly) to see that timeframe's volume profile."
+      ],
+      "common_mistakes": [
+        "VRVP's POC changes as the visible candles change when the chart is dragged; it lags and cannot be treated as a fixed price.",
+        "SVP, VAH and VAL cover a wider observation range and need more corroborating indicators; used alone the information overloads and the location is not precise enough.",
+        "Treating VP as the only system. VP is corroborating validation; where it conflicts with a moving average, the moving average governs.",
+        "Over-relying on feel-based trading off a few price numbers, whose hit rate is usually poor (about a third), which does not suit a trader chasing accuracy.",
+        "Relying on domestic Chinese platforms such as Tonghuashun, which cannot show the volume profile or the gaps; a TradingView-class tool is required."
+      ],
+      "trading_implication": "It corroborates support, resistance and the distribution of institutional orders without switching moving-average timeframes. Once price closes back below VAH, a retest of VAH turns it into resistance and the decline continues, with VAL as the support beneath — the same logic as an order block, whose property flips once broken by a close. A close above VAH allows a long on the pullback to VAH. VRVP shows the liquidity gaps above and the high and low volume nodes directly, which predicts the fill zone. Where VP, an order block and a moving average coincide, support and resistance are strong and the chop can be avoided. The system applies uniformly across gold, forex, crypto and A-shares. VP is a corroborating tool; where it conflicts with a moving average, the moving average governs.",
+      "merge_notes": null,
+      "source_cards": [
+        {
+          "project": "Teach-Wuyuan",
+          "card_id": "vrvp_svp_volume_profile",
+          "source_canonical_term": "成交量分布体系（VRVP/SVP/Volume Profile）",
+          "source_school": "Order Flow",
+          "source_merge_strategy": "llm_synthesis"
+        }
+      ],
+      "merge_strategy": "single_source_passthrough",
+      "merged_at": "2026-06-26T18:53:01.251807+00:00",
+      "merge_model": null,
+      "card_id": "vrvp_svp_volume_profile",
+      "canonical_term": "成交量分布体系（VRVP/SVP/Volume Profile）",
+      "global_canonical_en": "The Volume Profile System (VRVP / SVP / Volume Profile)",
+      "_source_file": "vrvp_svp_volume_profile.json",
+      "_school": "Order Flow"
+    }
+  ],
+  "cases": [
+    {
+      "card_id": "Teach-Wuyuan__local_3153485e_case_007_周五行情区间划分与4702关键锚点",
+      "type": "case",
+      "title": "Friday gold 15-minute range definition and the contest at the 4702 anchor",
+      "related_concepts": [
+        {
+          "term": "Fair Value Gap",
+          "global_card_id": "fair_value_gap",
+          "exists": true
+        },
+        {
+          "term": "看涨订单块",
+          "global_card_id": "order_block",
+          "exists": true
+        },
+        {
+          "term": "Volume Profile",
+          "global_card_id": "volume_profile",
+          "exists": true
+        },
+        {
+          "term": "EMA60",
+          "global_card_id": "ema60",
+          "exists": true
+        },
+        {
+          "term": "支阻互换",
+          "global_card_id": "support_and_resistance_flip",
+          "exists": true
+        },
+        {
+          "term": "顶背离",
+          "global_card_id": "top_bottom_divergence",
+          "exists": true
+        },
+        {
+          "term": "下降三角形",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "硬止损",
+          "global_card_id": "hard_stop_close_stop",
+          "exists": true
+        },
+        {
+          "term": "扩缩级验证",
+          "global_card_id": "level_expansion_validation",
+          "exists": true
+        },
+        {
+          "term": "流动性扫射",
+          "global_card_id": "liquidity_sweep",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "fair_value_gap",
+        "order_block",
+        "volume_profile",
+        "ema60",
+        "support_and_resistance_flip",
+        "top_bottom_divergence",
+        "hard_stop_close_stop",
+        "level_expansion_validation",
+        "liquidity_sweep"
+      ],
+      "school": "Order Flow",
+      "asset": "GOLD",
+      "timeframe": "15分钟",
+      "market_context": "Friday gold (GOLD) is confirmed as a 15-minute range, oscillating repeatedly between 4702 and 4740. The current close is about 4713.560, the 5-minute is already oversold, and the 4-hour has not yet mean-reverted.",
+      "key_observation": "The instructor defines the range by hand: the anchors below are 4702.10 (the lower edge of a 5-minute bullish FVG) and 4693 (a 1-hour bullish order block and moving average); resistance above is 4729.8–4740.7. Support and resistance are pinned by confluence across moving averages, volume profile, FVG and order blocks.",
+      "analysis_steps": [
+        "Step one: on Friday's stream, watching only the 5-minute, he noted price reaching about 4748 was badly overbought and called for a return to the midpoint at 24, or at worst 31/27 — all of which were reached.",
+        "Step two: he says he shorted at 44/45 to test it, stressing that in a range it is enough to find resistance to short and support to buy — a small loss, then another order, and the gain is large.",
+        "Step three: he used the FVG indicator to pin the 5-minute imbalance precisely (about four dollars: 48–52), stressing that when an order block and a moving average sit in the same band it is three-model confluence and very probably does not get through or does not break.",
+        "Step four: switching down to the 1-hour, he found the 1-hour bullish order block with its lower edge at 4693.54, and said that as long as the 1-hour does not close below 4693 it is a pullback long, with moving-average support at 4697 beneath.",
+        "Step five: back on the 5-minute, he found the bullish FVG the rally left, confirmed its lower edge near 4702.10, drew that anchor forward, and said every return to it later is a long.",
+        "Step six: he warned that a descending triangle was forming into the evening, that a break lower could continue, and that the 4-hour still had not mean-reverted, so downside risk had to be allowed for.",
+        "Step seven: he named 4702 as Monday's most important anchor — a bounce remains while the 5-minute has not broken it; once broken and wicked, the contest resumes back at the 1-hour 4693.",
+        "Step eight: looking further down he found the 5-minute bullish order block at 4683–4689, which becomes a 15-minute order block (4680–4688) when zoomed out, as higher-timeframe validated support below."
+      ],
+      "outcome": "He reports shorting Friday around 4744–4745 and taking a profitable long below. Monday's anchor is a forward call, with no final result given.",
+      "lessons": "Once a market is confirmed as a range, define the upper and lower bounds by hand: pin support and resistance by confluence across moving averages, volume profile, FVG and order blocks (a 5-minute FVG resolves to a few dollars), then contest it with overbought/oversold and divergence — short the top, buy the bottom.",
+      "primary_image": "cards/local_3153485e/images/case_007_primary.jpg",
+      "supporting_images": [
+        "cards/local_3153485e/images/case_007_detail_2.jpg"
+      ],
+      "image_descriptions": {
+        "case_007_primary.jpg": "GOLD 15分钟K线图，时间跨度覆盖2026-05-07至2026-05-11。图表主区域标注两个灰色矩形：上方矩形覆盖约4748至4760区间，下方较大矩形标注「1H 4729.8-4740.7」横跨图表中部。右侧价格轴显示多条水平参考线，包括4738.730、4729.759、4719.650、4718.799及4713.560。当前收盘价为4713.560，位于下方矩形区域下沿以下。图表含",
+        "case_007_detail_2.jpg": "GOLD 5分钟K线图，可见价格区间约4,700至4,750。图表上方存在两个灰色矩形区域，上方区域覆盖约4,729.8至4,750，下方区域标注「1H 4729.8-4740.7」覆盖4,729.8至4,740.7。一条水平虚线位于4,724.020。图表中部出现一根带长上影线的K线触及约4,748后回落。蓝色均线在中部形成弧形高点后向下弯曲。下方MACD面板三线均处于负值区域（-0.782、-"
+      },
+      "sources": [
+        {
+          "video_id": "local_3153485e",
+          "segment_ids": [
+            "seg_014",
+            "seg_015",
+            "seg_016",
+            "seg_017"
+          ],
+          "time_range": [
+            2446.49,
+            3110.64
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产、时间级别、关键价位（4702/4693/4683-4689/4729.8-4740.7）及分析步骤均清晰可读，讲师推理顺序完整。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:14:43.937742Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_3153485e_case_007_周五行情区间划分与4702关键锚点",
+      "_source_file": "Teach-Wuyuan__local_3153485e_case_007_周五行情区间划分与4702关键锚点.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_3b3bc764_case_010_下周黄金5344至5462关键阻力区预测",
+      "type": "case",
+      "title": "Using the ABC extension to project gold's 5344–5462 key resistance zone for next week",
+      "related_concepts": [
+        {
+          "term": "飞波扩展",
+          "global_card_id": "fibonacci_extension",
+          "exists": true
+        },
+        {
+          "term": "LVN",
+          "global_card_id": "low_volume_node",
+          "exists": true
+        },
+        {
+          "term": "VRVP",
+          "global_card_id": "vrvp",
+          "exists": true
+        },
+        {
+          "term": "看涨订单块",
+          "global_card_id": "order_block",
+          "exists": true
+        },
+        {
+          "term": "流动性",
+          "global_card_id": "liquidity",
+          "exists": true
+        },
+        {
+          "term": "流动性扫射",
+          "global_card_id": "liquidity_sweep",
+          "exists": true
+        },
+        {
+          "term": "供应区",
+          "global_card_id": "supply_zone",
+          "exists": true
+        },
+        {
+          "term": "硬止损",
+          "global_card_id": "hard_stop_close_stop",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "fibonacci_extension",
+        "low_volume_node",
+        "vrvp",
+        "order_block",
+        "liquidity",
+        "liquidity_sweep",
+        "supply_zone",
+        "hard_stop_close_stop"
+      ],
+      "school": "Order Flow",
+      "asset": "GOLD",
+      "timeframe": "1D",
+      "market_context": "Gold closed the daily at 5278.6, up 1.88%; the daily has turned bullish while the 6-hour is still beneath key resistance. Early March holds an order block plus a mass of trapped longs and resting offers, which formed an LVN liquidity gap.",
+      "key_observation": "By ABC extension, the 1.0 extension lands exactly at 5344, on the LVN liquidity gap. Market makers will very probably act in the 5377–5462 band, so that the retail longs trapped earlier do not get out flat.",
+      "analysis_steps": [
+        "Step one: find points A, B and C on the daily as the ABC start and measure with the extension tool.",
+        "Step two: the 1.0 extension gives 5344, which lands remarkably on the LVN liquidity gap and is taken as the boundary from the second range to the third.",
+        "Step three: 5377 to 5462 above (including the 5462.089 resistance dashed line) is judged the market-maker zone, because a mass of trapped longs and offers resting there balance out and form an LVN.",
+        "Step four: break the market into first, second and third ranges, noting that if 5344 is taken and held it counts as a switch to the higher range.",
+        "Step five: warn that the small 5385–5388 band risks a wick and recovery, and that anyone resting orders there or carrying size into Friday should watch for a fundamental-driven shakeout."
+      ],
+      "outcome": null,
+      "lessons": "Market makers will not let a mass of previously trapped retail out flat at the same price; the key resistance zone — the LVN liquidity gap — is very likely to be the harvest level. Use the ABC extension together with volume nodes to locate the high-probability reaction zone, and guard against a wick shakeout inside the small ranges.",
+      "primary_image": "cards/local_3b3bc764/images/case_010_primary.jpg",
+      "supporting_images": [
+        "cards/local_3b3bc764/images/case_010_detail_1.jpg",
+        "cards/local_3b3bc764/images/case_010_detail_2.jpg"
+      ],
+      "image_descriptions": {
+        "case_010_primary.jpg": "黄金（GOLD）日线蜡烛图，当前收盘价5,278.607，涨幅+1.88%。图表叠加菲波那契水平线，从0位（4,935.295）至1.618扩展位（5,770.987），共6条水平线可见。3月初区域存在一个蓝色矩形框，标注「OB+ob+」，框内含两条向下收敛趋势线。右侧附有VRVP成交量分布图，分布区间约4,600至5,400。5,462.089处有一条水平虚线横贯全图。图表左侧有向下延伸的虚线箭",
+        "case_010_detail_1.jpg": "GOLD日线蜡烛图，时间跨度约为2026年1月至5月。图表叠加飞波回撤工具，0点标注于4655.235，1.618扩展位标注于5770.987，中间各回撤位（0.236至0.786）均有水平线标注。3月初K线区域内有一个蓝色矩形框，标注为OB+，覆盖约5200至5350价格区间，框内有一条向下倾斜趋势线。右侧VRVP显示4400至4600及4800至5000两处成交量节点。当前收盘价为5278.6",
+        "case_010_detail_2.jpg": "黄金（GOLD）日线蜡烛图，价格轴范围约4,200至6,000。图表叠加飞波回撤工具，锚点从0（4,622.795）至1（5,344.845），并延伸至1.618（5,770.987）。左侧2月初高点区域有黄色手绘圆圈标注；3月区间存在蓝色矩形框标注「OB+」，覆盖约5,150–5,280，并附有蓝色下降趋势线。右侧价格轴旁叠加VRVP成交量分布图，成交量集中于4,800–5,200区间。最新收盘"
+      },
+      "sources": [
+        {
+          "video_id": "local_3b3bc764",
+          "segment_ids": [
+            "seg_030",
+            "seg_031"
+          ],
+          "time_range": [
+            5311.9,
+            5679.63
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产、级别、关键价位（5344/5377/5462/5388-5385）及ABC扩展推导步骤在讲解与图表中均清晰可辨。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:20:12.063944Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_3b3bc764_case_010_下周黄金5344至5462关键阻力区预测",
+      "_source_file": "Teach-Wuyuan__local_3b3bc764_case_010_下周黄金5344至5462关键阻力区预测.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_3b3bc764_case_014_1月30日无法找到对应级别的极端行情",
+      "type": "case",
+      "title": "January 30 gold crash: the one time no timeframe located it, and liquidity tools finally did",
+      "related_concepts": [
+        {
+          "term": "扩缩级验证",
+          "global_card_id": "level_expansion_validation",
+          "exists": true
+        },
+        {
+          "term": "多点验证",
+          "global_card_id": "multi_confluence_validation",
+          "exists": true
+        },
+        {
+          "term": "流动性",
+          "global_card_id": "liquidity",
+          "exists": true
+        },
+        {
+          "term": "EMA60",
+          "global_card_id": "ema60",
+          "exists": true
+        },
+        {
+          "term": "通用线",
+          "global_card_id": "btm",
+          "exists": true
+        },
+        {
+          "term": "需求区",
+          "global_card_id": "demand_zone",
+          "exists": true
+        },
+        {
+          "term": "VRVP",
+          "global_card_id": "vrvp",
+          "exists": true
+        },
+        {
+          "term": "SVP",
+          "global_card_id": "session_volume_profile",
+          "exists": true
+        },
+        {
+          "term": "流动性扫射",
+          "global_card_id": "liquidity_sweep",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "level_expansion_validation",
+        "multi_confluence_validation",
+        "liquidity",
+        "ema60",
+        "btm",
+        "demand_zone",
+        "vrvp",
+        "session_volume_profile",
+        "liquidity_sweep"
+      ],
+      "school": "Order Flow",
+      "asset": "GOLD",
+      "timeframe": "多级别（1分钟至10分钟、1小时、4小时）",
+      "market_context": "While demonstrating the multi-timeframe moving-average validation method on gold, the instructor looks back at history. Gold is currently breaking up out of a converging structure, which leads into the question of how to locate a timeframe for an extreme wick.",
+      "key_observation": "He notes that a gold wick sometimes cannot be matched to support or resistance on ANY timeframe, and that in the January 30 crash there was a candle for which nothing from the 1-minute to the 10-minute corresponded and demand validation failed as well.",
+      "analysis_steps": [
+        "Step one: he demonstrates the ordinary method on the live market — a timeframe validated at several points is the timeframe price is running on. Starting at the 1-minute, it is validated only once, which does not count.",
+        "Step two: stepping up through 2, 3, 4 and 5 minutes, above the 3-minute there are several validation points and the 4- and 5-minute validate better, confirming price is at least running on a bullish timeframe.",
+        "Step three: by contrast, he points out that a gold wick can usually be matched on some timeframe — with January 30's crash the sole exception.",
+        "Step four: revisiting that candle from the 1-minute all the way to the 10-minute, nothing corresponded on any timeframe, and the whole demand-validation procedure failed too.",
+        "Step five: in the end only a liquidity tool could locate the price where it inexplicably stopped, which shows liquidity tools cannot be substituted for."
+      ],
+      "outcome": null,
+      "lessons": "Almost every market can be matched to support or resistance on some timeframe by stepping up through them; but in an extreme move the moving averages and demand validation can all fail at once, and there a liquidity tool is indispensable. The market is fundamentally volume and price — carrying one more tool costs nothing.",
+      "primary_image": "cards/local_3b3bc764/images/case_014_primary.jpg",
+      "supporting_images": [
+        "cards/local_3b3bc764/images/case_014_detail_1.jpg",
+        "cards/local_3b3bc764/images/case_014_detail_2.jpg"
+      ],
+      "image_descriptions": {
+        "case_014_primary.jpg": "GOLD黄金差价合约4小时K线图，可见价格区间约5,130至5,230。图表中存在两条蓝色趋势线形成收敛结构，右侧标注ob+矩形区域位于约5,145至5,165。两条水平线分别标注5,189.353与5,168.903。手绘黄色箭头从约5,170向右上方延伸，黄色圆圈内含手写数字「68」位于5,140至5,175区间。最新K线为大阳线，收盘约5,223。右侧VRVP显示5,185至5,195附近成",
+        "case_014_detail_1.jpg": "GOLD黄金差价合约1小时K线图，可见价格区间约5168至5204。图表中绘有两条蓝色趋势线形成收敛结构，一条自左上向右下延伸，另一条自左下向右上延伸。一条黄色手绘曲线从高位急速下行至约5176后转平，末端标有黄色圆圈。图表左右各有一个蓝色矩形框，均位于5178至5184区间附近。右侧出现一根大阳线。下方副图MACD能量柱右侧出现红色放量，最下方振荡指标当前值为75.22，参考线位于50.00。",
+        "case_014_detail_2.jpg": "黄金差价合约2分钟K线图，时间范围覆盖2026年2月28日约00:00至07:30。图表右侧附有SVP成交量分布柱状图，约5,248至5,252区间呈现较宽黄色柱，顶部约5,258至5,263区间为红色区域。图表内叠加黄色与蓝色两条EMA曲线，右上角有一条红色斜向上趋势线。水平虚线标注于约5,248.806。下方三个子面板分别显示成交量柱状图及两条振荡指标，第二子面板含三处「Bear」文字标签。"
+      },
+      "sources": [
+        {
+          "video_id": "local_3b3bc764",
+          "segment_ids": [
+            "seg_022"
+          ],
+          "time_range": [
+            3847.67,
+            4028.46
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产、级别切换逻辑、案例核心（1月30日找不到级别、需求验证失效、靠流动性定位）讲述完整清晰。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:22:53.214859Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_3b3bc764_case_014_1月30日无法找到对应级别的极端行情",
+      "_source_file": "Teach-Wuyuan__local_3b3bc764_case_014_1月30日无法找到对应级别的极端行情.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_3b3bc764_case_015_下周黄金svp三时段支撑与5230阻力分析",
+      "type": "case",
+      "title": "Gold SVP multi-session volume analysis: 5166/5185 strong support and 5230 resistance, next week's plan",
+      "related_concepts": [
+        {
+          "term": "SVP",
+          "global_card_id": "session_volume_profile",
+          "exists": true
+        },
+        {
+          "term": "POC",
+          "global_card_id": "point_of_control",
+          "exists": true
+        },
+        {
+          "term": "VAH",
+          "global_card_id": "value_area_high",
+          "exists": true
+        },
+        {
+          "term": "LVN",
+          "global_card_id": "low_volume_node",
+          "exists": true
+        },
+        {
+          "term": "支阻互换",
+          "global_card_id": "support_and_resistance_flip",
+          "exists": true
+        },
+        {
+          "term": "破坏块",
+          "global_card_id": "breaker_block",
+          "exists": true
+        },
+        {
+          "term": "看涨订单块",
+          "global_card_id": "order_block",
+          "exists": true
+        },
+        {
+          "term": "EMA20",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "EMA60",
+          "global_card_id": "ema60",
+          "exists": true
+        },
+        {
+          "term": "乖离率",
+          "global_card_id": "bias_ratio",
+          "exists": true
+        },
+        {
+          "term": "扩缩级验证",
+          "global_card_id": "level_expansion_validation",
+          "exists": true
+        },
+        {
+          "term": "流动性",
+          "global_card_id": "liquidity",
+          "exists": true
+        },
+        {
+          "term": "VRVP",
+          "global_card_id": "vrvp",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "session_volume_profile",
+        "point_of_control",
+        "value_area_high",
+        "low_volume_node",
+        "support_and_resistance_flip",
+        "breaker_block",
+        "order_block",
+        "ema60",
+        "bias_ratio",
+        "level_expansion_validation",
+        "liquidity",
+        "vrvp"
+      ],
+      "school": "Order Flow",
+      "asset": "GOLD",
+      "timeframe": "5分钟",
+      "market_context": "Gold closed at 5278.607 and is in an uptrend overall. Friday's close is running inside a low-volume node (LVN) — institutions closing out for the weekend kept volume from building, leaving a vacuum. The instructor sets an SVP-based support and resistance framework for next week.",
+      "key_observation": "Using the volume distribution of the three trading sessions SVP anchors automatically, 5166 recurs across all three as strong support, 5185 is the POC (also confluent across the three), and 5230/5231 is the VAH that flips to support after a break and retest.",
+      "analysis_steps": [
+        "Step one: open SVP (session volume profile); the system anchors and divides the distribution ranges automatically. Turn the other order blocks off and look only at volume structure.",
+        "Step two: identify that price is running at a low-volume node (LVN), explained as institutions closing out on Friday leaving volume unable to build — a vacuum.",
+        "Step three: mark the range structure — the VAH high-volume peak and the VAL low-volume peak sit at the top and bottom, and the POC balance point is at 5185 (formerly 81).",
+        "Step four: zoom SVP out to get three trading sessions; 5166 is the 66 node in all three, and that three-session confluence makes it strong support.",
+        "Step five: stress that the liquidity method needs no timeframe switching — the 5-minute and the 1-hour show essentially the same support (5166 is also the 4-hour support).",
+        "Step six: take 5230/5231 as the next support-resistance flip (after a break, the prior VAH has to be retested); a close that breaks it confirms, and if it breaks price returns to the range below.",
+        "Step seven: on the 1-hour, the EMA20 is about 5220 and the EMA60 about 5193; the 1-hour is an LVN range with a large extension and a need to retest, with a pullback target around 5220.",
+        "Step eight: on the 30-minute, 5237 is both EMA20 support and that timeframe's VAH, confluent with the liquidity flip zone.",
+        "Step nine: drawing it on the 1-hour confirms that around 5193/5194 the EMA60, the POC and a 6-hour break block (a bearish order block turned bullish) all coincide — a long zone.",
+        "Step ten: the conclusion stresses that the trend is up and should not be shorted against; 5230 resistance is left open, and the plan is to buy the pullback to support around 5220/5193."
+      ],
+      "outcome": null,
+      "lessons": "In VP and SVP there is only price and liquidity, and support and resistance can be pinned without constantly switching timeframes. In an uptrend, do not short against it on impulse after hearing an analysis; wait for price to return to the support zone validated by three-session confluence, the POC, the moving average and the break block, and buy it with the trend.",
+      "primary_image": "cards/local_3b3bc764/images/case_015_primary.jpg",
+      "supporting_images": [
+        "cards/local_3b3bc764/images/case_015_detail_1.jpg"
+      ],
+      "image_descriptions": {
+        "case_015_primary.jpg": "图表为GOLD黄金差价合约6小时K线图，时间范围覆盖2026年1月15日至3月23日。右侧附有VRVP可见范围成交量分布图，显示约4950至5100区间及5250至5350区间存在两处高成交量节点。图表标注有两个矩形框，分别位于约5150至5260及5430至5500价格区间。EMA 60当前值5,077.572，EMA 20位于约5200附近。MACD能量柱在零轴上方，RSI读数69.29。当前",
+        "case_015_detail_1.jpg": "图表为GOLD黄金差价合约6小时K线图，当前收盘价5,278.607，开盘5,228.630，最高5,281.327，最低5,220.375。右侧附有VRVP成交量分布图，蓝黄柱条覆盖约4700至5700区间。主图可见多个蓝色矩形框标注于约5200-5240及5390-5430价格区间，并有橙色上升趋势线。MACD能量柱位于零轴上方，快线42.63、慢线41.16。屏幕中央及左下角弹出截图工具浮窗"
+      },
+      "sources": [
+        {
+          "video_id": "local_3b3bc764",
+          "segment_ids": [
+            "seg_037",
+            "seg_038",
+            "seg_039",
+            "seg_042"
+          ],
+          "time_range": [
+            6623.05,
+            7737.36
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产、级别、关键价位（5166/5185/5230/5237/5220/5193）及讲师推理顺序与多重验证逻辑在转录与图表中均清晰呈现。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:21:44.419482Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_3b3bc764_case_015_下周黄金svp三时段支撑与5230阻力分析",
+      "_source_file": "Teach-Wuyuan__local_3b3bc764_case_015_下周黄金svp三时段支撑与5230阻力分析.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_650683bc_case_017_原油流动性缺口回补与六小时分析",
+      "type": "case",
+      "title": "Crude: filling the liquidity gaps above, and the 6-hour EMA60 retest after a confirmed structure break",
+      "related_concepts": [
+        {
+          "term": "流动性",
+          "global_card_id": "liquidity",
+          "exists": true
+        },
+        {
+          "term": "LVN",
+          "global_card_id": "low_volume_node",
+          "exists": true
+        },
+        {
+          "term": "VRVP",
+          "global_card_id": "vrvp",
+          "exists": true
+        },
+        {
+          "term": "FVG",
+          "global_card_id": "fair_value_gap",
+          "exists": true
+        },
+        {
+          "term": "破土",
+          "global_card_id": "break_土_signal_line",
+          "exists": true
+        },
+        {
+          "term": "EMA60",
+          "global_card_id": "ema60",
+          "exists": true
+        },
+        {
+          "term": "飞波回撤",
+          "global_card_id": "fibonacci_retracement",
+          "exists": true
+        },
+        {
+          "term": "Order Block",
+          "global_card_id": "order_block",
+          "exists": true
+        },
+        {
+          "term": "BOS",
+          "global_card_id": "break_of_structure",
+          "exists": true
+        },
+        {
+          "term": "支阻互换",
+          "global_card_id": "support_and_resistance_flip",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "liquidity",
+        "low_volume_node",
+        "vrvp",
+        "fair_value_gap",
+        "break_土_signal_line",
+        "ema60",
+        "fibonacci_retracement",
+        "order_block",
+        "break_of_structure",
+        "support_and_resistance_flip"
+      ],
+      "school": "Order Flow",
+      "asset": "USOIL",
+      "timeframe": "6H",
+      "market_context": "Crude started its advance from around 58.5 on the daily, pulled back to the EMA60 after the structure break confirmed, then rallied fast to 99.30. Wicks above left several liquidity gaps and there is a debt gap below; the market is in an advance that fills gaps.",
+      "key_observation": "The instructor notes that wicks left several liquidity vacuums above crude (99, 104–105, 111–114) and a debt gap at 67.7–70 below, and that price will very probably fill upward first. After the 6-hour structure break confirmed, the retest of the EMA60 lets the advance continue into the gaps.",
+      "analysis_steps": [
+        "Step one: the debt gap below is roughly 67.7 to 70. That stretch is not only a price gap — the whole segment is empty of liquidity — so price may fill upward first.",
+        "Step two: identify the several small gaps left by wicks closing above: the first at the close near 99, then 104 to 105, then 111 to 114, and only then the crash.",
+        "Step three: on the 6-hour, this is where the structure break confirmed and price pulled all the way back to the 6-hour EMA60 (81.83); the earlier video already said that as long as the 6-hour holds, price can run up to fill the gaps.",
+        "Step four: verify the fill target with the retracement — the 0.5 at about 98.17, flagged Monday, is already minor resistance.",
+        "Step five: recall March 3, when price came down from the high at this level, reached about 92 on the 6-hour, and bounced off support at 302 above.",
+        "Step six: 103 and 106 higher up also fit the whole decline's retest structure, and VRVP's LVN liquidity gaps validate that resistance jointly.",
+        "Step seven: back on the daily, trace crude's ignition point at around 58.5 where the structure break confirmed and price pulled up, and project the rough target above with Fibonacci."
+      ],
+      "outcome": null,
+      "lessons": "A wick leaves a liquidity gap (LVN), and the vacuum left by a large advance or decline usually gets filled. Once a 6-hour structure break confirms and the EMA60 retest holds, price can run with the trend to fill the gaps; the Fibonacci 0.5 and VRVP's LVN validate the target resistance together.",
+      "primary_image": "cards/local_650683bc/images/case_017_primary.jpg",
+      "supporting_images": [
+        "cards/local_650683bc/images/case_017_detail_1.jpg",
+        "cards/local_650683bc/images/case_017_detail_2.jpg"
+      ],
+      "image_descriptions": {
+        "case_017_primary.jpg": "USOIL日线蜡烛图，时间跨度约2024年11月至2026年6月。图表显示EMA 20（当前59.68，黄色曲线）与EMA 60（当前59.42，蓝色曲线）。约59.59处有一条水平虚线贯穿全图。右侧绘有深色矩形框覆盖约68至72价位区间，并有黄色手绘箭头向上延伸。当前价格标签显示68.84。MACD面板右侧出现红色能量柱放量。RSI背离指标面板当前值63.18，面板内可见「Bear」文字标注。右",
+        "case_017_detail_1.jpg": "USOIL日线蜡烛图，时间跨度覆盖2月至5月初。图表左侧价格在60至75区间横向震荡，3月中旬出现数根大阳线，价格快速拉升至约99区域，最新收盘价99.30。EMA20（78.84）与EMA60（68.84）均位于当前价格下方。图表标注有「BOS OB-」、「1min ob-」、「5min ob+ 破坏」等文字标签，集中于85至92价格区间。69.75处有一条水平虚线。右侧VRVP成交量分布可见。",
+        "case_017_detail_2.jpg": "USOIL日线蜡烛图，时间跨度覆盖2月至2026年4月。图表标注有「5min ob-」、「BOS OI」、「1min ob+」、「1min ob+ 破坏」、「1min ob-」等文字标签，集中于3月K线区域。EMA 20（78.84）与EMA 60（68.84）均线可见，EMA 60对应一条水平虚线。右侧价格轴标注114.83、99.30、78.84、68.84四个价位。MACD与RSI（82.5"
+      },
+      "sources": [
+        {
+          "video_id": "local_650683bc",
+          "segment_ids": [
+            "seg_030"
+          ],
+          "time_range": [
+            6192.38,
+            6376.11
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产USOIL、6小时级别、关键缺口价位（99/104-105/111-114/67.7-70）、0.5位98.17及LVN验证均清晰可读，分析步骤完整。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:22:02.423896Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_650683bc_case_017_原油流动性缺口回补与六小时分析",
+      "_source_file": "Teach-Wuyuan__local_650683bc_case_017_原油流动性缺口回补与六小时分析.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_650683bc_case_020_黄金日线洗盘整理时间历史对照",
+      "type": "case",
+      "title": "Gold's daily shakeout duration, compared against last year's April–September range",
+      "related_concepts": [
+        {
+          "term": "洗盘整理",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "流动性扫射",
+          "global_card_id": "liquidity_sweep",
+          "exists": true
+        },
+        {
+          "term": "牛旗",
+          "global_card_id": "bull_flag_pattern",
+          "exists": true
+        },
+        {
+          "term": "Volume Profile",
+          "global_card_id": "volume_profile",
+          "exists": true
+        },
+        {
+          "term": "飞波回撤",
+          "global_card_id": "fibonacci_retracement",
+          "exists": true
+        },
+        {
+          "term": "第一次原则",
+          "global_card_id": "first_touch_principle",
+          "exists": true
+        },
+        {
+          "term": "EMA60",
+          "global_card_id": "ema60",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "liquidity_sweep",
+        "bull_flag_pattern",
+        "volume_profile",
+        "fibonacci_retracement",
+        "first_touch_principle",
+        "ema60"
+      ],
+      "school": "Order Flow",
+      "asset": "GOLD",
+      "timeframe": "1D",
+      "market_context": "Gold is around 5018, having pulled back after a 5238 high in early February, with the daily consolidating above 5000 in a shakeout. The monthly candle is down about 4.94% and the whole thing looks like a top, but the analyst reads it as the shakeout phase before the prior high breaks — the market has not started yet.",
+      "key_observation": "Last year (2025), gold ranged for roughly four months from late April into September; the monthly then looked even more like a top than now, and it broke out and rallied hard. This cycle has only consolidated two to three months since late January — too short, and the turnover is not complete.",
+      "analysis_steps": [
+        "Step 1: gold does not stall and refuse to fall; after the 5238 high it fell back, and the point is that it will not start until it has broken everyone's resolve.",
+        "Step 2: on the 1-hour, note that from late January or early February to now is only a month or two of consolidation — not long enough.",
+        "Step 3: on the daily, pull up the rectangle from around April 20 last year into September and compare: it took about four months of consolidation before the prior high genuinely broke.",
+        "Step 4: recall that the monthly then closed in a heap and looked more like a top than today's does, and the market still chose to converge and then run far higher.",
+        "Step 5: reason from the adage \"the longer the base, the higher the rise\" that a full shakeout that kills retail could point at 6500 or 7000.",
+        "Step 6: count monthly candles from the high to the low — last year it started only in the fifth month, against three now, which is clearly too few.",
+        "Step 7: gold tops mostly land mid-year (the middle of the first half); it is March, so a top two months out in May or June is a strained timeline."
+      ],
+      "outcome": null,
+      "lessons": "How long a range lasts determines the advance that follows — the longer the base, the higher the rise. Comparing the current consolidation's duration against historical shakeouts of the same kind judges whether the shakeout is complete and whether the top's timeline holds, which keeps you from being shaken out in the base or from calling a top wrongly.",
+      "primary_image": "cards/local_650683bc/images/case_020_primary.jpg",
+      "supporting_images": [
+        "cards/local_650683bc/images/case_020_detail_1.jpg"
+      ],
+      "image_descriptions": {
+        "case_020_primary.jpg": "GOLD 1小时蜡烛图，来源TVC，可见价格区间约5,020至5,360。图表标注两条飞波回撤水平线：0.786位于5,196.609，0.618位于5,080.707；另有一条虚线水平线位于5,252.700。右侧面板叠加SVP成交量分布图，绿红柱集中于5,040至5,260区间。图表中部覆盖大面积黄色手绘涂鸦，内容不可辨读。两条均线（蓝色与黄色）在右侧K线区域可见。标题栏显示「3.14 伍元交",
+        "case_020_detail_1.jpg": "GOLD 1小时K线图，来源TVC。图表可见价格范围约5020至5360。左侧存在一根极长上影线K线，右侧K线密集分布于5120至5260区间。图表标注有两条飞波回撤水平线：0.786位于5,196.609，0.618位于5,080.707；另有一条水平虚线位于5,249.714。右侧附有SVP成交量分布色块。图表中部有两组黄色手绘箭头与曲线标注。当前收盘价约5,144.050，日内跌幅约1.18"
+      },
+      "sources": [
+        {
+          "video_id": "local_650683bc",
+          "segment_ids": [
+            "seg_037",
+            "seg_038"
+          ],
+          "time_range": [
+            7479.07,
+            7842.4
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产、级别（日线对照）、去年4-9月与当前整理时长、年中见顶逻辑均在语音中明确表述，并配有日线及月线对照图。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:23:47.023849Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_650683bc_case_020_黄金日线洗盘整理时间历史对照",
+      "_source_file": "Teach-Wuyuan__local_650683bc_case_020_黄金日线洗盘整理时间历史对照.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_6fef25fa_case_012_黄金一小时_vrvp_与_vah_回测做多",
+      "type": "case",
+      "title": "Gold 1-hour fixed-range volume profile and the VAH retest long",
+      "related_concepts": [
+        {
+          "term": "VRVP",
+          "global_card_id": "vrvp",
+          "exists": true
+        },
+        {
+          "term": "VAH",
+          "global_card_id": "value_area_high",
+          "exists": true
+        },
+        {
+          "term": "POC",
+          "global_card_id": "point_of_control",
+          "exists": true
+        },
+        {
+          "term": "看涨订单块",
+          "global_card_id": "order_block",
+          "exists": true
+        },
+        {
+          "term": "支阻互换",
+          "global_card_id": "support_and_resistance_flip",
+          "exists": true
+        },
+        {
+          "term": "EMA60",
+          "global_card_id": "ema60",
+          "exists": true
+        },
+        {
+          "term": "通用线",
+          "global_card_id": "btm",
+          "exists": true
+        },
+        {
+          "term": "SMC",
+          "global_card_id": "smart_money_concepts",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "vrvp",
+        "value_area_high",
+        "point_of_control",
+        "order_block",
+        "support_and_resistance_flip",
+        "ema60",
+        "btm",
+        "smart_money_concepts"
+      ],
+      "school": "Order Flow",
+      "asset": "GOLD",
+      "timeframe": "1H",
+      "market_context": "After a large down candle dropped gold to about 5,040 on the 1-hour, it has been ranging between 5,040 and 5,160. The latest price has recovered to 5,171.798, above the EMA20 (5,130.397) and EMA60 (5,139.805), with the MACD histogram turning green.",
+      "key_observation": "Using the fixed-range volume profile from the low to the peak locks the whole distribution automatically: the high-volume node concentrates at 5,080–5,100 and the VAH is about 5,100, which serves as the support and resistance reference.",
+      "analysis_steps": [
+        "Step one: hide the indicators first and be clear that the object is the whole distribution from the 1-hour low up to the peak.",
+        "Step two: open the fixed-range volume profile, connect the start to that segment's low and then up to the peak; the tool locks the range and draws the whole distribution.",
+        "Step three: read the high-volume node (POC, the value area) — the greatest volume concentrates near 5,080–5,100.",
+        "Step four: with price supported, the first expectation is the range's VAH (about 5,100); above VAH a new high is possible.",
+        "Step five: the logic matches an order block — after a close breaks it, the pullback to VAH turns the old resistance into support and can be bought; if it breaks down, VAH becomes resistance and support below is VAL.",
+        "Step six: stress that VAH and VAL cover a wider range and need more corroboration; when VAH or VAL coincides with an order block and a moving average it constitutes strong support or resistance, which is the point of several systems validating each other."
+      ],
+      "outcome": null,
+      "lessons": "The volume profile's VAH and VAL are wide-ranging on their own and need more supporting evidence; only when they coincide with an order block and a moving average do they constitute strong support or resistance. Every method — SMC, BTM — validates the others, and the more you know the stronger the validation.",
+      "primary_image": "cards/local_6fef25fa/images/case_012_primary.jpg",
+      "supporting_images": [
+        "cards/local_6fef25fa/images/case_012_detail_1.jpg",
+        "cards/local_6fef25fa/images/case_012_detail_2.jpg"
+      ],
+      "image_descriptions": {
+        "case_012_primary.jpg": "GOLD 1小时K线图，含MACD与RSI乖离指标两个子面板。主图左侧叠加VRVP成交量分布，最大成交量节点集中于5080–5100区间附近，并有一条水平线标注于约5100价位。图表右侧K线从约5160下跌至约5040后出现反弹，最新价格标签显示约5171–5173。EMA 20（黄线，5130.397）与EMA 60（蓝线，5139.805）均位于当前价格下方。MACD能量柱由红转绿，RSI读数",
+        "case_012_detail_1.jpg": "GOLD 3分钟K线图，时间轴覆盖至2026-03-09。图表右侧价格轴显示范围约5070至5190。三条EMA线（20/60/100）可见，当前分别位于5168、5161及更低位置。右侧VRVP成交量分布图显示5088至5141区间成交量柱较宽。图表中部有一条水平虚线位于5125.563，另有两条水平实线分别位于5088.654与5075.308。下方MACD面板柱状值为0.146，RSI背离指",
+        "case_012_detail_2.jpg": "GOLD 1小时K线图，数据来源TVC，时间范围覆盖3月1日至3月7日。图表主区域可见两条均线：黄色曲线（较平滑，位于约5,200）与蓝色曲线（EMA 60 close，标注值5,139.805）。一条水平虚线标注当前价5,171.798贯穿全图。左侧出现大阴线急跌至约5,040，随后价格在5,040至5,160区间震荡，右侧最新K线回升至5,171.798。下方MACD面板能量柱右侧转绿并放大；"
+      },
+      "sources": [
+        {
+          "video_id": "local_6fef25fa",
+          "segment_ids": [
+            "seg_029"
+          ],
+          "time_range": [
+            5459.81,
+            5640.88
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "图表清晰显示GOLD一小时、VRVP分布与关键价位，讲师对VAH回测做多逻辑讲解完整，但未给出具体交易结果。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:36:11.226258Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_6fef25fa_case_012_黄金一小时_vrvp_与_vah_回测做多",
+      "_source_file": "Teach-Wuyuan__local_6fef25fa_case_012_黄金一小时_vrvp_与_vah_回测做多.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_6fef25fa_case_013_白银与黄金缺口对比及区间运行",
+      "type": "case",
+      "title": "Silver weaker than gold: the 99–105 gap unfilled, the daily capped by EMA20/60 and ranging 79.58–85",
+      "related_concepts": [
+        {
+          "term": "LVN/流动性缺口",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "HVN/高成交量节点",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "VRVP/可见范围成交量分布",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "POC",
+          "global_card_id": "point_of_control",
+          "exists": true
+        },
+        {
+          "term": "EMA20",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "EMA60",
+          "global_card_id": "ema60",
+          "exists": true
+        },
+        {
+          "term": "供应区/Supply Zone",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "需求区/Demand Zone",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "看涨订单块",
+          "global_card_id": "order_block",
+          "exists": true
+        },
+        {
+          "term": "区间高抛低吸",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "穿线",
+          "global_card_id": "cross_line_exit",
+          "exists": true
+        },
+        {
+          "term": "头肩底",
+          "global_card_id": null,
+          "exists": false
+        }
+      ],
+      "illustrates_concepts": [
+        "point_of_control",
+        "ema60",
+        "order_block",
+        "cross_line_exit"
+      ],
+      "school": "Order Flow",
+      "asset": "SILVER",
+      "timeframe": "1D",
+      "market_context": "Silver is at 84.476, up 2.69% on the day, below the EMA20 (84.95). It has consistently run a step weaker than gold — gold has broken out on the daily and runs above its moving averages while silver is capped. The analysis is the weekly review of 2026-03-07.",
+      "key_observation": "Silver has an unfilled crescent gap at 99–105 above (matching the high-volume node capping it), and the daily is pinned dead between the EMA20 (84.95) and the EMA60 (79.58), oscillating repeatedly between 79.58 and 85 — weaker than gold, which has already gone.",
+      "analysis_steps": [
+        "Step one: put silver and gold's dailies side by side. Gold's early-February decline had no liquidity structure supporting it and left a 5408–5500 crescent gap above, which it only filled recently before falling.",
+        "Step two: back on silver, VRVP shows its gap at 99–105 (105.8 down to 100), still just short of filled, matching the high-volume node capping it there.",
+        "Step three: silver's daily has not broken the EMA60 (79.58), so price can only oscillate between 85 (the EMA20) and 79.58 (the EMA60); clearing 86.9 would extend the advance.",
+        "Step four: on the 6-hour, silver is pinned hard under its moving averages; after the break confirmed, the retest was originally read as a head-and-shoulders bottom but the 105 target was never reached — a disappointing move.",
+        "Step five: on the 6-hour, the strongest supply zone is 111–117; clearing 117 means 200, and above 120 nothing holds it, while failing 117 means it is pressed back down.",
+        "Step six: on the 6-hour, the bullish order block left on February 19 is the demand zone at 76.13–78.33; on March 3 price pulled back into it and closed higher.",
+        "Step seven: the range conclusion — silver runs sideways between 76.23 and 85; sell highs and buy lows, and note that a daily close breaking 79.58 is the signal a correction has begun."
+      ],
+      "outcome": "No result is given for a new position. The review mentions earlier trades: long silver at 86 and short at 91, taking both sides. The operating advice is to sell highs and buy lows, and not to buy at 85 or sell at 76.",
+      "lessons": "Silver runs consistently a step weaker than gold, and it is hard for it to advance strongly while the gap above — the high-volume node — is unfilled. Confirm the top and bottom of the range with the volume profile and the moving averages, sell highs and buy lows, and avoid chasing against the trend at the range's edges.",
+      "primary_image": "cards/local_6fef25fa/images/case_013_primary.jpg",
+      "supporting_images": [
+        "cards/local_6fef25fa/images/case_013_detail_1.jpg"
+      ],
+      "image_descriptions": {
+        "case_013_primary.jpg": "黄金1小时K线图，价格区间约4,960至5,240。一条水平虚线标注于5,176.128。图表主体覆盖有两个黄色手绘椭圆：上方椭圆位于约5,160至5,240，内标字符「3」；下方椭圆位于约4,960至5,120，内标「9」与「7c」，右侧另标「D」。两椭圆间以黄色曲线相连。下方面板显示MACD能量柱为红色，RSI背离指标数值-65.25，曲线位于50线下方。图表左侧存在一根低点延伸至约4,960",
+        "case_013_detail_1.jpg": "黄金（GOLD）日线蜡烛图，时间范围覆盖2025年12月至2026年3月，最新收盘价5171.798，当日涨幅+1.71%。图表主体区域有一个大型手绘黄色椭圆圈，覆盖约4550至5300价格区间，椭圆内含双弧线结构；右侧有手绘黄色箭头指向右上方。两条水平虚线分别标注于约5200与5047.762。下方面板显示MACD（快线87.417，慢线101.911，柱值-14.495）及RSI乖离指标（当前"
+      },
+      "sources": [
+        {
+          "video_id": "local_6fef25fa",
+          "segment_ids": [
+            "seg_030",
+            "seg_031",
+            "seg_032",
+            "seg_034",
+            "seg_035"
+          ],
+          "time_range": [
+            5640.88,
+            6757.61
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产、日线/6小时级别、关键价位（99-105缺口、79.58-85区间、111-117供应、76.13-78.33需求）及分析步骤均清晰。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:37:51.697969Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_6fef25fa_case_013_白银与黄金缺口对比及区间运行",
+      "_source_file": "Teach-Wuyuan__local_6fef25fa_case_013_白银与黄金缺口对比及区间运行.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_b3289191_case_002_以太坊上方阻力补缺口路径分析",
+      "type": "case",
+      "title": "Ethereum: the resistance above and the path of gap fills (daily / monthly)",
+      "related_concepts": [
+        {
+          "term": "Fair Value Gap",
+          "global_card_id": "fair_value_gap",
+          "exists": true
+        },
+        {
+          "term": "供应区",
+          "global_card_id": "supply_zone",
+          "exists": true
+        },
+        {
+          "term": "支阻互换",
+          "global_card_id": "support_and_resistance_flip",
+          "exists": true
+        },
+        {
+          "term": "流动性",
+          "global_card_id": "liquidity",
+          "exists": true
+        },
+        {
+          "term": "资金费率",
+          "global_card_id": "funding_rate",
+          "exists": true
+        },
+        {
+          "term": "BOS",
+          "global_card_id": "break_of_structure",
+          "exists": true
+        },
+        {
+          "term": "现货DCA分批建仓",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "RWA",
+          "global_card_id": "real_world_assets",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "fair_value_gap",
+        "supply_zone",
+        "support_and_resistance_flip",
+        "liquidity",
+        "funding_rate",
+        "break_of_structure",
+        "real_world_assets"
+      ],
+      "school": "Order Flow",
+      "asset": "ETHUSD",
+      "timeframe": "1D",
+      "market_context": "Ethereum is around 2410, having fallen continuously from the highs with no structure, leaving several unfilled resistance zones and gaps above on the daily. In late February the instructor called the early stage of a bull market off funding rates turning negative, and judges the room below already compressed.",
+      "key_observation": "The decline had no structure at all and not one gap above has been filled, so price will very probably contest its way up level by level, filling each resistance zone in turn to around 3000 (2977–2980).",
+      "analysis_steps": [
+        "Step one: on February 26 funding rates turned negative — shorts pay longs — which reads as the early stage of a bull market, and shorts should not keep shorting.",
+        "Step two: everyone shorting still has room, but the room keeps shrinking, because there is too much above on the daily still to be filled.",
+        "Step three: the whole daily decline was structureless, so a bounce necessarily fills the resistance zones above level by level.",
+        "Step four: mark the first resistance zone, built from three candles, with a top at 2472 and the final high at 2626/2635.",
+        "Step five: mark the next resistance up at 2700–2751, and the one above that, through to the final gap zone around 3000 (2977–2980), midpoint about 2900.",
+        "Step six: resistance exists to be broken; on the monthly the room above is far greater than the room below, which favours continuing to contest longs.",
+        "Step seven: compare volatility — ETH moves 3% to 8% and even 10% on an ordinary day, while gold's largest daily fall is about 4% — so spot ETH is worth far more as an investment than gold.",
+        "Step eight: the real bull-bear structural divide is 3400; the game only starts properly above it, and 2980 today is the sewer of the sewer.",
+        "Step nine: the advice is to add a large spot position at 2200 — buy spot and hold it — with leveraged contracts possibly alongside from next week."
+      ],
+      "outcome": null,
+      "lessons": "After a structureless decline the gaps and resistance above are very likely to be filled level by level. Funding rates turning negative reads as the early stage of a bull market, the room below is already compressed, so add spot at the key levels and contest longs patiently one level at a time, weighting ETH's volatility far above gold's.",
+      "primary_image": "cards/local_b3289191/images/case_002_primary.jpg",
+      "supporting_images": [
+        "cards/local_b3289191/images/case_002_detail_2.jpg"
+      ],
+      "image_descriptions": {
+        "case_002_primary.jpg": "ETHUSD月线蜡烛图，时间跨度覆盖2019年至2026年。图表右侧价格轴标注6,821.47处有一条水平虚线，2,410.48处有一条水平点线。右上方约6,000至7,500价格区域有一个手绘黄色椭圆圈。当前月线K线开盘2,103.73、收盘2,410.48，涨幅+14.58%。图表中可见两条均线（黄色与蓝色）。下方MACD副图有两处「Bear」文字标注，RSI副图当前读数46.97，80.00",
+        "case_002_detail_2.jpg": "该图表来自coinglass网站，展示以太坊（ETH）资金费率历史数据，时间跨度约为2023年6月至2025年12月，采用8小时周期。图表上方显示ETH平均资金费率0.0013%、最高0.0655%、最低-0.0235%、差值0.0890%。白色折线代表ETH价格，绿色柱状图代表资金费率。图表上叠加有4处黄色手绘圆圈，标注于资金费率低谷或负值区域附近，并有两条黄色手绘箭头，一条向右上方延伸，一条向"
+      },
+      "sources": [
+        {
+          "video_id": "local_b3289191",
+          "segment_ids": [
+            "seg_005"
+          ],
+          "time_range": [
+            1121.78,
+            1500.21
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产、级别、各级阻力价位（2472/2626、2700-2751、2977-2980/3000）及分析顺序在语音与图表中均清晰。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:41:27.999109Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_b3289191_case_002_以太坊上方阻力补缺口路径分析",
+      "_source_file": "Teach-Wuyuan__local_b3289191_case_002_以太坊上方阻力补缺口路径分析.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_b3289191_case_014_白银下跌结构与下方支撑区规划",
+      "type": "case",
+      "title": "Silver's decline structure after a weekly overbought reading, and the multi-level support plan below",
+      "related_concepts": [
+        {
+          "term": "看跌订单块",
+          "global_card_id": "order_block",
+          "exists": true
+        },
+        {
+          "term": "FVG",
+          "global_card_id": "fair_value_gap",
+          "exists": true
+        },
+        {
+          "term": "飞机模型",
+          "global_card_id": "tent_airplane_pattern",
+          "exists": true
+        },
+        {
+          "term": "流动性扫射",
+          "global_card_id": "liquidity_sweep",
+          "exists": true
+        },
+        {
+          "term": "破坏块",
+          "global_card_id": "breaker_block",
+          "exists": true
+        },
+        {
+          "term": "飞波回撤",
+          "global_card_id": "fibonacci_retracement",
+          "exists": true
+        },
+        {
+          "term": "EMA60",
+          "global_card_id": "ema60",
+          "exists": true
+        },
+        {
+          "term": "扩级",
+          "global_card_id": "level_expansion_validation",
+          "exists": true
+        },
+        {
+          "term": "支阻互换",
+          "global_card_id": "support_and_resistance_flip",
+          "exists": true
+        },
+        {
+          "term": "波浪理论",
+          "global_card_id": "elliott_wave",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "order_block",
+        "fair_value_gap",
+        "tent_airplane_pattern",
+        "liquidity_sweep",
+        "breaker_block",
+        "fibonacci_retracement",
+        "ema60",
+        "level_expansion_validation",
+        "support_and_resistance_flip",
+        "elliott_wave"
+      ],
+      "school": "Order Flow",
+      "asset": "SILVER",
+      "timeframe": "1D",
+      "market_context": "Silver is in a very large bull market but extremely overbought. The weekly touched 83 and fell back to close at 80.78; the daily resistance at 81.6 was spiked to 83 but closed at 80, failing to clear the prior wick point — the same pullback risk gold faces.",
+      "key_observation": "The instructor notes the close failed to clear the prior wick point, and that if the correction range breaks it forms the \"aeroplane model\" of a fast decline. He plans the multi-level order-block support zones below from the top down, and stresses buying around 49 without hesitation.",
+      "analysis_steps": [
+        "Step 1: the weekly and monthly put silver in a very large bull market and extremely overbought; overbought must revert to the balance area, possibly running a complete five-wave decline.",
+        "Step 2: daily resistance is 81.6; price spiked to 83 and closed at 80. The close failed to clear the prior wick point, which carries the same risk gold has — an inducement wick before further decline.",
+        "Step 3: warn that breaking the correction range forms the \"aeroplane model\" — two hidden structures followed by a large down candle firing off a fast decline.",
+        "Step 4: list support top-down: daily / 4-hour 74.9–76.68 (a 4-hour bearish order block) has to hold; if 79.5 breaks, the 1-hour FVG and around 78 serve as short-term support.",
+        "Step 5: the 4-hour 77 is strong resistance; break it and the daily may fail, 76.5 does not hold either, and the test below goes deeper.",
+        "Step 6: continue down through the old levels at 60, 67 and 68, then 57–58, 52–53 and the key 47–49 zone — 49 in particular matches a 47% decline, the start of the two-year 2024 advance.",
+        "Step 7: conclusion — if the daily is broken through, look for a short-term long on the same logic as gold, buy around 49 without hesitation, and expect silver to go deeper than gold."
+      ],
+      "outcome": null,
+      "lessons": "Extreme weekly overbought must revert to the balance area; do not chase. A close that fails to clear the prior wick point is a danger signal. Plan the multi-level order-block support from the top down in advance, distinguish short-term support from the key long zone, and buy the pullback after a deep fall rather than chasing the advance.",
+      "primary_image": "cards/local_b3289191/images/case_014_primary.jpg",
+      "supporting_images": [
+        "cards/local_b3289191/images/case_014_detail_1.jpg"
+      ],
+      "image_descriptions": {
+        "case_014_primary.jpg": "白银（SILVER）周线蜡烛图，可见价格区间约25至110。图表左侧价格长期在25至40区间横向整理，随后向上攀升至约105高位。最右侧K线最高约83.05，收盘约80.78，带有较长上影线。图表标注两条向上倾斜白色趋势线及两个矩形框（分别覆盖约78至83与83至90区间）。右侧价格轴标注101.6548、80.7790、78.2071、74.1014、57.9039等多个价位。下方两个副图分别显",
+        "case_014_detail_1.jpg": "白银（SILVER）周线蜡烛图，价格可见范围约15至86。图表叠加EMA20（74.1014）、EMA60（57.9039）、EMA100（49.1695）三条均线，三线均向右上方延伸。最右侧K线收盘80.7790，单周涨幅+6.52%，最高触及83.0540。右上角标注「OB」标签。下方MACD面板快线7.9668、慢线5.8774，最右侧能量柱转绿并缩量；RSI面板当前值57.06，图中可见两"
+      },
+      "sources": [
+        {
+          "video_id": "local_b3289191",
+          "segment_ids": [
+            "seg_018"
+          ],
+          "time_range": [
+            6136.41,
+            6507.55
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产、周期、各级支撑价位与分析顺序均清晰，图表与讲述高度对应，仅无明确交易结果。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:43:04.052344Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_b3289191_case_014_白银下跌结构与下方支撑区规划",
+      "_source_file": "Teach-Wuyuan__local_b3289191_case_014_白银下跌结构与下方支撑区规划.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_b3289191_case_019_a股个股_600309等_用tradingview分析",
+      "type": "case",
+      "title": "Analysing A-share single names such as 600309 in TradingView, demonstrating the VP/FVG/SVP advantage",
+      "related_concepts": [
+        {
+          "term": "Volume Profile",
+          "global_card_id": "volume_profile",
+          "exists": true
+        },
+        {
+          "term": "SVP",
+          "global_card_id": "session_volume_profile",
+          "exists": true
+        },
+        {
+          "term": "FVG",
+          "global_card_id": "fair_value_gap",
+          "exists": true
+        },
+        {
+          "term": "LVN",
+          "global_card_id": "low_volume_node",
+          "exists": true
+        },
+        {
+          "term": "EMA20",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "EMA60",
+          "global_card_id": "ema60",
+          "exists": true
+        },
+        {
+          "term": "MACD",
+          "global_card_id": "moving_average_convergence_divergence",
+          "exists": true
+        },
+        {
+          "term": "RSI",
+          "global_card_id": "relative_strength_index",
+          "exists": true
+        },
+        {
+          "term": "死叉",
+          "global_card_id": "golden_death_cross",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "volume_profile",
+        "session_volume_profile",
+        "fair_value_gap",
+        "low_volume_node",
+        "ema60",
+        "moving_average_convergence_divergence",
+        "relative_strength_index",
+        "golden_death_cross"
+      ],
+      "school": "Order Flow",
+      "asset": "600309",
+      "timeframe": "1D",
+      "market_context": "At the end of the stream the instructor demonstrates viewing A-shares in TradingView. 600309's daily (framed on the 4-hour) has recovered from a low around 74 to about 88, with the rightmost candle closing 87.77 (−2.59%), overlaid with the EMA20 (87.82), the EMA60 (85.39) and FVG marks.",
+      "key_observation": "Viewing A-shares in TradingView shows the VP order distribution, the gaps (LVN fill zones), the SVP range division and FVG directly — none of which the domestic platforms (Tonghuashun, the knock-off Jiaoyixia) provide as data or as tools.",
+      "analysis_steps": [
+        "Step one: search the A-share code to pull up 600309's daily — the name he built a position in at 82, held to 81, and went long again after the correction at Dahua Shisheng.",
+        "Step two: turn on the VRVP volume profile to see the stock's whole order distribution and its high and low volume nodes.",
+        "Step three: point out a gap zone on the chart as an LVN range, explaining that price will very probably fill it — the same logic as forex.",
+        "Step four: overlay the FVG indicator, marking the FVGs at 81.5 to 82 and similar prices, so the whole structure of the stock is legible at a glance.",
+        "Step five: turn on SVP and divide the value areas by the method taught in the earlier VP course.",
+        "Step six: switch to the 15-minute and read the move with SVP, noting that a pullback after the break may offer shorts, and checking for a bearish cross.",
+        "Step seven: compare against the domestic platforms (Tonghuashun, Jiaoyixia / Jinshi data), which have no VP, no gaps and no scripting, to show TradingView's overall advantage for A-shares."
+      ],
+      "outcome": "He says he had the group build a position in 600309 at 82 and hold it to 81, then go long again at the Dahua Shisheng level after the correction, with members taking large gains. This is a retrospective account, not a live trade.",
+      "lessons": "Analysing A-shares with an international-grade tool (TradingView) shows the VP order distribution, the gaps, the SVP value areas and FVG directly; the method is identical to forex and precious metals, and far ahead of the domestic platforms.",
+      "primary_image": "cards/local_b3289191/images/case_019_primary.jpg",
+      "supporting_images": [
+        "cards/local_b3289191/images/case_019_detail_1.jpg",
+        "cards/local_b3289191/images/case_019_detail_2.jpg"
+      ],
+      "image_descriptions": {
+        "case_019_primary.jpg": "600309日线（4小时时间框架选中）蜡烛图，可见价格区间约74至96。图表叠加EMA20（黄线，当前87.82）与EMA60（蓝线，当前85.39），一条标注为「BB-2.26x-Max Close-2」的水平虚线位于约87.50贯穿全图。K线走势呈现左侧高位震荡、中段持续下跌至约74低点、右侧回升至约88的形态。下方两个副图分别显示MACD（快线1.65，慢线-0.36）与RSI背离指标（当前",
+        "case_019_detail_1.jpg": "图表显示标的002174（游族网络）4小时蜡烛图，可见价格区间约为8.80至11.00。图表区域叠加一条黄色下行趋势线（从约10.80延伸至9.80附近）及一条蓝色下行趋势线，另有一条白色水平虚线标注于9.65价位。右侧价格轴标注9.97与9.65两个价位。下方两个子面板分别显示MACD柱状图（最新值0.01/-0.02/-0.03）及另一振荡指标（当前值49.20，参考线位于75.00与25.0",
+        "case_019_detail_2.jpg": "ETHUSDT 4小时蜡烛图，可见范围约2,160至2,480。图表包含两条均线：蓝色均线当前位于约2,320，黄色均线位于约2,291。一条水平虚线标注于当前价2,376.39。4月18日附近出现一根大阳线，最高触及约2,460；最右侧K线收于2,376.39。右侧约2,380至2,420区间绘有一个黄色矩形框。下方两个子面板分别显示MACD（当前能量柱读数-0.41）与RSI（当前读数约55."
+      },
+      "sources": [
+        {
+          "video_id": "local_b3289191",
+          "segment_ids": [
+            "seg_030",
+            "seg_031"
+          ],
+          "time_range": [
+            10408.97,
+            10983.58
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "代码、时间框架、均线值与工具演示均在图表与讲述中清晰呈现，建仓价位有明确口述。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:43:24.559163Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_b3289191_case_019_a股个股_600309等_用tradingview分析",
+      "_source_file": "Teach-Wuyuan__local_b3289191_case_019_a股个股_600309等_用tradingview分析.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_d48a97df_case_001_黄金1小时图vrvp流动性与缺口分布分析",
+      "type": "case",
+      "title": "Gold 1-hour with VRVP: POC, VAH/VAL, and the short-side liquidity gaps left by the advance",
+      "related_concepts": [
+        {
+          "term": "VRVP",
+          "global_card_id": "vrvp",
+          "exists": true
+        },
+        {
+          "term": "POC",
+          "global_card_id": "point_of_control",
+          "exists": true
+        },
+        {
+          "term": "VAH",
+          "global_card_id": "value_area_high",
+          "exists": true
+        },
+        {
+          "term": "HVN",
+          "global_card_id": "high_volume_node",
+          "exists": true
+        },
+        {
+          "term": "流动性",
+          "global_card_id": "liquidity",
+          "exists": true
+        },
+        {
+          "term": "FVG",
+          "global_card_id": "fair_value_gap",
+          "exists": true
+        },
+        {
+          "term": "看涨订单块",
+          "global_card_id": "order_block",
+          "exists": true
+        },
+        {
+          "term": "SVP",
+          "global_card_id": "session_volume_profile",
+          "exists": true
+        },
+        {
+          "term": "EMA60",
+          "global_card_id": "ema60",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "vrvp",
+        "point_of_control",
+        "value_area_high",
+        "high_volume_node",
+        "liquidity",
+        "fair_value_gap",
+        "order_block",
+        "session_volume_profile",
+        "ema60"
+      ],
+      "school": "Order Flow",
+      "asset": "GOLD",
+      "timeframe": "1H",
+      "market_context": "Gold's 1-hour is around 4595.515, inside a whole consolidation between 4580 and 4640. Price rose fast from a low near 4400 to about 4640 and fell back, leaving a long structureless fast-advance zone, and is now contesting sideways at the highs.",
+      "key_observation": "Across the visible range the consolidation's POC is near 4615; price above the POC is strong and below it weak. The fast advance added almost no short-side volume (the yellow down value area is absent), which left liquidity gaps above, and the historical 4520–4560 gap is still unfilled.",
+      "analysis_steps": [
+        "Step one: overlay VRVP on gold's 1-hour and distinguish the dark bars (history already traded) from the value area (still being contested), noting that the fast zone above the advance has finished trading.",
+        "Step two: lock the visible candles and find the whole consolidation's POC at about 4615. The POC is the balance point between buyers and sellers — above it is strength, below it weakness — and price has retested and bounced off it precisely several times.",
+        "Step three: VRVP's drawback is that dragging the chart changes the POC as the visible candles change, so the range has to be pinned; higher timeframes mostly use VRVP and lower ones switch to SVP or the fixed-range profile.",
+        "Step four: mark the value area — VAH about 4643, VAL about 4471 — as that consolidation's volume high and low, demonstrating the automatic purple and green resistance and support marks.",
+        "Step five: the short-side value area on the advance (the yellow down volume) is almost absent, meaning nobody shorted into the fast rally and the shorts became fuel for the longs; price rose fast and the long-side volume was not high either.",
+        "Step six: the middle of that fast advance had no structural support, leaving a major liquidity gap — the whole segment is an FVG. The historical gap around 4520 to 4560 (January 8 to 12) is still unfilled; VP infers future support and resistance from past behaviour.",
+        "Step seven: combined with order blocks, the 1233 run inside that gap zone yields a bullish order block for a pullback long, with below 4500 as the reference for a structural break."
+      ],
+      "outcome": null,
+      "lessons": "VRVP's visible range has to be pinned to keep the POC stable; above the POC is strength and below it weakness. A fast advance with no short-side volume leaves a liquidity gap (an FVG) above, and combining VAH/VAL with order blocks locates the unfilled gaps and the support and resistance. VP is passive by nature and has to be used alongside the trend and the moving averages.",
+      "primary_image": "cards/local_d48a97df/images/case_001_primary.jpg",
+      "supporting_images": [
+        "cards/local_d48a97df/images/case_001_detail_2.jpg",
+        "cards/local_d48a97df/images/case_001_detail_3.jpg"
+      ],
+      "image_descriptions": {
+        "case_001_primary.jpg": "黄金（GOLD）1小时K线图，数据来源TVC，可见价格区间约4,440至4,700。图表左侧叠加VRVP成交量分布图，蓝色高成交量节点集中于约4,580至4,640区间。当前收盘价4,595.515以水平虚线标注于图表右侧。16日至17日附近标注有一个小矩形框，价格范围约4,595至4,610。9日及17日附近各出现一根带长下影线的K线。图表顶部显示EMA 20、EMA 60、EMA 100及BB",
+        "case_001_detail_2.jpg": "黄金差价合约1小时K线图，可见价格区间约4460至4640。图表左侧附有VRVP成交量分布柱状图。图表中部出现一段急速下跌K线序列，随后以黄色折线标注一段W形走势路径，折线经历两个低点（约4460与4480）及两个高点（约4540与4600）。图表右侧K线在4580至4630区间密集排列，并有一个小矩形框标注于约4595至4615区域。两条水平参考线分别位于4616.669（虚线）与4595.51",
+        "case_001_detail_3.jpg": "图表为GOLD黄金1小时K线图（TVC数据源），可见价格区间约4380至4620。左侧叠加VRVP可见范围成交量分布，蓝色高亮区域集中于约4460至4480。图表中部有黄色手绘折线，从约4400低点延伸至约4620高点后回落，再经历一次低点约4430后回升。右侧最新K线集中于约4595至4610区间，并有矩形框标注该区域。水平虚线贯穿全图位于约4595。当前出价显示4,595.515，买入价显示4"
+      },
+      "sources": [
+        {
+          "video_id": "local_d48a97df",
+          "segment_ids": [
+            "seg_001",
+            "seg_007",
+            "seg_008",
+            "seg_009",
+            "seg_010"
+          ],
+          "time_range": [
+            0.19,
+            3175.01
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产、级别、POC约4615、VAH约4643、VAL约4471、缺口区4520-4560均明确，分析步骤完整且顺序清晰。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:41:39.974375Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_d48a97df_case_001_黄金1小时图vrvp流动性与缺口分布分析",
+      "_source_file": "Teach-Wuyuan__local_d48a97df_case_001_黄金1小时图vrvp流动性与缺口分布分析.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_d48a97df_case_003_黄金6小时缺口回补与暴跌针点对应",
+      "type": "case",
+      "title": "Gold 6-hour: the crash filling every gap, with each wick point matching one",
+      "related_concepts": [
+        {
+          "term": "流动性",
+          "global_card_id": "liquidity",
+          "exists": true
+        },
+        {
+          "term": "LVN",
+          "global_card_id": "low_volume_node",
+          "exists": true
+        },
+        {
+          "term": "流动性扫射",
+          "global_card_id": "liquidity_sweep",
+          "exists": true
+        },
+        {
+          "term": "VRVP",
+          "global_card_id": "vrvp",
+          "exists": true
+        },
+        {
+          "term": "POC",
+          "global_card_id": "point_of_control",
+          "exists": true
+        },
+        {
+          "term": "VAH",
+          "global_card_id": "value_area_high",
+          "exists": true
+        },
+        {
+          "term": "FVG",
+          "global_card_id": "fair_value_gap",
+          "exists": true
+        },
+        {
+          "term": "扩级",
+          "global_card_id": "level_expansion_validation",
+          "exists": true
+        },
+        {
+          "term": "EMA60",
+          "global_card_id": "ema60",
+          "exists": true
+        },
+        {
+          "term": "EMA20",
+          "global_card_id": null,
+          "exists": false
+        }
+      ],
+      "illustrates_concepts": [
+        "liquidity",
+        "low_volume_node",
+        "liquidity_sweep",
+        "vrvp",
+        "point_of_control",
+        "value_area_high",
+        "fair_value_gap",
+        "level_expansion_validation",
+        "ema60"
+      ],
+      "school": "Order Flow",
+      "asset": "GOLD",
+      "timeframe": "6H",
+      "market_context": "Gold rose from around 4258 to about 4680 and fell back into the 4300s. The earlier fast advance left several liquidity gaps (LVNs) below. Price is now about 4595, oscillating near the EMA20 (about 4584) and the EMA60 (about 4503).",
+      "key_observation": "On the 6-hour, the decline that night filled every liquidity gap below one by one, and each wick point matches a prior gap exactly. Market makers took out all the buy-side liquidity above first, then bounced.",
+      "analysis_steps": [
+        "Step one: decide which timeframe key levels like 4500 belong to. Start with the 6-hour, and confirm every one of them corresponds there.",
+        "Step two: VRVP's drawback is that the POC changes substantially when the chart is dragged or the timeframe switched, so hide POC, VAH and VAL and use the volume distribution only for liquidity, or the trade comes out skewed.",
+        "Step three: on the 6-hour, mark the several enormous liquidity gap zones price passed through, block by block.",
+        "Step four: after the gaps were taken out price rose, retail contested at the highs (the green box around 4520–4560), and price then retested each gap below in turn.",
+        "Step five: explain why the decline that night was inevitable — a rally leaving enormous gaps must fill them. Market makers took out all the buy-side liquidity, price was driven hard back into the 4300s, every gap was filled, and every wick point matched a gap.",
+        "Step six: conclude that once the gaps were filled and the buy-side liquidity exhausted, price bounced naturally and shorting had no point; map the same logic back to the 1-hour."
+      ],
+      "outcome": null,
+      "lessons": "A liquidity gap (LVN) left by a fast advance is very likely to be filled, and the wick points usually match the gaps one for one; market makers sweep the buy-side liquidity clean before bouncing. When using VRVP, hide POC, VAH and VAL so a POC that moves on a timeframe switch does not mislead the read.",
+      "primary_image": "cards/local_d48a97df/images/case_003_primary.jpg",
+      "supporting_images": [
+        "cards/local_d48a97df/images/case_003_detail_1.jpg",
+        "cards/local_d48a97df/images/case_003_detail_2.jpg"
+      ],
+      "image_descriptions": {
+        "case_003_primary.jpg": "黄金（GOLD）6小时K线图，可见价格区间约为4240至4800。图表左侧显示VRVP成交量分布。图中绘有一个蓝色上升通道，价格从约4258区域上行至约4680后回落。在约4530至4590区间标注有一个深色矩形框。EMA20（蓝色）当前值约4584.761，EMA60（黄色）当前值约4503.987。右侧价格轴标注有4584.761、4548.445、4503.987、4326.018等多条水平",
+        "case_003_detail_1.jpg": "GOLD 1小时K线图，时间范围覆盖2026年1月5日至1月26日。图表左侧附有VRVP可见范围成交量分布柱状图。图表中部标注一个大型绿色矩形框，覆盖价格区间约4,511至4,568。右侧价格轴标注多条水平线，包括4,643.020（橙色）、4,462.876（黄色）及4,567.708、4,511.170（蓝色高亮）。一条水平虚线位于约4,595.515处。EMA60黄色曲线当前值约4,599.",
+        "case_003_detail_2.jpg": "GOLD 6小时K线图，可见价格区间约4,040至4,480。图表左侧以红色阴线为主，中部出现一根大阳线后进入震荡区间。右侧标注一个绿色矩形框，覆盖约4,320至4,440价格区域，横跨约10根K线。水平虚线标注于4,203.920处。左侧VRVP成交量分布图显示约4,200至4,320区间成交量节点较集中。图表叠加EMA 20、EMA 60（4,169.692）、EMA 100及BB 20 SM"
+      },
+      "sources": [
+        {
+          "video_id": "local_d48a97df",
+          "segment_ids": [
+            "seg_011"
+          ],
+          "time_range": [
+            3175.01,
+            3362.72
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产、级别、关键价位均可从图表读出，分析步骤与缺口回补逻辑在讲述中清晰完整。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:41:45.671208Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_d48a97df_case_003_黄金6小时缺口回补与暴跌针点对应",
+      "_source_file": "Teach-Wuyuan__local_d48a97df_case_003_黄金6小时缺口回补与暴跌针点对应.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_d48a97df_case_004_黄金一小时空头趋势与做市商破底翻预判",
+      "type": "case",
+      "title": "Gold 1-hour downtrend and the call for a market-maker break-the-low-and-turn",
+      "related_concepts": [
+        {
+          "term": "Volume Profile",
+          "global_card_id": "volume_profile",
+          "exists": true
+        },
+        {
+          "term": "POC",
+          "global_card_id": "point_of_control",
+          "exists": true
+        },
+        {
+          "term": "VAL",
+          "global_card_id": "value_area_low",
+          "exists": true
+        },
+        {
+          "term": "EMA60",
+          "global_card_id": "ema60",
+          "exists": true
+        },
+        {
+          "term": "金叉死叉",
+          "global_card_id": "golden_death_cross",
+          "exists": true
+        },
+        {
+          "term": "扩级",
+          "global_card_id": "level_expansion_validation",
+          "exists": true
+        },
+        {
+          "term": "流动性扫射",
+          "global_card_id": "liquidity_sweep",
+          "exists": true
+        },
+        {
+          "term": "破底翻",
+          "global_card_id": null,
+          "exists": false
+        },
+        {
+          "term": "看涨订单块",
+          "global_card_id": "order_block",
+          "exists": true
+        },
+        {
+          "term": "需求区",
+          "global_card_id": "demand_zone",
+          "exists": true
+        },
+        {
+          "term": "流动性",
+          "global_card_id": "liquidity",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "volume_profile",
+        "point_of_control",
+        "value_area_low",
+        "ema60",
+        "golden_death_cross",
+        "level_expansion_validation",
+        "liquidity_sweep",
+        "order_block",
+        "demand_zone",
+        "liquidity"
+      ],
+      "school": "Order Flow",
+      "asset": "GOLD",
+      "timeframe": "1H",
+      "market_context": "Gold's 1-hour is still in a downtrend, with the EMA60 broken and a bearish cross of the fast through the slow about to spread lower. The 4600 POC is a band of dense prior long volume that price has repeatedly failed to clear. Price is about 4595; the screenshot is mid-January 2026.",
+      "key_observation": "Reading VRVP's liquidity distribution, the instructor says the 4600 POC will not be cleared, that a huge liquidity gap sits across 4500 to 4560, and that retail long orders are dense around 4480 (the blue bid bars are thicker than the yellow) — which makes it hard for market makers to genuinely break price down and let retail get filled buying the dip.",
+      "analysis_steps": [
+        "Step one: read the liquidity distribution with VRVP, identifying the green box at about 4520–4560 as a bullish order block, already retested.",
+        "Step two: on the 1-hour, judge the trend — still down, with the same timeframe's EMA60 broken and the fast line crossing the slow into a bearish cross about to spread lower.",
+        "Step three: review Friday's liquidity — the 5-minute and 15-minute liquidity is at 4600, and the 4600 POC is the dense prior retail long band that price never clears.",
+        "Step four: anticipate the market maker's trick — around the 4475 VAL they may sweep liquidity once more, manufacturing the appearance of a decline to induce retail to turn bearish.",
+        "Step five: from the VP view the real liquidity gap is the large 4500–4560 band, with 4560–4520 as very strong 4-hour and 12-hour moving-average support and a high probability of a bounce.",
+        "Step six: the blue bid bars near 4480 are thicker than the yellow, which proves retail long orders are dense there; market makers will not let retail get filled buying the dip easily, which implies price will struggle to genuinely reach that zone.",
+        "Step seven: on the 12-hour, the fundamental support is 4412, the 12-hour limit; breaking through 4412 is very unlikely, since it would destroy the bull-market logic.",
+        "Step eight: on balance, price very probably tests here once more, consolidates, then plays a break-the-low-and-turn back up."
+      ],
+      "outcome": null,
+      "lessons": "Infer the market maker's intent from the volume and liquidity distribution: a band where retail long orders are dense is usually hard to break genuinely, and the market maker is more likely to sweep liquidity once at key support (the 4475 VAL) and then turn it back up. Do not turn bearish with the trend blindly at a gap.",
+      "primary_image": "cards/local_d48a97df/images/case_004_primary.jpg",
+      "supporting_images": [
+        "cards/local_d48a97df/images/case_004_detail_1.jpg",
+        "cards/local_d48a97df/images/case_004_detail_2.jpg"
+      ],
+      "image_descriptions": {
+        "case_004_primary.jpg": "GOLD 1小时K线图，数据来源TVC，可见价格区间约4400至4720。图表左侧叠加VRVP可见范围成交量分布图，蓝黄柱条分布于4400至4640区间。一个绿色填充矩形覆盖约4520至4560价格区间，横跨全图。约4520处有一条白色水平实线，约4600处有一条白色水平虚线。EMA20（蓝线，4595.388）与EMA60（黄线，4599.927）在图表中部交汇。最新收盘价为4595.515，三",
+        "case_004_detail_1.jpg": "GOLD 1小时蜡烛图，数据来源TVC，时间截至2026年1月13日。图表左侧叠加VRVP可见范围成交量分布。两条蓝色上升趋势线构成平行通道。一个绿色矩形框覆盖约4520至4560价格区间。黄色EMA 20曲线呈V形走势，蓝色EMA 60位于约4554。右侧价格轴标注4599.927、4595.515、4595.388三个高亮价位。水平虚线标注4466.522。下方MACD面板柱值为-8.564，",
+        "case_004_detail_2.jpg": "黄金（GOLD）1小时K线图，价格可见范围约4,460至4,620。图表左侧附有VRVP成交量分布图，蓝色与黄色柱并排显示。EMA 60（蓝色曲线）标注值为4,599.922，EMA 20亦可见。图表右下方有一个绿色填充矩形区域，覆盖约4,510至4,560价格范围。两条水平虚线分别位于约4,599和4,577附近。图表中部叠加有黄色手绘曲线，经过多个波峰波谷。右侧价格标签显示4,599.927、"
+      },
+      "sources": [
+        {
+          "video_id": "local_d48a97df",
+          "segment_ids": [
+            "seg_012",
+            "seg_013"
+          ],
+          "time_range": [
+            3362.72,
+            3735.38
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产、级别、关键价位（4600 POC、4475 VAL、4500-4560区间、4412极限）及推演步骤均清晰，图表与讲解吻合。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:42:09.309938Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_d48a97df_case_004_黄金一小时空头趋势与做市商破底翻预判",
+      "_source_file": "Teach-Wuyuan__local_d48a97df_case_004_黄金一小时空头趋势与做市商破底翻预判.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_d48a97df_case_005_黄金往期暴跌_230美金_390美金_缺口回补复盘",
+      "type": "case",
+      "title": "Gold's earlier $230/$390 crashes reviewed: institutions hunting short stops and filling the imbalances",
+      "related_concepts": [
+        {
+          "term": "Fair Value Gap",
+          "global_card_id": "fair_value_gap",
+          "exists": true
+        },
+        {
+          "term": "Order Block",
+          "global_card_id": "order_block",
+          "exists": true
+        },
+        {
+          "term": "VRVP",
+          "global_card_id": "vrvp",
+          "exists": true
+        },
+        {
+          "term": "流动性",
+          "global_card_id": "liquidity",
+          "exists": true
+        },
+        {
+          "term": "流动性扫射",
+          "global_card_id": "liquidity_sweep",
+          "exists": true
+        },
+        {
+          "term": "Low Volume Node",
+          "global_card_id": "low_volume_node",
+          "exists": true
+        },
+        {
+          "term": "底背离",
+          "global_card_id": "top_bottom_divergence",
+          "exists": true
+        },
+        {
+          "term": "POC",
+          "global_card_id": "point_of_control",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "fair_value_gap",
+        "order_block",
+        "vrvp",
+        "liquidity",
+        "liquidity_sweep",
+        "low_volume_node",
+        "top_bottom_divergence",
+        "point_of_control"
+      ],
+      "school": "Order Flow",
+      "asset": "GOLD",
+      "timeframe": "1H/4H",
+      "market_context": "Gold has previously crashed $230 at speed, leaving a mass of order blocks and imbalance gaps on the way. The instructor reviews the December 2025 4-hour advance gaps as the example, analysing how institutions trade the fills.",
+      "key_observation": "The fast $230 decline killed nearly every long in the market, so market makers have no interest in pressing lower; institutions have to BUY to take out retail short stops, filling the imbalance gaps left on the way and even reversing to a new high.",
+      "analysis_steps": [
+        "Step one: in a fast decline institutions only need to take out retail stops (the taker/maker logic) rather than genuinely buy; retail shorts all get eaten.",
+        "Step two: a mass of resting orders sits in the imbalance zone (the FVG, which is not a buy zone), and institutions bring price back into those zones to hunt that liquidity — which is why the gaps must be filled.",
+        "Step three: use VRVP to see the many order-block zones and liquidity gaps this fast decline produced; price falling to here only gets pressed back up, with 4360 as the lowest fill target.",
+        "Step four: a 4-hour bullish divergence below provides multiple validation, which is why price then bounced — direction read from liquidity.",
+        "Step five: think in reverse — after a $230 crash the longs are essentially all dead, so pressing lower is pointless and makes no money; institutions must use buys to kill the retail shorts and fill the gaps.",
+        "Step six: switch to the 4-hour and set VRVP's row count to 250 so the gaps render finely, then review the mass of gaps December 2025's advance left, demonstrating that gaps do get filled in the end."
+      ],
+      "outcome": null,
+      "lessons": "The imbalance gaps and order blocks left by a fast crash are very likely to be filled; institutions lead price by hunting short stops and filling gaps. Think against human instinct: once the longs are wiped out, institutions can only continue by buying, and the gap gets filled.",
+      "primary_image": "cards/local_d48a97df/images/case_005_primary.jpg",
+      "supporting_images": [],
+      "image_descriptions": {
+        "case_005_primary.jpg": "黄金1小时K线图，可见价格区间约4,400至4,740。图表左侧附有VRVP成交量分布图，最大成交量节点集中在4,496–4,520附近。蓝色水平实线标注于4,643.080，白色虚线标注于4,496.816，绿色矩形区域覆盖约4,520–4,560价格带并延伸至图表右侧。EMA60（黄色曲线）当前值为4,370.894，EMA20（蓝色曲线）当前值为4,334.618。1月13日至17日区间K线"
+      },
+      "sources": [
+        {
+          "video_id": "local_d48a97df",
+          "segment_ids": [
+            "seg_015",
+            "seg_016"
+          ],
+          "time_range": [
+            3916.7,
+            4287.58
+          ]
+        }
+      ],
+      "extraction_confidence": "medium",
+      "confidence_reason": "资产、级别、4360回补目标与底背离验证均明确，但具体230/390美金行情的精确价位与时间未完全在画面读出。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:42:19.628948Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_d48a97df_case_005_黄金往期暴跌_230美金_390美金_缺口回补复盘",
+      "_source_file": "Teach-Wuyuan__local_d48a97df_case_005_黄金往期暴跌_230美金_390美金_缺口回补复盘.json",
+      "_school": "Order Flow"
+    },
+    {
+      "card_id": "Teach-Wuyuan__local_d48a97df_case_006_黄金顶级交易者放弃hvn震荡区只做关键位",
+      "type": "case",
+      "title": "Top gold traders skip the HVN chop entirely and commit only on the retest after VAH liquidity is swept",
+      "related_concepts": [
+        {
+          "term": "HVN",
+          "global_card_id": "high_volume_node",
+          "exists": true
+        },
+        {
+          "term": "VRVP",
+          "global_card_id": "vrvp",
+          "exists": true
+        },
+        {
+          "term": "VAH",
+          "global_card_id": "value_area_high",
+          "exists": true
+        },
+        {
+          "term": "POC",
+          "global_card_id": "point_of_control",
+          "exists": true
+        },
+        {
+          "term": "流动性扫射",
+          "global_card_id": "liquidity_sweep",
+          "exists": true
+        },
+        {
+          "term": "FVG",
+          "global_card_id": "fair_value_gap",
+          "exists": true
+        },
+        {
+          "term": "Order Block",
+          "global_card_id": "order_block",
+          "exists": true
+        },
+        {
+          "term": "需求区",
+          "global_card_id": "demand_zone",
+          "exists": true
+        }
+      ],
+      "illustrates_concepts": [
+        "high_volume_node",
+        "vrvp",
+        "value_area_high",
+        "point_of_control",
+        "liquidity_sweep",
+        "fair_value_gap",
+        "order_block",
+        "demand_zone"
+      ],
+      "school": "Order Flow",
+      "asset": "GOLD",
+      "timeframe": "1H",
+      "market_context": "After a fast advance, gold's 1-hour has chopped sideways between roughly 4580 and 4640 for about fifteen candles. VRVP on the left shows 4440–4560 as the largest volume node (the HVN peak); price is about 4595, oscillating above the green support rectangle at 4520–4560.",
+      "key_observation": "VRVP shows retail contesting densely inside the HVN high-volume node (about 4480–4560). That whole band is unlikely to break immediately, holds no institutional orders and carries no trading value; the real key level is the retest after the VAH liquidity at about 4463 has been swept.",
+      "analysis_steps": [
+        "Step 1: pull up the VRVP volume profile and identify 4440–4560 on the left as the largest volume node (the HVN peak) — the asset's balanced value area.",
+        "Step 2: retail chops and contests continuously inside that HVN band, and the market is unlikely to break through the high-volume range immediately.",
+        "Step 3: the longer the volume bar at a price, the less likely an institutional order sits there; institutions act only at the two ends of the range and will not fight retail in the middle.",
+        "Step 4: conclude that top higher-timeframe traders skip the entire HVN chop, because it has no trading value.",
+        "Step 5: mark the VAH at about 4463 and wait for the liquidity there to be swept.",
+        "Step 6: once the liquidity is swept and price retests, commit size at the retest with the stop only a little below; combined with other indicators this can carry to above 4700.",
+        "Step 7: add that the European session is the worst of it for retail order placement — the high-volume nodes mostly form in the afternoon overlap of the Asian and European sessions — so find the low-volume node (LVN) rather than placing orders inside the HVN."
+      ],
+      "outcome": "Given as an illustration: top traders skip the whole HVN, wait for the VAH liquidity to be swept, and commit on the retest, potentially carrying straight to above 4700. It is a teaching demonstration, not a live trade record.",
+      "lessons": "Skilled traders skip the HVN chop rather than fight retail there, and enter with size only on the retest after liquidity at a key level such as VAH has been swept. The longer the volume bar, the less likely an institutional order sits there — find the LVN, not the HVN; the European session is retail's worst zone and carries no trading value.",
+      "primary_image": "cards/local_d48a97df/images/case_006_primary.jpg",
+      "supporting_images": [
+        "cards/local_d48a97df/images/case_006_detail_1.jpg",
+        "cards/local_d48a97df/images/case_006_detail_2.jpg"
+      ],
+      "image_descriptions": {
+        "case_006_primary.jpg": "黄金（GOLD）1小时K线图，可见价格区间约4390至4660。图表左侧叠加VRVP成交量分布柱，黄色椭圆圈注圈出左侧高成交量区域，右上方手写黄色圆圈标注「HVN」。4613.151处有白色虚线水平线延伸至图表右端。4510至4560区间覆盖绿色填充矩形。黄色曲线（EMA20）从左下向右上弯曲后趋平，蓝色曲线（EMA60）走势较平缓。最新价格标签显示卖出价4595.515、买入价4597.375，",
+        "case_006_detail_1.jpg": "GOLD 1小时K线图，可见价格范围约4400至4740。图表左侧附有VRVP成交量分布柱状图。两条均线可见：EMA 60（蓝色，当前值4405.786）与EMA 20（黄色，当前值4438.176）。一个绿色矩形区域覆盖约4500至4560价格范围，内含文字标注「佐老师系列课程支撑阻力分析」。三条水平线分别位于约4599.927（白色虚线）、4560（白色实线）及4485.401（白色虚线）。最",
+        "case_006_detail_2.jpg": "黄金（GOLD）1小时K线图，可见价格区间约4390至4660。图表左侧存在一段快速上涨走势，随后在4580–4640区间震荡约15根K线。两条贯穿全图的水平线分别标注于4632.467（虚线）与4599.927（点线）。图表右侧绘有一个绿色填充矩形，覆盖约4515–4560价格带。一条黄色手绘弧形曲线从左侧低点向上延伸后向下弯曲，箭头终点指向绿色矩形区域内约4520位置。左侧VRVP成交量分布图"
+      },
+      "sources": [
+        {
+          "video_id": "local_d48a97df",
+          "segment_ids": [
+            "seg_014",
+            "seg_017"
+          ],
+          "time_range": [
+            3735.38,
+            4468.85
+          ]
+        }
+      ],
+      "extraction_confidence": "high",
+      "confidence_reason": "资产GOLD、1小时周期、VAH约4463、目标4700等关键数值与分析步骤在讲解与图表中均清晰可读。",
+      "review_status": "pending",
+      "notes": null,
+      "warnings": [],
+      "extracted_at": "2026-06-26T15:42:43.399609Z",
+      "model_used": "anthropic/claude-opus-4-8",
+      "error": null,
+      "project_origin": "Teach-Wuyuan",
+      "global_card_id": "Teach-Wuyuan__local_d48a97df_case_006_黄金顶级交易者放弃hvn震荡区只做关键位",
+      "_source_file": "Teach-Wuyuan__local_d48a97df_case_006_黄金顶级交易者放弃hvn震荡区只做关键位.json",
+      "_school": "Order Flow"
+    }
+  ]
+}
