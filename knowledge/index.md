@@ -53,6 +53,7 @@ in it covered external domain knowledge or facts about the operator.
 ### operator-profile
 
 - [Direction Inversion Watch](direction-inversion-watch.md) — Steve's known error mode — direction/sign inversions that stay internally consistent; he asked Strader to watch for them
+- [Steve Is the Risk Authority, Not the Arbiter of Price Action](steve-risk-authority-not-pa-arbiter.md) — sole risk/sizing authority; confirmation belongs to hindsight measurement, never to his chair time
 - [Perceptual Profile](perceptual-profile.md) — Steve self-reports above-average (not freak-level) perception of momentum and angles — factor into drill design
 - [Trading Since 2021](trading-since-2021.md) — Steve has been trading only since 2021 — don't write as if he carries decades of market experience
 
