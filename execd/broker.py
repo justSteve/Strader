@@ -100,7 +100,41 @@ class Preview:
 
 
 @dataclass(frozen=True)
+class OrderLeg:
+    """One leg of an order, as the broker reported it. [st-ilp9]
+
+    ``instruction`` is the broker's own word — ``BUY_TO_OPEN``,
+    ``SELL_TO_CLOSE``, ``BUY_TO_CLOSE``, ``SELL_TO_OPEN``. ``side`` is that word
+    reduced to the two this service can itself express, which is lossy for a leg
+    it would never send: a ``BUY_TO_CLOSE`` reduces to ``BUY_TO_OPEN``. Read
+    ``instruction`` when the difference matters; ``side`` is there so that a
+    single-leg order still answers the question the service actually asks.
+
+    ``qty`` is this leg's contract count, which is not the order's: a 1-lot
+    butterfly has legs of 1, 2 and 1."""
+
+    symbol: str
+    instruction: str
+    side: Side
+    qty: int
+    leg_id: int | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"symbol": self.symbol, "instruction": self.instruction,
+                "side": self.side.value, "qty": self.qty, "leg_id": self.leg_id}
+
+
+@dataclass(frozen=True)
 class OrderResult:
+    """What the broker says about one order — its own, or anyone's.
+
+    ``orders()`` reads the whole account, and Steve trades multi-leg spreads by
+    hand in the same account, so this has to describe orders the service would
+    never place. ``legs`` is the truth about shape; ``symbol`` and ``side`` are
+    a convenience that only means anything for a single-leg order, and are
+    deliberately empty for a spread rather than quietly reporting leg 0 as the
+    whole order [st-ilp9]."""
+
     order_id: str
     status: OrderStatus
     symbol: str
@@ -112,6 +146,8 @@ class OrderResult:
     fill_price: float | None = None
     submitted_at: datetime = field(default_factory=_utcnow)
     message: str = ""
+    legs: tuple[OrderLeg, ...] = ()
+    strategy: str = ""                  # the broker's complex-strategy word
 
     @property
     def is_filled(self) -> bool:
@@ -121,12 +157,18 @@ class OrderResult:
     def is_working(self) -> bool:
         return self.status is OrderStatus.WORKING
 
+    @property
+    def is_multi_leg(self) -> bool:
+        return len(self.legs) > 1
+
     def to_dict(self) -> dict[str, Any]:
         return {"order_id": self.order_id, "status": self.status.value,
                 "symbol": self.symbol, "side": self.side.value, "qty": self.qty,
                 "order_type": self.order_type.value, "price": self.price,
                 "filled_qty": self.filled_qty, "fill_price": self.fill_price,
-                "submitted_at": self.submitted_at.isoformat(), "message": self.message}
+                "submitted_at": self.submitted_at.isoformat(), "message": self.message,
+                "legs": [leg.to_dict() for leg in self.legs],
+                "strategy": self.strategy}
 
 
 @dataclass(frozen=True)
@@ -141,17 +183,24 @@ class Position:
 
 @dataclass(frozen=True)
 class Fill:
+    """One executed leg. For a spread that is one of several, each carrying its
+    own symbol, instruction and price. Every leg of a three-leg fill used to be
+    stamped with leg 0's symbol and side [st-ilp9]."""
+
     order_id: str
     symbol: str
     side: Side
     qty: int
     price: float
     at: datetime = field(default_factory=_utcnow)
+    leg_id: int | None = None
+    instruction: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {"order_id": self.order_id, "symbol": self.symbol,
                 "side": self.side.value, "qty": self.qty, "price": self.price,
-                "at": self.at.isoformat()}
+                "at": self.at.isoformat(), "leg_id": self.leg_id,
+                "instruction": self.instruction}
 
 
 @runtime_checkable
@@ -375,6 +424,11 @@ class MockBroker:
             side=intent.side, qty=intent.qty, order_type=intent.order_type,
             price=price, filled_qty=filled_qty, fill_price=fill_price,
             submitted_at=self.clock(), message=message,
+            # The service only ever sends single-leg orders, so the mock's
+            # orders carry exactly one leg — the same shape the real transport
+            # reports for them [st-ilp9].
+            legs=(OrderLeg(symbol=intent.symbol, instruction=intent.side.value,
+                           side=intent.side, qty=intent.qty, leg_id=1),),
         )
 
     def _store(self, order: OrderResult) -> OrderResult:
@@ -394,4 +448,5 @@ class MockBroker:
             else:
                 self._positions[order.symbol] = Position(order.symbol, new_qty, held.avg_price)
         self._fills.append(Fill(order.order_id, order.symbol, order.side,
-                                order.filled_qty, price, self.clock()))
+                                order.filled_qty, price, self.clock(),
+                                leg_id=1, instruction=order.side.value))

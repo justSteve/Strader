@@ -24,9 +24,27 @@ class Side(str, Enum):
 
 
 class OrderType(str, Enum):
+    """Every order type the service must be able to *name*.
+
+    The first three are the only ones it can send. ``NET_CREDIT`` and
+    ``NET_DEBIT`` exist because the account holds spreads Steve places by hand
+    and the transport has to report them as what they are; until st-ilp9 an
+    unrecognised type fell through to ``LIMIT``, so a three-leg net-credit
+    butterfly was read back as a plain limit order [st-ilp9]. Naming a type is
+    not permission to send it — :meth:`OrderIntent.problems` refuses any intent
+    that asks for one outside :data:`SENDABLE_ORDER_TYPES`."""
+
     LIMIT = "LIMIT"
     MARKET = "MARKET"
     STOP = "STOP"
+    NET_CREDIT = "NET_CREDIT"
+    NET_DEBIT = "NET_DEBIT"
+
+
+#: What an intent may ask the service to send. Widening this is a wall-crossing
+#: decision, not a refactor: everything in bounds.py reasons about single-leg
+#: long premium.
+SENDABLE_ORDER_TYPES = frozenset({OrderType.LIMIT, OrderType.MARKET, OrderType.STOP})
 
 
 _OCC_RE = re.compile(r"^(?P<root>[A-Z]{1,6}) *(?P<ymd>\d{6})(?P<right>[CP])(?P<strike>\d{8})$")
@@ -104,6 +122,11 @@ class OrderIntent:
             out.append(str(exc))
         if not isinstance(self.qty, int) or isinstance(self.qty, bool) or self.qty <= 0:
             out.append(f"qty must be a positive integer, not {self.qty!r}")
+        if self.order_type not in SENDABLE_ORDER_TYPES:
+            # The type vocabulary is wider than the send vocabulary on purpose:
+            # the transport must be able to report a multi-leg spread it reads
+            # from the account without that becoming an order it can place.
+            out.append(f"the service does not send {self.order_type.value} orders")
         if self.order_type == OrderType.LIMIT and (self.limit is None or self.limit <= 0):
             out.append("a LIMIT order needs a positive limit")
         if self.order_type == OrderType.STOP and (self.stop_price is None or self.stop_price <= 0):

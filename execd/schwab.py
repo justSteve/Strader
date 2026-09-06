@@ -84,8 +84,8 @@ from typing import Any, Callable, Mapping
 import httpx
 
 from .arming import Locked
-from .broker import (BrokerError, Fill, OrderResult, OrderStatus, Position, Preview,
-                     Quote)
+from .broker import (BrokerError, Fill, OrderLeg, OrderResult, OrderStatus, Position,
+                     Preview, Quote)
 from .intent import OrderIntent, OrderType, Side
 
 API = "https://api.schwabapi.com"
@@ -170,6 +170,17 @@ _STATUS = {
 }
 #: Every other status Schwab lists (ACCEPTED, WORKING, QUEUED, NEW, PENDING_*,
 #: AWAITING_*, UNKNOWN) is an order the broker still holds: WORKING to us.
+
+_ORDER_TYPES = {
+    "LIMIT": OrderType.LIMIT,
+    "MARKET": OrderType.MARKET,
+    "STOP": OrderType.STOP,
+    "NET_CREDIT": OrderType.NET_CREDIT,
+    "NET_DEBIT": OrderType.NET_DEBIT,
+}
+#: Anything else beginning STOP (STOP_LIMIT, TRAILING_STOP) reads as STOP. Only
+#: after both of those does the price-shaped guess run — until st-ilp9 the
+#: guess ran for NET_CREDIT and NET_DEBIT too, and called them LIMIT [st-ilp9].
 
 
 # ── credential ───────────────────────────────────────────────────────────
@@ -716,7 +727,8 @@ class SchwabBroker:
                 symbol=intent.symbol, side=intent.side, qty=intent.qty,
                 order_type=intent.order_type,
                 price=intent.limit if intent.order_type is OrderType.LIMIT else intent.stop_price,
-                submitted_at=self.clock(), message=_error_detail(r) or "rejected (HTTP 400)")
+                submitted_at=self.clock(), legs=_intent_leg(intent),
+                message=_error_detail(r) or "rejected (HTTP 400)")
         if r.status_code not in (200, 201):
             raise BrokerError(f"schwab POST {self._scrub(path)}: HTTP {r.status_code} "
                               f"{_error_detail(r)}".rstrip())
@@ -727,7 +739,7 @@ class SchwabBroker:
                 symbol=intent.symbol, side=intent.side, qty=intent.qty,
                 order_type=intent.order_type,
                 price=intent.limit if intent.order_type is OrderType.LIMIT else intent.stop_price,
-                submitted_at=self.clock(),
+                submitted_at=self.clock(), legs=_intent_leg(intent),
                 message="placed (HTTP 201) but the broker returned no order id — "
                         "reconcile must find it in the broker's listing")
         try:
@@ -738,7 +750,7 @@ class SchwabBroker:
                 symbol=intent.symbol, side=intent.side, qty=intent.qty,
                 order_type=intent.order_type,
                 price=intent.limit if intent.order_type is OrderType.LIMIT else intent.stop_price,
-                submitted_at=self.clock(),
+                submitted_at=self.clock(), legs=_intent_leg(intent),
                 message=f"placed; the follow-up read failed ({exc}) — status unknown until reconcile")
 
     def cancel(self, order_id: str) -> OrderResult:
@@ -797,12 +809,22 @@ class SchwabBroker:
         return out
 
     def fills_since(self, since: datetime) -> list[Fill]:
-        """Spec-derived: each order's ``orderActivityCollection`` entries with
-        ``activityType == EXECUTION`` carry ``executionLegs[{price, quantity,
-        time}]``. One Fill per execution leg after ``since``."""
+        """Each order's ``orderActivityCollection`` entries with
+        ``activityType == EXECUTION`` carry ``executionLegs[{legId, price,
+        quantity, time}]``. One Fill per execution leg after ``since``, each
+        attributed to *its own* leg.
+
+        The attribution is a join the data already supports and the code simply
+        did not make: every one of the 72 execution legs in the 2026-09-05
+        recording carries a ``legId``, and so does every entry of every
+        ``orderLegCollection``. Without it a three-leg fill produced three Fill
+        records all stamped with leg 0's symbol and side — wrong data entering
+        the service's fill tracking, not merely incomplete data [st-ilp9]. An
+        execution leg whose ``legId`` matches nothing is reported with an empty
+        symbol rather than borrowed from a leg that happens to be first."""
         fills: list[Fill] = []
         for o in self._orders_raw():
-            symbol, side = _leg_symbol_side(o)
+            by_id = {leg.leg_id: leg for leg in _legs(o) if leg.leg_id is not None}
             for act in o.get("orderActivityCollection") or []:
                 if not isinstance(act, dict) or act.get("activityType") != "EXECUTION":
                     continue
@@ -815,8 +837,17 @@ class SchwabBroker:
                     qty = int(round(float(leg.get("quantity") or 0.0)))
                     if qty <= 0:
                         continue
-                    fills.append(Fill(order_id=str(o.get("orderId")), symbol=symbol, side=side,
-                                      qty=qty, price=float(leg.get("price") or 0.0), at=at))
+                    leg_id = leg.get("legId")
+                    leg_id = int(leg_id) if isinstance(leg_id, (int, float)) else None
+                    ordered = by_id.get(leg_id)
+                    fills.append(Fill(
+                        order_id=str(o.get("orderId")),
+                        symbol=ordered.symbol if ordered else "",
+                        side=ordered.side if ordered else Side.SELL_TO_CLOSE,
+                        qty=qty, price=float(leg.get("price") or 0.0), at=at,
+                        leg_id=leg_id,
+                        instruction=ordered.instruction if ordered else "",
+                    ))
         fills.sort(key=lambda f: f.at)
         return fills
 
@@ -842,31 +873,41 @@ class SchwabBroker:
         return self._to_result(body)
 
     def _to_result(self, o: Mapping[str, Any]) -> OrderResult:
-        """Spec-derived ``Order`` → :class:`OrderResult`."""
-        symbol, side = _leg_symbol_side(o)
+        """``Order`` → :class:`OrderResult`, faithful to what the account holds.
+
+        Recorded against 38 real orders on 2026-09-05, of which 18 were
+        three-leg butterflies Steve placed by hand. Read the leg collection, not
+        leg 0; take the type from the broker's word rather than inferring
+        ``LIMIT`` from the presence of a price; and for a spread leave the
+        single-leg convenience fields empty [st-ilp9]."""
+        legs = _legs(o)
+        one = legs[0] if len(legs) == 1 else None
+        symbol = one.symbol if one else ""
+        side = one.side if one else Side.SELL_TO_CLOSE
         raw_status = str(o.get("status") or "UNKNOWN")
         status = _STATUS.get(raw_status, OrderStatus.WORKING)
         raw_type = str(o.get("orderType") or "")
-        if raw_type in ("LIMIT", "MARKET", "STOP"):
-            otype = OrderType(raw_type)
+        if raw_type in _ORDER_TYPES:
+            otype = _ORDER_TYPES[raw_type]
         elif raw_type.startswith("STOP"):
             otype = OrderType.STOP
         else:
             otype = OrderType.LIMIT if o.get("price") is not None else OrderType.MARKET
         price = o.get("price") if otype is not OrderType.STOP else o.get("stopPrice")
         filled = int(round(float(o.get("filledQuantity") or 0.0)))
-        fill_price = _avg_fill_price(o)
-        legs = o.get("orderLegCollection") or []
-        qty = int(round(float(o.get("quantity") or (legs[0].get("quantity") if legs else 0) or 0)))
+        fill_price = _net_fill_price(o, legs) if len(legs) > 1 else _avg_fill_price(o)
+        qty = int(round(float(o.get("quantity") or (legs[0].qty if legs else 0) or 0)))
         message = raw_status if status is OrderStatus.WORKING and raw_status != "WORKING" else ""
         if status is OrderStatus.REJECTED:
             message = str(o.get("statusDescription") or o.get("tag") or "rejected")
+        strategy = str(o.get("complexOrderStrategyType") or "")
         return OrderResult(
             order_id=str(o.get("orderId")), status=status, symbol=symbol, side=side,
             qty=qty, order_type=otype,
             price=float(price) if price is not None else None,
             filled_qty=filled, fill_price=fill_price,
             submitted_at=_iso(o.get("enteredTime"), self.clock()), message=message,
+            legs=legs, strategy="" if strategy == "NONE" else strategy,
         )
 
 
@@ -877,14 +918,83 @@ def _order_id_from_location(location: str | None) -> str | None:
     return tail if tail.isdigit() else None
 
 
-def _leg_symbol_side(o: Mapping[str, Any]) -> tuple[str, Side]:
-    legs = o.get("orderLegCollection") or []
-    leg = legs[0] if legs and isinstance(legs[0], dict) else {}
-    inst = leg.get("instrument") or {}
-    symbol = str(inst.get("symbol") or "")
-    instruction = str(leg.get("instruction") or "")
-    side = Side.BUY_TO_OPEN if instruction.startswith("BUY") else Side.SELL_TO_CLOSE
-    return symbol, side
+def _intent_leg(intent: OrderIntent) -> tuple[OrderLeg, ...]:
+    """The single leg an intent describes, for the three results the transport
+    has to synthesize when the broker's own answer cannot be read. The service
+    sends nothing else — ``SENDABLE_ORDER_TYPES`` in ``intent.py`` says so."""
+    return (OrderLeg(symbol=intent.symbol, instruction=intent.side.value,
+                     side=intent.side, qty=intent.qty, leg_id=1),)
+
+
+def _side_of(instruction: str) -> Side:
+    """Reduce a broker instruction to the two sides the service can express.
+
+    Lossy on purpose and only for the convenience fields: ``BUY_TO_CLOSE``
+    lands on ``BUY_TO_OPEN``. :class:`~execd.broker.OrderLeg` keeps the word
+    itself, which is what to read for a leg the service did not send."""
+    return Side.BUY_TO_OPEN if instruction.startswith("BUY") else Side.SELL_TO_CLOSE
+
+
+def _legs(o: Mapping[str, Any]) -> tuple[OrderLeg, ...]:
+    """Every leg of ``orderLegCollection``, in the order the broker gave them.
+
+    ``orderStrategyType`` is *not* the leg count — it says SINGLE for all 38
+    orders in the 2026-09-05 recording, 18 of which have three legs. It
+    distinguishes a plain order from an OCO or TRIGGER group. The count lives
+    here and nowhere else [st-ilp9]."""
+    out: list[OrderLeg] = []
+    for leg in o.get("orderLegCollection") or []:
+        if not isinstance(leg, dict):
+            continue
+        inst = leg.get("instrument") or {}
+        instruction = str(leg.get("instruction") or "")
+        leg_id = leg.get("legId")
+        out.append(OrderLeg(
+            symbol=str(inst.get("symbol") or ""),
+            instruction=instruction,
+            side=_side_of(instruction),
+            qty=int(round(float(leg.get("quantity") or 0.0))),
+            leg_id=int(leg_id) if isinstance(leg_id, (int, float)) else None,
+        ))
+    return tuple(out)
+
+
+def _net_fill_price(o: Mapping[str, Any], legs: tuple[OrderLeg, ...]) -> float | None:
+    """The net premium per contract a multi-leg order actually filled at.
+
+    Averaging the leg prices, which is what a single-leg order wants, is
+    meaningless for a spread: the butterfly recorded on 2026-08-28 filled its
+    legs at 3.23, 0.85 and 0.22 and was a net credit of 1.75. So sell legs are
+    added and buy legs subtracted, and the total is divided by the order's
+    filled quantity. Reported unsigned, the way the broker reports it — the
+    direction is in ``order_type``, ``NET_CREDIT`` or ``NET_DEBIT``.
+
+    Checked against the recording: this reproduces the order's own price for 10
+    of the 11 filled multi-leg orders exactly, and the eleventh differs by 0.10
+    in the customer's favour, which is a fill better than the limit [st-ilp9]."""
+    by_id = {leg.leg_id: leg for leg in legs if leg.leg_id is not None}
+    total = 0.0
+    seen = False
+    for act in o.get("orderActivityCollection") or []:
+        if not isinstance(act, dict) or act.get("activityType") != "EXECUTION":
+            continue
+        for el in act.get("executionLegs") or []:
+            if not isinstance(el, dict):
+                continue
+            leg = by_id.get(el.get("legId"))
+            price = el.get("price")
+            if leg is None or price is None:
+                # One unattributable leg makes the net wrong, not approximate.
+                return None
+            qty = float(el.get("quantity") or 0.0)
+            if qty <= 0:
+                continue
+            total += (1.0 if leg.instruction.startswith("SELL") else -1.0) * float(price) * qty
+            seen = True
+    filled = float(o.get("filledQuantity") or 0.0)
+    if not seen or filled <= 0:
+        return None
+    return round(abs(total / filled), 4)
 
 
 def _avg_fill_price(o: Mapping[str, Any]) -> float | None:

@@ -6,7 +6,8 @@ from datetime import date
 
 import pytest
 
-from execd.intent import Occ, OrderIntent, OrderType, Side, parse_occ
+from execd.intent import (SENDABLE_ORDER_TYPES, Occ, OrderIntent, OrderType, Side,
+                          parse_occ)
 
 from .conftest import CALL, PUT, entry
 
@@ -61,6 +62,21 @@ class TestValidation:
     def test_a_stop_order_needs_a_stop_price(self):
         bad = OrderIntent("t-1", CALL, Side.SELL_TO_CLOSE, 1, order_type=OrderType.STOP)
         assert any("STOP" in p for p in bad.problems())
+
+    @pytest.mark.parametrize("order_type", [OrderType.NET_CREDIT, OrderType.NET_DEBIT])
+    def test_the_service_names_spread_orders_but_will_not_send_one(self, order_type):
+        """The transport has to report the three-leg spreads the account holds,
+        so the type vocabulary knows them; that must not become permission to
+        place one. Everything in bounds.py reasons about single-leg long
+        premium [st-ilp9]."""
+        bad = OrderIntent("t-1", CALL, Side.BUY_TO_OPEN, 1, order_type=order_type, limit=2.0)
+        assert any("does not send" in p for p in bad.problems())
+        with pytest.raises(ValueError):
+            bad.validated()
+
+    def test_every_sendable_type_is_accepted(self):
+        assert SENDABLE_ORDER_TYPES == {OrderType.LIMIT, OrderType.MARKET, OrderType.STOP}
+        assert entry().problems() == []
 
     def test_delta_outside_zero_to_one_is_refused(self):
         assert any("delta" in p for p in entry(delta=0.0).problems())

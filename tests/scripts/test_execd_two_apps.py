@@ -170,8 +170,20 @@ class TestVaultPayloadVersions:
             self, tmp_path, monkeypatch, capsys):
         """It must read SCHWAB_TRADING_TOKEN_PATH. Reading the market token
         here would put a credential that cannot trade into the vault the
-        service sends orders with — and it would fail live, not at start-up."""
+        service sends orders with — and it would fail live, not at start-up.
+
+        The missing token is named under ``tmp_path``. Until st-ilp9's session this
+        test left the path out and relied on the default not existing on the
+        box; Steve authorised app 2 on 09-05, the real token appeared, and the
+        test went red asking for a passphrase. A test whose result depends on
+        whether a live credential happens to exist is not testing the code."""
+        absent = tmp_path / "gone" / "schwab_trading_token.json"
         monkeypatch.setattr(evi, "load_schwab_trading", lambda: {
-            "SCHWAB_TRADING_API_KEY": "T-KEY", "SCHWAB_TRADING_APP_SECRET": "T-SECRET"})
+            "SCHWAB_TRADING_API_KEY": "T-KEY", "SCHWAB_TRADING_APP_SECRET": "T-SECRET",
+            "SCHWAB_TRADING_TOKEN_PATH": str(absent)})
         assert evi.init(tmp_path / "vault.json") == 1
-        assert "schwab_trading_token.json" in capsys.readouterr().err
+        assert str(absent) in capsys.readouterr().err
+
+    def test_the_token_path_falls_back_to_the_trading_token_not_the_market_one(self):
+        """The half of the above that the filesystem used to prove."""
+        assert evi._token_path({}).name == "schwab_trading_token.json"

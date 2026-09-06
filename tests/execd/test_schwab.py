@@ -8,12 +8,20 @@ market-data API on 2026-09-04 by ``scripts/record_schwab_shapes.py``
 tests read those files, so a field Schwab renames breaks a test here before
 it breaks the service.
 
-**Spec-derived** — the Trader API bodies (account numbers, positions, orders,
-preview) are built in this file from the Accounts and Trading API
-specification, because on the day this was written the app answered every
-``/trader`` call with 401 ``no apiproduct match found``. They are marked
-``SPEC`` below. When the product is on the app the recorder replaces them
-with captures and these constants go.
+**Spec-derived** — the remaining Trader API bodies (positions, preview, and the
+``spec_order`` bodies that let a test ask for one exact shape) are built in this
+file from the Accounts and Trading API specification, because on the day this
+was written the app answered every ``/trader`` call with 401 ``no apiproduct
+match found``. They are marked ``SPEC`` below.
+
+That changed on 2026-09-05, when app 2 took the trading product and
+``account_numbers.json``, ``account_positions.json``, ``orders.json`` and
+``order_by_id.json`` were captured from the live account. The first thing the
+recording did was disprove the specification-written client: 18 of the 38 real
+orders are three-leg butterflies, and the transport was reading every one of
+them as a single option [st-ilp9]. ``TestMultiLegOrders`` below runs against
+that recording. Preview, place and cancel can never be recorded — the recorder
+is GET-only by Steve's 2026-08-30 ruling — so those stay spec-derived.
 
 The fake never opens a socket: ``httpx.MockTransport`` hands every request to
 :class:`FakeSchwab`, which records it and answers from state. That is also
@@ -774,6 +782,146 @@ class TestOrdersAndFills:
         fake.orders[1] = spec_order(1, status="FILLED", fills=[(1, 2.08, "2026-09-04T14:31:03+0000")])
         fills = broker.fills_since(datetime(2026, 9, 4, 14, 0, tzinfo=timezone.utc))
         assert [f.order_id for f in fills] == ["1", "2"]
+
+
+# ── multi-leg orders, against the recording ──────────────────────────────
+#
+# RECORDED, not spec-derived: ``orders.json`` is the real account, captured
+# 2026-09-05 20:51 CT once app 2 carried the trading product. It is what found
+# this defect — the client was written from the specification, and the
+# specification did not say what the account would contain. Steve trades
+# three-leg butterflies by hand in the same account the service reads, so the
+# transport has to describe orders it would never place [st-ilp9].
+
+BUTTERFLY_ID = 1007760611230        # a FILLED net credit, recorded 2026-08-28
+BEFORE_THE_RECORDING = datetime(2026, 7, 1, tzinfo=timezone.utc)   # earliest fill: 07-27
+
+
+def recorded_orders() -> list[dict[str, Any]]:
+    return _load("orders")
+
+
+class TestMultiLegOrders:
+    @pytest.fixture
+    def account(self, fake):
+        """The recorded account, served whole by the fake."""
+        fake.orders = {o["orderId"]: o for o in recorded_orders()}
+        return fake
+
+    def test_the_recording_holds_both_shapes(self):
+        legs = [len(o["orderLegCollection"]) for o in recorded_orders()]
+        assert (legs.count(1), legs.count(3), len(legs)) == (20, 18, 38)
+
+    def test_order_strategy_type_is_not_the_leg_count(self):
+        """The value that reads like it says 'one leg' and does not: all 38 say
+        SINGLE, 18 of them have three legs. It separates a plain order from an
+        OCO or TRIGGER group."""
+        assert {o["orderStrategyType"] for o in recorded_orders()} == {"SINGLE"}
+
+    def test_every_leg_of_every_recorded_order_is_reported(self, broker, account):
+        by_id = {o.order_id: o for o in broker.orders()}
+        for raw in recorded_orders():
+            assert len(by_id[str(raw["orderId"])].legs) == len(raw["orderLegCollection"])
+
+    def test_a_butterfly_reports_three_legs_with_their_own_strikes(self, broker, account):
+        (order,) = [o for o in broker.orders() if o.order_id == str(BUTTERFLY_ID)]
+        assert [(leg.leg_id, leg.instruction, leg.symbol, leg.qty) for leg in order.legs] == [
+            (1, "SELL_TO_CLOSE", "SPXW  260828C07715000", 1),
+            (2, "BUY_TO_CLOSE", "SPXW  260828C07725000", 2),
+            (3, "SELL_TO_CLOSE", "SPXW  260828C07735000", 1),
+        ]
+        assert order.is_multi_leg and order.strategy == "BUTTERFLY"
+
+    def test_a_spread_is_not_reported_as_a_limit_order(self, broker, account):
+        """The old ladder knew LIMIT, MARKET and STOP; everything else fell to a
+        guess that picked LIMIT whenever a price was present, which is every
+        net-credit and net-debit order in the account."""
+        (order,) = [o for o in broker.orders() if o.order_id == str(BUTTERFLY_ID)]
+        assert order.order_type is OrderType.NET_CREDIT
+        types = {o.order_type for o in broker.orders() if o.is_multi_leg}
+        assert types == {OrderType.NET_CREDIT, OrderType.NET_DEBIT}
+
+    def test_a_spread_claims_no_single_symbol_or_side(self, broker, account):
+        """Leg 0's strike is not the order's strike. Reporting it as one is how
+        a butterfly became 'one option at 7715' — an empty symbol is a caller's
+        cue to read the legs, a wrong symbol is not."""
+        for order in broker.orders():
+            if order.is_multi_leg:
+                assert order.symbol == ""
+            else:
+                assert order.symbol == order.legs[0].symbol
+
+    def test_the_net_price_is_the_spread_price_not_a_leg_average(self, broker, account):
+        """Legs filled at 3.23, 0.85 and 0.22; the order was a net credit of
+        1.75. Averaging the legs gives 1.2875, which is not a price anything
+        traded at."""
+        (order,) = [o for o in broker.orders() if o.order_id == str(BUTTERFLY_ID)]
+        assert order.fill_price == 1.75
+        assert order.price == 1.75          # it filled at its limit
+
+    def test_every_filled_spread_prices_within_its_limit(self, broker, account):
+        """A fill is at the limit or better, never worse — the check that says
+        the sign convention is right rather than merely plausible."""
+        checked = 0
+        for order in broker.orders():
+            if not (order.is_multi_leg and order.is_filled and order.fill_price):
+                continue
+            checked += 1
+            if order.order_type is OrderType.NET_CREDIT:
+                assert order.fill_price >= order.price      # took at least the credit
+            else:
+                assert order.fill_price <= order.price      # paid no more than the debit
+        assert checked == 11
+
+    def test_each_execution_leg_is_stamped_with_its_own_leg(self, broker, account):
+        """Three fills, three symbols. Before this, all three carried leg 0's
+        symbol and side — three records saying a 7715 call traded at 3.23, 0.85
+        and 0.22."""
+        fills = [f for f in broker.fills_since(BEFORE_THE_RECORDING)
+                 if f.order_id == str(BUTTERFLY_ID)]
+        assert [(f.leg_id, f.instruction, f.symbol, f.qty, f.price) for f in fills] == [
+            (1, "SELL_TO_CLOSE", "SPXW  260828C07715000", 1, 3.23),
+            (2, "BUY_TO_CLOSE", "SPXW  260828C07725000", 2, 0.85),
+            (3, "SELL_TO_CLOSE", "SPXW  260828C07735000", 1, 0.22),
+        ]
+
+    def test_no_fill_in_the_account_borrows_another_legs_symbol(self, broker, account):
+        """The general form of the same defect, over all 72 recorded execution
+        legs: a fill's symbol is the symbol of the leg its legId names."""
+        wanted = {(str(o["orderId"]), leg["legId"]): leg["instrument"]["symbol"]
+                  for o in recorded_orders() for leg in o["orderLegCollection"]}
+        fills = broker.fills_since(BEFORE_THE_RECORDING)
+        assert len(fills) == 72
+        for f in fills:
+            assert f.symbol == wanted[(f.order_id, f.leg_id)]
+
+    def test_a_single_leg_order_is_unchanged(self, broker, account):
+        """The service's own orders are single-leg, and nothing about them moves:
+        symbol, side and an averaged fill price, exactly as before."""
+        singles = [o for o in broker.orders() if not o.is_multi_leg]
+        assert len(singles) == 20
+        for order in singles:
+            assert order.symbol and order.order_type is OrderType.LIMIT
+            assert order.side in (Side.BUY_TO_OPEN, Side.SELL_TO_CLOSE)
+
+    def test_an_execution_leg_naming_no_leg_reports_no_symbol(self, broker, fake):
+        """Rather than falling back to whichever leg is first — the fallback is
+        the bug."""
+        o = spec_order(3, status="FILLED", fills=[(1, 2.08, "2026-09-04T14:31:03+0000")])
+        o["orderActivityCollection"][0]["executionLegs"][0]["legId"] = 99
+        fake.orders[3] = o
+        (fill,) = broker.fills_since(NOW - timedelta(hours=1))
+        assert fill.symbol == "" and fill.instruction == "" and fill.leg_id == 99
+        assert fill.price == 2.08
+
+    def test_an_unattributable_leg_makes_the_net_price_unknown(self, broker, fake):
+        o = spec_order(4, status="FILLED", order_type="NET_CREDIT", price=1.75,
+                       fills=[(1, 2.08, "2026-09-04T14:31:03+0000")])
+        o["orderLegCollection"].append(dict(o["orderLegCollection"][0], legId=2))
+        o["orderActivityCollection"][0]["executionLegs"][0]["legId"] = 99
+        fake.orders[4] = o
+        (order,) = broker.orders()
+        assert order.is_multi_leg and order.fill_price is None
 
 
 # ── what the transport never does ────────────────────────────────────────
