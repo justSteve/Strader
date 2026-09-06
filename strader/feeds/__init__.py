@@ -18,11 +18,17 @@ from typing import Any
 
 # name -> dotted module path in the carried infra. The catalog doubles as
 # documentation of exactly what Strader carries.
+#
+# KEEP IT TRUE. `ingest_mancini -> market.ingest.mancini` sat here pointing at
+# a module the 2026-09-06 prune removed (nothing consumed session_from_mancini
+# anywhere in the tree). `available()` swallows the ImportError and reports
+# False, so a stale entry reads as "dep not installed" rather than "catalog is
+# lying" — which is why tests/strader/test_feeds_catalog.py now asserts every
+# entry resolves. [st-rfjg / st-c6ii]
 CARRIED: dict[str, str] = {
     # market data ingest (raw API -> typed entities, US/Central normalized)
     "ingest_databento": "market.ingest.databento",
     "ingest_schwab": "market.ingest.schwab",
-    "ingest_mancini": "market.ingest.mancini",
     "ingest_gexbot": "market.ingest.gexbot",
     # append-only corpus (history-is-the-value)
     "corpus_paths": "market.corpus.paths",
