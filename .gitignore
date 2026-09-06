@@ -82,3 +82,8 @@ logs/
 # The live DB is covered by the weekly WSL-image backup; do not re-add. [st-z3y5]
 .beads/*.bak
 .beads/backup-pre-*.jsonl
+
+# Written by the bd binary's workspacegate package, one per gated path.
+# Tracked by accident in 36f0a81 (a wide `git add`); deleting it just makes bd
+# write it back, so it is ignored rather than removed. [st-rfjg, audit row 56]
+.beads.gate.lock

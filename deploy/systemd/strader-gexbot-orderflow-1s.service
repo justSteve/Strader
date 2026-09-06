@@ -1,7 +1,9 @@
 [Unit]
 # GexBot 1Hz orderflow leg. [st-pgfe] Container change only — see strader-capture.service for the
-# full rationale. Window 08:30-15:05 CT, ported verbatim from
-# scripts/cron/gexbot-orderflow-1s-supervisor-session.sh (STRADER_CAPTURE_START_CT/UNTIL_CT).
+# full rationale. Window 08:30-15:05 CT, ported verbatim from the retired
+# gexbot-orderflow-1s-supervisor.sh (pruned 2026-09-06, tag pre-prune-2026-09-05). The window now
+# lives in ExecStart below and nowhere else; tests/scripts/test_gexbot_collect_window.py
+# pins it against the collector's own measured default.
 Description=Strader GexBot 1Hz orderflow leg
 After=network-online.target
 Wants=network-online.target

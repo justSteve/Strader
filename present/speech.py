@@ -1,7 +1,8 @@
 """Render emitted Signals as sentences meant to be *heard*.
 
-``present/signals.py`` formats the same objects for the eye — a tmux pane you
-scan. This module is its ear-side twin, and it is deliberately a separate
+``present/signals.py`` formatted the same objects for the eye — a tmux pane you
+scan — until it was pruned 2026-09-06 (tag pre-prune-2026-09-05) with the dashboard it fed,
+which was never written. This module outlived it and is deliberately a separate
 rendering rather than a reuse of ``Signal.reason``:
 
 1. ``reason`` is written to be read, in measurement-harness vocabulary.

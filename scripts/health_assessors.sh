@@ -9,7 +9,7 @@
 #     data/corpus/_gexbot_of1s_health.json  GexBot 1 Hz leg    (strader-gexbot-orderflow-1s.service)
 #
 # WHY THIS EXISTS. Until 2026-08-13 the */2 cron supervisors
-# (scripts/cron/*-supervisor*.sh → capture-supervisor-wrapper.sh) both relaunched
+# (scripts/cron/*-supervisor*.sh, pruned 2026-09-06 — tag pre-prune-2026-09-05) both relaunched
 # the collectors and ran the assessor. st-pgfe moved the collectors into systemd
 # units, which relaunch on failure by themselves — but nothing took over the
 # assessor half, so all three files froze at 2026-08-13 and every reader
@@ -21,9 +21,11 @@
 # readers were built for (they treat >180 s as stale).
 #
 # The arguments per collector are the ones the retired supervisors passed —
-# ported verbatim from scripts/cron/capture-supervisor-session.sh,
-# gexbot-supervisor-session.sh and gexbot-orderflow-1s-supervisor.sh — so the
-# verdict semantics (window, venue calendar, stale threshold) are unchanged.
+# ported verbatim from capture-supervisor-session.sh, gexbot-supervisor-session.sh
+# and gexbot-orderflow-1s-supervisor.sh, all four pruned 2026-09-06 (tag pre-prune-2026-09-05)
+# once this script had carried their arguments for three weeks — so the verdict
+# semantics (window, venue calendar, stale threshold) are unchanged. THIS FILE is
+# now where those arguments live; there is no second copy to drift against.
 #
 # Exit code: 0 unless an assessor itself broke (its rc=2). A DEAD/STALE verdict
 # is the assessor's finding, written to the state file and the health log where

@@ -18,6 +18,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[2]
 
 #: First second the feed carries information, measured 2026-08-07.
@@ -56,9 +58,29 @@ def test_the_tail_is_short_enough_to_stay_deliberate():
     assert poller.DEFAULT_UNTIL_CT <= "15:15"
 
 
-def test_the_supervisor_agrees_with_the_collector():
-    """Two windows that disagree mean the supervisor relaunches a collector that
-    immediately exits on its own gate, every two minutes."""
-    wrapper = (REPO / "scripts" / "cron" / "gexbot-supervisor-session.sh").read_text()
-    assert f"STRADER_CAPTURE_START_CT:-{poller.DEFAULT_START_CT}" in wrapper
-    assert f"STRADER_CAPTURE_UNTIL_CT:-{poller.DEFAULT_UNTIL_CT}" in wrapper
+UNITS = ("strader-gexbot.service", "strader-gexbot-orderflow-1s.service")
+
+
+@pytest.mark.parametrize("unit", UNITS)
+def test_the_scheduler_agrees_with_the_collector(unit):
+    """Two windows that disagree mean the scheduler launches a collector that
+    exits immediately on its own gate — a feed that looks scheduled and
+    collects nothing.
+
+    This used to read `scripts/cron/gexbot-supervisor-session.sh`, which passed
+    the window as STRADER_CAPTURE_*_CT env vars. Those */2 supervisors were
+    retired for systemd timers on 2026-08-13 and the wrappers were pruned on
+    2026-09-06 [st-rfjg, audit row 25]. The drift risk did not go away with
+    them, it MOVED: the window now lives in each unit's own ExecStart, so that
+    is what the collector is checked against. Both gexbot units are covered
+    because both pass the window explicitly.
+    """
+    exec_start = (REPO / "deploy" / "systemd" / unit).read_text()
+    assert f"--start-ct {poller.DEFAULT_START_CT}" in exec_start, (
+        f"{unit} opens its window somewhere other than the collector's "
+        f"measured {poller.DEFAULT_START_CT} default"
+    )
+    assert f"--until-ct {poller.DEFAULT_UNTIL_CT}" in exec_start, (
+        f"{unit} closes its window somewhere other than the collector's "
+        f"{poller.DEFAULT_UNTIL_CT} default"
+    )

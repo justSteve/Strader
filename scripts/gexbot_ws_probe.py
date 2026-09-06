@@ -83,11 +83,12 @@ BASE_URL = "https://api.gex.bot/v2"
 USER_AGENT = "Strader-WSProbe/1.0 (st-8qqw)"
 PROBE_ROOT = ROOT / "data" / "probes" / "gexbot-ws"
 
-# Matches scripts/gexbot_probe.py: cold TLS handshake plus any IPv6/IPv4 fallback
+# Matches gexbot_probe.py (pruned 2026-09-06, tag pre-prune-2026-09-05): cold TLS handshake
+# plus any IPv6/IPv4 fallback
 # does not fit inside the spec's 1s steady-state polling guidance.
 HTTP_TIMEOUT_S = 10.0
 # WSL on this distro returns ENETUNREACH on IPv6; binding the local socket to the
-# IPv4 any-address forces IPv4-only. Carried from scripts/gexbot_probe.py, same cause.
+# IPv4 any-address forces IPv4-only. Carried from the same pruned probe, same cause.
 LOCAL_ADDR_V4 = "0.0.0.0"
 
 # The vendor's publish window, in Central. websocket.md states it as NYSE cash hours.
@@ -162,7 +163,7 @@ def bearer(api_key: str) -> str:
     """Per the spec README the secret carries a `gexbot_custom_` prefix.
 
     A key dropped into .env with the prefix already attached must not be doubled —
-    same guard as scripts/gexbot_probe.py.
+    same guard the pruned gexbot_probe.py used.
     """
     token = api_key if api_key.startswith("gexbot_custom_") else f"gexbot_custom_{api_key}"
     return f"Bearer {token}"

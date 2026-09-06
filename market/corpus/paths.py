@@ -11,7 +11,7 @@ keyed by US/Central calendar date — `data/corpus/YYYY-MM-DD/`. Inside:
     manifest.json           collection summary, errors, cycle counts
 
 Date keying uses US/Central because that's the convention the rest of the
-Strader codebase already uses (see gex_series.py date rollover logic) and
+Strader codebase already uses (central_date below is the one definition) and
 it lines up with the cash session boundary at 15:00 CT.
 """
 from __future__ import annotations

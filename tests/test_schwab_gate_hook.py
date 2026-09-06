@@ -17,6 +17,7 @@ Points at the live hook — the fix was installed 2026-08-13 with Steve's approv
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -24,6 +25,14 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 GATE = REPO / ".claude" / "hooks" / "scripts" / "schwab-gate.sh"
+
+# The gate reads the named file's imports and SKIPS a file that is not there
+# (`[ -f "$PY_FILE" ] || continue`), so a case naming a production script
+# becomes an allow the day that script is deleted — a green suite over an
+# open gate. The behavioural cases below name fixtures that exist only to be
+# read; the live estate is covered by the sweep at the bottom of this file,
+# which follows the tree instead of pinning filenames. [st-rfjg, audit row 41]
+FIX = "tests/fixtures/schwab_gate"
 
 ALLOW, BLOCK = 0, 2
 
@@ -45,9 +54,9 @@ def flat(cmd: str) -> dict:
 
 
 BLOCKED = [
-    ("direct schwab import", "python3 scripts/refresh_schwab_token.py"),
-    ("transitive via broker_schwab", ".venv/bin/python scripts/gex_now.py"),
-    ("transitive, another", ".venv/bin/python3 scripts/mi_gauge.py --live"),
+    ("direct schwab import", f"python3 {FIX}/reaches_schwab_direct.py"),
+    ("transitive via broker_schwab", f".venv/bin/python {FIX}/reaches_broker_schwab.py"),
+    ("transitive, with args", f".venv/bin/python3 {FIX}/reaches_broker_schwab.py --live"),
     ("inline -c schwab", "python3 -c 'import schwab; print(1)'"),
     ("schwab as module", "python3 -m schwab.something"),
     ("steve's runner", "./scripts/run.sh hello_schwab.py"),
@@ -72,6 +81,7 @@ ALLOWED = [
     ("entitlements probe (tap-in calls this)", ".venv/bin/python3 scripts/entitlements_probe.py"),
     ("git show of a scripts path", "git show HEAD:scripts/run.sh"),
     ("grep mentioning schwab", "grep -rn schwab docs/"),
+    ("a .py reaching neither", f".venv/bin/python {FIX}/reaches_nothing.py"),
 ]
 
 
@@ -169,7 +179,7 @@ def test_the_hook_blocks_when_jq_is_missing(tmp_path):
     empty.mkdir()
     proc = subprocess.run(
         ["/bin/bash", str(GATE)],
-        input=json.dumps(nested("python3 scripts/hello_schwab.py")),
+        input=json.dumps(nested(f"python3 {FIX}/reaches_schwab_direct.py")),
         capture_output=True, text=True, cwd=REPO,
         env={**os.environ, "PATH": str(empty)},
     )
@@ -183,3 +193,56 @@ def test_the_guard_does_not_block_a_healthy_path():
     code = run(nested("ls -la scripts/run.sh"))
     assert code == ALLOW
 
+
+# --- the live estate, swept ------------------------------------------------
+#
+# The cases above prove the gate's RULE on fixtures. This proves the rule
+# covers the tree as it actually stands today, without naming a single file
+# that a prune could remove underneath it. [st-rfjg, audit row 41]
+
+REACHES = re.compile(
+    r"^[ \t]*(import[ \t]+(schwab|broker_schwab)|from[ \t]+(schwab|broker_schwab))",
+    re.MULTILINE,
+)
+
+
+def _tracked_py() -> list[str]:
+    out = subprocess.run(
+        ["git", "ls-files", "*.py"], cwd=REPO, capture_output=True, text=True
+    )
+    return [ln for ln in out.stdout.splitlines() if ln]
+
+
+def _reaching_files() -> list[str]:
+    hits = []
+    for rel in _tracked_py():
+        if rel.startswith("broker_schwab/readers/") or rel.startswith("lib/"):
+            continue
+        try:
+            body = (REPO / rel).read_text(errors="ignore")
+        except OSError:
+            continue
+        if REACHES.search(body):
+            hits.append(rel)
+    return hits
+
+
+def test_the_sweep_finds_something_to_check():
+    """A sweep that matches nothing would pass silently forever."""
+    assert _reaching_files(), (
+        "no tracked .py imports schwab or broker_schwab outside the readers — "
+        "either the estate changed shape or this sweep's regex broke"
+    )
+
+
+def test_every_reaching_file_in_the_tree_blocks():
+    """Every tracked file that reaches the API is refused, readers excepted."""
+    allowed = [rel for rel in _reaching_files() if run(nested(f"python3 {rel}")) != BLOCK]
+    assert not allowed, f"the gate allowed files that reach the live API: {allowed}"
+
+
+def test_the_approved_readers_still_pass():
+    """The two exemptions are the point of the gate being usable at all."""
+    for reader in ("quote.py", "chain.py"):
+        cmd = f".venv/bin/python3 broker_schwab/readers/{reader} '$SPX'"
+        assert run(nested(cmd)) == ALLOW, f"{reader} must stay reachable"
