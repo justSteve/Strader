@@ -11,12 +11,38 @@ set -euo pipefail
 ZGENT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 ZGENT_NAME=$(basename "$ZGENT_DIR")
 SESSION_LOG="/var/moo/logs/sessions.jsonl"
-SESSION_ID="${CLAUDE_SESSION_ID:-unknown}"
 
-# Detect warm vs cold start
+# The identity comes off STDIN, not the environment. CLAUDE_SESSION_ID is not
+# exported into a SessionStart hook, so `${CLAUDE_SESSION_ID:-unknown}` wrote
+# the literal "unknown" on every row this log has ever held — measured
+# 2026-09-05, 12 of 12 Strader rows — and no session was individually
+# identifiable. This is the schwab-gate failure again: read the wrong field,
+# find nothing, carry on silently. `-t 0` so an interactive run without a
+# payload cannot hang here, and every fallback is still "unknown".
+PAYLOAD=""
+if [ ! -t 0 ]; then
+    PAYLOAD="$(timeout 2 cat || true)"
+fi
+SESSION_ID="unknown"
+if [ -n "$PAYLOAD" ]; then
+    SESSION_ID="$(printf '%s' "$PAYLOAD" | jq -r '.session_id // "unknown"' 2>/dev/null || echo unknown)"
+fi
+[ -z "$SESSION_ID" ] && SESSION_ID="unknown"
+
+# Cold vs warm. The warm branch tested for .claude/state/snapshot.json, which
+# the checkpoint loop used to write — and that loop is DISCONTINUED
+# (knowledge/checkpoint-loop-discontinued.md). The file has never existed since,
+# so start_type was "cold" on 12 of 12 rows and the field carried no
+# information. It now reports the harness's own `source` (startup / resume /
+# clear / compact), which is the distinction the field was reaching for.
 START_TYPE="cold"
-if [ -f "$ZGENT_DIR/.claude/state/snapshot.json" ]; then
-    START_TYPE="warm"
+if [ -n "$PAYLOAD" ]; then
+    HOOK_SOURCE="$(printf '%s' "$PAYLOAD" | jq -r '.source // ""' 2>/dev/null || echo "")"
+    case "$HOOK_SOURCE" in
+        resume|clear|compact) START_TYPE="$HOOK_SOURCE" ;;
+        startup|"")           START_TYPE="cold" ;;
+        *)                    START_TYPE="$HOOK_SOURCE" ;;
+    esac
 fi
 
 # Log session start
