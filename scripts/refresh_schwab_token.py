@@ -214,6 +214,17 @@ def _shred(path: Path) -> None:
     path.unlink()
 
 
+def _harden(token_path: Path) -> None:
+    """Owner-only, always. schwab-py writes the minted token with the process
+    umask, so a fresh file comes out 0644: the trading token minted on
+    2026-09-05 sat world-readable until COO's estate review found it on
+    2026-09-07. Every copy made afterwards (backup, stash, rescue) inherits the
+    mode through copy2, so hardening the live file right after the mint covers
+    them all. A credential file is 0600 or it is not a credential file."""
+    if token_path.exists():
+        os.chmod(token_path, 0o600)
+
+
 def _sweep_rescues(token_path: Path) -> list[Path]:
     """Remove superseded copies once a re-auth has SUCCEEDED.
 
@@ -384,6 +395,8 @@ def main(argv: list[str] | None = None) -> int:
         print("[restore] reverting to previous token", file=sys.stderr)
         _restore(bak, token_path)
         return 3
+
+    _harden(token_path)
 
     print()
     print("─" * 70)

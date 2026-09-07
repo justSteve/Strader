@@ -235,3 +235,28 @@ def test_prune_copies_is_anchored_per_kind(tmp_path):
     assert len(list(tmp_path.glob("schwab_token.json.new-*"))) == 2
     assert len(list(tmp_path.glob("schwab_token.json.bak-*"))) == 1
     assert p.exists()
+
+
+# --------------------------------------------------------------------------
+# File mode: a minted token is owner-only whatever the umask [COO estate review, 2026-09-07]
+
+
+def test_harden_makes_a_minted_token_owner_only(tmp_path):
+    """schwab-py writes the token with the process umask (0644 by default); the
+    trading token minted 2026-09-05 sat world-readable for two days."""
+    p = _write(tmp_path / "schwab_token.json", _healthy())
+    p.chmod(0o644)
+    rst._harden(p)
+    assert p.stat().st_mode & 0o777 == 0o600
+
+
+def test_harden_tolerates_a_missing_file(tmp_path):
+    rst._harden(tmp_path / "schwab_token.json")  # no raise
+
+
+def test_copies_inherit_owner_only_mode_after_harden(tmp_path):
+    p = _write(tmp_path / "schwab_token.json", _healthy())
+    p.chmod(0o644)
+    rst._harden(p)
+    bak = rst._backup(p)
+    assert bak is not None and bak.stat().st_mode & 0o777 == 0o600
