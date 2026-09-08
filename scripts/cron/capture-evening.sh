@@ -27,8 +27,24 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 REPO="${STRADER_REPO:-/root/projects/Strader}"
 PY="${STRADER_PY:-$REPO/.venv/bin/python}"
 dow="$(TZ=America/Chicago date +%u)"       # 1=Mon … 5=Fri, 7=Sun
+now_ct="${STRADER_CAPTURE_NOW_CT:-$(TZ=America/Chicago date +%H:%M)}"
 until_ct="${STRADER_CAPTURE_EVENING_UNTIL_CT:-23:59:59}"
 [[ "$dow" == "5" ]] && until_ct="${STRADER_CAPTURE_FRIDAY_UNTIL_CT:-16:05}"
+
+# Refuse to start before the window opens. [st-sode, 2026-09-08]
+# The service is WantedBy=multi-user.target, so a reboot starts it whatever the
+# clock says; the streamer only refuses once its STOP time has passed, and the
+# evening stop is 23:59:59, so a 03:03 CT boot on 09-08 started this unit next
+# to strader-capture and both appended to one file for hours — every trade
+# written twice, some out of order, the footprint feed down on the first
+# out-of-order row. Exit 0 (not failure) so Restart=on-failure does not spin;
+# the timer starts the real run at 15:06 / Sun 17:00.
+opens_ct="15:06"
+[[ "$dow" == "7" ]] && opens_ct="17:00"
+if [[ "$dow" == "6" || "$now_ct" < "$opens_ct" ]]; then
+    echo "capture-evening: $now_ct CT is before the $opens_ct CT open (dow=$dow); not starting — the timer will." >&2
+    exit 0
+fi
 cd "$REPO" || exit 2
 exec env PYTHONPATH="$REPO" "$PY" "$REPO/scripts/corpus_stream_databento.py" \
     --streams es,es-mbp1 --now --until-ct "$until_ct"
