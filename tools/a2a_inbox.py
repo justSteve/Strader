@@ -213,6 +213,20 @@ def sessions_since(when: datetime, stamps: list[datetime]) -> int:
     return sum(1 for s in stamps if s > when)
 
 
+def memo_key(e: Event) -> str:
+    """The string a receipt must carry in REF to answer this memo.
+
+    Normally the memo's own REF (its filename). A MEMO row logged with REF `-`
+    has no file, so until 2026-09-08 nothing could ever answer it — receipt_index
+    skips `-` and three such rows sat OPEN with no possible reply [st-7kwg
+    session]. Such a memo is keyed by its own WHEN and ACTOR instead, and
+    fmt_memo prints that key so the reply-writer can copy it into REF.
+    """
+    if e.ref and e.ref != "-":
+        return e.ref
+    return f"@{e.when:%Y-%m-%d %H:%M}/{e.actor}"
+
+
 def receipt_index(events: list[Event]) -> dict[str, datetime]:
     """REF -> the earliest ACK/SERVICED time carrying it."""
     answered: dict[str, datetime] = {}
@@ -262,7 +276,7 @@ def open_memos(
     for e in events:
         if e.kind != "MEMO":
             continue
-        replied = answered.get(e.ref)
+        replied = answered.get(memo_key(e))
         if replied is None or replied < e.when:
             out.append(e)
     return out
@@ -279,7 +293,8 @@ def fmt_memo(e: Event, stamps: list[datetime]) -> str:
     n = sessions_since(e.when, stamps)
     flag = "[ALERT] " if n >= STALE_SESSIONS else ""
     plural = "session" if n == 1 else "sessions"
-    slug = re.sub(r"^\d{4}-\d{2}-\d{2}-", "", e.ref)  # date already shown
+    key = memo_key(e)
+    slug = key if key.startswith("@") else re.sub(r"^\d{4}-\d{2}-\d{2}-", "", key)  # date already shown
     return f"  {flag}{e.when:%Y-%m-%d} {slug} — OPEN {n} {plural} ({e.actor})"
 
 
@@ -342,14 +357,14 @@ def main() -> int:
         # is done — and not silence either, because silence is how 08-25 happened.
         peer_only = [
             e for e in events
-            if e.kind == "MEMO" and e.ref in extra and extra[e.ref][0] >= e.when
-            and not (e.ref in local and local[e.ref] >= e.when)
+            if e.kind == "MEMO" and memo_key(e) in extra and extra[memo_key(e)][0] >= e.when
+            and not (memo_key(e) in local and local[memo_key(e)] >= e.when)
         ]
         if peer_only:
             print(f"RECEIPTS FILED PEER-SIDE ONLY ({len(peer_only)}) — answered, wrong ledger [st-1eaw]")
             for e in sorted(peer_only, key=lambda x: x.when):
-                when, peer = extra[e.ref]
-                slug = re.sub(r"^\d{4}-\d{2}-\d{2}-", "", e.ref)
+                when, peer = extra[memo_key(e)]
+                slug = re.sub(r"^\d{4}-\d{2}-\d{2}-", "", memo_key(e))
                 print(f"  {e.when:%Y-%m-%d} {slug} — receipt sits in {peer}'s ledger "
                       f"({when:%Y-%m-%d}); receipt-protocol §2 wants it here")
             print()

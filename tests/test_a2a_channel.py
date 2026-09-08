@@ -193,6 +193,45 @@ def test_directive_is_writable_not_retired():
     assert "DIRECTIVE" not in a2a.RETIRED_KINDS
 
 
+def test_memo_with_no_ref_is_keyed_by_when_and_actor_and_closable(tmp_path):
+    """A MEMO row logged with REF `-` has no filename to answer. Before 2026-09-08
+    it was OPEN forever: receipt_index skips `-`. Now it is keyed @WHEN/ACTOR,
+    the alert line prints that key, and a receipt naming it closes the memo."""
+    p = tmp_path / "inbox.md"
+    p.write_text(
+        _ledger("| 2026-08-30 13:42 CT | COO | MEMO | st-1pgv | - | - | relayed request |\n"),
+        encoding="utf-8",
+    )
+    events, _ = a2a.parse_inbox(p)
+    (memo,) = a2a.open_memos(events)
+    assert a2a.memo_key(memo) == "@2026-08-30 13:42/COO"
+    assert "@2026-08-30 13:42/COO" in a2a.fmt_memo(memo, [])
+
+    p.write_text(
+        _ledger(
+            "| 2026-08-30 13:42 CT | COO | MEMO | st-1pgv | - | - | relayed request |\n"
+            "| 2026-09-08 07:00 CT | Strader | ACK | st-1pgv | @2026-08-30 13:42/COO | - | read |\n"
+        ),
+        encoding="utf-8",
+    )
+    events, _ = a2a.parse_inbox(p)
+    assert a2a.open_memos(events) == []
+
+
+def test_receipt_with_dash_ref_answers_nothing(tmp_path):
+    """The old failure, pinned: an ACK whose REF is `-` closes no memo, not all of them."""
+    p = tmp_path / "inbox.md"
+    p.write_text(
+        _ledger(
+            "| 2026-08-30 13:42 CT | COO | MEMO | st-1pgv | - | - | relayed request |\n"
+            "| 2026-09-08 07:00 CT | Strader | ACK | st-1pgv | - | - | read |\n"
+        ),
+        encoding="utf-8",
+    )
+    events, _ = a2a.parse_inbox(p)
+    assert len(a2a.open_memos(events)) == 1
+
+
 def test_receipt_must_match_the_ref(tmp_path):
     """A receipt with the wrong REF leaves the memo open — the failure to catch."""
     p = tmp_path / "inbox.md"
