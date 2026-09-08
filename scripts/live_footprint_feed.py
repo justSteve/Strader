@@ -29,6 +29,16 @@ ORDERING
     is latency added to every bar, so keep it small; 2s absorbs a reconnect
     without being visible against a bar that takes 30-60s to form.
 
+    The lag is measured in EVENT time, so it protects the live tail only. The
+    backlog already on disk at start is read in a burst, and a reconnect storm
+    can leave it interleaved by far more than the lag (2026-09-08: 9,446 rows
+    more than 2 s late, the worst 23.6 s; the feeder died on the same line 73
+    times). So the buffer holds everything until ``tail_rows`` says the file has
+    been read to its end (``CAUGHT_UP``), sorts the whole backlog once, and
+    only then applies the lag. A tail trade that still arrives later than
+    something already released is dropped and counted, never fatal — a bar
+    short a few prints beats a unit in a restart loop. [st-owq1]
+
 Usage:
     # Follow today's ES tape, push bars to a bridge on the default port
     .venv/bin/python scripts/live_footprint_feed.py
@@ -102,6 +112,18 @@ class DayRolledOver(RuntimeError):
     """The CT date advanced past the day this feeder was pinned to. [st-h510]"""
 
 
+class _CaughtUp:
+    """Marker ``tail_rows`` yields once, when a followed file has been read to
+    its current end. ``ordered_trades`` uses it to sort the backlog before the
+    reorder lag takes over; every other consumer should skip it. [st-owq1]"""
+
+    def __repr__(self) -> str:
+        return "CAUGHT_UP"
+
+
+CAUGHT_UP = _CaughtUp()
+
+
 def tail_rows(path: Path, *, follow: bool, poll_s: float = 0.5,
               stop_after_idle_s: float | None = None,
               pinned_day: _date | None = None):
@@ -123,6 +145,7 @@ def tail_rows(path: Path, *, follow: bool, poll_s: float = 0.5,
     buf = ""
     fh = None
     idle_since = None
+    announced_caught_up = False
     # A compacted day is a finished day: it cannot grow, so following it would
     # spin forever. Catch up over it and stop. (This bites the moment the
     # compaction cron has run over the day you are replaying.)
@@ -171,6 +194,11 @@ def tail_rows(path: Path, *, follow: bool, poll_s: float = 0.5,
 
             if not follow:
                 return
+            # The first empty read while following is the end of the backlog:
+            # everything below this point arrives live. Said once. [st-owq1]
+            if not announced_caught_up:
+                announced_caught_up = True
+                yield CAUGHT_UP
             # Checked only when the tape is IDLE, which is the one state that
             # can persist across midnight. A day still printing is a day still
             # live, whatever the wall clock says. [st-h510]
@@ -197,23 +225,53 @@ def ordered_trades(rows, *, reorder_lag_s: float, flush_at_end: bool = True):
     older than ``reorder_lag_s`` behind the newest seen, sorted by (ts,
     sequence). Duplicates — which a reconnect will redeliver — are dropped on
     ``dedup_key``. This is what keeps ``build_bars`` from raising mid-session.
+
+    Two rules added on st-owq1, after a reconnect storm scrambled a day's file
+    by up to 23.6 s and the feeder died on the same line 73 times:
+
+    * Until ``rows`` yields ``CAUGHT_UP`` (or ends), nothing is released: the
+      whole backlog is sorted once, so disorder of any size on disk is
+      absorbed. The lag then governs the live tail as before. A stream that
+      never yields the marker (``follow=False``) is sorted in full at the end.
+    * A trade that would still land behind something already released is
+      dropped and counted (``late``), with a warning, instead of being handed
+      to ``build_bars`` to raise on.
     """
     pending: list[tuple[datetime, int, object]] = []
     seen: set[tuple] = set()
     newest: datetime | None = None
-    dupes = bad = 0
+    last_out: tuple[datetime, int] | None = None
+    holding = True
+    dupes = bad = late = 0
 
     def _drain(cutoff):
+        nonlocal last_out, late
         pending.sort(key=lambda t: (t[0], t[1]))
         keep = []
         for item in pending:
-            if cutoff is None or item[0] <= cutoff:
-                yield item[2]
-            else:
+            if cutoff is not None and item[0] > cutoff:
                 keep.append(item)
+                continue
+            if last_out is not None and (item[0], item[1]) < last_out:
+                late += 1
+                if late == 1 or late % 500 == 0:
+                    logger.warning(
+                        "late trade dropped: %s arrived after %s was released "
+                        "(%.1fs behind the reorder lag; %d dropped so far)",
+                        item[0].isoformat(timespec="milliseconds"),
+                        last_out[0].isoformat(timespec="milliseconds"),
+                        (last_out[0] - item[0]).total_seconds(), late)
+                continue
+            last_out = (item[0], item[1])
+            yield item[2]
         pending[:] = keep
 
     for row in rows:
+        if row is CAUGHT_UP:
+            holding = False
+            if newest is not None:
+                yield from _drain(newest - _timedelta_seconds(reorder_lag_s))
+            continue
         try:
             key = dedup_key(row)
             if key in seen:
@@ -229,13 +287,15 @@ def ordered_trades(rows, *, reorder_lag_s: float, flush_at_end: bool = True):
         pending.append(parsed)
         ts = parsed[0]
         newest = ts if newest is None or ts > newest else newest
-        cutoff = newest - _timedelta_seconds(reorder_lag_s)
-        yield from _drain(cutoff)
+        if holding:
+            continue
+        yield from _drain(newest - _timedelta_seconds(reorder_lag_s))
 
     if flush_at_end:
         yield from _drain(None)
-    if dupes or bad:
-        logger.info("feeder: %d duplicate rows dropped, %d bad rows", dupes, bad)
+    if dupes or bad or late:
+        logger.info("feeder: %d duplicate rows dropped, %d bad rows, %d late trades dropped",
+                    dupes, bad, late)
 
 
 def _timedelta_seconds(s: float):

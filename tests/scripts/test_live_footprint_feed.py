@@ -189,8 +189,10 @@ def test_idle_tail_raises_when_the_ct_date_rolls_past_the_pinned_day(tmp_path, m
         for r in it:
             got.append(r)
     # The tape it already had is delivered first — the guard fires on IDLE, not
-    # on open, so a real session's bars are never dropped by it.
-    assert len(got) == len(rows)
+    # on open, so a real session's bars are never dropped by it. The caught-up
+    # marker lands between the backlog and the guard. [st-owq1]
+    assert got.count(feed.CAUGHT_UP) == 1
+    assert len([r for r in got if r is not feed.CAUGHT_UP]) == len(rows)
     assert "2026-08-12" in str(e.value) and "2026-08-13" in str(e.value)
 
 
@@ -207,7 +209,86 @@ def test_pinned_day_guard_is_silent_while_the_date_still_matches(tmp_path, monke
     # stop_after_idle_s gives the loop a way out that is NOT the rollover guard
     got = list(feed.tail_rows(p, follow=True, poll_s=0.01,
                               stop_after_idle_s=0.05, pinned_day=same))
-    assert len(got) == len(rows)
+    # One caught-up marker, said once however many idle polls follow. [st-owq1]
+    assert got.count(feed.CAUGHT_UP) == 1
+    assert len([r for r in got if r is not feed.CAUGHT_UP]) == len(rows)
+
+
+# --- the scrambled backlog (st-owq1) -----------------------------------------
+
+def _scramble_beyond_the_lag(rows, *, at=200, block=40, shift_s=20.0):
+    """Move a block of rows ``shift_s`` later in the FILE without touching
+    their event times — what a reconnect replay writes: old trades appended
+    after newer ones, further apart than any 2 s reorder lag covers."""
+    later = next(i for i, r in enumerate(rows)
+                 if datetime.fromisoformat(r["provenance"]["ts_event"])
+                 >= datetime.fromisoformat(rows[at]["provenance"]["ts_event"])
+                 + timedelta(seconds=shift_s))
+    moved = rows[at:at + block]
+    rest = rows[:at] + rows[at + block:]
+    cut = later - block
+    return rest[:cut] + moved + rest[cut:]
+
+
+def test_scrambled_backlog_is_sorted_before_the_lag_applies(tmp_path):
+    """2026-09-08: the day's file carried 9,446 rows more than 2 s out of
+    order after a reconnect storm, and the feeder died on the first of them
+    73 times in a row. The backlog is on disk in full when the feeder starts,
+    so there is no reason to apply a 2 s lag to it: hold, sort once, then
+    stream. Bars must equal the clean file's bars."""
+    rows = _synthetic_rows(600)
+    scrambled = _scramble_beyond_the_lag(rows)
+    assert scrambled != rows
+    path = _write_day(tmp_path, scrambled)
+    clean = _write_day(tmp_path, rows, name="clean.jsonl")
+
+    # The unfollowed read (a replay, --catch-up-only) sorts at the end.
+    assert _run_feeder(path, 200) == _run_feeder(clean, 200)
+
+    # The followed read (the live unit) sorts at the caught-up marker and
+    # keeps only the lag's worth pending — so the bars stream while the tape
+    # is still idle, not after the next print.
+    rows_live = feed.tail_rows(path, follow=True, poll_s=0.01, stop_after_idle_s=0.05)
+    trades = list(feed.ordered_trades(rows_live, reorder_lag_s=2.0))
+    assert [t.sequence for t in trades] == [r["data"]["sequence"] for r in rows]
+
+
+def test_late_tail_trade_is_dropped_and_counted_not_fatal(caplog):
+    """After catch-up a trade can still land behind something already
+    released (a live reconnect replay later than the lag). It is dropped with
+    a warning; the engine never sees disorder and the unit never dies."""
+    rows = _synthetic_rows(300)
+    # A trade from 10 s earlier arriving on the live tail, with a sequence no
+    # earlier row used so dedup does not hide it.
+    stale = _row(9999, 7500.0, 3, "B",
+                 ts=datetime.fromisoformat(rows[250]["provenance"]["ts_event"])
+                 - timedelta(seconds=10))
+    stream = rows[:100] + [feed.CAUGHT_UP] + rows[100:250] + [stale] + rows[250:]
+
+    with caplog.at_level("WARNING"):
+        trades = list(feed.ordered_trades(iter(stream), reorder_lag_s=2.0))
+
+    assert [t.sequence for t in trades] == [r["data"]["sequence"] for r in rows]
+    assert all(a.ts <= b.ts for a, b in zip(trades, trades[1:]))
+    assert sum("late trade dropped" in r.message for r in caplog.records) == 1
+    list(build_bars(iter(trades), n=100))  # and the engine accepts the result
+
+
+def test_nothing_is_released_before_the_caught_up_marker():
+    """The holding rule itself: with no marker yet, the buffer yields nothing,
+    however far the event clock has advanced — that is what lets the sort
+    cover 23 s of disorder instead of 2."""
+    rows = _synthetic_rows(400)  # 40 s of tape at 100 ms a print
+    stream = iter(rows + [feed.CAUGHT_UP])
+    out = feed.ordered_trades(stream, reorder_lag_s=2.0, flush_at_end=False)
+    first = next(out)
+    # Nothing came out until the marker; the first release is the first trade.
+    assert first.sequence == rows[0]["data"]["sequence"]
+    rest = list(out)
+    # The last 2 s stay pending for the live tail (flush disabled here).
+    held = [r for r in rows if datetime.fromisoformat(r["provenance"]["ts_event"])
+            > datetime.fromisoformat(rows[-1]["provenance"]["ts_event"]) - timedelta(seconds=2)]
+    assert len(rest) + 1 == len(rows) - len(held)
 
 
 def test_bar_payload_shape_matches_the_drill_column(tmp_path):
