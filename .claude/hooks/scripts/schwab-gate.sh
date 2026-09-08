@@ -37,6 +37,14 @@
 #    test_every_reaching_file_in_the_tree_blocks, which sweeps every tracked .py
 #    (16 reaching files as of 2026-09-06).
 #
+# WIDENED 2026-09-06 — st-rfjg, from COO's finding on st-p9mx. Gate 4 knew only
+# `tokens/`; the two-app split put app 1's market credential at
+# /var/lib/execd/market.json and app 2's vault at /etc/execd/vault.json, both
+# ungated. Gate 6 is new: the two scripts that MINT those files import neither
+# `schwab` nor `broker_schwab`, so gate 1 never saw them. Six ALLOW-when-it-
+# should-BLOCK cases measured before the change, all six blocked after, with
+# five mention-only controls still passing.
+#
 # KNOWN LIMIT, stated rather than papered over: this checks the named file's own
 # imports, not a full transitive closure. A script importing a local module that
 # in turn imports broker_schwab is not caught. The structural layer — the hobbled
@@ -126,15 +134,49 @@ if echo "$COMMAND" | grep -qE "$RUNNER_AT_CMD_POS" || echo "$COMMAND" | grep -qE
   exit 2
 fi
 
-# Gate 4: block token file modification
-if echo "$COMMAND" | grep -qE '(>|>>|cp |mv |rm |chmod ).*tokens/'; then
-  echo "SCHWAB GATE: Cannot modify token files." >&2
+# Gate 4: block modification of any at-rest Schwab credential.
+#
+# WIDENED 2026-09-06 [st-rfjg, from COO's finding on st-p9mx]. It read `tokens/`
+# alone, which was the whole estate when it was written. Since the two-app split
+# it is not: app 1's market credential is a plain 0600 JSON in the SERVICE state
+# directory (/var/lib/execd/market.json), deliberately outside the vault so the
+# 07:00 premarket reads work while execd is LOCKED, and app 2's lives in
+# /etc/execd/vault.json. Measured before the change: `cp /tmp/x
+# /var/lib/execd/market.json` and a redirect into the same file both returned
+# ALLOW. A credential the gate does not know about is a credential it does not
+# gate.
+#
+# The verb list is what makes this a write gate and not a mention gate — the
+# gate-3 lesson. `ls -la /var/lib/execd` and `grep -rn /var/lib/execd docs/`
+# still pass, and a commit message naming the path still passes.
+CRED_AT_REST='(tokens/|/var/lib/execd/|/etc/execd/)'
+if echo "$COMMAND" | grep -qE "(>|>>|cp |mv |rm |chmod |tee |install |dd ).*$CRED_AT_REST"; then
+  echo "SCHWAB GATE: Cannot modify Schwab credentials at rest (tokens/, /var/lib/execd/, /etc/execd/)." >&2
   exit 2
 fi
 
 # Gate 5: block schwab module execution
 if echo "$COMMAND" | grep -qE 'python3?[[:space:]]+-m[[:space:]]+schwab'; then
   echo "SCHWAB GATE: Cannot run schwab as module." >&2
+  exit 2
+fi
+
+# Gate 6: block the two scripts that MINT a credential file. [st-rfjg / st-p9mx]
+#
+# Neither imports `schwab` or `broker_schwab`, so gate 1 does not see them, and
+# both write a key and a secret to disk — execd_market_credential.py assembles
+# app 1's plain 0600 JSON, execd_vault_init.py writes app 2's encrypted vault
+# behind Steve's passphrase. Gate 4 catches the obvious `--out` under a gated
+# path; this catches the invocation whatever path it is handed.
+#
+# Command position or interpreter-invoked, same shape as gate 3, so writing
+# ABOUT them stays free: `grep -rn execd_vault_init docs/` passes, and so does
+# a commit message naming either.
+MINTERS='(execd_market_credential|execd_vault_init)\.py'
+MINT_AT_CMD_POS="(^|[;|&(]|&&|\|\|)[[:space:]]*(\./)?([^[:space:]\"']*/)?$MINTERS([[:space:]]|$)"
+MINT_VIA_INTERP="(^|[[:space:];|&(])([^[:space:]\"']*python3?|python3?)[[:space:]]+([^[:space:]\"']*/)?$MINTERS([[:space:]]|$)"
+if echo "$COMMAND" | grep -qE "$MINT_AT_CMD_POS" || echo "$COMMAND" | grep -qE "$MINT_VIA_INTERP"; then
+  echo "SCHWAB GATE: that script mints a Schwab credential file. Steve runs it." >&2
   exit 2
 fi
 
