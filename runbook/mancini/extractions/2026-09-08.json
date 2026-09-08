@@ -1,0 +1,755 @@
+{
+ "date": "2026-09-08",
+ "instrument": "ES",
+ "session_bias": "Lean long: ES can defend 7695/7714 and resume up to 7745, 7764, 7797+. Bear case begins only below 7671 (breakdown short, likely 7658 trigger) — offered, not taken.",
+ "levels": [
+  {
+   "price": 7723,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "Supports are: 7723"
+  },
+  {
+   "price": 7714,
+   "kind": "support",
+   "label": "major · flag resistance now first support down — bulls want to hold 7714 on any dips; instead of buying this, wait for a Failed Breakdown of today's daily low 7711 AND 7714 to recover",
+   "intent": "trade",
+   "conviction": "unstated",
+   "setup": "failed_breakdown",
+   "source_quote": "7714 (major)"
+  },
+  {
+   "price": 7711,
+   "kind": "trigger",
+   "label": "today's daily low, 3 points below 7714 — wait for a Failed Breakdown of this AND 7714 to recover",
+   "intent": "trade",
+   "conviction": "unstated",
+   "setup": "failed_breakdown",
+   "source_quote": "wait for a Failed Breakdown of today’s daily low which is 3 points lower at 7711"
+  },
+  {
+   "price": 7700,
+   "kind": "support",
+   "label": "big low set 10am Friday from which we rallied — instead of just buying 7695, wait for it to hold then recover that highly significant low at 7700",
+   "intent": "trade",
+   "conviction": "high",
+   "setup": "failed_breakdown",
+   "source_quote": "ES set a big low at 7700 from which we rallied to today’s highs"
+  },
+  {
+   "price": 7695,
+   "kind": "support",
+   "label": "major · key support, shelf of highs Wednesday into Thursday that broke out; bulls want to hold 7695 and 7714 — one could just bid this, but a Failed Breakdown (recover 7700) is the much safer option",
+   "intent": "watch",
+   "conviction": "medium",
+   "setup": "bid_direct",
+   "source_quote": "7695 (major)"
+  },
+  {
+   "price": 7682,
+   "kind": "support",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7682 (major)"
+  },
+  {
+   "price": 7671,
+   "kind": "support",
+   "label": "major · clear shelf of lows 3pm Wednesday to 7:30am Thursday; Failed Breakdown of this entire structure (ideally even 7662) is actionable — wait for 7671 to recover to long. Bear case begins below here",
+   "intent": "trade",
+   "conviction": "medium",
+   "setup": "failed_breakdown",
+   "source_quote": "7671 (major)"
+  },
+  {
+   "price": 7662,
+   "kind": "support",
+   "label": "flush low of the 7671 shelf, ~1:30AM Thursday — ideally the Failed Breakdown sweeps this",
+   "intent": "watch",
+   "conviction": "unstated",
+   "setup": "failed_breakdown",
+   "source_quote": "We flushed the shelf around 1:30AM Thursday to 7662 to set another low"
+  },
+  {
+   "price": 7658,
+   "kind": "trigger",
+   "label": "likely trigger down for the 7671 breakdown short — offered, Mancini does not take shorts",
+   "intent": "offered",
+   "conviction": "low",
+   "setup": "breakdown_short",
+   "source_quote": "Likely 7658 trigger down"
+  },
+  {
+   "price": 7649,
+   "kind": "support",
+   "label": "major · weak support, I won't touch it but one can bid here if desperate",
+   "intent": "avoid",
+   "conviction": "low",
+   "setup": "bid_direct",
+   "source_quote": "7649 (major)"
+  },
+  {
+   "price": 7638,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7638"
+  },
+  {
+   "price": 7627,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7627"
+  },
+  {
+   "price": 7619,
+   "kind": "support",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7619 (major)"
+  },
+  {
+   "price": 7618,
+   "kind": "support",
+   "label": "daily low Wednesday — not a ton of interest below 7649 until here; a Failed Breakdown here would be highly actionable",
+   "intent": "trade",
+   "conviction": "high",
+   "setup": "failed_breakdown",
+   "source_quote": "7618 is the daily low Wednesday. A Failed breakdown here would be highly actionable"
+  },
+  {
+   "price": 7612,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7612"
+  },
+  {
+   "price": 7603,
+   "kind": "support",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7603 (major)"
+  },
+  {
+   "price": 7595,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7595"
+  },
+  {
+   "price": 7587,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7587"
+  },
+  {
+   "price": 7576,
+   "kind": "support",
+   "label": "bull-flag range support, technically way down here",
+   "intent": "watch",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "Support is technically way down at 7576"
+  },
+  {
+   "price": 7575,
+   "kind": "support",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7575 (major)"
+  },
+  {
+   "price": 7568,
+   "kind": "support",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7568 (major)"
+  },
+  {
+   "price": 7555,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7555"
+  },
+  {
+   "price": 7549,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7549"
+  },
+  {
+   "price": 7538,
+   "kind": "support",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7538 (major)"
+  },
+  {
+   "price": 7530,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7530"
+  },
+  {
+   "price": 7517,
+   "kind": "support",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7517 (major)"
+  },
+  {
+   "price": 7507,
+   "kind": "support",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7507 (major)"
+  },
+  {
+   "price": 7499,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7499"
+  },
+  {
+   "price": 7491,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7491"
+  },
+  {
+   "price": 7485,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7485"
+  },
+  {
+   "price": 7475,
+   "kind": "support",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7475 (major)"
+  },
+  {
+   "price": 7466,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7466"
+  },
+  {
+   "price": 7458,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7458"
+  },
+  {
+   "price": 7447,
+   "kind": "support",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7447"
+  },
+  {
+   "price": 7428,
+   "kind": "support",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7428 (major)"
+  },
+  {
+   "price": 7722,
+   "kind": "trigger",
+   "label": "reclaim actionable to add on strength",
+   "intent": "trade",
+   "conviction": "unstated",
+   "setup": "level_reclaim",
+   "source_quote": "reclaims of 7722 and 7745 are actionable"
+  },
+  {
+   "price": 7735,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "Resistances are: 7735"
+  },
+  {
+   "price": 7745,
+   "kind": "resistance",
+   "label": "major · first bull-case target; reclaim of 7745 is actionable to add on strength",
+   "intent": "trade",
+   "conviction": "unstated",
+   "setup": "level_reclaim",
+   "source_quote": "7745 (major)"
+  },
+  {
+   "price": 7753,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7753"
+  },
+  {
+   "price": 7764,
+   "kind": "resistance",
+   "label": "major · bull-case target, react there",
+   "intent": "watch",
+   "conviction": "unstated",
+   "setup": "breakout_target",
+   "source_quote": "7764 (major)"
+  },
+  {
+   "price": 7770,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7770"
+  },
+  {
+   "price": 7783,
+   "kind": "resistance",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7783 (major)"
+  },
+  {
+   "price": 7792,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7792"
+  },
+  {
+   "price": 7797,
+   "kind": "resistance",
+   "label": "major · bull-case target, react there; the short spot to try for those who don't mind the low win rate — offered, Mancini does not short",
+   "intent": "offered",
+   "conviction": "low",
+   "setup": "none",
+   "source_quote": "7797 (major)"
+  },
+  {
+   "price": 7810,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7810"
+  },
+  {
+   "price": 7820,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7820"
+  },
+  {
+   "price": 7828,
+   "kind": "resistance",
+   "label": "major · after reacting at 7745/7764/7797, then 7828, then all time highs from there",
+   "intent": "watch",
+   "conviction": "unstated",
+   "setup": "breakout_target",
+   "source_quote": "7828 (major)"
+  },
+  {
+   "price": 7838,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7838"
+  },
+  {
+   "price": 7849,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7849"
+  },
+  {
+   "price": 7864,
+   "kind": "resistance",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7864 (major)"
+  },
+  {
+   "price": 7870,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7870"
+  },
+  {
+   "price": 7883,
+   "kind": "resistance",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7883 (major)"
+  },
+  {
+   "price": 7892,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7892"
+  },
+  {
+   "price": 7900,
+   "kind": "resistance",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7900 (major)"
+  },
+  {
+   "price": 7906,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7906"
+  },
+  {
+   "price": 7914,
+   "kind": "resistance",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7914 (major)"
+  },
+  {
+   "price": 7928,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7928"
+  },
+  {
+   "price": 7934,
+   "kind": "resistance",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7934 (major)"
+  },
+  {
+   "price": 7945,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7945"
+  },
+  {
+   "price": 7953,
+   "kind": "resistance",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7953 (major)"
+  },
+  {
+   "price": 7960,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7960"
+  },
+  {
+   "price": 7973,
+   "kind": "resistance",
+   "label": "major",
+   "intent": "unstated",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "7973 (major)"
+  },
+  {
+   "price": 7622,
+   "kind": "support",
+   "label": "Tuesday's daily low — the Failed Breakdown here Wednesday started the rally; structural origin, not an entry",
+   "intent": "watch",
+   "conviction": "unstated",
+   "setup": "none",
+   "source_quote": "ES put in a Failed Breakdown of Tuesday’s 7622 daily low"
+  }
+ ],
+ "commentary": [
+  {
+   "text": "Strong bull case: ES defends the 7714/7695 zone (flag resistance now support, and the key breakout shelf) and works back higher to 7745, 7764, 7797. React there, then 7828, then all time highs.",
+   "tags": [
+    "bull_case",
+    "breakout_target",
+    "structure"
+   ],
+   "trigger": {
+    "type": "price_zone",
+    "anchor_prices": [
+     7714,
+     7695,
+     7745,
+     7764,
+     7797,
+     7828
+    ],
+    "condition_text": "ES defends 7714/7695 on dips"
+   },
+   "source_quote": "The bull case is simply that ES can ideally defend that 7714/7695 zone in a strong bull case."
+  },
+  {
+   "text": "Mild bull case: ES defends 7671 lowest, or a quick trap below it, then works back higher to 7745, 7764, 7797.",
+   "tags": [
+    "bull_case",
+    "failed_breakdown"
+   ],
+   "trigger": {
+    "type": "price_zone",
+    "anchor_prices": [
+     7671,
+     7745,
+     7764,
+     7797
+    ],
+    "condition_text": "ES holds 7671 or quickly traps below it"
+   },
+   "source_quote": "In a more mild bull case, ES will defend 7671 lowest (or quick trap below). This allows ES to work back higher to 7745, 7764, 7797."
+  },
+  {
+   "text": "Adds on strength: given recent strength there are minimal spots to add that would not be chasing; reclaims of 7722 and 7745 are actionable.",
+   "tags": [
+    "long_entry",
+    "level_reclaim",
+    "risk"
+   ],
+   "trigger": {
+    "type": "price_cross",
+    "anchor_prices": [
+     7722,
+     7745
+    ],
+    "condition_text": "reclaim of 7722 or 7745"
+   },
+   "source_quote": "In terms of spots to add on strength, reclaims of 7722 and 7745 are actionable."
+  },
+  {
+   "text": "First support 7714 (the broken flag resistance): do not buy it direct — wait for a Failed Breakdown of Friday's daily low 7711 AND 7714 to recover.",
+   "tags": [
+    "long_entry",
+    "failed_breakdown",
+    "bid_direct"
+   ],
+   "trigger": {
+    "type": "price_cross",
+    "anchor_prices": [
+     7714,
+     7711
+    ],
+    "condition_text": "sweep of 7711 then 7714 recovers"
+   },
+   "source_quote": "Instead of buying this, wait for a Failed Breakdown of today’s daily low which is 3 points lower at 7711. Wait for that AND 7714 to recover."
+  },
+  {
+   "text": "7695 is key support (shelf of highs that broke out). One could bid it direct, but the safer option is to wait for 7695 to hold and then recover the highly significant 7700 low from 10am Friday.",
+   "tags": [
+    "long_entry",
+    "failed_breakdown",
+    "bid_direct"
+   ],
+   "trigger": {
+    "type": "price_cross",
+    "anchor_prices": [
+     7695,
+     7700
+    ],
+    "condition_text": "7695 holds and 7700 recovers"
+   },
+   "source_quote": "Instead of just buying 7695, wait for it to hold then recover that highly significant low at 7700."
+  },
+  {
+   "text": "7671 is a clear shelf of lows (3pm Wed to 7:30am Thu) flushed to 7662. A Failed Breakdown of the whole structure, ideally sweeping 7662, is actionable — wait for 7671 to recover to long it.",
+   "tags": [
+    "long_entry",
+    "failed_breakdown",
+    "structure"
+   ],
+   "trigger": {
+    "type": "price_cross",
+    "anchor_prices": [
+     7671,
+     7662
+    ],
+    "condition_text": "sweep below 7671 (ideally 7662) then 7671 recovers"
+   },
+   "source_quote": "The Failed Breakdown of this entire structure (ideally even 7662) is actionable. Just wait for 7671 to recover to long this."
+  },
+  {
+   "text": "7649 is weak support he will not touch (bid only if desperate). Little interest below until 7618, Wednesday's daily low, where a Failed Breakdown would be highly actionable.",
+   "tags": [
+    "no_entry",
+    "failed_breakdown",
+    "long_entry"
+   ],
+   "trigger": {
+    "type": "price_zone",
+    "anchor_prices": [
+     7649,
+     7618
+    ],
+    "condition_text": "sweep of 7618 then recover"
+   },
+   "source_quote": "7649 is below there. This is a weak support, I won’t touch it but one can bid here if desperate. There is not a ton of interest below there until ~7618. 7618 is the daily low Wednesday. A Failed breakdown here would be highly actionable."
+  },
+  {
+   "text": "Bear case begins below 7671: a breakdown short (advanced, low win rate, Mancini does not take these). Ideally after a final bounce or a Failed Breakdown, short beneath the lows of that bounce — likely 7658 trigger down.",
+   "tags": [
+    "bear_case",
+    "breakdown_short",
+    "short_entry",
+    "risk"
+   ],
+   "trigger": {
+    "type": "price_cross",
+    "anchor_prices": [
+     7671,
+     7658
+    ],
+    "condition_text": "loss of 7671, trigger below 7658"
+   },
+   "source_quote": "Bear case tomorrow: Begins below 7671."
+  },
+  {
+   "text": "Offered short at 7797 for those who don't mind the low win rate; Mancini does not short ES.",
+   "tags": [
+    "short_entry",
+    "risk"
+   ],
+   "trigger": {
+    "type": "price_zone",
+    "anchor_prices": [
+     7797
+    ],
+    "condition_text": "price reaches 7797"
+   },
+   "source_quote": "For those who don’t mind the low win rate associated with shorts, 7797 would be spots to try."
+  },
+  {
+   "text": "In summary: ES broke out of the week-long bull flag Thursday (resistance was 7714; range support technically 7576). General lean is ES defends 7695/7714 and resumes up to 7745, 7764, 7797+.",
+   "tags": [
+    "summary",
+    "regime",
+    "structure"
+   ],
+   "trigger": {
+    "type": "price_zone",
+    "anchor_prices": [
+     7695,
+     7714,
+     7745,
+     7764,
+     7797,
+     7576
+    ],
+    "condition_text": "7695/7714 defended"
+   },
+   "source_quote": "My general lean is ES can defend 7695/7714 and resume up to 7745, 7764, 7797+."
+  }
+ ],
+ "raw_excerpt": "Trade Plan Tuesday — Supports are: 7723, 7714 (major), 7700, 7695 (major), 7682 (major), 7671 (major), 7662, 7649 (major), 7638, 7627, 7619 (major),7612, 7603 (major), 7595, 7587, 7575 (major), 7568 (major), 7555, 7549, 7538 (major), 7530, 7517 (major), 7507 (major), 7499, 7491, 7485, 7475 (major), 7466, 7458, 7447, 7428 (major). Resistances are: 7735, 7745 (major), 7753, 7764 (major), 7770, 7783 (major), 7792, 7797 (major), 7810, 7820, 7828 (major), 7838, 7849, 7864 (major), 7870, 7883 (major), 7892, 7900 (major), 7906, 7914 (major), 7928, 7934 (major), 7945, 7953 (major), 7960, 7973 (major)."
+}
