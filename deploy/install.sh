@@ -51,7 +51,8 @@ for f in "$SRC"/*.service "$SRC"/*.timer; do
     fi
 done
 if [[ $START -eq 1 ]]; then
-    for u in strader-drill-bridge.service strader-footprint-feed.service strader-orderflow-sentinel.service; do
+    # strader-orderflow-sentinel.service left this list 2026-09-08 (deploy/systemd/retired/, st-x3tx)
+    for u in strader-drill-bridge.service strader-footprint-feed.service; do
         [[ -e "$SRC/$u" ]] || continue
         systemctl restart "$u" && echo "started $u"
     done

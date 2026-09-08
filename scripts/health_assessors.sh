@@ -6,7 +6,7 @@
 #
 #     data/corpus/_capture_health.json      ES trades + MBP-1 (strader-capture.service)
 #     data/corpus/_gexbot_health.json       GexBot 60 s poll   (strader-gexbot.service)
-#     data/corpus/_gexbot_of1s_health.json  GexBot 1 Hz leg    (strader-gexbot-orderflow-1s.service)
+#     (data/corpus/_gexbot_of1s_health.json — GexBot 1 Hz leg — RETIRED 2026-09-08, st-x3tx)
 #
 # WHY THIS EXISTS. Until 2026-08-13 the */2 cron supervisors
 # (scripts/cron/*-supervisor*.sh, pruned 2026-09-06 — tag pre-prune-2026-09-05) both relaunched
@@ -68,10 +68,11 @@ run_one "gexbot 60s" \
     --match corpus_poll_gexbot.py \
     --state "$CORPUS/_gexbot_health.json"
 
-run_one "gexbot 1Hz orderflow" \
-    --streams gexbot_orderflow_1s --stale-secs 300 --grace-secs 180 --venue cash \
-    --window-start 08:30 --window-end 15:05 \
-    --match corpus_poll_gexbot_orderflow_1s.py \
-    --state "$CORPUS/_gexbot_of1s_health.json"
+# The 1 Hz orderflow assessor was RETIRED 2026-09-08 (st-x3tx): /orderflow is
+# Quant-only, the tier is State (HTTP 403 measured 08:30:02 CT), so the leg is
+# permanently quiet and a verdict on it would read STALE forever — the shape that
+# teaches a health surface to be ignored. _gexbot_of1s_health.json stops being
+# written from here; the entitlements registry watches the STREAM for a
+# reappearance instead. Restore the block from git on an Orderflow re-subscription.
 
 exit "$worst"

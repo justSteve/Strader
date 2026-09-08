@@ -185,16 +185,16 @@ probe "GEX collector"     "corpus_poll_gexbot.py"       "SPX GEX -> corpus · th
 # cadence, own quota economics, own supervisor) — and it had no row here for its
 # first three live days. It was up, and this script could not have said so either
 # way, which is the 2026-08-05 GEXBot blindness this file exists to end. [st-pfrz]
-probe "GEX 1Hz orderflow" "corpus_poll_gexbot_orderflow_1s.py" "SPX orderflow at ~1 Hz -> corpus · same measured RTH gate as the collector above (08:30-15:05 CT weekdays, NYSE holidays off), so DOWN outside that is NORMAL. systemd strader-gexbot-orderflow-1s.timer starts it 08:30 CT (st-pgfe, 2026-08-13; the */2 cron shim is gone) — DOWN *inside* the window means the unit is failing [st-ipn0]" \
+probe "GEX 1Hz orderflow" "corpus_poll_gexbot_orderflow_1s.py" "RETIRED 2026-09-08 (st-x3tx): /orderflow is Quant-only and the tier is State — measured 08:30:02 CT, HTTP 403 'not subscribed to Orderflow package'. DOWN is the correct state. UP means the disable has not landed (ask on the bridge) and the poller is retrying a dead endpoint every 300 s. Re-enable only on an Orderflow re-subscription [st-ipn0 history]" \
       strader-gexbot-orderflow-1s.service
 # Supervised since 2026-08-16 06:20 CT (strader-orderflow-sentinel.service,
 # st-2yuw / co-03ojd.7). Before that it was the only unsupervised live surface
 # here: it died with the 08-11 reboot and again in the 08-15 OOM reset and stayed
 # down until a human noticed. Still: no window explains a DOWN — it runs all day.
-probe "OF sentinel"       "orderflow_sentinel.py"       "level-proximity alerts off the 1 Hz feed -> orderflow_alerts.jsonl + bridge /alerts (st-n0qm.9) · systemd strader-orderflow-sentinel.service; DOWN is ALWAYS actionable [st-igim]" \
+probe "OF sentinel"       "orderflow_sentinel.py"       "RETIRED 2026-09-08 (st-x3tx): its only input is the 1 Hz feed above, which the State tier cannot fill, so it heartbeats rows=0 forever. DOWN is the correct state; UP means the disable has not landed. The code stays (scripts/orderflow_sentinel.py, st-n0qm.9) for an Orderflow re-subscription [st-igim history]" \
       strader-orderflow-sentinel.service
 probe "MI gauge"          "mi_gauge"                    "cron-driven, usually DOWN between ticks"
-probe "GEX hist backfill" "gexbot_hist_backfill.py"     "nightly /hist harvest, cron 21:00 CT weekdays (st-mx42) — it runs for a few minutes after the close, so DOWN is NORMAL almost all day and this row is a permanent fixture, not a temporary one. The 'delete when the paid window completes' instruction this row used to carry pointed at st-ox9x, CANCELLED 2026-08-10; the surviving loose end is st-kr4a (files named .json.gz are plain JSON)"
+probe "GEX hist backfill" "gexbot_hist_backfill.py"     "RETIRED 2026-09-08 (st-x3tx): /hist is Quant-only (HTTP 403 measured 08:34 CT) and the archive is CLOSED at 2026-09-04 (entitlements registry final_day). DOWN is the correct state always; UP means the 21:00 cron line is still in COO's catalog (asked). Loose end st-kr4a (files named .json.gz are plain JSON) is unaffected"
 
 # Producer HEALTH FILES [st-n0qm.3, Phase 2b/4]: each live producer writes its
 # own heartbeat JSON; the bridge's /health/producers and the page's HUD dots
@@ -220,20 +220,19 @@ hstat() {           # hstat <label> <path> <fresh_s> [why-absent-is-normal]
 }
 hstat "tape health"     "$REPO/data/corpus/_capture_health.json"     180 "written every 2 min by strader-health-assessors.timer (co-03ojd.7); STALE here means the health WRITER stopped, not the tape — check systemctl list-timers strader-health-assessors"
 hstat "gex health"      "$REPO/data/corpus/_gexbot_health.json"      180 "same writer as tape health; idle outside 08:30-15:05 CT is normal"
-hstat "1Hz gex health"  "$REPO/data/corpus/_gexbot_of1s_health.json" 180 "same writer as tape health; idle/quiet outside 08:30-15:05 CT is normal"
-hstat "sentinel health" "$DAY_DIR/_sentinel_health.json"             90  "every 60 s while the sentinel runs (Phase 0)"
 hstat "feed health"     "$DAY_DIR/_footprint_health.json"            90  "every push and every 30 s while waiting (Phase 2b)"
 
 printf '\n'
 fsize "ES tape"      "$DAY_DIR/databento_glbx_es.jsonl"
 fsize "MBP-1 quotes" "$DAY_DIR/databento_glbx_es_mbp1.jsonl"
 fsize "GEX polls"    "$DAY_DIR/gexbot.jsonl"
-fsize "GEX 1Hz rows" "$DAY_DIR/gexbot_orderflow_1s.jsonl"
+fsize "GEX 1Hz rows" "$DAY_DIR/gexbot_orderflow_1s.jsonl" \
+      "RETIRED with the Orderflow leg (st-x3tx) — a file here that is not only 403 anomaly rows means Orderflow is back"
 # Written only when the sentinel actually fires. A quiet market produces no file,
 # so ABSENT here is a market state, not a fault — read it against the OF sentinel
 # process row above, which is the row that says whether anything is watching.
 fsize "OF alerts"    "$DAY_DIR/orderflow_alerts.jsonl" \
-      "no alert has fired today — normal on a quiet tape, IF the sentinel row above says UP"
+      "sentinel RETIRED 2026-09-08 (st-x3tx) — nothing writes this file until Orderflow is re-subscribed"
 fsize "MI gauge ticks"   "$DAY_DIR/mi_gauge_live.jsonl"
 # internals.jsonl is written by the 06:30 T+1 corpus_daily cron, NOT during the
 # session — so ABSENT is the NORMAL same-day state and was being read as an
