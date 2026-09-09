@@ -62,6 +62,18 @@ BLOCKED = [
     ("steve's runner", "./scripts/run.sh hello_schwab.py"),
     ("steve's runner, bare", "scripts/run.sh hello_schwab.py"),
     ("token write", "cp /tmp/x tokens/schwab_token.json"),
+    # Gate 4 widened + gate 6 added, landed by Steve 2026-09-08 (9f558c1,
+    # st-hun6). The two-app split (st-p9mx) put app 1's market credential at
+    # /var/lib/execd/market.json and app 2's vault at /etc/execd/vault.json —
+    # neither under tokens/ — and the two scripts that MINT them import neither
+    # schwab nor broker_schwab, so gate 1 never saw them. All six returned
+    # ALLOW against the live hook on 2026-09-06; all six BLOCK on 2026-09-09.
+    ("execd market cred copy", "cp /tmp/x /var/lib/execd/market.json"),
+    ("execd market cred redirect", "echo '{}' > /var/lib/execd/market.json"),
+    ("execd market cred chmod", "chmod 644 /var/lib/execd/market.json"),
+    ("execd vault copy", "cp /tmp/x /etc/execd/vault.json"),
+    ("market credential minter", ".venv/bin/python3 scripts/execd_market_credential.py"),
+    ("vault minter", "python3 scripts/execd_vault_init.py --init"),
 ]
 
 ALLOWED = [
@@ -82,6 +94,13 @@ ALLOWED = [
     ("git show of a scripts path", "git show HEAD:scripts/run.sh"),
     ("grep mentioning schwab", "grep -rn schwab docs/"),
     ("a .py reaching neither", f".venv/bin/python {FIX}/reaches_nothing.py"),
+    # Mention-only controls for gates 4 and 6 (st-hun6): naming the execd
+    # paths or the minters is not touching them — the gate-3 lesson again.
+    ("ls of the execd dir", "ls -la /var/lib/execd"),
+    ("grep for the execd path", "grep -rn /var/lib/execd docs/"),
+    ("grep for the vault minter", "grep -rn execd_vault_init docs/"),
+    ("git log of the market minter", "git log --oneline -- scripts/execd_market_credential.py"),
+    ("cat of a doc naming the vault", "cat docs/a2a/inbox.md"),
 ]
 
 

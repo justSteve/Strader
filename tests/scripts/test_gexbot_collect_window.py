@@ -58,7 +58,10 @@ def test_the_tail_is_short_enough_to_stay_deliberate():
     assert poller.DEFAULT_UNTIL_CT <= "15:15"
 
 
-UNITS = ("strader-gexbot.service", "strader-gexbot-orderflow-1s.service")
+# strader-gexbot-orderflow-1s.service was RETIRED 2026-09-08 (st-x3tx) — it
+# lives in deploy/systemd/retired/ now, and a retired unit has no window to
+# agree with. Listing it here after the move broke CI on two pushes.
+UNITS = ("strader-gexbot.service",)
 
 
 @pytest.mark.parametrize("unit", UNITS)
