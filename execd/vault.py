@@ -100,7 +100,10 @@ def _kdf_param_problems(n: int, r: int, p: int, dklen: int) -> list[str]:
 #: Short enough not to be a nuisance he has to type from a phone, long enough
 #: that scrypt at these parameters makes guessing pointless. Enforced on write
 #: so the refusal arrives when he is choosing, not when he is unlocking.
-MIN_PASSPHRASE_LEN = 12
+#: Spaces inside the passphrase are fine (words are easier to type than
+#: symbols); only a leading or trailing space is refused, below. Steve set the
+#: floor at 8 on 2026-09-10 (was 12), the same floor as the backup passphrase.
+MIN_PASSPHRASE_LEN = 8
 
 
 class VaultError(RuntimeError):

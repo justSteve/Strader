@@ -330,6 +330,17 @@ class TestChoosingAPassphrase:
         with pytest.raises(VaultError, match="space"):
             vault.store(TOKEN, PASS + " ")
 
+    def test_spaces_inside_the_passphrase_are_accepted(self, vault):
+        """Words with spaces between them are a passphrase, not a paste
+        accident. Steve, 2026-09-10: spaces allowed, floor of 8."""
+        spaced = "correct horse battery"
+        vault.store(TOKEN, spaced)
+        assert vault.load(spaced) == TOKEN
+        assert vault.verify("correcthorsebattery") is False
+
+    def test_the_floor_is_eight(self):
+        assert MIN_PASSPHRASE_LEN == 8
+
     def test_the_length_rule_does_not_apply_to_opening_an_existing_vault(self, vault):
         """The complaint belongs where he is choosing, not where he is trying
         to get in. A vault made under older rules must still open."""
