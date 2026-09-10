@@ -26,7 +26,7 @@ import tempfile
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 from .paths import day_dir, manifest_path
 
@@ -179,6 +179,27 @@ def _update_manifest_locked(
             manifest["notes"] = notes[excess:]
 
     _write_atomic(path, json.dumps(manifest, indent=2, default=_json_fallback))
+
+
+def rewrite_manifest(d: date | None, edit: "Callable[[dict[str, Any]], None]",
+                     *, path: Path | None = None) -> dict[str, Any]:
+    """Apply ``edit`` to the day's manifest under the same lock and atomic
+    rename ``update_manifest`` uses, and return the result. For the repair
+    tools, whose edits (SET a cycle count, add a repair record) the increment
+    API cannot express — before [st-5oli] they wrote the file directly and
+    outside the lock. A missing manifest is created; an unparseable one is
+    salvaged first. ``path`` overrides the corpus location (the repair tools
+    resolve their own, so a test can point them at a fixture)."""
+    path = path or manifest_path(d)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _manifest_lock(path):
+        if path.exists():
+            manifest = _load_or_salvage(path)
+        else:
+            manifest = {"date": (d or _today_central_iso()), "streams": {}, "notes": []}
+        edit(manifest)
+        _write_atomic(path, json.dumps(manifest, indent=2, default=_json_fallback))
+    return manifest
 
 
 def lock_path(path: Path) -> Path:

@@ -64,7 +64,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from market.corpus.paths import day_dir, manifest_path, resolve_existing  # noqa: E402
-from market.corpus.writer import utc_now_iso  # noqa: E402
+from market.corpus.writer import rewrite_manifest, utc_now_iso  # noqa: E402
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 LIVE_MARKER = b'"source": "live"'
@@ -258,16 +258,16 @@ def update_manifest_after_repair(
     an increment cannot express that. `repaired_utc` and the note leave the
     event legible to anyone who reads the manifest later.
     """
-    path = manifest_path(d)
-    manifest = json.loads(path.read_text())
-    s = manifest["streams"].setdefault(stream, {"cycles": 0, "errors": []})
-    s["cycles"] = kept
-    s["repaired_utc"] = utc_now_iso()
-    s["repair"] = {"dropped_batch_rows": dropped, "kept_live_rows": kept}
-    manifest.setdefault("notes", []).append(
-        {"ts": utc_now_iso(), "stream": stream, "note": note}
-    )
-    path.write_text(json.dumps(manifest, indent=2))
+    def edit(manifest: dict) -> None:
+        s = manifest["streams"].setdefault(stream, {"cycles": 0, "errors": []})
+        s["cycles"] = kept
+        s["repaired_utc"] = utc_now_iso()
+        s["repair"] = {"dropped_batch_rows": dropped, "kept_live_rows": kept}
+        manifest.setdefault("notes", []).append(
+            {"ts": utc_now_iso(), "stream": stream, "note": note}
+        )
+    # Under the writer's lock and rename, not a bare write_text [st-5oli].
+    rewrite_manifest(d, edit, path=manifest_path(d))
 
 
 def report(s: Survey, path: Path, *, max_gap: float, min_ratio: float) -> None:

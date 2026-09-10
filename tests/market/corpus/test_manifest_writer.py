@@ -290,3 +290,29 @@ class TestSalvage:
             writer.salvage(paths.manifest_path(DAY))
         with pytest.raises(ValueError):
             writer.update_manifest(DAY, STREAM, increment_cycles=1)
+
+
+class TestRewriteManifest:
+    """The repair tools' edit path: same lock, same rename, salvage first [st-5oli]."""
+
+    def test_edit_is_applied_under_the_writer_and_the_result_returned(self, corpus):
+        writer.update_manifest(DAY, STREAM, increment_cycles=9)
+
+        def edit(m):
+            m["streams"][STREAM]["cycles"] = 4
+            m["streams"][STREAM]["repair"] = {"dropped": 5}
+            m["notes"].append({"ts": "t", "stream": STREAM, "note": "repaired"})
+        out = writer.rewrite_manifest(DAY, edit)
+        assert out["streams"][STREAM]["cycles"] == 4
+        assert _stream() == out["streams"][STREAM]
+        assert _manifest()["notes"][-1]["note"] == "repaired"
+        assert paths.manifest_path(DAY).stat().st_mode & 0o777 == 0o644
+
+    def test_creates_a_missing_manifest_and_salvages_a_broken_one(self, corpus):
+        writer.rewrite_manifest(DAY, lambda m: m["notes"].append({"ts": "t", "stream": "x", "note": "n"}))
+        assert _manifest()["streams"] == {} and _manifest()["date"] == DAY.isoformat()
+        _interleaved(corpus)
+        writer.rewrite_manifest(DAY, lambda m: m["streams"][STREAM].__setitem__("cycles", 1))
+        m = _manifest()
+        assert m["streams"][STREAM]["cycles"] == 1
+        assert any(n.get("key", "").startswith("repair:") for n in m["notes"])
