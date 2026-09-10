@@ -1,5 +1,20 @@
 # DaysActivity - 2026-09-10
 
+## 09:43 - Session Handoff [Context reset — Steve offline, watch paused]
+
+**Summary**: Closing the session for a context reset at Steve's request. Everything from the 09:41 entry below stands; since then the watch tool was smoke-tested live (starts clean, 64 levels, GEX poll) and nothing else changed. No peer memo was read this session; nothing owed. COO digest delivered at 09:41 (st-d7qe row); nothing new for COO since.
+
+**Open Work**:
+- Steve is offline as of 09:38 CT. When he returns and wants eyes on ES again: `.venv/bin/python tools/es_level_watch.py` under Monitor (or a moocity tmux pane); the plan page is at /tmp/desk-mancini-latest-es-plan.html AND /var/moo/desk/desk-mancini-latest-es-plan.html — desk-html.sh writes only the latter, copy to the former after any render
+- st-fsf3 — bash-guard settings patch waits on Steve: `factory/scripts/land-patch.sh docs/patches/2026-09-10-bash-guard.diff`
+- Live capture units run the pre-st-5oli writer until their next restart (evening 15:06 today, session 02:50 tomorrow)
+- Ready queue next: st-z1a1 (level taxonomy support-side only), st-cqwc (recognizer effort/effect), depth-aware duplicate sweep noted on st-c078
+
+**Files Changed**:
+DaysActivity.md
+
+---
+
 ## 09:41 - Session Handoff [Live ES watch for Steve · plan page updated with PA, DXY, bonds]
 
 **Summary**: Steve traded the open with Strader on watch: the plan page got a current-PA section (ES vs the ladder, 120-min level deltas, GEX summary, DXY via the UUP proxy since Schwab serves no $DXY, bonds/yields, VIX) rendered to both desk addresses at 08:42 CT, and a tape watch relayed level crossings, GEX major moves and 15-min summaries 08:41–09:38 CT until he went offline. The watch is now `tools/es_level_watch.py` with its damping rules tested.
