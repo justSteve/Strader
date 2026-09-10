@@ -501,13 +501,11 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
   <button id="anat" class="drill-only" title="Walk the recognizer's four-stage setups on this day">Anatomy</button>
   <button id="helpbtn" title="What am I looking at?">?</button>
 </div>
-<div class="crow" id="rqrow">
-  <label title="Replay a region of this day with the emitter scoped. Say it — '13:30 to 14:10, sweeps and plan-level only' — or shift-drag the chart.">Replay
-    <input type="text" id="rqinput" placeholder="13:30 to 14:10, sweeps and plan-level only — or shift-drag the chart"></label>
-  <button id="rqrun" title="Replay the region (Enter in the box does the same)">▷ Region</button>
-  <span id="rqkinds" title="Scope the emitter: click to keep only these kinds. None selected = everything, or the words in the sentence."></span>
-  <span id="rqstatus" class="rq-status"></span>
-</div>
+<!-- The Replay box, the ▷ Region button and the kind chips (plan-level, sweeps, …)
+     were pulled 2026-09-10 at Steve's word: the chips forced the panel too wide,
+     and Replay/Region wait for a planning session on their UI. The JS below is
+     parked, not deleted — every access is guarded, so with no #rqrow / #rqpanel /
+     #rqsel in the page it is inert. -->
 </div>
 <div class="readouts">
   <span>Bar <b id="ro-bar">0</b></span>
@@ -520,7 +518,6 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
 <div id="emrow"></div>
 <div id="empanel"></div>
 </div>
-<div id="rqpanel" hidden></div>
 <div id="visits"></div>
 <div id="scendeck" class="drill-only"></div>
 <div id="anatomy" class="drill-only"></div>
@@ -528,19 +525,17 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
 <div id="stage"><div id="vp"></div><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
   <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
   <div id="livehud"></div>
-  <div id="rqsel"></div>
 </div>
-<p class="hint">Space = play/pause · ←/→ = step · Ctrl+←/→ = speed down/up · Shift-drag the chart = replay that region · Pick a level (Level ▾) to arm it AND jump to its first visit · <b>?</b> explains the screen ·
+<p class="hint">Space = play/pause · ←/→ = step · Ctrl+←/→ = speed down/up · Pick a level (Level ▾) to arm it AND jump to its first visit · <b>?</b> explains the screen ·
 Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button>
 · <button id="candles" title="Open the same tape as 1-minute candles in a second window, synced to this minute">Candles ↗</button>
 · coach: <span id="bridge-dot">—</span>
-· <span id="prod-dots" title="producers: tape · 1 Hz gex · sentinel · footprint feed"></span>
+· <span id="prod-dots" title="producers: tape · footprint feed"></span>
 · <span id="cue-chip" title="Cell cues: cells the stack spoke about flash, then keep an edge mark. Press x or click to toggle.">cues ⚑</span>
 · <span id="sen-strip" title="Sentinel: GexBot level alerts drawn on the ES axis at strike + live basis. Press s or click to toggle."><span class="sen-lbl">Sentinel</span><span class="sen-txt">—</span></span></p>
 <div id="help"><div class="card">
   <h2>What am I looking at?</h2>
   <p>This is one full trading day replayed as <b>volume bars</b>: every column is exactly the same number of contracts changing hands (shown in the header), <b>not</b> the same amount of time. When columns arrive fast, the market is busy; when they crawl, it's quiet. Each column's <b>footer</b> carries the bar's real duration as its colored fill height — tall fill = slow bar, short fill = urgent tape. That height is on a <b>fixed absolute scale — full = 120s</b>, the same on every day you drill, so heights are comparable across days and you can learn what a given pace looks like.</p>
-  <p><b>Replay a region.</b> Hold <b>Shift</b> and drag a box on the chart, or type it in the <b>Replay</b> box — <i>13:30 to 14:10, sweeps and plan-level only</i> — and press Enter. The instrument re-runs that window of tape through the same code the live page runs and lists everything it would have said there: the scorer's minute events (plan-level, superlatives, climax) and the footprint stack's emissions (sweeps, stacks, divergences, setups), in time order. Click a row to jump to that bar; <b>n</b>/<b>p</b> step through the rows, <b>g</b> marks one worth keeping, <b>d</b> drops it as noise, <b>Esc</b> closes. The kind chips beside the box scope the list; with none selected the words in the sentence decide, and no words means everything. A drag writes the same sentence into the box from the bars and prices it covered, so you can edit it and run again.</p>
   <h4>Reading one cell (a price inside a bar)</h4>
   <ul>
     <li><span class="swatch" style="background:var(--buy)"></span> <b>Blue = buyers were the aggressors</b> at that price (they crossed the spread to lift sellers' offers). <span class="swatch" style="background:var(--sell)"></span> <b>Red = sellers were the aggressors</b> (they hit buyers' bids).</li>
@@ -2293,7 +2288,11 @@ function sendState(kind, extra) {
   fetch(BRIDGE + "/state", { method: "POST", body: JSON.stringify(snapshot(kind, extra)),
                              headers: { "Content-Type": "text/plain" } }).catch(() => {});
 }
-// ── region replay [co-j9t1g] ──────────────────────────────────────────────
+// ── region replay [co-j9t1g] — PARKED 2026-09-10 ─────────────────────────
+// Steve, 2026-09-10: the Replay box, ▷ Region button and kind chips are out of
+// the page until a planning session settles their UI. The markup (#rqrow,
+// #rqpanel, #rqsel) is gone; this code stays, guarded, and does nothing
+// without it. Restoring the three elements brings the feature back as it was.
 // Steve, via Desk memo 20260826T013442: "from the chart, target a region of
 // price action that interests you and get a full replay of that window with
 // the emitter scoped to a chosen subset — sweeps only, plan-level only."
@@ -2691,11 +2690,13 @@ async function pollBars() {
   setTimeout(pollBars, POLL_MS);
 }
 // ── producer health dots [st-n0qm.3] ─────────────────────────────────────
-// Four dots from GET /health/producers: tape capture, 1 Hz GexBot leg,
-// sentinel, footprint feed. Colour is the AGE of each producer's own health
-// file against its freshness budget — the bridge reports what is on disk and
-// draws no verdict of its own. Polled every 15 s; a dead bridge greys them all.
-const PROD_ORDER = [["tape", "tape"], ["gex_1s", "1Hz"], ["sentinel", "sent"], ["feed", "feed"]];
+// Two dots from GET /health/producers: tape capture and the footprint feed.
+// Colour is the AGE of each producer's own health file against its freshness
+// budget — the bridge reports what is on disk and draws no verdict of its own.
+// Polled every 15 s; a dead bridge greys them all. The 1 Hz GexBot leg and the
+// sentinel dots came out 2026-09-10 (Steve): both producers were retired with
+// Quant (st-x3tx) and read permanently red.
+const PROD_ORDER = [["tape", "tape"], ["feed", "feed"]];
 const PROD_POLL_MS = 15000;
 function renderProducerDots(h) {
   const el = $("prod-dots"); if (!el) return;
