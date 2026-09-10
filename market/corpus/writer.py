@@ -210,6 +210,13 @@ def _write_atomic(path: Path, text: str) -> None:
             f.write(text)
             f.flush()
             os.fsync(f.fileno())
+        # mkstemp creates 0600; the manifest is a shared read surface — keep the
+        # mode the file already had (0644 for a new one, the umask default).
+        try:
+            mode = path.stat().st_mode & 0o777
+        except FileNotFoundError:
+            mode = 0o644
+        os.chmod(tmp, mode)
         os.replace(tmp, path)
     except BaseException:
         tmp.unlink(missing_ok=True)

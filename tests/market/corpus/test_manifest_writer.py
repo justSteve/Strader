@@ -240,6 +240,14 @@ class TestConcurrentWriters:
         assert writer.lock_path(paths.manifest_path(DAY)).exists()
         assert _stream()["cycles"] == 2
 
+    def test_the_manifest_is_world_readable_not_mkstemp_0600(self, corpus):
+        writer.update_manifest(DAY, STREAM, increment_cycles=1)
+        p = paths.manifest_path(DAY)
+        assert p.stat().st_mode & 0o777 == 0o644
+        p.chmod(0o640)
+        writer.update_manifest(DAY, STREAM, increment_cycles=1)
+        assert p.stat().st_mode & 0o777 == 0o640  # an existing mode is kept
+
 
 def _interleaved(corpus) -> str:
     """Rebuild the measured 09-07 shape: a valid doc, then a longer doc's tail."""
