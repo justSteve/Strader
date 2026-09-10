@@ -41,8 +41,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from market.corpus.paths import most_recent_session_day
 from market.entities.volume_profile import VolumeProfile
 from market.orderflow.anchored_profile import (
+    ANCHORS,
     CENTRAL,
     ValueArea,
+    anchor_start,
     anchor_utc,
     build_profile_from_bars,
     build_split_profile,
@@ -230,7 +232,7 @@ def hole_banner(hole) -> str:
 def render_page(profile, va: ValueArea, last: float, bar_count: int,
                 end_ct: datetime, anchor_ct: datetime, generated_ct: datetime,
                 source: str = "ticks", aggressor: bool = True,
-                hole: tuple | None = None) -> str:
+                hole: tuple | None = None, anchor: str = "prior") -> str:
     """TradingView-style profile: right-justified bars at tick resolution.
 
     Layout follows TV's price scale — the axis is on the RIGHT and the bars
@@ -288,7 +290,7 @@ def render_page(profile, va: ValueArea, last: float, bar_count: int,
 
     return f"""<!doctype html>
 <meta charset="utf-8">
-<title>Premarket Volume Profile — {SYMBOL} — anchored {anchor_ct:%a %b %-d} 08:30 CT</title>
+<title>Volume Profile — {SYMBOL} — anchored {anchor_ct:%a %b %-d %H:%M} CT ({ANCHORS[anchor]})</title>
 <style>
  :root {{ color-scheme: light dark; --ink:#1c1f24; --dim:#6b7280; --line:#e3e6ea;
           --bg:#fff; --buy:#26a69a; --sell:#ef5350; --flat:#9aa7b8;
@@ -348,9 +350,10 @@ def render_page(profile, va: ValueArea, last: float, bar_count: int,
 </style>
 <div class="prof" id="prof" data-bucket="{profile.bucket_pts:g}">{"".join(rows)}</div>
 <div id="hud">
-<h1>Premarket Volume Profile — {SYMBOL}</h1>
+<h1>Volume Profile — {SYMBOL}</h1>
 <div class="sub">
-  Anchored {anchor_ct:%A %b %-d, 08:30 CT} (prior RTH open) → {end_ct:%a %H:%M CT}<br>
+  Anchored {anchor_ct:%A %b %-d, %H:%M CT} ({ANCHORS[anchor]}) → {end_ct:%a %H:%M CT}<br>
+  anchor: {" · ".join(f'<b>{k}</b>' if k == anchor else f'<a href="?anchor={k}">{k}</a>' for k in ANCHORS)}<br>
   {bar_count:,} {"prints" if source == "ticks" else "bars"} ·
   {profile.total:,} contracts · {profile.bucket_pts:g}-pt buckets ·
   generated {generated_ct:%Y-%m-%d %H:%M CT}
@@ -447,6 +450,10 @@ def main(argv=None) -> int:
     ap.add_argument("--bucket-ticks", type=int, default=1,
                     help="bucket width in ES ticks for the tick path "
                          "(1 = 0.25pt, native; default 1)")
+    ap.add_argument("--anchor", choices=tuple(ANCHORS), default="prior",
+                    help="window start: prior (prior day's 08:30 CT open, default), "
+                         "overnight (most recent 17:00 CT Globex open), today (most "
+                         "recent 08:30 CT open)")
     ap.add_argument("--dry-run", action="store_true",
                     help="build and summarise, publish nothing")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -458,7 +465,7 @@ def main(argv=None) -> int:
                    if args.date else None)
     try:
         page_html, summary = build_page(session_day, source=args.source,
-                                        bucket_ticks=args.bucket_ticks)
+                                        bucket_ticks=args.bucket_ticks, anchor=args.anchor)
     except Exception as e:  # noqa: BLE001 — last-good contract
         logger.error("source %r unusable, published page LEFT AS-IS: %s", args.source, e)
         return 2
@@ -467,17 +474,27 @@ def main(argv=None) -> int:
     return 0
 
 
-def build_page(session_day=None, *, source: str = "ticks", bucket_ticks: int = 1) -> tuple[str, str]:
+def build_page(session_day=None, *, source: str = "ticks", bucket_ticks: int = 1,
+               anchor: str = "prior") -> tuple[str, str]:
     """Build the page in-process and return (html, summary line). The one
     path both the 08:15 cron (main) and the on-demand server
     (scripts/profile_server.py, Steve 2026-09-10: "re-gen on a page refresh")
     go through. Raises on a source failure; the caller decides what a failure
-    means (main leaves the published page as-is, the server serves last-good)."""
-    if session_day is None:
-        session_day = most_recent_session_day()
-    start = anchor_utc(session_day)
+    means (main leaves the published page as-is, the server serves last-good).
+
+    ``anchor`` is one of ANCHORS (prior / overnight / today). ``session_day``
+    pins the prior-open anchor to a given day (the cron and the tests); with
+    any other anchor it is ignored and the window starts at anchor_start()."""
+    if anchor not in ANCHORS:
+        raise ValueError(f"anchor must be one of {', '.join(ANCHORS)}; got {anchor!r}")
+    if anchor == "prior":
+        if session_day is None:
+            session_day = most_recent_session_day()
+        start = anchor_utc(session_day)
+    else:
+        start = anchor_start(anchor)
     anchor_ct = start.astimezone(CENTRAL)
-    logger.info("anchor: %s (prior RTH open)", anchor_ct.strftime("%a %Y-%m-%d %H:%M CT"))
+    logger.info("anchor: %s (%s)", anchor_ct.strftime("%a %Y-%m-%d %H:%M CT"), ANCHORS[anchor])
 
     aggressor, hole = False, None
     if source == "ticks":
@@ -503,9 +520,9 @@ def build_page(session_day=None, *, source: str = "ticks", bucket_ticks: int = 1
 
     generated = datetime.now(tz=CENTRAL)
     page_html = render_page(profile, va, last, n, end_ct, anchor_ct, generated,
-                            source, aggressor, hole=hole)
+                            source, aggressor, hole=hole, anchor=anchor)
     extra = f"   delta {profile.delta:+,}" if aggressor else ""
-    summary = (f"{SYMBOL} anchored VP [{source}] — {n:,} "
+    summary = (f"{SYMBOL} anchored VP [{source}, {anchor}] — {n:,} "
                f"{'prints' if source == 'ticks' else 'bars'}, "
                f"{profile.total:,} contracts, {profile.bucket_pts:g}pt buckets\n"
                f"  anchor {anchor_ct:%a %H:%M CT}  ->  {end_ct:%a %H:%M CT}\n"

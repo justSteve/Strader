@@ -1,10 +1,10 @@
-"""scripts/profile_server.py — the on-refresh profile pages. [Steve 2026-09-10]
+"""scripts/profile_server.py — the on-refresh profile pages. [st-ad4c]
 
-Each route renders on request, serves a render newer than the cache window
-as-is, renders once under concurrent refreshes, serves the last good page
-with a stale header when a render fails, answers 503 in plain words when it
-has never rendered, and resolves the tailnet prefix the way the bridge does.
-The builders are replaced with fakes; no corpus is read.
+Each (route, anchor) renders on request, serves a render newer than the cache
+window as-is, renders once under concurrent refreshes, serves the last good
+page with a stale header when a render fails, answers 503 in plain words when
+it has never rendered, and resolves the tailnet prefix the way the bridge
+does. The builders are replaced with fakes; no corpus is read.
 """
 from __future__ import annotations
 
@@ -25,21 +25,23 @@ import profile_server as ps  # noqa: E402
 class Counter:
     def __init__(self, html="<html>page</html>", delay=0.0, fail=False):
         self.n, self.html, self.delay, self.fail = 0, html, delay, fail
+        self.anchors: list[str] = []
         self.lock = threading.Lock()
 
-    def __call__(self):
+    def __call__(self, anchor):
         with self.lock:
             self.n += 1
+            self.anchors.append(anchor)
         if self.delay:
             time.sleep(self.delay)
         if self.fail:
             raise RuntimeError("tape unreadable")
-        return self.html
+        return self.html.replace("page", anchor)
 
 
 @pytest.fixture
 def server(monkeypatch):
-    vol, mkt = Counter("<html>vol</html>"), Counter("<html>mkt</html>")
+    vol, mkt = Counter("<html>vol page</html>"), Counter("<html>mkt page</html>")
     routes = {"volprofile": ps.Route("volprofile", vol, cache_s=0.5),
               "mktprofile": ps.Route("mktprofile", mkt, cache_s=0.5)}
     monkeypatch.setattr(ps, "ROUTES", routes)
@@ -69,15 +71,32 @@ def test_route_for_is_prefix_tolerant():
     assert ps.route_for("/footprint/") is None
 
 
+def test_anchor_for_defaults_and_rejects():
+    assert ps.anchor_for("/volprofile/") == "prior"
+    assert ps.anchor_for("/volprofile/?anchor=today") == "today"
+    assert ps.anchor_for("/volprofile/?anchor=Overnight") == "overnight"
+    assert ps.anchor_for("/volprofile/?anchor=lastweek") is None
+
+
 def test_a_refresh_renders_and_the_cache_window_serves_the_same_page(server):
     base, routes, vol, _ = server
     s1, _, b1 = get(base + "/volprofile/")
     s2, _, b2 = get(base + "/volprofile")
-    assert (s1, s2) == (200, 200) and b1 == b2 == "<html>vol</html>"
+    assert (s1, s2) == (200, 200) and b1 == b2 == "<html>vol prior</html>"
     assert vol.n == 1                      # second hit inside the cache window
     time.sleep(0.6)
     get(base + "/volprofile/")
     assert vol.n == 2                      # past the window: a refresh re-renders
+
+
+def test_each_anchor_is_its_own_render_and_cache(server):
+    base, routes, vol, _ = server
+    assert get(base + "/volprofile/?anchor=today")[2] == "<html>vol today</html>"
+    assert get(base + "/volprofile/?anchor=overnight")[2] == "<html>vol overnight</html>"
+    assert get(base + "/volprofile/?anchor=today")[2] == "<html>vol today</html>"   # cached
+    assert vol.anchors == ["today", "overnight"]
+    s, _, b = get(base + "/volprofile/?anchor=lastweek")
+    assert s == 400 and "prior, overnight, today" in b
 
 
 def test_concurrent_refreshes_render_once(server):
@@ -95,8 +114,8 @@ def test_a_failed_render_serves_last_good_with_a_stale_header(server):
     time.sleep(0.6)
     vol.fail = True
     s, h, b = get(base + "/volprofile/")
-    assert s == 200 and b == "<html>vol</html>" and h.get("X-Profile-Stale") == "1"
-    assert "tape unreadable" in routes["volprofile"].last_error
+    assert s == 200 and b == "<html>vol prior</html>" and h.get("X-Profile-Stale") == "1"
+    assert "tape unreadable" in routes["volprofile"].last_error()
 
 
 def test_never_rendered_and_failing_answers_503_in_words(server):
@@ -106,15 +125,16 @@ def test_never_rendered_and_failing_answers_503_in_words(server):
     assert s == 503 and "mktprofile" in b and "tape unreadable" in b
 
 
-def test_health_reports_each_route(server):
+def test_health_reports_each_route_and_anchor(server):
     base, routes, vol, _ = server
     get(base + "/volprofile/")
     s, _, b = get(base + "/health")
     d = json.loads(b)
-    assert s == 200 and d["ok"] is True
-    assert d["routes"]["volprofile"]["renders"] == 1
-    assert d["routes"]["volprofile"]["last_render_ms"] is not None
-    assert d["routes"]["mktprofile"]["renders"] == 0
+    assert s == 200 and d["ok"] is True and d["anchors"] == ["prior", "overnight", "today"]
+    assert d["routes"]["volprofile"]["prior"]["renders"] == 1
+    assert d["routes"]["volprofile"]["prior"]["last_render_ms"] is not None
+    assert d["routes"]["volprofile"]["today"]["renders"] == 0
+    assert d["routes"]["mktprofile"]["prior"]["renders"] == 0
 
 
 def test_unknown_path_is_404_naming_the_pages(server):

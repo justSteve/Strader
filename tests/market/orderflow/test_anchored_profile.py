@@ -101,3 +101,46 @@ class TestValueArea:
         va = ValueArea(val=7740.0, poc=7750.0, vah=7760.0,
                        volume=70, total=100, coverage=0.70)
         assert va.width == 20.0 and va.achieved == 0.70
+
+
+# ── anchor_start: the three anchors Steve asked for (2026-09-10) ──────────────
+from datetime import time as _time  # noqa: E402
+from market.orderflow.anchored_profile import ANCHORS, GLOBEX_OPEN_CT, anchor_start  # noqa: E402
+
+
+def _ct(y, m, d, hh, mm):
+    from market.orderflow.anchored_profile import CENTRAL
+    return datetime(y, m, d, hh, mm, tzinfo=CENTRAL).astimezone(timezone.utc)
+
+
+class TestAnchorStart:
+    def test_the_three_kinds_and_nothing_else(self):
+        assert list(ANCHORS) == ["prior", "overnight", "today"]
+        with pytest.raises(ValueError, match="prior, overnight, today"):
+            anchor_start("lastweek")
+
+    def test_midday_thursday(self):
+        now = _ct(2026, 9, 10, 12, 45)                       # Thu
+        assert anchor_start("prior", now) == anchor_utc(date(2026, 9, 9))
+        assert anchor_start("today", now) == anchor_utc(date(2026, 9, 10))
+        assert anchor_start("overnight", now) == anchor_utc(date(2026, 9, 9), GLOBEX_OPEN_CT)
+
+    def test_before_the_open_today_is_the_prior_open(self):
+        now = _ct(2026, 9, 10, 8, 15)                        # the 08:15 cron moment
+        assert anchor_start("today", now) == anchor_start("prior", now) == anchor_utc(date(2026, 9, 9))
+        assert anchor_start("overnight", now) == anchor_utc(date(2026, 9, 9), GLOBEX_OPEN_CT)
+
+    def test_evening_after_globex_open(self):
+        now = _ct(2026, 9, 10, 18, 30)                       # Thu evening
+        assert anchor_start("overnight", now) == anchor_utc(date(2026, 9, 10), GLOBEX_OPEN_CT)
+        assert anchor_start("today", now) == anchor_utc(date(2026, 9, 10))
+
+    def test_monday_overnight_is_sunday_and_weekend_rolls_to_thursday(self):
+        mon = _ct(2026, 9, 14, 10, 0)
+        assert anchor_start("overnight", mon) == anchor_utc(date(2026, 9, 13), GLOBEX_OPEN_CT)  # Sun 17:00
+        assert anchor_start("prior", mon) == anchor_utc(date(2026, 9, 11))                      # Fri
+        sat = _ct(2026, 9, 12, 12, 0)
+        assert anchor_start("overnight", sat) == anchor_utc(date(2026, 9, 10), GLOBEX_OPEN_CT)  # Thu 17:00
+        assert anchor_start("today", sat) == anchor_utc(date(2026, 9, 11))                      # Fri open
+        sun_evening = _ct(2026, 9, 13, 19, 0)
+        assert anchor_start("overnight", sun_evening) == anchor_utc(date(2026, 9, 13), GLOBEX_OPEN_CT)

@@ -289,6 +289,50 @@ def anchor_utc(session_day, open_ct: time = RTH_OPEN_CT) -> datetime:
     return local.astimezone(timezone.utc)
 
 
+GLOBEX_OPEN_CT = time(17, 0)
+
+#: The three anchors Steve asked for (2026-09-10: "those 3 are sufficient"),
+#: shared by the volume profile and the market profile pages. kind → label.
+ANCHORS: dict[str, str] = {
+    "prior": "prior RTH open",
+    "overnight": "overnight (Globex) open",
+    "today": "today's RTH open",
+}
+
+
+def anchor_start(kind: str, now_utc: datetime | None = None) -> datetime:
+    """UTC start of the profile window for anchor ``kind`` at ``now_utc``.
+
+    prior      the prior day's 08:30 CT cash open — ``most_recent_session_day``,
+               the same day the 08:15 cron and the corpus gate use, unchanged.
+    today      the most recent 08:30 CT cash open at or before now. Before the
+               open (and on a weekend) there is no session today yet, so this
+               resolves to the same open as ``prior`` — true, not a fallback.
+    overnight  the most recent 17:00 CT Globex open at or before now. Sunday
+               17:00 opens Monday's session; Friday 17:00 and Saturday have no
+               open, so a weekend rolls back to Thursday 17:00 until Sunday.
+    """
+    if kind not in ANCHORS:
+        raise ValueError(f"anchor must be one of {', '.join(ANCHORS)}; got {kind!r}")
+    from market.corpus.paths import most_recent_session_day  # local: paths imports nothing from here
+    now_utc = now_utc or datetime.now(timezone.utc)
+    now_ct = now_utc.astimezone(CENTRAL)
+    if kind == "prior":
+        return anchor_utc(most_recent_session_day(now_utc))
+    if kind == "today":
+        d = now_ct.date()
+        if now_ct.weekday() >= 5 or now_ct.time() < RTH_OPEN_CT:
+            return anchor_utc(most_recent_session_day(now_utc))
+        return anchor_utc(d)
+    # overnight
+    d = now_ct.date()
+    if now_ct.time() < GLOBEX_OPEN_CT:
+        d -= timedelta(days=1)
+    while d.weekday() in (4, 5):          # Friday, Saturday: no Globex open
+        d -= timedelta(days=1)
+    return anchor_utc(d, GLOBEX_OPEN_CT)
+
+
 def _bar_trades(bar: dict, bucket: float, symbol: str) -> Iterable[Trade]:
     """Spread one bar's volume across the buckets its range touched.
 

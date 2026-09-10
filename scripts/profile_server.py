@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Profile server — the anchored profiles, rendered on every page refresh. [st-profiles]
+"""Profile server — the anchored profiles, rendered on every page refresh. [st-ad4c]
 
 Steve, 2026-09-10: "I'd prefer it re-gen on a page refresh. It should live at
 https://mydesk-1.tail89f676.ts.net/volprofile/ — and I'll have the same ask of
@@ -8,14 +8,18 @@ minutes is fine." Measured: the volume profile renders in ~4 s over a full
 two-session window, so refresh-driven is the design, with a short cache so a
 double refresh (or two devices) renders once.
 
-Routes (prefix-tolerant, so `tailscale serve --set-path /volprofile` works the
-same way /footprint does for the drill bridge):
+Routes (prefix-tolerant, so `tailscale serve --set-path /volprofile
+http://127.0.0.1:7790/volprofile` works — tailscale strips the mount path, so
+the backend URL carries the route):
 
-    GET /volprofile/   anchored volume profile  (scripts/premarket_volume_profile.build_page)
-    GET /mktprofile/   anchored market profile  (scripts/anchored_market_profile.build + render_html)
-    GET /health        JSON: per-route last render time, duration, cache age, last error
+    GET /volprofile/[?anchor=prior|overnight|today]   anchored volume profile
+    GET /mktprofile/[?anchor=…]                        anchored market profile
+    GET /health                                        JSON per route and anchor
 
-Contract, per route:
+The three anchors (Steve: "those 3 are sufficient") are defined once in
+market/orderflow/anchored_profile.ANCHORS; the default is `prior`.
+
+Contract, per (route, anchor):
   * one render at a time — a lock; a second request during a render waits and
     receives the same page rather than starting another render;
   * a render newer than CACHE_S seconds is served as-is;
@@ -41,48 +45,51 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "scripts"))
 
+from market.orderflow.anchored_profile import ANCHORS  # noqa: E402
+
 logger = logging.getLogger("profile_server")
 
 PORT = int(os.environ.get("PROFILE_SERVER_PORT", "7790"))
 CACHE_S = float(os.environ.get("PROFILE_CACHE_S", "10"))
-RENDER_TIMEOUT_S = 120.0
+DEFAULT_ANCHOR = "prior"
 
 
 # ── builders ─────────────────────────────────────────────────────────────────
-# Each returns the page HTML. Imported lazily so a route whose renderer is not
-# on disk yet (the market profile lands separately) answers 503 with a plain
-# sentence instead of taking the whole server down at import time.
+# Each takes the anchor kind and returns the page HTML. Imported lazily so a
+# route whose renderer is not on disk yet (the market profile lands
+# separately) answers 503 with a plain sentence instead of taking the whole
+# server down at import time.
 
-def _build_volprofile() -> str:
+def _build_volprofile(anchor: str) -> str:
     mod = importlib.import_module("premarket_volume_profile")
-    html, summary = mod.build_page()
-    logger.info("volprofile: %s", summary.replace("\n", " | "))
+    html, summary = mod.build_page(anchor=anchor)
+    logger.info("volprofile[%s]: %s", anchor, summary.replace("\n", " | "))
     return html
 
 
-def _build_mktprofile() -> str:
+def _build_mktprofile(anchor: str) -> str:
     mod = importlib.import_module("anchored_market_profile")
-    payload = mod.build()
+    payload = mod.build(anchor=anchor)
     return mod.render_html(payload)
 
 
-BUILDERS: dict[str, Callable[[], str]] = {
+BUILDERS: dict[str, Callable[[str], str]] = {
     "volprofile": _build_volprofile,
     "mktprofile": _build_mktprofile,
 }
 
 
-# ── one cache entry per route ────────────────────────────────────────────────
+# ── one cache entry per (route, anchor) ──────────────────────────────────────
 
-class Route:
-    def __init__(self, name: str, build: Callable[[], str], cache_s: float = CACHE_S):
-        self.name, self.build, self.cache_s = name, build, cache_s
+class Entry:
+    def __init__(self, name: str, anchor: str, build: Callable[[str], str], cache_s: float):
+        self.name, self.anchor, self.build, self.cache_s = name, anchor, build, cache_s
         self.lock = threading.Lock()
         self.html: str | None = None
         self.built_at: float = 0.0           # time.monotonic()
@@ -91,26 +98,28 @@ class Route:
         self.renders = 0
         self.last_error: str | None = None
 
-    def get(self, now: float | None = None) -> tuple[str | None, bool]:
+    def get(self) -> tuple[str | None, bool]:
         """(html, stale). stale=True means the render failed and this is the
         last good page; html=None means there is no page at all."""
-        now = time.monotonic() if now is None else now
         with self.lock:                      # a concurrent refresh waits, then reads the fresh page
+            now = time.monotonic()
             if self.html is not None and now - self.built_at < self.cache_s:
                 return self.html, False
             t0 = time.monotonic()
             try:
-                html = self.build()
+                html = self.build(self.anchor)
             except Exception as e:  # noqa: BLE001 — last-good contract
                 self.last_error = f"{type(e).__name__}: {e}"
-                logger.error("%s: render failed, serving last good: %s", self.name, self.last_error)
+                logger.error("%s[%s]: render failed, serving last good: %s",
+                             self.name, self.anchor, self.last_error)
                 return self.html, True
             self.html, self.built_at = html, time.monotonic()
             self.built_wall = datetime.now(timezone.utc).isoformat(timespec="seconds")
             self.last_ms = (self.built_at - t0) * 1000
             self.renders += 1
             self.last_error = None
-            logger.info("%s: rendered in %.0f ms (%d bytes)", self.name, self.last_ms, len(html))
+            logger.info("%s[%s]: rendered in %.0f ms (%d bytes)",
+                        self.name, self.anchor, self.last_ms, len(html))
             return self.html, False
 
     def health(self) -> dict:
@@ -118,6 +127,23 @@ class Route:
         return {"renders": self.renders, "last_render_utc": self.built_wall,
                 "last_render_ms": None if self.last_ms is None else round(self.last_ms),
                 "cache_age_s": age, "cache_s": self.cache_s, "last_error": self.last_error}
+
+
+class Route:
+    """A page name with one Entry per anchor."""
+
+    def __init__(self, name: str, build: Callable[[str], str], cache_s: float = CACHE_S):
+        self.name, self.build, self.cache_s = name, build, cache_s
+        self.entries: dict[str, Entry] = {a: Entry(name, a, build, cache_s) for a in ANCHORS}
+
+    def get(self, anchor: str = DEFAULT_ANCHOR) -> tuple[str | None, bool]:
+        return self.entries[anchor].get()
+
+    def last_error(self, anchor: str = DEFAULT_ANCHOR) -> str | None:
+        return self.entries[anchor].last_error
+
+    def health(self) -> dict:
+        return {a: e.health() for a, e in self.entries.items()}
 
 
 ROUTES: dict[str, Route] = {name: Route(name, fn) for name, fn in BUILDERS.items()}
@@ -131,6 +157,16 @@ def route_for(path: str) -> str | None:
         if p in ROUTES:
             return p
     return None
+
+
+def anchor_for(url: str) -> str | None:
+    """The ?anchor= value, DEFAULT_ANCHOR when absent, None when not a known kind."""
+    q = parse_qs(urlsplit(url).query)
+    vals = q.get("anchor")
+    if not vals:
+        return DEFAULT_ANCHOR
+    a = vals[-1].strip().lower()
+    return a if a in ANCHORS else None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -156,7 +192,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlsplit(self.path).path
         if path.rstrip("/").endswith("/health") or path == "/health":
-            body = json.dumps({"ok": True, "routes": {n: r.health() for n, r in ROUTES.items()}},
+            body = json.dumps({"ok": True, "anchors": list(ANCHORS),
+                               "routes": {n: r.health() for n, r in ROUTES.items()}},
                               indent=1).encode()
             return self._send(200, body, "application/json")
         name = route_for(path)
@@ -164,9 +201,13 @@ class Handler(BaseHTTPRequestHandler):
             names = ", ".join(f"/{n}/" for n in ROUTES)
             return self._send(404, f"no such profile page; the pages are {names}\n".encode(),
                               "text/plain; charset=utf-8")
-        html, stale = ROUTES[name].get()
+        anchor = anchor_for(self.path)
+        if anchor is None:
+            return self._send(400, (f"anchor must be one of {', '.join(ANCHORS)}\n").encode(),
+                              "text/plain; charset=utf-8")
+        html, stale = ROUTES[name].get(anchor)
         if html is None:
-            err = ROUTES[name].last_error or "not rendered yet"
+            err = ROUTES[name].last_error(anchor) or "not rendered yet"
             return self._send(503, (f"{name}: no page could be rendered — {err}\n").encode(),
                               "text/plain; charset=utf-8")
         extra = {"X-Profile-Stale": "1"} if stale else {}
@@ -176,8 +217,8 @@ class Handler(BaseHTTPRequestHandler):
 def serve(port: int = PORT) -> None:
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     httpd.daemon_threads = True
-    logger.info("profile server on http://127.0.0.1:%d  routes %s  cache %.0fs",
-                port, " ".join(f"/{n}/" for n in ROUTES), CACHE_S)
+    logger.info("profile server on http://127.0.0.1:%d  routes %s  anchors %s  cache %.0fs",
+                port, " ".join(f"/{n}/" for n in ROUTES), "/".join(ANCHORS), CACHE_S)
     try:
         httpd.serve_forever(poll_interval=0.5)
     except KeyboardInterrupt:
