@@ -21,6 +21,15 @@ class TPOBracket:
     end_ts: datetime                # last trade in the bracket
     row_indices: tuple[int, ...]    # ascending indices into TPOProfile.prices
     close: float                    # last traded price of the bracket
+    # Which session segment the bracket falls in — "rth" for a cash-session
+    # half hour, "globex" for an overnight one. Defaulted so the single-session
+    # builder (every bracket is RTH by construction) and its tests are
+    # unchanged; the anchored builder sets it per bracket so a page can colour
+    # the prior cash session, the overnight and today apart. [st-jz12]
+    segment: str = "rth"
+    # Index of the bracket counted from the profile's anchor. Single-session
+    # profiles leave it None — their position IS their letter.
+    index: int | None = None
 
 
 @dataclass(frozen=True)
