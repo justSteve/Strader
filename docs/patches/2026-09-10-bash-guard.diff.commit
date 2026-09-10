@@ -1,0 +1,4 @@
+settings: register bash-guard.sh as the second PreToolUse Bash hook — destructive rm/mv on data/corpus, peer repo roots, the bridge, git clean -x; COO dialect [st-fsf3]
+
+Landed by Steve with factory/scripts/land-patch.sh from
+docs/patches/2026-09-10-bash-guard.diff (Strader-authored).

@@ -1,0 +1,13 @@
+--- .claude/settings.json
++++ .claude/settings.json
+@@ -6,6 +6,10 @@
+           {
+             "command": "/root/projects/Strader/.claude/hooks/scripts/schwab-gate.sh",
+             "type": "command"
++          },
++          {
++            "command": "/root/projects/Strader/.claude/hooks/scripts/bash-guard.sh",
++            "type": "command"
+           }
+         ],
+         "matcher": "Bash"

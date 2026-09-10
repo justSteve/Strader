@@ -1,0 +1,1 @@
+.venv/bin/python -m pytest tests/test_bash_guard_hook.py tests/test_schwab_gate_hook.py -q
