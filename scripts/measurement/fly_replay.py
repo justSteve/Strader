@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -67,6 +68,11 @@ def main() -> int:
     ap.add_argument("--settle", type=float, default=None,
                     help="SPX settle spot (default: schwab last, else parity)")
     args = ap.parse_args()
+
+    # The OPRA read-time duplicate guard reports on stderr at INFO, and says
+    # nothing on a clean tape. Without a handler its one line goes nowhere,
+    # which is how a doubled day reads as a normal one. [st-c078]
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     d = datetime.fromisoformat(args.date).date()
     k_low, k_mid, k_high = args.center - args.width, args.center, args.center + args.width

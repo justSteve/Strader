@@ -30,10 +30,16 @@ RUN
     priced from a 14:45 entry, not the 14:00 one. Rows carry "entry_ct"; the
     SPX-at-entry field keeps its Stage 1 name "spx1400" so the summary reads both.
 """
-import json, gzip, glob, os, sys, statistics as st
+import json, gzip, glob, logging, os, sys, statistics as st
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 from multiprocessing import Pool
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from market.corpus.opra import OpraDedup  # noqa: E402
+
 CT = ZoneInfo("America/Chicago")
 BASE, OUT = sys.argv[1], sys.argv[2]
 ENTRY = sys.argv[3] if len(sys.argv) > 3 else "14:00"
@@ -77,19 +83,29 @@ def run_day(path):
     t1357 = hm(EH, EM - 3); t1403 = hm(EH, EM + 3); t1400 = hm(EH, EM); t1500 = f"{h15:02d}:00"
     prints = {}  # sym -> [(hms, price)]
     parity = {}  # strike -> {"C": [...], "P": [...]}
+    # Read-time duplicate guard [st-c078]. The substring prefilter above stays:
+    # the expiry tag and the clock window discard most of the file before any
+    # JSON is parsed, and this script runs over the whole corpus under Pool(6).
+    # So the guard sits on the already-parsed row rather than behind
+    # read_opra_rows, and its "of M" counts rows this study looked at, not rows
+    # in the file. STRADER_OPRA_DEDUP=0 reproduces the pre-guard read.
+    guard = OpraDedup(label=day)
     with _open(path) as f:
         for line in f:
             if tag not in line: continue
             i = line.find('"ts_event": "')
             hm = line[i+24:i+29]
             if hm < t1357 or hm >= t1500: continue
-            r = json.loads(line); sym = r["data"]["symbol"]; ps = parse_sym(sym)
+            r = json.loads(line)
+            if guard.is_duplicate(r): continue
+            sym = r["data"]["symbol"]; ps = parse_sym(sym)
             if not ps or ps[0] != exp: continue
             hms = r["provenance"]["ts_event"][11:19]; price = r["data"]["price"]
             if hm < t1403:
                 parity.setdefault(ps[2], {"C": [], "P": []})[ps[1]].append(price)
             if hm >= t1400:
                 prints.setdefault(sym, []).append((hms, price))
+    guard.report()
     # infer SPX from parity
     diffs = []
     for k, cp in parity.items():
@@ -145,6 +161,10 @@ def run_day(path):
     return out
 
 if __name__ == "__main__":
+    # The OPRA duplicate guard logs at INFO, once per day that carried
+    # duplicates, and is silent on a clean tape. Pool workers are forked, so
+    # they inherit this handler. [st-c078]
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     base = {json.loads(l)["day"]: json.loads(l) for l in open(BASE)}
     paths = opra_paths(base)
     n = 0

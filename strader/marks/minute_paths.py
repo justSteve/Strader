@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
+from market.corpus.opra import read_opra_rows
 from strader.marks.estimated import MinuteBar, minute_index, minute_label
 
 __all__ = [
@@ -149,11 +150,23 @@ class OpraDay:
         return out
 
 
-def read_opra_day(path: Path, day: str) -> OpraDay:
+def read_opra_day(path: Path, day: str, *, dedup: bool | None = None) -> OpraDay:
     """All 0DTE SPXW prints on ``day`` plus the file's measured coverage.
 
     Coverage counts every row in the file, 0DTE or not, inside the window or
     not; ``prints`` keeps only the day's own expiry.
+
+    Read through ``market.corpus.opra.read_opra_rows``, so a doubled tape is
+    counted once. The guard has to sit ahead of the coverage tally, not just
+    ahead of ``prints``: coverage is the measured bound that travels with every
+    calibration number, and on 2026-07-20 an unguarded read reports 1,024,302
+    rows for a day that holds 512,151 prints. ``dedup=False``, or
+    ``STRADER_OPRA_DEDUP=0``, reproduces the pre-guard read. [st-c078]
+
+    The cost is one ``json.loads`` on rows this function used to skip on the
+    ``tag not in line`` substring test — measured at +2.2s over the 1,024,302
+    rows of 2026-07-20. The expiry and clock substring tests below are kept
+    exactly as they were; only the second parse is gone.
     """
     off = ct_offset_seconds(day)
     y, m, d = day.split("-")
@@ -161,30 +174,28 @@ def read_opra_day(path: Path, day: str) -> OpraDay:
     tag = f"SPXW  {exp}"
     cov = PrintCoverage()
     prints: dict[str, list[tuple[int, float]]] = {}
-    with open_text(path) as f:
-        for line in f:
-            utc = _utc_seconds_from_line(line)
-            if utc is None:
-                continue
-            sec_ct = utc + off
-            if sec_ct < 0:
-                sec_ct += 86400
-            cov.n_rows += 1
-            cov.note(sec_ct)
-            if tag not in line:
-                continue
-            try:
-                r = json.loads(line)
-                data = r["data"]
-                sym = data["symbol"]
-                price = float(data["price"])
-            except (ValueError, KeyError, TypeError):
-                continue
-            parsed = parse_symbol(sym)
-            if parsed is None or parsed[0] != exp:
-                continue
-            cov.n_0dte += 1
-            prints.setdefault(sym, []).append((sec_ct, price))
+    for line, r in read_opra_rows(path, dedup=dedup):
+        utc = _utc_seconds_from_line(line)
+        if utc is None:
+            continue
+        sec_ct = utc + off
+        if sec_ct < 0:
+            sec_ct += 86400
+        cov.n_rows += 1
+        cov.note(sec_ct)
+        if tag not in line:
+            continue
+        try:
+            data = r["data"]
+            sym = data["symbol"]
+            price = float(data["price"])
+        except (ValueError, KeyError, TypeError):
+            continue
+        parsed = parse_symbol(sym)
+        if parsed is None or parsed[0] != exp:
+            continue
+        cov.n_0dte += 1
+        prints.setdefault(sym, []).append((sec_ct, price))
     for ps in prints.values():
         ps.sort()
     return OpraDay(day=day, prints=prints, coverage=cov)

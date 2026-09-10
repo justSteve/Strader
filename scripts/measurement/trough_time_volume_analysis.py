@@ -16,6 +16,7 @@ If the ratio is ~1.0 for both, the signal is purely mechanical.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import statistics
 import sys
@@ -24,6 +25,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 STRADER_ROOT = Path("/root/projects/Strader")
+if str(STRADER_ROOT) not in sys.path:
+    sys.path.insert(0, str(STRADER_ROOT))
+
+from market.corpus.opra import read_opra_rows  # noqa: E402
+
 DATA_DIR = STRADER_ROOT / "data"
 CORPUS_DIR = DATA_DIR / "corpus"
 MEASUREMENT_DIR = DATA_DIR / "measurement"
@@ -63,45 +69,53 @@ def count_opra_volume_per_minute(opra_path: Path, window_start_utc: datetime,
     """Count SPXW option contract volume per CT-minute in [start, end).
 
     Returns dict mapping minute-since-13:00-CT -> total contracts.
+
+    Reads through ``market.corpus.opra.read_opra_rows``, so a duplicated print
+    is counted once. Contract volume is a pure sum, which is exactly the shape
+    of measure a doubled tape corrupts. ``STRADER_OPRA_DEDUP=0`` reproduces the
+    pre-guard read. [st-c078]
+
+    NOTE the ``break`` below: this function assumes the file is in ascending
+    ts_event order and stops at the first row past the window. That assumption
+    is the tape's, not the guard's, and it predates st-c078 — on a doubled day
+    the second pull restarts at the session open, so the break fires at the end
+    of the FIRST pull and the rest of the file is never read. The guard makes
+    the rows this function does see correct; it does not make the file
+    monotonic. A tape repaired in place restores the assumption.
     """
     minute_vol = {}
-    with open(opra_path, "r") as f:
-        for line in f:
-            try:
-                rec = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            ts_str = rec.get("provenance", {}).get("ts_event")
-            if not ts_str:
-                continue
-            try:
-                ts = parse_iso_timestamp(ts_str)
-            except (ValueError, IndexError):
-                continue
+    for _line, rec in read_opra_rows(opra_path):
+        ts_str = rec.get("provenance", {}).get("ts_event")
+        if not ts_str:
+            continue
+        try:
+            ts = parse_iso_timestamp(ts_str)
+        except (ValueError, IndexError):
+            continue
 
-            if ts < window_start_utc:
-                continue
-            if ts >= window_end_utc:
-                break
+        if ts < window_start_utc:
+            continue
+        if ts >= window_end_utc:
+            break
 
-            data = rec.get("data", {})
-            symbol = data.get("symbol", "")
-            if not symbol.startswith("SPXW"):
-                continue
-            size = data.get("size", 0)
-            if size <= 0:
-                continue
+        data = rec.get("data", {})
+        symbol = data.get("symbol", "")
+        if not symbol.startswith("SPXW"):
+            continue
+        size = data.get("size", 0)
+        if size <= 0:
+            continue
 
-            # Convert to CT (UTC-5 during CDT, UTC-6 during CST)
-            # The trough_t field has the offset embedded; we'll use UTC offset -5 for CDT
-            # The corpus spans May 2025 - May 2026, all CDT or CST
-            # CDT: March-November, CST: November-March
-            # For minute binning, we use the event's own timezone info
-            ct = ts.astimezone(timezone(timedelta(hours=-5)))
-            minute_since_1300 = (ct.hour - 13) * 60 + ct.minute
+        # Convert to CT (UTC-5 during CDT, UTC-6 during CST)
+        # The trough_t field has the offset embedded; we'll use UTC offset -5 for CDT
+        # The corpus spans May 2025 - May 2026, all CDT or CST
+        # CDT: March-November, CST: November-March
+        # For minute binning, we use the event's own timezone info
+        ct = ts.astimezone(timezone(timedelta(hours=-5)))
+        minute_since_1300 = (ct.hour - 13) * 60 + ct.minute
 
-            if 0 <= minute_since_1300 < 120:  # [13:00, 15:00) CT
-                minute_vol[minute_since_1300] = minute_vol.get(minute_since_1300, 0) + size
+        if 0 <= minute_since_1300 < 120:  # [13:00, 15:00) CT
+            minute_vol[minute_since_1300] = minute_vol.get(minute_since_1300, 0) + size
 
     return minute_vol
 
@@ -153,6 +167,9 @@ def permutation_test(group1, group2, n_perm=10000):
 
 
 def main():
+    # The OPRA duplicate guard logs at INFO, once per day that carried
+    # duplicates, and is silent on a clean tape. [st-c078]
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     random.seed(42)
     days = load_v_days()
     confirmed_set = set(CONFIRMED_V_DAYS)

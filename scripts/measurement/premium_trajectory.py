@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import logging
 import math
 import statistics
 import sys
@@ -28,6 +29,11 @@ from datetime import datetime, date as _date
 from zoneinfo import ZoneInfo
 
 STRADER_ROOT = Path("/root/projects/Strader")
+if str(STRADER_ROOT) not in sys.path:
+    sys.path.insert(0, str(STRADER_ROOT))
+
+from market.corpus.opra import read_opra_rows  # noqa: E402
+
 DATA_DIR = STRADER_ROOT / "data"
 CORPUS_DIR = DATA_DIR / "corpus"
 MEASUREMENT_DIR = DATA_DIR / "measurement"
@@ -80,56 +86,57 @@ def build_premium_curve(opra_path: Path, trade_date: _date,
     """Build minute-by-minute premium data for specific 0DTE strikes.
 
     Returns: {strike_key: {minute: {last_price, vwap, volume, trade_count}}}
+
+    Reads through ``market.corpus.opra.read_opra_rows``: duplicates are dropped
+    at the read, so ``volume`` and ``trade_count`` are the day's real ones on a
+    doubled tape (the VWAP would have survived either way, which is what made
+    the doubling quiet). ``STRADER_OPRA_DEDUP=0`` reproduces the pre-guard
+    read. [st-c078]
     """
     curves = defaultdict(lambda: defaultdict(lambda: {"prices": [], "sizes": []}))
 
-    with open(opra_path) as f:
-        for line in f:
-            try:
-                rec = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            ts_str = rec.get("provenance", {}).get("ts_event")
-            if not ts_str:
-                continue
-            try:
-                ts = parse_iso_timestamp(ts_str)
-            except (ValueError, IndexError):
-                continue
+    for _line, rec in read_opra_rows(opra_path):
+        ts_str = rec.get("provenance", {}).get("ts_event")
+        if not ts_str:
+            continue
+        try:
+            ts = parse_iso_timestamp(ts_str)
+        except (ValueError, IndexError):
+            continue
 
-            ct = ts.astimezone(CENTRAL)
-            m = (ct.hour - 13) * 60 + ct.minute
-            if m < start_minute or m > end_minute:
-                continue
+        ct = ts.astimezone(CENTRAL)
+        m = (ct.hour - 13) * 60 + ct.minute
+        if m < start_minute or m > end_minute:
+            continue
 
-            data = rec.get("data", {})
-            symbol = data.get("symbol", "")
-            if not symbol.startswith("SPXW"):
-                continue
+        data = rec.get("data", {})
+        symbol = data.get("symbol", "")
+        if not symbol.startswith("SPXW"):
+            continue
 
-            size = data.get("size", 0)
-            price = data.get("price", 0.0)
-            if size <= 0 or price <= 0:
-                continue
+        size = data.get("size", 0)
+        price = data.get("price", 0.0)
+        if size <= 0 or price <= 0:
+            continue
 
-            parsed = parse_occ_symbol(symbol)
-            if parsed is None:
-                continue
+        parsed = parse_occ_symbol(symbol)
+        if parsed is None:
+            continue
 
-            dte = (parsed["expiry"] - trade_date).days
-            if dte != 0:
-                continue
+        dte = (parsed["expiry"] - trade_date).days
+        if dte != 0:
+            continue
 
-            strike = parsed["strike"]
-            pc = parsed["pc"]
-            if pc != "C":
-                continue
-            if strike not in target_strikes:
-                continue
+        strike = parsed["strike"]
+        pc = parsed["pc"]
+        if pc != "C":
+            continue
+        if strike not in target_strikes:
+            continue
 
-            key = f"C{strike:.0f}"
-            curves[key][m]["prices"].append(price)
-            curves[key][m]["sizes"].append(size)
+        key = f"C{strike:.0f}"
+        curves[key][m]["prices"].append(price)
+        curves[key][m]["sizes"].append(size)
 
     result = {}
     for key in curves:
@@ -246,6 +253,9 @@ def analyze_premium_curve(curve: dict[int, dict], entry_minute: int,
 
 
 def main():
+    # The OPRA duplicate guard logs at INFO, once per day that carried
+    # duplicates, and is silent on a clean tape. [st-c078]
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     results = []
     # Skips are tracked by reason and reported. Since st-7av4 stopped the daily
     # OPRA import (2026-08-07), the tape is pulled on demand for selected

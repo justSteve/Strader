@@ -12,12 +12,12 @@ completely differently.
 from __future__ import annotations
 
 import bisect
-import gzip
-import json
 import re
 from datetime import datetime, time as _time
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+from market.corpus.opra import read_opra_rows
 
 CENTRAL = ZoneInfo("America/Chicago")
 UTC = ZoneInfo("UTC")
@@ -45,33 +45,35 @@ def ct_epoch(d, hhmm: str) -> float:
     return datetime.combine(d, _time(h, m), tzinfo=CENTRAL).timestamp()
 
 
-def collect_window(corpus_path: Path, expiry: str, t0: float, t1: float
+def collect_window(corpus_path: Path, expiry: str, t0: float, t1: float,
+                   *, dedup: bool | None = None
                    ) -> list[tuple[float, str, float, float]]:
     """Single pass over the tape -> [(epoch, right, strike, price)] for `expiry`
     within [t0, t1]. gz-aware. Used to derive both the parity settle and the
-    fly legs without re-scanning."""
+    fly legs without re-scanning.
+
+    Reads through ``market.corpus.opra.read_opra_rows``, so a doubled tape
+    (a batch pull that ran twice — 2026-07-20) yields each print once and the
+    leg print counts are the real ones. ``dedup=False``, or
+    ``STRADER_OPRA_DEDUP=0``, reproduces the pre-guard read. [st-c078]
+    """
     out: list[tuple[float, str, float, float]] = []
-    opener = gzip.open if str(corpus_path).endswith(".gz") else open
-    with opener(corpus_path, "rt") as fh:
-        for line in fh:
-            if not line.strip():
-                continue
-            row = json.loads(line)
-            data = row.get("data", {})
-            parsed = parse_occ(data.get("symbol") or "")
-            if not parsed:
-                continue
-            exp, r, strike = parsed
-            if exp != expiry:
-                continue
-            prov = row.get("provenance", {})
-            ts = prov.get("ts_event") or row.get("ts_pull_utc")
-            price = data.get("price")
-            if ts is None or price is None:
-                continue
-            ep = epoch_of(ts)
-            if t0 <= ep <= t1:
-                out.append((ep, r, strike, float(price)))
+    for _line, row in read_opra_rows(corpus_path, dedup=dedup):
+        data = row.get("data", {})
+        parsed = parse_occ(data.get("symbol") or "")
+        if not parsed:
+            continue
+        exp, r, strike = parsed
+        if exp != expiry:
+            continue
+        prov = row.get("provenance", {})
+        ts = prov.get("ts_event") or row.get("ts_pull_utc")
+        price = data.get("price")
+        if ts is None or price is None:
+            continue
+        ep = epoch_of(ts)
+        if t0 <= ep <= t1:
+            out.append((ep, r, strike, float(price)))
     return out
 
 

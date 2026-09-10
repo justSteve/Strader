@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import statistics
 import sys
 from datetime import date as _date, datetime
@@ -110,6 +111,11 @@ def main() -> int:
     ap.add_argument("--end-ct", default="15:00")
     ap.add_argument("--bin", type=int, default=30)
     args = ap.parse_args()
+
+    # One line per day that carried duplicate prints; silent on a clean tape.
+    # Over a whole-corpus batch this is the only place a doubled day announces
+    # itself, so it must have a handler. [st-c078]
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     days = sorted(p.name for p in CORPUS_ROOT.iterdir()
                   if p.is_dir() and len(p.name) == 10 and p.name[4] == "-")

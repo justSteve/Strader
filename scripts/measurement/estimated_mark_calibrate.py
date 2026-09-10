@@ -33,6 +33,7 @@ RUN
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from collections import defaultdict
 from multiprocessing import Pool
@@ -87,6 +88,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--min-legs", type=int, default=MIN_LEGS_PER_BIN)
     ap.add_argument("--workers", type=int, default=6)
     a = ap.parse_args(argv)
+
+    # The OPRA read-time duplicate guard reports on stderr at INFO, once per
+    # day that carried duplicates, and says nothing on a clean tape. Without a
+    # handler its line goes nowhere. Workers are forked, so they inherit
+    # this. [st-c078]
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     corpus = a.corpus or default_corpus()
     window = DEFAULT_WINDOW_CT

@@ -57,10 +57,15 @@ WHAT
 RUN
     .venv/bin/python3 scripts/measurement/final_fifteen_premium.py [out.jsonl]
 """
-import json, gzip, glob, os, sys, statistics as st
+import json, gzip, glob, logging, os, sys, statistics as st
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 from multiprocessing import Pool
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from market.corpus.opra import OpraDedup  # noqa: E402
 
 CT = ZoneInfo("America/Chicago")
 OUT = sys.argv[1] if len(sys.argv) > 1 else "data/measurement/final-fifteen-premium.jsonl"
@@ -100,6 +105,14 @@ def run_day(path):
     pre = {}      # sym -> last (hms, price) in 14:40-14:45  — the "mark at 14:45"
     parity = {}   # strike -> {"C": [...], "P": [...]} in 14:42-14:48
     walk = {}     # sym -> [(hms, price)] in 14:45-15:00
+    # Read-time duplicate guard [st-c078]. This loop keeps its substring
+    # prefilter — the expiry tag and the clock window throw away most of the
+    # file before any JSON is parsed, and over 276 corpus days that is the
+    # difference between minutes and tens of minutes. So the guard sits where
+    # the row is already parsed rather than behind read_opra_rows, and sees
+    # only the rows this study was going to use. Its "of M" is that count, not
+    # the file's. STRADER_OPRA_DEDUP=0 reproduces the pre-guard read.
+    guard = OpraDedup(label=day)
     with _open(path) as f:
         for line in f:
             if tag not in line:
@@ -114,6 +127,8 @@ def run_day(path):
                 r = json.loads(line)
             except Exception:
                 continue
+            if guard.is_duplicate(r):
+                continue
             sym = r["data"]["symbol"]
             ps = parse_sym(sym)
             if not ps or ps[0] != exp:
@@ -126,6 +141,7 @@ def run_day(path):
                 walk.setdefault(sym, []).append((hms, price))
             if t1442 <= clock < t1448:
                 parity.setdefault(ps[2], {"C": [], "P": []})[ps[1]].append(price)
+    guard.report()
 
     diffs = [(k, st.median(cp["C"]) - st.median(cp["P"]))
              for k, cp in parity.items() if cp["C"] and cp["P"]]
@@ -193,6 +209,10 @@ def run_day(path):
 
 
 if __name__ == "__main__":
+    # The OPRA duplicate guard logs at INFO, once per day that carried
+    # duplicates, and is silent on a clean tape. Pool workers are forked, so
+    # they inherit this handler. [st-c078]
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     paths = sorted(glob.glob("data/corpus/20*/databento_opra.jsonl")
                    + glob.glob("data/corpus/20*/databento_opra.jsonl.gz"))
     n = 0

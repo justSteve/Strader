@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import math
 import os
 import statistics
@@ -30,6 +31,11 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 STRADER_ROOT = Path("/root/projects/Strader")
+if str(STRADER_ROOT) not in sys.path:
+    sys.path.insert(0, str(STRADER_ROOT))
+
+from market.corpus.opra import read_opra_rows  # noqa: E402
+
 DATA_DIR = STRADER_ROOT / "data"
 CORPUS_DIR = DATA_DIR / "corpus"
 MEASUREMENT_DIR = DATA_DIR / "measurement"
@@ -296,7 +302,14 @@ def build_opra_tape(opra_path: Path, trade_date: _date,
                     trough_price: float,
                     track_strikes: list[float] | None = None
                     ) -> tuple[dict[int, OPRAMinuteBar], dict[str, StrikeTracker]]:
-    """Build 1-minute OPRA bars and optionally track specific strikes."""
+    """Build 1-minute OPRA bars and optionally track specific strikes.
+
+    Reads through ``market.corpus.opra.read_opra_rows``: every field on an
+    OPRAMinuteBar is a count or a sum (volume, trade_count, premium,
+    large_trade_count), so a doubled tape doubles all of them. The guard drops
+    duplicates at the read. ``STRADER_OPRA_DEDUP=0`` reproduces the pre-guard
+    read. [st-c078]
+    """
     bars = {}
     for m in range(start_minute, end_minute + 1):
         bars[m] = OPRAMinuteBar(minute=m)
@@ -308,68 +321,63 @@ def build_opra_tape(opra_path: Path, trade_date: _date,
                 key = f"{pc}{strike:.0f}_0DTE"
                 trackers[key] = StrikeTracker(strike=strike, pc=pc, dte=0)
 
-    with open(opra_path) as f:
-        for line in f:
-            try:
-                rec = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            ts_str = rec.get("provenance", {}).get("ts_event")
-            if not ts_str:
-                continue
-            try:
-                ts = parse_iso_timestamp(ts_str)
-            except (ValueError, IndexError):
-                continue
+    for _line, rec in read_opra_rows(opra_path):
+        ts_str = rec.get("provenance", {}).get("ts_event")
+        if not ts_str:
+            continue
+        try:
+            ts = parse_iso_timestamp(ts_str)
+        except (ValueError, IndexError):
+            continue
 
-            m = minute_since_1300(ts)
-            if m < start_minute or m > end_minute:
-                continue
+        m = minute_since_1300(ts)
+        if m < start_minute or m > end_minute:
+            continue
 
-            data = rec.get("data", {})
-            symbol = data.get("symbol", "")
-            if not symbol.startswith("SPXW"):
-                continue
+        data = rec.get("data", {})
+        symbol = data.get("symbol", "")
+        if not symbol.startswith("SPXW"):
+            continue
 
-            size = data.get("size", 0)
-            price = data.get("price", 0.0)
-            if size <= 0 or price <= 0:
-                continue
+        size = data.get("size", 0)
+        price = data.get("price", 0.0)
+        if size <= 0 or price <= 0:
+            continue
 
-            parsed = parse_occ_symbol(symbol)
-            if parsed is None:
-                continue
+        parsed = parse_occ_symbol(symbol)
+        if parsed is None:
+            continue
 
-            dte = compute_dte(trade_date, parsed["expiry"])
-            pc = parsed["pc"]
-            strike = parsed["strike"]
-            premium = size * price * 100  # dollar premium
+        dte = compute_dte(trade_date, parsed["expiry"])
+        pc = parsed["pc"]
+        strike = parsed["strike"]
+        premium = size * price * 100  # dollar premium
 
-            bar = bars[m]
-            bar.total_volume += size
-            bar.trade_count += 1
-            bar.total_premium += premium
+        bar = bars[m]
+        bar.total_volume += size
+        bar.trade_count += 1
+        bar.total_premium += premium
 
-            if pc == "P":
-                bar.put_volume += size
-                bar.put_premium += premium
-            else:
-                bar.call_volume += size
-                bar.call_premium += premium
+        if pc == "P":
+            bar.put_volume += size
+            bar.put_premium += premium
+        else:
+            bar.call_volume += size
+            bar.call_premium += premium
 
-            if dte == 0:
-                bar.dte0_volume += size
-            else:
-                bar.dte_nonzero_volume += size
+        if dte == 0:
+            bar.dte0_volume += size
+        else:
+            bar.dte_nonzero_volume += size
 
-            if size >= 50:
-                bar.large_trade_count += 1
+        if size >= 50:
+            bar.large_trade_count += 1
 
-            # Track specific strikes
-            if track_strikes and dte == 0:
-                key = f"{pc}{strike:.0f}_0DTE"
-                if key in trackers:
-                    trackers[key].add_trade(m, price, size)
+        # Track specific strikes
+        if track_strikes and dte == 0:
+            key = f"{pc}{strike:.0f}_0DTE"
+            if key in trackers:
+                trackers[key].add_trade(m, price, size)
 
     return bars, trackers
 
@@ -800,6 +808,10 @@ def main():
     parser.add_argument("--json", action="store_true", help="Output JSON profiles")
     parser.add_argument("--quiet", action="store_true", help="Suppress summary output")
     args = parser.parse_args()
+
+    # The OPRA duplicate guard logs at INFO, once per day that carried
+    # duplicates, and is silent on a clean tape. [st-c078]
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     if not args.date and not args.all_v_days:
         args.date = "2026-05-21"

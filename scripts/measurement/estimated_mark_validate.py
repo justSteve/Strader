@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from multiprocessing import Pool
 from pathlib import Path
@@ -89,6 +90,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--days-from", default=None)
     ap.add_argument("--workers", type=int, default=6)
     a = ap.parse_args(argv)
+
+    # See estimated_mark_calibrate.main — the OPRA duplicate guard logs at
+    # INFO and needs a handler to be heard. [st-c078]
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     corpus = a.corpus or default_corpus()
     cal = Calibration.load(a.calibration)

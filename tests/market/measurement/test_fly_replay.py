@@ -69,3 +69,78 @@ def test_settle_parity_uses_latest_print_per_strike():
         (200.0, "P", 7405.0, 0.9),   # latest put -> S = 7405 + 1.2 - 0.9 = 7405.3
     ]
     assert round(fr.settle_parity(w, 0.0, 300.0), 2) == 7405.3
+
+
+# --------------------------------------------------------------------------
+# collect_window reads through the OPRA duplicate guard [st-c078]
+#
+# These touch a file, unlike everything above. A doubled OPRA tape (a batch
+# pull that ran twice — 2026-07-20) used to inflate this study's "leg prints"
+# counts 2x; the fly price itself survived, because a forward-filled last
+# trade does not care how many times it was written. The counts are what the
+# study reports on screen, so they have to be the real ones.
+# --------------------------------------------------------------------------
+
+def _tape(tmp_path, rows):
+    import json
+    p = tmp_path / "databento_opra.jsonl"
+    p.write_text("".join(
+        json.dumps({
+            "ts_pull_utc": pull,
+            "provenance": {"ts_event": ts},
+            "data": {"symbol": sym, "instrument_id": iid, "price": px,
+                     "size": sz, "sequence": seq},
+        }) + "\n" for ts, sym, iid, px, sz, seq, pull in rows), encoding="utf-8")
+    return p
+
+
+_EP = 1753120800.0   # 2026-07-21 13:00:00 CT, whole seconds
+
+
+def _iso(offset_s: int) -> str:
+    from datetime import datetime, timezone
+    t = datetime.fromtimestamp(_EP + offset_s, timezone.utc)
+    return t.strftime("%Y-%m-%dT%H:%M:%S") + ".000000000+00:00"
+
+
+_THREE = [
+    (_iso(0), "SPXW  260721C07510000", 111, 1.35, 1, 900, "PULL-A"),
+    (_iso(1), "SPXW  260721C07515000", 222, 0.80, 2, 901, "PULL-A"),
+    (_iso(2), "SPXW  260721C07520000", 333, 0.40, 3, 902, "PULL-A"),
+]
+
+
+def test_collect_window_drops_duplicates_from_a_doubled_tape(tmp_path):
+    doubled = _THREE + [(ts, sym, iid, px, sz, seq, "PULL-B")
+                        for ts, sym, iid, px, sz, seq, _ in _THREE]
+    p = _tape(tmp_path, doubled)
+    w = fr.collect_window(p, "260721", _EP, _EP + 60)
+    assert len(w) == 3
+    legs = fr.legs_from_window(w, {7510.0, 7515.0, 7520.0}, "C")
+    assert [len(legs[k]) for k in (7510.0, 7515.0, 7520.0)] == [1, 1, 1]
+
+
+def test_collect_window_leaves_a_clean_tape_alone(tmp_path):
+    p = _tape(tmp_path, _THREE)
+    assert len(fr.collect_window(p, "260721", _EP, _EP + 60)) == 3
+
+
+def test_collect_window_dedup_false_is_the_pre_guard_read(tmp_path):
+    doubled = _THREE + [(ts, sym, iid, px, sz, seq, "PULL-B")
+                        for ts, sym, iid, px, sz, seq, _ in _THREE]
+    p = _tape(tmp_path, doubled)
+    assert len(fr.collect_window(p, "260721", _EP, _EP + 60, dedup=False)) == 6
+
+
+def test_collect_window_keeps_distinct_prints_at_one_instant(tmp_path):
+    """Same contract, same nanosecond, same price and size, different sequence.
+
+    These are real fills — 4.97% of the clean 2026-07-21 tape looks like this —
+    and a narrower key would eat them.
+    """
+    ts = _iso(0)
+    p = _tape(tmp_path, [
+        (ts, "SPXW  260721C07510000", 111, 1.35, 1, 900, "PULL-A"),
+        (ts, "SPXW  260721C07510000", 111, 1.35, 1, 901, "PULL-A"),
+    ])
+    assert len(fr.collect_window(p, "260721", _EP, _EP + 60)) == 2
