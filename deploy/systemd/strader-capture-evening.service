@@ -9,6 +9,12 @@
 # The weekday-dependent stop time lives in scripts/cron/capture-evening.sh; the
 # supervision (Restart=on-failure with the stretching backoff, SIGINT, journald)
 # is copied from the session unit for the same reasons written there.
+#
+# [Install] WantedBy=multi-user.target means a reboot starts this unit whatever
+# the clock says — on 2026-09-08 (03:06 boot) and 08-28 (03:30 boot) it ran
+# beside strader-capture and doubled the tape. The guard is in the wrapper:
+# capture-evening.sh exits 0 before the 15:06 / Sun 17:00 open, so the timer
+# remains the only real start. [st-7kwg]
 Description=Strader Databento live capture — evening session (15:06 CT → end of day)
 Documentation=https://github.com/justSteve/Strader
 After=network-online.target
