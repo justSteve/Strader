@@ -134,14 +134,16 @@ class TestAtomicWrite:
         writer.update_manifest(DAY, STREAM, increment_cycles=5)
         before = paths.manifest_path(DAY).read_text()
 
-        def boom(self, text):
+        def boom(fd):
             raise OSError("disk full")
         with monkeypatch.context() as m:
-            m.setattr(type(paths.manifest_path(DAY)), "write_text", boom)
+            m.setattr(writer.os, "fsync", boom)
             with pytest.raises(OSError):
                 writer.update_manifest(DAY, STREAM, increment_cycles=1)
         assert paths.manifest_path(DAY).read_text() == before
         assert json.loads(before)["streams"][STREAM]["cycles"] == 5
+        # the private temp file does not survive the failure either [st-5oli]
+        assert [q.name for q in paths.day_dir(DAY).iterdir() if ".tmp" in q.name] == []
 
 
 class TestResolveErrors:
@@ -178,3 +180,105 @@ class TestResolveErrors:
         st = _stream()
         assert st["errors"] == ["reconnect #1: gap again"]
         assert st["errors_resolved"]["count"] == 1
+
+
+# --- st-5oli: two writers on one day --------------------------------------
+# Measured 2026-09-08: 2026-09-06 and 09-07 manifests failed json.loads with
+# 'Extra data' — a complete document followed by the tail of a longer one.
+# The temp name was one shared manifest.json.tmp per day, so two writers
+# truncated and wrote the same inode, then both renamed it. These pin the
+# lock, the private temp name, and the salvage of what the old shape left.
+
+import multiprocessing as _mp
+import os as _os
+
+_N_WRITERS = 4
+_N_UPDATES = 25
+
+
+def _hammer(root: str, idx: int) -> None:
+    paths.CORPUS_ROOT = type(paths.CORPUS_ROOT)(root)
+    for i in range(_N_UPDATES):
+        writer.update_manifest(DAY, f"stream{idx}", increment_cycles=1,
+                               note=f"w{idx} n{i}", note_key=f"w{idx}:{i}")
+
+
+class TestConcurrentWriters:
+    def test_parallel_writers_leave_one_parseable_manifest_with_every_update(self, corpus):
+        ctx = _mp.get_context("fork")
+        procs = [ctx.Process(target=_hammer, args=(str(corpus), k)) for k in range(_N_WRITERS)]
+        for p in procs:
+            p.start()
+        for p in procs:
+            p.join(60)
+        assert all(p.exitcode == 0 for p in procs), [p.exitcode for p in procs]
+        m = _manifest()  # json.loads — the file parses
+        assert {k: v["cycles"] for k, v in m["streams"].items()} == {
+            f"stream{k}": _N_UPDATES for k in range(_N_WRITERS)}
+        # 100 keyed notes were written; the cap keeps the last 50 and counts the rest
+        assert len(m["notes"]) == writer.MAX_MANIFEST_NOTES
+        assert m["notes_dropped"] == _N_WRITERS * _N_UPDATES - writer.MAX_MANIFEST_NOTES
+        leftovers = [p.name for p in paths.day_dir(DAY).iterdir() if ".tmp" in p.name]
+        assert leftovers == []
+
+    def test_temp_name_is_private_per_write_and_lock_stays(self, corpus):
+        seen = []
+        real = writer.tempfile.mkstemp
+
+        def spy(**kw):
+            fd, name = real(**kw)
+            seen.append(name)
+            return fd, name
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(writer.tempfile, "mkstemp", spy)
+            writer.update_manifest(DAY, STREAM, increment_cycles=1)
+            writer.update_manifest(DAY, STREAM, increment_cycles=1)
+        assert len(seen) == 2 and seen[0] != seen[1]
+        assert all(_os.path.basename(n).startswith("manifest.json.") for n in seen)
+        assert not any(_os.path.exists(n) for n in seen)
+        assert writer.lock_path(paths.manifest_path(DAY)).exists()
+        assert _stream()["cycles"] == 2
+
+
+def _interleaved(corpus) -> str:
+    """Rebuild the measured 09-07 shape: a valid doc, then a longer doc's tail."""
+    writer.update_manifest(DAY, STREAM, increment_cycles=7, note="first")
+    good = paths.manifest_path(DAY).read_text()
+    tail = ',\n      "key": "outage:73:2026-09-07T06:55:24Z"\n    }\n  ],\n  "notes_dropped": 178\n}\n'
+    paths.manifest_path(DAY).write_text(good + tail)
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(paths.manifest_path(DAY).read_text())
+    return good
+
+
+class TestSalvage:
+    def test_a_writer_meeting_an_interleaved_manifest_salvages_and_continues(self, corpus, caplog):
+        _interleaved(corpus)
+        with caplog.at_level("WARNING", logger="market.corpus.writer"):
+            writer.update_manifest(DAY, STREAM, increment_cycles=1)
+        m = _manifest()
+        assert m["streams"][STREAM]["cycles"] == 8
+        repair = [n for n in m["notes"] if n.get("key", "").startswith("repair:")]
+        assert len(repair) == 1
+        assert "outage:73" in repair[0]["note"] and "notes_dropped\": 178" in repair[0]["note"]
+        kept = [p for p in paths.day_dir(DAY).iterdir() if ".corrupt-" in p.name]
+        assert len(kept) == 1
+        with pytest.raises(json.JSONDecodeError):
+            json.loads(kept[0].read_text())  # the original is preserved verbatim
+        assert "salvaged" in caplog.text
+
+    def test_salvage_is_callable_on_its_own_for_the_two_measured_days(self, corpus):
+        good = _interleaved(corpus)
+        m, report = writer.salvage(paths.manifest_path(DAY))
+        assert m["streams"][STREAM]["cycles"] == 7
+        assert report.startswith(f"salvaged {len(good)} of ")
+        assert json.loads(paths.manifest_path(DAY).read_text())["notes"][-1]["key"].startswith("repair:")
+
+    def test_nothing_to_salvage_raises(self, corpus):
+        paths.day_dir(DAY, create=True)
+        paths.manifest_path(DAY).write_text("{ this is not json")
+        with pytest.raises(ValueError, match="no leading JSON document"):
+            writer.salvage(paths.manifest_path(DAY))
+        with pytest.raises(ValueError):
+            writer.update_manifest(DAY, STREAM, increment_cycles=1)
