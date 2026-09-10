@@ -455,50 +455,64 @@ def main(argv=None) -> int:
                         format="%(levelname)s %(name)s: %(message)s")
 
     session_day = (datetime.strptime(args.date, "%Y-%m-%d").date()
-                   if args.date else most_recent_session_day())
+                   if args.date else None)
+    try:
+        page_html, summary = build_page(session_day, source=args.source,
+                                        bucket_ticks=args.bucket_ticks)
+    except Exception as e:  # noqa: BLE001 — last-good contract
+        logger.error("source %r unusable, published page LEFT AS-IS: %s", args.source, e)
+        return 2
+    publish(page_html, args.dry_run)
+    print(summary)
+    return 0
+
+
+def build_page(session_day=None, *, source: str = "ticks", bucket_ticks: int = 1) -> tuple[str, str]:
+    """Build the page in-process and return (html, summary line). The one
+    path both the 08:15 cron (main) and the on-demand server
+    (scripts/profile_server.py, Steve 2026-09-10: "re-gen on a page refresh")
+    go through. Raises on a source failure; the caller decides what a failure
+    means (main leaves the published page as-is, the server serves last-good)."""
+    if session_day is None:
+        session_day = most_recent_session_day()
     start = anchor_utc(session_day)
     anchor_ct = start.astimezone(CENTRAL)
     logger.info("anchor: %s (prior RTH open)", anchor_ct.strftime("%a %Y-%m-%d %H:%M CT"))
 
-    source, aggressor, hole = args.source, False, None
-    try:
-        if source == "ticks":
-            # Tally as the generator drains: the profile streams, so the print
-            # count and the LAST PRINT (a real traded price, not a bucket floor)
-            # have to be captured in passing rather than recomputed.
-            tally = _Tally()
-            profile = build_split_profile(tally(trades_from_corpus(start)),
-                                          bucket_ticks=args.bucket_ticks)
-            va = value_area(profile.as_volume_profile())
-            last, end_ct, n = tally.last.price, tally.last.ts, tally.n
-            aggressor = True
-            if tally.gap and tally.gap[2] >= HOLE_MIN_SECS:
-                hole = tally.gap
-                logger.warning("tape hole inside the window: %s → %s (%.1f h)",
-                               hole[0].isoformat(), hole[1].isoformat(), hole[2] / 3600)
-        else:
-            bars = fetch_bars(start) if source == "schwab" else bars_from_corpus(start)
-            profile = build_profile_from_bars(bars, symbol=SYMBOL)
-            va = value_area(profile)
-            last = float(bars[-1]["close"])
-            end_ct, n = _ct(bars[-1]["datetime"]), len(bars)
-    except Exception as e:  # noqa: BLE001 — last-good contract
-        logger.error("source %r unusable, published page LEFT AS-IS: %s", source, e)
-        return 2
+    aggressor, hole = False, None
+    if source == "ticks":
+        # Tally as the generator drains: the profile streams, so the print
+        # count and the LAST PRINT (a real traded price, not a bucket floor)
+        # have to be captured in passing rather than recomputed.
+        tally = _Tally()
+        profile = build_split_profile(tally(trades_from_corpus(start)),
+                                      bucket_ticks=bucket_ticks)
+        va = value_area(profile.as_volume_profile())
+        last, end_ct, n = tally.last.price, tally.last.ts, tally.n
+        aggressor = True
+        if tally.gap and tally.gap[2] >= HOLE_MIN_SECS:
+            hole = tally.gap
+            logger.warning("tape hole inside the window: %s → %s (%.1f h)",
+                           hole[0].isoformat(), hole[1].isoformat(), hole[2] / 3600)
+    else:
+        bars = fetch_bars(start) if source == "schwab" else bars_from_corpus(start)
+        profile = build_profile_from_bars(bars, symbol=SYMBOL)
+        va = value_area(profile)
+        last = float(bars[-1]["close"])
+        end_ct, n = _ct(bars[-1]["datetime"]), len(bars)
 
     generated = datetime.now(tz=CENTRAL)
-    publish(render_page(profile, va, last, n, end_ct, anchor_ct, generated,
-                        source, aggressor, hole=hole), args.dry_run)
-
+    page_html = render_page(profile, va, last, n, end_ct, anchor_ct, generated,
+                            source, aggressor, hole=hole)
     extra = f"   delta {profile.delta:+,}" if aggressor else ""
-    print(f"{SYMBOL} anchored VP [{source}] — {n:,} "
-          f"{'prints' if source == 'ticks' else 'bars'}, "
-          f"{profile.total:,} contracts, {profile.bucket_pts:g}pt buckets\n"
-          f"  anchor {anchor_ct:%a %H:%M CT}  ->  {end_ct:%a %H:%M CT}\n"
-          f"  VAH {va.vah:g}   POC {va.poc:g}   VAL {va.val:g}   "
-          f"(VA {va.achieved:.0%}, width {va.width:g}){extra}\n"
-          f"  last {last:g} ({last - va.poc:+g} vs POC)")
-    return 0
+    summary = (f"{SYMBOL} anchored VP [{source}] — {n:,} "
+               f"{'prints' if source == 'ticks' else 'bars'}, "
+               f"{profile.total:,} contracts, {profile.bucket_pts:g}pt buckets\n"
+               f"  anchor {anchor_ct:%a %H:%M CT}  ->  {end_ct:%a %H:%M CT}\n"
+               f"  VAH {va.vah:g}   POC {va.poc:g}   VAL {va.val:g}   "
+               f"(VA {va.achieved:.0%}, width {va.width:g}){extra}\n"
+               f"  last {last:g} ({last - va.poc:+g} vs POC)")
+    return page_html, summary
 
 
 if __name__ == "__main__":

@@ -1,0 +1,37 @@
+[Unit]
+# Profile server — the anchored volume profile and market profile pages,
+# rendered on every page refresh. [Steve 2026-09-10]
+#
+# Steve: "I'd prefer it re-gen on a page refresh. It should live at
+# https://mydesk-1.tail89f676.ts.net/volprofile/ — and I'll have the same ask
+# of a Market Profile." Published the same way the footprint page is:
+#     tailscale serve --bg --set-path /volprofile http://127.0.0.1:7790
+#     tailscale serve --bg --set-path /mktprofile http://127.0.0.1:7790
+# (the server is prefix-tolerant, like the drill bridge).
+#
+# Restart=always: it holds nothing but a render cache; a server that is down
+# is a page that is blank.
+Description=Strader profile server (anchored volume + market profile pages on 127.0.0.1:7790)
+Documentation=https://github.com/justSteve/Strader
+After=network-online.target
+Wants=network-online.target
+
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=exec
+WorkingDirectory=/root/projects/Strader
+Environment=PYTHONPATH=/root/projects/Strader
+ExecStart=/root/projects/Strader/.venv/bin/python /root/projects/Strader/scripts/profile_server.py
+Restart=always
+RestartSec=3s
+Nice=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strader-profile-server
+KillSignal=SIGINT
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

@@ -79,6 +79,18 @@ mtimes, `crontab -l`, and `tmux -L moocity` were the instruments.
 > when the units are active. The table below is kept as the record of what this
 > registry found on 08-13.
 >
+> **Added 2026-09-10 [st-ad4c].** `strader-profile-server.service` —
+> `scripts/profile_server.py` on `127.0.0.1:7790`, the anchored profile pages
+> rendered on every page refresh (Steve: "re-gen on a page refresh"; measured
+> ~4 s a render, 10 s cache, one render at a time, last-good page with an
+> `X-Profile-Stale` header when a render fails). On the tailnet at
+> `https://mydesk-1.tail89f676.ts.net/volprofile/` and `/mktprofile/`
+> (`tailscale serve --bg --set-path /volprofile http://127.0.0.1:7790/volprofile`,
+> same for `/mktprofile` — the backend URL must carry the route, tailscale strips
+> the mount path). `GET /health` reports renders, last duration, cache age and
+> last error per route. The 08:15 cron still publishes the desk copy of the
+> volume profile; both go through `premarket_volume_profile.build_page()`.
+>
 > **Phase 3, 2026-08-16 [st-n0qm.8, st-n0qm.9].** The sentinel now also POSTs
 > each alert to the bridge (`--bridge`, default `http://127.0.0.1:7788`, best-
 > effort, off under `--replay`); the bridge keeps them as an append-only
