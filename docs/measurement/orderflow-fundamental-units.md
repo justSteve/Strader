@@ -238,7 +238,7 @@ The scenario catalog's units are **level-engagement** units; this corpus measure
 | S4 clean break | **level-free correlate, by negation** | A flush-leg with hot-death/no absorption-death in tail — the aggression keeps getting paid; also the host-down confirmation-event graveyard (19.2% win) |
 | S5 sprung trap fails | **partial level-free correlate** | Confirmations-into-dying-legs (neither-verdicts 48.6% within 1 min of leg end) + host-leg-down context |
 | S6 chop straddle | **texture match only** | dead-drift archetype (32.4%) is its leg-scale texture; the level-straddle itself is unmeasured |
-| S1 clean rejection | **unmeasured (level-relative)** | probe-fade is the nearest level-free texture, not an identification |
+| S1 clean hold ("clean rejection" until st-z1a1) | **unmeasured (level-relative)** | probe-fade is the nearest level-free texture, not an identification |
 | S3 level reclaim | **unmeasured** (flush-stage-violence discrimination vs S2 requires level + sub-minute data) |
 
 ### 4.3 F1–F4 frames

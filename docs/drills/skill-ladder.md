@@ -36,16 +36,21 @@ sequence** (flush → stall → flip → confirm) observed at different terminat
 ```
 price meets level
 ├─ no force either direction ·································· S6 chop straddle
-├─ force punished at once, level never trades through ········· S1 clean rejection
+├─ force punished at once, level never trades through ········· S1 clean hold
 └─ force breaks through ··········· STAGE 1 flush
    ├─ aggression keeps getting paid ··························· S4 clean break
    └─ aggression stops paying ····· STAGE 2 stall
       └─ footers change sides ····· STAGE 3 flip
          ├─ retake never holds ································ S5 sprung trap fails
          └─ retake holds ·········· STAGE 4 confirm
-            ├─ flush was violent ······························ S2 failed breakdown
-            └─ flush was quiet ································ S3 level reclaim
+            ├─ flush was violent ······························ S2 failed break  (↓ failed breakdown · ↑ failed breakout)
+            └─ flush was quiet ································ S3 quiet retake  (↓ level reclaim · ↑ level reject)
 ```
+
+Every exit has two instances — **↓ at a support** (the break is down, the reversal is
+the bullish read) and **↑ at a resistance** (the break is up, the reversal is the
+bearish read). Direction is an axis across the tree, not a seventh exit; the sides are
+measured separately and never pooled (st-z1a1, `scenario-catalog.md` Part I).
 
 So the curriculum is not "learn six things." It is **learn ONE sequence deeply, then
 learn where each lookalike departs from it.** Every discrimination drill is a question
@@ -112,7 +117,7 @@ at the others. Anchor generalization is the LAST unit, not four separate curricu
 | 3 | **S2 vs S4** | The trap vs the anti-trap. Tell lives in stage 2: is the aggression still getting paid? | Costliest confusion in the deck |
 | 4 | **S5** | The confirm gate — no call before stage 4; fast cut if early | Doctrine, proven on tape |
 | 5 | **S3 vs S2** | Family refinement: flush violence separates the siblings | Low-stakes; family agreement = success |
-| 6 | **S1 + S6** | The no-sequence pair: level holds vs level is noise | Needs sequence reads first; refs [to tag] |
+| 6 | **S1 + S6** | The no-sequence pair: level holds (clean hold) vs level is noise | Needs sequence reads first; refs [to tag] |
 | 7 | Anchor generalization | The same ladder re-met at range edges (range_trap) and LVNs (return_to_lvn) | Completes Carmine's set |
 
 The drill page's **Ladder dropdown** presents scenarios in exactly this order. Lesson

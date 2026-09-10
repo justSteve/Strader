@@ -134,6 +134,25 @@ meta:
         held; EVENT acceptance is broken. Reclaimed has no EVENT emitter at
         all. If the state machine cannot land in one commit the word swap may
         go first, but the two vocabularies must never both ship.
+    - id: s1-is-held-not-rejection
+      date: 2026-09-10
+      bead: st-z1a1
+      recommend: >
+        The drill canon's S1 story is "Clean hold", not "Clean rejection".
+        "Reject" was doing two jobs — S1's name (the level never trades
+        through) and the recognizer's level_reject, which is S3's upside
+        instance (a quiet poke above a resistance that is retaken — the level
+        trades through first). Two stories, one word, on the spoken surface.
+        S1 takes "held" because that is the chart's ratified plan-level word
+        (one-plan-level-state-machine above). Applied in
+        docs/drills/scenario-catalog.md, scenario-deck.json, skill-ladder.md
+        and docs/foundation/07-levels-and-traps.md the same day.
+      constraint: >
+        The drill's judgment button still says "Reject (fade it)" and the
+        EVENT tier still says REJECTION for a held touch; both are the
+        judgment-verb reconciliation st-g9y owns and were not touched. Until
+        that lands, "reject" spoken bare means the level held (S1 / judgment)
+        and level_reject in code means S3 up — read the surface before the word.
     - id: confidence-off-the-display
       date: 2026-08-25
       bead: st-66ld

@@ -46,12 +46,21 @@ attached at the end of each line *as labels, not as vocabulary*:
 
 | The story | The call | Deck code |
 |-----------|----------|-----------|
-| Price touches the level, aggression into it is punished at once, price leaves the way it came. The level **holds on first contact**. | Fade held; the level worked | S1 · Clean rejection |
-| Price **breaks through with real force… and the break fails**: the aggression stops paying, the other side takes over, price retakes the level. The trap — full story below. | Wait for the retake, then go WITH it | S2 · Failed breakdown |
-| Same ending as the trap — price ends up back above a lost level — but the level was lost **quietly**, no violence. A gentler sibling. | Same as the trap, a notch less conviction | S3 · Level reclaim |
-| Price breaks through **and keeps getting paid** — no stall, no fight, just continuation. The break was real. | Never fade it; go with it or stand aside | S4 · Clean break |
-| The trap **starts** — break, stall, even a pressure flip — but the retake never comes; price rolls back over. A trap that failed to spring. | No trade; if in early (against doctrine), cut fast | S5 · Sprung trap fails |
+| Price touches the level, aggression into it is punished at once, price leaves the way it came. The level **holds on first contact**. | Fade held; the level worked | S1 · Clean hold |
+| Price **breaks through with real force… and the break fails**: the aggression stops paying, the other side takes over, price retakes the level. The trap — full story below. | Wait for the retake, then go WITH it | S2 · Failed break — ↓ failed breakdown / ↑ failed breakout |
+| Same ending as the trap — price ends up back on the right side of a lost level — but the level was lost **quietly**, no violence. A gentler sibling. | Same as the trap, a notch less conviction | S3 · Quiet retake — ↓ level reclaim / ↑ level reject |
+| Price breaks through **and keeps getting paid** — no stall, no fight, just continuation. The break was real. | Never fade it; go with it or stand aside | S4 · Clean break — ↓ breakdown holds / ↑ breakout holds |
+| The trap **starts** — break, stall, even a pressure flip — but the retake never comes; price rolls back through. A trap that failed to spring. | No trade; if in early (against doctrine), cut fast | S5 · Sprung trap fails |
 | Price straddles the level with conviction in neither direction. Today, this level is noise. | No call at all | S6 · Chop straddle |
+
+Every story but the last has **two instances**, and the instance carries the direction.
+**↓ at a support**: the break is down, on selling; the reversal, if it comes, is back
+*above* the floor — the bullish read, Mancini's Failed Breakdown family. **↑ at a
+resistance**: the break is up, on buying; the reversal is back *beneath* the lid — the
+bearish read, the bull trap. Same four stages, colours swapped. The two sides are not
+mirror images in the numbers: the midday dead zone is a support-side effect and does not
+show on the resistance side, so anything measured about these stories is measured per
+side and never pooled (the catalog's Part I carries the figures).
 
 Everything the drills score is one of those six stories.
 
@@ -90,7 +99,14 @@ direction.
 
 That four-part sequence — **flush → stall → flip → confirm** — is what the drill
 vocabulary calls the four **stages**, and the recognizer's walkthroughs narrate
-them live on real tape. Each stage is a concept you already own: the flush is
+them live on real tape. That is the ↓ instance, at a support. Turn it over for
+the ↑ instance at a resistance: above the lid sit the stops of the shorts and the entry
+orders of breakout longs — stored *buy* decisions. The flush is blue through the lid,
+both piles detonating upward; the stall is still-bright blue with price making no new
+highs; the flip is footers turning red as the forced buyers run out; the confirm is the
+close back beneath the lid on paid selling, and now the trapped longs' stops fire as
+*sell* orders. Mancini's name for the ↓ form is Failed Breakdown; the ↑ form is the
+Failed Breakout, the bull trap, and on your side of the book it is a put, never a short. Each stage is a concept you already own: the flush is
 conviction at burst pace (documents 02+06), the stall is absorption (05), the flip
 is the footer changing sides (06), the confirm is conviction with effect the other
 way (02).
@@ -125,7 +141,8 @@ deck — the deck exists because this sequence *is* the strategy.
 1. What are the five sources of levels — and what physically makes a level
    "live" when price touches it?
 2. Tell the six stories that can unfold when price meets a level, in your own
-   words, without using the deck codes.
+   words, without using the deck codes — then tell the trap once more from the
+   resistance side, naming who is trapped and whose stops power the confirm.
 3. Walk the trap's four stages: who is selling in the flush, why that fuel
    self-exhausts, who is trapped after the flip, and whose stops power the
    confirm.
