@@ -1,5 +1,26 @@
 # DaysActivity - 2026-09-10
 
+## 09:41 - Session Handoff [Live ES watch for Steve · plan page updated with PA, DXY, bonds]
+
+**Summary**: Steve traded the open with Strader on watch: the plan page got a current-PA section (ES vs the ladder, 120-min level deltas, GEX summary, DXY via the UUP proxy since Schwab serves no $DXY, bonds/yields, VIX) rendered to both desk addresses at 08:42 CT, and a tape watch relayed level crossings, GEX major moves and 15-min summaries 08:41–09:38 CT until he went offline. The watch is now `tools/es_level_watch.py` with its damping rules tested.
+
+**Open Work**:
+- Steve is offline as of 09:38 CT; the watch is stopped. Restart on request: `.venv/bin/python tools/es_level_watch.py` under Monitor, or in a tmux pane
+- st-fsf3 — bash-guard settings patch still waits on Steve
+- The plan doc's appended PA section is overwritten by any later `runbook.mancini.refresh` (it re-emits the doc); if that matters, the section belongs in `extra_sections`
+
+**Tried**:
+- Naive "price crossed the level" → 14 events in 90 s on 7603; fixed with 1-pt hysteresis, then a 5-min per-level cooldown with chop counts in the summary
+- GEX negative major reported every poll → it toggles 7525/7540 ↔ 7580/7600 on alternate polls (two clusters, not a move); now requires two held polls and 30 min since the value was last seen
+- `desk-html.sh` writes /var/moo/desk only; Steve's tab is parked on /tmp/desk-mancini-latest-es-plan.html, so the page is copied there after render. The 08:15 cron cannot render at all (marked not on cron PATH), which is why the page sat at 06:08 until 08:42
+
+**Files Changed**:
+tools/es_level_watch.py
+tests/tools/test_es_level_watch.py
+tests/tools/__init__.py
+
+---
+
 ## 07:58 - Session Handoff [Bash guard prepared — one patch waits on Steve]
 
 **Summary**: Built Strader's bash-guard hook in COO's dialect (verbatim copy of its enforcement library) with three Strader rules on top — the corpus tree, the zgent bridge, `git clean -x` — pinned by 58 tests including the nested-versus-flat payload control; the hook is inert until the settings patch lands.
