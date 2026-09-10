@@ -1,5 +1,23 @@
 # DaysActivity - 2026-09-10
 
+## 07:58 - Session Handoff [Bash guard prepared — one patch waits on Steve]
+
+**Summary**: Built Strader's bash-guard hook in COO's dialect (verbatim copy of its enforcement library) with three Strader rules on top — the corpus tree, the zgent bridge, `git clean -x` — pinned by 58 tests including the nested-versus-flat payload control; the hook is inert until the settings patch lands.
+
+**Open Work**:
+- st-fsf3 — **waiting on Steve**: `factory/scripts/land-patch.sh docs/patches/2026-09-10-bash-guard.diff` registers the hook (applies clean, measured). `Bash(rm *)`/`Bash(mv *)` left auto-allowed on purpose; delete those two allow lines at landing if every rm should prompt instead
+- st-c078 — a future duplicate sweep should cover depth as well as trades
+
+**Files Changed**:
+.claude/hooks/scripts/bash-guard.sh
+.claude/hooks/lib/enforcement-common.sh
+tests/test_bash_guard_hook.py
+docs/patches/2026-09-10-bash-guard.diff
+docs/patches/2026-09-10-bash-guard.diff.test
+docs/patches/2026-09-10-bash-guard.diff.commit
+
+---
+
 ## 07:41 - Session Handoff [Mancini Thursday parse · manifest collision fixed · 09-08 and 08-28 tapes repaired]
 
 **Summary**: Parsed the Thursday plan (64 levels, 8 commentary, clipboard loaded, desk NAV [today]); fixed the corpus manifest writer (per-day flock, private mkstemp temp, salvage of an interleaved file, file mode preserved) and repaired the 09-06/09-07 manifests with evidence; measured and repaired the two-live-writer doubling on 09-08 (03:06–06:44 CT) and, newly found, on 08-28 (03:31–03:48 CT) with a new guarded repair tool. Both beads closed; desk-down bead closed on observation; orderflow-1s timer confirmed disabled by Steve.
