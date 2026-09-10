@@ -83,6 +83,16 @@ input[type=range] { flex:1; min-width:140px; }
 #yaxis { position:absolute; right:0; top:0; bottom:0; width:56px; border-left:1px solid var(--axis);
   font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums; }
 #yaxis div { position:absolute; right:6px; transform:translateY(-50%); }
+/* crosshair [Steve, 2026-09-10]: two dotted lines under the cursor, TradingView
+   style, plus the price at the axis. Off by default; C toggles it. Cost is one
+   transform per animation frame on three elements — no chart repaint. */
+#xh-h, #xh-v { display:none; position:absolute; pointer-events:none; z-index:28; }
+#xh-h { left:0; right:56px; height:0; border-top:1px dotted var(--muted); }
+#xh-v { top:0; bottom:0; width:0; border-left:1px dotted var(--muted); }
+#xh-p { display:none; position:absolute; right:0; width:56px; box-sizing:border-box; padding:1px 6px 1px 0;
+  text-align:right; font-size:10px; font-variant-numeric:tabular-nums; color:var(--page);
+  background:var(--muted); transform:translateY(-50%); pointer-events:none; z-index:29; }
+#stage.xh-on #xh-h, #stage.xh-on #xh-v, #stage.xh-on #xh-p { display:block; }
 .lvl-line { position:absolute; left:0; right:56px; border-top:2px dashed var(--critical); z-index:5; }
 .lvl-tag { position:absolute; right:60px; transform:translateY(-100%); font-size:10px;
   color:var(--critical); background:var(--surface-1); padding:0 4px; z-index:6; }
@@ -525,8 +535,9 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
 <div id="stage"><div id="vp"></div><div id="cols"><div id="colstrip"></div></div><div id="yaxis"></div>
   <div id="caption"><span class="x" onclick="this.parentElement.style.display='none'">×</span><span id="caption-text"></span></div>
   <div id="livehud"></div>
+  <div id="xh-h"></div><div id="xh-v"></div><div id="xh-p"></div>
 </div>
-<p class="hint">Space = play/pause · ←/→ = step · Ctrl+←/→ = speed down/up · Pick a level (Level ▾) to arm it AND jump to its first visit · <b>?</b> explains the screen ·
+<p class="hint">Space = play/pause · ←/→ = step · Ctrl+←/→ = speed down/up · <b>C</b> = crosshair on/off · Pick a level (Level ▾) to arm it AND jump to its first visit · <b>?</b> explains the screen ·
 Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button>
 · <button id="candles" title="Open the same tape as 1-minute candles in a second window, synced to this minute">Candles ↗</button>
 · coach: <span id="bridge-dot">—</span>
@@ -1203,10 +1214,17 @@ const yFor = price => (viewHi - price) / TICK * cellH;
 
 function drawAxis() {
   yaxis.innerHTML = "";
-  const step = Math.max(1, Math.round((viewHi - viewLo) / TICK / 14)) * TICK;
+  // Labels land on WHOLE points, contiguous (Steve, 2026-09-10): every whole
+  // number while the rows leave room for the text, then every 2, 5, 10 … points.
+  // The old step was a tick multiple rounded to ~14 labels, which put x.25 /
+  // x.75 on the axis.
+  const pxPerPoint = cellH / TICK;                 // 1 point = 1/TICK rows
+  const MIN_LABEL_PX = 13;
+  const nice = [1, 2, 5, 10, 20, 50, 100];
+  let step = nice.find(s => s * pxPerPoint >= MIN_LABEL_PX) || 100;
   for (let p = Math.ceil(viewLo / step) * step; p <= viewHi; p += step) {
     const d = document.createElement("div");
-    d.style.top = yFor(p) + "px"; d.textContent = fmtPrice(p);
+    d.style.top = yFor(p) + "px"; d.textContent = String(p);
     yaxis.appendChild(d);
   }
   drawLevelLine();
@@ -2197,6 +2215,7 @@ document.addEventListener("keydown", e => {
   }
   if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
   if (e.code === "KeyX") toggleCues();
+  if (e.code === "KeyC") toggleCrosshair();
   if (e.code === "KeyV") toggleVp();
   if (e.code === "KeyS" && LIVE) toggleSentinel();   // drills carry no alerts [st-9olq]
   if (e.code === "ArrowRight") stepUser();
@@ -2206,6 +2225,37 @@ window.addEventListener("resize", () => {
   if (!userSized) { autoH = stageHeight(); stage.style.height = autoH + "px"; }
   repaintAll();
 });
+
+// ── crosshair (Steve, 2026-09-10) ─────────────────────────────────────────
+// Two dotted lines under the cursor and the price at the axis, like the
+// TradingView grid. Off by default; C toggles. One mousemove listener, work
+// deferred to the next animation frame, three style writes per frame and no
+// chart repaint — the cost is not measurable next to the bar poll.
+let xhOn = false, xhRaf = 0, xhX = 0, xhY = 0;
+function xhPaint() {
+  xhRaf = 0;
+  const h = $("xh-h"), v = $("xh-v"), p = $("xh-p"); if (!h || !v || !p) return;
+  h.style.transform = `translateY(${xhY}px)`;
+  v.style.transform = `translateX(${xhX}px)`;
+  if (viewHi != null && cellH > 0) {
+    const price = Math.round((viewHi - xhY / cellH * TICK) / TICK) * TICK;   // snapped to the tick
+    p.style.top = yFor(price) + "px"; p.textContent = fmtPrice(price);
+  }
+}
+function toggleCrosshair(force) {
+  xhOn = force == null ? !xhOn : !!force;
+  stage.classList.toggle("xh-on", xhOn);
+  if (!xhOn && xhRaf) { cancelAnimationFrame(xhRaf); xhRaf = 0; }
+  showCaption(`Crosshair ${xhOn ? "on" : "off"} (C)`);
+}
+stage.addEventListener("mousemove", e => {
+  if (!xhOn) return;
+  const r = stage.getBoundingClientRect();
+  xhX = e.clientX - r.left; xhY = e.clientY - r.top;
+  if (!xhRaf) xhRaf = requestAnimationFrame(xhPaint);
+});
+stage.addEventListener("mouseleave", () => { if (xhOn) stage.classList.remove("xh-on"); });
+stage.addEventListener("mouseenter", () => { if (xhOn) stage.classList.add("xh-on"); });
 
 // ── coach bridge (st-ago): silent when absent, two-way when present ──────
 // POST bodies go as text/plain so a file:// page makes "simple" CORS
