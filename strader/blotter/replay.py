@@ -89,6 +89,31 @@ def _replay_say(day: str, fire_ct: str, close_ct: str, lookback_min: int) -> str
     return f"{day} {idx // 60:02d}:{idx % 60:02d} to {close_ct}"
 
 
+def build_row(day: str, rule: Rule, fire_ct: str, call: str, state: dict, priced: L.Priced, seq: int, *,
+              lane: str = LANE_REPLAY, events: Sequence[dict] = (), lookback_min: int = EVENTS_LOOKBACK_MIN) -> Row:
+    """One row from one priced call — the same composer for the replay and
+    the shadow lane, so the two lanes' rows read alike field for field."""
+    return Row(
+        id=row_id(day, rule.id, seq), lane=lane, day=day, rule_id=rule.id,
+        registered=rule.registered, call=call, sources=list(rule.entity.sources),
+        instrument=rule.instrument, occ_symbol=priced.symbol, right=priced.right,
+        strike=priced.strike, lots=1, fire_ct=fire_ct, entry_ts=L.hms(priced.entry_sec),
+        entry_premium_pts=priced.entry_pts, spx_at_entry=priced.spx_at_entry,
+        es_at_entry=priced.es_at_entry, exit_ts=L.hms(priced.exit_sec),
+        exit_premium_pts=priced.exit_pts, exit_reason=priced.exit_reason,
+        pnl_pts=priced.pnl_pts, pnl_usd=round(priced.pnl_pts * 100.0, 2),
+        mfe_pts=priced.mfe_pts, mae_pts=priced.mae_pts, mark_path=priced.mark_path,
+        estimated=priced.mark_path == "estimated", n_marks=priced.n_marks,
+        state={"T": state["T"], "pT": state["pT"], "fp": state.get("fp"), "mc": state.get("mc"),
+               "gx": state.get("gx")},
+        events=list(events),
+        excerpts=[rule.id, *rule.entity.sources],
+        replay=_replay_say(day, fire_ct, rule.exit.time_ct, lookback_min),
+        grid=priced.grid, estimated_exit=priced.estimated_exit,
+        extrapolated=priced.extrapolated, notes=list(priced.notes),
+    )
+
+
 def replay_day(day: str, rules: Sequence[Rule], *, corpus: Path = DEFAULT_CORPUS, parsed: Path = DEFAULT_PARSED,
                cal: Calibration | None = None, events: bool = True,
                lookback_min: int = EVENTS_LOOKBACK_MIN) -> DayReport:
@@ -124,25 +149,8 @@ def replay_day(day: str, rules: Sequence[Rule], *, corpus: Path = DEFAULT_CORPUS
             seq[rule.id] = seq.get(rule.id, 0) + 1
             if events and fire_ct not in events_cache:
                 events_cache[fire_ct] = _events_before(day, fire_ct, lookback_min)
-            row = Row(
-                id=row_id(day, rule.id, seq[rule.id]), lane=LANE_REPLAY, day=day, rule_id=rule.id,
-                registered=rule.registered, call=call, sources=list(rule.entity.sources),
-                instrument=rule.instrument, occ_symbol=priced.symbol, right=priced.right,
-                strike=priced.strike, lots=1, fire_ct=fire_ct, entry_ts=L.hms(priced.entry_sec),
-                entry_premium_pts=priced.entry_pts, spx_at_entry=priced.spx_at_entry,
-                es_at_entry=priced.es_at_entry, exit_ts=L.hms(priced.exit_sec),
-                exit_premium_pts=priced.exit_pts, exit_reason=priced.exit_reason,
-                pnl_pts=priced.pnl_pts, pnl_usd=round(priced.pnl_pts * 100.0, 2),
-                mfe_pts=priced.mfe_pts, mae_pts=priced.mae_pts, mark_path=priced.mark_path,
-                estimated=priced.mark_path == "estimated", n_marks=priced.n_marks,
-                state={"T": state["T"], "pT": state["pT"], "fp": state.get("fp"), "mc": state.get("mc"),
-                       "gx": state.get("gx")},
-                events=events_cache.get(fire_ct, []) if events else [],
-                excerpts=[rule.id, *rule.entity.sources],
-                replay=_replay_say(day, fire_ct, rule.exit.time_ct, lookback_min),
-                grid=priced.grid, estimated_exit=priced.estimated_exit,
-                extrapolated=priced.extrapolated, notes=list(priced.notes),
-            )
+            row = build_row(day, rule, fire_ct, call, state, priced, seq[rule.id],
+                            events=events_cache.get(fire_ct, []) if events else [], lookback_min=lookback_min)
             fire.update({"priced": True, "row_id": row.id})
             rep.fires.append(fire)
             rep.rows.append(row.to_dict())
