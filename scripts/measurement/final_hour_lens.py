@@ -214,9 +214,9 @@ def mancini(levels, window, pT, bias):
     }
 
 # ---------------------------------------------------------------- gex
-def load_gex(day):
+def load_gex(day, corpus_root="data/corpus"):
     """[(epoch, spot, zero, mpos, mneg)] from the corpus pull, sorted."""
-    path = f"data/corpus/{day}/gexbot.jsonl"
+    path = f"{corpus_root}/{day}/gexbot.jsonl"
     out = []
     if not os.path.exists(path): return out
     with open(path) as f:
@@ -271,42 +271,66 @@ def outcome(fin, pT):
             "fin_delta": stats(fin)["d"], "fin_vol": stats(fin)["v"]}
 
 # ---------------------------------------------------------------- driver
-def run_day(path):
-    day = os.path.basename(os.path.dirname(path))
-    try: y, m, d = map(int, day.split("-"))
-    except Exception: return []
-    off = datetime(y, m, d, 12, tzinfo=CT).utcoffset().total_seconds() / 3600
-    trades = load_tape(path, off)
-    if len(trades) < 1000: return [{"day": day, "skip": "thin", "n": len(trades)}]
+def ct_offset_hours(day):
+    """America/Chicago UTC offset at noon on ``day`` (YYYY-MM-DD), in hours."""
+    y, m, d = map(int, day.split("-"))
+    return datetime(y, m, d, 12, tzinfo=CT).utcoffset().total_seconds() / 3600
+
+def load_levels(day, parsed_root="runbook/mancini/parsed"):
+    """(levels, session_bias) from the parsed letter written for ``day``; (None, None) when
+    there is no parse or it does not read. A missing letter is 'no Mancini leg', not an error."""
+    parsed = f"{parsed_root}/{day}.json"
+    if not os.path.exists(parsed): return None, None
+    try:
+        pj = json.load(open(parsed)); return (pj.get("levels") or []), pj.get("session_bias")
+    except Exception: return None, None
+
+def segmenter(trades, off):
+    """seg(a, b) -> the prints with CT minute-of-day in [a, b), from one tape read."""
     def hms_to_min(hms):  # utc HH:MM:SS -> CT minutes since midnight
         return (int(hms[:2]) + off) * 60 + int(hms[3:5]) + int(hms[6:8]) / 60
     mins = [hms_to_min(t[0]) for t in trades]
     def seg(a, b): return [t for t, mn in zip(trades, mins) if a <= mn < b]
+    return seg
+
+def lens_state(day, T_min, trades, seg, levels, bias, grows, *, with_outcome=True):
+    """The three lenses at T (minutes since midnight CT) from prints before T — one row.
+
+    This is the state the pre-registered rules above read, and the state the
+    blotter's rule registry (strader/blotter/state.py) hands each rule at its fire
+    minute [st-djb9]. ``with_outcome=False`` leaves the ``out`` group off, so a
+    rule can never be handed what happened after T. Same computation either way:
+    ``run_day`` below calls this with the outcome on, and its rows are unchanged.
+    """
+    y, m, d = map(int, day.split("-"))
+    h, mi = divmod(T_min, 60)
+    pre = seg(13 * 60, T_min); fin = seg(T_min, 15 * 60)
+    if not pre or (with_outcome and not fin):
+        return {"day": day, "T": f"{h:02d}{mi:02d}", "skip": "gap"}
+    pT = pre[-1][1]
     full = bool(seg(9 * 60, 10 * 60))
-    parsed = f"runbook/mancini/parsed/{day}.json"
-    levels = bias = None
-    if os.path.exists(parsed):
-        try:
-            pj = json.load(open(parsed)); levels = pj.get("levels") or []; bias = pj.get("session_bias")
-        except Exception: levels = None
+    t_epoch = datetime(y, m, d, h, mi, tzinfo=CT).timestamp()
+    t13 = datetime(y, m, d, 13, 0, tzinfo=CT).timestamp()
+    row = {
+        "day": day, "T": f"{h:02d}{mi:02d}", "full": full, "pT": pT, "n": len(trades),
+        "fp": footprint(trades, seg, pT, T_min, full),
+        "mc": mancini(levels, pre, pT, bias),
+        "gx": gex(grows, t_epoch, t13),
+    }
+    if with_outcome:
+        row["out"] = outcome(fin, pT)
+    return row
+
+def run_day(path):
+    day = os.path.basename(os.path.dirname(path))
+    try: off = ct_offset_hours(day)
+    except Exception: return []
+    trades = load_tape(path, off)
+    if len(trades) < 1000: return [{"day": day, "skip": "thin", "n": len(trades)}]
+    seg = segmenter(trades, off)
+    levels, bias = load_levels(day)
     grows = load_gex(day)
-    out = []
-    for (h, mi) in TS:
-        T_min = h * 60 + mi
-        pre = seg(13 * 60, T_min); fin = seg(T_min, 15 * 60)
-        if not pre or not fin:
-            out.append({"day": day, "T": f"{h:02d}{mi:02d}", "skip": "gap"}); continue
-        pT = pre[-1][1]
-        t_epoch = datetime(y, m, d, h, mi, tzinfo=CT).timestamp()
-        t13 = datetime(y, m, d, 13, 0, tzinfo=CT).timestamp()
-        out.append({
-            "day": day, "T": f"{h:02d}{mi:02d}", "full": full, "pT": pT, "n": len(trades),
-            "fp": footprint(trades, seg, pT, T_min, full),
-            "mc": mancini(levels, pre, pT, bias),
-            "gx": gex(grows, t_epoch, t13),
-            "out": outcome(fin, pT),
-        })
-    return out
+    return [lens_state(day, h * 60 + mi, trades, seg, levels, bias, grows) for (h, mi) in TS]
 
 if __name__ == "__main__":
     paths = sorted(glob.glob("data/corpus/20*/databento_glbx_es.jsonl") + glob.glob("data/corpus/20*/databento_glbx_es.jsonl.gz"))

@@ -57,6 +57,13 @@ in it covered external domain knowledge or facts about the operator.
 - [Perceptual Profile](perceptual-profile.md) — Steve self-reports above-average (not freak-level) perception of momentum and angles — factor into drill design
 - [Trading Since 2021](trading-since-2021.md) — Steve has been trading only since 2021 — don't write as if he carries decades of market experience
 
+### setup
+
+Registered rules (a `rule:` block in the header, code at `scripts/measurement/rules/<id>.py`, scored as trades by the blotter). `setup` joins the vocabulary with the refactor-and-blotter plan; the migration (st-ts3o) retypes the playbook files.
+
+- [Footprint Up at 14:45](footprint-up-1445.md) — `exploratory`; the footprint lens's up call at 14:45 CT, pre-registered 2026-08-29, held on both halves as a direction call (n=40); scored as trades by the blotter
+- [Launch Into No Lid at 14:45](launch-into-no-lid-1445.md) — `exploratory`; R2 of the final-hour combinations — the launch shape with no Mancini lid held within 10 above — pre-registered 2026-08-29, held on both halves (n=26); scored as trades by the blotter
+
 ### playbook
 
 - [Buying Movement — Delta-First](buying-movement-delta-first.md) — Steve trades flies and singles delta-first not theta-first; singles = short-hold move-capture, flies = V-dump entry with a scaled exit and a runner left for the pin

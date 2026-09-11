@@ -50,7 +50,7 @@ def write_day(corpus: Path, day: str, *, seed: int, gz: bool = False,
               opra_from: str = "13:00", opra_to: str = "15:00",
               es_from: str = "12:00", es_to: str = "15:00",
               es_start: float = 6420.0, drift_per_min: float = 0.0,
-              decoy_top_level_ts: bool = True) -> Path:
+              decoy_top_level_ts: bool = True, side_bias: float = 0.5) -> Path:
     """One corpus day. Returns the day directory."""
     rng = random.Random(seed)
     d = corpus / day
@@ -63,8 +63,12 @@ def write_day(corpus: Path, day: str, *, seed: int, gz: bool = False,
         es += rng.gauss(drift_per_min / 60.0, 0.12)
         es_path.append((s, round(es * 4) / 4))
     es_by_sec = dict(es_path)
+    first_es_sec = es_path[0][0]
 
     def es_at(s: int) -> float:
+        # Clamp to the first ES second: an ES tape that starts after the option
+        # window (a thin-day fixture) must not walk backwards forever.
+        s = max(s, first_es_sec)
         while s not in es_by_sec:
             s -= 1
         return es_by_sec[s]
@@ -78,7 +82,9 @@ def write_day(corpus: Path, day: str, *, seed: int, gz: bool = False,
     es_name = "databento_glbx_es.jsonl" + (".gz" if gz else "")
     with (gzip.open(d / es_name, "wt") if gz else open(d / es_name, "w")) as f:
         for s, p in es_path:
-            f.write(row(s, {"symbol": "ESZ5", "price": p, "size": 1, "side": "B" if rng.random() < 0.5 else "A"}))
+            # side_bias: the share of prints stamped as buyer-aggressed ("B"); 0.5 is
+            # a coin flip, above it the tape carries positive aggressor delta.
+            f.write(row(s, {"symbol": "ESZ5", "price": p, "size": 1, "side": "B" if rng.random() < side_bias else "A"}))
 
     # Option prints: strikes on the 5-pt grid within +-60 of the 13:00 spot.
     spx0 = es_at(_sec("13:00")) - BASIS
