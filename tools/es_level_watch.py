@@ -17,14 +17,14 @@ the day's ES trades file as it is written (no network, no Schwab), and prints:
 GEX levels are SPX strikes; the tape is ES. Every GEX level is moved to ES by
 the live basis before comparison, and both numbers are printed on the line:
 ``ES 7670 UP through 7669 ES (GEX long-gamma 7665 SPX, basis +4.1)``. The
-basis is measured, never assumed: the median of the last five GexBot polls'
-``spot`` against the ES print at that same second (gexbot.jsonl vs the tape),
-falling back to the latest RTH ``es_minus_spx_basis`` in schwab.jsonl. With no
-basis at all, GEX levels are NOT watched and one [ALERT] says so — on 09-11
-the watch compared raw SPX strikes to ES prints and every GEX clear was a
-phantom (measured basis that day: median +4.07, +8.25 at the 08:30 open while
-SPX spot lagged; the Schwab premarket row reads +49 and is excluded).
-Mancini levels are ES already and are used as written.
+basis is read ONCE, at the first GexBot poll at or after 08:35 CT (Steve,
+2026-09-12: one beginning-of-day number is enough; SPX takes a few minutes
+after the cash open to settle), as GexBot ``spot`` against the ES print at
+that same second, and held for the day; ``--basis N`` sets it by hand. Until
+it is read, GEX levels are NOT watched and one [ALERT] says so — on 09-11 the
+watch compared raw SPX strikes to ES prints and every GEX clear was a phantom
+(measured that day: +4.07 median through RTH, +8.25 at 08:30 while SPX was
+still opening). Mancini levels are ES already and are used as written.
 
 Delta is ask-hit volume minus bid-hit volume (Databento side A/B). It is
 pressure, not progress: on 09-10 the morning sold off on POSITIVE delta and
@@ -40,9 +40,9 @@ from __future__ import annotations
 
 import argparse
 import bisect
+import gzip
 import json
 import os
-import statistics
 import sys
 import time
 from collections import deque
@@ -58,12 +58,9 @@ STALE_S = 90
 SUMMARY_S = 900
 GEX_POLL_S = 60
 GEX_REPEAT_S = 1800
-BASIS_WINDOW = 5          # polls in the rolling median
-BASIS_MIN = 3             # fewer than this and the GexBot median is not trusted
-BASIS_MAX_AGE_S = 1800    # a sample older than this no longer counts
+BASIS_READ_MIN = 8 * 60 + 35   # CT minute of day from which the one basis read is taken
 BASIS_PAIR_S = 10.0       # ES print must be within this of the GexBot spot time
 PRINT_MEMORY_S = 300      # recent prints kept for pairing
-SCHWAB_UNUSABLE = ("premarket", "open")   # SPX quote not yet a live index at these pulls
 
 
 class Clock:
@@ -154,24 +151,18 @@ class LevelCrosser:
 
 
 class Basis:
-    """ES minus SPX, measured — the number every GEX strike is moved by.
+    """ES minus SPX, read once and held — the number every GEX strike is moved by.
 
-    Primary: each new GexBot poll's ``spot`` paired with the ES print at the
-    vendor's spot time (within BASIS_PAIR_S); the median of the last
-    BASIS_WINDOW samples no older than BASIS_MAX_AGE_S, once BASIS_MIN have
-    landed (the first poll after 08:30 catches SPX still opening: +8.5 on
-    09-11 against +4.1 for the day). Fallback: the latest ``afternoon`` or
-    ``close-watch`` ``es_minus_spx_basis`` row in schwab.jsonl — ``premarket``
-    pairs a prior-close SPX quote with overnight ES (+49 on 09-11) and
-    ``open`` is pulled one second into the open (+7.8). ``value(t)`` is
+    The first GexBot poll whose spot time is at or after BASIS_READ_MIN CT is
+    paired with the ES print at that second (within BASIS_PAIR_S); that one
+    number is the day's basis. Earlier polls are ignored (SPX is still
+    opening: +8.5 at 08:31 on 09-11 against +4.1 for the day). ``value()`` is
     (basis, source) or None — None means refuse, not zero.
     """
 
-    def __init__(self, schwab_path: Path | None = None) -> None:
-        self.schwab_path = schwab_path
-        self.samples: deque[tuple[float, float]] = deque()
+    def __init__(self, fixed: float | None = None) -> None:
+        self.read: tuple[float, str] | None = (fixed, "--basis") if fixed is not None else None
         self.prints: deque[tuple[float, float]] = deque()   # (ts_event, px)
-        self.last_spot_ts: float | None = None
 
     def add_print(self, ts: float, px: float) -> None:
         self.prints.append((ts, px))
@@ -179,7 +170,7 @@ class Basis:
             self.prints.popleft()
 
     def es_at(self, ts: float) -> float | None:
-        """The last ES print at or before ``ts``, if within BASIS_PAIR_S."""
+        """The ES print nearest ``ts``, if within BASIS_PAIR_S."""
         if not self.prints:
             return None
         keys = [p[0] for p in self.prints]
@@ -192,47 +183,21 @@ class Basis:
         best = min(cands, key=lambda p: abs(p[0] - ts))
         return best[1] if abs(best[0] - ts) <= BASIS_PAIR_S else None
 
-    def sample_gex(self, spot: float | None, spot_ts: float | None, t: float) -> float | None:
-        """Add one sample from a GexBot poll; returns the sample or None."""
-        if spot is None or spot_ts is None or spot_ts == self.last_spot_ts:
+    def sample_gex(self, spot: float | None, spot_ts: float | None) -> float | None:
+        """Take the day's read from a GexBot poll if none is held yet; returns it or None."""
+        if self.read is not None or spot is None or spot_ts is None:
             return None
-        self.last_spot_ts = spot_ts
+        at = datetime.fromtimestamp(spot_ts, CT)
+        if at.hour * 60 + at.minute < BASIS_READ_MIN:
+            return None
         es = self.es_at(spot_ts)
         if es is None:
             return None
-        b = es - spot
-        self.samples.append((t, b))
-        while len(self.samples) > BASIS_WINDOW:
-            self.samples.popleft()
-        return b
+        self.read = (es - spot, f"gexbot {at.strftime('%H:%M')}")
+        return self.read[0]
 
-    def schwab(self, t: float) -> tuple[float, str] | None:
-        if self.schwab_path is None:
-            return None
-        try:
-            rows = [json.loads(l) for l in self.schwab_path.read_text().splitlines() if l.strip()]
-        except (OSError, ValueError):
-            return None
-        best = None
-        for r in rows:
-            try:
-                ts = parse_utc(r["ts_pull_utc"])
-                b = r["data"]["es_minus_spx_basis"]
-            except (KeyError, TypeError, ValueError):
-                continue
-            if b is None or r.get("stage") in SCHWAB_UNUSABLE or ts > t:
-                continue
-            if best is None or ts > best[0]:
-                best = (ts, float(b), str(r.get("stage", "?")))
-        if best is None:
-            return None
-        return best[1], f"schwab {best[2]} {datetime.fromtimestamp(best[0], CT).strftime('%H:%M')}"
-
-    def value(self, t: float) -> tuple[float, str] | None:
-        live = [b for (ts, b) in self.samples if t - ts <= BASIS_MAX_AGE_S]
-        if len(live) >= BASIS_MIN:
-            return statistics.median(live), f"gexbot×{len(live)}"
-        return self.schwab(t)
+    def value(self) -> tuple[float, str] | None:
+        return self.read
 
 
 def gex_last_row(path: Path):
@@ -355,12 +320,14 @@ def follow(path: Path):
 
 
 def replay(path: Path, start_ct: str | None):
-    """Yield the day's lines from the start (from ``start_ct`` HH:MM CT if given)."""
+    """Yield the day's lines from the start (from ``start_ct`` HH:MM CT if given);
+    reads the archived ``.jsonl.gz`` once the corpus job has compressed the day."""
     start_t = None
     if start_ct:
         day = path.parent.name
         start_t = datetime.strptime(f"{day} {start_ct}", "%Y-%m-%d %H:%M").replace(tzinfo=CT).timestamp()
-    with path.open() as f:
+    opener = gzip.open if path.suffix == ".gz" else open
+    with opener(path, "rt") as f:
         for line in f:
             if start_t is not None:
                 try:
@@ -385,10 +352,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cooldown", type=float, default=300, help="seconds before the same level reports again")
     ap.add_argument("--replay", action="store_true", help="read the day's tape from the start on its own clock")
     ap.add_argument("--start", default=None, help="replay only: first print at/after HH:MM CT")
+    ap.add_argument("--basis", type=float, default=None, help="ES minus SPX, fixed by hand for the day")
     args = ap.parse_args(argv)
 
     day_dir = REPO / "data" / "corpus" / args.date
     tape = day_dir / "databento_glbx_es.jsonl"
+    if args.replay and not tape.exists() and tape.with_suffix(".jsonl.gz").exists():
+        tape = tape.with_suffix(".jsonl.gz")
     if not tape.exists():
         print(f"no live tape at {tape}", file=sys.stderr)
         return 3
@@ -407,7 +377,7 @@ def main(argv: list[str] | None = None) -> int:
             say(f"[ALERT] no Mancini levels for {args.date}: {e}")
         mancini = {}
     gex = GexMajors(source)
-    basis = Basis(day_dir / "schwab.jsonl")
+    basis = Basis(args.basis)
     crosser = LevelCrosser(args.band, args.cooldown)
 
     last_px = None
@@ -428,16 +398,16 @@ def main(argv: list[str] | None = None) -> int:
         if t - last_gex > GEX_POLL_S:
             for m in gex.poll(t):
                 say(m)
-            basis.sample_gex(gex.spot, gex.spot_ts, t)
-            basis_now = basis.value(t)
+            basis.sample_gex(gex.spot, gex.spot_ts)
+            basis_now = basis.value()
             last_gex = t
             if basis_now is None and basis_state != "off":
-                say(f"[ALERT] no ES/SPX basis (fewer than {BASIS_MIN} GexBot spots paired with a print, "
-                    "no afternoon Schwab pull) — GEX levels NOT watched until one arrives")
+                say("[ALERT] no ES/SPX basis yet (read at the first GexBot poll from 08:35 CT, or --basis) "
+                    "— GEX levels NOT watched until then")
                 basis_state = "off"
             elif basis_now is not None and basis_state != "on":
                 b, src = basis_now
-                say(f"basis {b:+.2f} ({src}) — GEX levels watched at ES = SPX {b:+.1f}")
+                say(f"basis {b:+.2f} ({src}) — GEX levels watched at ES = SPX {b:+.1f} for the day")
                 basis_state = "on"
         if t - win_start >= SUMMARY_S and w_hi is not None:
             chop = crosser.take_chop()
