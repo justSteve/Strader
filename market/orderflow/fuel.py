@@ -1,4 +1,4 @@
-"""Trapped-seller fuel — the five measured components at entry consideration. [st-aq1n]
+"""Trapped-seller fuel — the five measured components at entry consideration. [st-aq1n st-ysh0]
 
 Codifies ``knowledge/trapped-seller-fuel.md``: when price approaches a level,
 measure what the tape actually shows about accumulation at it — never the
@@ -55,6 +55,16 @@ class FuelKnobs:
     shelf_frac: float = 0.5       # node run / shelf threshold, x level-zone peak
     thin_scan_pts: float = 15.0   # how far past the level to look for the shelf
     min_lid_rej: int = 2          # render "no lid yet" below this
+    # The read SIDE is picked from the approach when a level engages and then
+    # HELD: it flips only when price accepts on the other side — this many
+    # consecutive closes at least this far through the level (the shape
+    # tape_events.py uses for PLAN-LEVEL acceptance). Measured 2026-08-27 on
+    # 7733 (st-ysh0): side-by-close flipped seven times in ten bars on
+    # quarter-point differences, and each side is a different measurement
+    # (mirrored bands), so the line on the chart was decided by which bar the
+    # refresh counter landed on.
+    side_flip_closes: int = 2
+    side_flip_min_pts: float = 1.0
 
 
 # ---------------------------------------------------------------- history
@@ -241,8 +251,12 @@ class FuelTracker:
     Emits on engagement start (first bar whose close is within ``engage_pts``
     of a level after being outside) and every ``refresh_bars`` bars while it
     stays engaged. One level per bar — the nearest. Read direction is
-    mechanical: close below the level = long read (trapped sellers under a
-    ceiling), close above = short read (mirror).
+    mechanical and sticky: on engagement, close below the level = long read
+    (trapped sellers under a ceiling), close above = short read (mirror); the
+    side then holds until price ACCEPTS on the other side (``side_flip_closes``
+    consecutive closes at least ``side_flip_min_pts`` through the level). A
+    close oscillating across the level inside the engage band is not a
+    breach and does not flip the read. [st-ysh0]
     """
 
     def __init__(self, levels: list[float], *,
@@ -263,6 +277,9 @@ class FuelTracker:
         self._window: list = []          # bars inside knobs.window_s of newest
         self._vol_by_price: dict[float, int] = {}
         self._engaged: float | None = None
+        self._side: str | None = None        # read side held for the engaged level
+        self._side_level: float | None = None
+        self._flip_run = 0                   # consecutive closes accepted on the other side
         # Global bars-since-last-emission, seeded so the first engagement
         # emits at once. One floor for BOTH cadence and engagement changes:
         # adjacent Mancini levels sit 2-6 pts apart, so a close oscillating
@@ -293,8 +310,36 @@ class FuelTracker:
                 best, dist = lv, d
         return best
 
+    @staticmethod
+    def _approach_side(level: float, bar) -> str:
+        """First read for a fresh engagement: which side price came in on.
+        A close exactly on the level defers to the bar's open."""
+        if bar.close < level:
+            return "long"
+        if bar.close > level:
+            return "short"
+        return "long" if bar.open < level else "short"
+
+    def _track_side(self, level: float, bar) -> str:
+        """Hold the read side across bars; flip only on acceptance through."""
+        if level != self._side_level or self._side is None:
+            self._side_level = level
+            self._side = self._approach_side(level, bar)
+            self._flip_run = 0
+            return self._side
+        k = self.k
+        if self._side == "long":
+            through = bar.close >= level + k.side_flip_min_pts
+        else:
+            through = bar.close <= level - k.side_flip_min_pts
+        self._flip_run = self._flip_run + 1 if through else 0
+        if self._flip_run >= k.side_flip_closes:
+            self._side = "short" if self._side == "long" else "long"
+            self._flip_run = 0
+        return self._side
+
     def _compute(self, level: float, bar) -> dict:
-        read = "long" if bar.close < level else "short"
+        read = self._side or self._approach_side(level, bar)
         if not self.history and self._loader is not None:
             if self._next_load_ts is None or bar.end_ts >= self._next_load_ts:
                 self._next_load_ts = bar.end_ts + timedelta(minutes=15)
@@ -370,8 +415,11 @@ class FuelTracker:
             level = self._nearest(bar.close)
             if level is None:
                 self._engaged = None
+                self._side = self._side_level = None
+                self._flip_run = 0
                 return None
             self._engaged = level
+            self._track_side(level, bar)
             if self._gap >= self.k.refresh_bars:
                 self._gap = 0
                 return self._compute(level, bar)

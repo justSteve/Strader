@@ -155,6 +155,45 @@ def test_tracker_read_side_is_mechanical():
     tr2 = FuelTracker([7739.0])
     above = tr2.on_bar(bar(0, 7741, 7742, 7740, 7741.5))
     assert above and above["read"] == "short"
+    tr3 = FuelTracker([7739.0])                       # close ON the level: the approach decides
+    on = tr3.on_bar(bar(0, 7736, 7739.5, 7735.5, 7739.0))
+    assert on and on["read"] == "long"
+
+
+def _reads(levels, closes, **knobs):
+    tr = FuelTracker(levels, knobs=FuelKnobs(refresh_bars=1, **knobs))
+    return [(e or {}).get("read") for e in (tr.on_bar(b) for b in close_seq(closes))]
+
+
+def test_side_holds_while_price_oscillates_across_the_level():
+    """st-ysh0, measured 2026-08-27 on 7733: closes 7731.75 / 7733.25 ten bars
+    apart flipped the read with no breach between them. Now the side picked on
+    approach holds through quarter-point straddles."""
+    closes = [7731.75, 7733.25, 7732.5, 7733.5, 7732.75, 7733.25, 7733.75, 7732.0, 7733.5, 7732.25]
+    assert _reads([7733.0], closes) == ["long"] * 10
+
+
+def test_side_flips_only_on_acceptance_through_the_level():
+    # one close a point through, then back: not accepted
+    assert _reads([7733.0], [7731.5, 7734.0, 7732.5, 7734.25]) == ["long"] * 4
+    # two consecutive closes >= 1 pt through: the read flips to the mirror
+    assert _reads([7733.0], [7731.5, 7734.0, 7734.25, 7733.5]) == ["long", "long", "short", "short"]
+    # and a half-point straddle after the flip does not flip it back
+    assert _reads([7733.0], [7731.5, 7734.0, 7734.25, 7732.5, 7732.75])[-1] == "short"
+    # the mirror: a short read flips long on two closes >= 1 pt under
+    assert _reads([7733.0], [7734.5, 7732.0, 7731.75]) == ["short", "short", "long"]
+
+
+def test_side_is_repicked_from_the_approach_on_re_engagement():
+    reads = _reads([7739.0], [7736.0, 7737.0, 7750.0, 7751.0, 7741.5])
+    assert reads == ["long", "long", None, None, "short"]
+
+
+def test_side_flip_knobs_are_honoured():
+    reads = _reads([7733.0], [7731.5, 7734.0, 7734.25, 7734.5], side_flip_closes=3)
+    assert reads == ["long", "long", "long", "short"]
+    reads = _reads([7733.0], [7731.5, 7733.75, 7733.75], side_flip_min_pts=0.5)
+    assert reads == ["long", "long", "short"]
 
 
 def test_absent_components_render_absent():
