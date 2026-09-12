@@ -136,3 +136,38 @@ def test_compare_names_the_mismatch(corpus, cal, tmp_path):
     assert "occ_symbol" in out["mismatches"][1]["differs"]
     out2 = S.compare(DAY, rows[:1], rules, corpus=corpus, parsed=tmp_path / "parsed", cal=cal)
     assert out2["replay_only"] == [f"{DAY}-launch-into-no-lid-1445-1"]
+
+
+def test_compare_holds_every_journaled_answer(corpus, cal, tmp_path):
+    """The journal is the shadow's side of the compare: rows when there are
+    any, and every rule's answer at the fire minute either way (2026-09-11,
+    day 1, wrote no rows and the compare must still run)."""
+    _write_snapshot(corpus)
+    clock = Clock("16:30:00")
+    rules = load_rules()
+    S.run_shadow(DAY, rules, corpus=corpus, parsed=tmp_path / "parsed", cal=cal, out_dir=tmp_path / "out",
+                 now_fn=clock.now, sleep_fn=clock.sleep, events=False)
+    rows, fires = S.read_journal(tmp_path / "out", DAY)
+    assert len(rows) == 2 and {(f["rule_id"], f["call"]) for f in fires} == {("footprint-up-1445", "up"), ("launch-into-no-lid-1445", "up")}
+    out = S.compare(DAY, rows, rules, corpus=corpus, parsed=tmp_path / "parsed", cal=cal, shadow_fires=fires)
+    assert out["clean"] and out["n_fires"] == 2 and out["fire_mismatches"] == []
+    # a day that journaled "no call" for both rules and wrote no rows file
+    quiet = tmp_path / "quiet"
+    quiet.mkdir()
+    S.shadow_log_path(quiet, DAY).write_text(
+        json.dumps({"phase": "fire", "fire_ct": "14:45", "day": DAY,
+                    "answers": [{"rule_id": r.id, "call": None} for r in rules]}) + "\n"
+        + json.dumps({"phase": "close", "day": DAY, "n_calls": 0, "n_rows": 0, "n_unpriced": 0}) + "\n")
+    assert not S.shadow_rows_path(quiet, DAY).exists()
+    rows, fires = S.read_journal(quiet, DAY)
+    assert rows == [] and [f["call"] for f in fires] == [None, None]
+    out = S.compare(DAY, rows, rules, corpus=corpus, parsed=tmp_path / "parsed", cal=cal, shadow_fires=fires)
+    assert not out["clean"] and out["n_shadow"] == 0 and out["n_replay"] == 2
+    assert out["fire_mismatches"][0] == {"rule_id": "footprint-up-1445", "fire_ct": "14:45", "shadow": None, "replay": "up"}
+    assert out["replay_only"] == [f"{DAY}-footprint-up-1445-1", f"{DAY}-launch-into-no-lid-1445-1"]
+    # a journal that never reached the close is not a day to compare
+    open_day = tmp_path / "open"
+    open_day.mkdir()
+    S.shadow_log_path(open_day, DAY).write_text(json.dumps({"phase": "fire", "fire_ct": "14:45", "day": DAY, "answers": []}) + "\n")
+    assert S.read_journal(open_day, DAY) is None
+    assert S.read_journal(tmp_path / "nowhere", DAY) is None

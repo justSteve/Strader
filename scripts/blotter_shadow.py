@@ -65,14 +65,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"calibration {args.calibration} not found; estimated rows will be unpriced", file=sys.stderr)
 
     if args.compare:
-        p = S.shadow_rows_path(args.out_dir, day)
-        if not p.is_file():
-            print(f"no shadow rows for {day} at {p}", file=sys.stderr)
-            return 1
-        rows = [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
-        out = S.compare(day, rows, rules, corpus=args.corpus, parsed=args.parsed, cal=cal)
+        side = S.read_journal(args.out_dir, day)
+        if side is None:
+            print(f"no closed shadow journal for {day} at {S.shadow_log_path(args.out_dir, day)} "
+                  f"— the day was not shadowed to its close, nothing to compare", file=sys.stderr)
+            return 2
+        rows, fires = side
+        out = S.compare(day, rows, rules, corpus=args.corpus, parsed=args.parsed, cal=cal, shadow_fires=fires)
         print(json.dumps(out, indent=1, sort_keys=True))
-        print(f"{day}: {'CLEAN' if out['clean'] else 'MISMATCH'} — {out['n_shadow']} shadow rows, {out['n_replay']} replay rows")
+        print(f"{day}: {'CLEAN' if out['clean'] else 'MISMATCH'} — {out['n_fires']} answers held, "
+              f"{out['n_shadow']} shadow rows, {out['n_replay']} replay rows")
         return 0 if out["clean"] else 1
 
     print(f"shadowing {day} with {[r.id for r in rules]}; fire minutes {sorted({t for r in rules for t in r.fire_at})} CT", flush=True)

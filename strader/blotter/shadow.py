@@ -23,13 +23,18 @@ WHAT
                                 (rows written), ``unpriced``
 
 THE ACCEPTANCE — the determinism quarantine (co-itsck)
-    Replaying the day afterwards must reproduce every shadow row's rule id,
-    fire minute, call, entry minute and contract. :func:`compare` does that
-    against :func:`strader.blotter.replay.replay_day` and names each mismatch.
-    A mismatch is a wall-clock or live-only read in a rule, or the live tape
-    lagging the archive at the fire minute — either way the diff says which
-    row. One week of clean compares earns the systemd unit; until then this
-    is hand-run (the 08-23 feeder crash, st-wnuk, is why).
+    Replaying the day afterwards must reproduce every answer the shadow
+    journaled at the fire minute (rule id, fire minute, call — including "no
+    call") and every shadow row's entry minute and contract. :func:`compare`
+    does that against :func:`strader.blotter.replay.replay_day` and names
+    each mismatch. A mismatch is a wall-clock or live-only read in a rule, or
+    the live tape lagging the archive at the fire minute — either way the diff
+    says which rule or row. A day on which no rule called anything is still a
+    comparison: the replay must agree there was nothing to write
+    (:func:`read_journal` gives the compare its side of that day; 2026-09-11,
+    day 1, had no rows file and the first compare refused to run). One week
+    of clean compares earns the systemd unit; until then this is hand-run
+    (the 08-23 feeder crash, st-wnuk, is why).
 
 THE ONLY CLOCK
     ``now_fn`` is the one place a wall clock is read, and it is injected so a
@@ -52,7 +57,7 @@ from strader.blotter.state import DEFAULT_CORPUS, DEFAULT_PARSED, day_inputs, st
 from strader.marks.estimated import Calibration, minute_index
 
 __all__ = ["CT", "FIRE_GRACE_S", "CLOSE_GRACE_S", "SNAPSHOT_WAIT_S", "ShadowReport",
-           "run_shadow", "compare", "shadow_rows_path", "shadow_log_path", "COMPARE_KEYS"]
+           "run_shadow", "compare", "read_journal", "shadow_rows_path", "shadow_log_path", "COMPARE_KEYS"]
 
 CT = ZoneInfo("America/Chicago")
 FIRE_GRACE_S = 5          # seconds after a fire minute closes before the state is built
@@ -225,15 +230,49 @@ def _view(r: dict) -> dict:
             "entry_minute": r["entry_ts"][:5], "occ_symbol": r["occ_symbol"]}
 
 
-def compare(day: str, shadow_rows: Sequence[dict], rules: Sequence[Rule], *, corpus: Path = DEFAULT_CORPUS,
-            parsed: Path = DEFAULT_PARSED, cal: Calibration | None) -> dict:
-    """Replay the day and hold it against the shadow rows.
+def read_journal(out_dir: Path, day: str) -> tuple[list[dict], list[dict]] | None:
+    """The shadow's side of ``day`` from its files: ``(rows, fires)``.
 
-    Returns ``{"clean": bool, "mismatches": [...], "shadow_only": [...],
-    "replay_only": [...], "n_shadow": n, "n_replay": n}``. A mismatch names the
-    row and the key that differs.
+    ``rows`` is the rows file, or empty when the day wrote none. ``fires`` is
+    one ``{"rule_id", "fire_ct", "call"}`` per answer the journal holds.
+    Returns None when the journal is missing or has no ``close`` record — the
+    day has not been shadowed to its close, so there is nothing to compare.
+    """
+    log = shadow_log_path(out_dir, day)
+    if not log.is_file():
+        return None
+    journal = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines() if l.strip()]
+    if not any(j.get("phase") == "close" for j in journal):
+        return None
+    fires = [{"rule_id": a["rule_id"], "fire_ct": j["fire_ct"], "call": a["call"]}
+             for j in journal if j.get("phase") == "fire" for a in j.get("answers", [])]
+    rows_file = shadow_rows_path(out_dir, day)
+    rows = ([json.loads(l) for l in rows_file.read_text(encoding="utf-8").splitlines() if l.strip()]
+            if rows_file.is_file() else [])
+    return rows, fires
+
+
+def compare(day: str, shadow_rows: Sequence[dict], rules: Sequence[Rule], *, corpus: Path = DEFAULT_CORPUS,
+            parsed: Path = DEFAULT_PARSED, cal: Calibration | None,
+            shadow_fires: Sequence[dict] | None = None) -> dict:
+    """Replay the day and hold it against the shadow rows — and, when
+    ``shadow_fires`` is given, against every answer the shadow journaled.
+
+    Returns ``{"clean": bool, "fire_mismatches": [...], "mismatches": [...],
+    "shadow_only": [...], "replay_only": [...], "n_shadow": n, "n_replay": n,
+    "n_fires": n}``. A fire mismatch names the rule and minute whose call
+    differs (``"absent"`` when one lane never answered); a row mismatch names
+    the row and the key that differs.
     """
     rep = replay_day(day, rules, corpus=corpus, parsed=parsed, cal=cal, events=False)
+    fire_mismatches = []
+    if shadow_fires is not None:
+        s_calls = {(f["rule_id"], f["fire_ct"]): f["call"] for f in shadow_fires}
+        r_calls = {(f["rule_id"], f["fire_ct"]): f["call"] for f in rep.fires}
+        for k in sorted(set(s_calls) | set(r_calls)):
+            a, b = s_calls.get(k, "absent"), r_calls.get(k, "absent")
+            if a != b:
+                fire_mismatches.append({"rule_id": k[0], "fire_ct": k[1], "shadow": a, "replay": b})
     replay = {_key(r): r for r in rep.rows}
     shadow = {_key(r): r for r in shadow_rows}
     mismatches = []
@@ -244,11 +283,14 @@ def compare(day: str, shadow_rows: Sequence[dict], rules: Sequence[Rule], *, cor
             mismatches.append({"row_id": shadow[k]["id"], "differs": diff})
     out = {
         "day": day,
+        "n_fires": len(shadow_fires) if shadow_fires is not None else None,
         "n_shadow": len(shadow), "n_replay": len(replay),
+        "fire_mismatches": fire_mismatches,
         "shadow_only": [shadow[k]["id"] for k in sorted(set(shadow) - set(replay))],
         "replay_only": [replay[k]["id"] for k in sorted(set(replay) - set(shadow))],
         "mismatches": mismatches,
+        "replay_skip": rep.skip,
         "replay_unpriced": [{"rule_id": u["rule_id"], "reason": u["reason"]} for u in rep.unpriced],
     }
-    out["clean"] = not (out["shadow_only"] or out["replay_only"] or mismatches)
+    out["clean"] = not (fire_mismatches or out["shadow_only"] or out["replay_only"] or mismatches)
     return out
