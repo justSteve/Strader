@@ -128,8 +128,13 @@ def _stub_repo(tmp_path, exit_code=0):
 
 
 def _run_wrapper(repo, tmp_path, *args):
+    # HB_STATE_DIR: the wrapper's trap writes a heartbeat through heartbeat-lib,
+    # whose default is the LIVE /var/moo/state. Without this override the
+    # failure test below wrote a real "strader-schwab-open failed" record every
+    # time the suite ran (co-9c1on filed on it 2026-09-04, seen again 2026-09-12).
     env = dict(os.environ, STRADER_REPO=str(repo),
-               STRADER_SCHWAB_LOGDIR=str(tmp_path / "logs"))
+               STRADER_SCHWAB_LOGDIR=str(tmp_path / "logs"),
+               HB_STATE_DIR=str(tmp_path / "hb"))
     return subprocess.run(["bash", str(WRAPPER), *args],
                           env=env, capture_output=True, text=True, timeout=30)
 
@@ -152,6 +157,9 @@ def test_wrapper_propagates_failure_and_attempts_alert(tmp_path):
     repo, calls = _stub_repo(tmp_path, exit_code=1)
     proc = _run_wrapper(repo, tmp_path, "open")
     assert proc.returncode == 1
+    # the heartbeat landed in the test's own state dir, not the live one
+    hb = tmp_path / "hb" / "strader-schwab-open.json"
+    assert hb.is_file() and '"failed"' in hb.read_text()
     logged = calls.read_text().splitlines()
     # first call: the pull; second call: the `python -` alert heredoc
     assert any("--stage open" in l for l in logged)
