@@ -26,7 +26,9 @@ does not have to.
   stale token, an alert his own config names — `[ALERT]`, one line.
 - **Nothing waits on Steve by default.** Decide, build, report in a few
   lines. When something truly needs him: one sentence with a recommended
-  answer he can accept in a word; silence means take the recommendation.
+  answer he can accept in a word. **Silence means Deferred, never Yes**
+  (Steve, 2026-09-12, global rule for every agent): an unanswered ask stays
+  open on its bead; nobody proceeds on it.
 - **He learns by watching the parts move.** Surfaces show the mechanism
   while it happens, in the units on his screen (2,000-lot volume bars, CT
   timestamps, strikes). Theory only as vocabulary.
