@@ -12,6 +12,10 @@
 #
 # Everything else — backup of the old token, shape check of the new grant, a
 # live market-data call — is scripts/refresh_schwab_token.py, unchanged.
+# Since execd stage 3 (st-p8k8): once /opt/execd/INSTALLED exists the service
+# holds both grants and re-authorisation happens on its page —
+# https://mydesk-1.tail89f676.ts.net/exec/ — so the script below answers with
+# that address and exit 3 instead of minting a file nothing reads.
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")/.."
 exec .venv/bin/python3 scripts/refresh_schwab_token.py "$@"

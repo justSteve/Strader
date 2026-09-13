@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -65,6 +65,18 @@ class Refused(Exception):
     def __init__(self, refusal: Refusal) -> None:
         super().__init__(f"{refusal.bound}: {refusal.reason}")
         self.refusal = refusal
+
+
+def _wall_of(credential: Any) -> datetime | None:
+    """The seven-day wall of a vault-shaped credential, from its wrapped
+    token's ``creation_timestamp``; ``None`` for anything else (the mock's
+    stand-in credential, say). Kept here rather than imported from the
+    transport module so this module stays transport-free."""
+    try:
+        created = int(credential["token"]["creation_timestamp"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return datetime.fromtimestamp(created, tz=timezone.utc) + timedelta(days=7)
 
 
 def _utcnow() -> datetime:
@@ -218,7 +230,8 @@ class ExecService:
             expiry = min(until, close) if until is not None else close
             state = self.arming.unlock(credential, expiry)
             self.journal.record("unlock", state=state.value, until=expiry,
-                                capped=bool(until is not None and until > close))
+                                capped=bool(until is not None and until > close),
+                                refresh_wall=_wall_of(credential))
             return self.status()
 
     def stand_down(self) -> dict[str, Any]:
@@ -269,7 +282,41 @@ class ExecService:
             "working": [w.to_dict() for w in self._working.values()],
             "bounds": self.bounds.to_dict(),
             "journal": str(self.journal.path_for()),
+            # When each grant's seven-day wall is, and nothing else (no
+            # values) — so the token-age heartbeat can read the service instead
+            # of a file once the files are gone (st-p8k8). Absent for a broker
+            # that has no grants to report on.
+            "credential": self._credential_status(),
         }
+
+    def _credential_status(self) -> dict[str, Any] | None:
+        status = getattr(self.broker, "token_status", None)
+        if not callable(status):
+            return None
+        try:
+            out = dict(status())
+        except Exception as exc:  # a broker that cannot say is reported, not hidden
+            out = {"error": type(exc).__name__}
+        # While LOCKED the trading grant is not in memory, so its wall cannot
+        # be read — but the journal remembers the wall from the last unlock or
+        # re-authorisation, and the 06:30 token-age heartbeat runs before
+        # Steve is awake to unlock. A date is not a secret.
+        out["last_known_trading_wall"] = self._last_known_trading_wall()
+        return out
+
+    def _last_known_trading_wall(self) -> str | None:
+        days = self.journal.days()
+        for day in reversed(days[-10:]):
+            latest: str | None = None
+            for e in self.journal.read(day):
+                if e.get("event") == "unlock" and e.get("refresh_wall"):
+                    latest = e["refresh_wall"]
+                elif (e.get("event") == "reauth" and e.get("app") == "trading"
+                        and e.get("refresh_wall")):
+                    latest = e["refresh_wall"]
+            if latest:
+                return latest
+        return None
 
     def day_state(self) -> DayState:
         return self.journal.day_state()
@@ -279,6 +326,12 @@ class ExecService:
 
     def chain(self, root: str, expiry: str | None = None) -> dict[str, Any]:
         return self.broker.chain(root, expiry)
+
+    def market_read(self, kind: str, params: dict[str, str]) -> Any:
+        """A raw market-data body for the repo's readers (st-p8k8). No bound
+        applies — nothing here can transmit — and no arming state gates it:
+        the market credential is held outside the lock on purpose."""
+        return self.broker.market_read(kind, params)
 
     def orders(self) -> list[OrderResult]:
         return self.broker.orders()

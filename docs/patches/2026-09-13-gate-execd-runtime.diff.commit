@@ -1,0 +1,15 @@
+schwab-gate gate 7: the execd runtime — /opt/execd writes, the install, Windows shells, memory readers, the page port, stopping the unit [st-p8k8]
+
+Stage 3 of the live execution service installs execd as its own user with the
+trading credential in memory between Steve's passphrase and the close. Every
+agent shell on this box is root, so the six ways round that process boundary
+named in the design (§5) are denied from agent shells here: writing under
+/opt/execd, running deploy/install.sh --execd (--dry-run stays free), wsl.exe /
+powershell / cmd.exe, gdb / strace / ltrace / /proc/<pid>/mem, reaching the
+page port 127.0.0.1:8779, and systemctl stop/restart/kill or pkill of the
+service. Invocations are blocked; mentions, ls, grep, journalctl and systemctl
+status pass. Measured 2026-09-13 against the live hook: all 18 new cases ALLOW
+today, all 18 BLOCK with this change, 14 existing BLOCK cases and 30 ALLOW
+cases unchanged. Pinned in tests/test_schwab_gate_hook.py.
+
+Prepared by COO; landed by Steve.

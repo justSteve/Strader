@@ -84,8 +84,8 @@ from typing import Any, Callable, Mapping
 import httpx
 
 from .arming import Locked
-from .broker import (BrokerError, Fill, OrderLeg, OrderResult, OrderStatus, Position,
-                     Preview, Quote)
+from .broker import (MARKET_READS, BrokerError, Fill, OrderLeg, OrderResult, OrderStatus,
+                     Position, Preview, Quote)
 from .intent import OrderIntent, OrderType, Side
 
 API = "https://api.schwabapi.com"
@@ -298,6 +298,53 @@ def refresh(client: httpx.Client, credential: Credential, *,
                      "refresh_token": credential.refresh_token})
     return _wrap(r, int(credential.token["creation_timestamp"]),
                  previous_refresh=credential.refresh_token, now=now)
+
+
+def new_client(transport: httpx.BaseTransport | None = None,
+               timeout_s: float = TIMEOUT_S) -> httpx.Client:
+    """An HTTPS client for the OAuth calls the page makes (stage 3). Lives here
+    so that ``execd.page`` never imports a transport itself — the wall
+    (``tests/execd/test_wall.py``) allows exactly one module to."""
+    return httpx.Client(base_url=API, timeout=timeout_s, transport=transport)
+
+
+#: The one cheap call that proves a fresh grant works for the family it is
+#: for. Probing the wrong family is the 2026-05-20 outage: a good market-data
+#: token was restored over because the check hit ``/trader`` and 401'd.
+VERIFY_CALL: dict[App, tuple[str, dict[str, str]]] = {
+    App.MARKET: ("/marketdata/v1/quotes", {"symbols": "$SPX"}),
+    App.TRADING: ("/trader/v1/accounts/accountNumbers", {}),
+}
+
+
+def verify_grant(client: httpx.Client, app: App, wrapped: Mapping[str, Any]) -> None:
+    """Prove a just-exchanged grant before it is stored (stage 3's page).
+
+    Two checks, because they prove different things (st-r1b5). The SHAPE
+    check — a ``refresh_token`` is present — is the one that matters for the
+    weekly ritual: on 2026-08-12 a mistyped redirect produced a grant with a
+    28-character access token and no refresh token that answered 200 to a
+    market call and was dead thirty minutes later. The LIVE call proves the
+    access token reaches the family this app is registered for. Raises
+    :class:`~execd.broker.BrokerError` naming which check failed; never
+    quotes a token."""
+    inner = wrapped.get("token") if isinstance(wrapped, Mapping) else None
+    if not isinstance(inner, Mapping) or not inner.get("refresh_token"):
+        raise BrokerError("the grant came back with no refresh_token — a defective "
+                          "grant (the 2026-08-12 shape); nothing stored, try the link again")
+    access = str(inner.get("access_token") or "")
+    if not access:
+        raise BrokerError("the grant came back with no access_token; nothing stored")
+    path, params = VERIFY_CALL[app]
+    try:
+        r = client.get(path, params=params,
+                       headers={"Authorization": f"Bearer {access}", "Accept": "application/json"})
+    except httpx.HTTPError as exc:
+        raise BrokerError(f"the live check for the {app.value} app could not reach "
+                          f"Schwab: {type(exc).__name__}; nothing stored") from None
+    if r.status_code != 200:
+        raise BrokerError(f"the live check for the {app.value} app answered HTTP "
+                          f"{r.status_code} {_error_detail(r)}; nothing stored".rstrip())
 
 
 def _post_token(client: httpx.Client, app_key: str, secret: str,
@@ -607,6 +654,22 @@ class SchwabBroker:
         return h
 
     # ── market data (recorded 2026-09-04) ────────────────────────────────
+    def market_read(self, kind: str, params: dict[str, str]) -> Any:
+        """A raw market-data read for the repo's readers (stage 3, st-p8k8):
+        the body Schwab answered, unshaped, so ``broker_schwab`` consumers
+        parse exactly what they parsed when they held the token themselves.
+
+        GET only, and only the three resources in :data:`MARKET_READS` — the
+        path is built here from the resource name, never taken from the
+        caller, so this cannot become a way to reach ``/trader``. The path's
+        family routes it to the MARKET credential (:func:`app_for`), which is
+        held outside the arming lock; these reads therefore answer while the
+        service is LOCKED, which is what the 07:00 jobs need."""
+        if kind not in MARKET_READS:
+            raise BrokerError(f"no such market read: {kind}")
+        path = f"/marketdata/v1/{kind}"
+        return self._json(self._request("GET", path, params=dict(params)), kind)
+
     def quote(self, symbol: str) -> Quote:
         """Recorded: ``GET /marketdata/v1/quotes?symbols=`` →
         ``{symbol: {quote: {bidPrice, askPrice, lastPrice, quoteTime, tradeTime}}}``.

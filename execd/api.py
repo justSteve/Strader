@@ -1,6 +1,7 @@
 """The narrow door — HTTP on the loopback, and nothing else. [st-eznu]
 
-Fourteen routes, no policy. Every one of them is a translation of an
+Fifteen routes, no policy (fourteen from stage 1 and the ``/marketdata/<kind>``
+pass-through from stage 3, st-p8k8). Every one of them is a translation of an
 :class:`~execd.service.ExecService` method into JSON and back; the bounds, the
 arming state and the journal all live behind it. That is deliberate: a rule
 that lives in a request handler is a rule that a second entry point can miss,
@@ -33,9 +34,24 @@ from .intent import OrderIntent
 from .service import ExecService, Refused
 
 #: The loopback, and only the loopback. The page that Steve unlocks from is a
-#: separate surface on the tailnet (stage 3); this one never leaves the box.
+#: separate surface on the tailnet (stage 3, ``execd.page``); this one never
+#: leaves the box.
 BIND_HOST = "127.0.0.1"
 BIND_PORT = 8778
+
+#: Schwab's own parameter names for the three market-data resources the
+#: service passes through, from its API reference. Anything not named here is
+#: refused as a 400 rather than forwarded.
+MARKET_READ_PARAMS: dict[str, frozenset[str]] = {
+    "quotes": frozenset({"symbols", "fields", "indicative"}),
+    "chains": frozenset({"symbol", "contractType", "strikeCount", "includeUnderlyingQuote",
+                         "strategy", "interval", "strike", "range", "fromDate", "toDate",
+                         "volatility", "underlyingPrice", "interestRate",
+                         "daysToExpiration", "expMonth", "optionType", "entitlement"}),
+    "pricehistory": frozenset({"symbol", "periodType", "period", "frequencyType",
+                               "frequency", "startDate", "endDate",
+                               "needExtendedHoursData", "needPreviousClose"}),
+}
 
 
 def create_app(service: ExecService) -> Flask:
@@ -69,6 +85,23 @@ def create_app(service: ExecService) -> Flask:
     def chain():
         root = _required_arg("root")
         return jsonify(service.chain(root, request.args.get("expiry")))
+
+    # The raw market-data reads the repo's readers make through the service
+    # (stage 3, st-p8k8). Each is the Schwab resource of the same name; the
+    # query string is passed through by an allowlist of that resource's own
+    # parameter names, so a reader asks for exactly what it asked Schwab for
+    # and nothing else reaches the broker.
+    @app.get("/marketdata/<kind>")
+    def marketdata(kind: str):
+        allowed = MARKET_READ_PARAMS.get(kind)
+        if allowed is None:
+            raise ValueError(f"no such market read: {kind} — one of "
+                             f"{', '.join(MARKET_READ_PARAMS)}")
+        params = {k: v for k, v in request.args.items() if k in allowed}
+        unknown = sorted(set(request.args) - set(allowed))
+        if unknown:
+            raise ValueError(f"{kind} does not take {', '.join(unknown)}")
+        return jsonify(service.market_read(kind, params))
 
     @app.get("/orders")
     def orders():

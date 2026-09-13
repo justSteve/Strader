@@ -144,15 +144,41 @@ def assess_token(
             age_seconds=None, days_left=None, reauth_by_ts=None, reauth_by_iso=None,
         )
 
-    creation_ts = int(creation_ts)
+    return assess_wall(int(creation_ts) + REFRESH_TOKEN_LIFETIME_S, path=spath,
+                       has_refresh_token=has_refresh, now=now,
+                       warn_days_left=warn_days_left,
+                       critical_days_left=critical_days_left)
+
+
+def assess_wall(
+    reauth_by_ts: int,
+    *,
+    path: str,
+    has_refresh_token: bool = True,
+    now: int | None = None,
+    warn_days_left: float = DEFAULT_WARN_DAYS_LEFT,
+    critical_days_left: float = DEFAULT_CRITICAL_DAYS_LEFT,
+) -> TokenHealth:
+    """Assess a grant by its seven-day wall alone — what the execution service
+    reports for each app once the token files are gone (stage 3, st-p8k8):
+    ``refresh_wall``, no values. ``assess_token`` derives the wall from a file
+    and lands here; the heartbeat lands here straight from the service.
+
+    ``path`` is the label the verdict carries (a file path, or ``execd:<app>``).
+    """
+    import time
+
+    now = int(time.time()) if now is None else int(now)
+    reauth_by_ts = int(reauth_by_ts)
+    creation_ts = reauth_by_ts - REFRESH_TOKEN_LIFETIME_S
     age_seconds = now - creation_ts
-    reauth_by_ts = creation_ts + REFRESH_TOKEN_LIFETIME_S
     days_left = (reauth_by_ts - now) / 86400.0
     reauth_by_iso = _iso(reauth_by_ts)
+    spath = path
 
     # A grant with no refresh_token cannot be refreshed — it dies at the end of
     # its short access-token life no matter how "young" it looks. Alarm now.
-    if not has_refresh:
+    if not has_refresh_token:
         return TokenHealth(
             status=STATUS_DEFECTIVE,
             message=(f"Schwab token at {spath} has NO refresh_token (defective grant — "

@@ -1,0 +1,105 @@
+--- a/.claude/hooks/scripts/schwab-gate.sh	2026-09-13 13:01:57.281507947 -0500
++++ b/.claude/hooks/scripts/schwab-gate.sh	2026-09-13 13:01:57.299751620 -0500
+@@ -180,4 +180,51 @@
+   exit 2
+ fi
+ 
++# Gate 7: the execution service's runtime. [st-p8k8, stage 3; design §5]
++#
++# Stage 3 installs execd as its own user from a copy at /opt/execd that only
++# `bash deploy/install.sh --execd` (Steve) writes, with the trading credential
++# in memory between his passphrase and the close. Every agent shell on this box
++# is root, so the process boundary is a boundary only if the ways round it are
++# denied here: changing the installed copy, running the install, calling out to
++# Windows, reading another process's memory, reaching the page port that holds
++# unlock and resume, and stopping the service under a live position.
++#
++# Same discipline as gates 3, 4 and 6: an INVOCATION is blocked, a MENTION is
++# not. `grep -rn /opt/execd docs/`, `ls -la /opt/execd`, `journalctl -u
++# strader-execd`, `systemctl status strader-execd` and a commit message naming
++# any of these all pass. `bash deploy/install.sh --execd --dry-run` passes: it
++# prints the plan and touches nothing.
++EXECD_INSTALLED_TREE='/opt/execd/'
++if echo "$COMMAND" | grep -qE "(>|>>|cp |mv |rm |chmod |chown |tee |install |dd |rsync ).*$EXECD_INSTALLED_TREE"; then
++  echo "SCHWAB GATE: /opt/execd is the installed execution service. Only deploy/install.sh --execd writes it, and Steve runs that." >&2
++  exit 2
++fi
++INSTALL_EXECD='(^|[;|&(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?(bash[[:space:]]+|sh[[:space:]]+|\./)?([^[:space:]"'\'']*/)?deploy/install\.sh[^;|&]*--execd'
++if echo "$COMMAND" | grep -qE "$INSTALL_EXECD" && ! echo "$COMMAND" | grep -qE -- '--dry-run'; then
++  echo "SCHWAB GATE: deploy/install.sh --execd installs the execution service. Steve runs it (--dry-run is fine)." >&2
++  exit 2
++fi
++WINDOWS_SHELL='(^|[;|&(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?([^[:space:]"'\'']*/)?(wsl\.exe|powershell(\.exe)?|pwsh(\.exe)?|cmd\.exe)([[:space:]]|$)'
++if echo "$COMMAND" | grep -qiE "$WINDOWS_SHELL"; then
++  echo "SCHWAB GATE: Windows shells (wsl.exe, powershell, cmd.exe) are not run from an agent shell on this box [st-p8k8 §5]." >&2
++  exit 2
++fi
++MEMORY_READER='(^|[;|&(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?([^[:space:]"'\'']*/)?(gdb|gcore|strace|ltrace)([[:space:]]|$)'
++if echo "$COMMAND" | grep -qE "$MEMORY_READER" || echo "$COMMAND" | grep -qE '/proc/([0-9]+|self)/mem([[:space:]]|$|/)'; then
++  echo "SCHWAB GATE: reading a process's memory (gdb, strace, /proc/<pid>/mem) is denied — the credential lives in execd's memory [st-p8k8 §5]." >&2
++  exit 2
++fi
++PAGE_PORT='(127\.0\.0\.1|localhost|0\.0\.0\.0|\[::1\]):8779'
++if echo "$COMMAND" | grep -qE "(curl|wget|nc|ncat|socat|python3?|httpie|http)[^;|&]*$PAGE_PORT"; then
++  echo "SCHWAB GATE: 127.0.0.1:8779 is Steve's page (unlock, resume, re-auth). Agents use the API on 8778." >&2
++  exit 2
++fi
++STOP_SERVICE='(^|[;|&(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?systemctl[[:space:]]+(stop|restart|kill|disable|mask)[[:space:]]+[^;|&]*strader-execd'
++KILL_SERVICE='(^|[;|&(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?(pkill|killall)[[:space:]]+[^;|&]*execd'
++if echo "$COMMAND" | grep -qE "$STOP_SERVICE" || echo "$COMMAND" | grep -qE "$KILL_SERVICE"; then
++  echo "SCHWAB GATE: stopping strader-execd is Steve's — a service that is down cannot send an exit. (status and journalctl are fine.)" >&2
++  exit 2
++fi
++
+ exit 0
+--- a/tests/test_schwab_gate_hook.py	2026-09-13 13:01:57.281507947 -0500
++++ b/tests/test_schwab_gate_hook.py	2026-09-13 13:01:57.299751620 -0500
+@@ -74,6 +74,27 @@
+     ("execd vault copy", "cp /tmp/x /etc/execd/vault.json"),
+     ("market credential minter", ".venv/bin/python3 scripts/execd_market_credential.py"),
+     ("vault minter", "python3 scripts/execd_vault_init.py --init"),
++    # Gate 7 (st-p8k8, stage 3): the installed service's runtime. The copy at
++    # /opt/execd, the install itself, Windows shells, memory readers, the page
++    # port that holds unlock/resume, and stopping the unit.
++    ("installed copy overwrite", "cp execd/service.py /opt/execd/execd/service.py"),
++    ("installed copy rsync", "rsync -a execd/ /opt/execd/execd/"),
++    ("installed copy redirect", "echo x > /opt/execd/INSTALLED"),
++    ("the install", "bash deploy/install.sh --execd"),
++    ("the install, sudo, path", "sudo bash /root/projects/Strader/deploy/install.sh --execd"),
++    ("wsl.exe", "wsl.exe --shutdown"),
++    ("powershell", "powershell.exe -Command Get-Process"),
++    ("powershell, no suffix, mid-chain", "cd /tmp && powershell -c 'ls'"),
++    ("cmd.exe", "cmd.exe /c dir"),
++    ("gdb attach", "gdb -p 4242"),
++    ("strace", "strace -p 4242"),
++    ("proc mem", "dd if=/proc/4242/mem bs=1 count=100"),
++    ("page port curl", "curl -s http://127.0.0.1:8779/exec/"),
++    ("page port curl post", "curl -X POST -d passphrase=x http://localhost:8779/exec/unlock"),
++    ("page port python", "python3 -c 'import urllib.request as u; u.urlopen(\"http://127.0.0.1:8779/exec/\")'"),
++    ("stop the unit", "systemctl stop strader-execd.service"),
++    ("restart the unit", "sudo systemctl restart strader-execd"),
++    ("pkill the service", "pkill -f 'python -m execd'"),
+ ]
+ 
+ ALLOWED = [
+@@ -101,6 +122,20 @@
+     ("grep for the vault minter", "grep -rn execd_vault_init docs/"),
+     ("git log of the market minter", "git log --oneline -- scripts/execd_market_credential.py"),
+     ("cat of a doc naming the vault", "cat docs/a2a/inbox.md"),
++    # Mention-only and read-only controls for gate 7: the runtime is looked at
++    # freely, and the install's dry run prints a plan and touches nothing.
++    ("ls of the installed copy", "ls -la /opt/execd/execd"),
++    ("grep for the installed path", "grep -rn /opt/execd docs/ execd/"),
++    ("install dry run", "bash deploy/install.sh --execd --dry-run"),
++    ("install diff", "bash deploy/install.sh --diff"),
++    ("unit status", "systemctl status strader-execd.service"),
++    ("unit journal", "journalctl -u strader-execd -n 50"),
++    ("the API port", "curl -s http://127.0.0.1:8778/status"),
++    ("commit message naming the page port", 'git commit -m "page on 127.0.0.1:8779 behind tailscale serve"'),
++    ("commit message naming powershell", 'git commit -m "record-boot-event: powershell.exe fallback"'),
++    ("a script that calls powershell inside", "bash factory/scripts/record-boot-event.sh --list"),
++    ("commit message naming strace", 'git commit -m "gate 7 denies gdb and strace"'),
++    ("proc status, not mem", "cat /proc/4242/status"),
+ ]
+ 
+ 

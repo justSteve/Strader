@@ -19,11 +19,16 @@ and the split is what makes that safe.
 
 It asks for the passphrase twice, on the terminal, with no echo. Nothing
 about the passphrase or the credential is printed, logged, or written
-anywhere but the vault file. Steve runs this at stage 3; it needs his
-passphrase, so an agent cannot run it for him and must not try.
+anywhere but the vault file. Steve runs this at stage 3 (the install script
+calls it); it needs his passphrase, so an agent cannot run it for him and
+must not try. The floor is 8 characters and spaces inside are allowed
+(Steve, 2026-09-10, co-ofzol).
 
-    .venv/bin/python scripts/execd_vault_init.py --vault /etc/execd/vault.json
-    .venv/bin/python scripts/execd_vault_init.py --vault /etc/execd/vault.json --check
+    .venv/bin/python scripts/execd_vault_init.py --vault /var/lib/execd/vault.json
+    .venv/bin/python scripts/execd_vault_init.py --vault /var/lib/execd/vault.json --check
+
+``bash deploy/install.sh --execd`` runs this for Steve when no vault exists yet
+(stage 3, st-p8k8) and sets the file's owner to the service user afterwards.
 
 ``--check`` opens an existing vault with the passphrase and reports the
 refresh-token wall and nothing else — the way to confirm a vault before the
@@ -89,7 +94,7 @@ def init(vault_path: Path) -> int:
     print(f"writing {vault_path}")
     print(f"the refresh token in it expires {cred.refresh_wall.isoformat()} — "
           f"re-authorise on the page before then")
-    first = _ask("passphrase (12+ characters, no leading/trailing space): ")
+    first = _ask("passphrase (8+ characters, spaces inside allowed, none at the ends): ")
     second = _ask("again: ")
     if first != second:
         print("the two entries differ; nothing written", file=sys.stderr)
@@ -104,7 +109,8 @@ def init(vault_path: Path) -> int:
     os.chmod(vault_path, 0o600)
     print(f"vault written: version {info.version}, {info.size_bytes} bytes, "
           f"{info.updated or info.created}")
-    print("next: python -m execd --schwab --vault", vault_path, "--unlock-stdin")
+    print("next: if the service is installed, open its page and unlock; otherwise "
+          "bash deploy/install.sh --execd")
     return 0
 
 

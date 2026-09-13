@@ -126,7 +126,11 @@ class TestTheServiceReadsIt:
     def test_load_market_credential_returns_the_payload(self, market_rig, tmp_path):
         out = tmp_path / "market.json"
         emc.write(out)
-        assert load_market_credential(out)["app"]["key"] == "MARKET-KEY"
+        # Since stage 3 (st-p8k8) the loader hands back the holder the page
+        # rewrites at re-auth; ``current()`` is what the transport calls.
+        holder = load_market_credential(out)
+        assert holder.current()["app"]["key"] == "MARKET-KEY"
+        assert holder.path == out
 
 
 class TestVaultPayloadVersions:

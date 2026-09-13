@@ -50,6 +50,8 @@ in the repo outside `.venv` and `lib`.
 |---|---|---|
 | `python -m strader.intent` | interactive REPL | The intent desk. §3. |
 | `python -m execd --mock …` | long-running server | execd. Its operator surface is HTTP, not argv. §5. |
+| `bash deploy/install.sh --execd` | one command, Steve's | Stage 3 (st-p8k8): creates the `execd` user, copies `execd/` to `/opt/execd`, builds its venv, seeds `/etc/execd/bounds.yaml`, writes the market credential, asks for the vault passphrase, installs and starts `strader-execd.service`, publishes the page. Idempotent; `--dry-run` prints the plan. §5.15. |
+| `https://mydesk-1.tail89f676.ts.net/exec/` | the page | Steve's surface on the tailnet: unlock, STOP, clear STOP, flatten, stand down, lock, weekly re-auth of both apps. Loopback `127.0.0.1:8779` behind `tailscale serve`. §5.15. |
 | `python -m strader.execution.feed --preflight --token PATH` | one-shot check | Go/no-go preflight. §6. |
 | `python scripts/fire_server.py [--port N]` | long-running server | Fire server. §7. |
 | `reauthData` / `reauthAccount` | interactive chore | The shell handles for the weekly re-auth — app 1 (market data) and app 2 (trading). Each prints both walls before and after and names the other. `reauth` alone no longer runs anything; it says which two exist. §5.12a. |
@@ -373,7 +375,7 @@ timeout and returns `"unknown"` on any failure — so a copy installed at
 `/opt/execd` that is not a checkout stamps `unknown` rather than lying about a
 version. Every journal line carries this sha.
 
-### 5.2 The API — fourteen routes
+### 5.2 The API — fifteen routes
 
 `execd/api.py`. Loopback only, JSON in and out. Flask, `threaded=True`.
 
@@ -385,6 +387,7 @@ version. Every journal line carries this sha.
 | GET | `/orders` | — | `{"orders": [OrderResult…]}` |
 | GET | `/positions` | — | `{"broker": [Position…], "tracked": [OpenPosition…]}` |
 | GET | `/journal` | `?n=` (default 50, clamped to 1–1000) | `{"entries": [...]}` |
+| GET | `/marketdata/<kind>` | `kind` ∈ `quotes`, `chains`, `pricehistory`; the query is Schwab's own parameter names for that resource, allow-listed | the raw Schwab body. Stage 3 (st-p8k8): what `broker_schwab.client.create_client()` returns speaks to this, so every reader in the repo reads through the one credential holder. Answers while LOCKED. |
 | POST | `/preview` | an intent object | `{"refused": null, "preview": {...}, "would_send": bool}` |
 | POST | `/place` | an intent object | §5.6 |
 | POST | `/cancel` | `{"order_id": "..."}` | `{"refused": null, "order": {...}}` |
@@ -411,14 +414,16 @@ Status codes: `200` acted or answered a read · `400` not a valid intent
 
 **Deliberately absent: `/unlock`, `/resume`, and any re-auth route.**
 `tests/execd/test_api.py::test_the_url_map_holds_exactly_the_narrow_door` pins
-the app's rule set to exactly these fourteen, and a second test names
+the app's rule set to exactly these fifteen, and a second test names
 `/unlock`, `/arm`, `/resume`, `/reauth`, `/re-auth`, `/oauth` explicitly. Adding
 **any** route breaks the suite, not only an arming one. An agent that can reach this API can ask
 the service to trade inside Steve's bounds. It cannot arm it, cannot clear his
 STOP, and never sees the credential.
 
 `ExecService` does have `unlock()`, `resume()` and `lock()` methods — they are
-reached from Steve's tailnet page, which is stage 3 and does not exist yet.
+reached from Steve's page (`execd/page.py`, stage 3, §5.15), which is a
+second Flask app on `127.0.0.1:8779`, published tailnet-only by
+`tailscale serve`, and never from this API.
 
 ### 5.3 The status object
 
@@ -818,12 +823,69 @@ service's page and never writes down.
 | Stage | Bead | What lands |
 |---|---|---|
 | 1 | `st-eznu` | **done** — everything in §5 against `MockBroker` |
-| 2 | `st-w2nw` | **built 2026-09-04** — the Schwab transport, the vault, the OAuth helpers the page will call (`authorize_url`, `code_from_received_url`, `exchange`, `refresh`). Open on it: the Trader API shapes are spec-derived until the Accounts and Trading product is on the app and the recorder is re-run. |
-| 3 | `st-p8k8` | dedicated user, systemd unit, `deploy/install.sh`, the tailnet page that takes the passphrase, the plaintext token retired |
+| 2 | `st-w2nw` | **built 2026-09-04**, trader shapes recorded 09-05 — the Schwab transport, the vault, the OAuth helpers the page calls (`authorize_url`, `code_from_received_url`, `exchange`, `refresh`, `verify_grant`). Left open only for the live read-only proof, which is stage 3's first unlock. |
+| 3 | `st-p8k8` | **built 2026-09-13**, Steve's three lines pending — dedicated user, systemd unit, `deploy/install.sh --execd`, the page (§5.15), the readers re-pointed, the token-age heartbeat reading the service, the hook change presented. The plaintext token files retire once the service has been seen answering a morning run. |
 | 4 | `st-k6gl` | one 1-lot live single with Steve at the STOP button |
 | 5 | `st-47i2` | FD0 tickets and promoted rules become intents; the paste line retires |
 
 **Order is strict. Nothing sends before stage 4.**
+
+### 5.15 The page and the installed service (stage 3, st-p8k8)
+
+**Where it runs.** `bash deploy/install.sh --execd` (Steve, as root) creates
+the system user `execd`, copies the `execd/` package — only that package — to
+`/opt/execd/execd` (root:execd 0750) with an `INSTALLED` stamp naming the
+commit, builds `/opt/execd/venv` from `deploy/execd-requirements.txt`, seeds
+`/etc/execd/bounds.yaml` once, writes `/var/lib/execd/market.json` from the
+repo's market token (app 1), asks for the vault passphrase twice and writes
+`/var/lib/execd/vault.json` (app 2), installs and starts
+`strader-execd.service`, and runs `tailscale serve --bg --set-path /exec
+http://127.0.0.1:8779/exec`. Re-running it refreshes the code and restarts the
+unit; it never overwrites a bounds file, a vault or a market credential that
+exists. `--dry-run` prints every step and touches nothing. The unit runs as
+`execd` with `ProtectSystem=strict` and `ReadWritePaths=/var/lib/execd`, and
+`installed_sha()` reads the stamp, so every journal line names the commit
+that was installed.
+
+**The page** (`execd/page.py`) is a second Flask app in the same process on
+`127.0.0.1:8779`, reachable only through `tailscale serve` (tailnet, never
+funnel) at `https://mydesk-1.tail89f676.ts.net/exec/`. One rule: every action
+that adds capability takes the passphrase; every action that reduces it does
+not.
+
+| Action | Passphrase | What it does |
+|---|---|---|
+| UNLOCK | yes | opens the vault, arms until today's close (`ExecService.unlock`) |
+| STOP | no | touches the kill file; one tap from a phone |
+| clear STOP | yes | `ExecService.resume` |
+| FLATTEN | no, but a second page with a single-use 60 s confirm | `ExecService.flatten` |
+| stand down / lock | no | `stand_down` / `lock` |
+| re-authorise (either app) | yes, twice: for the link and for the store | `authorize_url` → Steve logs in → pastes the landing address → `exchange` → `verify_grant` against the app's own family → stored: the trading grant back into the vault under the same passphrase (and swapped into memory if armed), the market grant to its file |
+
+A wrong passphrase is journaled as `refused` with bound `passphrase`, costs a
+one-second delay, and carries no value. A re-auth is journaled as `reauth`
+with the app and its new wall. An unlock now journals the trading grant's
+wall too, so the status object's `credential.last_known_trading_wall` can be
+read while LOCKED — which is what the 06:30 token-age heartbeat gets.
+
+**Why the passphrase and not a login.** Every agent shell on this box is root
+and can reach the loopback port directly; a cookie or header is forgeable by
+root, the passphrase is not held by any agent. The port is the second layer:
+the hook change presented with this stage (`docs/patches/2026-09-13-gate-execd-runtime.diff`,
+and its COO twin) denies agent shells the page port, writes under
+`/opt/execd`, the install itself, Windows shells, memory readers, and stopping
+the unit.
+
+**The readers.** `broker_schwab.client.create_client()` returns
+`broker_schwab.execd_client.ExecdClient` when the service answers on 8778 and
+the old `schwab-py` client over the token file when it does not
+(`STRADER_MARKET_DATA=execd|legacy|auto`). The client offers the four calls
+the readers make — `get_quotes`, `get_option_chain`,
+`get_price_history_every_minute`, `…_every_five_minutes` — over
+`GET /marketdata/<kind>`. No consumer changed. The token-age heartbeat
+(`scripts/schwab_token_health.py`) reads the service's walls first and the
+files only as fallback. `reauthData` / `reauthTrade` answer with the page's
+address once `/opt/execd/INSTALLED` exists.
 
 ---
 
@@ -869,13 +931,18 @@ market-data call — both must pass before it reports done. It keeps the last te
 backups beside the token. An agent can run everything up to the login link; the
 login itself is Steve's, because it needs a browser session.
 
-**Inside execd** (stage 2, for the stage 3 page): `execd.schwab.authorize_url`
-builds the login link, `code_from_received_url` takes the pasted redirect (and
-refuses a state that does not match the link shown), `exchange` trades the
-code for a wrapped token with `creation_timestamp` = now — the start of the
-seven-day clock — and the page stores it in the vault with the passphrase Steve
-just typed. `refresh` renews the access token and preserves the timestamp.
-Nothing here writes the vault; the page does, with his passphrase present.
+**On the page** (stage 3, §5.15, the path of record once the service is
+installed): `execd.schwab.authorize_url` builds the login link,
+`code_from_received_url` takes the pasted redirect (and refuses a state that
+does not match the link shown), `exchange` trades the code for a wrapped
+token with `creation_timestamp` = now — the start of the seven-day clock —
+`verify_grant` proves it against the family the app is for, and the page
+stores it: the trading grant in the vault with the passphrase Steve just
+typed, the market grant in its file. `refresh` renews the access token and
+preserves the timestamp. Both apps, one sitting, so the two walls stay on the
+same day. The script above keeps working only until the service is installed;
+after that it answers with the page's address (`SCHWAB_REAUTH_FORCE_FILE=1`
+overrides, for a fallback nobody should need).
 
 ---
 

@@ -1,0 +1,66 @@
+[Unit]
+# execd — the live execution service: the one holder of the Schwab credential
+# on this box. [st-p8k8, epic st-5qjq; Steve's ruling st-l3s4 2026-08-30]
+#
+# Runs as its own user from the INSTALLED copy at /opt/execd (root:execd 0750,
+# put there only by `bash deploy/install.sh --execd`, which Steve runs), never
+# from the repo checkout — so no agent can change what is actually transmitting
+# without Steve running the install. State is /var/lib/execd (execd:execd 0700):
+# the encrypted vault, the market credential, the journal, the STOP file. The
+# bounds are Steve's file at /etc/execd/bounds.yaml.
+#
+# Two loopback ports, nothing else bound:
+#   127.0.0.1:8778  the narrow door — no unlock, no resume, no re-auth
+#   127.0.0.1:8779  Steve's page, published tailnet-only by
+#                   tailscale serve --bg --set-path /exec http://127.0.0.1:8779/exec
+#
+# It comes back LOCKED after every restart by design: the trading credential is
+# in memory only between Steve's passphrase and the close. The market credential
+# loads at start so the 07:00 reads answer before he is awake (st-p9mx).
+#
+# Restart=always: a service that is down is a service that cannot send an exit.
+# Stopping it by hand strands nothing — the broker-resident protective stop is
+# on every fill for exactly that case — but do not stop it during the session.
+Description=Strader execd — live execution service (loopback 8778; page 8779)
+Documentation=https://github.com/justSteve/Strader
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/opt/execd/INSTALLED
+
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=exec
+User=execd
+Group=execd
+WorkingDirectory=/opt/execd
+UMask=0077
+ExecStart=/opt/execd/venv/bin/python -m execd --schwab \
+    --vault /var/lib/execd/vault.json \
+    --market-credential /var/lib/execd/market.json \
+    --state-dir /var/lib/execd \
+    --bounds /etc/execd/bounds.yaml \
+    --page-port 8779 \
+    --callback-url https://127.0.0.1:8182
+Restart=always
+RestartSec=3s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strader-execd
+KillSignal=SIGINT
+TimeoutStopSec=15
+
+# Hardening: the process can read its code and config and write its own state.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/execd
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

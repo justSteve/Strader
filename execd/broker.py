@@ -1,7 +1,9 @@
 """The broker seam, and the mock that stands in for one until stage 2. [st-eznu]
 
 Everything the service needs from a broker is the :class:`Broker` protocol
-below — eight methods, all of them data in and data out. Stage 2 (st-w2nw)
+below — nine methods, all of them data in and data out (eight from stage 1;
+``market_read``, the raw pass-through for the repo's readers, from stage 3,
+st-p8k8). Stage 2 (st-w2nw)
 lands a second implementation that speaks Schwab's Trader API over HTTPS. The
 service never learns which one it is holding, which is what lets every bound,
 every refusal and the whole protective-stop dance be tested here at full speed
@@ -203,12 +205,21 @@ class Fill:
                 "instruction": self.instruction}
 
 
+#: The three market-data reads the service passes through for the repo's
+#: readers (stage 3, st-p8k8): the corpus snapshots, the premarket profile and
+#: the gauges used to hold their own copy of the market token; now they ask
+#: the one credential holder. GET only, the market family only — the names
+#: are the Schwab resource names, and anything not in this set is refused.
+MARKET_READS = ("quotes", "chains", "pricehistory")
+
+
 @runtime_checkable
 class Broker(Protocol):
-    """The only surface the service knows. Eight methods, no credential."""
+    """The only surface the service knows. Nine methods, no credential."""
 
     def quote(self, symbol: str) -> Quote: ...
     def chain(self, root: str, expiry: str | None = None) -> dict[str, Any]: ...
+    def market_read(self, kind: str, params: dict[str, str]) -> Any: ...
     def preview(self, intent: OrderIntent) -> Preview: ...
     def place(self, intent: OrderIntent) -> OrderResult: ...
     def cancel(self, order_id: str) -> OrderResult: ...
@@ -231,6 +242,7 @@ class MockBroker:
         self.clock = clock
         self._quotes: dict[str, Quote] = {}
         self._chains: dict[str, dict[str, Any]] = {}
+        self._history: dict[str, list[dict[str, Any]]] = {}
         self._orders: dict[str, OrderResult] = {}
         self._positions: dict[str, Position] = {}
         self._fills: list[Fill] = []
@@ -262,6 +274,11 @@ class MockBroker:
     def set_position(self, symbol: str, qty: int, avg_price: float) -> None:
         self._positions[symbol] = Position(symbol, qty, avg_price)
 
+    def set_history(self, symbol: str, candles: list[dict[str, Any]]) -> None:
+        """Candles ``market_read("pricehistory")`` answers for ``symbol``, in
+        Schwab's own shape (``open high low close volume datetime``)."""
+        self._history[symbol] = list(candles)
+
     # ── protocol ─────────────────────────────────────────────────────────
     def quote(self, symbol: str) -> Quote:
         self._record("quote", symbol=symbol)
@@ -276,6 +293,42 @@ class MockBroker:
         if ch is None:
             raise BrokerError(f"no chain for {root}")
         return ch
+
+    def market_read(self, kind: str, params: dict[str, str]) -> Any:
+        """The raw market-data body a reader would have fetched itself, built
+        from what the mock was given. Shapes follow the recorded live ones
+        (``tests/fixtures/schwab/``) closely enough for the repo's readers to
+        parse: quotes keyed by symbol with a ``quote`` block, a chain with the
+        two expiry maps, a price history with ``candles`` and ``empty``."""
+        self._record("market_read", kind=kind, params=dict(params))
+        if kind not in MARKET_READS:
+            raise BrokerError(f"no such market read: {kind}")
+        if (msg := self.fail_next) is not None:
+            self.fail_next = None
+            raise BrokerError(msg)
+        if kind == "quotes":
+            out: dict[str, Any] = {}
+            for sym in str(params.get("symbols", "")).split(","):
+                sym = sym.strip()
+                q = self._quotes.get(sym)
+                if q is not None:
+                    out[sym] = {"symbol": sym, "quote": {
+                        "bidPrice": q.bid, "askPrice": q.ask, "lastPrice": q.last,
+                        "mark": q.mid, "quoteTime": int(q.as_of.timestamp() * 1000),
+                        "tradeTime": int(q.as_of.timestamp() * 1000)}}
+            return out
+        if kind == "chains":
+            symbol = str(params.get("symbol", "")).lstrip("$")
+            ch = self._chains.get(symbol.upper()) or self._chains.get(symbol.upper() + "W")
+            if ch is None:
+                return {"symbol": params.get("symbol"), "status": "FAILED",
+                        "callExpDateMap": {}, "putExpDateMap": {}}
+            return {"symbol": params.get("symbol"), "status": "SUCCESS",
+                    "callExpDateMap": ch.get("calls", ch.get("callExpDateMap", {})),
+                    "putExpDateMap": ch.get("puts", ch.get("putExpDateMap", {}))}
+        candles = self._history.get(str(params.get("symbol", "")), [])
+        return {"symbol": params.get("symbol"), "candles": candles,
+                "empty": not candles}
 
     def preview(self, intent: OrderIntent) -> Preview:
         self._record("preview", intent_id=intent.intent_id)

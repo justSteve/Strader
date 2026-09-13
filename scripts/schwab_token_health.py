@@ -90,6 +90,42 @@ def _trading_token_state() -> tuple[Path | None, str]:
     return path, "ok"
 
 
+def _service_health(warn: float, crit: float) -> tuple[TokenHealth | None, TokenHealth | None, str]:
+    """Both walls as the execution service reports them, or ``(None, None,
+    why)`` when it does not answer (stage 3, st-p8k8).
+
+    Once the service is installed it is the one credential holder on this box
+    and the token files under ``tokens/`` are retired, so this is the first
+    place the heartbeat looks. The market wall is always readable (that
+    credential is held outside the arming lock); the trading wall is readable
+    while armed, and otherwise the service reports the wall it last saw at an
+    unlock or a re-authorisation, which is what a 06:30 check gets."""
+    from broker_schwab.execd_client import service_status
+    from strader.schwab_token import assess_wall
+
+    st = service_status()
+    if st is None:
+        return None, None, "execd not answering"
+    cred = st.get("credential") or {}
+    market = None
+    trading = None
+    mk = cred.get("market") or {}
+    if mk.get("armed") and mk.get("refresh_wall"):
+        market = assess_wall(_iso_to_ts(mk["refresh_wall"]), path="execd:market",
+                             warn_days_left=warn, critical_days_left=crit)
+    wall = cred.get("refresh_wall") if cred.get("armed") else cred.get("last_known_trading_wall")
+    if wall:
+        trading = assess_wall(_iso_to_ts(wall), path="execd:trading",
+                              warn_days_left=warn, critical_days_left=crit)
+    note = ("execd answering" if market or trading
+            else "execd answering but reports no wall for either app")
+    return market, trading, note
+
+
+def _iso_to_ts(text: str) -> int:
+    return int(datetime.fromisoformat(text).timestamp())
+
+
 def _write_heartbeat(health: TokenHealth) -> None:
     """Overwrite the heartbeat state file on every run. A stale heartbeat is itself
     a signal that the checker stopped running."""
@@ -205,17 +241,29 @@ def main(argv: list[str] | None = None) -> int:
     crit = args.critical_days_left if args.critical_days_left is not None else DEFAULT_CRITICAL_DAYS_LEFT
 
     try:
-        token_path = _resolve_token_path()
-        health = assess_token(token_path, warn_days_left=warn, critical_days_left=crit)
+        # The execution service first (stage 3, st-p8k8): once installed it
+        # holds both grants and the token files are retired. The files remain
+        # the source until then, and the fallback for a wall the service
+        # cannot report.
+        market_health, trading_health, source_note = _service_health(warn, crit)
+        if market_health is None:
+            token_path = _resolve_token_path()
+            market_health = assess_token(token_path, warn_days_left=warn,
+                                         critical_days_left=crit)
+        else:
+            token_path = Path(market_health.path)
+        health = market_health
         # Two apps mean two grants and two independent seven-day walls
         # (st-p9mx). The verdict is the NEARER wall, because that is the one
         # that ends a trading day, and the discipline is to re-authorise both
         # in one sitting so they land on the same day anyway.
-        trading_path, trading_note = _trading_token_state()
-        trading_health = None
-        if trading_path is not None:
-            trading_health = assess_token(trading_path, warn_days_left=warn,
-                                          critical_days_left=crit)
+        trading_note = source_note
+        if trading_health is None:
+            trading_path, trading_note = _trading_token_state()
+            if trading_path is not None:
+                trading_health = assess_token(trading_path, warn_days_left=warn,
+                                              critical_days_left=crit)
+        if trading_health is not None:
             if (trading_health.days_left is not None and health.days_left is not None
                     and trading_health.days_left < health.days_left):
                 health = trading_health
@@ -229,10 +277,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         out = health.to_dict()
         if trading_health is not None:
-            out["apps"] = {"market": assess_token(
-                               token_path, warn_days_left=warn,
-                               critical_days_left=crit).to_dict(),
+            out["apps"] = {"market": market_health.to_dict(),
                            "trading": trading_health.to_dict()}
+        out["source"] = source_note
         else:
             out["trading_note"] = trading_note
         print(json.dumps(out, indent=2))

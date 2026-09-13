@@ -1,4 +1,4 @@
-"""``python -m execd`` — run the service. [st-eznu, st-w2nw]
+"""``python -m execd`` — run the service. [st-eznu, st-w2nw, st-p8k8]
 
 Two brokers, and the choice is explicit or the process refuses to start: a
 process called ``execd`` that started quietly and turned out to be talking to
@@ -6,17 +6,27 @@ nothing — or to the wrong thing — would be worse than one that would not
 start.
 
     .venv/bin/python -m execd --mock --state-dir /tmp/execd --mock-unlock
-    .venv/bin/python -m execd --schwab --vault /etc/execd/vault.json --state-dir /var/lib/execd
+    .venv/bin/python -m execd --schwab --vault /var/lib/execd/vault.json \
+        --market-credential /var/lib/execd/market.json --state-dir /var/lib/execd
 
 ``--schwab`` (stage 2, st-w2nw) starts the service LOCKED against the real
-Trader API. Nothing arms it but Steve's passphrase: on its tailnet page in
-stage 3, or — until the page exists — typed at this console with
-``--unlock-stdin``, which reads one line from standard input and never sees
-argv or the environment. ``--mock-unlock`` cannot arm a real broker: the
-guard is on the broker object, not on the flag order.
+Trader API. Nothing arms it but Steve's passphrase: on its tailnet page
+(stage 3, st-p8k8, ``execd.page`` on a second loopback port that ``tailscale
+serve`` publishes), or at this console with ``--unlock-stdin``, which reads
+one line from standard input and never sees argv or the environment.
+``--mock-unlock`` cannot arm a real broker: the guard is on the broker object,
+not on the flag order.
 
-The service binds the loopback and nothing else. There is no route here that
-arms anything.
+Two loopback ports, two surfaces. ``127.0.0.1:8778`` is the narrow door the
+trading code and the agents use — no unlock, no resume, no re-auth.
+``127.0.0.1:8779`` is Steve's page, where those three live behind his
+passphrase. Neither binds anything but the loopback; the page reaches the
+tailnet only through ``tailscale serve``, never funnel.
+
+The installed copy (``/opt/execd``, put there by ``deploy/install.sh`` which
+Steve runs) is not a git checkout; ``install.sh`` leaves an ``INSTALLED``
+stamp beside the package naming the commit it copied, and every journal line
+carries that sha.
 """
 
 from __future__ import annotations
@@ -28,18 +38,25 @@ import subprocess
 import sys
 from pathlib import Path
 
+import threading
+
 from .api import BIND_HOST, BIND_PORT, create_app
 from .bounds import load_bounds
 from .broker import MockBroker
+from .page import DEFAULT_CALLBACK_URL, PAGE_HOST, PAGE_PORT, CredentialFile, create_page
 from .schwab import Credential, SchwabBroker, trading_payload
 from .service import ExecService, ServiceConfig
 from .vault import BadPassphrase, Vault, VaultError
 
 REPO = Path(__file__).resolve().parent.parent
-DEFAULT_VAULT = "/etc/execd/vault.json"
+DEFAULT_VAULT = "/var/lib/execd/vault.json"
+
+#: Written by ``deploy/install.sh`` beside the installed package: one
+#: ``key=value`` per line, ``sha=`` first. Absent in a checkout.
+INSTALLED_STAMP = REPO / "INSTALLED"
 
 
-def load_market_credential(path: str | Path) -> dict:
+def load_market_credential(path: str | Path) -> CredentialFile:
     """The market-data app's credential, read at start-up and held outside the
     arming lock (st-p9mx).
 
@@ -50,19 +67,26 @@ def load_market_credential(path: str | Path) -> dict:
     refuses the whole ``/trader/v1`` family on that registration — and because
     nothing in this service routes a trading call to it.
 
-    ``scripts/execd_market_credential.py`` writes the file. Raises so the
+    ``scripts/execd_market_credential.py`` writes the file the first time; the
+    page rewrites it at each weekly re-authorisation (stage 3). Raises so the
     caller can decide whether to start without it."""
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
-    Credential.from_payload(raw)      # shape-checked here, not on the first quote
-    return raw
+    holder = CredentialFile(path)
+    holder.load()                     # shape-checked here, not on the first quote
+    return holder
 
 
 def installed_sha() -> str:
     """The sha of the copy that is running, stamped on every journal line.
 
-    Every order this service sends is attributable to a commit. When the
-    installed copy at ``/opt/execd`` is not a checkout, git says so and the
-    stamp reads ``unknown`` rather than lying about a version."""
+    Every order this service sends is attributable to a commit. The installed
+    copy at ``/opt/execd`` is not a checkout, so ``deploy/install.sh`` leaves
+    an ``INSTALLED`` stamp there naming the commit (and ``-dirty`` if the tree
+    it copied from had uncommitted changes); that is read first. In a checkout
+    git answers. When neither can, the stamp reads ``unknown`` rather than
+    lying about a version."""
+    stamped = _stamped_sha()
+    if stamped:
+        return stamped
     try:
         out = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
                              capture_output=True, text=True, timeout=10)
@@ -82,6 +106,18 @@ def installed_sha() -> str:
     if status.returncode != 0:
         return f"{sha}-unverified"
     return f"{sha}-dirty" if status.stdout.strip() else sha
+
+
+def _stamped_sha() -> str | None:
+    try:
+        text = INSTALLED_STAMP.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        key, sep, value = line.partition("=")
+        if sep and key.strip() == "sha" and value.strip():
+            return value.strip()
+    return None
 
 
 def may_mock_unlock(broker: object) -> bool:
@@ -120,6 +156,14 @@ def build_parser() -> argparse.ArgumentParser:
                    help="loopback port (default: %(default)s)")
     p.add_argument("--mock-unlock", action="store_true",
                    help="arm the service with a fake credential — mock only, for local trials")
+    p.add_argument("--page-port", type=int, default=PAGE_PORT,
+                   help="loopback port for Steve's page — unlock, STOP, flatten, re-auth "
+                        "(default: %(default)s); published by tailscale serve, never funnel")
+    p.add_argument("--no-page", action="store_true",
+                   help="do not serve the page (console trials; --unlock-stdin still works)")
+    p.add_argument("--callback-url", default=DEFAULT_CALLBACK_URL,
+                   help="the OAuth callback both Schwab apps are registered with, for the "
+                        "page's re-authorisation (default: %(default)s)")
     return p
 
 
@@ -149,21 +193,30 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.schwab and not Path(args.vault).is_file():
-        print(f"execd: --schwab needs the vault at {args.vault} and there is none. "
-              f"scripts/execd_vault_init.py writes one (Steve's passphrase).", file=sys.stderr)
-        return 2
+        if not args.market_credential:
+            print(f"execd: --schwab needs the vault at {args.vault} and there is none. "
+                  f"scripts/execd_vault_init.py writes one (Steve's passphrase).",
+                  file=sys.stderr)
+            return 2
+        # With a market credential there is something real to serve — the
+        # 07:00 reads — so the service starts, LOCKED for good until the vault
+        # exists, and says so here and on its page rather than refusing.
+        print(f"execd: no vault at {args.vault} — the service starts LOCKED and cannot "
+              f"be armed until scripts/execd_vault_init.py writes one (Steve's "
+              f"passphrase). Market reads still answer.", file=sys.stderr)
 
     bounds = load_bounds(args.bounds)
     config = ServiceConfig(state_dir=Path(args.state_dir), bounds=bounds,
                            sha=installed_sha())
     broker = MockBroker() if args.mock else SchwabBroker(underlying=config.index_symbol)
     service = ExecService(broker, config)
+    market: CredentialFile | None = None
     if isinstance(broker, SchwabBroker):
         broker.bind(service.arming)
         if args.market_credential:
             try:
                 market = load_market_credential(args.market_credential)
-                broker.bind_market(lambda: market)
+                broker.bind_market(market.current)
             except (OSError, ValueError) as exc:
                 print(f"execd: the market credential at {args.market_credential} "
                       f"is unusable: {exc}", file=sys.stderr)
@@ -211,6 +264,15 @@ def main(argv: list[str] | None = None) -> int:
     name = "mock" if args.mock else "schwab"
     print(f"execd {config.sha} on {BIND_HOST}:{args.port} — broker={name}, "
           f"state={config.state_dir}, arming={service.arming.state.value}", file=sys.stderr)
+    if not args.no_page:
+        page = create_page(service, vault=args.vault, market=market,
+                           callback_url=args.callback_url)
+        threading.Thread(
+            target=lambda: page.run(host=PAGE_HOST, port=args.page_port, threaded=True),
+            name="execd-page", daemon=True).start()
+        print(f"execd page on {PAGE_HOST}:{args.page_port} — publish it with: tailscale serve "
+              f"--bg --set-path /exec http://{PAGE_HOST}:{args.page_port}/exec",
+              file=sys.stderr)
     create_app(service).run(host=BIND_HOST, port=args.port, threaded=True)
     return 0
 

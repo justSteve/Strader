@@ -81,6 +81,19 @@ class Arming:
         self._unlocked_at = self.clock()
         return self.state
 
+    def replace_credential(self, credential: Any) -> ArmState:
+        """Swap the credential in memory for a fresh one without touching the
+        arming window — the page does this after a weekly re-authorisation
+        while the service is armed (stage 3, st-p8k8), so the new refresh token
+        is the one in use. Refused while LOCKED: a replacement is not an
+        unlock, and nothing arms this service but the passphrase."""
+        if credential is None:
+            raise ValueError("replace_credential needs a credential")
+        if self._credential is None:
+            raise Locked("the service is locked — there is no credential to replace")
+        self._credential = credential
+        return self.state
+
     def stand_down(self) -> ArmState:
         """Done for the day. The credential stays in memory so exits and
         flatten still work; nothing new opens."""

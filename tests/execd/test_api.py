@@ -59,6 +59,45 @@ class TestReads:
         r = client.get("/chain?root=SPXW")
         assert r.status_code == 200 and r.json["root"] == "SPXW"
 
+
+class TestMarketDataPassThrough:
+    """Stage 3 (st-p8k8): the repo's readers ask the service for the raw
+    market-data bodies they used to fetch with their own copy of the token.
+    Answers while LOCKED, because the market credential is outside the lock."""
+
+    def test_quotes_answer_while_locked_in_schwabs_shape(self, locked_client):
+        r = locked_client.get("/marketdata/quotes?symbols=$SPX,SPXW  260826C06400000")
+        assert r.status_code == 200
+        assert r.json["$SPX"]["quote"]["lastPrice"] == SPX_NOW
+        assert r.json[CALL]["quote"]["askPrice"] == 2.10
+
+    def test_pricehistory_reports_empty_when_there_is_nothing(self, locked_client):
+        r = locked_client.get("/marketdata/pricehistory?symbol=/ES&periodType=day"
+                              "&frequencyType=minute&frequency=1")
+        assert r.status_code == 200 and r.json == {"symbol": "/ES", "candles": [],
+                                                   "empty": True}
+
+    def test_chains_answer_the_two_expiry_maps(self, locked_client):
+        r = locked_client.get("/marketdata/chains?symbol=$SPX&strikeCount=20")
+        assert r.status_code == 200
+        assert set(r.json) >= {"callExpDateMap", "putExpDateMap", "status"}
+
+    def test_an_unknown_resource_is_a_400_not_a_forward(self, locked_client):
+        r = locked_client.get("/marketdata/accounts")
+        assert r.status_code == 400 and "no such market read" in r.json["detail"]
+
+    def test_a_parameter_schwab_does_not_take_is_refused(self, locked_client):
+        r = locked_client.get("/marketdata/quotes?symbols=$SPX&accountNumber=1")
+        assert r.status_code == 400 and "accountNumber" in r.json["detail"]
+
+    def test_only_get(self, locked_client):
+        assert locked_client.post("/marketdata/quotes").status_code == 405
+
+    def test_a_broker_failure_is_a_502(self, locked_client, broker):
+        broker.fail_next = "down"
+        r = locked_client.get("/marketdata/quotes?symbols=$SPX")
+        assert r.status_code == 502
+
     def test_orders_and_positions(self, client):
         post(client, "/place", entry().to_dict())
         assert len(client.get("/orders").json["orders"]) == 2      # entry + resting stop
@@ -176,6 +215,9 @@ class TestTheRoutesThatDoNotExist:
             "/status", "/quote", "/chain", "/orders", "/positions", "/journal",
             "/preview", "/place", "/cancel", "/flatten", "/stand-down", "/stop",
             "/observe", "/poll-fills",
+            # stage 3 (st-p8k8): the raw market-data pass-through for the
+            # repo's readers. One rule, three resource names, GET only.
+            "/marketdata/<kind>",
         }
 
     def test_arming_is_reachable_on_the_service_but_not_over_http(self, armed, client):

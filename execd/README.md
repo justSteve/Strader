@@ -6,24 +6,68 @@ the token is hidden from agents, pasting is not the long-term transport.*
 This is that service. Epic **st-5qjq**; design of record
 `docs/a2a/2026-08-30-coo-to-strader-live-execution-service-plan.md`.
 
-**Stages 1 and 2 are what is here.** Two brokers: `MockBroker` (stage 1,
+**Stages 1, 2 and 3 are what is here.** Two brokers: `MockBroker` (stage 1,
 st-eznu) and `SchwabBroker` (stage 2, st-w2nw) — the Trader API over plain
 HTTPS in `execd/schwab.py`, the one module in the package that imports a
-transport. There is still no credential on disk here (the vault holds it,
-encrypted) and no import of the repo's hobbled `schwab` library —
-`tests/execd/test_wall.py` asserts all of it by reading the source and by
-watching what a full import actually loads.
+transport. There is no plaintext credential on disk here (the vault holds
+the trading one, encrypted; the market one — which cannot trade — sits 0600
+in the service's own state directory) and no import of the repo's hobbled
+`schwab` library — `tests/execd/test_wall.py` asserts all of it by reading
+the source and by watching what a full import actually loads. Stage 3
+(st-p8k8) added the page (`execd/page.py`), the installed service
+(`deploy/install.sh --execd`, `deploy/systemd/strader-execd.service`) and the
+raw market-data door the repo's readers now use.
 
-**What stage 2 could and could not record.** The market-data shapes the
-client reads were recorded against the live API on 2026-09-04
-(`tests/fixtures/schwab/`). The Trader API shapes — account numbers,
-positions, orders, preview — could not be: measured that morning, the app
-registered for this box answered every `/trader` path with HTTP 401
-`no apiproduct match found`, which is Schwab saying the **Accounts and
-Trading product is not on the app**. That is Steve's developer-portal change.
-Until it lands and `scripts/record_schwab_shapes.py` is re-run, those parts
-of the client are written to the API specification and say so in their
-docstrings; the tests mark their fixtures `SPEC`.
+**Recorded, and not.** The market-data shapes were recorded live on
+2026-09-04 and the Trader API read shapes — account numbers, the account
+body, orders, order-by-id — on 2026-09-05 once app 2 had its grant
+(`tests/fixtures/schwab/`). Preview, place and cancel are POST/DELETE, which
+the recorder never sends by Steve's 2026-08-30 ruling; those shapes are
+spec-derived until stage 4 sends the first one.
+
+## Stage 3 — the installed service and the page
+
+```bash
+bash deploy/install.sh --execd            # Steve, as root; asks for the vault passphrase once
+bash deploy/install.sh --execd --dry-run  # anyone: prints every step, touches nothing
+```
+
+The install creates the system user `execd`, copies this package (only this
+package) to `/opt/execd/execd` with an `INSTALLED` stamp naming the commit,
+builds `/opt/execd/venv` from `deploy/execd-requirements.txt`, seeds
+`/etc/execd/bounds.yaml` once, writes `/var/lib/execd/market.json` from the
+repo's market token, writes `/var/lib/execd/vault.json` from the trading
+token under the passphrase Steve types, installs and starts
+`strader-execd.service` (user `execd`, `ProtectSystem=strict`), and publishes
+the page with `tailscale serve --bg --set-path /exec http://127.0.0.1:8779/exec`.
+Re-running it refreshes the code and restarts the unit and never overwrites a
+bounds file, a vault or a market credential that exists.
+
+**The page** — `https://mydesk-1.tail89f676.ts.net/exec/`, a second Flask app
+in the same process on `127.0.0.1:8779`, tailnet only, funnel never — holds
+what the API deliberately lacks. One rule: every action that *adds*
+capability takes the passphrase (UNLOCK, clear STOP, store a re-authorised
+grant); every action that *reduces* it does not (STOP, FLATTEN with a
+single-use confirm, stand down, lock). The weekly re-authorisation of both
+Schwab apps runs there: the page shows the login link, Steve pastes the
+landing address, the service exchanges the code, proves the grant against the
+app's own family (`verify_grant`) and only then stores it — the trading grant
+back into the vault, the market grant to its file, and into memory if the
+service is armed. Nothing on the page, in the journal or in a log line ever
+carries a passphrase or a token.
+
+**The readers.** `broker_schwab.client.create_client()` returns an
+`ExecdClient` when the service answers on 8778 — the same four `schwab-py`
+read calls, over `GET /marketdata/{quotes,chains,pricehistory}` — and the
+old token-file client when it does not. No consumer changed. The token-age
+heartbeat reads the service's walls first. Once a morning run has been seen
+going through the service, the token files under `tokens/` retire and
+`reauthData` / `reauthTrade` already answer with the page's address.
+
+**Presented, not landed:** `docs/patches/2026-09-13-gate-execd-runtime.diff`
+(and its COO twin) deny agent shells the six ways round the process boundary
+the design names — writes under `/opt/execd`, the install, Windows shells,
+memory readers, the page port, stopping the unit. Hooks are Steve's to land.
 
 ---
 
@@ -55,7 +99,7 @@ It binds `127.0.0.1:8778` and refuses to bind anything else.
 
 ## The narrow door
 
-Fourteen routes on the loopback, JSON in and out. `200` the service acted,
+Fifteen routes on the loopback, JSON in and out. `200` the service acted,
 `400` the request was not a valid intent, `409` a bound refused it —
 `{"refused": {"bound": "...", "reason": "..."}}` — `502` the broker could not
 be reached.
@@ -71,11 +115,13 @@ be reached.
 | `POST /stand-down` · `POST /stop` | done for the day; the kill switch on |
 | `POST /observe` · `POST /poll-fills` | feed it the SPX mark; pick up a stop that fired |
 
+| `GET /marketdata/<kind>` | the raw Schwab body for `quotes`, `chains` or `pricehistory`, query allow-listed to that resource's own parameters — the readers' door (stage 3) |
+
 **What is deliberately absent: `/unlock`, `/resume`, and any re-auth route.**
 An agent that can reach this API can ask the service to trade inside Steve's
 bounds. It cannot arm it, cannot clear his STOP, and never sees the credential.
 That claim is asserted against the app's own URL map, so adding a route back
-breaks the suite.
+breaks the suite. Those three live on the page (stage 3), behind the passphrase.
 
 ## What it refuses, whatever the caller asks
 
@@ -230,8 +276,8 @@ scrubs account identifiers at capture, writes `tests/fixtures/schwab/` with a
 
 | stage | bead | what lands |
 |---|---|---|
-| 2 | st-w2nw | **built** — the transport, the vault, the OAuth helpers for the page. Open on it: the Trader API shapes are spec-derived until the Accounts and Trading product is on the app and the recorder is re-run. |
-| 3 | st-p8k8 | dedicated user, systemd unit, `deploy/install.sh`, the tailnet page that takes the passphrase and runs the weekly re-auth, the plaintext token retired |
+| 2 | st-w2nw | **built**; trader read shapes recorded 09-05. Open only for the live read-only proof, which is stage 3's first unlock. |
+| 3 | st-p8k8 | **built 2026-09-13** — user, unit, `deploy/install.sh --execd`, the page, the readers re-pointed, the hook change presented. Pending Steve: the passphrase, the install, the hook, the first unlock; then the token files retire. |
 | 4 | st-k6gl | a full rehearsal with sending disabled, then one 1-lot live single with Steve at the STOP button |
 | 5 | st-47i2 | FD0 tickets and promoted rules become intents; the paste line retires |
 

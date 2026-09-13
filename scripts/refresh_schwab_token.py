@@ -318,7 +318,26 @@ def _verify_client(client) -> None:
     return None
 
 
+#: Written by ``deploy/install.sh --execd`` beside the installed service. Once
+#: it exists, the service is the one credential holder on this box and the
+#: weekly re-authorisation happens on its page — a grant minted here would go
+#: into a file nothing reads any more, and a second grant for the same app is
+#: a second seven-day wall to keep track of. [st-p8k8]
+EXECD_INSTALLED = Path("/opt/execd/INSTALLED")
+EXECD_PAGE = "https://mydesk-1.tail89f676.ts.net/exec/"
+
+
+def _retired_by_the_service() -> bool:
+    return EXECD_INSTALLED.exists() and os.environ.get("SCHWAB_REAUTH_FORCE_FILE") != "1"
+
+
 def main(argv: list[str] | None = None) -> int:
+    if _retired_by_the_service():
+        print(f"Since the execution service was installed, re-authorisation happens on its "
+              f"page: {EXECD_PAGE} (open 're-authorise an app', both apps, one sitting). "
+              f"This script now writes a token file nothing reads. To mint one anyway, set "
+              f"SCHWAB_REAUTH_FORCE_FILE=1.", file=sys.stderr)
+        return 3
     args = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     args.add_argument("--trading", action="store_true",
                       help="mint the TRADING app's grant (app 2, Accounts and "

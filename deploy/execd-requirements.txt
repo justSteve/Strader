@@ -1,0 +1,23 @@
+# The installed execution service's venv (/opt/execd/venv). [st-p8k8]
+#
+# Pinned to the versions measured in the repo venv on 2026-09-13, so the copy
+# at /opt/execd runs the same libraries the suite passed on. Four direct
+# dependencies; the rest are theirs. Nothing here reaches the repo's hobbled
+# schwab-py — execd never imports it (tests/execd/test_wall.py).
+Flask==3.1.3
+httpx==0.28.1
+cryptography==48.0.0
+PyYAML==6.0.3
+Werkzeug==3.1.8
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+itsdangerous==2.2.0
+click==8.3.3
+blinker==1.9.0
+httpcore==1.0.9
+h11==0.16.0
+anyio==4.13.0
+idna==3.13
+certifi==2026.4.22
+cffi==2.0.0
+pycparser==3.0
