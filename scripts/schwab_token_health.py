@@ -276,10 +276,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         out = health.to_dict()
+        out["source"] = source_note
         if trading_health is not None:
             out["apps"] = {"market": market_health.to_dict(),
                            "trading": trading_health.to_dict()}
-        out["source"] = source_note
         else:
             out["trading_note"] = trading_note
         print(json.dumps(out, indent=2))
