@@ -33,9 +33,11 @@ def test_replay_goldens(frozen_state):
     assert len(s["levels"]) == 47
     assert s["last_price"] == 7763.25
     r = s["rollups"]
-    assert r["broken"] == []
-    assert r["reclaimed"] == [7774.0, 7763.0, 7755.0, 7783.0, 7790.0,
-                              7803.0, 7815.0]
+    # 7774 broke 20:15, reclaimed 20:55, then closed through again at 15:25
+    # with price finishing 7763.25 — eleven points under it. Reclaimed is not
+    # terminal [st-7xzw]; the level is broken at the close.
+    assert r["broken"] == [7774.0]
+    assert r["reclaimed"] == [7763.0, 7755.0, 7783.0, 7790.0, 7803.0, 7815.0]
     assert r["tested_held"] == []
     assert len(r["untested_above"]) == 8
     assert len(r["untested_below"]) == 32
@@ -48,13 +50,14 @@ def test_replay_goldens(frozen_state):
 def test_replay_evidence_chain(frozen_state):
     """Every claim carries tape: the 7774 support's full arc, pinned."""
     lv = {l["price"]: l for l in frozen_state["levels"]}[7774.0]
-    assert lv["state"] == "reclaimed"
+    assert lv["state"] == "broken" and lv["rebreaks"] == 1
     assert lv["first_touch"] == "2026-08-04T20:00:00+00:00"
     assert lv["n_touches"] == 31
     assert lv["n_defenses"] == 9
     events = [(e["event"], e["ts"]) for e in lv["events"]]
     assert ("break", "2026-08-04T20:15:00+00:00") in events
     assert ("reclaim", "2026-08-04T20:55:00+00:00") in events
+    assert ("break", "2026-08-05T15:25:00+00:00") in events   # lost again
     # Chronological, and every event carries its candle row.
     tss = [e["ts"] for e in lv["events"]]
     assert tss == sorted(tss)
@@ -99,7 +102,7 @@ def test_tick_writes_current_and_day_files(tmp_path):
     cur = json.loads((state_root / "current.json").read_text())
     day = json.loads((state_root / "2026-08-05.json").read_text())
     assert cur["levels"] == day["levels"]
-    assert "7 reclaimed" in note
+    assert "6 reclaimed" in note and "1 broken" in note
 
 
 def test_tick_without_parse_waits(tmp_path):

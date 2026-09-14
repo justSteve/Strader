@@ -153,7 +153,8 @@ def refresh(day: str | None = None, *, open_browser: bool = False,
     section = overnight.render_section(report, title)
     doc = run_mod._emit_desk_plan(
         result, overnight_section=section,
-        header_note=f"Interaction section refreshed {stamp}.")
+        header_note=f"Interaction section refreshed {stamp}.",
+        report=report)
     if doc is None:
         summary = "overnight refresh: desk publish unavailable — nothing written"
         if not quiet:

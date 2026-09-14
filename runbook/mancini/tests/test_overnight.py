@@ -115,3 +115,18 @@ def test_build_section_degrades_without_raising():
 
     text = build_overnight_section(r, fetch=dead_fetch)
     assert "Overnight data unavailable (token expired)" in text
+
+
+def test_reclaimed_level_lost_again_is_broken_again():
+    """[st-7xzw] 7620 on 2026-09-14: trapped and reclaimed Sunday evening,
+    then closed through again pre-open. Reclaimed is not terminal."""
+    candles = [
+        bar(0, 7440, 7441, 7425, 7430),  # break
+        bar(1, 7428, 7438, 7427, 7436),  # reclaim
+        bar(2, 7436, 7437, 7420, 7428),  # lost again
+    ]
+    [it] = compute_interactions([sup(7434)], candles)
+    assert it.state == "broken" and it.rebreaks == 1
+    assert it.reclaim_time is None and it.extreme == 7420
+    arc = [e["event"] for e in it.events if e["event"] in ("break", "reclaim")]
+    assert arc == ["break", "reclaim", "break"]

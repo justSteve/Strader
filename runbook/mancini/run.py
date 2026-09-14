@@ -32,6 +32,8 @@ import sys
 from datetime import date as date_cls, datetime, timezone
 from pathlib import Path
 
+import os
+
 from strader.procs import run_bounded
 
 from . import clean
@@ -289,7 +291,8 @@ def _ct(iso_ts: str) -> str:
 
 def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = None,
                       overnight_section: str | None = None,
-                      header_note: str | None = None) -> str:
+                      header_note: str | None = None,
+                      report=None) -> str:
     """The prose plan-day doc for the steves-desk Trading window. [st-eo0]
 
     Same content contract as the hand-written myDesk/reports/mancini docs:
@@ -320,6 +323,16 @@ def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = No
         "prices verbatim from the letter."
         + (f" {header_note}" if header_note else ""),
         "",
+    ]
+    # The letter measured against the tape goes ABOVE the bias [st-7xzw]:
+    # Steve, 2026-09-14 — the plan read "bulls keep full control while ~7620
+    # holds" after 7620 had fallen overnight. The letter is the starting
+    # point; what price has done to it since is the first thing on the page.
+    if report is not None:
+        from . import reality
+
+        lines += [reality.render_reality_block(result, report), ""]
+    lines += [
         "## Bias",
         "",
         result.session_bias or "(none)",
@@ -327,10 +340,15 @@ def _render_desk_plan(result: ParseResult, extra_sections: list[str] | None = No
         "## Actionable — forward-looking notes",
         "",
     ]
-    for c in result.commentary:
-        anchors = ", ".join(str(p) for p in c.trigger.anchor_prices)
-        suffix = f"  _[{c.trigger.type}: {anchors}]_" if anchors else f"  _[{c.trigger.type}]_"
-        lines.append(f"- {c.text}{suffix}")
+    if report is not None:
+        from . import reality
+
+        lines += reality.annotate_notes(result, report)
+    else:
+        for c in result.commentary:
+            anchors = ", ".join(str(p) for p in c.trigger.anchor_prices)
+            suffix = f"  _[{c.trigger.type}: {anchors}]_" if anchors else f"  _[{c.trigger.type}]_"
+            lines.append(f"- {c.text}{suffix}")
     if not result.commentary:
         lines.append("_(commentary pending — interpretive leg unavailable; "
                      "ladders below are the deterministic list levels)_")
@@ -400,8 +418,15 @@ def _render_desk_html(doc: Path) -> Path | None:
         logger.warning("desk html skipped: renderer absent (%s)", DESK_HTML_SCRIPT)
         return None
     try:
+        # DESK_NO_TRANSLATE: desk-html.sh's translator pass calls a model and
+        # on 2026-09-14 took 90 s+ per render (its own log: "model timed out
+        # after 150s"), so every refresh that morning hit our 60 s bound and
+        # the browser page stayed on the 08:10 version while the doc moved
+        # on. The plan page is levels and Mancini's words; nothing in it
+        # needs translating. [st-7xzw]
         proc = run_bounded([str(DESK_HTML_SCRIPT), str(doc), str(DESK_HTML)],
-                           capture_output=True, text=True, timeout=DESK_RENDER_TIMEOUT_S)
+                           capture_output=True, text=True, timeout=DESK_RENDER_TIMEOUT_S,
+                           env={**os.environ, "DESK_NO_TRANSLATE": "1"})
     except subprocess.TimeoutExpired:
         logger.warning("desk html skipped: renderer timed out after %d s and was killed "
                        "with its process group", DESK_RENDER_TIMEOUT_S)
@@ -426,7 +451,8 @@ def _render_desk_html(doc: Path) -> Path | None:
 
 def _emit_desk_plan(result: ParseResult, extra_sections: list[str] | None = None,
                     overnight_section: str | None = None,
-                    header_note: str | None = None) -> Path | None:
+                    header_note: str | None = None,
+                    report=None) -> Path | None:
     """Write the plan-day doc and refresh the Trading window's stable title.
 
     Non-fatal by contract (mirrors the chart emit): the parse artifacts are the
@@ -442,7 +468,7 @@ def _emit_desk_plan(result: ParseResult, extra_sections: list[str] | None = None
     DESK_REPORTS.mkdir(parents=True, exist_ok=True)
     doc = DESK_REPORTS / f"mancini-es-{result.date}.md"
     doc.write_text(_render_desk_plan(result, extra_sections, overnight_section,
-                                     header_note),
+                                     header_note, report=report),
                    encoding="utf-8")
     logger.info("desk plan doc: %s", doc)
     if DESK_REFRESH.exists():
@@ -818,9 +844,11 @@ def main(argv: list[str] | None = None) -> int:
             # build_overnight_section degrades to a one-line note internally.
             from . import overnight
 
+            report = overnight.build_overnight_report(result)
             desk_path = _emit_desk_plan(
                 result,
-                overnight_section=overnight.build_overnight_section(result))
+                overnight_section=overnight.render_section(report),
+                report=report)
         except Exception as e:  # noqa: BLE001
             logger.warning("desk publish failed (non-fatal): %s", e)
 

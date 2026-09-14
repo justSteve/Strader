@@ -67,7 +67,8 @@ def _load_parse(day: str, parsed_root: Path) -> ParseResult | None:
 
 
 def build_state(result: ParseResult, candles: list[dict],
-                tolerance: float = overnight.DEFAULT_TOLERANCE_PTS) -> dict:
+                tolerance: float = overnight.DEFAULT_TOLERANCE_PTS,
+                contract: str = "/ES") -> dict:
     """One pass of the machine over ``candles`` → the serializable state doc."""
     interactions = overnight.compute_interactions(result.levels, candles,
                                                   tolerance)
@@ -93,6 +94,7 @@ def build_state(result: ParseResult, candles: list[dict],
             "first_touch": it.first_touch,
             "n_touches": it.touches,
             "n_defenses": it.defenses,
+            "rebreaks": it.rebreaks,
             "last_event_ts": it.last_event_ts,
             "distance_from_price": (round(last_price - it.price, 2)
                                     if last_price is not None else None),
@@ -109,7 +111,8 @@ def build_state(result: ParseResult, candles: list[dict],
     return {
         "day": result.date,
         "generated_at": datetime.now(tz=timezone.utc).isoformat(timespec="seconds"),
-        "source": "schwab:/ES:5m:eth",
+        "source": f"schwab:{contract}:5m:eth",
+        "contract": contract,
         "tolerance_pts": tolerance,
         "window": {
             "start": overnight._iso_utc(candles[0]["datetime"]) if candles else None,
@@ -151,10 +154,13 @@ def tick(day: str, parsed_root: Path = PARSED_ROOT,
     result = _load_parse(day, parsed_root)
     if result is None:
         return False, f"no parse yet for {day} ({parsed_root}/{day}.json)"
+    contract = "/ES"
     if candles is None:
         start = overnight.letter_window_start(day)
-        candles = (fetch or overnight.fetch_overnight_candles)(start)
-    state = build_state(result, candles)
+        # The letter's contract, not Schwab's continuous front month [st-7xzw].
+        res = overnight.resolve_letter_contract(result, start, fetch=fetch)
+        candles, contract = res.candles, res.symbol
+    state = build_state(result, candles, contract=contract)
     path = write_state(state, state_root)
     r = state["rollups"]
     return True, (f"{len(state['levels'])} levels @ {state['last_price']:g}: "
