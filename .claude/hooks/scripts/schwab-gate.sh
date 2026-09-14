@@ -180,4 +180,51 @@ if echo "$COMMAND" | grep -qE "$MINT_AT_CMD_POS" || echo "$COMMAND" | grep -qE "
   exit 2
 fi
 
+# Gate 7: the execution service's runtime. [st-p8k8, stage 3; design §5]
+#
+# Stage 3 installs execd as its own user from a copy at /opt/execd that only
+# `bash deploy/install.sh --execd` (Steve) writes, with the trading credential
+# in memory between his passphrase and the close. Every agent shell on this box
+# is root, so the process boundary is a boundary only if the ways round it are
+# denied here: changing the installed copy, running the install, calling out to
+# Windows, reading another process's memory, reaching the page port that holds
+# unlock and resume, and stopping the service under a live position.
+#
+# Same discipline as gates 3, 4 and 6: an INVOCATION is blocked, a MENTION is
+# not. `grep -rn /opt/execd docs/`, `ls -la /opt/execd`, `journalctl -u
+# strader-execd`, `systemctl status strader-execd` and a commit message naming
+# any of these all pass. `bash deploy/install.sh --execd --dry-run` passes: it
+# prints the plan and touches nothing.
+EXECD_INSTALLED_TREE='/opt/execd/'
+if echo "$COMMAND" | grep -qE "(>|>>|cp |mv |rm |chmod |chown |tee |install |dd |rsync ).*$EXECD_INSTALLED_TREE"; then
+  echo "SCHWAB GATE: /opt/execd is the installed execution service. Only deploy/install.sh --execd writes it, and Steve runs that." >&2
+  exit 2
+fi
+INSTALL_EXECD='(^|[;|&(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?(bash[[:space:]]+|sh[[:space:]]+|\./)?([^[:space:]"'\'']*/)?deploy/install\.sh[^;|&]*--execd'
+if echo "$COMMAND" | grep -qE "$INSTALL_EXECD" && ! echo "$COMMAND" | grep -qE -- '--dry-run'; then
+  echo "SCHWAB GATE: deploy/install.sh --execd installs the execution service. Steve runs it (--dry-run is fine)." >&2
+  exit 2
+fi
+WINDOWS_SHELL='(^|[;|&(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?([^[:space:]"'\'']*/)?(wsl\.exe|powershell(\.exe)?|pwsh(\.exe)?|cmd\.exe)([[:space:]]|$)'
+if echo "$COMMAND" | grep -qiE "$WINDOWS_SHELL"; then
+  echo "SCHWAB GATE: Windows shells (wsl.exe, powershell, cmd.exe) are not run from an agent shell on this box [st-p8k8 §5]." >&2
+  exit 2
+fi
+MEMORY_READER='(^|[;|&(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?([^[:space:]"'\'']*/)?(gdb|gcore|strace|ltrace)([[:space:]]|$)'
+if echo "$COMMAND" | grep -qE "$MEMORY_READER" || echo "$COMMAND" | grep -qE '/proc/([0-9]+|self)/mem([[:space:]]|$|/)'; then
+  echo "SCHWAB GATE: reading a process's memory (gdb, strace, /proc/<pid>/mem) is denied — the credential lives in execd's memory [st-p8k8 §5]." >&2
+  exit 2
+fi
+PAGE_PORT='(127\.0\.0\.1|localhost|0\.0\.0\.0|\[::1\]):8779'
+if echo "$COMMAND" | grep -qE "(curl|wget|nc|ncat|socat|python3?|httpie|http)[^;|&]*$PAGE_PORT"; then
+  echo "SCHWAB GATE: 127.0.0.1:8779 is Steve's page (unlock, resume, re-auth). Agents use the API on 8778." >&2
+  exit 2
+fi
+STOP_SERVICE='(^|[;|&(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?systemctl[[:space:]]+(stop|restart|kill|disable|mask)[[:space:]]+[^;|&]*strader-execd'
+KILL_SERVICE='(^|[;|&(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?(pkill|killall)[[:space:]]+[^;|&]*execd'
+if echo "$COMMAND" | grep -qE "$STOP_SERVICE" || echo "$COMMAND" | grep -qE "$KILL_SERVICE"; then
+  echo "SCHWAB GATE: stopping strader-execd is Steve's — a service that is down cannot send an exit. (status and journalctl are fine.)" >&2
+  exit 2
+fi
+
 exit 0

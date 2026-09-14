@@ -74,6 +74,27 @@ BLOCKED = [
     ("execd vault copy", "cp /tmp/x /etc/execd/vault.json"),
     ("market credential minter", ".venv/bin/python3 scripts/execd_market_credential.py"),
     ("vault minter", "python3 scripts/execd_vault_init.py --init"),
+    # Gate 7 (st-p8k8, stage 3): the installed service's runtime. The copy at
+    # /opt/execd, the install itself, Windows shells, memory readers, the page
+    # port that holds unlock/resume, and stopping the unit.
+    ("installed copy overwrite", "cp execd/service.py /opt/execd/execd/service.py"),
+    ("installed copy rsync", "rsync -a execd/ /opt/execd/execd/"),
+    ("installed copy redirect", "echo x > /opt/execd/INSTALLED"),
+    ("the install", "bash deploy/install.sh --execd"),
+    ("the install, sudo, path", "sudo bash /root/projects/Strader/deploy/install.sh --execd"),
+    ("wsl.exe", "wsl.exe --shutdown"),
+    ("powershell", "powershell.exe -Command Get-Process"),
+    ("powershell, no suffix, mid-chain", "cd /tmp && powershell -c 'ls'"),
+    ("cmd.exe", "cmd.exe /c dir"),
+    ("gdb attach", "gdb -p 4242"),
+    ("strace", "strace -p 4242"),
+    ("proc mem", "dd if=/proc/4242/mem bs=1 count=100"),
+    ("page port curl", "curl -s http://127.0.0.1:8779/exec/"),
+    ("page port curl post", "curl -X POST -d passphrase=x http://localhost:8779/exec/unlock"),
+    ("page port python", "python3 -c 'import urllib.request as u; u.urlopen(\"http://127.0.0.1:8779/exec/\")'"),
+    ("stop the unit", "systemctl stop strader-execd.service"),
+    ("restart the unit", "sudo systemctl restart strader-execd"),
+    ("pkill the service", "pkill -f 'python -m execd'"),
 ]
 
 ALLOWED = [
@@ -101,6 +122,20 @@ ALLOWED = [
     ("grep for the vault minter", "grep -rn execd_vault_init docs/"),
     ("git log of the market minter", "git log --oneline -- scripts/execd_market_credential.py"),
     ("cat of a doc naming the vault", "cat docs/a2a/inbox.md"),
+    # Mention-only and read-only controls for gate 7: the runtime is looked at
+    # freely, and the install's dry run prints a plan and touches nothing.
+    ("ls of the installed copy", "ls -la /opt/execd/execd"),
+    ("grep for the installed path", "grep -rn /opt/execd docs/ execd/"),
+    ("install dry run", "bash deploy/install.sh --execd --dry-run"),
+    ("install diff", "bash deploy/install.sh --diff"),
+    ("unit status", "systemctl status strader-execd.service"),
+    ("unit journal", "journalctl -u strader-execd -n 50"),
+    ("the API port", "curl -s http://127.0.0.1:8778/status"),
+    ("commit message naming the page port", 'git commit -m "page on 127.0.0.1:8779 behind tailscale serve"'),
+    ("commit message naming powershell", 'git commit -m "record-boot-event: powershell.exe fallback"'),
+    ("a script that calls powershell inside", "bash factory/scripts/record-boot-event.sh --list"),
+    ("commit message naming strace", 'git commit -m "gate 7 denies gdb and strace"'),
+    ("proc status, not mem", "cat /proc/4242/status"),
 ]
 
 
