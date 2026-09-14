@@ -233,6 +233,23 @@ def test_send_refuses_a_stale_go(tmp_path):
     assert "minutes ago and the tape has moved" in out and fake.placed == []
 
 
+def test_cancel_between_go_and_send_withdraws_the_ticket(tmp_path):
+    """Steve, 2026-09-14, between go and send: "cancel". The staged record
+    must not stay sendable — and a fresh process must see the withdrawal."""
+    fake = FakeExecd(_accepted(), place_answer=_filled())
+    s = _priced_single(tmp_path, fake)
+    s.go()
+    out = s.handle("cancel")
+    assert out.startswith("Standing down.") and "Withdrew the staged ticket desk-" in out
+    assert "withdrawn" in s.send() and fake.placed == []
+    again = Session(plan_dir=tmp_path, day=DAY, execd=fake)
+    assert "withdrawn" in again.send() and fake.placed == []
+    rec = json.loads(next((tmp_path / "staged").glob("*-single.json")).read_text())
+    assert rec["withdrawn_at"]
+    # standing down again has nothing more to withdraw, and says only that
+    assert s.stand_down() == "Standing down. Nothing priced, nothing pending."
+
+
 def test_send_with_no_service_wired(tmp_path):
     s = Session(plan_dir=tmp_path, day=DAY)
     assert "No execution service is wired" in s.send()

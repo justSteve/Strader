@@ -41,7 +41,7 @@ DEFAULT_PLAN_DIR = Path(__file__).resolve().parents[2] / "data" / "intent"
 # a staged intent older than this is refused by "yes" — say it again; the tape has moved
 PENDING_MAX_MINUTES = 10
 VERBS = ("read", "mark", "call", "arm", "yes", "no", "fly", "single", "price", "go",
-         "send", "stand down", "show", "frame", "basis", "replay")
+         "send", "stand down", "cancel", "show", "frame", "basis", "replay")
 
 
 class Session:
@@ -119,7 +119,7 @@ class Session:
         if not text:
             return self.show()
         low = text.lower()
-        if low.startswith("stand down"):
+        if low.startswith("stand down") or low.rstrip(".!") == "cancel":
             return self.stand_down()
         verb, _, rest = text.partition(" ")
         verb = verb.lower().rstrip(":,")
@@ -476,6 +476,8 @@ class Session:
         path, rec = self._last_staged()
         if rec is None:
             return "Nothing staged. Say price, then go, then send."
+        if rec.get("withdrawn_at"):
+            return "That ticket was withdrawn (stand down). Say price, then go, then send."
         ex = rec.get("execd") or {}
         if not ex.get("routed") or "intent" not in ex:
             return "The last go did not reach execd. Say go again, then send."
@@ -510,9 +512,31 @@ class Session:
         return text
 
     def stand_down(self) -> str:
+        """``stand down`` or ``cancel``: nothing priced, nothing pending, and
+        the staged ticket withdrawn so ``send`` cannot act on it (Steve said
+        "cancel" between go and send, 2026-09-14; before this the record
+        stayed sendable for ten minutes)."""
         self.plan.orders = []
         self.plan.bracket = None
         self._clear_pending()
-        self._log("stand down")
+        withdrawn = self._withdraw_staged()
+        self._log("stand down" + (f" — withdrew {withdrawn}" if withdrawn else ""))
         self._save()
-        return "Standing down. Nothing priced, nothing pending."
+        tail = f" Withdrew the staged ticket {withdrawn}; send will refuse it." if withdrawn else ""
+        return "Standing down. Nothing priced, nothing pending." + tail
+
+    def _withdraw_staged(self) -> str | None:
+        """Mark the newest staged record of the day withdrawn. Returns its
+        intent id, or None when there is nothing live to withdraw."""
+        path, rec = self._last_staged()
+        if rec is None or rec.get("withdrawn_at"):
+            return None
+        if (rec.get("execd") or {}).get("place"):
+            return None                                  # already sent; nothing to withdraw
+        rec["withdrawn_at"] = dt.datetime.now(CT).isoformat(timespec="seconds")
+        try:
+            path.write_text(json.dumps(rec, indent=2), encoding="utf-8")
+        except OSError as e:
+            log.error("intent: could not withdraw %s: %s", path, e)
+            return None
+        return ((rec.get("execd") or {}).get("intent") or {}).get("intent_id") or path.stem

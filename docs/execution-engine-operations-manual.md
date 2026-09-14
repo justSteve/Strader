@@ -134,7 +134,7 @@ line before the split, because it is two words.
 | `price` | — | order line + paste line + FD0 block | resolves the **last** structure against the loaded chain; sets `plan.orders` and `plan.bracket` |
 | `go` | — | the staged paste line and legs, then execd's answer (§3.11) | writes `data/intent/staged/<stamp>-<shape>.json`; a single goes to execd as an intent for a **preview**, journaled under `desk-<stamp>`; **sends nothing** |
 | `send` | — | `SENT AND FILLED: order …`, `SENT: order … WORKING …`, or the refusal | **the one verb that transmits**: the intent `go` previewed, same id, to `POST /place`; refused at the desk unless the last `go` was accepted by execd within ten minutes; a repeat is answered from the service's journal, never re-sent (§3.11) |
-| `stand down` | — | `Standing down. Nothing priced, nothing pending.` | clears orders, bracket and pending |
+| `stand down` / `cancel` | — | `Standing down. Nothing priced, nothing pending.` (+ `Withdrew the staged ticket desk-…; send will refuse it.`) | clears orders, bracket and pending; marks the newest staged record `withdrawn_at`, so `send` refuses it |
 | `show` | — | full read-back | none beyond rendering |
 | `frame` | `es` \| `spx` | `Bare prices are ES from here on.` | sets `plan.frame_default`; anything else answers `Frame is ES or SPX.` |
 | `basis` | a number | `Basis 92: an ES price less 92 is the SPX price.` | sets `plan.basis` (ES minus SPX, in points) |
