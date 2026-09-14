@@ -472,6 +472,7 @@ _STYLE = """
  .state{font-size:1.6em;font-weight:700}
  .LOCKED{color:#9ca3af}.ARMED{color:#34d399}.STOOD_DOWN{color:#fbbf24}
  .pos-up{border-left:6px solid #34d399}.pos-down{border-left:6px solid #f87171}
+ td.neg{color:#f87171;font-weight:700}td.pos{color:#34d399;font-weight:700}
  .paper{background:#fbbf24;color:#111;font-weight:700;padding:.5em .7em;border-radius:6px;margin-bottom:.6em}
  .live{background:#dc2626;color:#fff;font-weight:700;padding:.5em .7em;border-radius:6px;margin-bottom:.6em}
  .stop-on{color:#f87171;font-weight:700}
@@ -590,12 +591,15 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
         ("realized today", f"{_money(pnl.get('realized_usd'))} over {pnl.get('closes', 0)} close(s)"),
         ("unrealized, net if closed now", _money(pnl.get("unrealized_net_usd"))),
         ("day, realized + unrealized", _money(pnl.get("day_usd"))),
-        ("realized loss against the ceiling", f"${day['realized_loss_usd']:.2f}"),
+        # Signed and red when there is one: "$40.00" read as a gain (Steve,
+        # 2026-09-14); a loss against the ceiling is "-$40.00" in red.
+        ("realized loss against the ceiling",
+         _money(-day["realized_loss_usd"]) if day["realized_loss_usd"] else "$0.00"),
         ("headroom to the ceiling", f"${day['loss_headroom_usd']:.2f}"),
         ("attempts", f"{day['attempts_used']} used, {day['attempts_left']} left"),
     ]
     parts.append("<h2>Today</h2><div class=card><table>" + "".join(
-        f"<tr><td>{esc(k)}</td><td>{esc(str(v))}</td></tr>" for k, v in rows)
+        f"<tr><td>{esc(k)}</td><td{_money_class(v)}>{esc(str(v))}</td></tr>" for k, v in rows)
         + "</table></div>")
     if st["working"]:
         lines = ["working " + json.dumps(w, separators=(",", ":")) for w in st["working"]]
@@ -634,6 +638,17 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     parts.append(f"<div class=k>{esc(PAGE_URL)} · tailnet only</div>")
     live_money = bool(st["positions"] or st["working"])
     return _page("execd", "".join(parts), refresh_s=5 if live_money else None)
+
+
+def _money_class(v: Any) -> str:
+    """`` class=neg`` / `` class=pos`` for a rendered money string, so a loss
+    is red and a gain green wherever one is shown; nothing for the rest."""
+    s = str(v)
+    if s.startswith("-$"):
+        return " class=neg"
+    if s.startswith("+$"):
+        return " class=pos"
+    return ""
 
 
 def _money(v: Any) -> str:

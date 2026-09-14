@@ -107,3 +107,32 @@ def test_the_page_shows_the_position_and_refreshes_only_while_it_is_open(armed: 
     assert "at the stop" in body and "stop 1.20" in body
     assert "unrealized, net if closed now" in body
     assert "pos-down" in body
+
+
+def test_a_realized_loss_renders_signed_and_red(armed: ExecService, broker, tmp_path):
+    """Steve, 2026-09-14: "$40.00" on the loss row read as a gain."""
+    import json
+    import httpx
+    from execd.page import CredentialFile, create_page
+    from execd.vault import Vault
+    from .test_page import CALLBACK, PASS, Schwab, market_payload, vault_payload
+
+    vault = Vault(tmp_path / "vault.json")
+    vault.store(vault_payload(), PASS)
+    mfile = tmp_path / "market.json"
+    mfile.write_text(json.dumps(market_payload()))
+    market = CredentialFile(mfile)
+    market.load()
+    app = create_page(armed, vault=vault, market=market, callback_url=CALLBACK,
+                      http_client=httpx.Client(base_url="https://api.schwabapi.com",
+                                               transport=httpx.MockTransport(Schwab())))
+    app.config["TESTING"] = True
+    client = app.test_client()
+    assert "<td>$0.00</td>" in client.get("/exec/").get_data(as_text=True)
+
+    armed.place(entry("v-6"))
+    broker.set_quote(CALL, bid=1.70, ask=1.80)
+    armed.flatten(reason="page")                                  # -$40 realized
+    body = client.get("/exec/").get_data(as_text=True)
+    assert "<td class=neg>-$40.00</td>" in body
+    assert "<td class=neg>-$40.00</td>" in body and "$40.00</td>" not in body.replace("-$40.00", "")
