@@ -225,6 +225,12 @@ def check_instrument(intent: OrderIntent, bounds: Bounds) -> Refusal | None:
     return None
 
 
+#: Roots the session window does not gate on entry (Steve, 2026-09-14). The
+#: arming expiry still ends at the close on a normal unlock; an unlock after
+#: the close arms until the end of the day, for testing.
+WINDOW_EXEMPT_ROOTS = frozenset({"SPX", "SPXW"})
+
+
 def check_window(now: datetime, bounds: Bounds, *, opening: bool) -> Refusal | None:
     """The session gate. ``opening`` applies the earlier no-new-entries cutoff."""
     local = now.astimezone(CT)
@@ -339,8 +345,14 @@ def check_entry(
             "is derived from them and is not optional",
         )
 
-    if (r := check_window(now, bounds, opening=True)) is not None:
-        return r
+    # Steve, 2026-09-14: "we need to revoke the trading-hours rule when SPX
+    # is the target instrument. It can not fill after hours and placing live
+    # trades can help during testing." SPX and SPXW are the only roots the
+    # service trades, so the window gates nothing today; it stays here for
+    # any root added later, and check_window itself is unchanged.
+    if intent.occ.root not in WINDOW_EXEMPT_ROOTS:
+        if (r := check_window(now, bounds, opening=True)) is not None:
+            return r
 
     if state.open_positions >= bounds.max_open_positions:
         return Refusal(

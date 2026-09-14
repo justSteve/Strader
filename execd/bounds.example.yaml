@@ -41,7 +41,10 @@ daily_loss_ceiling_usd: 500.0
 # matches his live file so a fresh install does not quietly revert it.
 max_attempts: 10
 
-# The session, in Central time. Nothing opens after no_open_after_ct; exits are
+# The session, in Central time. NOT APPLIED TO SPX/SPXW ENTRIES since
+# 2026-09-14 (Steve: "revoke the trading-hours rule when SPX is the target
+# instrument"); kept for any other root, and an unlock after close_ct arms
+# until the end of the day. Nothing opens after no_open_after_ct; exits are
 # not gated by any of these.
 open_ct: "08:30"
 close_ct: "15:00"

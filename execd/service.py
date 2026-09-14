@@ -217,31 +217,33 @@ class ExecService:
 
     # ── arming (page-only; none of these has an API route) ───────────────
     def unlock(self, credential: Any, until: datetime | None = None) -> dict[str, Any]:
-        """Arm the service — for today, and never past today's close.
+        """Arm the service — for today, and never past today.
 
         ``session_close`` rolls to the *next* day's close when now is already
         past it, which is right for "when does this session end" and wrong as
         an arming expiry: unlocking at 15:30 CT used to arm the service until
-        15:00 tomorrow (finding 16 of the 2026-08-30 audit). After the close
-        there is nothing today to arm for, so the unlock is refused; an
-        explicit ``until`` is capped at today's close for the same reason.
-        Exits and flatten need no arming window — only entries do."""
+        15:00 tomorrow (finding 16 of the 2026-08-30 audit). Until 2026-09-14
+        an unlock after the close was refused; Steve then revoked the
+        trading-hours rule for SPX so after-hours sends can exercise the pipe,
+        and an unlock after the close now arms until the end of the day,
+        Central. An explicit ``until`` is capped the same way. Exits and
+        flatten need no arming window — only entries do."""
         with self._lock:
             now = self.clock()
             close = session_close(now, self.bounds)
-            if close.astimezone(CT).date() != now.astimezone(CT).date():
-                refusal = Refusal(
-                    "window",
-                    f"the session closed at {self.bounds.close_ct} CT — an unlock "
-                    f"now would arm the service until tomorrow's close, and "
-                    f"there is nothing today to arm for")
-                self.journal.record("refused", kind="unlock",
-                                    refused=refusal.to_dict())
-                raise Refused(refusal)
+            after_close = close.astimezone(CT).date() != now.astimezone(CT).date()
+            if after_close:
+                # Steve, 2026-09-14: after-hours sends help testing (SPX cannot
+                # fill after hours). An unlock after the close arms until the
+                # END OF TODAY, Central — never until tomorrow's close, which
+                # was finding 16 of the 2026-08-30 audit.
+                local = now.astimezone(CT)
+                close = local.replace(hour=23, minute=59, second=59, microsecond=0)
             expiry = min(until, close) if until is not None else close
             state = self.arming.unlock(credential, expiry)
             self.journal.record("unlock", state=state.value, until=expiry,
                                 capped=bool(until is not None and until > close),
+                                after_close=after_close,
                                 refresh_wall=_wall_of(credential))
             # The start-up reconcile, deferred from the constructor when the
             # service came back LOCKED (see _recover): now there is a

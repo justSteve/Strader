@@ -153,10 +153,10 @@ class TestUnlock:
         assert "no vault" in body and "execd_vault_init" in body
         assert service.arming.state is ArmState.LOCKED
 
-    def test_after_the_close_the_refusal_is_shown(self, page, service, clock):
+    def test_after_the_close_an_unlock_arms_until_the_end_of_the_day(self, page, service, clock):
         clock.set_ct(15, 30)
         body = landing(page, page.post("/exec/unlock", data={"passphrase": PASS}))
-        assert "Unlock refused" in body and service.arming.state is ArmState.LOCKED
+        assert "Armed until 23:59 CT" in body and service.arming.state is ArmState.ARMED
 
     def test_the_page_never_shows_a_passphrase_or_token(self, page, service):
         landing(page, page.post("/exec/unlock", data={"passphrase": PASS}))

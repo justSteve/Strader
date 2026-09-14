@@ -576,7 +576,7 @@ names the most fundamental thing wrong:
 | 4 | `qty` | `qty > qty_cap` |
 | 5 | `stop` | the STOP file exists |
 | 6 | `protective_stop` | `require_protective_stop` and either `stop_spx` or `delta` is missing |
-| 7 | `window` | weekend; or before `open_ct`; or at/after `no_open_after_ct` |
+| 7 | `window` | weekend; or before `open_ct`; or at/after `no_open_after_ct` — **not applied to SPX/SPXW roots** (`WINDOW_EXEMPT_ROOTS`; Steve 2026-09-14: "revoke the trading-hours rule when SPX is the target instrument. It can not fill after hours and placing live trades can help during testing"). Since those are the only instruments, the window gates no entry today; an unlock after the close arms until 23:59 CT instead of being refused |
 | 8 | `positions` | `open_positions >= max_open_positions` |
 | 9 | `ceiling` | `attempts_used >= max_attempts` |
 | 10 | `ceiling` | `realized_loss_usd >= daily_loss_ceiling_usd` |

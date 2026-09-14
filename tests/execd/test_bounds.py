@@ -85,18 +85,27 @@ class TestEachBoundRefusesByName:
         r = refusal(entry(delta=None))
         assert r.bound == "protective_stop"
 
-    def test_window_refuses_before_the_open(self):
-        r = refusal(entry(), now=datetime(2026, 8, 26, 8, 0, tzinfo=CT))
+    def test_the_window_does_not_gate_spx_entries(self):
+        """Steve, 2026-09-14: the trading-hours rule is revoked for SPX — it
+        cannot fill after hours, and after-hours sends exercise the pipe."""
+        from execd.bounds import WINDOW_EXEMPT_ROOTS
+        assert WINDOW_EXEMPT_ROOTS == {"SPX", "SPXW"}
+        for when in (datetime(2026, 8, 26, 8, 0, tzinfo=CT),       # before the open
+                     datetime(2026, 8, 26, 14, 55, tzinfo=CT),     # past no_open_after
+                     datetime(2026, 8, 30, 10, 0, tzinfo=CT)):     # a Sunday
+            assert refusal(entry(), now=when) is None, when
+
+    def test_check_window_itself_still_knows_the_hours(self):
+        """The rule is not gone, only not applied to SPX roots."""
+        from execd.bounds import check_window
+        b = Bounds()
+        r = check_window(datetime(2026, 8, 26, 8, 0, tzinfo=CT), b, opening=True)
         assert r.bound == "window" and "before" in r.reason
-
-    def test_window_refuses_a_new_position_after_the_late_cutoff(self):
-        # 14:55 CT is inside the session but past no_open_after (14:50).
-        r = refusal(entry(), now=datetime(2026, 8, 26, 14, 55, tzinfo=CT))
+        r = check_window(datetime(2026, 8, 26, 14, 55, tzinfo=CT), b, opening=True)
         assert r.bound == "window" and "no new positions" in r.reason
-
-    def test_window_refuses_a_weekend(self):
-        r = refusal(entry(), now=datetime(2026, 8, 30, 10, 0, tzinfo=CT))
+        r = check_window(datetime(2026, 8, 30, 10, 0, tzinfo=CT), b, opening=True)
         assert r.bound == "window" and "Sunday" in r.reason
+        assert check_window(datetime(2026, 8, 26, 10, 0, tzinfo=CT), b, opening=True) is None
 
     def test_positions_refuses_a_second_open_position(self):
         r = refusal(entry(), state=DayState(open_positions=1))
@@ -197,10 +206,10 @@ class TestOrderOfChecks:
         r = refusal(entry(), now=datetime(2026, 8, 26, 3, 0, tzinfo=CT), killed=True)
         assert r.bound == "stop"
 
-    def test_the_window_outranks_the_position_limit(self):
+    def test_the_position_limit_holds_outside_the_hours_too(self):
         r = refusal(entry(), state=DayState(open_positions=9),
                     now=datetime(2026, 8, 26, 3, 0, tzinfo=CT))
-        assert r.bound == "window"
+        assert r.bound == "positions"
 
     def test_the_ceiling_outranks_the_price_band(self):
         r = refusal(entry(limit=99.0), state=DayState(realized_loss_usd=500))

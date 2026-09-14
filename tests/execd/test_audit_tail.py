@@ -36,14 +36,16 @@ TRIGGER = SPX_NOW - 12.5
 
 
 class TestUnlockCannotOutliveTheSession:
-    def test_an_unlock_after_the_close_is_refused(self, service, clock):
+    def test_an_unlock_after_the_close_arms_until_the_end_of_the_day(self, service, clock):
+        """Finding 16 said never until tomorrow's close; Steve (2026-09-14)
+        revoked the trading-hours rule for SPX so after-hours sends can
+        exercise the pipe. The cap is now the end of today, Central."""
         clock.set_ct(15, 30)
-        with pytest.raises(Refused) as exc:
-            service.unlock({"token": "x"})
-        assert exc.value.refusal.bound == "window"
-        assert "tomorrow" in exc.value.refusal.reason
-        refused = service.journal.events("refused")[-1]
-        assert refused["kind"] == "unlock"
+        st = service.unlock({"token": "x"})
+        assert st["arming"]["state"] == "ARMED"
+        assert st["arming"]["expires_at_ct"] == "23:59 CT"
+        line = service.journal.events("unlock")[-1]
+        assert line["after_close"] is True and line["until"].startswith("2026-08-26T23:59:59")
 
     def test_an_unlock_before_the_open_arms_until_todays_close(self, service, clock):
         clock.set_ct(7, 0)

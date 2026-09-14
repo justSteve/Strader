@@ -144,10 +144,11 @@ class TestIdempotency:
 
     def test_a_refused_intent_id_may_be_retried(self, armed, clock):
         """A refusal has no side effect, so a caller that fixes the reason —
-        here, waiting for the session to open — is not locked out by its id."""
-        clock.set_ct(7, 0)
-        assert armed.place(entry(intent_id="retry-1"))["refused"]["bound"] == "window"
-        clock.set_ct(10, 0)
+        here, STOP cleared — is not locked out by its id. (Used to wait for
+        the open; the window no longer gates SPX, Steve 2026-09-14.)"""
+        armed.stop()
+        assert armed.place(entry(intent_id="retry-1"))["refused"]["bound"] == "stop"
+        armed.resume()
         assert armed.place(entry(intent_id="retry-1"))["refused"] is None
 
     def test_a_different_id_for_the_same_contract_is_a_second_order(self, armed, broker):
