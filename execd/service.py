@@ -232,7 +232,19 @@ class ExecService:
             self.journal.record("unlock", state=state.value, until=expiry,
                                 capped=bool(until is not None and until > close),
                                 refresh_wall=_wall_of(credential))
+            # The start-up reconcile, deferred from the constructor when the
+            # service came back LOCKED (see _recover): now there is a
+            # credential to ask the broker with.
+            self.reconcile()
             return self.status()
+
+    def _needs_credential(self) -> bool:
+        """Does this broker need the arming state's credential to answer?
+        The Schwab transport does (it is bound to ``arming.credential``); the
+        mock does not. Read off the broker rather than its class name so a
+        third broker declares itself."""
+        return getattr(self.broker, "credential_source", None) is not None or \
+            hasattr(self.broker, "bind")
 
     def stand_down(self) -> dict[str, Any]:
         with self._lock:
@@ -1336,4 +1348,12 @@ class ExecService:
                                 working=[w.to_dict() for w in self._working.values()])
         # The journal is what this service believed when it died. The broker is
         # what is true now, and a restart is exactly when those differ. [st-v7oa]
-        self.reconcile()
+        # But a real service comes back LOCKED, and the transport's credential
+        # source is bound only after this constructor returns — so the first
+        # installed start (2026-09-14 06:50 CT) journaled one spurious
+        # 'no trading credential source is bound' error. With no credential
+        # there is nothing to ask the broker with; the reconcile runs at the
+        # unlock instead, which is the first moment it can. The mock needs no
+        # credential and keeps reconciling here, so the recovery tests hold.
+        if self.arming.permits_exit() is None or not self._needs_credential():
+            self.reconcile()

@@ -278,3 +278,39 @@ class TestTheDayCeilingCountsWorkingOrders:
         armed.reconcile()
         assert armed.status()["day"]["attempts_used"] == 1
         assert armed.status()["day"]["open_positions"] == 1
+
+
+class TestStartUpReconcileWaitsForTheCredential:
+    """A real service comes back LOCKED, and its transport is bound to the
+    arming state only after the constructor returns. The first installed start
+    (2026-09-14 06:50 CT) journaled one spurious 'no trading credential source
+    is bound' error for exactly that reason. With no credential there is
+    nothing to ask the broker with, so the start-up reconcile runs at the
+    unlock instead. The mock needs no credential and keeps reconciling at
+    construction. [st-p8k8]"""
+
+    class CredentialBroker(MockBroker):
+        """A mock that declares it needs the arming credential, like Schwab."""
+
+        credential_source = None
+
+        def bind(self, arming):
+            self.credential_source = arming.credential
+            return self
+
+    def test_a_locked_start_does_not_ask_the_broker_or_journal_an_error(self, clock, tmp_path):
+        broker = self.CredentialBroker(clock=clock)
+        service = ExecService(broker, ServiceConfig(state_dir=tmp_path, sha="t"), clock=clock)
+        assert not [c for c in broker.calls if c[0] == "positions"]
+        assert not [e for e in service.journal.read() if e["event"] == "error"]
+
+    def test_the_unlock_runs_the_reconcile_it_deferred(self, clock, tmp_path):
+        broker = self.CredentialBroker(clock=clock)
+        service = ExecService(broker, ServiceConfig(state_dir=tmp_path, sha="t"), clock=clock)
+        broker.bind(service.arming)
+        service.unlock({"token": {"creation_timestamp": 1_757_000_000}})
+        assert [c for c in broker.calls if c[0] == "positions"], "unlock must reconcile"
+
+    def test_the_mock_still_reconciles_at_construction(self, broker, clock, tmp_path):
+        ExecService(broker, ServiceConfig(state_dir=tmp_path, sha="t"), clock=clock)
+        assert [c for c in broker.calls if c[0] == "positions"]
