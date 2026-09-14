@@ -471,6 +471,7 @@ _STYLE = """
  .card{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:.9em 1em;margin:.6em 0}
  .state{font-size:1.6em;font-weight:700}
  .LOCKED{color:#9ca3af}.ARMED{color:#34d399}.STOOD_DOWN{color:#fbbf24}
+ .pos-up{border-left:6px solid #34d399}.pos-down{border-left:6px solid #f87171}
  .paper{background:#fbbf24;color:#111;font-weight:700;padding:.5em .7em;border-radius:6px;margin-bottom:.6em}
  .live{background:#dc2626;color:#fff;font-weight:700;padding:.5em .7em;border-radius:6px;margin-bottom:.6em}
  .stop-on{color:#f87171;font-weight:700}
@@ -494,9 +495,13 @@ _STYLE = """
 """
 
 
-def _page(title: str, body: str) -> str:
+def _page(title: str, body: str, *, refresh_s: int | None = None) -> str:
+    # The page reloads itself only while there is money moving on it — a
+    # position or a working entry — so the unrealized P&L is live and a
+    # passphrase being typed on a quiet page is never wiped.
+    meta = f"<meta http-equiv=refresh content={int(refresh_s)}>" if refresh_s else ""
     return (f"<!doctype html><html><head><meta charset=utf-8><title>{esc(title)}</title>"
-            f"{_STYLE}</head><body><h1>{esc(title)}</h1>{body}</body></html>")
+            f"{meta}{_STYLE}</head><body><h1>{esc(title)}</h1>{body}</body></html>")
 
 
 def _fmt_wall(iso: str | None, now: datetime) -> str:
@@ -574,19 +579,26 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
         parts.append(f"<form method=post action='{a['lock']}'>"
                      "<button class='big cancel'>lock — forget the credential</button></form>")
 
+    # ── the position, with its money ──
+    for p in st["positions"]:
+        parts.append(_render_position(p))
+
     # ── the day ──
+    pnl = st.get("pnl") or {}
     rows = [
         ("open positions", day["open_positions"]),
-        ("realized loss", f"${day['realized_loss_usd']:.2f}"),
+        ("realized today", f"{_money(pnl.get('realized_usd'))} over {pnl.get('closes', 0)} close(s)"),
+        ("unrealized, net if closed now", _money(pnl.get("unrealized_net_usd"))),
+        ("day, realized + unrealized", _money(pnl.get("day_usd"))),
+        ("realized loss against the ceiling", f"${day['realized_loss_usd']:.2f}"),
         ("headroom to the ceiling", f"${day['loss_headroom_usd']:.2f}"),
         ("attempts", f"{day['attempts_used']} used, {day['attempts_left']} left"),
     ]
     parts.append("<h2>Today</h2><div class=card><table>" + "".join(
         f"<tr><td>{esc(k)}</td><td>{esc(str(v))}</td></tr>" for k, v in rows)
         + "</table></div>")
-    if st["positions"] or st["working"]:
-        lines = [json.dumps(p, separators=(",", ":")) for p in st["positions"]]
-        lines += ["working " + json.dumps(w, separators=(",", ":")) for w in st["working"]]
+    if st["working"]:
+        lines = ["working " + json.dumps(w, separators=(",", ":")) for w in st["working"]]
         parts.append("<div class=card><pre>" + esc("\n".join(lines)) + "</pre></div>")
 
     # ── credentials ──
@@ -620,7 +632,54 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
         parts.append("<h2>Journal, latest first</h2><div class=card><pre>"
                      + esc("\n".join(lines)) + "</pre></div>")
     parts.append(f"<div class=k>{esc(PAGE_URL)} · tailnet only</div>")
-    return _page("execd", "".join(parts))
+    live_money = bool(st["positions"] or st["working"])
+    return _page("execd", "".join(parts), refresh_s=5 if live_money else None)
+
+
+def _money(v: Any) -> str:
+    """``+$50.00`` / ``-$11.30`` / ``—`` when the quote could not be read."""
+    if not isinstance(v, (int, float)):
+        return "—"
+    sign = "+" if v > 0 else ("-" if v < 0 else "")
+    return f"{sign}${abs(v):,.2f}"
+
+
+def _render_position(p: dict[str, Any]) -> str:
+    """One open position: the contract, the entry, the live bid and ask, and
+    every part of the money — cost, value at the bid, unrealized, both
+    commissions, the net if closed now, the net at the stop."""
+    v = p.get("valuation") or {}
+    qty = p["qty"]
+    sym = str(p["symbol"]).strip()
+    rows = [
+        ("contract", f"{sym} × {qty}"),
+        ("entry", f"{p['entry_price']:.2f} → cost ${v.get('cost_usd', 0):,.2f}"),
+    ]
+    if v.get("bid") is not None:
+        rows.append(("now", f"bid {v['bid']:.2f} / ask {v['ask']:.2f} "
+                            f"(quote {v.get('quote_age_s', 0):.0f}s old)"))
+        rows.append(("value at the bid", f"${v['value_usd']:,.2f}"))
+        rows.append(("unrealized, before commissions", _money(v["unrealized_usd"])))
+    else:
+        rows.append(("now", f"no quote — {v.get('error') or 'unknown'}"))
+    rows.append(("commissions, in and out",
+                 f"${v.get('commissions_usd', 0):.2f} "
+                 f"(entry ${v.get('entry_commission_usd', 0):.2f}, "
+                 f"exit ${v.get('exit_commission_usd', 0):.2f})"))
+    rows.append(("NET IF CLOSED NOW", _money(v.get("net_if_closed_usd"))))
+    if p.get("stop_price") is not None:
+        rows.append(("at the stop", f"stop {p['stop_price']:.2f} → net {_money(v.get('at_stop_usd'))}"
+                     + (f" (order {p['stop_order_id']})" if p.get("stop_order_id") else " (NO STOP RESTING)")))
+    else:
+        rows.append(("at the stop", "NO STOP — the position is unprotected"))
+    if p.get("stop_spx") is not None:
+        rows.append(("SPX cut level", f"{p['stop_spx']:.2f}"))
+    if p.get("exit_order_id"):
+        rows.append(("exit in flight", f"order {p['exit_order_id']} ({p.get('exit_reason')})"))
+    cls = "pos-up" if isinstance(v.get("net_if_closed_usd"), (int, float)) and v["net_if_closed_usd"] >= 0 else "pos-down"
+    return (f"<h2>Open position</h2><div class='card {cls}'><table>" + "".join(
+        f"<tr><td>{esc(k)}</td><td>{esc(str(val))}</td></tr>" for k, val in rows)
+        + "</table></div>")
 
 
 def _short(v: Any) -> str:

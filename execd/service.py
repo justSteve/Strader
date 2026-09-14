@@ -50,7 +50,9 @@ from .bounds import (
     CT, Bounds, DayState, QuoteView, Refusal, check_entry, check_exit,
     check_preview_cost, check_risk_budget, session_close,
 )
-from .broker import Broker, BrokerError, OrderResult, OrderStatus, Position, Quote
+from .broker import (
+    COMMISSION_PER_CONTRACT_USD, Broker, BrokerError, OrderResult, OrderStatus, Position, Quote,
+)
 from .intent import OrderIntent, OrderType, Side, parse_occ
 from .journal import Journal
 from .stops import (
@@ -173,6 +175,10 @@ class OpenPosition:
     #: oversell that grew once a second. [st-97z1]
     exit_order_id: str | None = None
     exit_reason: str | None = None
+    #: what the entry cost in commission, from the broker's preview when the
+    #: service opened it; the published per-contract rate for a position it
+    #: recovered or adopted. Part of the page's P&L (Steve, 2026-09-14).
+    entry_commission_usd: float = 0.0
 
     @property
     def exit_in_flight(self) -> bool:
@@ -187,6 +193,7 @@ class OpenPosition:
             "entry_order_id": self.entry_order_id,
             "opened_at": self.opened_at.isoformat() if self.opened_at else None,
             "exit_order_id": self.exit_order_id, "exit_reason": self.exit_reason,
+            "entry_commission_usd": self.entry_commission_usd,
         }
 
 
@@ -295,8 +302,10 @@ class ExecService:
                 "loss_headroom_usd": round(
                     max(0.0, self.bounds.daily_loss_ceiling_usd - day.realized_loss_usd), 2),
             },
-            "positions": [p.to_dict() for p in self._open.values()],
+            "positions": [{**p.to_dict(), "valuation": self.valuation(p)}
+                          for p in self._open.values()],
             "working": [w.to_dict() for w in self._working.values()],
+            "pnl": self._day_pnl(),
             "bounds": self.bounds.to_dict(),
             "journal": str(self.journal.path_for()),
             # When each grant's seven-day wall is, and nothing else (no
@@ -337,6 +346,69 @@ class ExecService:
 
     def day_state(self) -> DayState:
         return self.journal.day_state()
+
+    # ── P&L, for the page (Steve, 2026-09-14: "the unrealized pnl including
+    # all aspects of the order needs to display on the page") ─────────────
+    def valuation(self, pos: OpenPosition) -> dict[str, Any]:
+        """What the position is worth now and what it would net if closed.
+
+        ``value_usd`` is at the live **bid** — the price a market sell gets —
+        not the mid. ``commissions_usd`` counts both ways: what the entry cost
+        (from the broker's preview) and what the exit will cost at the
+        published per-contract rate. ``net_if_closed_usd`` is the number Steve
+        asked for; ``at_stop_usd`` is the same arithmetic at the resting
+        stop's price. A quote that cannot be read leaves the money fields
+        ``None`` and says why."""
+        n = pos.qty
+        cost = round(pos.entry_price * CONTRACT_MULTIPLIER * n, 2)
+        exit_fee = round(COMMISSION_PER_CONTRACT_USD * n, 2)
+        fees = round(pos.entry_commission_usd + exit_fee, 2)
+        out: dict[str, Any] = {
+            "cost_usd": cost, "entry_commission_usd": round(pos.entry_commission_usd, 2),
+            "exit_commission_usd": exit_fee, "commissions_usd": fees,
+            "bid": None, "ask": None, "quote_age_s": None,
+            "value_usd": None, "unrealized_usd": None, "net_if_closed_usd": None,
+            "at_stop_usd": None, "error": None,
+        }
+        if pos.stop_price is not None:
+            out["at_stop_usd"] = round((pos.stop_price - pos.entry_price)
+                                       * CONTRACT_MULTIPLIER * n - fees, 2)
+        try:
+            q = self.broker.quote(pos.symbol)
+        except BrokerError as exc:
+            out["error"] = str(exc)
+            return out
+        out["bid"], out["ask"] = q.bid, q.ask
+        out["quote_age_s"] = round(q.age_s(self.clock()), 1)
+        value = round(q.bid * CONTRACT_MULTIPLIER * n, 2)
+        out["value_usd"] = value
+        out["unrealized_usd"] = round(value - cost, 2)
+        out["net_if_closed_usd"] = round(value - cost - fees, 2)
+        return out
+
+    def _day_pnl(self) -> dict[str, Any]:
+        """Today's money in one place: realized from the journal's ``closed``
+        lines (gains positive, as they are written), unrealized from the live
+        valuations, and the two together."""
+        realized = 0.0
+        closes = 0
+        for e in self.journal.read():
+            if e.get("event") == "closed" and isinstance(e.get("pnl_usd"), (int, float)):
+                realized += float(e["pnl_usd"])
+                closes += 1
+        realized = round(realized, 2)
+        unrealized: float | None = 0.0
+        for pos in self._open.values():
+            v = self.valuation(pos)
+            if v["net_if_closed_usd"] is None:
+                unrealized = None
+                break
+            unrealized += v["net_if_closed_usd"]
+        if unrealized is not None:
+            unrealized = round(unrealized, 2)
+        return {"realized_usd": realized, "closes": closes,
+                "unrealized_net_usd": unrealized,
+                "day_usd": None if unrealized is None else round(realized + unrealized, 2)}
 
     def has_exposure(self) -> bool:
         """Anything the watcher should be watching: a position held, or an
@@ -941,6 +1013,7 @@ class ExecService:
             intent_id=intent.intent_id, right=intent.occ.right,
             stop_spx=intent.stop_spx, delta=intent.delta,
             entry_order_id=order.order_id, opened_at=self.clock(),
+            entry_commission_usd=float(prev.commission_usd or 0.0),
         )
         self._open[pos.symbol] = pos
         # stop_spx and delta go on the FILL line, not only on the stop line: if
