@@ -19,7 +19,7 @@ TEMPLATE = (HERE / "Panel.template.dc.html").read_text()
 # (file stem, stage, frame height) in life-cycle order
 STAGES = [
     ("Flat", "none", 260),
-    ("Previewed", "previewed", 560),
+    ("Previewed", "previewed", 640),
     ("Working", "working", 620),
     ("Main", "filled", 720),
     ("Exiting", "exiting", 540),
