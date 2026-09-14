@@ -1,0 +1,230 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #0b1020; color: #e5e7eb; font-family: -apple-system, system-ui, sans-serif; font-size: 16px; }
+    a { color: #e5e7eb; } a:hover { color: #ffffff; }
+    .k { color: #9ca3af; font-size: .9em; }
+    table { width: 100%; border-collapse: collapse; font-size: .92em; }
+    td { padding: .25em .2em; border-bottom: 1px solid #1f2937; vertical-align: top; }
+    td:first-child { color: #9ca3af; white-space: nowrap; padding-right: .8em; }
+    td.neg { color: #f87171; font-weight: 700; } td.pos { color: #34d399; font-weight: 700; }
+    button { font-family: inherit; }
+  </style>
+</helmet>
+<div style="padding: 16px; max-width: 544px; margin: 0 auto; background: #0b1020; min-height: 100%; box-sizing: border-box;">
+
+  <div style="background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 14.4px 16px; margin: 0;">
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+        <div style="font-size: 1.6em; font-weight: 700; line-height: 1.1; color: {{ stageColor }};">{{ stageWord }}</div>
+        <sc-if value="{{ paper }}" hint-placeholder-val="{{ true }}">
+          <div style="background: #fbbf24; color: #111111; font-weight: 700; font-size: .8em; padding: 4px 8px; border-radius: 6px; letter-spacing: .04em;">PAPER</div>
+        </sc-if>
+        <sc-if value="{{ live }}" hint-placeholder-val="{{ false }}">
+          <div style="background: #dc2626; color: #ffffff; font-weight: 700; font-size: .8em; padding: 4px 8px; border-radius: 6px; letter-spacing: .04em;">LIVE</div>
+        </sc-if>
+      </div>
+      <button onClick="{{ refresh }}" title="refresh now" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background: #1f2937; color: #e5e7eb; border: 0; border-radius: 8px; cursor: pointer; flex-shrink: 0;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path></svg>
+      </button>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="color: #9ca3af; font-size: .9em;">updated {{ updated }} · {{ pollWord }}</span>
+        <button onClick="{{ togglePause }}" style="background: transparent; color: #9ca3af; border: 1px solid #374151; border-radius: 8px; min-height: 36px; padding: 0 12px; font-size: .9em; cursor: pointer;">{{ pauseWord }}</button>
+      </div>
+      <button onClick="{{ toggleMore }}" style="background: transparent; color: #9ca3af; border: 1px solid #374151; border-radius: 8px; min-height: 36px; padding: 0 12px; font-size: .9em; cursor: pointer; flex-shrink: 0;">{{ moreWord }}</button>
+    </div>
+
+    <!-- ── no order ─────────────────────────────────────────────── -->
+    <sc-if value="{{ is.none }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top: 12px; color: #9ca3af; font-size: .9em;">nothing held, nothing working — pick a side above to price one</div>
+      <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+        <table style="margin-top: 8px;">
+          <tr><td>last order</td><td>closed 14:13:05 CT, +$48.70 net</td></tr>
+          <tr><td>today</td><td>attempts 1 used, 9 left · headroom $500.00</td></tr>
+        </table>
+      </sc-if>
+    </sc-if>
+
+    <!-- ── previewed ────────────────────────────────────────────── -->
+    <sc-if value="{{ is.previewed }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top: 12px; font-size: 1.15em; font-weight: 700;">SPXW 260915C07630 × 1 — buy limit 4.70 = $470.00</div>
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px;">
+        <div style="color: #9ca3af; font-size: .9em;">the broker's cost line</div>
+        <div style="font-size: 2em; font-weight: 700; color: #e5e7eb;">$470.65</div>
+      </div>
+      <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+        <table style="margin-top: 8px;">
+          <tr><td>the rules</td><td>every bound passed — 11 checks</td></tr>
+          <tr><td>cut if SPX reaches</td><td>7618.50 — 15.70 pts below 7634.20</td></tr>
+          <tr><td>most this costs</td><td class="neg">-$11.30</td></tr>
+          <tr><td>resting stop the service places</td><td>4.60 → net -$11.30 (commissions $1.30 in and out)</td></tr>
+          <tr><td>this attempt</td><td>2 of 10 · headroom $500.00</td></tr>
+        </table>
+      </sc-if>
+      <div style="margin-top: 8px; color: #9ca3af; font-size: .9em;">SEND is good for 42 s, once</div>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+        <button style="display: block; width: 100%; padding: 14.4px; font-size: 1.25em; border-radius: 12px; border: 0; font-weight: 700; cursor: pointer; background: #dc2626; color: #ffffff;">SEND — one order</button>
+        <button style="display: block; width: 100%; padding: 14.4px; font-size: 1.25em; border-radius: 12px; border: 0; font-weight: 700; cursor: pointer; background: #374151; color: #e5e7eb;">re-price</button>
+      </div>
+    </sc-if>
+
+    <!-- ── working ──────────────────────────────────────────────── -->
+    <sc-if value="{{ is.working }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top: 12px; font-size: 1.15em; font-weight: 700;">SPXW 260915C07630 × 1 — buy limit 4.70 = $470.00</div>
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px;">
+        <div style="color: #9ca3af; font-size: .9em;">ask above the limit</div>
+        <div style="font-size: 2em; font-weight: 700; color: #fbbf24;">+0.05</div>
+      </div>
+      <div style="color: #9ca3af; font-size: .9em;">bid 4.60 / ask 4.75 (quote 2 s old) — resting at the broker</div>
+      <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+        <table style="margin-top: 8px;">
+          <tr><td>order</td><td>1003 · sent 14:11:20 CT, 12 s ago</td></tr>
+          <tr><td>intent</td><td>page-20260914T141120</td></tr>
+          <tr><td>stop to rest on the fill</td><td>4.60 · SPX cut level 7618.50</td></tr>
+          <tr><td>this attempt</td><td>2 of 10 · $11.30 at risk</td></tr>
+          <tr><td>slot</td><td>holds the day's one position until it resolves</td></tr>
+        </table>
+      </sc-if>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+        <button style="display: block; width: 100%; padding: 14.4px; font-size: 1.25em; border-radius: 12px; border: 0; font-weight: 700; cursor: pointer; background: #374151; color: #e5e7eb;">CANCEL — take the order back</button>
+        <button style="display: block; width: 100%; padding: 14.4px; font-size: 1.25em; border-radius: 12px; border: 0; font-weight: 700; cursor: pointer; background: #dc2626; color: #ffffff;">STOP</button>
+      </div>
+      <div style="margin-top: 8px; color: #9ca3af; font-size: .9em;">a resting limit is never changed in place: cancel, re-price, send again</div>
+    </sc-if>
+
+    <!-- ── filled ───────────────────────────────────────────────── -->
+    <sc-if value="{{ is.filled }}" hint-placeholder-val="{{ true }}">
+      <div style="margin-top: 12px; font-size: 1.15em; font-weight: 700;">SPXW 260915C07630 × 1 — in at 4.70, cost $470.00</div>
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px;">
+        <div style="color: #9ca3af; font-size: .9em;">NET IF CLOSED NOW</div>
+        <div style="font-size: 2em; font-weight: 700; color: #34d399;">+$38.70</div>
+      </div>
+      <div style="color: #9ca3af; font-size: .9em;">bid 5.10 / ask 5.30 (quote 2 s old) · stop resting at 4.60</div>
+      <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+        <table style="margin-top: 8px;">
+          <tr><td>value at the bid</td><td>$510.00</td></tr>
+          <tr><td>unrealized, before commissions</td><td class="pos">+$40.00</td></tr>
+          <tr><td>commissions, in and out</td><td>$1.30 (entry $0.65, exit $0.65)</td></tr>
+          <tr><td>at the stop</td><td>stop 4.60 resting (order 1004) → net -$11.30</td></tr>
+          <tr><td>SPX cut level</td><td>7618.50 — SPX now 7634.20, 15.70 pts above the cut</td></tr>
+          <tr><td>opened</td><td>14:11:32 CT · entry order 1003 · intent page-20260914T141120</td></tr>
+        </table>
+      </sc-if>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+        <button style="display: block; width: 100%; padding: 14.4px; font-size: 1.25em; border-radius: 12px; border: 0; font-weight: 700; cursor: pointer; background: #b45309; color: #ffffff;">FLATTEN</button>
+        <button style="display: block; width: 100%; padding: 14.4px; font-size: 1.25em; border-radius: 12px; border: 0; font-weight: 700; cursor: pointer; background: #dc2626; color: #ffffff;">STOP</button>
+      </div>
+      <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top: 8px; color: #9ca3af; font-size: .9em;">today: realized +$48.70 over 1 close · unrealized +$38.70 · day +$87.40 · attempts 2 used, 8 left · headroom $500.00</div>
+      </sc-if>
+    </sc-if>
+
+    <!-- ── exit in flight ───────────────────────────────────────── -->
+    <sc-if value="{{ is.exiting }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top: 12px; font-size: 1.15em; font-weight: 700;">SPXW 260915C07630 × 1 — in at 4.70, cost $470.00</div>
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px;">
+        <div style="color: #9ca3af; font-size: .9em;">market sell in flight</div>
+        <div style="font-size: 2em; font-weight: 700; color: #fbbf24;">4 s</div>
+      </div>
+      <div style="color: #9ca3af; font-size: .9em;">order 1005 · last bid 5.20 → about +$48.70 net</div>
+      <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+        <table style="margin-top: 8px;">
+          <tr><td>reason</td><td>FLATTEN from the page, 14:13:01 CT</td></tr>
+          <tr><td>resting stop</td><td>cancelled before the close went on (order 1004)</td></tr>
+          <tr><td>if the close dies</td><td>the stop is re-rested and this row says so</td></tr>
+        </table>
+      </sc-if>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+        <button style="display: block; width: 100%; padding: 14.4px; font-size: 1.25em; border-radius: 12px; border: 0; font-weight: 700; cursor: pointer; background: #b45309; color: #ffffff;">FLATTEN — replace the close in flight</button>
+      </div>
+      <div style="margin-top: 8px; color: #9ca3af; font-size: .9em;">one close in flight per position; FLATTEN cancels it and sends another</div>
+    </sc-if>
+
+    <!-- ── closed ───────────────────────────────────────────────── -->
+    <sc-if value="{{ is.closed }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top: 12px; font-size: 1.15em; font-weight: 700;">SPXW 260915C07630 × 1 — closed 14:13:05 CT</div>
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px;">
+        <div style="color: #9ca3af; font-size: .9em;">P&amp;L, after commissions</div>
+        <div style="font-size: 2em; font-weight: 700; color: #34d399;">+$48.70</div>
+      </div>
+      <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+        <table style="margin-top: 8px;">
+          <tr><td>in</td><td>4.70 at 14:11:32 CT</td></tr>
+          <tr><td>out</td><td>5.20 at 14:13:05 CT · held 1 m 33 s</td></tr>
+          <tr><td>reason</td><td>FLATTEN from the page</td></tr>
+          <tr><td>commissions</td><td>$1.30</td></tr>
+          <tr><td>orders</td><td>entry 1003 · stop 1004 cancelled · exit 1005 filled</td></tr>
+          <tr><td>journal</td><td>2026-09-14, 9 lines under page-20260914T141120</td></tr>
+        </table>
+        <div style="margin-top: 8px; color: #9ca3af; font-size: .9em;">today: realized +$48.70 over 1 close · attempts 1 used, 9 left · headroom $500.00</div>
+      </sc-if>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+        <button style="display: block; width: 100%; padding: 14.4px; font-size: 1.25em; border-radius: 12px; border: 0; font-weight: 700; cursor: pointer; background: #374151; color: #e5e7eb;">NEW ORDER — pick a side</button>
+      </div>
+    </sc-if>
+
+    <!-- ── refused ──────────────────────────────────────────────── -->
+    <sc-if value="{{ is.refused }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top: 12px; background: #7f1d1d; border: 1px solid #ef4444; border-radius: 10px; padding: 11.2px 16px;">price_band — limit 5.40 is 14% above the touch 4.75; nothing was sent</div>
+      <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+        <table style="margin-top: 8px;">
+          <tr><td>intent</td><td>page-20260914T141120</td></tr>
+          <tr><td>checked before it</td><td>instrument, side, order type, qty, stop, protective stop, positions, ceiling, tick — all passed</td></tr>
+          <tr><td>the broker</td><td>was not asked</td></tr>
+        </table>
+      </sc-if>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+        <button style="display: block; width: 100%; padding: 14.4px; font-size: 1.25em; border-radius: 12px; border: 0; font-weight: 700; cursor: pointer; background: #374151; color: #e5e7eb;">re-price</button>
+      </div>
+      <div style="margin-top: 8px; color: #9ca3af; font-size: .9em;">fix and preview again</div>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"stage":{"editor":"enum","options":["none","previewed","working","filled","exiting","closed","refused"],"default":"__STAGE__","section":"context"},"density":{"editor":"enum","options":["full","compact"],"default":"full","section":"context"},"mode":{"editor":"enum","options":["paper","live"],"default":"paper","section":"context"},"$preview":{"width":576,"height":__HEIGHT__}}'>
+class Component extends DCLogic {
+  state = { compact: null, paused: false, updated: '2 s ago' };
+  renderVals() {
+    var stage = this.props.stage || '__STAGE__';
+    var density = this.props.density || 'full';
+    var mode = this.props.mode || 'paper';
+    var compact = this.state.compact === null ? density === 'compact' : this.state.compact;
+    var colors = { none: '#9ca3af', previewed: '#60a5fa', working: '#fbbf24', filled: '#34d399',
+                   exiting: '#fbbf24', closed: '#9ca3af', refused: '#f87171' };
+    var words = { none: 'no order', previewed: 'PREVIEWED', working: 'WORKING', filled: 'FILLED',
+                  exiting: 'EXIT IN FLIGHT', closed: 'CLOSED', refused: 'REFUSED' };
+    var self = this;
+    return {
+      is: { none: stage === 'none', previewed: stage === 'previewed', working: stage === 'working',
+            filled: stage === 'filled', exiting: stage === 'exiting', closed: stage === 'closed',
+            refused: stage === 'refused' },
+      stageWord: words[stage] || stage,
+      stageColor: colors[stage] || '#e5e7eb',
+      full: !compact,
+      moreWord: compact ? 'more' : 'less',
+      paper: mode === 'paper',
+      live: mode === 'live',
+      pollWord: this.state.paused ? 'paused' : 'live, every 3 s',
+      pauseWord: this.state.paused ? 'resume' : 'pause',
+      updated: this.state.updated,
+      refresh: function () { self.setState({ updated: 'just now' }); },
+      togglePause: function () { self.setState({ paused: !self.state.paused }); },
+      toggleMore: function () { self.setState({ compact: !compact }); }
+    };
+  }
+}
+</script>
+</body>
+</html>
