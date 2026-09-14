@@ -37,6 +37,26 @@ def test_valuation_counts_every_part_of_the_order(armed: ExecService, broker):
                          "unrealized_net_usd": -11.30, "day_usd": -11.30}
 
 
+def test_one_status_call_strikes_the_position_and_the_day_at_one_quote(armed: ExecService, broker):
+    """14:37 CT, 2026-09-14: the position row said -6.30 and the day row
+    -1.30 on the same page — two quote reads inside one status call."""
+    armed.place(entry("v-5"))
+    reads = []
+    real_quote = broker.quote
+
+    def moving(symbol):
+        q = real_quote(symbol)
+        if symbol == CALL:
+            reads.append(1)
+            broker.set_quote(CALL, bid=2.00 - 0.05 * len(reads), ask=2.10)   # moves after every read
+        return q
+
+    broker.quote = moving
+    st = armed.status()
+    assert reads.count(1) == 1                                    # one read for the position
+    assert st["pnl"]["unrealized_net_usd"] == st["positions"][0]["valuation"]["net_if_closed_usd"]
+
+
 def test_a_quote_that_cannot_be_read_leaves_the_money_blank_not_wrong(armed: ExecService, broker):
     armed.place(entry("v-2"))
     broker.fail_next = "down"

@@ -288,6 +288,7 @@ class ExecService:
     def status(self) -> dict[str, Any]:
         now = self.clock()
         day = self.day_state()
+        valuations = [(p, self.valuation(p)) for p in list(self._open.values())]
         return {
             "now": now.isoformat(),
             "now_ct": now.astimezone(CT).strftime("%Y-%m-%d %H:%M:%S CT"),
@@ -302,10 +303,12 @@ class ExecService:
                 "loss_headroom_usd": round(
                     max(0.0, self.bounds.daily_loss_ceiling_usd - day.realized_loss_usd), 2),
             },
-            "positions": [{**p.to_dict(), "valuation": self.valuation(p)}
-                          for p in self._open.values()],
+            # One quote read per position per status call: the position row
+            # and the day row are struck at the same price (14:37 CT today
+            # they were not — two reads, two bids, two different nets).
+            "positions": [{**p.to_dict(), "valuation": v} for p, v in valuations],
             "working": [w.to_dict() for w in self._working.values()],
-            "pnl": self._day_pnl(),
+            "pnl": self._day_pnl([v for _p, v in valuations]),
             "bounds": self.bounds.to_dict(),
             "journal": str(self.journal.path_for()),
             # When each grant's seven-day wall is, and nothing else (no
@@ -386,10 +389,11 @@ class ExecService:
         out["net_if_closed_usd"] = round(value - cost - fees, 2)
         return out
 
-    def _day_pnl(self) -> dict[str, Any]:
+    def _day_pnl(self, valuations: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """Today's money in one place: realized from the journal's ``closed``
-        lines (gains positive, as they are written), unrealized from the live
-        valuations, and the two together."""
+        lines (gains positive, as they are written), unrealized from the
+        valuations handed in (struck once, shared with the position rows),
+        and the two together."""
         realized = 0.0
         closes = 0
         for e in self.journal.read():
@@ -397,9 +401,10 @@ class ExecService:
                 realized += float(e["pnl_usd"])
                 closes += 1
         realized = round(realized, 2)
+        if valuations is None:
+            valuations = [self.valuation(p) for p in list(self._open.values())]
         unrealized: float | None = 0.0
-        for pos in self._open.values():
-            v = self.valuation(pos)
+        for v in valuations:
             if v["net_if_closed_usd"] is None:
                 unrealized = None
                 break
