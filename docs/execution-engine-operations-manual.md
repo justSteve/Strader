@@ -1036,6 +1036,31 @@ protective stop, the watcher, reconcile, the fill sweep, FLATTEN — runs
 unchanged over the book, so paper exercises the same code the live ticket
 will. `tests/execd/test_paper.py` walks it.
 
+### 5.18 The position's money on the page (stage 4, st-k6gl)
+
+Steve, 2026-09-14: *"the unrealized pnl including all aspects of the order
+needs to display on the page."* `ExecService.valuation(pos)` rides on every
+position in `/status` and `_day_pnl()` as `pnl`:
+
+| field | meaning |
+|---|---|
+| `cost_usd` | entry price × 100 × qty |
+| `bid`, `ask`, `quote_age_s` | the live quote the value is struck at |
+| `value_usd` | **bid** × 100 × qty — what a market sell gets now, not the mid |
+| `unrealized_usd` | value − cost, before commissions |
+| `entry_commission_usd` | from the broker's preview at the fill (published rate for a recovered position) |
+| `exit_commission_usd` | published per-contract rate × qty |
+| `commissions_usd` | both |
+| `net_if_closed_usd` | value − cost − commissions — the number he asked for |
+| `at_stop_usd` | the same arithmetic at the resting stop's price |
+| `error` | why the money is blank when the quote could not be read |
+
+`pnl`: `realized_usd` (the day's `closed` lines summed, gains positive),
+`closes`, `unrealized_net_usd`, `day_usd`. The page renders an "Open
+position" card with every row, green or red edge by the net, and reloads
+itself every 5 s **only while a position or working entry exists**, so a
+passphrase being typed on a quiet page is never wiped.
+
 ## 6. The feed and the credential
 
 ### 6.1 Preflight
