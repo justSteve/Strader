@@ -59,6 +59,9 @@ from .bounds import CT
 from .broker import BrokerError
 from .schwab import (VAULT_VERSION, App, Credential, authorize_url, code_from_received_url,
                      exchange, new_client, trading_payload, verify_grant)
+from .intent import OrderIntent
+from .orderform import PREVIEW_TTL_S, Selection, intent_for, price, stamp
+from .orderpage import fd0_html, position_html, preview_fields_html, quote_html, render_order, state_html, strikes_html
 from .service import ExecService, Refused
 from .vault import BadPassphrase, Vault, VaultError, VaultMissing
 
@@ -377,12 +380,113 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                     f"{wall.astimezone(CT).strftime('%a %Y-%m-%d %H:%M CT')}. "
                     f"Do the other app in this sitting.")
 
+    # ── the order form (stage 4, st-k6gl) — by code alone ─────────────
+    def _today():
+        return clock().astimezone(CT).date()
+
+    def _selection(args) -> Selection:
+        return Selection.from_args(args, today=_today(),
+                                   lots_cap=service.bounds.qty_cap)
+
+    def _order_page(sel: Selection, **kw):
+        priced = price(service, sel) if sel.side else None
+        embed = request.args.get("embed") == "1" or request.form.get("embed") == "1"
+        return render_order(service, _actions(), sel, priced, today=_today(),
+                            embed=embed, **kw)
+
+    @bp.get("/order")
+    def order():
+        return _order_page(_selection(request.args), msg=request.args.get("msg"),
+                           bad=request.args.get("bad"))
+
+    @bp.get("/order/price")
+    def order_price():
+        sel = _selection(request.args)
+        priced = price(service, sel)
+        body = priced.to_dict()
+        body["fd0_html"] = fd0_html(priced)
+        body["strikes_html"] = strikes_html(priced, url_for("exec.order"))
+        body["preview_fields_html"] = preview_fields_html(sel)
+        return body
+
+    @bp.get("/order/state")
+    def order_state():
+        st = service.status()
+        symbol = request.args.get("symbol") or ""
+        quote = None
+        error = None
+        spx = None
+        if symbol:
+            try:
+                quote = service.quote(symbol).to_dict()
+                spx = service.spx_mark()
+            except BrokerError as exc:
+                error = str(exc)
+        return {"mode": st["mode"], "arming": st["arming"], "day": st["day"],
+                "pnl": st.get("pnl"), "positions": st["positions"],
+                "quote": quote, "spx": spx,
+                "quote_html": quote_html(quote, spx, error),
+                "position_html": position_html(st), "state_html": state_html(st)}
+
+    @bp.post("/order/preview")
+    def order_preview():
+        sel = _selection(request.form)
+        priced = price(service, sel)
+        try:
+            intent = intent_for(priced, intent_id=f"page-{stamp(clock())}",
+                                engine_sha=service.config.sha)
+        except ValueError as exc:
+            return _order_page(sel, bad=f"Not previewed: {exc}")
+        try:
+            out = service.preview(OrderIntent.from_dict(intent))
+        except Refused as exc:
+            return _order_page(sel, bad=f"Refused ({exc.refusal.bound}): {exc.refusal.reason}. Nothing sent.")
+        except BrokerError as exc:
+            return _order_page(sel, bad=f"The broker could not be reached: {exc}. Nothing sent.")
+        except ValueError as exc:
+            return _order_page(sel, bad=f"Not previewed: {exc}")
+        if out.get("refused"):
+            r = out["refused"]
+            text = f"Refused ({r.get('bound')}): {r.get('reason')}. Nothing sent."
+            return _order_page(sel, bad=text)
+        p = out["preview"]
+        word = "PAPER (simulated) — " if out.get("mode") == "paper" else ""
+        text = (f"{word}Preview from Schwab: {str(p.get('symbol', '')).strip()} x{p.get('qty')} "
+                f"at {float(p.get('price') or 0):.2f} — cost ${float(p.get('cost_usd') or 0):.2f}, "
+                f"commission ${float(p.get('commission_usd') or 0):.2f}, total "
+                f"${float(p.get('total_usd') or 0):.2f}; "
+                + ("the broker accepts it." if p.get("accepted") else "the broker would REJECT it: "
+                   + "; ".join(p.get("messages") or [])))
+        nonce = nonces.issue("send", PREVIEW_TTL_S, intent=intent)
+        return _order_page(sel, nonce=nonce, preview=out, preview_text=text)
+
+    @bp.post("/order/send")
+    def order_send():
+        item = nonces.spend(request.form.get("nonce", ""), "send")
+        if item is None:
+            return redirect(url_for("exec.order", bad=f"That SEND was used already or is older "
+                                    f"than {int(PREVIEW_TTL_S)} s — preview again."), code=303)
+        intent = item.extra.get("intent") or {}
+        try:
+            out = service.place(OrderIntent.from_dict(intent))
+        except Refused as exc:
+            return redirect(url_for("exec.order", bad=f"Refused ({exc.refusal.bound}): "
+                                    f"{exc.refusal.reason}. Nothing sent."), code=303)
+        except BrokerError as exc:
+            return redirect(url_for("exec.order", bad=f"The broker could not be reached: {exc}. "
+                                    f"Nothing was sent that the service knows of — check the "
+                                    f"orders before sending again."), code=303)
+        except ValueError as exc:
+            return redirect(url_for("exec.order", bad=f"Not sent: {exc}"), code=303)
+        return redirect(url_for("exec.order", msg=_describe_place(out)), code=303)
+
     def _actions() -> dict[str, str]:
         """Absolute paths for every form, so a page served at ``/exec/flatten``
         posts its confirm to ``/exec/flatten/confirm`` and not to a sibling."""
         return {name: url_for(f"exec.{name}") for name in (
             "index", "unlock", "stop", "resume", "stand_down", "lock", "flatten",
-            "flatten_confirm", "reauth_link", "reauth_store")}
+            "flatten_confirm", "reauth_link", "reauth_store",
+            "order", "order_price", "order_state", "order_preview", "order_send")}
 
     app.register_blueprint(bp)
     return app
@@ -638,6 +742,33 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     parts.append(f"<div class=k>{esc(PAGE_URL)} · tailnet only</div>")
     live_money = bool(st["positions"] or st["working"])
     return _page("execd", "".join(parts), refresh_s=5 if live_money else None)
+
+
+def _describe_place(out: dict[str, Any]) -> str:
+    """The service's answer to a send, in plain words — the desk's wording,
+    kept here because the installed service has no ``strader/``."""
+    word = "PAPER (simulated) — " if out.get("mode") == "paper" else ""
+    if out.get("refused"):
+        r = out["refused"]
+        return f"{word}Refused ({r.get('bound')}): {r.get('reason')}. Nothing sent."
+    o = out.get("order") or {}
+    oid = o.get("order_id")
+    if out.get("replayed"):
+        return f"{word}Already sent under this id — order {oid}, {o.get('status')}. Nothing new sent."
+    status = str(o.get("status", ""))
+    if status == "REJECTED":
+        return f"{word}Sent, and the broker REJECTED it (order {oid}): {o.get('message') or 'no reason given'}."
+    if status == "FILLED" or o.get("filled_qty"):
+        fill = float(o.get("fill_price") or 0)
+        qty = int(o.get("filled_qty") or o.get("qty") or 0)
+        head = f"{word}SENT AND FILLED: order {oid}, {qty} at {fill:.2f} (${fill * 100 * qty:.2f})."
+        stop = out.get("stop_order")
+        if isinstance(stop, dict) and stop.get("order_id"):
+            return head + (f" Protective stop resting: order {stop['order_id']} at "
+                           f"{float(stop.get('price') or 0):.2f}. The service watches the SPX mark.")
+        return head + " ** NO PROTECTIVE STOP RESTED — FLATTEN if in doubt."
+    return (f"{word}SENT: order {oid} is {status} at the broker, not filled yet; "
+            f"the stop rests when it fills.")
 
 
 def _money_class(v: Any) -> str:

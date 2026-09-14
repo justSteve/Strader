@@ -107,3 +107,38 @@ def exit_intent(intent_id: str = "t-001-x", symbol: str = CALL, qty: int = 1,
         intent_id=intent_id, symbol=symbol, side=Side.SELL_TO_CLOSE, qty=qty,
         order_type=OrderType.MARKET, source="test", **kw,
     )
+
+
+# ── a chain in Schwab's shape, for the order form (st-k6gl) ──────────────
+
+def schwab_chain_maps(expiry: str = "2026-08-26") -> dict:
+    """``callExpDateMap`` / ``putExpDateMap`` for SPXW strikes around
+    ``SPX_NOW`` (6380). The 6400 call is the conftest ``CALL`` (quoted
+    2.00/2.10, delta 0.30) and the 6300 put the conftest ``PUT``, so a ticket
+    on either can be previewed and placed through the mock."""
+    def leg(root: str, strike: float, right: str, bid: float, ask: float, delta: float) -> dict:
+        ymd = expiry[2:4] + expiry[5:7] + expiry[8:10]
+        return {"symbol": f"{root:<6}{ymd}{right}{int(round(strike * 1000)):08d}",
+                "strikePrice": strike, "expirationDate": f"{expiry}T15:00:00-05:00",
+                "bid": bid, "ask": ask, "last": round((bid + ask) / 2, 2), "delta": delta,
+                "daysToExpiration": 0, "totalVolume": 100, "openInterest": 50}
+    key = f"{expiry}:0"
+    calls = {
+        "6350.0": [leg("SPXW", 6350, "C", 32.0, 32.4, 0.78)],
+        "6360.0": [leg("SPXW", 6360, "C", 24.0, 24.3, 0.70)],
+        "6370.0": [leg("SPXW", 6370, "C", 16.5, 16.8, 0.60)],
+        "6380.0": [leg("SPXW", 6380, "C", 10.0, 10.2, 0.52)],
+        "6390.0": [leg("SPXW", 6390, "C", 5.0, 5.2, 0.40)],
+        "6400.0": [leg("SPXW", 6400, "C", 2.00, 2.10, 0.30)],
+        "6410.0": [leg("SPXW", 6410, "C", 0.80, 0.90, 0.18)],
+        "6420.0": [leg("SPXW", 6420, "C", 0.30, 0.40, 0.09)],
+    }
+    puts = {
+        "6300.0": [leg("SPXW", 6300, "P", 1.80, 1.90, -0.28)],
+        "6320.0": [leg("SPXW", 6320, "P", 3.0, 3.2, -0.34)],
+        "6340.0": [leg("SPXW", 6340, "P", 5.0, 5.2, -0.40)],
+        "6360.0": [leg("SPXW", 6360, "P", 8.0, 8.3, -0.46)],
+        "6380.0": [leg("SPXW", 6380, "P", 11.0, 11.3, -0.52)],
+        "6400.0": [leg("SPXW", 6400, "P", 22.0, 22.4, -0.70)],
+    }
+    return {"calls": {key: calls}, "puts": {key: puts}}

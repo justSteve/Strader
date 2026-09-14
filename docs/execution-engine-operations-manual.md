@@ -1061,6 +1061,72 @@ position" card with every row, green or red edge by the net, and reloads
 itself every 5 s **only while a position or working entry exists**, so a
 passphrase being typed on a quiet page is never wiped.
 
+### 5.19 The order form — `/exec/order` (stage 4, st-k6gl)
+
+`execd/orderform.py` (the selection, the chain read, the choice, the priced
+ticket, the intent) and `execd/orderpage.py` (the HTML, one small inline
+script). Steve, 2026-09-14: *"the page needed to run by code alone … a
+button to indicate bearish or bullish intent … pre-populating the strikes
+available … indicate a delta so I can over-ride the default … only the
+essential elements of the order form … eventually this needs to run on an
+iPad."* No model, agent or terminal between his intent and the service.
+
+**The page, top to bottom:** mode banner, arming state, STOP and FLATTEN;
+BULLISH (calls) / BEARISH (puts); expiry (today or the next weekday); the
+strikes around spot with bid, ask and delta, the chosen row marked; the
+inputs (delta override, FD0 budget, attempts); the FD0 block; PREVIEW; after
+a preview, Schwab's cost line and SEND; the open position with its money
+and the day's totals.
+
+| Route | Does |
+|---|---|
+| `GET /exec/order?side=call\|put&expiry=…&strike=…&delta=…&budget=…&attempts=…&embed=1` | renders the page; `embed=1` drops the header and footer for a panel |
+| `GET /exec/order/price?…` | the priced ticket as JSON plus the FD0, strikes and hidden-field fragments the script swaps in |
+| `GET /exec/order/state?symbol=…` | the status body's live half plus the chosen contract's quote and the SPX mark, with HTML fragments |
+| `POST /exec/order/preview` | `service.preview(intent)`; on a 200, the cost line and a single-use 60 s SEND token |
+| `POST /exec/order/send` | spends the token, `service.place(the same intent)`, redirects with the result in words |
+
+**The choice** (`orderform.choose`): a tapped strike wins; else the delta
+override picks the strike whose |delta| is nearest; else nearest to spot
+(Steve's ruling). Ties go to the tighter spread.
+
+**The chain read** (`orderform.load_chain`): one bounded `market_read("chains")`
+per side and expiry — `strikeCount=40`, one `contractType`, `fromDate=toDate`
+— parsed by the engine's own `parse_chain`, SPXW preferred; never the
+unbounded `service.chain`. Answers while LOCKED (the market credential).
+
+**The limit** is the ask rounded up on the service's tick grid
+(`stops.tick_for`: 0.05 under $3, 0.10 at and above), so the `tick` rule
+cannot refuse it. **The resting stop** shown is `protective_stop_price` at
+that limit; its net includes both commissions.
+
+**The intent** is `page-<stamp>`, source `page`, with `stop_spx` and
+`delta` from the ticket — the same wire form the desk sends. The journal
+shows who sent.
+
+**No passphrase on SEND**: arming already happened; the token is single use
+and dies in 60 s, and the service's price-band and quote-age rules refuse a
+stale ticket regardless. Agents cannot reach the page port (gate 7).
+
+**The script** (inline, no external assets): re-fetches `/order/price` when
+delta, budget, attempts or lots change; polls `/order/state` every 3 s for
+the quote, the position and the state; pauses while the tab is hidden. The
+page works with the script off — every control is a link or a form.
+
+**iPad**: `apple-mobile-web-app-capable` for Add to Home Screen, full-width
+buttons, tap-sized strike rows, `inputmode` numeric keyboards, no keyboard
+shortcuts, nothing loaded from the network.
+
+**Load, stated:** compose is microseconds; the chain is fetched only on a
+side or expiry change; the poll is two small quote calls every 3 s per open
+page. Unmeasured: Schwab's market-data rate limit (commonly cited 120/min;
+this sits well under it) and Flask's dev server under an all-day poll.
+
+`tests/execd/test_orderform.py` walks side → strikes → FD0 → preview → send
+→ fill → stop over the real routes and the mock, including a stale token, a
+refused preview, LOCKED, paper mode, the embed variant, and no secret in any
+page or JSON body.
+
 ## 6. The feed and the credential
 
 ### 6.1 Preflight
