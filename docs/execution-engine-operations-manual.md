@@ -714,7 +714,7 @@ restarted to pick up a change.
 | `qty_cap` | `1` |
 | `max_open_positions` | `1` |
 | `daily_loss_ceiling_usd` | `500.0` (Steve, 2026-08-31, st-2j80 — was `100.0`) |
-| `max_attempts` | `2` |
+| `max_attempts` | `10` (Steve, 2026-09-14: "from 2 up to 10. the $500 limit remains as is"; the code default is still `2`) |
 | `open_ct` | `"08:30"` |
 | `close_ct` | `"15:00"` |
 | `no_open_after_ct` | `"14:50"` |

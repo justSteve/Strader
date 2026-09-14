@@ -36,7 +36,10 @@ max_open_positions: 1
 # bind at all: a $2.10 SPX call with a twelve-point stop risks $205 whatever
 # the ceiling says.
 daily_loss_ceiling_usd: 500.0
-max_attempts: 2
+# 2 → 10, Steve 2026-09-14: "adjust rule that puts the number of loss
+# transactions from 2 up to 10. the $500 limit remains as is." The seed
+# matches his live file so a fresh install does not quietly revert it.
+max_attempts: 10
 
 # The session, in Central time. Nothing opens after no_open_after_ct; exits are
 # not gated by any of these.
