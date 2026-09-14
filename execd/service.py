@@ -333,6 +333,12 @@ class ExecService:
     def day_state(self) -> DayState:
         return self.journal.day_state()
 
+    def has_exposure(self) -> bool:
+        """Anything the watcher should be watching: a position held, or an
+        entry the broker acknowledged and has not resolved. [st-k6gl]"""
+        with self._lock:
+            return bool(self._open or self._working)
+
     def quote(self, symbol: str) -> Quote:
         return self.broker.quote(symbol)
 

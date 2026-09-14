@@ -29,7 +29,9 @@ from strader.execution.fd0 import Fd0
 from strader.intent import grammar
 from strader.intent.bracket import NotBracketable, bracket
 from strader.intent.entities import DayPlan, Intent, Order, StructureTemplate
-from strader.intent.execd import DeskExecd, ExecdUnreachable, describe, intent_for, repo_sha
+from strader.intent.execd import (
+    DeskExecd, ExecdUnreachable, describe, describe_place, intent_for, repo_sha,
+)
 from strader.intent.readback import anchor_echo, order_line, read_back
 from strader.intent.tos import occ_symbols, render
 
@@ -39,7 +41,7 @@ DEFAULT_PLAN_DIR = Path(__file__).resolve().parents[2] / "data" / "intent"
 # a staged intent older than this is refused by "yes" — say it again; the tape has moved
 PENDING_MAX_MINUTES = 10
 VERBS = ("read", "mark", "call", "arm", "yes", "no", "fly", "single", "price", "go",
-         "stand down", "show", "frame", "basis", "replay")
+         "send", "stand down", "show", "frame", "basis", "replay")
 
 
 class Session:
@@ -124,6 +126,7 @@ class Session:
         fn = {"read": self.read, "mark": self.mark, "call": self.call, "arm": self.arm,
               "yes": lambda _r: self.yes(), "no": lambda _r: self.no(), "fly": self.fly,
               "single": self.single, "show": lambda _r: self.show(), "go": lambda _r: self.go(),
+              "send": lambda _r: self.send(),
               "frame": self.frame, "basis": self.basis, "replay": self.replay}.get(verb)
         if fn is None:
             return self.read(text)
@@ -442,6 +445,69 @@ class Session:
         text = describe(ans)
         self._log(f"execd {intent_id}: HTTP {ans.status} — {text.splitlines()[0]}")
         return "\n" + text
+
+    # ---------------------------------------------------------------- send
+    def _last_staged(self) -> tuple[Path | None, dict | None]:
+        """The newest staged record of this day's plan — what ``go`` wrote."""
+        staged_dir = self.plan_dir / "staged"
+        if not staged_dir.is_dir():
+            return None, None
+        for path in sorted(staged_dir.glob("*.json"), reverse=True):
+            try:
+                rec = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if rec.get("plan") == self.path.name:
+                return path, rec
+        return None, None
+
+    def send(self) -> str:
+        """Send what ``go`` staged and execd previewed — the same intent, the
+        same id — through ``POST /place``. The service applies its rules
+        again and the broker's preview again before the one order goes.
+
+        Refuses, in the desk's own words, when there is nothing staged, when
+        the last ``go`` was not previewed and accepted, and when the staged
+        record is older than ``PENDING_MAX_MINUTES`` (the tape has moved: say
+        price, go, send again). A repeat is safe: the service answers an id it
+        already sent from its journal."""
+        if self.execd is None:
+            return "No execution service is wired (--no-execd). Nothing sent."
+        path, rec = self._last_staged()
+        if rec is None:
+            return "Nothing staged. Say price, then go, then send."
+        ex = rec.get("execd") or {}
+        if not ex.get("routed") or "intent" not in ex:
+            return "The last go did not reach execd. Say go again, then send."
+        if ex.get("status") != 200:
+            return ("The last go was not accepted by execd's preview — "
+                    "say go again and read its answer before send.")
+        try:
+            staged_at = dt.datetime.fromisoformat(rec["staged_at"])
+            age = (dt.datetime.now(CT) - staged_at).total_seconds() / 60
+        except (KeyError, ValueError):
+            age = None
+        if age is not None and age > PENDING_MAX_MINUTES:
+            return (f"That was staged {age:.0f} minutes ago and the tape has moved. "
+                    f"Say price, then go, then send.")
+        intent = ex["intent"]
+        try:
+            ans = self.execd.place(intent)
+        except ExecdUnreachable as e:
+            self._log(f"send {intent['intent_id']}: execd unreachable — {e}")
+            self._save()
+            return f"Execd not reachable ({e}). Nothing sent."
+        ex["place"] = {"sent_at": dt.datetime.now(CT).isoformat(timespec="seconds"),
+                       "status": ans.status, "answer": ans.body}
+        rec["execd"] = ex
+        try:
+            path.write_text(json.dumps(rec, indent=2), encoding="utf-8")
+        except OSError as e:
+            log.error("intent: could not record the send on %s: %s", path, e)
+        text = describe_place(ans)
+        self._log(f"send {intent['intent_id']}: HTTP {ans.status} — {text.splitlines()[0]}")
+        self._save()
+        return text
 
     def stand_down(self) -> str:
         self.plan.orders = []

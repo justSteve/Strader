@@ -113,7 +113,7 @@ be reached.
 | `POST /place` | the one path that transmits |
 | `POST /cancel` · `POST /flatten` | getting out |
 | `POST /stand-down` · `POST /stop` | done for the day; the kill switch on |
-| `POST /observe` · `POST /poll-fills` | feed it the SPX mark; pick up a stop that fired |
+| `POST /observe` · `POST /poll-fills` | feed it the SPX mark; pick up a stop that fired — driven in-process by `execd/watch.py` since stage 4 (every 5 s while a position or working entry exists) |
 
 | `GET /marketdata/<kind>` | the raw Schwab body for `quotes`, `chains` or `pricehistory`, query allow-listed to that resource's own parameters — the readers' door (stage 3) |
 

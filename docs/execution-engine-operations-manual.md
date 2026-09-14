@@ -133,6 +133,7 @@ line before the split, because it is two words.
 | `single` | free text | full read-back | appends a `StructureTemplate` with `vehicle="single"` |
 | `price` | — | order line + paste line + FD0 block | resolves the **last** structure against the loaded chain; sets `plan.orders` and `plan.bracket` |
 | `go` | — | the staged paste line and legs, then execd's answer (§3.11) | writes `data/intent/staged/<stamp>-<shape>.json`; a single goes to execd as an intent for a **preview**, journaled under `desk-<stamp>`; **sends nothing** |
+| `send` | — | `SENT AND FILLED: order …`, `SENT: order … WORKING …`, or the refusal | **the one verb that transmits**: the intent `go` previewed, same id, to `POST /place`; refused at the desk unless the last `go` was accepted by execd within ten minutes; a repeat is answered from the service's journal, never re-sent (§3.11) |
 | `stand down` | — | `Standing down. Nothing priced, nothing pending.` | clears orders, bracket and pending |
 | `show` | — | full read-back | none beyond rendering |
 | `frame` | `es` \| `spx` | `Bare prices are ES from here on.` | sets `plan.frame_default`; anything else answers `Frame is ES or SPX.` |
@@ -290,10 +291,23 @@ untouched. Two calls, and no third:
 | `DeskExecd.chain(expiry)` | `GET /marketdata/chains?symbol=$SPX&contractType=ALL&strikeCount=40&includeUnderlyingQuote=true&fromDate=…&toDate=…` | Schwab's chain body; `live_chain()` turns it into the `Chain` that `price` resolves against. Answers while LOCKED. |
 | `DeskExecd.preview(intent)` | `POST /preview` | 200 with `preview.{price, cost_usd, commission_usd, total_usd, accepted, messages}`; 409 with `refused.{bound, reason}`; 400 malformed; 502 broker down. |
 
-**There is no `DeskExecd.place`**, and `tests/execd/test_desk_join.py`
-asserts its absence. The wall between "priced" and "sent" is crossed by a later
-commit on the same bead, after the rehearsal has been read back against the
-service's journal.
+**`send` is the third call** (`DeskExecd.place`, `POST /place`), added the
+same morning on Steve's word ("i want to see the full life cycle now"). It
+sends exactly the intent the last `go` staged and execd previewed, under the
+same id; the desk refuses when nothing is staged, when that preview was not a
+200, or when the record is older than ten minutes. The service runs its rules
+and the broker's preview again before the order goes, rests the protective
+stop on the fill, and the watcher (§5.16) feeds it the SPX mark from then on.
+There is no cancel, flatten or stop on the desk — those are the page.
+
+**The life cycle, in the words the desk answers with:** `single …` → `price`
+(the live chain, the paste line, FD0's stop) → `go` (`Execd preview, nothing
+sent: … cost $…; the broker accepts it.`) → `send` (`SENT AND FILLED: order
+N, 1 at 2.10 ($210.00). Protective stop resting at the broker: order M at
+1.45. The service watches the SPX mark; STOP and FLATTEN are on your page.`)
+→ the exit: the watcher fires FD0's SPX-level exit, or the broker's stop
+fills, or FLATTEN on the page → the journal, read back against Schwab's
+orders. `tests/execd/test_desk_join.py` walks that whole path over the mock.
 
 **The intent** (`intent_for`): one OCC leg from `occ_symbols`, `BUY_TO_OPEN`,
 the lot count, `LIMIT` at the priced ask, `source: intent-desk`, `engine_sha`
@@ -322,6 +336,12 @@ the door; `price` resolved a 1-lot 0DTE call at the ask with an FD0 bracket;
 (`window`) under `desk-20260914T073956`. The broker was not asked — the bounds
 come first. The first preview that reaches Schwab needs the session window
 (08:30–14:50 CT) and the service ARMED.
+
+**Every change to `execd/` reaches the running service only through the
+install** (the copy at `/opt/execd` is Steve's to write). The handle is
+`installExecd` (COO `factory/templates/bashrc.d/execd-install.sh`): pulls
+Strader fast-forward only, runs the install, reminds that the restarted
+service is LOCKED until unlocked on the page. Interactive terminals only.
 
 **The raw preview shape.** The bead's residue from `st-p9mx`: the preview,
 place and cancel bodies in `tests/execd/test_schwab.py` are spec-derived. The
@@ -954,6 +974,26 @@ files only as fallback. `reauthData` / `reauthTrade` answer with the page's
 address once `/opt/execd/INSTALLED` exists.
 
 ---
+
+### 5.16 The watcher (stage 4, st-k6gl)
+
+`execd/watch.py`. Found while walking the full life cycle on 2026-09-14:
+`POST /observe` (the SPX-mark exit) and `POST /poll-fills` (the fill sweep)
+existed from stage 1 and **nothing in the tree called either one**. A fill
+rested its broker stop and then sat unwatched by the accurate loop until the
+next `place` or `flatten` happened to reconcile.
+
+`Watcher` is a daemon thread started by `__main__` (`--watch-interval`,
+default 5 s; `0` turns it off, trials only). Each pass: LOCKED → nothing (no
+credential, no exit possible); no position and no working entry → nothing;
+otherwise `reconcile()` (the broker's truth on fills and what closed), then
+the index mark into `observe()`, which fires FD0's SPX-level exit. Every
+5 s while exposed, every 30 s idle. A broker outage is one `error kind=watch`
+journal line per outage and a `watch: broker back` line when it clears; an
+unexpected exception is logged and the loop continues. It never opens
+anything — `reconcile` and `observe` are exit-class.
+
+Reaches the running service at the next install (`installExecd`).
 
 ## 6. The feed and the credential
 

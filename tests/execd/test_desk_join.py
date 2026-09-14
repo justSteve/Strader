@@ -146,8 +146,64 @@ def test_a_transport_that_keeps_the_raw_body_gets_it_journaled(armed, broker, tm
     assert lines[2]["body"] == body
 
 
-def test_the_desk_has_no_way_to_place():
-    """The wall, asserted: the desk's client cannot be asked to send."""
-    assert not hasattr(DeskExecd, "place")
+def test_the_full_life_cycle_price_go_send_fill_stop_watch_exit(door, armed, broker, tmp_path):
+    """Steve, 2026-09-14: "i want to see the full life cycle now." Price on
+    the live chain, go (preview), send (place), the fill, the protective stop
+    resting at the broker, the watcher feeding the SPX mark, the exit firing
+    when the mark crosses FD0's level, the position gone."""
+    from execd.watch import Watcher
+
+    s = Session(plan_dir=tmp_path, day=DAY, execd=door)
+    s.single("one call, 0DTE")
+    s.price(live_chain(door, DAY))
+    assert "Execd preview, nothing sent" in s.go()
+
+    out = s.send()
+    assert out.startswith("SENT AND FILLED: order ")
+    assert "1 at 2.10 ($210.00)" in out
+    assert "Protective stop resting at the broker: order" in out
+    kinds = [c[0] for c in broker.calls if c[0] in ("preview", "place")]
+    assert kinds == ["preview", "preview", "place", "place"]      # go, send's own, entry, stop
+    st = armed.status()
+    assert len(st["positions"]) == 1 and st["positions"][0]["symbol"] == CALL
+    stop_spx = st["positions"][0]["stop_spx"]
+    rec = json.loads(next((tmp_path / "staged").glob("*-single.json")).read_text())
+    assert rec["execd"]["place"]["status"] == 200
+    assert rec["execd"]["place"]["answer"]["order"]["status"] == "FILLED"
+    intent_id = rec["execd"]["intent"]["intent_id"]
+    events = [e["event"] for e in armed.journal.find(intent_id)]
+    assert events[:2] == ["request", "preview"]                   # go
+    assert "placed" in events and "filled" in events and "stop_placed" in events
+
+    # a second send is answered from the journal, never re-sent
+    again = s.send()
+    assert again.startswith("Already sent earlier under this id")
+    assert [c[0] for c in broker.calls].count("place") == 2
+
+    # the watcher: flat SPX, nothing fires; SPX through FD0's level, the exit goes
+    w = Watcher(armed)
+    r = w.once()
+    assert "skipped" not in r and r["observe"]["fired"] == []
+    broker.set_quote("$SPX", bid=stop_spx - 1.25, ask=stop_spx - 0.75, last=stop_spx - 1.0)
+    r = w.once()
+    assert r["observe"]["fired"] and r["observe"]["fired"][0]["symbol"] == CALL
+    assert "exit_triggered" in [e["event"] for e in armed.journal.find(intent_id)]
+
+
+def test_send_refuses_without_an_accepted_go(door, armed, broker, tmp_path):
+    s = Session(plan_dir=tmp_path, day=DAY, execd=door)
+    assert s.send() == "Nothing staged. Say price, then go, then send."
+    s.single("one call, 0DTE")
+    s.price(live_chain(door, DAY))
+    armed.stop()
+    assert "Execd refused (" in s.go()
+    assert "not accepted by execd's preview" in s.send()
+    assert not any(c[0] == "place" for c in broker.calls)
+
+
+def test_the_desk_has_no_cancel_or_flatten():
+    """Getting out is Steve's page: STOP, FLATTEN, stand down. The desk can
+    preview and send one entry, and nothing else."""
     assert not hasattr(DeskExecd, "cancel")
     assert not hasattr(DeskExecd, "flatten")
+    assert not hasattr(DeskExecd, "stop")

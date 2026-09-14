@@ -47,6 +47,7 @@ from .page import DEFAULT_CALLBACK_URL, PAGE_HOST, PAGE_PORT, CredentialFile, cr
 from .schwab import Credential, SchwabBroker, trading_payload
 from .service import ExecService, ServiceConfig
 from .vault import BadPassphrase, Vault, VaultError
+from .watch import INTERVAL_S as WATCH_INTERVAL_S, Watcher
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_VAULT = "/var/lib/execd/vault.json"
@@ -164,6 +165,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--callback-url", default=DEFAULT_CALLBACK_URL,
                    help="the OAuth callback both Schwab apps are registered with, for the "
                         "page's re-authorisation (default: %(default)s)")
+    p.add_argument("--watch-interval", type=float, default=WATCH_INTERVAL_S,
+                   help="seconds between SPX-mark reads while a position or working entry "
+                        "exists — the exit loop and the fill sweep (default: %(default)s; "
+                        "0 turns the watcher off, for trials only)")
     return p
 
 
@@ -264,6 +269,14 @@ def main(argv: list[str] | None = None) -> int:
     name = "mock" if args.mock else "schwab"
     print(f"execd {config.sha} on {BIND_HOST}:{args.port} — broker={name}, "
           f"state={config.state_dir}, arming={service.arming.state.value}", file=sys.stderr)
+    if args.watch_interval > 0:
+        # The loop that watches a live position: fills picked up, the SPX-mark
+        # exit fired. Without it a fill rests its broker stop and then sits
+        # unwatched until the next place or flatten (st-k6gl).
+        Watcher(service, interval_s=args.watch_interval).start()
+        print(f"execd watch: every {args.watch_interval:g}s while exposed", file=sys.stderr)
+    else:
+        print("execd watch: OFF — no SPX-mark exit loop, no fill sweep", file=sys.stderr)
     if not args.no_page:
         page = create_page(service, vault=args.vault, market=market,
                            callback_url=args.callback_url)

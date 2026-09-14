@@ -32,15 +32,33 @@ def _chain():
 class FakeExecd:
     """Answers with whatever it was told; remembers what it was asked."""
 
-    def __init__(self, answer: Answer | Exception) -> None:
+    def __init__(self, answer: Answer | Exception,
+                 place_answer: Answer | Exception | None = None) -> None:
         self.answer = answer
+        self.place_answer = place_answer
         self.intents: list[dict] = []
+        self.placed: list[dict] = []
 
     def preview(self, intent: dict) -> Answer:
         self.intents.append(intent)
         if isinstance(self.answer, Exception):
             raise self.answer
         return self.answer
+
+    def place(self, intent: dict) -> Answer:
+        self.placed.append(intent)
+        if isinstance(self.place_answer, Exception):
+            raise self.place_answer
+        assert self.place_answer is not None, "the test did not expect a send"
+        return self.place_answer
+
+
+def _filled(order_id="4242", stop_id="4243") -> Answer:
+    return Answer(200, {"refused": None, "order": {
+        "order_id": order_id, "status": "FILLED", "symbol": "SPXW  260822C06320000",
+        "side": "BUY_TO_OPEN", "qty": 1, "order_type": "LIMIT", "price": 1.55,
+        "filled_qty": 1, "fill_price": 1.52, "message": ""},
+        "preview": {}, "stop_order": {"order_id": stop_id, "status": "WORKING", "price": 1.45}})
 
 
 def _accepted(cost=155.0, commission=0.65) -> Answer:
@@ -166,6 +184,91 @@ def test_a_single_without_a_bracket_still_goes_and_the_service_judges(tmp_path):
     out = s.go()
     assert fake.intents and "stop_spx" not in fake.intents[0]
     assert "Execd refused (protective_stop)" in out
+
+
+# ── send ─────────────────────────────────────────────────────────────────
+
+def test_send_sends_what_go_previewed_under_the_same_id(tmp_path):
+    fake = FakeExecd(_accepted(), place_answer=_filled())
+    s = _priced_single(tmp_path, fake)
+    s.go()
+    out = s.send()
+    assert out.startswith("SENT AND FILLED: order 4242, 1 at 1.52 ($152.00).")
+    assert "Protective stop resting at the broker: order 4243 at 1.45" in out
+    assert fake.placed == fake.intents                              # same intent, same id
+    rec = json.loads(next((tmp_path / "staged").glob("*-single.json")).read_text())
+    assert rec["execd"]["place"]["status"] == 200
+    assert rec["execd"]["place"]["answer"]["order"]["order_id"] == "4242"
+    assert any(line.startswith(("send desk-",)) or " send desk-" in line for line in s.plan.log)
+
+
+def test_send_in_a_fresh_process_finds_the_staged_record(tmp_path):
+    """price in one process, go in the next, send in a third — the pane."""
+    fake = FakeExecd(_accepted(), place_answer=_filled())
+    s = _priced_single(tmp_path, fake)
+    s.go()
+    again = Session(plan_dir=tmp_path, day=DAY, execd=fake)
+    assert again.send().startswith("SENT AND FILLED")
+
+
+def test_send_refuses_when_nothing_is_staged_or_go_was_refused(tmp_path):
+    fake = FakeExecd(Answer(409, {"refused": {"bound": "window", "reason": "closed"}}),
+                     place_answer=_filled())
+    s = _priced_single(tmp_path, fake)
+    assert s.send() == "Nothing staged. Say price, then go, then send."
+    s.go()
+    assert "not accepted by execd's preview" in s.send()
+    assert fake.placed == []
+
+
+def test_send_refuses_a_stale_go(tmp_path):
+    fake = FakeExecd(_accepted(), place_answer=_filled())
+    s = _priced_single(tmp_path, fake)
+    s.go()
+    path = next((tmp_path / "staged").glob("*-single.json"))
+    rec = json.loads(path.read_text())
+    rec["staged_at"] = "2026-08-22T09:00:00-05:00"
+    path.write_text(json.dumps(rec))
+    out = s.send()
+    assert "minutes ago and the tape has moved" in out and fake.placed == []
+
+
+def test_send_with_no_service_wired(tmp_path):
+    s = Session(plan_dir=tmp_path, day=DAY)
+    assert "No execution service is wired" in s.send()
+
+
+def test_send_when_the_service_drops_says_nothing_sent(tmp_path):
+    fake = FakeExecd(_accepted(), place_answer=ExecdUnreachable("execd unreachable at x"))
+    s = _priced_single(tmp_path, fake)
+    s.go()
+    out = s.send()
+    assert "Execd not reachable" in out and "Nothing sent" in out
+
+
+def test_describe_place_every_branch():
+    from strader.intent.execd import describe_place
+    working = Answer(200, {"refused": None, "order": {"order_id": "1", "status": "WORKING",
+                                                       "price": 1.55, "filled_qty": 0},
+                           "working": {"limit": 1.55}, "stop_order": None})
+    assert describe_place(working).startswith("SENT: order 1 is WORKING at the broker at 1.55")
+    rejected = Answer(200, {"refused": None, "order": {"order_id": "2", "status": "REJECTED",
+                                                        "message": "no buying power"}})
+    assert "REJECTED" in describe_place(rejected) and "Nothing is open" in describe_place(rejected)
+    replayed = Answer(200, {"refused": None, "replayed": True,
+                            "order": {"order_id": "3", "status": "FILLED"}})
+    assert describe_place(replayed).startswith("Already sent earlier")
+    bare = _filled()
+    bare.body["stop_order"] = None
+    assert "NO PROTECTIVE STOP RESTED" in describe_place(bare)
+    assert "Nothing sent" in describe_place(Answer(409, {"refused": {"bound": "stop", "reason": "on"}}))
+    assert "check the page" in describe_place(Answer(502, {"error": "broker", "detail": "down"}))
+    assert "Check the page" in describe_place(Answer(500, {"detail": "boom"}))
+
+
+def test_handle_routes_send(tmp_path):
+    s = Session(plan_dir=tmp_path, day=DAY)
+    assert "No execution service is wired" in s.handle("send")
 
 
 # ── intent_for and describe on their own ─────────────────────────────────

@@ -8,11 +8,15 @@ so the rehearsal leaves the same audit trail the live ticket will, and the
 live ticket (one 1-lot, Steve at the STOP button) reuses the id it previewed
 under.
 
+Then ``send`` (Steve's word, 2026-09-14: "i want to see the full life cycle
+now"): the same intent, same id, to ``POST /place``. The service previews it
+again, applies its rules again, sends the one order, and on the fill rests the
+protective stop at the broker and watches the SPX mark (``execd.watch``). A
+repeat of an id the service already sent is answered from its journal, never
+re-sent.
+
 What this module does not do, on purpose:
 
-- It has no ``place``. The wall between "priced" and "sent" is crossed by a
-  later commit on the same bead, after the rehearsal has been read back
-  against the journal. Until then the desk cannot send even if asked.
 - It imports neither ``schwab`` nor ``broker_schwab`` — plain HTTP to the
   loopback with the standard library, the same as the readers' client. The
   gate hook that keeps agent code away from the live API stays exactly as it
@@ -134,6 +138,12 @@ class DeskExecd:
         pass. Sends nothing, in every branch."""
         return self._call("POST", "/preview", intent)
 
+    def place(self, intent: dict[str, Any]) -> Answer:
+        """``POST /place``. The one call that can transmit. The service runs
+        its rules and the broker's preview again, sends the order, and on a
+        fill rests the protective stop. Same intent, same id as the preview."""
+        return self._call("POST", "/place", intent)
+
     def chain(self, expiry: dt.date, *, symbol: str = "$SPX",
               strike_count: int = CHAIN_STRIKES) -> dict[str, Any]:
         """The raw Schwab chain body for one expiry, through the service's
@@ -231,6 +241,50 @@ def describe(ans: Answer) -> str:
     if ans.status == 502:
         return f"Execd could not reach the broker: {detail}. Nothing sent."
     return f"Execd answered HTTP {ans.status}: {detail}. Nothing sent."
+
+
+def describe_place(ans: Answer) -> str:
+    """The service's answer to a send, in the desk's words. Says SENT only
+    when the service says it sent; every other branch says what happened
+    instead."""
+    if ans.status == 200 and isinstance(ans.body.get("order"), dict):
+        o = ans.body["order"]
+        oid = o.get("order_id")
+        if ans.body.get("replayed"):
+            return (f"Already sent earlier under this id — order {oid}, status {o.get('status')}. "
+                    f"Nothing new sent.")
+        status = str(o.get("status", ""))
+        if status == "REJECTED":
+            return (f"Sent, and the broker REJECTED it (order {oid}): "
+                    f"{o.get('message') or 'no reason given'}. Nothing is open.")
+        if status == "FILLED" or o.get("filled_qty"):
+            fill = _f(o.get("fill_price"))
+            qty = int(o.get("filled_qty") or o.get("qty") or 0)
+            head = (f"SENT AND FILLED: order {oid}, {qty} at {fill:.2f} "
+                    f"(${fill * 100 * qty:.2f}).")
+            stop = ans.body.get("stop_order")
+            if isinstance(stop, dict) and stop.get("order_id"):
+                head += (f" Protective stop resting at the broker: order {stop['order_id']} "
+                         f"at {_f(stop.get('price')):.2f}. The service watches the SPX mark; "
+                         f"STOP and FLATTEN are on your page.")
+            else:
+                head += (" ** NO PROTECTIVE STOP RESTED — the position is live and "
+                         "unprotected; FLATTEN on the page if in doubt.")
+            return head
+        work = ans.body.get("working")
+        limit = _f((work or {}).get("limit") or o.get("price"))
+        return (f"SENT: order {oid} is {status} at the broker at {limit:.2f}, not filled yet. "
+                f"The service is watching it; the stop rests when it fills.")
+    if ans.status == 409 and ans.refused is not None:
+        r = ans.refused
+        return f"Execd refused ({r.get('bound')}): {r.get('reason')}. Nothing sent."
+    detail = ans.body.get("detail") or ans.body
+    if ans.status == 400:
+        return f"Execd rejected the intent as malformed: {detail}. Nothing sent."
+    if ans.status == 502:
+        return (f"Execd could not reach the broker: {detail}. Nothing was sent that the "
+                f"service knows of — check the page's orders before sending again.")
+    return f"Execd answered HTTP {ans.status}: {detail}. Check the page before sending again."
 
 
 def _f(v: Any) -> float:
