@@ -6,9 +6,13 @@ Two claims are tested here that the rest of the service depends on:
 resetting it — a bug that would hand Steve a fresh $100 of loss and two fresh
 attempts every time the box came back, which on this box is not hypothetical.
 
-And **losses only debit**: a winner does not buy back an attempt or raise the
-ceiling. That is FD0's ``Budget`` semantics, and it is the difference between a
-ceiling on the day's damage and a running P&L.
+And **losses only debit the ceiling**: a winner does not raise it. That is
+FD0's ``Budget`` semantics, and it is the difference between a ceiling on the
+day's damage and a running P&L.
+
+Attempts follow Steve's 2026-09-14 rule (st-fn5y): an attempt is a filled
+position; one that closes at break-even or better gives its attempt back; a
+working entry holds a slot but no attempt. ``TestAttemptsAreLosingFills``.
 """
 
 from __future__ import annotations
@@ -137,15 +141,17 @@ class TestDayState:
         close(journal, pnl=-40.0)
         assert journal.day_state().realized_loss_usd == 40.0
 
-    def test_a_win_does_not_credit_it_back(self, journal):
-        """Read the module docstring. This is the bound, not a P&L."""
+    def test_a_win_does_not_credit_the_ceiling_back(self, journal):
+        """Read the module docstring. The ceiling is the bound, not a P&L.
+        The attempt count is a different rule since 2026-09-14: the winner
+        gives back its OWN attempt, never the loser's."""
         fill(journal, intent_id="t-1")
         close(journal, pnl=-60.0, intent_id="t-1")
         fill(journal, intent_id="t-2")
         close(journal, pnl=+500.0, intent_id="t-2")
         s = journal.day_state()
         assert s.realized_loss_usd == 60.0
-        assert s.attempts_used == 2
+        assert s.attempts_used == 1
 
     def test_losses_accumulate(self, journal):
         for i, pnl in enumerate((-30.0, -45.5)):
@@ -185,3 +191,77 @@ class TestDayState:
         second = Journal(tmp_path / "journal", sha="abc1234", clock=clock)
         s = second.day_state()
         assert (s.realized_loss_usd, s.attempts_used) == (80.0, 1)
+
+
+class TestAttemptsAreLosingFills:
+    """Steve, 2026-09-14 (st-fn5y): "An 'attempt' is a 'filled position'. Any
+    attempt that breaks even or better doesn't decrement the counter." Four
+    cases, one each: a winning close returns the attempt, a losing close
+    keeps it, an open fill holds it, a working entry holds a slot but no
+    attempt."""
+
+    def test_a_winning_close_returns_the_attempt(self, journal):
+        fill(journal)
+        close(journal, pnl=+35.0)
+        s = journal.day_state()
+        assert (s.open_positions, s.attempts_used) == (0, 0)
+
+    def test_a_break_even_close_returns_the_attempt_too(self, journal):
+        fill(journal)
+        close(journal, pnl=0.0)
+        assert journal.day_state().attempts_used == 0
+
+    def test_a_losing_close_keeps_the_attempt(self, journal):
+        fill(journal)
+        close(journal, pnl=-0.01)
+        s = journal.day_state()
+        assert (s.open_positions, s.attempts_used) == (0, 1)
+
+    def test_an_open_fill_holds_the_attempt(self, journal):
+        fill(journal)
+        s = journal.day_state()
+        assert (s.open_positions, s.attempts_used) == (1, 1)
+
+    def test_a_working_entry_holds_a_slot_but_no_attempt(self, journal):
+        journal.record("working", kind="entry", symbol=CALL, qty=1, order_id="w-1",
+                       intent_id="t-1")
+        s = journal.day_state()
+        assert (s.open_positions, s.attempts_used) == (1, 0)
+        journal.record("entry_resolved", order_id="w-1", outcome="canceled")
+        assert journal.day_state() == journal.day_state()
+        assert (journal.day_state().open_positions, journal.day_state().attempts_used) == (0, 0)
+
+    def test_a_partial_loss_then_a_bigger_gain_is_judged_as_one_position(self, journal):
+        """The attempt is judged on the whole position when nothing is left,
+        not on the last line alone."""
+        journal.record("filled", kind="entry", symbol=CALL, qty=2, price=2.10, intent_id="t-2")
+        journal.record("closed", symbol=CALL, qty=1, remaining_qty=1, pnl_usd=-10.0,
+                       intent_id="t-2")
+        assert journal.day_state().attempts_used == 1          # still open: held
+        journal.record("closed", symbol=CALL, qty=1, remaining_qty=0, pnl_usd=+40.0,
+                       intent_id="t-2")
+        s = journal.day_state()
+        assert (s.open_positions, s.attempts_used, s.realized_loss_usd) == (0, 0, 10.0)
+
+    def test_a_partial_gain_then_a_bigger_loss_keeps_it(self, journal):
+        journal.record("filled", kind="entry", symbol=CALL, qty=2, price=2.10, intent_id="t-3")
+        journal.record("closed", symbol=CALL, qty=1, remaining_qty=1, pnl_usd=+10.0,
+                       intent_id="t-3")
+        journal.record("closed", symbol=CALL, qty=1, remaining_qty=0, pnl_usd=-40.0,
+                       intent_id="t-3")
+        assert journal.day_state().attempts_used == 1
+
+    def test_a_close_of_a_position_this_service_did_not_open_costs_no_attempt(self, journal):
+        journal.record("position_adopted", symbol=CALL, qty=1)
+        close(journal, pnl=-90.0, intent_id=f"adopted:{CALL}")
+        s = journal.day_state()
+        assert (s.attempts_used, s.realized_loss_usd) == (0, 90.0)
+
+    def test_ten_losses_are_ten_attempts_and_ten_wins_are_none(self, journal):
+        for i in range(10):
+            fill(journal, intent_id=f"L-{i}")
+            close(journal, pnl=-5.0, intent_id=f"L-{i}")
+        for i in range(10):
+            fill(journal, intent_id=f"W-{i}")
+            close(journal, pnl=+5.0, intent_id=f"W-{i}")
+        assert journal.day_state().attempts_used == 10

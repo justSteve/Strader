@@ -424,9 +424,11 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 error = str(exc)
         return {"mode": st["mode"], "arming": st["arming"], "day": st["day"],
                 "pnl": st.get("pnl"), "positions": st["positions"],
+                "working": st["working"],
                 "quote": quote, "spx": spx,
                 "quote_html": quote_html(quote, spx, error),
-                "position_html": position_html(st), "state_html": state_html(st)}
+                "position_html": position_html(st, _actions()),
+                "state_html": state_html(st)}
 
     @bp.post("/order/preview")
     def order_preview():
@@ -457,7 +459,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 f"${float(p.get('total_usd') or 0):.2f}; "
                 + ("the broker accepts it." if p.get("accepted") else "the broker would REJECT it: "
                    + "; ".join(p.get("messages") or [])))
-        nonce = nonces.issue("send", PREVIEW_TTL_S, intent=intent)
+        nonce = nonces.issue("send", PREVIEW_TTL_S, intent=intent, query=sel.as_query())
         return _order_page(sel, nonce=nonce, preview=out, preview_text=text)
 
     @bp.post("/order/send")
@@ -468,7 +470,8 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                                     f"than {int(PREVIEW_TTL_S)} s — preview again."), code=303)
         intent = item.extra.get("intent") or {}
         try:
-            out = service.place(OrderIntent.from_dict(intent))
+            out = service.place(OrderIntent.from_dict(intent),
+                                page_query=item.extra.get("query") or None)
         except Refused as exc:
             return redirect(url_for("exec.order", bad=f"Refused ({exc.refusal.bound}): "
                                     f"{exc.refusal.reason}. Nothing sent."), code=303)
@@ -480,13 +483,72 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
             return redirect(url_for("exec.order", bad=f"Not sent: {exc}"), code=303)
         return redirect(url_for("exec.order", msg=_describe_place(out)), code=303)
 
+    # ── the bracket's live editor and the working entry's cancel (st-fn5y) ──
+    @bp.post("/order/adjust")
+    def order_adjust():
+        """UPDATE on the position card: both trigger conditions, one button.
+        Steve, 2026-09-14: "a live editor allowing an update to both"."""
+        symbol = request.form.get("symbol", "")
+        try:
+            stop = _form_price("stop_price")
+            target = _form_price("target_price")
+            if stop is None and target is None:
+                return redirect(url_for("exec.order", bad="Nothing to update: enter a stop, "
+                                        "a target, or both."), code=303)
+            out = service.adjust(symbol, stop_price=stop, target_price=target)
+        except Refused as exc:
+            return redirect(url_for("exec.order", bad=f"Refused ({exc.refusal.bound}): "
+                                    f"{exc.refusal.reason}. Nothing changed."), code=303)
+        except BrokerError as exc:
+            return redirect(url_for("exec.order", bad=f"The broker could not be reached: {exc}. "
+                                    f"Read the position card before trying again."), code=303)
+        except ValueError as exc:
+            return redirect(url_for("exec.order", bad=f"Not updated: {exc}"), code=303)
+        if out.get("refused"):
+            r = out["refused"]
+            return redirect(url_for("exec.order", bad=f"Refused ({r.get('bound')}): "
+                                    f"{r.get('reason')}."), code=303)
+        return redirect(url_for("exec.order", msg=_describe_adjust(out)), code=303)
+
+    @bp.post("/order/cancel")
+    def order_cancel():
+        """CANCEL AND RE-PRICE on the working-entry card. Steve, 2026-09-14:
+        "assume the canceled order will be re-priced and re-armed" — so the
+        form comes back with the selection the entry was priced from."""
+        order_id = request.form.get("order_id", "")
+        query: dict[str, str] = {}
+        for w in service.status()["working"]:
+            if w.get("order_id") == order_id and isinstance(w.get("page_query"), dict):
+                query = {str(k): str(v) for k, v in w["page_query"].items()}
+        try:
+            service.cancel(order_id)
+        except Refused as exc:
+            return redirect(url_for("exec.order", bad=f"Refused ({exc.refusal.bound}): "
+                                    f"{exc.refusal.reason}. Nothing changed."), code=303)
+        except BrokerError as exc:
+            return redirect(url_for("exec.order", bad=f"The broker could not be reached: {exc}. "
+                                    f"Nothing cancelled that the service knows of."), code=303)
+        except ValueError as exc:
+            return redirect(url_for("exec.order", bad=f"Not cancelled: {exc}"), code=303)
+        return redirect(url_for("exec.order", **query, msg=f"Cancelled {order_id}."), code=303)
+
+    def _form_price(name: str) -> float | None:
+        raw = (request.form.get(name) or "").strip()
+        if not raw:
+            return None
+        try:
+            return float(raw)
+        except ValueError:
+            raise ValueError(f"{name.replace('_', ' ')} must be a number, not {raw!r}") from None
+
     def _actions() -> dict[str, str]:
         """Absolute paths for every form, so a page served at ``/exec/flatten``
         posts its confirm to ``/exec/flatten/confirm`` and not to a sibling."""
         return {name: url_for(f"exec.{name}") for name in (
             "index", "unlock", "stop", "resume", "stand_down", "lock", "flatten",
             "flatten_confirm", "reauth_link", "reauth_store",
-            "order", "order_price", "order_state", "order_preview", "order_send")}
+            "order", "order_price", "order_state", "order_preview", "order_send",
+            "order_adjust", "order_cancel")}
 
     app.register_blueprint(bp)
     return app
@@ -588,6 +650,10 @@ _STYLE = """
  .cancel{background:#1f2937;color:#9ca3af}
  input[type=password],input[type=text],textarea{width:100%;box-sizing:border-box;font-size:1.1em;
       padding:.6em;border-radius:8px;border:1px solid #374151;background:#0b1020;color:#e5e7eb}
+ .bracket{display:grid;grid-template-columns:1fr 1fr;gap:.6em;margin:.6em 0 0}
+ .bracket label{display:block;color:#9ca3af;font-size:.9em}
+ .bracket input{width:100%;box-sizing:border-box;font-size:1.1em;padding:.6em;border-radius:8px;
+      border:1px solid #374151;background:#0b1020;color:#e5e7eb}
  .msg{background:#064e3b;border:1px solid #10b981;border-radius:10px;padding:.7em 1em}
  .bad{background:#7f1d1d;border:1px solid #ef4444;border-radius:10px;padding:.7em 1em}
  table{width:100%;border-collapse:collapse;font-size:.92em}
@@ -763,12 +829,42 @@ def _describe_place(out: dict[str, Any]) -> str:
         qty = int(o.get("filled_qty") or o.get("qty") or 0)
         head = f"{word}SENT AND FILLED: order {oid}, {qty} at {fill:.2f} (${fill * 100 * qty:.2f})."
         stop = out.get("stop_order")
+        target = out.get("target_order")
+        if isinstance(target, dict) and target.get("closed"):
+            c = target["closed"]
+            tail = (f" The take-profit filled the moment it landed at "
+                    f"{float(c.get('exit_price') or 0):.2f} — the position is closed "
+                    f"({_money(c.get('pnl_usd'))}).")
+        elif isinstance(target, dict) and target.get("order_id"):
+            tail = (f" Take-profit resting: order {target['order_id']} at "
+                    f"{float(target.get('price') or 0):.2f}.")
+        else:
+            tail = " No take-profit rested — the journal says why."
         if isinstance(stop, dict) and stop.get("order_id"):
             return head + (f" Protective stop resting: order {stop['order_id']} at "
-                           f"{float(stop.get('price') or 0):.2f}. The service watches the SPX mark.")
-        return head + " ** NO PROTECTIVE STOP RESTED — FLATTEN if in doubt."
+                           f"{float(stop.get('price') or 0):.2f}.") + tail + \
+                " The service watches the SPX mark."
+        return head + " ** NO PROTECTIVE STOP RESTED — FLATTEN if in doubt." + tail
     return (f"{word}SENT: order {oid} is {status} at the broker, not filled yet; "
-            f"the stop rests when it fills.")
+            f"the bracket rests when it fills.")
+
+
+def _describe_adjust(out: dict[str, Any]) -> str:
+    """The service's answer to an UPDATE, in plain words."""
+    word = "PAPER (simulated) — " if out.get("mode") == "paper" else ""
+    parts: list[str] = []
+    for leg, name in (("stop", "Stop"), ("target", "Target")):
+        r = out.get(leg)
+        if not isinstance(r, dict):
+            continue
+        if r.get("moved"):
+            line = f"{name} moved from {float(r.get('old_price') or 0):.2f} to {float(r['new_price']):.2f}"
+            if leg == "stop" and r.get("stop_spx") is not None:
+                line += f" (SPX cut level now {float(r['stop_spx']):.2f})"
+            parts.append(line + ".")
+        else:
+            parts.append(f"{name} NOT moved: {r.get('error') or 'no reason given'}.")
+    return word + (" ".join(parts) if parts else "Nothing changed.")
 
 
 def _money_class(v: Any) -> str:
@@ -790,10 +886,12 @@ def _money(v: Any) -> str:
     return f"{sign}${abs(v):,.2f}"
 
 
-def _render_position(p: dict[str, Any]) -> str:
+def _render_position(p: dict[str, Any], adjust_action: str | None = None) -> str:
     """One open position: the contract, the entry, the live bid and ask, and
     every part of the money — cost, value at the bid, unrealized, both
-    commissions, the net if closed now, the net at the stop."""
+    commissions, the net if closed now, the net at the stop and at the
+    target. With ``adjust_action``, the bracket's live editor: two inputs
+    pre-filled with the resting prices and one UPDATE button (st-fn5y)."""
     v = p.get("valuation") or {}
     qty = p["qty"]
     sym = str(p["symbol"]).strip()
@@ -818,14 +916,29 @@ def _render_position(p: dict[str, Any]) -> str:
                      + (f" (order {p['stop_order_id']})" if p.get("stop_order_id") else " (NO STOP RESTING)")))
     else:
         rows.append(("at the stop", "NO STOP — the position is unprotected"))
+    if p.get("target_price") is not None:
+        rows.append(("at the target", f"target {p['target_price']:.2f} → net {_money(v.get('at_target_usd'))}"
+                     + (f" (order {p['target_order_id']})" if p.get("target_order_id") else " (NO TARGET RESTING)")))
+    else:
+        rows.append(("at the target", "NO TARGET — the journal says why"))
     if p.get("stop_spx") is not None:
         rows.append(("SPX cut level", f"{p['stop_spx']:.2f}"))
     if p.get("exit_order_id"):
         rows.append(("exit in flight", f"order {p['exit_order_id']} ({p.get('exit_reason')})"))
     cls = "pos-up" if isinstance(v.get("net_if_closed_usd"), (int, float)) and v["net_if_closed_usd"] >= 0 else "pos-down"
-    return (f"<h2>Open position</h2><div class='card {cls}'><table>" + "".join(
+    html = (f"<h2>Open position</h2><div class='card {cls}'><table>" + "".join(
         f"<tr><td>{esc(k)}</td><td>{esc(str(val))}</td></tr>" for k, val in rows)
-        + "</table></div>")
+        + "</table>")
+    if adjust_action and not p.get("exit_order_id"):
+        stop_val = f"{p['stop_price']:.2f}" if p.get("stop_price") is not None else ""
+        target_val = f"{p['target_price']:.2f}" if p.get("target_price") is not None else ""
+        html += (f"<form method=post action='{adjust_action}' class=adjust>"
+                 f"<input type=hidden name=symbol value='{esc(p['symbol'])}'>"
+                 "<div class=bracket>"
+                 f"<label>stop<input name=stop_price inputmode=decimal value='{stop_val}'></label>"
+                 f"<label>target<input name=target_price inputmode=decimal value='{target_val}'></label>"
+                 "</div><button class='big quiet'>UPDATE</button></form>")
+    return html + "</div>"
 
 
 def _short(v: Any) -> str:

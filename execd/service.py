@@ -28,6 +28,20 @@ cheap to leave room for a stop, a broker that refuses the stop, an adopted
 position with no stop inputs, a stop cancelled by request — writes a
 ``stop_unprotected`` line, and that line is the guarantee.
 
+**The stop and the take-profit are one bracket.** Steve, 2026-09-14 (st-fn5y):
+*"Future filled orders will result in resting 'take profit' orders in addition
+to stoplosses. The screen should be a live editor allowing an update to both
+trigger conditions."* On a fill the service rests both — the SELL STOP below
+and a SELL LIMIT at the target above — and treats them as one-cancels-the-
+other by its own hand, because Schwab's OCO is not something this service
+sends: when either fills, the other comes off before the close is booked;
+``_market_close`` takes both off before its own close goes on and puts both
+back on every failure branch; a partial exit resizes both; :meth:`adjust`
+moves either by the same cancel-then-rest motion and refuses when the cancel
+finds the leg already filled. A target that cannot be derived or rested is
+``target_unprotected`` — a warning, not a fault, because the stop still
+stands. Nothing here replaces an order in place: the transport has no PUT.
+
 **The day's ceiling is read from the journal, not remembered.** A restart
 recovers it. See ``execd.journal``.
 
@@ -56,8 +70,8 @@ from .broker import (
 from .intent import OrderIntent, OrderType, Side, parse_occ
 from .journal import Journal
 from .stops import (
-    CONTRACT_MULTIPLIER, exit_triggered, protective_stop_price, risk_usd,
-    stop_is_consistent,
+    CONTRACT_MULTIPLIER, exit_triggered, on_tick, protective_stop_price, risk_usd,
+    stop_is_consistent, take_profit_price,
 )
 
 
@@ -135,12 +149,19 @@ class WorkingEntry:
     limit: float | None = None
     stop_spx: float | None = None
     delta: float | None = None
+    #: The order page's selection query (side, expiry, strike, delta, budget,
+    #: attempts) the intent was priced from, when the page sent it — so a
+    #: cancel can bring the form back priced fresh (st-fn5y; Steve: "assume
+    #: the canceled order will be re-priced and re-armed"). ``None`` for an
+    #: entry the desk or the API sent.
+    page_query: dict[str, str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "order_id": self.order_id, "symbol": self.symbol, "qty": self.qty,
             "intent_id": self.intent_id, "right": self.right, "limit": self.limit,
             "stop_spx": self.stop_spx, "delta": self.delta,
+            "page_query": dict(self.page_query) if self.page_query else None,
         }
 
 
@@ -165,6 +186,14 @@ class OpenPosition:
     delta: float | None = None
     stop_order_id: str | None = None
     stop_price: float | None = None
+    #: the take-profit half of the bracket (st-fn5y): the resting SELL LIMIT
+    #: and its price. ``None`` when it could not be derived or rested — the
+    #: journal says why under ``target_unprotected``.
+    target_order_id: str | None = None
+    target_price: float | None = None
+    #: the index level when the entry filled; with ``delta`` it is what lets
+    #: an adjusted stop price move the SPX-mark trigger with it
+    entry_spx: float | None = None
     entry_order_id: str = ""
     opened_at: datetime | None = None
     #: first time the broker failed to report this position, or ``None``
@@ -190,6 +219,8 @@ class OpenPosition:
             "intent_id": self.intent_id, "right": self.right,
             "stop_spx": self.stop_spx, "delta": self.delta,
             "stop_order_id": self.stop_order_id, "stop_price": self.stop_price,
+            "target_order_id": self.target_order_id, "target_price": self.target_price,
+            "entry_spx": self.entry_spx,
             "entry_order_id": self.entry_order_id,
             "opened_at": self.opened_at.isoformat() if self.opened_at else None,
             "exit_order_id": self.exit_order_id, "exit_reason": self.exit_reason,
@@ -361,9 +392,10 @@ class ExecService:
         not the mid. ``commissions_usd`` counts both ways: what the entry cost
         (from the broker's preview) and what the exit will cost at the
         published per-contract rate. ``net_if_closed_usd`` is the number Steve
-        asked for; ``at_stop_usd`` is the same arithmetic at the resting
-        stop's price. A quote that cannot be read leaves the money fields
-        ``None`` and says why."""
+        asked for; ``at_stop_usd`` and ``at_target_usd`` are the same
+        arithmetic at the resting stop's and the resting target's price. A
+        quote that cannot be read leaves the money fields ``None`` and says
+        why."""
         n = pos.qty
         cost = round(pos.entry_price * CONTRACT_MULTIPLIER * n, 2)
         exit_fee = round(COMMISSION_PER_CONTRACT_USD * n, 2)
@@ -373,11 +405,14 @@ class ExecService:
             "exit_commission_usd": exit_fee, "commissions_usd": fees,
             "bid": None, "ask": None, "quote_age_s": None,
             "value_usd": None, "unrealized_usd": None, "net_if_closed_usd": None,
-            "at_stop_usd": None, "error": None,
+            "at_stop_usd": None, "at_target_usd": None, "error": None,
         }
         if pos.stop_price is not None:
             out["at_stop_usd"] = round((pos.stop_price - pos.entry_price)
                                        * CONTRACT_MULTIPLIER * n - fees, 2)
+        if pos.target_price is not None:
+            out["at_target_usd"] = round((pos.target_price - pos.entry_price)
+                                         * CONTRACT_MULTIPLIER * n - fees, 2)
         try:
             q = self.broker.quote(pos.symbol)
         except BrokerError as exc:
@@ -470,7 +505,11 @@ class ExecService:
             self.journal.record("preview_raw", intent_id=intent.intent_id, body=prev.raw)
 
     # ── the one path that transmits ──────────────────────────────────────
-    def place(self, intent: OrderIntent) -> dict[str, Any]:
+    def place(self, intent: OrderIntent, *,
+              page_query: dict[str, str] | None = None) -> dict[str, Any]:
+        """``page_query`` is the order page's selection the intent was priced
+        from; it rides on the working entry so a cancel can re-price it. It
+        is never part of the intent and never reaches the broker."""
         with self._lock:
             intent = intent.validated()
 
@@ -489,7 +528,7 @@ class ExecService:
             self.journal.record("request", kind="place", intent_id=intent.intent_id,
                                 intent=intent.to_dict())
             if intent.is_entry:
-                return self._place_entry(intent)
+                return self._place_entry(intent, page_query=page_query)
             return self._place_exit(intent)
 
     def cancel(self, order_id: str) -> dict[str, Any]:
@@ -499,9 +538,12 @@ class ExecService:
         The resting stop under a live position is not an order in the way, it
         is the position's only protection if this box dies. Cancelling it alone
         opens risk, which no exit-class credential may do (finding 5 of the
-        2026-08-30 audit — it used to succeed, silently). The ways out that
-        exist all handle the stop properly: an exit and flatten cancel it in
-        the same motion they close the position it protects."""
+        2026-08-30 audit — it used to succeed, silently). The resting
+        take-profit is the other half of the same bracket and is refused for
+        the same reason: the bracket is edited with :meth:`adjust`, never
+        pulled apart. The ways out that exist all handle both properly: an
+        exit and flatten cancel them in the same motion they close the
+        position they protect."""
         with self._lock:
             if (r := self.arming.permits_exit()) is not None:
                 self.journal.record("refused", kind="cancel", order_id=order_id,
@@ -513,8 +555,19 @@ class ExecService:
                         "protective_stop",
                         f"{order_id} is the resting stop under a live "
                         f"{pos.symbol} position — cancelling it alone leaves "
-                        f"the position unprotected; close it with an exit or "
-                        f"flatten, which take the stop off in the same motion")
+                        f"the position unprotected; move it with adjust, or close "
+                        f"the position with an exit or flatten, which take the "
+                        f"bracket off in the same motion")
+                    self.journal.record("refused", kind="cancel", order_id=order_id,
+                                        refused=refusal.to_dict())
+                    raise Refused(refusal)
+                if pos.target_order_id == order_id:
+                    refusal = Refusal(
+                        "take_profit",
+                        f"{order_id} is the resting take-profit under a live "
+                        f"{pos.symbol} position — it is one half of the bracket; "
+                        f"move it with adjust, or close the position with an exit "
+                        f"or flatten, which take the bracket off in the same motion")
                     self.journal.record("refused", kind="cancel", order_id=order_id,
                                         refused=refusal.to_dict())
                     raise Refused(refusal)
@@ -523,23 +576,24 @@ class ExecService:
             for pos in self._open.values():
                 if pos.exit_order_id == order_id:
                     # The close was pulled by hand; the position is live again
-                    # and gets its protection back, and the SPX loop may fire.
+                    # and gets its bracket back, and the SPX loop may fire.
                     self.journal.record("exit_resolved", symbol=pos.symbol,
                                         order_id=order_id, outcome="canceled",
                                         reason=pos.exit_reason,
                                         detail="cancelled by request")
                     pos.exit_order_id = None
                     pos.exit_reason = None
-                    self._rest_stop_at(pos, pos.stop_price)
+                    self._rest_bracket(pos)
             if order_id in self._working:
                 self._resolve_working(order_id, outcome="canceled",
                                       detail="cancelled by request")
             return {"refused": None, "order": result.to_dict()}
 
     def flatten(self, reason: str = "flatten") -> dict[str, Any]:
-        """Close everything at market. Legal while STOPped, while stood down,
-        and outside the session window — the whole point of the switch is that
-        it never traps him."""
+        """Close everything at market, taking both halves of every bracket
+        off first. Legal while STOPped, while stood down, and outside the
+        session window — the whole point of the switch is that it never traps
+        him."""
         with self._lock:
             if (r := self.arming.permits_exit()) is not None:
                 self.journal.record("refused", kind="flatten", refused=r.to_dict())
@@ -568,8 +622,9 @@ class ExecService:
     def observe(self, spx: float) -> dict[str, Any]:
         """Feed the service the index mark. Fires the SPX-level exit FD0 derived.
 
-        This is the accurate stop while the box is alive; the resting order at
-        the broker is the one that survives it not being."""
+        This is the accurate stop while the box is alive; the resting bracket
+        at the broker is what survives it not being. When it fires, both
+        resting legs come off before the close goes on (``_market_close``)."""
         with self._lock:
             fired: list[dict[str, Any]] = []
             pending: list[dict[str, Any]] = []
@@ -601,17 +656,18 @@ class ExecService:
 
     def poll_fills(self) -> dict[str, Any]:
         """Pick up fills the service did not initiate — a resting protective
-        stop that triggered while nothing was watching."""
+        stop or take-profit that triggered while nothing was watching."""
         with self._lock:
             return self._pick_up_fills()
 
     def _pick_up_fills(self) -> dict[str, Any]:
         """The fill sweep, without the lock, so ``reconcile`` can run it first.
 
-        Order matters: a stop that fired at the broker has to be booked — with
+        Order matters: a leg that fired at the broker has to be booked — with
         its P&L, against the day's ceiling — before the position sweep notices
         the position is gone. Reversed, a losing trade would vanish from the
-        ceiling it was supposed to debit."""
+        ceiling it was supposed to debit. Booking goes through ``_book_close``,
+        which takes the *other* leg of the bracket off first (st-fn5y)."""
         since = self._last_fill_poll
         now = self.clock()
         try:
@@ -631,28 +687,23 @@ class ExecService:
                 why = "in-flight-close"
                 pos.exit_order_id = None
                 pos.exit_reason = None
-            elif pos.stop_order_id and fill.order_id != pos.stop_order_id:
-                continue
+            elif pos.stop_order_id and fill.order_id == pos.stop_order_id:
+                kind, why = "protective-stop", "resting-stop"
+                pos.stop_order_id = None        # it filled; nothing to cancel
+            elif pos.target_order_id and fill.order_id == pos.target_order_id:
+                kind, why = "target", "resting-target"
+                pos.target_order_id = None
+            elif pos.stop_order_id or pos.target_order_id:
+                continue    # a sell this service can name neither leg of
             else:
                 kind, why = "protective-stop", "resting-stop"
             closed_qty = min(fill.qty or pos.qty, pos.qty)
-            remaining = pos.qty - closed_qty
-            pnl = self._pnl_usd(pos, fill.price, closed_qty)
-            self.journal.record("closed", symbol=pos.symbol, qty=closed_qty,
-                                remaining_qty=remaining, intent_id=pos.intent_id,
-                                kind=kind, entry_price=pos.entry_price,
-                                exit_price=fill.price, pnl_usd=pnl,
-                                order_id=fill.order_id, reason=why)
-            if remaining:
-                # The stop that fired took part of the position; what is
-                # left needs one of its own or it is running naked.
-                pos.qty = remaining
-                self._rest_stop_at(pos, pos.stop_price)
-            else:
-                self._open.pop(pos.symbol, None)
+            booked = self._book_close(pos, order_id=fill.order_id, exit_px=fill.price,
+                                      closed_qty=closed_qty, reason=kind, why=why)
             picked.append({"symbol": pos.symbol, "exit_price": fill.price,
-                           "pnl_usd": pnl, "remaining_qty": remaining,
-                           "order_id": fill.order_id})
+                           "pnl_usd": booked["pnl_usd"],
+                           "remaining_qty": booked["remaining_qty"],
+                           "order_id": fill.order_id, "reason": kind})
         return {"picked_up": picked}
 
     # ── the second record ────────────────────────────────────────────────
@@ -742,15 +793,15 @@ class ExecService:
             pos = OpenPosition(
                 symbol=work.symbol, qty=qty, entry_price=fill_px,
                 intent_id=work.intent_id, right=work.right,
-                stop_spx=work.stop_spx, delta=work.delta,
+                stop_spx=work.stop_spx, delta=work.delta, entry_spx=spx,
                 entry_order_id=order.order_id, opened_at=self.clock(),
             )
             self._open[pos.symbol] = pos
         else:
-            # The position grew. Its resting stop is now smaller than what is
-            # held, which is the same silent hole in the other direction, so the
-            # old one comes off before a correctly sized one goes on.
-            self._cancel_protective_stop(pos)
+            # The position grew. Its resting bracket is now smaller than what
+            # is held, which is the same silent hole in the other direction,
+            # so the old legs come off before correctly sized ones go on.
+            self._cancel_bracket(pos)
             pos.qty += qty
         self.journal.record("filled", kind="entry", intent_id=work.intent_id,
                             symbol=pos.symbol, qty=qty, price=fill_px,
@@ -762,8 +813,10 @@ class ExecService:
             self.journal.record("stop_unprotected", symbol=pos.symbol,
                                 intent_id=pos.intent_id, qty=pos.qty,
                                 detail="no index mark at reconcile — cannot derive a stop")
+            self._place_take_profit(pos)
             return
         self._place_protective_stop(pos, spx)
+        self._place_take_profit(pos)
 
     def _reconcile_exits(self, broker_orders: dict[str, OrderResult]) -> list[dict[str, Any]]:
         """What became of the closes this service sent. [st-97z1]
@@ -802,8 +855,8 @@ class ExecService:
             pos.exit_order_id = None
             pos.exit_reason = None
             # The close is not happening; the position is live again and needs
-            # its broker-resident protection back.
-            self._rest_stop_at(pos, pos.stop_price)
+            # its broker-resident bracket back.
+            self._rest_bracket(pos)
             resolved.append({"symbol": pos.symbol, "order_id": order_id,
                              "outcome": outcome, "closed": False})
         return resolved
@@ -857,9 +910,9 @@ class ExecService:
                                     intent_id=pos.intent_id,
                                     detail="the broker's size is the one that is real")
                 corrected.append(symbol)
-                self._cancel_protective_stop(pos)
+                self._cancel_bracket(pos)
                 pos.qty = held.qty
-                self._rest_stop_at(pos, pos.stop_price)
+                self._rest_bracket(pos)
 
         for symbol, pos in list(self._open.items()):
             if symbol in broker_positions:
@@ -877,9 +930,9 @@ class ExecService:
                                 detail="the broker has not reported this position for "
                                        f"{settled_for:.0f}s — closed somewhere this "
                                        "service did not see")
-            # A stop still resting under a position that is gone would open a
-            # short if it triggered. Pull it before dropping the record of it.
-            self._cancel_protective_stop(pos)
+            # A leg still resting under a position that is gone would open a
+            # short if it triggered. Pull both before dropping the record.
+            self._cancel_bracket(pos)
             self._open.pop(symbol, None)
         return adopted, corrected, gone
 
@@ -955,7 +1008,8 @@ class ExecService:
                            f"no resting stop can be derived for this entry: {exc}")
         return check_risk_budget(intent, self.bounds, self.day_state(), stop_price)
 
-    def _place_entry(self, intent: OrderIntent) -> dict[str, Any]:
+    def _place_entry(self, intent: OrderIntent, *,
+                     page_query: dict[str, str] | None = None) -> dict[str, Any]:
         if (refusal := self._entry_refusal(intent)) is not None:
             return self._refuse(intent, refusal, kind="place")
 
@@ -992,25 +1046,27 @@ class ExecService:
 
         out: dict[str, Any] = {"refused": None, "order": order.to_dict(),
                                "preview": prev.to_dict(), "stop_order": None,
-                               "mode": self.config.mode}
+                               "target_order": None, "mode": self.config.mode}
         if order.status is OrderStatus.REJECTED:
             self.journal.record("rejected", intent_id=intent.intent_id,
                                 order_id=order.order_id, detail=order.message)
             return out
         if not order.is_filled:
-            # Acknowledged, not filled. Held, not forgotten: it takes a slot and
-            # an attempt until reconcile() learns what the broker did with it.
+            # Acknowledged, not filled. Held, not forgotten: it takes a slot
+            # until reconcile() learns what the broker did with it. (Not an
+            # attempt — Steve, 2026-09-14: an attempt is a filled position.)
             work = WorkingEntry(
                 order_id=order.order_id, symbol=intent.symbol,
                 qty=order.qty, intent_id=intent.intent_id, right=intent.occ.right,
                 limit=intent.limit, stop_spx=intent.stop_spx, delta=intent.delta,
+                page_query=dict(page_query) if page_query else None,
             )
             self._working[work.order_id] = work
             self.journal.record("working", kind="entry", intent_id=intent.intent_id,
                                 symbol=work.symbol, qty=work.qty,
                                 order_id=work.order_id, status=order.status.value,
                                 limit=work.limit, stop_spx=work.stop_spx,
-                                delta=work.delta, spx=spx)
+                                delta=work.delta, spx=spx, page_query=work.page_query)
             out["working"] = work.to_dict()
             return out
 
@@ -1018,7 +1074,7 @@ class ExecService:
         pos = OpenPosition(
             symbol=intent.symbol, qty=order.filled_qty, entry_price=fill_px,
             intent_id=intent.intent_id, right=intent.occ.right,
-            stop_spx=intent.stop_spx, delta=intent.delta,
+            stop_spx=intent.stop_spx, delta=intent.delta, entry_spx=spx,
             entry_order_id=order.order_id, opened_at=self.clock(),
             entry_commission_usd=float(prev.commission_usd or 0.0),
         )
@@ -1033,6 +1089,7 @@ class ExecService:
                             spx=spx, stop_spx=intent.stop_spx, delta=intent.delta,
                             order_id=order.order_id)
         out["stop_order"] = self._place_protective_stop(pos, spx)
+        out["target_order"] = self._place_take_profit(pos)
         return out
 
     def _place_protective_stop(self, pos: OpenPosition, spx: float) -> dict[str, Any] | None:
@@ -1049,6 +1106,25 @@ class ExecService:
                                 intent_id=pos.intent_id, detail=str(exc))
             return None
         return self._rest_stop_at(pos, price, spx=spx, kind="entry")
+
+    def _place_take_profit(self, pos: OpenPosition) -> dict[str, Any] | None:
+        """Rest the take-profit half of the bracket (st-fn5y). A warning on
+        failure, not a fault: the stop is the protection, this is the exit
+        Steve asked to have waiting. Runs after the stop so the ``risk`` basis
+        has a stop price to multiply."""
+        if pos.symbol not in self._open:
+            return None        # the stop's placement closed it (a race) — nothing to target
+        b = self.bounds
+        try:
+            price = take_profit_price(pos.entry_price, b.take_profit_multiple,
+                                      b.take_profit_basis, stop_price=pos.stop_price)
+        except ValueError as exc:
+            self.journal.record("target_unprotected", symbol=pos.symbol,
+                                intent_id=pos.intent_id, qty=pos.qty,
+                                basis=b.take_profit_basis, multiple=b.take_profit_multiple,
+                                detail=f"no take-profit can be derived: {exc}")
+            return None
+        return self._rest_target_at(pos, price, kind="entry")
 
     # ── internals: the exit ──────────────────────────────────────────────
     def _exit_refusal(self, intent: OrderIntent) -> Refusal | None:
@@ -1086,23 +1162,27 @@ class ExecService:
                 f"replaces it, rather than stacking a second sell on it"),
                 kind="place")
 
-        # A full-size exit and the resting stop must not both be live at the
-        # broker — same discipline as _market_close, same finding 3. A partial
-        # exit leaves the stop standing and _settle resizes it on the fill;
-        # the window where a partial rests unfilled beside a full-size stop is
-        # a known residual, recorded on st-97z1.
-        if pos is not None and intent.qty >= pos.qty and pos.stop_order_id:
-            stop_id = pos.stop_order_id
-            result = self.broker.cancel(stop_id)   # a BrokerError propagates: 502, nothing sent
-            if result.is_filled:
-                pos.stop_order_id = None
-                settled = self._settle(pos, result, reason="resting-stop")
-                return {"refused": None, "order": None, "closed": settled,
-                        "note": "the resting stop had already filled — "
-                                "the position was closed before this exit was sent"}
-            pos.stop_order_id = None
-            self.journal.record("canceled", kind="protective-stop",
-                                symbol=pos.symbol, order_id=stop_id)
+        # A full-size exit and the resting bracket must not both be live at
+        # the broker — same discipline as _market_close, same finding 3. A
+        # partial exit leaves the bracket standing and _settle resizes it on
+        # the fill; the window where a partial rests unfilled beside a
+        # full-size bracket is a known residual, recorded on st-97z1.
+        if pos is not None and intent.qty >= pos.qty:
+            for leg, reason, word in (("stop", "resting-stop", "stop"),
+                                      ("target", "target", "take-profit")):
+                try:
+                    _canceled, fill = self._pull_leg(pos, leg)
+                except BrokerError:
+                    # a BrokerError propagates: 502, nothing sent. If the stop
+                    # had already come off, it goes back on first.
+                    if leg == "target":
+                        self._rest_stop_at(pos, pos.stop_price)
+                    raise
+                if fill is not None:
+                    settled = self._settle(pos, fill, reason=reason)
+                    return {"refused": None, "order": None, "closed": settled,
+                            "note": f"the resting {word} had already filled — "
+                                    f"the position was closed before this exit was sent"}
 
         order = self.broker.place(intent)
         self.journal.record("placed", intent_id=intent.intent_id, kind="exit",
@@ -1111,7 +1191,7 @@ class ExecService:
         if pos is None:
             return out
         if order.status is OrderStatus.REJECTED:
-            self._rest_stop_at(pos, pos.stop_price)
+            self._rest_bracket(pos)
             return out
         if not order.is_filled:
             pos.exit_order_id = order.order_id
@@ -1135,18 +1215,20 @@ class ExecService:
         privilege) cancels the in-flight close first instead of waiting behind
         it, because "get me out" must not queue behind an earlier, slower exit.
 
-        **The resting stop comes off before the close goes on (finding 3).**
-        The SPX loop and the resting stop are designed to fire at the same
-        price, so a close sent while the stop still rests is asking for both to
-        fill — a one-contract short on a long-premium-only account. Cancelling
-        first is safe in every branch: if the cancel reports the stop already
-        FILLED, the stop won the race, the position is already closed at the
-        broker, and no close is sent at all; if the broker cannot be reached,
-        nothing is sent and the standing stop is the protection working; if the
-        close is afterwards rejected or cannot be sent, the stop is re-rested
-        and the failure is loud. Every caller journals its intent to close
-        before this runs (``exit_triggered``, the flatten request line, the
-        place request line), so the cancel always has its why one line above.
+        **The resting bracket comes off before the close goes on (finding 3,
+        widened to both legs by st-fn5y).** The SPX loop and the resting stop
+        are designed to fire at the same price, so a close sent while the stop
+        still rests is asking for both to fill — a one-contract short on a
+        long-premium-only account; the take-profit resting through a close is
+        the same short from the other side. Cancelling first is safe in every
+        branch: if a cancel reports that leg already FILLED, that leg won the
+        race, the position is already closed at the broker, and no close is
+        sent at all; if the broker cannot be reached, nothing is sent and what
+        still rests is the protection working; if the close is afterwards
+        rejected or cannot be sent, both legs are re-rested and the failure is
+        loud. Every caller journals its intent to close before this runs
+        (``exit_triggered``, the flatten request line, the place request
+        line), so the cancels always have their why one line above.
         """
         if pos.exit_in_flight:
             if not force:
@@ -1169,40 +1251,23 @@ class ExecService:
         if (r := check_exit(intent, self.bounds, held_qty=pos.qty)) is not None:
             raise Refused(r)
 
-        if pos.stop_order_id:
-            stop_id = pos.stop_order_id
-            try:
-                result = self.broker.cancel(stop_id)
-            except BrokerError as exc:
-                self.journal.record("error", kind="cancel-stop", symbol=pos.symbol,
-                                    order_id=stop_id, detail=str(exc))
-                return {"symbol": pos.symbol, "order_id": None, "status": "DEFERRED",
-                        "closed": False,
-                        "detail": "the resting stop could not be cancelled — "
-                                  "nothing sent, the stop is still the protection"}
-            if result.is_filled:
-                # The race, and the stop won it: price reached the level at the
-                # broker before the cancel arrived. The position is already
-                # closed there; book that instead of also selling it.
-                pos.stop_order_id = None
-                return self._settle(pos, result, reason="resting-stop")
-            pos.stop_order_id = None
-            self.journal.record("canceled", kind="protective-stop",
-                                symbol=pos.symbol, order_id=stop_id)
+        early = self._take_bracket_off(pos)
+        if early is not None:
+            return early
 
         try:
             order = self.broker.place(intent)
         except BrokerError as exc:
             self.journal.record("error", kind="close", symbol=pos.symbol,
                                 reason=reason, detail=str(exc))
-            self._rest_stop_at(pos, pos.stop_price)   # the protection goes back on
+            self._rest_bracket(pos)   # the protection goes back on
             raise
         self.journal.record("placed", intent_id=intent.intent_id, kind="exit",
                             reason=reason, order=order.to_dict())
         if order.status is OrderStatus.REJECTED:
             self.journal.record("rejected", intent_id=intent.intent_id,
                                 order_id=order.order_id, detail=order.message)
-            self._rest_stop_at(pos, pos.stop_price)
+            self._rest_bracket(pos)
             return {"symbol": pos.symbol, "order_id": order.order_id,
                     "status": order.status.value, "closed": False}
         if not order.is_filled:
@@ -1242,56 +1307,181 @@ class ExecService:
         return None
 
     def _settle(self, pos: OpenPosition, order: OrderResult, reason: str) -> dict[str, Any]:
-        """Book the close, then deal with the resting stop.
-
-        In that order: a journal line costs nothing if the cancel then fails,
-        but a cancelled stop with no record of why is a hole in the audit.
-
-        A **partial** fill is the case worth reading. The position shrinks but
-        does not go away, so the resting stop — sized for the whole position —
-        is now larger than what is held, and if it triggered it would sell
-        contracts Steve does not own. So a partial exit cancels the stop and
-        rests a new one at the same price for what is left. The mock never
-        fills partially; a real broker does, which is why this is here before
-        the transport is."""
+        """Book a close the broker reported as an order — a filled market
+        close, or a leg found filled by a cancel. See ``_book_close``."""
         exit_px = order.fill_price if order.fill_price is not None else 0.0
         closed_qty = min(order.filled_qty or pos.qty, pos.qty)
+        return self._book_close(pos, order_id=order.order_id, exit_px=exit_px,
+                                closed_qty=closed_qty, reason=reason, why=reason)
+
+    def _book_close(self, pos: OpenPosition, *, order_id: str, exit_px: float,
+                    closed_qty: int, reason: str, why: str) -> dict[str, Any]:
+        """The one place a close is booked. Take the other leg(s) of the
+        bracket off, then write the ``closed`` line, then resize or drop.
+
+        The cancels go first because every moment the other leg rests past
+        the fill is a moment it can fill too — a short on a long-premium-only
+        account (st-fn5y). The journal loses nothing by waiting: a cancel that
+        fails is caught and journaled, so the ``closed`` line is written
+        either way. A cancel that finds the other leg already filled books
+        that fill as well, capped at what was still held; anything past that
+        is journaled as ``oversold``, loud, because it is a short this service
+        cannot itself buy back.
+
+        A **partial** fill is the case worth reading. The position shrinks but
+        does not go away, so the resting legs — sized for the whole position —
+        are now larger than what is held, and if either triggered it would
+        sell contracts Steve does not own. So a partial exit cancels both and
+        rests new ones at the same prices for what is left. The mock never
+        fills partially unless asked; a real broker does."""
+        stop_canceled, stop_fill = self._cancel_leg_quietly(pos, "stop")
+        target_canceled, target_fill = self._cancel_leg_quietly(pos, "target")
+
         remaining = pos.qty - closed_qty
         pnl = self._pnl_usd(pos, exit_px, closed_qty)
         self.journal.record("closed", symbol=pos.symbol, qty=closed_qty,
                             remaining_qty=remaining, intent_id=pos.intent_id,
                             kind=reason, entry_price=pos.entry_price,
                             exit_price=exit_px, pnl_usd=pnl,
-                            order_id=order.order_id, reason=reason)
+                            order_id=order_id, reason=why)
+        also_filled: list[dict[str, Any]] = []
+        for other_reason, other in (("protective-stop", stop_fill), ("target", target_fill)):
+            if other is None:
+                continue
+            remaining = self._book_found_fill(pos, other, other_reason, remaining=remaining)
+            also_filled.append(other.to_dict())
 
-        canceled = self._cancel_protective_stop(pos)
-        restopped = None
+        restopped = retargeted = None
         if remaining:
             pos.qty = remaining
             restopped = self._rest_stop_at(pos, pos.stop_price)
+            retargeted = self._rest_target_at(pos, pos.target_price)
         else:
             self._open.pop(pos.symbol, None)
 
         return {"symbol": pos.symbol, "qty": closed_qty, "remaining_qty": remaining,
                 "entry_price": pos.entry_price, "exit_price": exit_px,
-                "pnl_usd": pnl, "reason": reason, "order_id": order.order_id,
-                "closed": remaining == 0, "stop_canceled": canceled,
-                "stop_replaced": restopped}
+                "pnl_usd": pnl, "reason": reason, "order_id": order_id,
+                "closed": remaining == 0,
+                "stop_canceled": stop_canceled, "stop_replaced": restopped,
+                "target_canceled": target_canceled, "target_replaced": retargeted,
+                "also_filled": also_filled}
+
+    def _book_found_fill(self, pos: OpenPosition, order: OrderResult, reason: str, *,
+                         remaining: int | None = None) -> int:
+        """A leg a cancel found already filled. Booked against what is still
+        held, the way ``_pick_up_fills`` caps a fill at the position; the
+        excess — both legs filled, a short — is ``oversold``. Returns what is
+        still held afterwards."""
+        held = pos.qty if remaining is None else remaining
+        qty = min(order.filled_qty or held, held)
+        px = order.fill_price if order.fill_price is not None else 0.0
+        if qty > 0:
+            pnl = self._pnl_usd(pos, px, qty)
+            self.journal.record("closed", symbol=pos.symbol, qty=qty,
+                                remaining_qty=held - qty, intent_id=pos.intent_id,
+                                kind=reason, entry_price=pos.entry_price,
+                                exit_price=px, pnl_usd=pnl, order_id=order.order_id,
+                                reason=reason, detail="found filled by the cancel")
+        excess = (order.filled_qty or 0) - qty
+        if excess > 0:
+            self.journal.record(
+                "oversold", symbol=pos.symbol, intent_id=pos.intent_id,
+                order_id=order.order_id, qty=excess, price=px, leg=reason,
+                detail=f"both legs of the bracket filled — the account is short "
+                       f"{excess} {pos.symbol.strip()}; this service only sells to "
+                       f"close, so it must be bought back by hand")
+        return held - qty
+
+    # ── the bracket's legs ───────────────────────────────────────────────
+    _LEG_KIND = {"stop": "protective-stop", "target": "take-profit"}
+    _LEG_ATTR = {"stop": "stop_order_id", "target": "target_order_id"}
+
+    def _pull_leg(self, pos: OpenPosition, leg: str) -> tuple[dict[str, Any] | None,
+                                                            OrderResult | None]:
+        """Cancel one resting leg. Returns ``(canceled, None)`` when it came
+        off, ``(None, fill)`` when the cancel found it already filled — the
+        race the exit path is built to survive — and ``(None, None)`` when
+        nothing was resting. A ``BrokerError`` propagates with the order id
+        still on the position, so the caller decides what "could not cancel"
+        means where it stands."""
+        attr = self._LEG_ATTR[leg]
+        order_id = getattr(pos, attr)
+        if not order_id:
+            return None, None
+        result = self.broker.cancel(order_id)
+        setattr(pos, attr, None)
+        if result.is_filled:
+            return None, result
+        self.journal.record("canceled", kind=self._LEG_KIND[leg],
+                            symbol=pos.symbol, order_id=order_id)
+        return result.to_dict(), None
+
+    def _cancel_leg_quietly(self, pos: OpenPosition, leg: str) -> tuple[dict[str, Any] | None,
+                                                                      OrderResult | None]:
+        """``_pull_leg`` for callers that are already past the point of
+        refusing: a broker that cannot be reached is journaled and the leg is
+        forgotten, because a close that has happened cannot wait on it."""
+        attr = self._LEG_ATTR[leg]
+        order_id = getattr(pos, attr)
+        try:
+            return self._pull_leg(pos, leg)
+        except BrokerError as exc:
+            setattr(pos, attr, None)
+            self.journal.record("error", kind=f"cancel-{leg}", symbol=pos.symbol,
+                                order_id=order_id, detail=str(exc))
+            return None, None
 
     def _cancel_protective_stop(self, pos: OpenPosition) -> dict[str, Any] | None:
-        if not pos.stop_order_id:
-            return None
-        order_id = pos.stop_order_id
-        pos.stop_order_id = None
-        try:
-            canceled = self.broker.cancel(order_id).to_dict()
-        except BrokerError as exc:
-            self.journal.record("error", kind="cancel-stop", symbol=pos.symbol,
-                                order_id=order_id, detail=str(exc))
-            return None
-        self.journal.record("canceled", kind="protective-stop",
-                            symbol=pos.symbol, order_id=order_id)
+        canceled, fill = self._cancel_leg_quietly(pos, "stop")
+        if fill is not None:
+            pos.qty = self._book_found_fill(pos, fill, "protective-stop")
         return canceled
+
+    def _cancel_take_profit(self, pos: OpenPosition) -> dict[str, Any] | None:
+        canceled, fill = self._cancel_leg_quietly(pos, "target")
+        if fill is not None:
+            pos.qty = self._book_found_fill(pos, fill, "target")
+        return canceled
+
+    def _cancel_bracket(self, pos: OpenPosition) -> None:
+        """Both legs off, for a position whose size is about to change."""
+        self._cancel_protective_stop(pos)
+        self._cancel_take_profit(pos)
+
+    def _take_bracket_off(self, pos: OpenPosition) -> dict[str, Any] | None:
+        """Both legs off before a close goes on. ``None`` means clear to send.
+        Anything else is the answer the caller returns instead of sending: a
+        DEFERRED when a cancel could not reach the broker (nothing sent, and
+        whatever still rests is the protection working — a stop that had
+        already come off goes back on), or the settled close when a cancel
+        found that leg already filled (the position is closed at the broker;
+        selling it again would be the short)."""
+        for leg, reason, word in (("stop", "resting-stop", "stop"),
+                                  ("target", "target", "take-profit")):
+            order_id = getattr(pos, self._LEG_ATTR[leg])
+            try:
+                _canceled, fill = self._pull_leg(pos, leg)
+            except BrokerError as exc:
+                self.journal.record("error", kind=f"cancel-{leg}", symbol=pos.symbol,
+                                    order_id=order_id, detail=str(exc))
+                if leg == "target":
+                    self._rest_stop_at(pos, pos.stop_price)
+                return {"symbol": pos.symbol, "order_id": None, "status": "DEFERRED",
+                        "closed": False,
+                        "detail": f"the resting {word} could not be cancelled — "
+                                  f"nothing sent, the bracket is still the protection"}
+            if fill is not None:
+                return self._settle(pos, fill, reason=reason)
+        return None
+
+    def _rest_bracket(self, pos: OpenPosition) -> None:
+        """Both legs back on at their standing prices, for what is held now.
+        The stop first: it is the protection. The target only if the stop's
+        placement did not itself close the position."""
+        self._rest_stop_at(pos, pos.stop_price)
+        if pos.symbol in self._open:
+            self._rest_target_at(pos, pos.target_price)
 
     def _rest_stop_at(self, pos: OpenPosition, price: float | None, *,
                       spx: float | None = None,
@@ -1318,6 +1508,13 @@ class ExecService:
                                 intent_id=pos.intent_id, qty=pos.qty, stop_price=price,
                                 detail=f"broker refused the {kind} stop: {exc}")
             return None
+        if result.status is OrderStatus.REJECTED:
+            self.journal.record("stop_unprotected", symbol=pos.symbol,
+                                intent_id=pos.intent_id, qty=pos.qty, stop_price=price,
+                                order_id=result.order_id,
+                                detail=f"broker rejected the {kind} stop: "
+                                       f"{result.message or 'no reason given'}")
+            return None
         pos.stop_order_id = result.order_id
         pos.stop_price = price
         self.journal.record("stop_placed", symbol=pos.symbol, intent_id=pos.intent_id,
@@ -1326,6 +1523,261 @@ class ExecService:
                             kind=kind, risk_usd=risk_usd(pos.entry_price, price, pos.qty),
                             order=result.to_dict())
         return result.to_dict()
+
+    def _rest_target_at(self, pos: OpenPosition, price: float | None, *,
+                        kind: str = "resized") -> dict[str, Any] | None:
+        """Rest the SELL LIMIT that takes the profit, for what is held now.
+
+        The one place a resting target is created, the mirror of
+        ``_rest_stop_at``. Failure is ``target_unprotected`` — a warning: the
+        stop still stands. A target the book is already through when it
+        lands fills at once, and that fill *is* the exit, booked here."""
+        if price is None:
+            self.journal.record("target_unprotected", symbol=pos.symbol,
+                                intent_id=pos.intent_id, qty=pos.qty,
+                                detail=f"no target price to rest ({kind})")
+            return None
+        target_intent = OrderIntent(
+            intent_id=f"{pos.intent_id}:target:{pos.qty}", symbol=pos.symbol,
+            side=Side.SELL_TO_CLOSE, qty=pos.qty, order_type=OrderType.LIMIT,
+            limit=price, source="take-profit", engine_sha=self.config.sha,
+        )
+        try:
+            result = self.broker.place(target_intent)
+        except BrokerError as exc:
+            self.journal.record("target_unprotected", symbol=pos.symbol,
+                                intent_id=pos.intent_id, qty=pos.qty, target_price=price,
+                                detail=f"broker refused the {kind} take-profit: {exc}")
+            return None
+        if result.status is OrderStatus.REJECTED:
+            self.journal.record("target_unprotected", symbol=pos.symbol,
+                                intent_id=pos.intent_id, qty=pos.qty, target_price=price,
+                                order_id=result.order_id,
+                                detail=f"broker rejected the {kind} take-profit: "
+                                       f"{result.message or 'no reason given'}")
+            return None
+        b = self.bounds
+        line = dict(symbol=pos.symbol, intent_id=pos.intent_id, target_price=price,
+                    basis=b.take_profit_basis, multiple=b.take_profit_multiple,
+                    qty=pos.qty, order_id=result.order_id, kind=kind,
+                    reward_usd=round((price - pos.entry_price) * CONTRACT_MULTIPLIER * pos.qty, 2),
+                    order=result.to_dict())
+        if result.is_filled:
+            # The bid was already at or through the target when it landed.
+            # That is the exit, taken at once; recovery must not rebuild a
+            # resting order from this line, hence the flag.
+            pos.target_price = price
+            self.journal.record("target_placed", filled_at_once=True, **line)
+            settled = self._settle(pos, result, reason="target")
+            return {**result.to_dict(), "closed": settled}
+        pos.target_order_id = result.order_id
+        pos.target_price = price
+        self.journal.record("target_placed", **line)
+        return result.to_dict()
+
+    # ── the live editor: both trigger conditions ─────────────────────────
+    def adjust(self, symbol: str, *, stop_price: float | None = None,
+               target_price: float | None = None) -> dict[str, Any]:
+        """Move the resting stop, the resting target, or both. [st-fn5y]
+
+        Steve, 2026-09-14: *"The screen should be a live editor allowing an
+        update to both trigger conditions."* There is no replace-order in
+        the transport (no PUT, by design), so a move is the same motion every
+        other path uses: cancel the leg, rest a new one. Exit-class — legal
+        while STOPped or stood down, needs a credential — with these
+        refusals, each named: no such position; a close already in flight
+        (the bracket is off while it works); a price off the tick grid; a
+        stop not below the live bid or a target not above it (either would
+        fill at once — a sale, not a trigger); a stop at or above the target;
+        and a stop moved so wide that the position's risk to it exceeds the
+        day's headroom, which is the ceiling doing to an adjusted stop what
+        it does to an entry. A cancel that finds the leg already filled books
+        that fill and refuses the adjust with what happened.
+
+        Moving the stop price also moves the SPX-mark trigger the loop
+        watches, by the same delta walk in reverse from the level the entry
+        filled at, so the two stops stay one stop. Journaled as
+        ``stop_adjusted`` / ``target_adjusted`` with old and new."""
+        with self._lock:
+            if stop_price is None and target_price is None:
+                raise ValueError("adjust needs a stop_price, a target_price, or both")
+            self.journal.record("request", kind="adjust", symbol=symbol,
+                                stop_price=stop_price, target_price=target_price)
+            if (r := self.arming.permits_exit()) is not None:
+                return self._refuse_adjust(symbol, r)
+            pos = self._open.get(symbol)
+            if pos is None:
+                return self._refuse_adjust(symbol, Refusal(
+                    "position", f"no open position in {symbol.strip()} to adjust"))
+            if pos.exit_in_flight:
+                return self._refuse_adjust(symbol, Refusal(
+                    "exit_in_flight",
+                    f"a close for {symbol.strip()} is working at the broker (order "
+                    f"{pos.exit_order_id}) and the bracket is off while it does — "
+                    f"cancel that close first, or let it fill"))
+            q = self.broker.quote(symbol)          # a BrokerError propagates: 502
+            bid = float(q.bid)
+            new_stop = pos.stop_price if stop_price is None else float(stop_price)
+            new_target = pos.target_price if target_price is None else float(target_price)
+            if (r := self._adjust_refusal(pos, bid, new_stop, new_target,
+                                          stop_given=stop_price is not None,
+                                          target_given=target_price is not None)) is not None:
+                return self._refuse_adjust(symbol, r)
+
+            out: dict[str, Any] = {"refused": None, "symbol": symbol, "bid": bid,
+                                   "stop": None, "target": None, "closed": None,
+                                   "mode": self.config.mode}
+            if stop_price is not None:
+                moved = self._move_leg(pos, "stop", float(stop_price), bid)
+                if moved.get("closed") is not None:
+                    return self._adjust_closed(symbol, out, "stop", moved)
+                out["stop"] = moved
+            if target_price is not None and pos.symbol in self._open:
+                moved = self._move_leg(pos, "target", float(target_price), bid)
+                if moved.get("closed") is not None:
+                    return self._adjust_closed(symbol, out, "target", moved)
+                out["target"] = moved
+            return out
+
+    def _adjust_refusal(self, pos: OpenPosition, bid: float, new_stop: float | None,
+                        new_target: float | None, *, stop_given: bool,
+                        target_given: bool) -> Refusal | None:
+        for label, price, given in (("stop", new_stop, stop_given),
+                                    ("target", new_target, target_given)):
+            if not given or price is None:
+                continue
+            if price <= 0:
+                return Refusal("bracket", f"a {label} price must be positive, not {price:g}")
+            if not on_tick(price):
+                from .stops import tick_for
+                tick = tick_for(price)
+                return Refusal(
+                    "tick",
+                    f"{label} {price:.2f} is not on the {tick:.2f} grid SPX options "
+                    f"quote in {'at and above' if tick > 0.05 else 'below'} $3.00")
+        if stop_given and new_stop is not None and new_stop >= bid:
+            return Refusal("bracket", f"a stop at {new_stop:.2f} is not below the "
+                                      f"{bid:.2f} bid — it would fill at once")
+        if target_given and new_target is not None and new_target <= bid:
+            return Refusal("bracket", f"a target at {new_target:.2f} is not above the "
+                                      f"{bid:.2f} bid — it would fill at once")
+        if new_stop is not None and new_target is not None and new_stop >= new_target:
+            return Refusal("bracket", f"the stop ({new_stop:.2f}) must sit below the "
+                                      f"target ({new_target:.2f})")
+        if stop_given and new_stop is not None:
+            risk = risk_usd(pos.entry_price, new_stop, pos.qty)
+            state = self.day_state()
+            headroom = round(self.bounds.daily_loss_ceiling_usd - state.realized_loss_usd, 2)
+            if risk > headroom:
+                return Refusal(
+                    "ceiling",
+                    f"a stop at {new_stop:.2f} puts ${risk:.2f} at risk on this position, "
+                    f"and the day has ${headroom:.2f} of its "
+                    f"${self.bounds.daily_loss_ceiling_usd:.2f} ceiling left")
+        return None
+
+    def _refuse_adjust(self, symbol: str, refusal: Refusal) -> dict[str, Any]:
+        self.journal.record("refused", kind="adjust", symbol=symbol,
+                            refused=refusal.to_dict())
+        return {"refused": refusal.to_dict(), "symbol": symbol, "stop": None,
+                "target": None, "closed": None, "mode": self.config.mode}
+
+    def _adjust_closed(self, symbol: str, out: dict[str, Any], leg: str,
+                       moved: dict[str, Any]) -> dict[str, Any]:
+        """The cancel found the leg already filled: the position is closed
+        (booked), and the adjust is refused with what happened."""
+        settled = moved["closed"]
+        word = "stop" if leg == "stop" else "take-profit"
+        refusal = Refusal(
+            "filled",
+            f"the resting {word} filled at {settled['exit_price']:.2f} before it "
+            f"could be moved — the position is closed ({self._money(settled['pnl_usd'])}); "
+            f"nothing adjusted")
+        self.journal.record("refused", kind="adjust", symbol=symbol,
+                            refused=refusal.to_dict())
+        return {**out, "refused": refusal.to_dict(), "closed": settled}
+
+    @staticmethod
+    def _money(v: float) -> str:
+        sign = "+" if v > 0 else ("-" if v < 0 else "")
+        return f"{sign}${abs(v):,.2f}"
+
+    def _move_leg(self, pos: OpenPosition, leg: str, new_price: float,
+                  bid: float) -> dict[str, Any]:
+        """Cancel one leg and rest it at the new price. Returns what happened;
+        ``closed`` is set when the cancel found the leg filled."""
+        old_price = pos.stop_price if leg == "stop" else pos.target_price
+        old_id = getattr(pos, self._LEG_ATTR[leg])
+        try:
+            _canceled, fill = self._pull_leg(pos, leg)
+        except BrokerError as exc:
+            self.journal.record("error", kind=f"adjust-{leg}", symbol=pos.symbol,
+                                order_id=old_id, detail=str(exc))
+            raise
+        if fill is not None:
+            reason = "resting-stop" if leg == "stop" else "target"
+            return {"moved": False, "closed": self._settle(pos, fill, reason=reason)}
+
+        if leg == "stop":
+            old_spx = pos.stop_spx
+            new_spx = self._stop_spx_for(pos, new_price)
+            if new_spx is not None:
+                pos.stop_spx = new_spx
+            placed = self._rest_stop_at(pos, new_price, kind="adjusted")
+            if placed is None:
+                # The new stop would not rest. The old one goes back — and the
+                # SPX trigger with it — so the position is not left naked by an
+                # edit. If that fails too, stop_unprotected is already written.
+                pos.stop_spx = old_spx
+                self._rest_stop_at(pos, old_price, kind="restored")
+                return {"moved": False, "old_price": old_price, "new_price": new_price,
+                        "order_id": pos.stop_order_id,
+                        "error": "the broker would not rest the stop at the new price; "
+                                 "the old stop is back"}
+            self.journal.record("stop_adjusted", symbol=pos.symbol, intent_id=pos.intent_id,
+                                old_price=old_price, new_price=new_price,
+                                old_order_id=old_id, new_order_id=pos.stop_order_id,
+                                old_stop_spx=old_spx, new_stop_spx=pos.stop_spx,
+                                bid=bid, qty=pos.qty)
+            return {"moved": True, "old_price": old_price, "new_price": new_price,
+                    "order_id": pos.stop_order_id, "stop_spx": pos.stop_spx}
+
+        placed = self._rest_target_at(pos, new_price, kind="adjusted")
+        if placed is None:
+            self._rest_target_at(pos, old_price, kind="restored")
+            return {"moved": False, "old_price": old_price, "new_price": new_price,
+                    "order_id": pos.target_order_id,
+                    "error": "the broker would not rest the take-profit at the new "
+                             "price; the old one is back"}
+        if placed.get("closed") is not None:
+            # the bid ran through the new target as it landed: that is the exit
+            return {"moved": True, "old_price": old_price, "new_price": new_price,
+                    "closed": placed["closed"]}
+        self.journal.record("target_adjusted", symbol=pos.symbol, intent_id=pos.intent_id,
+                            old_price=old_price, new_price=new_price,
+                            old_order_id=old_id, new_order_id=pos.target_order_id,
+                            bid=bid, qty=pos.qty)
+        return {"moved": True, "old_price": old_price, "new_price": new_price,
+                "order_id": pos.target_order_id}
+
+    def _stop_spx_for(self, pos: OpenPosition, stop_price: float) -> float | None:
+        """The SPX level that corresponds to an option-price stop, by the
+        entry's delta walked backwards from the level the entry filled at:
+        the inverse of ``stops.premium_at_stop``. ``None`` when the position
+        has no delta or no entry mark (adopted, or recovered without one), in
+        which case the SPX loop keeps whatever level it had."""
+        if pos.delta is None or pos.entry_spx is None or pos.entry_price <= 0:
+            return None
+        delta = abs(float(pos.delta))
+        if delta <= 0:
+            return None
+        distance = (pos.entry_price - float(stop_price)) / delta
+        if distance <= 0:
+            return None
+        r = (pos.right or "").upper()
+        if r in ("C", "CALL"):
+            return round(float(pos.entry_spx) - distance, 2)
+        return round(float(pos.entry_spx) + distance, 2)
 
     def _pnl_usd(self, pos: OpenPosition, exit_price: float,
                  qty: int | None = None) -> float:
@@ -1374,6 +1826,7 @@ class ExecService:
                     entry_price=float(e.get("price", 0.0) or 0.0),
                     intent_id=str(e.get("intent_id", "")), right=right,
                     stop_spx=e.get("stop_spx"), delta=e.get("delta"),
+                    entry_spx=e.get("spx"),
                     entry_order_id=str(e.get("order_id", "")),
                     opened_at=_ts_of(e) or self.clock(),
                 )
@@ -1386,6 +1839,21 @@ class ExecService:
                         pos.stop_spx = e.get("stop_spx")
                     if e.get("delta") is not None:
                         pos.delta = e.get("delta")
+            elif e.get("event") == "target_placed":
+                pos = self._open.get(str(e.get("symbol", "")))
+                if pos is not None:
+                    pos.target_price = e.get("target_price")
+                    # a target that filled the moment it landed never rested;
+                    # the closed line that follows drops the position anyway
+                    pos.target_order_id = None if e.get("filled_at_once") else e.get("order_id")
+            elif e.get("event") == "canceled" and e.get("kind") in ("protective-stop", "take-profit"):
+                # A leg that came off and was not put back (a close in flight
+                # when the service died) must not come back as a resting id.
+                pos = self._open.get(str(e.get("symbol", "")))
+                if pos is not None:
+                    attr = "stop_order_id" if e.get("kind") == "protective-stop" else "target_order_id"
+                    if getattr(pos, attr) == e.get("order_id"):
+                        setattr(pos, attr, None)
             elif e.get("event") == "working" and e.get("kind") == "entry":
                 symbol = str(e.get("symbol", ""))
                 order_id = str(e.get("order_id", ""))
@@ -1395,12 +1863,15 @@ class ExecService:
                     right = parse_occ(symbol).right
                 except ValueError:
                     continue
+                query = e.get("page_query")
                 self._working[order_id] = WorkingEntry(
                     order_id=order_id, symbol=symbol,
                     qty=int(e.get("qty", 0) or 0),
                     intent_id=str(e.get("intent_id", "")), right=right,
                     limit=e.get("limit"), stop_spx=e.get("stop_spx"),
                     delta=e.get("delta"),
+                    page_query={str(k): str(v) for k, v in query.items()}
+                    if isinstance(query, dict) else None,
                 )
             elif e.get("event") == "entry_resolved":
                 self._working.pop(str(e.get("order_id", "")), None)

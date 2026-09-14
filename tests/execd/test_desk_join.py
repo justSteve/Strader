@@ -163,7 +163,8 @@ def test_the_full_life_cycle_price_go_send_fill_stop_watch_exit(door, armed, bro
     assert "1 at 2.10 ($210.00)" in out
     assert "Protective stop resting at the broker: order" in out
     kinds = [c[0] for c in broker.calls if c[0] in ("preview", "place")]
-    assert kinds == ["preview", "preview", "place", "place"]      # go, send's own, entry, stop
+    # go, send's own, entry, then the bracket: stop and take-profit (st-fn5y)
+    assert kinds == ["preview", "preview", "place", "place", "place"]
     st = armed.status()
     assert len(st["positions"]) == 1 and st["positions"][0]["symbol"] == CALL
     stop_spx = st["positions"][0]["stop_spx"]
@@ -178,7 +179,7 @@ def test_the_full_life_cycle_price_go_send_fill_stop_watch_exit(door, armed, bro
     # a second send is answered from the journal, never re-sent
     again = s.send()
     assert again.startswith("Already sent earlier under this id")
-    assert [c[0] for c in broker.calls].count("place") == 2
+    assert [c[0] for c in broker.calls].count("place") == 3
 
     # the watcher: flat SPX, nothing fires; SPX through FD0's level, the exit goes
     w = Watcher(armed)

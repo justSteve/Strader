@@ -206,7 +206,10 @@ class TestPage:
         assert "SENT AND FILLED" in landing and "Protective stop resting" in landing
         st = armed.status()
         assert st["positions"][0]["symbol"] == CALL and st["positions"][0]["stop_order_id"]
-        assert [c[0] for c in chain.calls if c[0] == "place"] == ["place", "place"]  # entry + stop
+        assert st["positions"][0]["target_order_id"]                  # the bracket (st-fn5y)
+        assert "Take-profit resting" in landing
+        # entry + the bracket: stop and take-profit
+        assert [c[0] for c in chain.calls if c[0] == "place"] == ["place", "place", "place"]
         ids = {e.get("intent_id") for e in armed.journal.read() if e.get("intent_id")}
         page_ids = [i for i in ids if str(i).startswith("page-")]
         assert len(page_ids) == 1
@@ -216,9 +219,11 @@ class TestPage:
         # the same nonce is dead
         r = order_page.post("/exec/order/send", data={"nonce": nonce})
         assert "used already" in text(order_page.get(r.headers["Location"]))
-        assert [c[0] for c in chain.calls if c[0] == "place"] == ["place", "place"]
-        # the position and its money are on the page now
+        assert [c[0] for c in chain.calls if c[0] == "place"] == ["place", "place", "place"]
+        # the position, its money and the bracket editor are on the page now
         assert "Open position" in landing and "NET IF CLOSED NOW" in landing
+        assert "at the target" in landing and ">UPDATE<" in landing
+        assert "name=stop_price" in landing and "name=target_price" in landing
 
     def test_a_stale_send_token_refuses(self, order_page, mono):
         from execd.orderform import PREVIEW_TTL_S

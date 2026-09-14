@@ -100,13 +100,14 @@ class TestMarketDataPassThrough:
 
     def test_orders_and_positions(self, client):
         post(client, "/place", entry().to_dict())
-        assert len(client.get("/orders").json["orders"]) == 2      # entry + resting stop
+        # entry + the bracket: the resting stop and the resting take-profit (st-fn5y)
+        assert len(client.get("/orders").json["orders"]) == 3
         assert client.get("/positions").json["tracked"][0]["symbol"] == CALL
 
     def test_journal_tail(self, client):
         post(client, "/place", entry().to_dict())
-        events = [e["event"] for e in client.get("/journal?n=3").json["entries"]]
-        assert events == ["placed", "filled", "stop_placed"]
+        events = [e["event"] for e in client.get("/journal?n=4").json["entries"]]
+        assert events == ["placed", "filled", "stop_placed", "target_placed"]
 
 
 class TestPlacing:
@@ -218,6 +219,9 @@ class TestTheRoutesThatDoNotExist:
             # stage 3 (st-p8k8): the raw market-data pass-through for the
             # repo's readers. One rule, three resource names, GET only.
             "/marketdata/<kind>",
+            # st-fn5y: the bracket's live editor — move the stop, the target,
+            # or both under a live position. Exit-class; arms nothing.
+            "/adjust",
         }
 
     def test_arming_is_reachable_on_the_service_but_not_over_http(self, armed, client):

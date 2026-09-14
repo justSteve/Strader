@@ -389,6 +389,8 @@ class TestSurface:
             "/exec/reauth/link", "/exec/reauth/store",
             "/exec/order", "/exec/order/price", "/exec/order/state",
             "/exec/order/preview", "/exec/order/send",
+            # st-fn5y: the bracket's UPDATE and the working entry's CANCEL AND RE-PRICE
+            "/exec/order/adjust", "/exec/order/cancel",
         }
 
     def test_every_form_posts_to_an_absolute_exec_path(self, page):

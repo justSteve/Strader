@@ -21,10 +21,14 @@ qty_cap: 1
 # How many may be open at once.
 max_open_positions: 1
 
-# The hard ceiling on the day's damage, and how many entries may be attempted.
-# A winning trade does not buy back an attempt or raise the ceiling — this
-# bounds how much of the day can go wrong, it is not a running P&L. Both are
-# rebuilt from the journal, so a restart does not reset them.
+# The hard ceiling on the day's damage, and how many attempts may be used.
+# An attempt is a filled position (Steve, 2026-09-14): it is held while the
+# position is open and kept only if the position closes at a loss — a close
+# at break-even or better gives its attempt back. A working entry that has
+# not filled holds a position slot but no attempt. A winning trade never
+# raises the ceiling — that bounds how much of the day can go wrong, it is
+# not a running P&L. Both are rebuilt from the journal, so a restart does not
+# reset them.
 #
 # It bounds two things. Loss ALREADY REALIZED: once it reaches the ceiling, no
 # new entry. And the worst case of the entry IN FRONT OF IT: an entry is priced
@@ -38,7 +42,8 @@ max_open_positions: 1
 daily_loss_ceiling_usd: 500.0
 # 2 → 10, Steve 2026-09-14: "adjust rule that puts the number of loss
 # transactions from 2 up to 10. the $500 limit remains as is." The seed
-# matches his live file so a fresh install does not quietly revert it.
+# matches his live file so a fresh install does not quietly revert it. Ten
+# LOSING attempts, per the rule above.
 max_attempts: 10
 
 # The session, in Central time. NOT APPLIED TO SPX/SPXW ENTRIES since
@@ -64,3 +69,21 @@ preview_cost_tolerance_usd: 5.00
 # stop is derived from. This key exists only so the refusal has something to
 # name: `false` is not a setting, it is a bounds file that will not load.
 require_protective_stop: true
+
+# The take-profit half of the bracket (Steve, 2026-09-14: "upon fill, api
+# should create a resting order at a 10x profit target"). On every fill the
+# service rests a sell limit at the target beside the stop, and the two are
+# one bracket: when either fills the other is cancelled at once.
+#
+# Two readings of "10x", and the basis picks one:
+#   premium — the target is the fill price times the multiple. A $2.10 fill
+#             rests a sell at $21.00.
+#   risk    — the target is the fill price plus the multiple times the
+#             distance to the stop. A $2.10 fill with a $1.50 stop (60 cents
+#             of risk) rests a sell at $8.10.
+# ASSUMPTION: premium. Steve's ruling on premium-vs-risk is pending on
+# st-fn5y; change the basis here when he rules, no code change needed.
+# The multiple must be positive, and above 1 on the premium basis (a target
+# at or under the fill is a sale, not a target). Rounded up to the tick.
+take_profit_multiple: 10.0
+take_profit_basis: premium

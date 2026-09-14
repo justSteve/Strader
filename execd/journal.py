@@ -19,10 +19,16 @@ There is no counter in memory to drift, and a restart mid-session recovers the
 ceiling rather than resetting it — which is the whole point of a ceiling that
 holds when Steve is not watching.
 
-Losses only debit. A winning trade does not buy back an attempt or raise the
-ceiling; the budget is a bound on how much of the day can go wrong, not a
-running P&L. That is FD0's ``Budget`` semantics
-(``strader/execution/compose.py:131-148``), carried here unchanged.
+Losses only debit the ceiling. A winning trade does not raise it; the budget
+is a bound on how much of the day can go wrong, not a running P&L. That is
+FD0's ``Budget`` semantics (``execd/compose.py``), carried here unchanged.
+
+Attempts are counted differently since 2026-09-14 (Steve, st-fn5y): *"An
+'attempt' is a 'filled position'. Any attempt that breaks even or better
+doesn't decrement the counter."* So an attempt is held by a filled position
+while it is open and kept only by one that closed at a loss; a close at zero
+or better gives its attempt back. A working entry holds a position slot but
+no attempt.
 """
 
 from __future__ import annotations
@@ -133,15 +139,22 @@ class Journal:
         *requested*; a limit resting at the broker held none of the day's budget
         and so could be repeated without limit.
 
-        **Filled entries** are the ordinary case: an attempt spent and a slot
-        taken, released when the position closes with nothing remaining.
+        **Filled entries** are the ordinary case: a slot taken and an attempt
+        held while the position is open. When it closes with nothing
+        remaining the slot is released, and the attempt is kept only if the
+        position's P&L, summed over every ``closed`` line it produced, is
+        below zero — Steve, 2026-09-14 (st-fn5y): *"an 'attempt' is a 'filled
+        position'. Any attempt that breaks even or better doesn't decrement
+        the counter."* So ``attempts_used`` is the positions this service
+        opened that are still open, plus its losing closes.
 
-        **Working entries** — placed, acknowledged, not yet resolved — hold an
-        attempt and a slot too, because a resting buy becomes a position the
-        moment the book comes to it and the service is not watching the book.
-        ``entry_resolved`` releases them: filled ones are then counted by their
-        own fill line, cancelled and rejected ones cost nothing, which keeps a
-        broker that refuses twice from spending Steve's day.
+        **Working entries** — placed, acknowledged, not yet resolved — hold a
+        slot, because a resting buy becomes a position the moment the book
+        comes to it and the service is not watching the book; they hold no
+        attempt, because nothing has filled. ``entry_resolved`` releases the
+        slot: filled ones are then counted by their own fill line, cancelled
+        and rejected ones cost nothing, which keeps a broker that refuses
+        twice from spending Steve's day.
 
         **Adopted positions** — found at the broker and never opened here — hold
         a slot but not an attempt. They are real risk, so they close the entry
@@ -150,9 +163,12 @@ class Journal:
         """
         opened = 0
         closed = 0
+        losing = 0
         realized_loss = 0.0
         pending: set[str] = set()      # entry orders live at the broker
         adopted: set[str] = set()      # symbols held that this service did not open
+        opened_keys: set[str] = set()  # intent ids and symbols this service filled
+        pnl_by_position: dict[str, float] = {}
         for e in self.read(day):
             event = e.get("event")
             if event == "working" and e.get("kind") == "entry":
@@ -162,6 +178,9 @@ class Journal:
                 pending.discard(str(e.get("order_id") or ""))
             elif event == "filled" and e.get("kind") == "entry":
                 opened += 1
+                for key in (e.get("intent_id"), e.get("symbol")):
+                    if key:
+                        opened_keys.add(str(key))
             elif event == "position_adopted":
                 if symbol := str(e.get("symbol") or ""):
                     adopted.add(symbol)
@@ -171,20 +190,29 @@ class Journal:
                 # A partial close carries what is still open. The loss on the
                 # part that closed debits the ceiling immediately — waiting for
                 # the rest would let a bad day spend more than Steve allowed —
-                # but the position slot is only freed when nothing is left.
+                # but the position slot is only freed when nothing is left,
+                # and only then is the whole position's P&L judged for the
+                # attempt.
                 symbol = str(e.get("symbol") or "")
+                key = str(e.get("intent_id") or symbol)
+                pnl = e.get("pnl_usd")
+                if isinstance(pnl, (int, float)):
+                    if pnl < 0:
+                        realized_loss += -float(pnl)
+                    pnl_by_position[key] = pnl_by_position.get(key, 0.0) + float(pnl)
                 if not e.get("remaining_qty"):
                     if symbol in adopted:
                         adopted.discard(symbol)
                     else:
                         closed += 1
-                pnl = e.get("pnl_usd")
-                if isinstance(pnl, (int, float)) and pnl < 0:
-                    realized_loss += -float(pnl)
+                        total = pnl_by_position.pop(key, 0.0)
+                        ours = key in opened_keys or symbol in opened_keys
+                        if ours and total < 0:
+                            losing += 1
         return DayState(
             open_positions=max(0, opened - closed) + len(pending) + len(adopted),
             realized_loss_usd=round(realized_loss, 2),
-            attempts_used=opened + len(pending),
+            attempts_used=max(0, opened - closed) + losing,
         )
 
     def __iter__(self) -> Iterator[dict[str, Any]]:  # pragma: no cover - convenience

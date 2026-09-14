@@ -20,8 +20,9 @@ called them. ``ExecService.reconcile`` calls both — at start-up, before every
 entry, before an exit is sized, and on the fill poll — and the tests below are
 what "asks the broker" has to mean:
 
-* a working entry occupies a position slot and an attempt while it is alive,
-  because it can become a position at any moment;
+* a working entry occupies a position slot while it is alive, because it can
+  become a position at any moment (not an attempt — since 2026-09-14 an
+  attempt is a filled position, st-fn5y);
 * it survives a restart, because the journal records it;
 * when it fills, the service notices and rests the protective stop it owes;
 * when it is cancelled or rejected, the slot comes back;
@@ -45,14 +46,17 @@ def working_buys(broker: MockBroker) -> list:
 
 
 class TestAWorkingEntryIsNotForgotten:
-    def test_it_occupies_a_position_and_an_attempt(self, armed, broker):
+    def test_it_occupies_a_position_slot_but_no_attempt(self, armed, broker):
+        """The slot is what closes the entry door. The attempt is Steve's
+        counter of filled positions (2026-09-14), and nothing has filled."""
         broker.rest_limits = True
         out = armed.place(entry())
         assert out["order"]["status"] == "WORKING"
         assert out["stop_order"] is None          # nothing filled, nothing to protect
+        assert out["target_order"] is None
         day = armed.status()["day"]
         assert day["open_positions"] == 1
-        assert day["attempts_used"] == 1
+        assert day["attempts_used"] == 0
 
     def test_it_is_visible_as_a_working_order_not_a_position(self, armed, broker):
         broker.rest_limits = True
@@ -261,15 +265,19 @@ class TestAnExitIsSizedAgainstTheBroker:
 
 
 class TestTheDayCeilingCountsWorkingOrders:
-    def test_two_working_entries_exhaust_the_attempts(self, armed, broker):
+    def test_two_working_entries_fill_the_slots_and_spend_no_attempt(self, armed, broker):
+        """Working entries close the entry door by the position count, not
+        the attempt count: nothing has filled, so no attempt is spent
+        (Steve, 2026-09-14)."""
         armed.bounds = armed.config.bounds = Bounds(max_open_positions=2)
         broker.rest_limits = True
         armed.place(entry(intent_id="a-1"))
         armed.place(entry(intent_id="a-2", symbol=PUT,
                           stop_spx=SPX_NOW + 12.0, delta=0.28, limit=1.90))
         out = armed.place(entry(intent_id="a-3"))
-        assert out["refused"]["bound"] in ("positions", "ceiling")
-        assert armed.status()["day"]["attempts_used"] == 2
+        assert out["refused"]["bound"] == "positions"
+        assert armed.status()["day"]["attempts_used"] == 0
+        assert armed.status()["day"]["open_positions"] == 2
 
     def test_a_working_entry_that_fills_is_counted_once(self, armed, broker):
         broker.rest_limits = True

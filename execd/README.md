@@ -99,7 +99,7 @@ It binds `127.0.0.1:8778` and refuses to bind anything else.
 
 ## The narrow door
 
-Fifteen routes on the loopback, JSON in and out. `200` the service acted,
+Sixteen routes on the loopback, JSON in and out. `200` the service acted,
 `400` the request was not a valid intent, `409` a bound refused it —
 `{"refused": {"bound": "...", "reason": "..."}}` — `502` the broker could not
 be reached.
@@ -112,12 +112,13 @@ be reached.
 | `POST /preview` | price an intent through every bound, transmit nothing |
 | `POST /place` | the one path that transmits |
 | `POST /cancel` · `POST /flatten` | getting out |
+| `POST /adjust` | move the resting stop, the resting take-profit, or both, under a live position — `{symbol, stop_price?, target_price?}` (st-fn5y) |
 | `POST /stand-down` · `POST /stop` | done for the day; the kill switch on |
 | `POST /observe` · `POST /poll-fills` | feed it the SPX mark; pick up a stop that fired — driven in-process by `execd/watch.py` since stage 4 (every 5 s while a position or working entry exists) |
 
 | `GET /marketdata/<kind>` | the raw Schwab body for `quotes`, `chains` or `pricehistory`, query allow-listed to that resource's own parameters — the readers' door (stage 3) |
 
-**The order form** (`execd/orderform.py` + `execd/orderpage.py`, stage 4): `/exec/order` — BULLISH/BEARISH, the strikes around spot with bid/ask/delta, a delta override, FD0's derivation and the resting stop, PREVIEW then SEND with a single-use token; the engine is `execd/compose.py` (moved from `strader/execution/`, which re-exports it). Manual §5.19.
+**The order form** (`execd/orderform.py` + `execd/orderpage.py`, stage 4): `/exec/order` — BULLISH/BEARISH, the strikes around spot with bid/ask/delta, a delta override, FD0's derivation and the resting stop, PREVIEW then SEND with a single-use token; the engine is `execd/compose.py` (moved from `strader/execution/`, which re-exports it). Manual §5.19. Since st-fn5y the position card carries the bracket's live editor — the stop and the target in two inputs, one UPDATE button — and a working entry carries CANCEL AND RE-PRICE, which pulls it and brings the form back priced from the selection it was sent from. Manual §5.20.
 
 **Paper mode** (`execd/paper.py`, stage 4): `/etc/execd/mode` says `paper` (the
 default, seeded by the install) or `live`. In paper every read and the broker's
@@ -147,7 +148,8 @@ breaks the suite. Those three live on the page (stage 3), behind the passphrase.
 | `protective_stop` | an entry must carry `stop_spx` and `delta`, and the sign must not be transposed |
 | `window` | 08:30–15:00 CT, weekdays; nothing opens after 14:50 |
 | `positions` | 1 open at a time |
-| `ceiling` | $500 realized loss, 10 attempts (2 at the design; 10 by Steve, 2026-09-14) — rebuilt from the journal, so a restart does not reset it; and the entry's own worst case, limit down to its derived stop, must fit the headroom left |
+| `ceiling` | $500 realized loss, 10 attempts (2 at the design; 10 by Steve, 2026-09-14) — an attempt is a filled position, held while it is open and kept only if it closes at a loss; a close at break-even or better gives it back (Steve, 2026-09-14, st-fn5y). Rebuilt from the journal, so a restart does not reset it; and the entry's own worst case, limit down to its derived stop, must fit the headroom left — as must a stop moved wider by `adjust` |
+| `bracket` | an adjusted stop must sit below the live bid and an adjusted target above it, on the tick grid; a leg that filled before it could be moved is booked and the adjust refused (`filled`) |
 | `tick` | a limit or stop price on the exchange's grid — 0.05 below $3.00, 0.10 at and above (measured, st-pohq); off-grid is a rejected order, and an off-grid stop is no stop |
 | `price_band` | a limit within 10% of the touch, against a quote under 30s old |
 | `preview_cost` | the broker's own preview must agree with the intent before anything is sent |
@@ -170,36 +172,60 @@ someone. The one thing that refuses an exit is having no credential to send it
 with.
 
 **A fill without a protective stop is a state this service does not reach
-quietly.** The stop's inputs are checked before the entry is previewed. On the
-fill the service derives the option-price stop from the SPX level through delta
-(`execd/stops.py`) and rests it at the broker, so a dead box still has a stop;
-while the box is alive `observe(spx)` runs the accurate SPX-mark exit and
-cancels the resting order when it fires. A broker that refuses the resting stop
-is journaled as `stop_unprotected` — loud, because the position is live. When
-an exit fills only partly, the resting stop — sized for the whole position — is
-cancelled and re-rested at the smaller size, because a stop larger than the
-position would sell contracts Steve no longer owns.
+quietly — and every fill rests a bracket.** The stop's inputs are checked
+before the entry is previewed. On the fill the service derives the option-price
+stop from the SPX level through delta (`execd/stops.py`) and rests it at the
+broker, so a dead box still has a stop; beside it, since st-fn5y (Steve,
+2026-09-14: *"future filled orders will result in resting 'take profit' orders
+in addition to stoplosses"*), it rests a sell limit at the take-profit target —
+the fill price times `take_profit_multiple` on the `premium` basis (a $2.10
+fill rests a sell at $21.00), or the fill plus the multiple times the distance
+to the stop on the `risk` basis; premium is the standing assumption until he
+rules. The two are one bracket and the service works the one-cancels-the-other
+itself: when either leg fills, the other comes off before the close is booked;
+a cancel that finds the other leg already filled books that fill against what
+was held and journals anything past it as `oversold`. While the box is alive
+`observe(spx)` runs the accurate SPX-mark exit. A broker that refuses the
+resting stop is journaled as `stop_unprotected` — loud, because the position is
+live; a target that cannot be derived or rested is `target_unprotected` — a
+warning, because the stop still stands. When an exit fills only partly, both
+resting legs — sized for the whole position — are cancelled and re-rested at
+the smaller size, because a leg larger than the position would sell contracts
+Steve no longer owns. Both legs are edited from the page, never pulled apart:
+`cancel` refuses either leg's order id, and `adjust` moves either by the same
+cancel-then-rest motion (there is no replace-order; the transport has no PUT),
+refusing a price off the grid, a stop not below the live bid, a target not
+above it, or a stop moved wider than the day's headroom — and moving the stop
+moves the SPX-mark trigger with it, by the same delta walk in reverse.
 
-**One close in flight per position, and the stop comes off before the close
+**One close in flight per position, and the bracket comes off before the close
 goes on.** The SPX-mark loop and the broker-resident stop are designed to fire
-at the same price, so the service never lets both a close and the stop rest at
-the broker at once: `_market_close` cancels the stop first, and every failure
-branch afterwards puts it back — a cancel that finds the stop already filled
-books that fill and sends nothing, a broker that cannot be reached leaves the
-stop standing as the protection it is, a rejected close re-rests it. A close
-that comes back WORKING is remembered on the position (`exit_order_id`), in the
-journal (`exit_unfilled`), and across a restart, and while it is in flight the
-loop reports it as pending instead of firing again — re-sending the close every
-tick until one filled was finding 2 of the 2026-08-30 audit, an oversell that
-grew once a second. `flatten` is the one caller allowed to jump the queue: it
-cancels an in-flight close and replaces it, because "get me out" must not wait
-behind an earlier, slower exit. One residual is recorded on `st-97z1`: a
-*partial* manual exit leaves the full-size stop standing while it rests.
+at the same price, so the service never lets both a close and a resting leg
+rest at the broker at once: `_market_close` cancels the stop and then the
+target first, and every failure branch afterwards puts both back — a cancel
+that finds a leg already filled books that fill and sends nothing, a broker
+that cannot be reached leaves what still rests standing as the protection it is
+(a stop that had already come off goes back on), a rejected close re-rests
+both. A close that comes back WORKING is remembered on the position
+(`exit_order_id`), in the journal (`exit_unfilled`), and across a restart, and
+while it is in flight the loop reports it as pending instead of firing again —
+re-sending the close every tick until one filled was finding 2 of the
+2026-08-30 audit, an oversell that grew once a second. `flatten` is the one
+caller allowed to jump the queue: it cancels an in-flight close and replaces it,
+because "get me out" must not wait behind an earlier, slower exit. One residual
+is recorded on `st-97z1`: a *partial* manual exit leaves the full-size bracket
+standing while it rests.
 
 **The day is derived from the journal, not remembered.** Open positions, the
 realized-loss ceiling and the attempts used are rebuilt by reading the file
-(`execd/journal.py`), so a restart recovers them. Losses only debit; a winner
-does not buy back an attempt. On this box, restarts are not hypothetical.
+(`execd/journal.py`), so a restart recovers them. Losses only debit the ceiling;
+a winner does not raise it. Attempts follow Steve's 2026-09-14 rule (st-fn5y):
+*"an 'attempt' is a 'filled position'. Any attempt that breaks even or better
+doesn't decrement the counter"* — so an attempt is held by a filled position
+while it is open and kept only if it closes at a loss, judged on the whole
+position's P&L once nothing is left; a working entry holds a position slot (it
+closes the entry door) but no attempt. On this box, restarts are not
+hypothetical.
 
 **The ceiling bounds the position in front of it, not only the day behind it.**
 Every ceiling check used to look backwards at loss already realized, so two
@@ -216,11 +242,11 @@ below the price of one position it is a number, not a bound.
 authority on what this service *intended*; only the broker knows what is *held*,
 and `ExecService.reconcile` asks it — at start-up, before every entry, before an
 exit is sized, and before a flatten. An entry the broker acknowledges without
-filling is a `working` entry: it holds a position slot and an attempt until
-reconcile learns what became of it, so an order resting at the broker can no
-longer be repeated without limit. Filled ones become tracked positions and get
-the protective stop they were owed; cancelled and rejected ones give the slot
-back; ones the broker cannot account for keep it, because holding a slot only
+filling is a `working` entry: it holds a position slot (not an attempt — an
+attempt is a filled position, Steve 2026-09-14) until reconcile learns what
+became of it, so an order resting at the broker can no longer be repeated
+without limit. Filled ones become tracked positions and get the bracket they
+were owed; cancelled and rejected ones give the slot back; ones the broker cannot account for keep it, because holding a slot only
 refuses new risk while forgetting one creates it. Positions found at the broker
 that this service never opened are adopted so `flatten` can close them, and a
 tracked size that disagrees with the broker's is corrected to the broker's. A
@@ -239,7 +265,8 @@ Append-only JSONL, one file per Central trading day under
 `<state-dir>/journal/`, every line stamped with the git sha of the copy that
 wrote it and fsync'd before the call returns. `request`, `refused` with its
 bound, `preview`, `placed`, `working`, `entry_resolved`, `filled`,
-`stop_placed`, `stop_unprotected`, `exit_triggered`, `exit_unfilled`,
+`stop_placed`, `stop_unprotected`, `target_placed`, `target_unprotected`,
+`stop_adjusted`, `target_adjusted`, `oversold`, `exit_triggered`, `exit_unfilled`,
 `exit_resolved`, `closed` with its P&L, `canceled`, `position_adopted`,
 `position_corrected`, `position_gone`, `reconcile_unknown`, `exit_unverified`,
 `unlock`, `stand_down`, `stop`, `recovered`.

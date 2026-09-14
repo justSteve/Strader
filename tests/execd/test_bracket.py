@@ -1,0 +1,1035 @@
+"""The bracket — a take-profit beside the stop, one-cancels-the-other by the
+service's own hand, a live editor for both, and cancel-and-re-price. [st-fn5y]
+
+Steve, 2026-09-14: *"Future filled orders will result in resting 'take profit'
+orders in addition to stoplosses. The screen should be a live editor allowing
+an update to both trigger conditions."* And: *"Upon fill, api should create a
+resting order at a 10x profit target."* The 10x here is on the PREMIUM basis
+(fill × 10) — the standing assumption until he rules on premium-vs-risk.
+
+What has to be true, and is asserted below, branch by branch:
+
+* a fill rests both legs; a target that cannot be derived or rested is a
+  warning (``target_unprotected``), never a fault, because the stop stands;
+* when either leg fills the other comes off at once, and a cancel that finds
+  the other leg already filled books it and journals the short as
+  ``oversold``;
+* every close the service sends takes both legs off first and puts both back
+  on every failure branch; a partial exit resizes both; flatten pulls both;
+* ``adjust`` moves either leg by cancel-then-rest, refuses off-grid prices,
+  a stop not below the bid, a target not above it, a stop wider than the
+  day's headroom, and a leg that filled before it could move;
+* a restart rebuilds the target from the journal like the stop;
+* the paper book fills a resting sell limit at the bid once the bid reaches
+  it, attributable to that order;
+* the page carries the target row, the UPDATE form, and CANCEL AND RE-PRICE
+  that brings the form back priced from the selection the entry came from.
+"""
+
+from __future__ import annotations
+
+import json
+
+import httpx
+import pytest
+
+from execd.api import create_app
+from execd.bounds import Bounds
+from execd.broker import BrokerError, MockBroker, OrderResult, OrderStatus
+from execd.intent import OrderIntent, OrderType, Side
+from execd.paper import PaperBroker
+from execd.service import ExecService, Refused, ServiceConfig
+from execd.stops import take_profit_price
+
+from .conftest import CALL, PUT, SPX_NOW, entry, exit_intent, schwab_chain_maps
+
+#: the conftest entry with a two-point SPX stop at 0.30 delta: fill 2.10,
+#: stop 1.50, target 21.00 on the premium basis
+NEAR_STOP = SPX_NOW - 2.0
+TRIGGER = NEAR_STOP - 0.5
+
+
+def sells(broker: MockBroker) -> list[dict]:
+    return [kw for kw in broker.calls_to("place")
+            if kw.get("side") == "SELL_TO_CLOSE" and kw.get("order_type") == "MARKET"]
+
+
+def legs(broker: MockBroker, symbol: str = CALL) -> dict[str, list[OrderResult]]:
+    working = broker.working_orders(symbol)
+    return {"stop": [o for o in working if o.order_type is OrderType.STOP],
+            "target": [o for o in working if o.order_type is OrderType.LIMIT
+                       and o.side is Side.SELL_TO_CLOSE]}
+
+
+@pytest.fixture
+def holding(armed: ExecService):
+    """An armed service holding one fill at 2.10 with a 1.50 stop and a
+    21.00 target resting."""
+    out = armed.place(entry(intent_id="br-1", stop_spx=NEAR_STOP, delta=0.30))
+    assert out["order"]["status"] == "FILLED"
+    return armed
+
+
+def pos_of(svc: ExecService) -> dict:
+    return svc.status()["positions"][0]
+
+
+# ── the arithmetic ───────────────────────────────────────────────────────
+
+class TestTakeProfitPrice:
+    def test_premium_basis_is_fill_times_the_multiple_on_the_tick(self):
+        assert take_profit_price(2.10, 10.0) == 21.00
+        assert take_profit_price(0.35, 10.0) == 3.50
+        assert take_profit_price(0.27, 10.0) == 2.70
+
+    def test_it_rounds_up_onto_the_grid_in_force_at_the_target(self):
+        assert take_profit_price(0.283, 10.0) == 2.85       # 2.83 → 0.05 grid below $3
+        assert take_profit_price(0.301, 10.0) == 3.10       # 3.01 → 0.10 grid at $3+
+        assert take_profit_price(2.10, 1.5) == 3.20         # 3.15 → 3.20
+
+    def test_risk_basis_is_fill_plus_the_multiple_times_the_distance_to_the_stop(self):
+        assert take_profit_price(2.10, 10.0, "risk", stop_price=1.50) == 8.10
+        assert take_profit_price(2.10, 1.0, "risk", stop_price=1.50) == 2.70
+
+    @pytest.mark.parametrize("kwargs, match", [
+        (dict(fill_px=0, multiple=10), "positive"),
+        (dict(fill_px=2.10, multiple=0), "multiple"),
+        (dict(fill_px=2.10, multiple=10, basis="risk"), "needs a resting stop"),
+        (dict(fill_px=2.10, multiple=10, basis="risk", stop_price=2.10), "not below"),
+        (dict(fill_px=2.10, multiple=10, basis="mid"), "basis"),
+        (dict(fill_px=2.10, multiple=1.0), "not above"),
+    ])
+    def test_inputs_that_cannot_make_a_target_raise(self, kwargs, match):
+        with pytest.raises(ValueError, match=match):
+            take_profit_price(**kwargs)
+
+
+# ── A. the target on the fill ────────────────────────────────────────────
+
+class TestTheTargetRestsOnTheFill:
+    def test_a_fill_rests_a_stop_and_a_target(self, holding, broker):
+        out = holding.journal.find("br-1")
+        assert [e["event"] for e in out][-3:] == ["filled", "stop_placed", "target_placed"]
+        p = pos_of(holding)
+        assert (p["stop_price"], p["target_price"]) == (1.50, 21.00)
+        assert p["stop_order_id"] and p["target_order_id"]
+        assert p["stop_order_id"] != p["target_order_id"]
+        resting = legs(broker)
+        assert len(resting["stop"]) == 1 and len(resting["target"]) == 1
+        assert resting["target"][0].price == 21.00 and resting["target"][0].qty == 1
+
+    def test_the_target_line_carries_the_basis_and_the_multiple(self, holding):
+        line = holding.journal.events("target_placed")[0]
+        assert line["target_price"] == 21.00 and line["basis"] == "premium"
+        assert line["multiple"] == 10.0 and line["kind"] == "entry"
+        assert line["reward_usd"] == 1890.0 and line["order_id"]
+
+    def test_the_place_answer_carries_the_target_order(self, armed):
+        out = armed.place(entry(intent_id="br-2", stop_spx=NEAR_STOP, delta=0.30))
+        assert out["target_order"]["order_type"] == "LIMIT"
+        assert out["target_order"]["side"] == "SELL_TO_CLOSE"
+        assert out["target_order"]["price"] == 21.00
+        assert out["target_order"]["status"] == "WORKING"
+
+    def test_the_risk_basis_multiplies_the_distance_to_the_stop(self, broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha",
+                               bounds=Bounds(take_profit_basis="risk", take_profit_multiple=10.0))
+        svc = ExecService(broker, config, clock=clock)
+        svc.unlock({"token": "x"})
+        svc.place(entry(intent_id="br-3", stop_spx=NEAR_STOP, delta=0.30))
+        assert pos_of(svc)["target_price"] == 8.10                # 2.10 + 10 × 0.60
+        assert svc.journal.events("target_placed")[0]["basis"] == "risk"
+
+    def test_a_broker_that_refuses_the_target_is_a_warning_not_a_fault(
+            self, armed, broker, monkeypatch):
+        real_place = broker.place
+
+        def place(intent):
+            if intent.order_type is OrderType.LIMIT and intent.side is Side.SELL_TO_CLOSE:
+                raise BrokerError("no sell limits today")
+            return real_place(intent)
+
+        monkeypatch.setattr(broker, "place", place)
+        out = armed.place(entry(intent_id="br-4", stop_spx=NEAR_STOP, delta=0.30))
+        assert out["order"]["status"] == "FILLED"
+        assert out["stop_order"]["status"] == "WORKING"          # the protection stands
+        assert out["target_order"] is None
+        p = pos_of(armed)
+        assert p["stop_order_id"] and p["target_order_id"] is None and p["target_price"] is None
+        line = armed.journal.events("target_unprotected")[0]
+        assert "no sell limits today" in line["detail"] and line["target_price"] == 21.00
+        assert not armed.journal.events("stop_unprotected")
+
+    def test_a_target_the_broker_rejects_is_journaled_with_its_order(
+            self, armed, broker, monkeypatch):
+        real_place = broker.place
+
+        def place(intent):
+            if intent.order_type is OrderType.LIMIT and intent.side is Side.SELL_TO_CLOSE:
+                broker.reject_next = "price too far from the market"
+            return real_place(intent)
+
+        monkeypatch.setattr(broker, "place", place)
+        armed.place(entry(intent_id="br-5", stop_spx=NEAR_STOP, delta=0.30))
+        line = armed.journal.events("target_unprotected")[0]
+        assert "rejected" in line["detail"] and line["order_id"]
+        assert pos_of(armed)["target_order_id"] is None
+
+    def test_a_working_entry_that_fills_later_gets_its_target_at_reconcile(self, armed, broker):
+        broker.rest_limits = True
+        out = armed.place(entry(intent_id="br-6", stop_spx=NEAR_STOP, delta=0.30))
+        broker.rest_limits = False
+        broker.fill_resting(out["order"]["order_id"])
+        armed.reconcile()
+        p = pos_of(armed)
+        assert p["stop_order_id"] and p["target_order_id"]
+        assert p["target_price"] == 21.00
+
+    def test_the_status_and_the_valuation_carry_the_target(self, holding):
+        p = pos_of(holding)
+        v = p["valuation"]
+        assert v["at_target_usd"] == pytest.approx((21.00 - 2.10) * 100 - 1.30)
+        assert v["at_stop_usd"] == pytest.approx((1.50 - 2.10) * 100 - 1.30)
+        assert p["entry_spx"] == SPX_NOW
+
+    def test_a_target_already_through_when_it_lands_is_the_exit(self, armed, broker):
+        """The bid is above the target the moment the sell limit lands (a
+        ten-cent option whose bid jumps to 0.30 as the 0.15 target lands). That fill is the close,
+        booked as the target, and the stop comes off."""
+        cheap = "SPXW  260826C06450000"
+        broker.set_quote(cheap, bid=0.05, ask=0.10)
+        armed.bounds = armed.config.bounds = Bounds(take_profit_multiple=1.2)
+        real_place = broker.place
+
+        def place(intent):
+            if intent.order_type is OrderType.LIMIT and intent.side is Side.SELL_TO_CLOSE:
+                broker.set_quote(cheap, bid=0.30, ask=0.32)      # the bid ran up
+            return real_place(intent)
+
+        broker.place = place
+        out = armed.place(entry(intent_id="br-7", symbol=cheap, limit=0.10,
+                                stop_spx=NEAR_STOP, delta=0.30))
+        assert out["order"]["status"] == "FILLED"
+        assert out["target_order"]["closed"]["reason"] == "target"
+        assert armed.status()["positions"] == []
+        assert armed.journal.events("target_placed")[0]["filled_at_once"] is True
+        assert not broker.working_orders(cheap)                 # the stop came off
+
+
+# ── B. one cancels the other ─────────────────────────────────────────────
+
+class TestOneCancelsTheOther:
+    def test_the_stop_filling_cancels_the_target(self, holding, broker, clock):
+        p = pos_of(holding)
+        clock.advance(minutes=1)
+        broker.fill_resting(p["stop_order_id"])
+        out = holding.poll_fills()
+        assert out["picked_up"][0]["reason"] == "protective-stop"
+        assert out["picked_up"][0]["pnl_usd"] == -60.0
+        assert broker._orders[p["target_order_id"]].status is OrderStatus.CANCELED
+        assert holding.status()["positions"] == []
+        closed = holding.journal.events("closed")[-1]
+        assert closed["kind"] == "protective-stop" and closed["reason"] == "resting-stop"
+
+    def test_the_target_filling_cancels_the_stop_and_books_the_win(self, holding, broker, clock):
+        p = pos_of(holding)
+        clock.advance(minutes=1)
+        broker.fill_resting(p["target_order_id"])
+        out = holding.poll_fills()
+        assert out["picked_up"][0]["reason"] == "target"
+        assert out["picked_up"][0]["exit_price"] == 21.00
+        assert out["picked_up"][0]["pnl_usd"] == 1890.0
+        assert broker._orders[p["stop_order_id"]].status is OrderStatus.CANCELED
+        assert holding.status()["positions"] == []
+        closed = holding.journal.events("closed")[-1]
+        assert closed["kind"] == "target" and closed["reason"] == "resting-target"
+        assert closed["pnl_usd"] == 1890.0
+
+    def test_the_other_leg_comes_off_before_the_close_is_booked(self, holding, broker, clock):
+        p = pos_of(holding)
+        clock.advance(minutes=1)
+        broker.fill_resting(p["target_order_id"])
+        holding.poll_fills()
+        events = [e["event"] for e in holding.journal.read()]
+        assert events.index("canceled") < events.index("closed")
+
+    def test_a_target_win_gives_the_attempt_back(self, holding, broker, clock):
+        assert holding.status()["day"]["attempts_used"] == 1     # held while open
+        clock.advance(minutes=1)
+        broker.fill_resting(pos_of(holding)["target_order_id"])
+        holding.poll_fills()
+        day = holding.status()["day"]
+        assert day["attempts_used"] == 0 and day["attempts_left"] == holding.bounds.max_attempts
+
+    def test_a_stop_loss_keeps_the_attempt(self, holding, broker, clock):
+        clock.advance(minutes=1)
+        broker.fill_resting(pos_of(holding)["stop_order_id"])
+        holding.poll_fills()
+        assert holding.status()["day"]["attempts_used"] == 1
+
+    def test_both_legs_filled_is_booked_once_and_the_short_is_loud(self, holding, broker, clock):
+        """The race lost on both sides: the stop filled, and before the cancel
+        reached the target it filled too. One close is booked against what
+        was held; the extra contract sold is ``oversold`` in the journal."""
+        p = pos_of(holding)
+        clock.advance(minutes=1)
+        broker.fill_resting(p["stop_order_id"])
+        broker.fill_resting(p["target_order_id"])
+        out = holding.poll_fills()
+        assert len(out["picked_up"]) == 1
+        closed = holding.journal.events("closed")
+        assert len(closed) == 1 and closed[0]["kind"] == "protective-stop"
+        over = holding.journal.events("oversold")
+        assert len(over) == 1 and over[0]["qty"] == 1 and over[0]["leg"] == "target"
+        assert "bought back by hand" in over[0]["detail"]
+        assert holding.status()["positions"] == []
+
+
+class TestTheCloseTakesBothLegsOff:
+    def test_both_cancels_precede_the_close(self, holding, broker):
+        p = pos_of(holding)
+        holding.observe(TRIGGER)
+        names = [(n, kw) for n, kw in broker.calls]
+        cancel_ids = [kw["order_id"] for n, kw in names if n == "cancel"]
+        assert set(cancel_ids) >= {p["stop_order_id"], p["target_order_id"]}
+        last_cancel = max(i for i, (n, _) in enumerate(names) if n == "cancel")
+        close = min(i for i, (n, kw) in enumerate(names)
+                    if n == "place" and kw.get("side") == "SELL_TO_CLOSE"
+                    and kw.get("order_type") == "MARKET")
+        assert last_cancel < close
+        assert holding.status()["positions"] == []
+        assert not broker.working_orders(CALL)
+
+    def test_when_the_target_wins_the_race_no_close_is_sent(self, holding, broker):
+        p = pos_of(holding)
+        broker.fill_resting(p["target_order_id"])
+        result = holding.observe(TRIGGER)
+        assert result["fired"][0]["reason"] == "target"
+        assert result["fired"][0]["closed"] is True
+        assert result["fired"][0]["pnl_usd"] == 1890.0
+        assert sells(broker) == []
+        assert broker._orders[p["stop_order_id"]].status is OrderStatus.CANCELED
+        assert holding.status()["positions"] == []
+
+    def test_when_the_stop_wins_the_race_the_target_comes_off(self, holding, broker):
+        p = pos_of(holding)
+        broker.fill_resting(p["stop_order_id"])
+        result = holding.observe(TRIGGER)
+        assert result["fired"][0]["reason"] == "resting-stop"
+        assert broker._orders[p["target_order_id"]].status is OrderStatus.CANCELED
+        assert sells(broker) == []
+
+    def test_a_rejected_close_puts_both_legs_back(self, holding, broker):
+        before = pos_of(holding)
+        broker.reject_next = "market closed"
+        holding.observe(TRIGGER)
+        after = pos_of(holding)
+        assert after["stop_order_id"] and after["stop_order_id"] != before["stop_order_id"]
+        assert after["target_order_id"] and after["target_order_id"] != before["target_order_id"]
+        assert (after["stop_price"], after["target_price"]) == (1.50, 21.00)
+        resting = legs(broker)
+        assert len(resting["stop"]) == 1 and len(resting["target"]) == 1
+
+    def test_a_broker_down_at_the_close_puts_both_legs_back(self, holding, broker, monkeypatch):
+        real_place = broker.place
+
+        def place(intent):
+            if intent.order_type is OrderType.MARKET:
+                raise BrokerError("connection reset")
+            return real_place(intent)
+
+        monkeypatch.setattr(broker, "place", place)
+        result = holding.observe(TRIGGER)
+        assert result["fired"][0]["closed"] is False
+        resting = legs(broker)
+        assert len(resting["stop"]) == 1 and len(resting["target"]) == 1
+
+    def test_a_broker_down_at_the_target_cancel_sends_nothing_and_restores_the_stop(
+            self, holding, broker, monkeypatch):
+        p = pos_of(holding)
+        real_cancel = broker.cancel
+
+        def cancel(order_id):
+            if order_id == p["target_order_id"]:
+                raise BrokerError("connection reset")
+            return real_cancel(order_id)
+
+        monkeypatch.setattr(broker, "cancel", cancel)
+        result = holding.observe(TRIGGER)
+        assert result["fired"][0]["status"] == "DEFERRED"
+        assert sells(broker) == []
+        after = pos_of(holding)
+        assert after["stop_order_id"] and after["stop_order_id"] != p["stop_order_id"]
+        assert after["target_order_id"] == p["target_order_id"]     # still resting
+        assert broker._orders[p["target_order_id"]].is_working
+        assert broker._orders[after["stop_order_id"]].is_working
+
+    def test_a_manual_full_exit_pulls_both_legs_first(self, holding, broker):
+        p = pos_of(holding)
+        out = holding.place(exit_intent(intent_id="br-x"))
+        assert out["closed"]["closed"] is True
+        assert broker._orders[p["stop_order_id"]].status is OrderStatus.CANCELED
+        assert broker._orders[p["target_order_id"]].status is OrderStatus.CANCELED
+
+    def test_a_manual_exit_finding_the_target_filled_sends_nothing(self, holding, broker):
+        broker.fill_resting(pos_of(holding)["target_order_id"])
+        out = holding.place(exit_intent(intent_id="br-late"))
+        assert out["order"] is None
+        assert out["closed"]["reason"] == "target"
+        assert "take-profit had already filled" in out["note"]
+        assert sells(broker) == []
+
+    def test_flatten_takes_both_legs_off(self, holding, broker):
+        p = pos_of(holding)
+        out = holding.flatten(reason="test")
+        assert out["closed"][0]["closed"] is True
+        # both legs came off BEFORE the close went on, so the settle found
+        # nothing left to cancel — the cancels are in the broker's call log
+        assert out["closed"][0]["stop_canceled"] is None
+        assert out["closed"][0]["target_canceled"] is None
+        assert not broker.working_orders(CALL)
+        cancelled = {kw["order_id"] for kw in broker.calls_to("cancel")}
+        assert {p["stop_order_id"], p["target_order_id"]} <= cancelled
+
+    def test_a_cancelled_in_flight_close_puts_both_legs_back(self, holding, broker):
+        broker.rest_market = True
+        out = holding.observe(TRIGGER)
+        assert legs(broker) == {"stop": [], "target": []}          # both off while it works
+        holding.cancel(out["fired"][0]["order_id"])
+        resting = legs(broker)
+        assert len(resting["stop"]) == 1 and len(resting["target"]) == 1
+
+    def test_a_close_the_broker_killed_puts_both_legs_back(self, holding, broker):
+        broker.rest_market = True
+        out = holding.observe(TRIGGER)
+        broker.reject_resting(out["fired"][0]["order_id"], "killed at the exchange")
+        holding.reconcile()
+        resting = legs(broker)
+        assert len(resting["stop"]) == 1 and len(resting["target"]) == 1
+
+
+class TestPartialExitsResizeBoth:
+    @pytest.fixture
+    def two_lot(self, broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha",
+                               bounds=Bounds(qty_cap=2))
+        svc = ExecService(broker, config, clock=clock)
+        svc.unlock({"token": "x"})
+        svc.place(entry(intent_id="two-1", qty=2, stop_spx=NEAR_STOP, delta=0.30))
+        return svc
+
+    def test_both_legs_are_sized_to_the_position(self, two_lot, broker):
+        resting = legs(broker)
+        assert resting["stop"][0].qty == 2 and resting["target"][0].qty == 2
+
+    def test_a_partial_exit_replaces_both_at_the_smaller_size(self, two_lot, broker):
+        broker.partial_fill_qty = 1
+        out = two_lot.place(exit_intent(intent_id="two-1-x", qty=2))
+        assert out["closed"]["remaining_qty"] == 1
+        assert out["closed"]["stop_replaced"] and out["closed"]["target_replaced"]
+        resting = legs(broker)
+        assert len(resting["stop"]) == 1 and resting["stop"][0].qty == 1
+        assert len(resting["target"]) == 1 and resting["target"][0].qty == 1
+        assert resting["target"][0].price == 21.00
+        assert two_lot.journal.events("target_placed")[-1]["kind"] == "resized"
+
+    def test_a_partially_filled_target_leaves_a_resized_bracket_for_the_rest(
+            self, two_lot, broker, clock):
+        from dataclasses import replace
+        p = pos_of(two_lot)
+        clock.advance(minutes=1)
+        broker._orders[p["target_order_id"]] = replace(broker._orders[p["target_order_id"]], qty=1)
+        broker.fill_resting(p["target_order_id"])
+        out = two_lot.poll_fills()
+        assert out["picked_up"][0]["remaining_qty"] == 1
+        resting = legs(broker)
+        assert len(resting["stop"]) == 1 and resting["stop"][0].qty == 1
+        assert len(resting["target"]) == 1 and resting["target"][0].qty == 1
+
+    def test_a_size_the_broker_corrects_resizes_both(self, two_lot, broker):
+        broker.set_position(CALL, qty=1, avg_price=2.10)
+        two_lot.reconcile()
+        assert two_lot.journal.events("position_corrected")
+        resting = legs(broker)
+        assert resting["stop"][0].qty == 1 and resting["target"][0].qty == 1
+
+
+class TestCancelGuardsTheTarget:
+    def test_cancelling_the_target_alone_is_refused(self, holding, broker):
+        target_id = pos_of(holding)["target_order_id"]
+        with pytest.raises(Refused) as exc:
+            holding.cancel(target_id)
+        assert exc.value.refusal.bound == "take_profit"
+        assert broker._orders[target_id].is_working
+        assert holding.journal.events("refused")[-1]["order_id"] == target_id
+
+    def test_a_position_gone_elsewhere_pulls_both_legs(self, holding, broker, clock):
+        from execd.service import POSITION_SETTLE_S
+        p = pos_of(holding)
+        broker._positions.clear()
+        holding.reconcile()
+        clock.advance(seconds=POSITION_SETTLE_S + 1)
+        holding.reconcile()
+        assert broker._orders[p["stop_order_id"]].status is OrderStatus.CANCELED
+        assert broker._orders[p["target_order_id"]].status is OrderStatus.CANCELED
+
+
+# ── C. the live editor ───────────────────────────────────────────────────
+
+class TestAdjust:
+    def test_both_legs_move_by_cancel_then_rest(self, holding, broker):
+        before = pos_of(holding)
+        out = holding.adjust(CALL, stop_price=1.80, target_price=25.00)
+        assert out["refused"] is None
+        assert out["stop"]["moved"] and out["target"]["moved"]
+        assert (out["stop"]["old_price"], out["stop"]["new_price"]) == (1.50, 1.80)
+        assert (out["target"]["old_price"], out["target"]["new_price"]) == (21.00, 25.00)
+        after = pos_of(holding)
+        assert (after["stop_price"], after["target_price"]) == (1.80, 25.00)
+        assert after["stop_order_id"] != before["stop_order_id"]
+        assert after["target_order_id"] != before["target_order_id"]
+        assert broker._orders[before["stop_order_id"]].status is OrderStatus.CANCELED
+        assert broker._orders[before["target_order_id"]].status is OrderStatus.CANCELED
+        resting = legs(broker)
+        assert resting["stop"][0].price == 1.80 and resting["target"][0].price == 25.00
+
+    def test_the_moves_are_journaled_with_old_and_new(self, holding):
+        holding.adjust(CALL, stop_price=1.80, target_price=25.00)
+        s = holding.journal.events("stop_adjusted")[0]
+        t = holding.journal.events("target_adjusted")[0]
+        assert (s["old_price"], s["new_price"]) == (1.50, 1.80)
+        assert (t["old_price"], t["new_price"]) == (21.00, 25.00)
+        assert s["old_order_id"] != s["new_order_id"] and t["old_order_id"] != t["new_order_id"]
+        assert s["bid"] == 2.00
+        assert holding.journal.events("stop_placed")[-1]["kind"] == "adjusted"
+        assert holding.journal.events("target_placed")[-1]["kind"] == "adjusted"
+
+    def test_one_leg_alone_leaves_the_other_untouched(self, holding, broker):
+        before = pos_of(holding)
+        out = holding.adjust(CALL, target_price=30.00)
+        assert out["stop"] is None and out["target"]["moved"]
+        after = pos_of(holding)
+        assert after["stop_order_id"] == before["stop_order_id"] and after["stop_price"] == 1.50
+        assert after["target_price"] == 30.00
+
+    def test_moving_the_stop_moves_the_spx_trigger_with_it(self, holding, broker):
+        """The two stops stay one stop: the SPX level the loop watches is
+        re-derived from the new option price through the entry's delta."""
+        assert pos_of(holding)["stop_spx"] == NEAR_STOP
+        out = holding.adjust(CALL, stop_price=1.80)
+        # (2.10 − 1.80) / 0.30 = 1.0 point below the entry's SPX mark
+        assert out["stop"]["stop_spx"] == SPX_NOW - 1.0
+        assert pos_of(holding)["stop_spx"] == SPX_NOW - 1.0
+        line = holding.journal.events("stop_adjusted")[0]
+        assert (line["old_stop_spx"], line["new_stop_spx"]) == (NEAR_STOP, SPX_NOW - 1.0)
+        assert holding.observe(SPX_NOW - 0.5)["fired"] == []
+        assert holding.observe(SPX_NOW - 1.0)["fired"][0]["closed"] is True
+
+    def test_a_put_stop_moves_the_trigger_the_other_way(self, armed):
+        armed.place(entry(intent_id="br-p", symbol=PUT, limit=1.90,
+                          stop_spx=SPX_NOW + 2.0, delta=0.30))
+        assert pos_of(armed)["stop_price"] == 1.30                # 1.90 − 2 × 0.30
+        out = armed.adjust(PUT, stop_price=1.60)              # (1.90 − 1.60)/0.30 = 1.0
+        assert out["refused"] is None
+        assert out["stop"]["stop_spx"] == SPX_NOW + 1.0
+        assert armed.observe(SPX_NOW + 1.0)["fired"][0]["closed"] is True
+
+    @pytest.mark.parametrize("kwargs, bound, words", [
+        (dict(stop_price=1.83), "tick", "not on the 0.05 grid"),
+        (dict(target_price=3.05), "tick", "not on the 0.10 grid"),
+        (dict(stop_price=2.05), "bracket", "not below the 2.00 bid"),
+        (dict(stop_price=2.00), "bracket", "not below the 2.00 bid"),
+        (dict(target_price=1.95), "bracket", "not above the 2.00 bid"),
+        (dict(target_price=2.00), "bracket", "not above the 2.00 bid"),
+        (dict(stop_price=-1.0), "bracket", "positive"),
+    ])
+    def test_a_price_that_cannot_be_a_trigger_is_refused(self, holding, broker, kwargs, bound, words):
+        before = pos_of(holding)
+        out = holding.adjust(CALL, **kwargs)
+        assert out["refused"]["bound"] == bound and words in out["refused"]["reason"]
+        after = pos_of(holding)
+        assert (after["stop_order_id"], after["target_order_id"]) == \
+            (before["stop_order_id"], before["target_order_id"])
+        assert broker.calls_to("cancel") == []
+        assert holding.journal.events("refused")[-1]["kind"] == "adjust"
+
+    def test_a_stop_wider_than_the_days_headroom_is_refused(self, holding):
+        """The ceiling does to an adjusted stop what it does to an entry: a
+        stop at 0.05 puts $205 at risk, and the day has $150 left."""
+        holding.journal.record("closed", symbol="other", pnl_usd=-350.0)
+        out = holding.adjust(CALL, stop_price=0.05)
+        assert out["refused"]["bound"] == "ceiling"
+        assert "$205.00" in out["refused"]["reason"] and "$150.00" in out["refused"]["reason"]
+        assert pos_of(holding)["stop_price"] == 1.50
+
+    def test_tightening_the_stop_never_meets_the_ceiling(self, holding):
+        holding.journal.record("closed", symbol="other", pnl_usd=-480.0)
+        assert holding.adjust(CALL, stop_price=1.95)["refused"] is None
+
+    def test_no_position_is_a_refusal(self, holding):
+        out = holding.adjust(PUT, stop_price=1.00)
+        assert out["refused"]["bound"] == "position"
+
+    def test_nothing_to_adjust_is_a_value_error(self, holding):
+        with pytest.raises(ValueError, match="stop_price, a target_price, or both"):
+            holding.adjust(CALL)
+
+    def test_a_close_in_flight_refuses_the_adjust(self, holding, broker):
+        broker.rest_market = True
+        holding.observe(TRIGGER)
+        out = holding.adjust(CALL, stop_price=1.80)
+        assert out["refused"]["bound"] == "exit_in_flight"
+
+    def test_a_locked_service_refuses(self, holding):
+        holding.lock()
+        out = holding.adjust(CALL, stop_price=1.80)
+        assert out["refused"]["bound"] == "armed"
+
+    def test_adjust_is_legal_while_stopped(self, holding):
+        holding.stop()
+        assert holding.adjust(CALL, target_price=25.00)["refused"] is None
+
+    def test_a_stop_that_filled_before_it_could_move_is_booked_and_refused(self, holding, broker):
+        p = pos_of(holding)
+        broker.fill_resting(p["stop_order_id"])
+        out = holding.adjust(CALL, stop_price=1.80, target_price=25.00)
+        assert out["refused"]["bound"] == "filled"
+        assert "stop filled at 1.50" in out["refused"]["reason"]
+        assert out["closed"]["reason"] == "resting-stop" and out["closed"]["closed"] is True
+        assert out["target"] is None                                # never reached
+        assert holding.status()["positions"] == []
+        assert broker._orders[p["target_order_id"]].status is OrderStatus.CANCELED
+        assert holding.journal.events("closed")[-1]["kind"] == "resting-stop"
+
+    def test_a_target_that_filled_before_it_could_move_is_booked_and_refused(self, holding, broker):
+        p = pos_of(holding)
+        broker.fill_resting(p["target_order_id"])
+        out = holding.adjust(CALL, target_price=25.00)
+        assert out["refused"]["bound"] == "filled"
+        assert "take-profit filled at 21.00" in out["refused"]["reason"]
+        assert out["closed"]["reason"] == "target" and out["closed"]["pnl_usd"] == 1890.0
+        assert holding.status()["positions"] == []
+        assert broker._orders[p["stop_order_id"]].status is OrderStatus.CANCELED
+
+    def test_a_broker_down_at_the_cancel_changes_nothing_and_raises(self, holding, broker):
+        before = pos_of(holding)
+        broker.fail_next = "connection reset"        # the quote read fails first
+        with pytest.raises(BrokerError):
+            holding.adjust(CALL, stop_price=1.80)
+        after = pos_of(holding)
+        assert after["stop_order_id"] == before["stop_order_id"]
+
+    def test_a_new_stop_the_broker_will_not_rest_brings_the_old_one_back(
+            self, holding, broker, monkeypatch):
+        before = pos_of(holding)
+        real_place = broker.place
+
+        def place(intent):
+            if intent.order_type is OrderType.STOP and intent.stop_price == 1.80:
+                raise BrokerError("no")
+            return real_place(intent)
+
+        monkeypatch.setattr(broker, "place", place)
+        out = holding.adjust(CALL, stop_price=1.80)
+        assert out["refused"] is None and out["stop"]["moved"] is False
+        assert "old stop is back" in out["stop"]["error"]
+        after = pos_of(holding)
+        assert after["stop_price"] == 1.50 and after["stop_spx"] == NEAR_STOP
+        assert after["stop_order_id"] and after["stop_order_id"] != before["stop_order_id"]
+        assert broker._orders[after["stop_order_id"]].is_working
+        assert not holding.journal.events("stop_adjusted")
+        assert holding.journal.events("stop_placed")[-1]["kind"] == "restored"
+
+
+class TestAdjustOverTheApi:
+    @pytest.fixture
+    def client(self, holding):
+        return create_app(holding).test_client()
+
+    @staticmethod
+    def post(client, payload):
+        return client.post("/adjust", data=json.dumps(payload), content_type="application/json")
+
+    def test_a_good_adjust_is_a_200(self, client, holding):
+        r = self.post(client, {"symbol": CALL, "stop_price": 1.80, "target_price": "25.0"})
+        assert r.status_code == 200
+        assert r.json["stop"]["moved"] and r.json["target"]["new_price"] == 25.0
+        assert pos_of(holding)["stop_price"] == 1.80
+
+    def test_a_refusal_is_a_409_naming_the_bound(self, client):
+        r = self.post(client, {"symbol": CALL, "stop_price": 2.50})
+        assert r.status_code == 409 and r.json["refused"]["bound"] == "bracket"
+
+    @pytest.mark.parametrize("payload", [
+        {}, {"stop_price": 1.80}, {"symbol": CALL, "stop_price": "one eighty"},
+        {"symbol": CALL, "target_price": True},
+    ])
+    def test_a_malformed_request_is_a_400(self, client, payload):
+        r = self.post(client, payload)
+        assert r.status_code == 400 and r.json["error"] == "bad_request"
+
+    def test_nothing_to_adjust_is_a_400(self, client):
+        assert self.post(client, {"symbol": CALL}).status_code == 400
+
+    def test_a_broker_failure_is_a_502(self, client, broker):
+        broker.fail_next = "down"
+        r = self.post(client, {"symbol": CALL, "stop_price": 1.80})
+        assert r.status_code == 502 and r.json["error"] == "broker"
+
+    def test_a_locked_service_is_a_409(self, holding):
+        holding.lock()
+        client = create_app(holding).test_client()
+        r = self.post(client, {"symbol": CALL, "stop_price": 1.80})
+        assert r.status_code == 409 and r.json["refused"]["bound"] == "armed"
+
+    def test_adjust_refuses_a_get(self, client):
+        assert client.get("/adjust").status_code == 405
+
+
+# ── recovery ─────────────────────────────────────────────────────────────
+
+class TestRecovery:
+    def test_a_restart_rebuilds_the_target_like_the_stop(self, broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        first = ExecService(broker, config, clock=clock)
+        first.unlock({"token": "x"})
+        first.place(entry(intent_id="rec-1", stop_spx=NEAR_STOP, delta=0.30))
+        before = pos_of(first)
+
+        second = ExecService(broker, config, clock=clock)
+        after = pos_of(second)
+        assert after["target_order_id"] == before["target_order_id"]
+        assert after["target_price"] == 21.00
+        assert after["stop_order_id"] == before["stop_order_id"]
+        assert after["entry_spx"] == SPX_NOW
+
+    def test_a_restart_after_an_adjust_carries_the_new_legs(self, broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        first = ExecService(broker, config, clock=clock)
+        first.unlock({"token": "x"})
+        first.place(entry(intent_id="rec-2", stop_spx=NEAR_STOP, delta=0.30))
+        first.adjust(CALL, stop_price=1.80, target_price=25.00)
+        moved = pos_of(first)
+
+        second = ExecService(broker, config, clock=clock)
+        after = pos_of(second)
+        assert (after["stop_order_id"], after["target_order_id"]) == \
+            (moved["stop_order_id"], moved["target_order_id"])
+        assert (after["stop_price"], after["target_price"]) == (1.80, 25.00)
+        assert after["stop_spx"] == SPX_NOW - 1.0
+        second.unlock({"token": "x"})
+        assert second.observe(SPX_NOW - 1.0)["fired"][0]["closed"] is True
+
+    def test_legs_that_were_off_for_a_close_in_flight_do_not_come_back_as_ids(
+            self, broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        first = ExecService(broker, config, clock=clock)
+        first.unlock({"token": "x"})
+        first.place(entry(intent_id="rec-3", stop_spx=NEAR_STOP, delta=0.30))
+        broker.rest_market = True
+        first.observe(TRIGGER)
+
+        second = ExecService(broker, config, clock=clock)
+        p = pos_of(second)
+        assert p["exit_order_id"] and p["stop_order_id"] is None and p["target_order_id"] is None
+        assert (p["stop_price"], p["target_price"]) == (1.50, 21.00)   # the prices survive
+
+    def test_a_target_that_filled_as_it_landed_is_not_resurrected(self, armed, broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        cheap = "SPXW  260826C06450000"
+        broker.set_quote(cheap, bid=0.05, ask=0.10)
+        first = ExecService(broker, config, clock=clock)
+        first.bounds = first.config.bounds = Bounds(take_profit_multiple=1.2)
+        first.unlock({"token": "x"})
+        real_place = broker.place
+
+        def place(intent):
+            if intent.order_type is OrderType.LIMIT and intent.side is Side.SELL_TO_CLOSE:
+                broker.set_quote(cheap, bid=0.30, ask=0.32)
+            return real_place(intent)
+
+        broker.place = place
+        first.place(entry(intent_id="rec-4", symbol=cheap, limit=0.10,
+                          stop_spx=NEAR_STOP, delta=0.30))
+        broker.place = real_place
+        second = ExecService(broker, config, clock=clock)
+        assert second.status()["positions"] == []
+
+
+# ── D. the attempts rule, through the service ────────────────────────────
+
+class TestAttemptsThroughTheService:
+    def test_a_winning_flatten_gives_the_attempt_back(self, holding, broker):
+        broker.set_quote(CALL, bid=2.60, ask=2.70)
+        holding.flatten(reason="test")
+        day = holding.status()["day"]
+        assert day["attempts_used"] == 0 and day["attempts_left"] == holding.bounds.max_attempts
+        assert day["realized_loss_usd"] == 0.0
+
+    def test_a_losing_flatten_keeps_it(self, holding, broker):
+        holding.flatten(reason="test")                          # sells at the 2.00 bid
+        assert holding.status()["day"]["attempts_used"] == 1
+
+    def test_a_working_entry_holds_a_slot_and_no_attempt_then_fills_and_holds_one(
+            self, armed, broker):
+        broker.rest_limits = True
+        out = armed.place(entry(intent_id="att-1", stop_spx=NEAR_STOP, delta=0.30))
+        day = armed.status()["day"]
+        assert (day["open_positions"], day["attempts_used"]) == (1, 0)
+        broker.fill_resting(out["order"]["order_id"])
+        armed.reconcile()
+        day = armed.status()["day"]
+        assert (day["open_positions"], day["attempts_used"]) == (1, 1)
+
+    def test_max_attempts_counts_losses_only(self, armed, broker):
+        armed.bounds = armed.config.bounds = Bounds(max_attempts=2)
+        for i in range(3):                                      # three winners
+            armed.place(entry(intent_id=f"w-{i}", stop_spx=NEAR_STOP, delta=0.30))
+            broker.set_quote(CALL, bid=2.60, ask=2.70)
+            armed.flatten(reason="test")
+            broker.set_quote(CALL, bid=2.00, ask=2.10)
+        assert armed.status()["day"]["attempts_used"] == 0
+        for i in range(2):                                      # two losers
+            armed.place(entry(intent_id=f"l-{i}", stop_spx=NEAR_STOP, delta=0.30))
+            armed.flatten(reason="test")
+        out = armed.place(entry(intent_id="third-loss", stop_spx=NEAR_STOP, delta=0.30))
+        assert out["refused"]["bound"] == "ceiling" and "attempts" in out["refused"]["reason"]
+
+
+# ── E. cancel and re-price ───────────────────────────────────────────────
+
+class TestCancelAndRePrice:
+    def test_a_working_entry_from_the_api_carries_no_page_query(self, armed, broker):
+        broker.rest_limits = True
+        out = armed.place(entry(intent_id="cq-1"))
+        assert out["working"]["page_query"] is None
+
+    def test_place_records_the_page_query_on_the_working_line_and_recovers_it(
+            self, broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        broker.rest_limits = True
+        first = ExecService(broker, config, clock=clock)
+        first.unlock({"token": "x"})
+        query = {"side": "call", "expiry": "2026-08-26", "delta": "0.3", "budget": "150"}
+        out = first.place(entry(intent_id="cq-2"), page_query=query)
+        assert out["working"]["page_query"] == query
+        assert first.journal.events("working")[0]["page_query"] == query
+        second = ExecService(broker, config, clock=clock)
+        assert second.status()["working"][0]["page_query"] == query
+
+    def test_the_query_never_reaches_the_broker_or_the_intent(self, armed, broker):
+        broker.rest_limits = True
+        armed.place(entry(intent_id="cq-3"), page_query={"side": "call"})
+        assert "page_query" not in armed.journal.find("cq-3")[0]["intent"]
+        assert all("page_query" not in kw for kw in broker.calls_to("place"))
+
+
+# ── F. the paper book ────────────────────────────────────────────────────
+
+class TestPaperTarget:
+    @pytest.fixture
+    def live(self, clock):
+        b = MockBroker(clock=clock)
+        b.set_quote(CALL, bid=2.00, ask=2.10)
+        b.set_quote("$SPX", bid=SPX_NOW - 0.25, ask=SPX_NOW + 0.25, last=SPX_NOW)
+        return b
+
+    @pytest.fixture
+    def paper(self, live, clock, tmp_path):
+        return PaperBroker(live, book_path=tmp_path / "paper-book.json", clock=clock)
+
+    def test_a_resting_sell_limit_fills_at_the_bid_once_the_bid_reaches_it(self, paper, live, clock):
+        paper.place(entry("pt-1"))
+        target = paper.place(OrderIntent("pt-1-t", CALL, Side.SELL_TO_CLOSE, 1,
+                                         order_type=OrderType.LIMIT, limit=2.50))
+        assert target.status is OrderStatus.WORKING and target.price == 2.50
+        since = clock()
+        clock.advance(seconds=5)
+        live.set_quote(CALL, bid=2.45, ask=2.55)
+        assert paper.fills_since(since) == []                   # not there yet
+        live.set_quote(CALL, bid=2.55, ask=2.65)
+        fills = paper.fills_since(since)
+        assert len(fills) == 1
+        assert fills[0].order_id == target.order_id and fills[0].price == 2.55
+        assert fills[0].side is Side.SELL_TO_CLOSE
+        assert paper.positions() == []
+        assert paper.orders()[-1].status is OrderStatus.FILLED
+
+    def test_a_marketable_sell_limit_fills_at_once_at_the_bid(self, paper):
+        paper.place(entry("pt-2"))
+        o = paper.place(OrderIntent("pt-2-t", CALL, Side.SELL_TO_CLOSE, 1,
+                                    order_type=OrderType.LIMIT, limit=1.90))
+        assert o.status is OrderStatus.FILLED and o.fill_price == 2.00
+
+    def test_the_target_fills_in_the_book_and_the_sweep_books_it_as_the_target(
+            self, paper, live, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", mode="paper")
+        svc = ExecService(paper, config, clock=clock)
+        svc.unlock({"token": "x"})
+        out = svc.place(entry("pt-3", stop_spx=NEAR_STOP, delta=0.30))
+        assert out["stop_order"]["order_id"] == "paper-0002"
+        assert out["target_order"]["order_id"] == "paper-0003"
+        assert out["target_order"]["price"] == 21.00
+        clock.advance(seconds=5)
+        live.set_quote(CALL, bid=21.50, ask=21.70)
+        r = svc.poll_fills()
+        assert len(r["picked_up"]) == 1
+        assert r["picked_up"][0]["order_id"] == "paper-0003"
+        assert r["picked_up"][0]["reason"] == "target"
+        assert r["picked_up"][0]["pnl_usd"] == 1940.0             # (21.50 − 2.10) × 100
+        assert svc.status()["positions"] == []
+        book = {o.order_id: o.status for o in paper.orders()}
+        assert book["paper-0002"] is OrderStatus.CANCELED         # the stop came off
+        assert svc.status()["day"]["attempts_used"] == 0           # a win gives it back
+        assert [c[0] for c in live.calls if c[0] in ("place", "cancel")] == []
+
+    def test_the_stop_fills_in_the_book_and_the_target_comes_off(self, paper, live, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", mode="paper")
+        svc = ExecService(paper, config, clock=clock)
+        svc.unlock({"token": "x"})
+        svc.place(entry("pt-4", stop_spx=NEAR_STOP, delta=0.30))
+        clock.advance(seconds=5)
+        live.set_quote(CALL, bid=1.45, ask=1.55)
+        r = svc.poll_fills()
+        assert r["picked_up"][0]["reason"] == "protective-stop"
+        book = {o.order_id: o.status for o in paper.orders()}
+        assert book["paper-0003"] is OrderStatus.CANCELED
+        assert svc.status()["day"]["attempts_used"] == 1
+
+
+# ── the page ─────────────────────────────────────────────────────────────
+
+@pytest.fixture
+def page(armed: ExecService, broker, clock, tmp_path):
+    from execd.page import CredentialFile, create_page
+    from execd.vault import Vault
+    from .test_page import CALLBACK, PASS, Schwab, market_payload, vault_payload
+
+    broker.set_chain("SPXW", schwab_chain_maps())
+    vault = Vault(tmp_path / "vault.json")
+    vault.store(vault_payload(), PASS)
+    mfile = tmp_path / "market.json"
+    mfile.write_text(json.dumps(market_payload()))
+    market = CredentialFile(mfile)
+    market.load()
+    app = create_page(armed, vault=vault, market=market, callback_url=CALLBACK,
+                      http_client=httpx.Client(base_url="https://api.schwabapi.com",
+                                               transport=httpx.MockTransport(Schwab())),
+                      clock=clock)
+    app.config["TESTING"] = True
+    return app.test_client()
+
+
+def text(r) -> str:
+    return r.get_data(as_text=True)
+
+
+class TestThePage:
+    def test_the_position_card_shows_the_target_and_the_editor(self, page, holding):
+        body = text(page.get("/exec/order"))
+        assert "at the target" in body and "target 21.00" in body
+        assert "at the stop" in body and "stop 1.50" in body
+        assert "action='/exec/order/adjust'" in body and ">UPDATE<" in body
+        assert "name=stop_price inputmode=decimal value='1.50'" in body
+        assert "name=target_price inputmode=decimal value='21.00'" in body
+        assert f"name=symbol value='{CALL}'" in body
+
+    def test_the_state_json_carries_the_target_and_the_editor_fragment(self, page, holding):
+        s = page.get(f"/exec/order/state?symbol={CALL}").json
+        p = s["positions"][0]
+        assert p["target_price"] == 21.00 and p["target_order_id"]
+        assert p["valuation"]["at_target_usd"] == pytest.approx((21.00 - 2.10) * 100 - 1.30)
+        assert ">UPDATE<" in s["position_html"] and s["working"] == []
+
+    def test_update_moves_both_and_says_so(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop_price": "1.80",
+                                                  "target_price": "25"})
+        assert r.status_code == 303
+        landing = text(page.get(r.headers["Location"]))
+        assert "Stop moved from 1.50 to 1.80" in landing
+        assert "Target moved from 21.00 to 25.00" in landing
+        assert "value='1.80'" in landing and "value='25.00'" in landing
+        assert (pos_of(holding)["stop_price"], pos_of(holding)["target_price"]) == (1.80, 25.00)
+
+    def test_update_with_one_field_blank_moves_only_the_other(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop_price": "",
+                                                  "target_price": "30.00"})
+        landing = text(page.get(r.headers["Location"]))
+        assert "Target moved" in landing and "Stop moved" not in landing
+        assert pos_of(holding)["stop_price"] == 1.50
+
+    def test_a_refused_update_says_why_and_changes_nothing(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop_price": "2.50"})
+        landing = text(page.get(r.headers["Location"]))
+        assert "Refused (bracket)" in landing and "not below the 2.00 bid" in landing
+        assert pos_of(holding)["stop_price"] == 1.50
+
+    def test_a_number_that_is_not_one_is_refused_in_words(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop_price": "one"})
+        assert "Not updated" in text(page.get(r.headers["Location"]))
+
+    def test_nothing_entered_is_nothing_updated(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL})
+        assert "Nothing to update" in text(page.get(r.headers["Location"]))
+
+    def test_the_editor_is_absent_while_a_close_is_in_flight(self, page, holding, broker):
+        broker.rest_market = True
+        holding.observe(TRIGGER)
+        body = text(page.get("/exec/order"))
+        assert "exit in flight" in body and ">UPDATE<" not in body
+
+    def test_cancel_and_re_price_brings_the_form_back_priced_from_the_selection(
+            self, page, armed, broker):
+        broker.rest_limits = True
+        r = page.post("/exec/order/preview", data={"side": "call", "delta": "0.3",
+                                                   "budget": "150"})
+        nonce = text(r).split("name=nonce value='")[1].split("'")[0]
+        r = page.post("/exec/order/send", data={"nonce": nonce})
+        landing = text(page.get(r.headers["Location"]))
+        assert "not filled yet" in landing and "the bracket rests when it fills" in landing
+        assert "Working entry" in landing and "CANCEL AND RE-PRICE" in landing
+        assert "action='/exec/order/cancel'" in landing
+        w = armed.status()["working"][0]
+        assert w["page_query"] == {"side": "call", "expiry": "2026-08-26",
+                                   "delta": "0.3", "budget": "150"}
+        assert armed.journal.events("working")[0]["page_query"] == w["page_query"]
+
+        r = page.post("/exec/order/cancel", data={"order_id": w["order_id"]})
+        assert r.status_code == 303
+        where = r.headers["Location"]
+        assert "side=call" in where and "delta=0.3" in where and "budget=150" in where
+        assert "expiry=2026-08-26" in where
+        landing = text(page.get(where))
+        assert f"Cancelled {w['order_id']}" in landing
+        assert "Working entry" not in landing
+        assert "PREVIEW" in landing and ">6400<" in landing.split("<tr class='chosen'>")[1].split("</tr>")[0]
+        assert armed.status()["working"] == []
+        assert armed.journal.events("entry_resolved")[-1]["outcome"] == "canceled"
+        assert armed.status()["day"]["open_positions"] == 0
+
+    def test_cancelling_an_entry_the_desk_sent_lands_on_the_bare_form(self, page, armed, broker):
+        broker.rest_limits = True
+        out = armed.place(entry(intent_id="desk-1"))
+        r = page.post("/exec/order/cancel", data={"order_id": out["order"]["order_id"]})
+        where = r.headers["Location"]
+        assert where.startswith("/exec/order?") and "side=" not in where
+        assert armed.status()["working"] == []
+
+    def test_cancelling_a_bracket_leg_from_the_page_is_refused(self, page, holding):
+        target_id = pos_of(holding)["target_order_id"]
+        r = page.post("/exec/order/cancel", data={"order_id": target_id})
+        assert "Refused (take_profit)" in text(page.get(r.headers["Location"]))
+        assert pos_of(holding)["target_order_id"] == target_id
+
+    def test_the_page_has_no_explanatory_text_under_the_bracket_controls(self, page, holding):
+        body = text(page.get("/exec/order"))
+        card = body.split("<h2>Open position</h2>")[1].split("</form>")[0]
+        assert "<div class=k>" not in card.split("<form")[1]
+
+    def test_the_landing_message_names_the_bracket_after_a_fill(self, page, armed):
+        r = page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
+        nonce = text(r).split("name=nonce value='")[1].split("'")[0]
+        r = page.post("/exec/order/send", data={"nonce": nonce})
+        landing = text(page.get(r.headers["Location"]))
+        assert "Protective stop resting" in landing and "Take-profit resting" in landing
+        assert "at 21.00" in landing

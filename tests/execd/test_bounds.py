@@ -372,7 +372,27 @@ class TestConfiguration:
             "max_attempts", "open_ct", "close_ct", "no_open_after_ct", "weekdays_only",
             "price_band_pct", "max_quote_age_s", "preview_cost_tolerance_usd",
             "require_protective_stop",
+            "take_profit_multiple", "take_profit_basis",
         }
+
+    def test_the_take_profit_defaults_are_the_standing_assumption(self):
+        """Steve's "10x" (2026-09-14, st-fn5y) — premium basis until he rules
+        on premium-vs-risk. The default must not drift while that is open."""
+        b = Bounds()
+        assert (b.take_profit_multiple, b.take_profit_basis) == (10.0, "premium")
+
+    @pytest.mark.parametrize("kw", [
+        {"take_profit_multiple": 0}, {"take_profit_multiple": -3},
+        {"take_profit_multiple": 1.0},                       # premium × 1 is the fill
+        {"take_profit_basis": "mid"},
+    ])
+    def test_a_take_profit_that_cannot_be_a_target_is_refused(self, kw):
+        with pytest.raises(ValueError, match="bounds:"):
+            Bounds(**kw).validated()
+
+    def test_a_risk_basis_multiple_of_one_is_allowed(self):
+        """Fill plus one times the risk is above the fill — a real target."""
+        assert Bounds(take_profit_basis="risk", take_profit_multiple=1.0).validated()
 
 
 class TestTheBoundsAreAllCovered:

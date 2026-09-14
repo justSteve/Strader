@@ -106,6 +106,14 @@ class Bounds:
     max_quote_age_s: float = 30.0     # older than this is not a live quote
     preview_cost_tolerance_usd: float = 5.00
     require_protective_stop: bool = True
+    #: The take-profit half of the bracket (Steve, 2026-09-14, st-fn5y: "upon
+    #: fill, api should create a resting order at a 10x profit target"). The
+    #: target is the fill price times the multiple on the ``premium`` basis,
+    #: or the fill plus the multiple times the distance to the stop on the
+    #: ``risk`` basis. ``premium`` is the standing ASSUMPTION; his ruling on
+    #: which "10x" he means is pending on st-fn5y.
+    take_profit_multiple: float = 10.0
+    take_profit_basis: str = "premium"
 
     # ── derived ──
     @property
@@ -149,6 +157,15 @@ class Bounds:
                 "stop is what survives this box dying, and a bound you can switch "
                 "off is not a bound"
             )
+        if self.take_profit_basis not in ("premium", "risk"):
+            out.append(f"take_profit_basis must be 'premium' or 'risk', not {self.take_profit_basis!r}")
+        if self.take_profit_multiple <= 0:
+            out.append(f"take_profit_multiple must be positive, not {self.take_profit_multiple}")
+        elif self.take_profit_basis == "premium" and self.take_profit_multiple <= 1:
+            # fill × 1.0 is the fill: a target at or under it is a sale that
+            # fills at once, not a target.
+            out.append(f"take_profit_multiple on the premium basis must be above 1, "
+                       f"not {self.take_profit_multiple}")
         try:
             o, c, n = self.open_time, self.close_time, self.no_open_after
         except ValueError as exc:
@@ -206,6 +223,8 @@ class Bounds:
             "max_quote_age_s": self.max_quote_age_s,
             "preview_cost_tolerance_usd": self.preview_cost_tolerance_usd,
             "require_protective_stop": self.require_protective_stop,
+            "take_profit_multiple": self.take_profit_multiple,
+            "take_profit_basis": self.take_profit_basis,
         }
 
 
@@ -362,9 +381,14 @@ def check_entry(
         )
 
     if state.attempts_used >= bounds.max_attempts:
+        # Steve, 2026-09-14 (st-fn5y): an attempt is a filled position, and
+        # one that closes at break-even or better gives its attempt back. So
+        # this counts losing closes plus positions still open, not fills.
         return Refusal(
             "ceiling",
-            f"{state.attempts_used} of {bounds.max_attempts} attempts used today",
+            f"{state.attempts_used} of {bounds.max_attempts} attempts used today "
+            f"(losing closes and open positions; a close at break-even or better "
+            f"gives its attempt back)",
         )
 
     if state.realized_loss_usd >= bounds.daily_loss_ceiling_usd:

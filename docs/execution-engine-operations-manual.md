@@ -465,7 +465,7 @@ timeout and returns `"unknown"` on any failure — so a copy installed at
 `/opt/execd` that is not a checkout stamps `unknown` rather than lying about a
 version. Every journal line carries this sha.
 
-### 5.2 The API — fifteen routes
+### 5.2 The API — sixteen routes
 
 `execd/api.py`. Loopback only, JSON in and out. Flask, `threaded=True`.
 
@@ -482,6 +482,7 @@ version. Every journal line carries this sha.
 | POST | `/place` | an intent object | §5.6 |
 | POST | `/cancel` | `{"order_id": "..."}` | `{"refused": null, "order": {...}}` |
 | POST | `/flatten` | `{"reason": "..."}` optional; **JSON required** | `{"refused": null, "closed": [...], "errors": [...]}` |
+| POST | `/adjust` | `{"symbol": "...", "stop_price": 1.80, "target_price": 25.0}` — at least one price | `{"refused": null, "stop": {moved, old_price, new_price, order_id, stop_spx}, "target": {...}, "closed": null}`; `409` names the refusal (`bracket`, `tick`, `ceiling`, `position`, `exit_in_flight`, `filled`, `armed`); `502` the broker. §5.20 (st-fn5y) |
 | POST | `/stand-down` | `{}`; **JSON required** | the status object |
 | POST | `/stop` | — | the status object. **Ungated on purpose.** |
 | POST | `/observe` | `{"spx": 6320.5}` | `{"spx": …, "fired": [...], "pending": [...]}` |
@@ -504,7 +505,7 @@ Status codes: `200` acted or answered a read · `400` not a valid intent
 
 **Deliberately absent: `/unlock`, `/resume`, and any re-auth route.**
 `tests/execd/test_api.py::test_the_url_map_holds_exactly_the_narrow_door` pins
-the app's rule set to exactly these fifteen, and a second test names
+the app's rule set to exactly these sixteen, and a second test names
 `/unlock`, `/arm`, `/resume`, `/reauth`, `/re-auth`, `/oauth` explicitly. Adding
 **any** route breaks the suite, not only an arming one. An agent that can reach this API can ask
 the service to trade inside Steve's bounds. It cannot arm it, cannot clear his
@@ -523,7 +524,9 @@ arming:    {state, killed, kill_file, unlocked_at, expires_at, expires_at_ct,
             permits_entry, permits_exit}
 day:       {open_positions, realized_loss_usd, attempts_used, attempts_left,
             loss_headroom_usd}
-positions: [OpenPosition…]
+positions: [OpenPosition… — each with stop_order_id, stop_price,
+            target_order_id, target_price, entry_spx and a valuation
+            carrying at_stop_usd and at_target_usd]
 bounds:    {the thirteen bound values}
 journal:   the path to today's file
 ```
@@ -578,7 +581,7 @@ names the most fundamental thing wrong:
 | 6 | `protective_stop` | `require_protective_stop` and either `stop_spx` or `delta` is missing |
 | 7 | `window` | weekend; or before `open_ct`; or at/after `no_open_after_ct` — **not applied to SPX/SPXW roots** (`WINDOW_EXEMPT_ROOTS`; Steve 2026-09-14: "revoke the trading-hours rule when SPX is the target instrument. It can not fill after hours and placing live trades can help during testing"). Since those are the only instruments, the window gates no entry today; an unlock after the close arms until 23:59 CT instead of being refused |
 | 8 | `positions` | `open_positions >= max_open_positions` |
-| 9 | `ceiling` | `attempts_used >= max_attempts` |
+| 9 | `ceiling` | `attempts_used >= max_attempts` — an attempt is a filled position, held while open and kept only if it closes at a loss; a close at break-even or better gives it back (Steve, 2026-09-14, st-fn5y, §5.20); a working entry holds a slot (row 8) but no attempt |
 | 10 | `ceiling` | `realized_loss_usd >= daily_loss_ceiling_usd` |
 | 10a | `tick` | the limit (or a stop price) is off the exchange's grid — 0.05 below $3.00, 0.10 at and above it (measured 2026-09-04, st-pohq); an off-grid price is a rejected order, not a tighter one |
 | 11 | `price_band` | no quote; or quote older than `max_quote_age_s`; or not two-sided; or limit above `ask*(1+band)`; or limit below `bid*(1-band)` |
@@ -649,9 +652,11 @@ it is already triggered, which is a transposed sign, not a trade.
 
 **Partial exits.** A stop sized for the whole position would sell contracts
 Steve no longer owns, so a partial fill cancels the resting stop and rests a new
-one at the same price for what is left (`_settle`, and again in `poll_fills`).
-`_rest_stop_at` is the **only** place a resting stop is created, so its size can
-never drift from the position.
+one at the same price for what is left (`_book_close`, reached from `_settle`
+and from `poll_fills`). `_rest_stop_at` is the **only** place a resting stop is
+created, so its size can never drift from the position. Since st-fn5y the
+resting take-profit beside it is resized in the same motion (`_rest_target_at`,
+its mirror); the two are one bracket — §5.20.
 
 A failure to rest the stop journals `stop_unprotected` — loud, because the
 position is live and unprotected until the SPX-mark loop or Steve deals with it.
@@ -665,9 +670,12 @@ before the call returns.
 Every line carries `ts`, `ts_ct`, `event`, `sha`.
 
 Events: `request` · `refused` · `preview` · `placed` · `rejected` · `filled` ·
-`stop_placed` · `stop_unprotected` · `exit_triggered` · `exit_unfilled` ·
-`closed` · `canceled` · `flattened` · `replayed` · `error` · `unlock` ·
-`stand_down` · `lock` · `stop` · `resume` · `recovered` · `unreadable`.
+`stop_placed` · `stop_unprotected` · `target_placed` · `target_unprotected` ·
+`stop_adjusted` · `target_adjusted` · `oversold` · `exit_triggered` ·
+`exit_unfilled` · `closed` · `canceled` · `flattened` · `replayed` · `error` ·
+`unlock` · `stand_down` · `lock` · `stop` · `resume` · `recovered` ·
+`unreadable`. The five with `target`, `adjusted` and `oversold` are the
+bracket's (st-fn5y, §5.20).
 
 `unreadable` is not written — it is *synthesised on read* when a line will not
 parse, which is what a kill mid-write looks like. Surfacing it as data rather
@@ -676,10 +684,18 @@ than raising means the rest of the day is still the audit.
 **The day is derived, not remembered.** `day_state()` rebuilds
 `open_positions`, `realized_loss_usd` and `attempts_used` by reading the file,
 so a restart mid-session recovers the ceiling rather than resetting it.
-`attempts_used` counts `filled`+`kind=entry` lines. A partial close debits the
-loss immediately but only frees the position slot when `remaining_qty` is
-falsy. **Losses only debit** — a winning trade does not buy back an attempt or
-raise the ceiling. That is FD0's `Budget` semantics carried across unchanged.
+`attempts_used` is the positions this service opened that are still open plus
+its losing closes: a `filled`+`kind=entry` line holds an attempt until the
+position's last `closed` line (`remaining_qty` falsy), and then the attempt is
+kept only if the position's `pnl_usd` summed over its `closed` lines is below
+zero. Steve, 2026-09-14 (st-fn5y): *"An 'attempt' is a 'filled position'. Any
+attempt that breaks even or better doesn't decrement the counter."* A `working`
+entry holds a position slot and no attempt; an adopted position holds a slot
+and no attempt. A partial close debits the loss immediately but only frees the
+position slot — and judges the attempt — when `remaining_qty` is falsy.
+**Losses only debit the ceiling** — a winning trade does not raise it. That is
+FD0's `Budget` semantics carried across unchanged; the attempts rule is the
+one thing that changed, on his word.
 
 Read API: `read(day)`, `days()`, `find(intent_id, day)`, `tail(n, day)`,
 `events(*names, day)`, `day_state(day)`, `path_for(day)`, `today()`.
@@ -727,14 +743,18 @@ restarted to pick up a change.
 | `max_quote_age_s` | `30.0` |
 | `preview_cost_tolerance_usd` | `5.00` |
 | `require_protective_stop` | `true` |
+| `take_profit_multiple` | `10.0` (Steve, 2026-09-14, st-fn5y: "a 10x profit target") |
+| `take_profit_basis` | `premium` — the target is the fill price times the multiple; `risk` makes it the fill plus the multiple times the distance to the stop. **ASSUMPTION: premium.** His ruling on which "10x" he means is pending on st-fn5y; change the basis in the file when he rules |
 
 **An unknown key is a start-up error, not a silent default** — a typo must not
 leave the service running under limits Steve did not choose. Validation also
 rejects an empty `instruments`, `qty_cap < 1`, `max_open_positions < 1`, a
 non-positive ceiling, `max_attempts < 1`, `price_band_pct` outside `(0,1)`, a
-non-positive `max_quote_age_s`, `open_ct >= close_ct`, and a
-`no_open_after_ct` outside the window. A file that exists but is wrong **raises**;
-a file that is absent falls back to the start values.
+non-positive `max_quote_age_s`, `open_ct >= close_ct`, a `no_open_after_ct`
+outside the window, a `take_profit_basis` other than `premium` or `risk`, a
+non-positive `take_profit_multiple`, and a premium-basis multiple at or under
+1 (fill × 1 is the fill — a sale, not a target). A file that exists but is
+wrong **raises**; a file that is absent falls back to the start values.
 
 **The ceiling bounds the position in front of it, not only the day behind it.**
 Until 2026-08-31, `check_entry` refused a new entry once *realized* loss reached
@@ -868,8 +888,9 @@ because the check hit `/trader/v1` and 401'd.
 ### 5.12 Recovery
 
 `_recover()` runs in the constructor. It replays today's journal and rebuilds
-`_open` from `filled`+`kind=entry`, `stop_placed` and `closed` lines, then
-journals `recovered` if anything survived. The service comes back **LOCKED**, so
+`_open` from `filled`+`kind=entry`, `stop_placed`, `target_placed`, the legs'
+`canceled` lines and `closed` lines (and `_working` from `working` lines,
+with the page's `page_query`), then journals `recovered` if anything survived. The service comes back **LOCKED**, so
 it cannot open anything; what it must not do is come back not knowing a position
 is live, because then the SPX-mark loop stops watching it and `flatten` misses
 it.
@@ -1084,7 +1105,9 @@ and the day's totals.
 | `GET /exec/order/price?…` | the priced ticket as JSON plus the FD0, strikes and hidden-field fragments the script swaps in |
 | `GET /exec/order/state?symbol=…` | the status body's live half plus the chosen contract's quote and the SPX mark, with HTML fragments |
 | `POST /exec/order/preview` | `service.preview(intent)`; on a 200, the cost line and a single-use 60 s SEND token |
-| `POST /exec/order/send` | spends the token, `service.place(the same intent)`, redirects with the result in words |
+| `POST /exec/order/send` | spends the token, `service.place(the same intent)` with the selection query riding on the working entry, redirects with the result in words |
+| `POST /exec/order/adjust` | UPDATE on the position card: `symbol`, `stop_price`, `target_price` (either may be blank) → `service.adjust`; redirects with what moved (§5.20) |
+| `POST /exec/order/cancel` | CANCEL AND RE-PRICE on the working-entry card: `order_id` → `service.cancel`, then redirects to `/exec/order` with the side/expiry/strike/delta/budget/attempts the entry was priced from, so the form comes back priced fresh (§5.20) |
 
 **The choice** (`orderform.choose`): a tapped strike wins; else the delta
 override picks the strike whose |delta| is nearest; else nearest to spot
@@ -1126,6 +1149,99 @@ this sits well under it) and Flask's dev server under an all-day poll.
 → fill → stop over the real routes and the mock, including a stale token, a
 refused preview, LOCKED, paper mode, the embed variant, and no secret in any
 page or JSON body.
+
+### 5.20 The bracket — take-profit, one-cancels-the-other, the live editor (st-fn5y)
+
+Steve, 2026-09-14: *"Future filled orders will result in resting 'take
+profit' orders in addition to stoplosses. The screen should be a live editor
+allowing an update to both trigger conditions."* *"Upon fill, api should
+create a resting order at a 10x profit target."* *"An 'attempt' is a 'filled
+position'. Any attempt that breaks even or better doesn't decrement the
+counter."* On a cancelled working entry: *"Assume the canceled order will be
+re-priced and re-armed."* Four rulings, one change.
+
+**The target.** On every fill, after the protective stop, the service rests a
+SELL_TO_CLOSE LIMIT at the take-profit price (`_place_take_profit` →
+`_rest_target_at`, the mirror of `_rest_stop_at` and the only place a target
+is created). The price is `stops.take_profit_price`: on the `premium` basis
+the fill times `take_profit_multiple` (a $2.10 fill → $21.00); on the `risk`
+basis the fill plus the multiple times the distance to the stop ($2.10 with a
+$1.50 stop → $8.10). Rounded **up** to the tick in force at the target. The
+basis is a bounds key (§5.10); **premium is the standing assumption** until
+Steve rules which "10x" he means — that ask is open on st-fn5y. `OpenPosition`
+carries `target_order_id` and `target_price`; the journal writes
+`target_placed` (order id, price, basis, multiple, reward) and, when the target
+cannot be derived or the broker refuses or rejects it, `target_unprotected` — a
+**warning, not a fault**: the stop still stands. A target the bid is already
+through when it lands fills at once, and that fill is the exit, booked as
+`target`. Recovery (§5.12) rebuilds the target from `target_placed` the way it
+rebuilds the stop, and clears a leg whose `canceled` line was not followed by
+a new placement (a close was in flight when the service died).
+
+**One cancels the other, by the service's hand.** Schwab's own OCO is not
+something this service sends; it works the pair itself. When either leg
+fills — the fill sweep, or a cancel that reports FILLED — the other comes off
+**before** the `closed` line is written (`_book_close`), because every moment
+it rests past the fill is a moment it can fill too. The `closed` line is
+written either way: a cancel that fails is caught and journaled. A cancel that
+finds the other leg *also* filled books that fill against what was still held
+and journals anything past it as `oversold` — loud, because it is a short on
+a long-premium-only account that this service, which only sells to close,
+cannot itself buy back. `_market_close` (the SPX-mark exit, FLATTEN) takes the
+stop and then the target off before its close goes on (`_take_bracket_off`);
+a cancel that finds a leg filled settles on that fill and sends nothing; a
+broker that cannot be reached at a cancel sends nothing, leaves what still
+rests standing and puts back a stop that had already come off (DEFERRED); a
+rejected or unsendable close re-rests both (`_rest_bracket`). A partial exit
+resizes both. `flatten` pulls both. `cancel` refuses either leg's order id
+(`protective_stop`, `take_profit`) — the bracket is edited, never pulled apart.
+The `closed` line's `kind` is `target` when the target filled, `resting-stop`
+or `protective-stop` when the stop did.
+
+**The live editor.** `ExecService.adjust(symbol, stop_price=, target_price=)`
+— `POST /adjust` on the API, UPDATE on the order page's position card (two
+inputs pre-filled with the resting prices, `inputmode=decimal`, one button).
+Exit-class: legal while STOPped or stood down, needs a credential. Each price
+given is checked, and the refusal is named: `position` (nothing open in that
+contract), `exit_in_flight` (the bracket is off while a close works), `tick`
+(off the grid), `bracket` (a stop not below the live bid, a target not above
+it — either would fill at once), `ceiling` (a stop moved so wide that the
+position's risk to it exceeds the day's headroom — the ceiling doing to an
+adjusted stop what `check_risk_budget` does to an entry; tightening never meets
+it). A move is the same motion every other path uses — cancel the leg, rest a
+new one (there is no replace-order; the transport has no PUT). A cancel that
+finds the leg already filled books that fill and refuses the adjust as
+`filled`, with what happened. A new price the broker will not rest brings the
+old leg back. **Moving the stop moves the SPX-mark trigger with it**: the new
+`stop_spx` is the entry's delta walked backwards from the level the entry
+filled at (`_stop_spx_for`, the inverse of `stops.premium_at_stop`), so the
+two stops stay one stop; the journal line `stop_adjusted` carries old and new
+for both, `target_adjusted` for the target. The page's poll leaves the
+position card alone while one of its inputs has focus, so a number half-typed
+is never wiped. The status JSON carries `target_price`, `target_order_id` and
+the valuation row `at_target_usd` (the same arithmetic as `at_stop_usd`).
+
+**Attempts count losing fills only.** §5.8. Ten `max_attempts` are ten losing
+positions; a winner or a scratch gives its attempt back; a working entry
+holds a slot and no attempt.
+
+**Cancel and re-price.** A working entry on the order page carries one button,
+CANCEL AND RE-PRICE. The page stored the selection query the entry was priced
+from on the `WorkingEntry` at send time (`page_query`, on the `working` journal
+line, recovered across a restart, never part of the intent and never sent to
+the broker); the cancel goes through `service.cancel`, and the redirect lands
+on `/exec/order` with that query, so the form comes back priced fresh, ready
+to PREVIEW and SEND. An entry the desk or the API sent has no query and lands
+on the bare form.
+
+`tests/execd/test_bracket.py` is what all of this has to mean: the arithmetic
+on both bases, the target on the fill and at reconcile, the warning branches,
+OCO both ways, both legs filled, both cancels before the close, every failure
+branch putting both back, partial exits resizing both, the guarded cancel,
+every adjust refusal, a leg that filled before it could move, the moved SPX
+trigger for a call and a put, the API's four status codes, recovery, the
+attempts rule through the service, the paper book's target fill, and the
+page's editor and cancel.
 
 ## 6. The feed and the credential
 

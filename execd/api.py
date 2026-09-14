@@ -1,7 +1,8 @@
 """The narrow door — HTTP on the loopback, and nothing else. [st-eznu]
 
-Fifteen routes, no policy (fourteen from stage 1 and the ``/marketdata/<kind>``
-pass-through from stage 3, st-p8k8). Every one of them is a translation of an
+Sixteen routes, no policy (fourteen from stage 1, the ``/marketdata/<kind>``
+pass-through from stage 3, st-p8k8, and ``/adjust`` for the bracket's live
+editor, st-fn5y). Every one of them is a translation of an
 :class:`~execd.service.ExecService` method into JSON and back; the bounds, the
 arming state and the journal all live behind it. That is deliberate: a rule
 that lives in a request handler is a rule that a second entry point can miss,
@@ -141,6 +142,19 @@ def create_app(service: ExecService) -> Flask:
         _require_json()
         return _answer(service.flatten(reason=str(_body().get("reason", "flatten"))))
 
+    @app.post("/adjust")
+    def adjust():
+        """Move the resting stop, the resting target, or both, under a live
+        position (st-fn5y). ``{"symbol", "stop_price"?, "target_price"?}`` —
+        at least one price. 409 names the refusal; 502 the broker."""
+        body = _body()
+        symbol = body.get("symbol")
+        if not symbol:
+            raise ValueError("adjust needs a symbol")
+        return _answer(service.adjust(str(symbol),
+                                      stop_price=_optional_price(body, "stop_price"),
+                                      target_price=_optional_price(body, "target_price")))
+
     @app.post("/stand-down")
     def stand_down():
         _require_json()
@@ -211,6 +225,20 @@ def _required_arg(name: str) -> str:
     if not value:
         raise ValueError(f"{name} is required")
     return value
+
+
+def _optional_price(body: dict[str, Any], name: str) -> float | None:
+    """A price field that may be absent or empty; anything present must be a
+    number, and a number that is not is a 400, not a guess."""
+    value = body.get(name)
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be a number")
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} must be a number, not {value!r}") from None
 
 
 def _answer(result: dict[str, Any]):

@@ -129,6 +129,63 @@ def risk_usd(fill_px: float, stop_price: float, qty: int = 1) -> float:
     return round((float(fill_px) - float(stop_price)) * CONTRACT_MULTIPLIER * int(qty), 2)
 
 
+def on_tick(pts: float) -> bool:
+    """Is this premium on the exchange's grid at its own price level?"""
+    tick = tick_for(pts)
+    return round(float(pts) * 100) % round(tick * 100) == 0
+
+
+#: The two ways a take-profit target may be derived from a fill (st-fn5y).
+TAKE_PROFIT_BASES = ("premium", "risk")
+
+
+def take_profit_price(fill_px: float, multiple: float, basis: str = "premium",
+                      stop_price: float | None = None,
+                      tick: float = PREMIUM_TICK_PTS) -> float:
+    """The price of the resting SELL LIMIT that takes the profit. [st-fn5y]
+
+    Steve, 2026-09-14: *"Upon fill, api should create a resting order at a
+    10x profit target."* Two readings of "10x" and this function knows both:
+
+    ``premium``
+        the target is the fill price times the multiple — a $2.10 fill rests
+        a sell at $21.00. The standing ASSUMPTION until Steve rules.
+    ``risk``
+        the target is the fill price plus the multiple times the distance to
+        the resting stop — a $2.10 fill with a $1.50 stop (60c of risk) rests
+        a sell at $8.10. Needs the stop price; without one it cannot be
+        derived, and says so.
+
+    Rounded **up** to the tick, the same direction as the stop: the tighter
+    tick would take the profit a nickel early, and "10x" is a floor on what
+    Steve asked for, not a target to undershoot. Raises ``ValueError`` when
+    the inputs cannot produce a target above the fill — a target at or under
+    the fill is a sale, not a target."""
+    fill_px = float(fill_px)
+    multiple = float(multiple)
+    if fill_px <= 0:
+        raise ValueError(f"fill price must be positive, not {fill_px}")
+    if multiple <= 0:
+        raise ValueError(f"take-profit multiple must be positive, not {multiple}")
+    if basis == "premium":
+        raw = fill_px * multiple
+    elif basis == "risk":
+        if stop_price is None:
+            raise ValueError("the risk basis needs a resting stop price and there is none")
+        risk = fill_px - float(stop_price)
+        if risk <= 0:
+            raise ValueError(
+                f"a stop at {float(stop_price):.2f} is not below the {fill_px:.2f} fill — "
+                f"no risk to multiply")
+        raw = fill_px + multiple * risk
+    else:
+        raise ValueError(f"take-profit basis must be one of {TAKE_PROFIT_BASES}, not {basis!r}")
+    price = _round_up_to_tick(raw, tick)
+    if price <= fill_px:
+        raise ValueError(f"a target at {price:.2f} is not above the {fill_px:.2f} fill")
+    return round(price, 2)
+
+
 def exit_triggered(right: str, spx: float, stop_spx: float) -> bool:
     """Has the index reached the cut?
 

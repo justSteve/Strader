@@ -52,11 +52,12 @@ _SCRIPT = """
       var p = document.getElementById('previewform'); if (p && j.preview_fields_html) p.innerHTML = j.preview_fields_html;
       if (j.contract) window.__sym = j.contract.symbol;
     }).catch(function(){}); }
+  function editing(el){ var a = document.activeElement; return !!(el && a && a.tagName === 'INPUT' && el.contains(a)); }
   function poll(){ if (document.visibilityState === 'hidden') return;
     var u = STATE + (window.__sym ? ('?symbol=' + encodeURIComponent(window.__sym)) : '');
     fetch(u, {headers:{'Accept':'application/json'}}).then(function(r){return r.json();}).then(function(j){
       var qd = document.getElementById('quote'); if (qd && j.quote_html) qd.innerHTML = j.quote_html;
-      var pc = document.getElementById('position'); if (pc) pc.innerHTML = j.position_html || '';
+      var pc = document.getElementById('position'); if (pc && !editing(pc)) pc.innerHTML = j.position_html || '';
       var st = document.getElementById('state'); if (st && j.state_html) st.innerHTML = j.state_html;
     }).catch(function(){}); }
   if (form) { ['delta','budget','attempts','lots'].forEach(function(n){ var el = form.elements[n];
@@ -165,18 +166,43 @@ def quote_html(q: dict[str, Any] | None, spx: float | None, error: str | None) -
             + (f" · SPX {spx:.2f}" if spx else "") + "</div>")
 
 
-def position_html(st: dict[str, Any]) -> str:
+def position_html(st: dict[str, Any], actions: Mapping[str, str] | None = None) -> str:
+    """The open position with its bracket editor, the working entry with its
+    CANCEL AND RE-PRICE, and the day's line. ``actions`` carries the page's
+    ``order_adjust`` and ``order_cancel`` paths; without them the cards
+    render with no controls (a read-only surface)."""
     from .page import _render_position
     pnl = st.get("pnl") or {}
     day = st["day"]
-    html = "".join(_render_position(p) for p in st["positions"])
-    if st["working"]:
-        html += "<div class=card><pre>" + esc(json.dumps(st["working"])) + "</pre></div>"
+    adjust = actions.get("order_adjust") if actions else None
+    cancel = actions.get("order_cancel") if actions else None
+    html = "".join(_render_position(p, adjust) for p in st["positions"])
+    for w in st["working"]:
+        html += working_html(w, cancel)
     html += (f"<div class=k>today: realized {money(pnl.get('realized_usd'))} over "
              f"{pnl.get('closes', 0)} close(s) · unrealized {money(pnl.get('unrealized_net_usd'))} · "
              f"day {money(pnl.get('day_usd'))} · attempts {day['attempts_used']} used, "
              f"{day['attempts_left']} left · headroom ${day['loss_headroom_usd']:.2f}</div>")
     return html
+
+
+def working_html(w: dict[str, Any], cancel_action: str | None) -> str:
+    """One entry the broker holds and has not filled: what it is, and one
+    button — CANCEL AND RE-PRICE — that pulls it and brings the form back
+    priced fresh from the selection it was sent from (st-fn5y)."""
+    sym = str(w.get("symbol", "")).strip()
+    rows = [("working entry", f"{sym} × {w.get('qty')}"),
+            ("limit", f"{float(w['limit']):.2f}" if w.get("limit") is not None else "—"),
+            ("order", str(w.get("order_id", "")))]
+    if w.get("stop_spx") is not None:
+        rows.append(("SPX cut level", f"{float(w['stop_spx']):.2f}"))
+    html = ("<h2>Working entry</h2><div class=card><table>" + "".join(
+        f"<tr><td>{esc(k)}</td><td>{esc(v)}</td></tr>" for k, v in rows) + "</table>")
+    if cancel_action:
+        html += (f"<form method=post action='{cancel_action}'>"
+                 f"<input type=hidden name=order_id value='{esc(w.get('order_id', ''))}'>"
+                 "<button class='big exit'>CANCEL AND RE-PRICE</button></form>")
+    return html + "</div>"
 
 
 def preview_fields_html(sel: Selection) -> str:
@@ -262,8 +288,8 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     else:
         parts.append("<div class=card><div class=k>pick a side to see the strikes</div></div>")
 
-    # the position and the day
-    parts.append(f"<div id=position>{position_html(st)}</div>")
+    # the position with its bracket editor, the working entry, and the day
+    parts.append(f"<div id=position>{position_html(st, actions)}</div>")
 
     script = _SCRIPT % {"price": json.dumps(actions["order_price"]),
                         "state": json.dumps(actions["order_state"]), "poll": POLL_S}

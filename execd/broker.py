@@ -372,6 +372,18 @@ class MockBroker:
             return self._store(self._new_order(intent, OrderStatus.WORKING,
                                                price=intent.limit))
 
+        if intent.order_type is OrderType.LIMIT and intent.side is Side.SELL_TO_CLOSE:
+            # A sell limit above the bid rests until the bid comes up to it —
+            # that is what a take-profit is (st-fn5y). A marketable one fills
+            # at the bid below. ``fill_resting`` is how a test brings the bid
+            # to it.
+            q = self._quotes.get(intent.symbol)
+            if q is None:
+                raise BrokerError(f"no quote for {intent.symbol}")
+            if q.bid < float(intent.limit or 0.0):
+                return self._store(self._new_order(intent, OrderStatus.WORKING,
+                                                   price=intent.limit))
+
         if intent.order_type is OrderType.MARKET and self.rest_market:
             return self._store(self._new_order(intent, OrderStatus.WORKING))
 

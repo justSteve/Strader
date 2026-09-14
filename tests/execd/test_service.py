@@ -37,7 +37,7 @@ class TestTheEntryPath:
         assert out["order"]["fill_price"] == 2.10
         events = [e["event"] for e in armed.journal.read()]
         assert events == ["unlock", "request", "preview", "placed", "filled",
-                          "stop_placed"]
+                          "stop_placed", "target_placed"]
 
     def test_the_fill_becomes_a_tracked_position(self, armed):
         armed.place(entry())
@@ -291,7 +291,7 @@ class TestPartialExits:
     def test_a_partial_exit_replaces_the_stop_at_the_smaller_size(self, two_lot, broker):
         broker.partial_fill_qty = 1
         two_lot.place(exit_intent(intent_id="two-1-x", qty=2))
-        resting = broker.working_orders(CALL)
+        resting = [o for o in broker.working_orders(CALL) if o.order_type is OrderType.STOP]
         assert len(resting) == 1 and resting[0].qty == 1
         assert two_lot.journal.events("stop_placed")[-1]["kind"] == "resized"
 
@@ -339,7 +339,7 @@ class TestPartialExits:
 
         out = two_lot.poll_fills()
         assert out["picked_up"][0]["remaining_qty"] == 1
-        resting = broker.working_orders(CALL)
+        resting = [o for o in broker.working_orders(CALL) if o.order_type is OrderType.STOP]
         assert len(resting) == 1 and resting[0].qty == 1
         assert two_lot.status()["positions"][0]["qty"] == 1
 
@@ -606,12 +606,14 @@ class TestTheJournalReproducesTheDay:
         armed.observe(SPX_NOW - 12.5)
         armed.stand_down()
         events = [e["event"] for e in armed.journal.read()]
-        # The stop's cancel precedes the close's placement since st-97z1: the
-        # two are designed to fire at the same price, so they must never both
-        # be live at the broker.
+        # The bracket's cancels precede the close's placement since st-97z1
+        # (the stop) and st-fn5y (the take-profit): the legs are designed to
+        # fire at the same prices the close is sent at, so none may be live at
+        # the broker beside it.
         assert events == [
             "unlock", "request", "preview", "placed", "filled", "stop_placed",
-            "exit_triggered", "canceled", "placed", "closed", "stand_down",
+            "target_placed", "exit_triggered", "canceled", "canceled", "placed",
+            "closed", "stand_down",
         ]
 
     def test_every_line_carries_the_installed_sha(self, armed):
