@@ -19,12 +19,12 @@ TEMPLATE = (HERE / "Panel.template.dc.html").read_text()
 # (file stem, stage, frame height) in life-cycle order
 STAGES = [
     ("Flat", "none", 260),
-    ("Previewed", "previewed", 640),
-    ("Working", "working", 620),
+    ("Previewed", "previewed", 600),
+    ("Working", "working", 500),
     ("Main", "filled", 720),
-    ("Exiting", "exiting", 540),
-    ("Closed", "closed", 600),
-    ("Refused", "refused", 470),
+    ("Exiting", "exiting", 470),
+    ("Closed", "closed", 440),
+    ("Refused", "refused", 360),
 ]
 W = 576
 GAP_X = 96
@@ -51,11 +51,10 @@ def main(out: Path) -> None:
         "annotations": [
             {"id": "brief", "x": 0, "y": -260, "w": 640,
              "text": ("Order status panel for /exec/order, one artboard per stage of an order's life, "
-                      "left to right. The panel replaces the position block at the foot of the page.\n\n"
-                      "Every stage: the stage word, the mode chip, one number that matters, the rows "
-                      "behind it, and only the controls that act on this stage. The header's refresh, "
-                      "pause and less/more work on each artboard; the chips above each artboard switch "
-                      "stage, density and mode.\n\n"
+                      "left to right. One ticking clock in the header; every other time is 'x ago'.\n\n"
+                      "Names are [C|P][strike]. One net number, commissions included. The filled stage "
+                      "is a live editor for the stop and the take-profit target (10x the fill price, "
+                      "the standing assumption on st-fn5y).\n\n"
                       "Numbers are sample values from today's first paper cycle.")},
         ],
         "launch": {"view": "canvas"},
