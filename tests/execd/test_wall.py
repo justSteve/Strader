@@ -173,7 +173,15 @@ def test_there_are_exactly_two_brokers_and_each_lives_where_it_says():
             if isinstance(obj, type) and name.endswith("Broker") and name != "Broker" \
                     and obj.__module__ == mod.__name__:
                 found[name] = path.name
-    assert found == {"MockBroker": "broker.py", "SchwabBroker": "schwab.py"}
+    assert found == {"MockBroker": "broker.py", "SchwabBroker": "schwab.py",
+                     "PaperBroker": "paper.py"}
+    # The third is a wrapper, not a transport: it can reach Schwab only
+    # through the one it wraps, and it carries no client of its own.
+    import inspect
+    import execd.paper
+    paper_src = inspect.getsource(execd.paper)
+    assert "httpx" not in paper_src and "from .schwab" not in paper_src \
+        and "import schwab" not in paper_src
 
 
 def test_the_service_refuses_to_start_without_a_broker_flag(tmp_path):

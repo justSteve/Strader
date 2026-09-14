@@ -45,10 +45,13 @@ class Journal:
     """One directory of ``YYYY-MM-DD.jsonl`` files, named by Central date."""
 
     def __init__(self, directory: str | Path, sha: str = "unknown",
-                 clock: Callable[[], datetime] = _utcnow) -> None:
+                 clock: Callable[[], datetime] = _utcnow, mode: str = "live") -> None:
         self.dir = Path(directory)
         self.dir.mkdir(parents=True, exist_ok=True)
         self.sha = sha or "unknown"
+        #: ``paper`` or ``live`` — on every line, so a simulated fill can
+        #: never be read back as a real one (st-k6gl).
+        self.mode = mode
         self.clock = clock
         self._lock = threading.Lock()
 
@@ -68,6 +71,7 @@ class Journal:
             "ts_ct": now.astimezone(CT).strftime("%Y-%m-%d %H:%M:%S"),
             "event": event,
             "sha": self.sha,
+            "mode": self.mode,
         }
         line.update({k: _plain(v) for k, v in fields.items()})
         payload = json.dumps(line, separators=(",", ":"), sort_keys=False)

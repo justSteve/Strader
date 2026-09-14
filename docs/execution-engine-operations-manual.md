@@ -337,6 +337,10 @@ the door; `price` resolved a 1-lot 0DTE call at the ask with an FD0 bracket;
 come first. The first preview that reaches Schwab needs the session window
 (08:30–14:50 CT) and the service ARMED.
 
+**Paper first.** With `/etc/execd/mode` at `paper` (§5.17) the same
+`send` fills in the simulated book against live quotes and every read-back
+is prefixed `PAPER (simulated) — `; the broker's preview is still Schwab's.
+
 **Every change to `execd/` reaches the running service only through the
 install** (the copy at `/opt/execd` is Steve's to write). The handle is
 `installExecd` (COO `factory/templates/bashrc.d/execd-install.sh`): pulls
@@ -994,6 +998,43 @@ unexpected exception is logged and the loop continues. It never opens
 anything — `reconcile` and `observe` are exit-class.
 
 Reaches the running service at the next install (`installExecd`).
+
+### 5.17 Paper mode (stage 4, st-k6gl)
+
+`execd/paper.py`. Steve, 2026-09-14: *"since schwab doesn't support paper
+trading via api I'd like to simulate one by defining a mode where every api
+submission is live except anything that submits a live order."*
+
+**The mode file:** `/etc/execd/mode`, Steve's, one word: `paper` or `live`.
+Absent means `paper`. Any other word and the service refuses to start. The
+install seeds it as `paper` once and never touches it again. To go live:
+write `live` there and run `installExecd` (a restart is what re-reads it).
+
+**What paper does.** `PaperBroker` wraps the real transport. Quotes, chains,
+the raw market reads, the account, the token walls and **the broker's own
+preview** go to Schwab exactly as in live mode. `place`, `cancel`, `orders`,
+`positions` and `fills_since` never reach Schwab: they run against a book at
+`/var/lib/execd/paper-book.json`, filled against live quotes:
+
+| order | paper behaviour |
+|---|---|
+| limit buy | fills at once at the live offer when the offer is at or under the limit; else rests and fills when the offer comes down to it |
+| market sell | fills at once at the live bid |
+| stop sell | rests; fills at the bid once the bid is at or under the stop price |
+| cancel | resting → CANCELED; already filled → reported filled (the race) |
+| any order with no live quote | refused — nothing is simulated without a market |
+
+Order ids are `paper-NNNN`. Steve's real positions are invisible to the
+service in paper mode, on purpose: paper must not adopt, watch or flatten
+what it did not open. The book persists across a restart.
+
+**Every line says so.** `mode: paper` on every journal line, `mode` in
+`/status` and in every `/preview` and `/place` answer, an amber PAPER
+banner on the page, and the desk prefixes every read-back with
+`PAPER (simulated) — `. The service's whole loop — rules, preview, the
+protective stop, the watcher, reconcile, the fill sweep, FLATTEN — runs
+unchanged over the book, so paper exercises the same code the live ticket
+will. `tests/execd/test_paper.py` walks it.
 
 ## 6. The feed and the credential
 

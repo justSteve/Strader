@@ -104,6 +104,9 @@ class ServiceConfig:
     bounds: Bounds = field(default_factory=Bounds)
     sha: str = "unknown"
     index_symbol: str = "$SPX"
+    #: ``live`` or ``paper`` (``execd.paper``). Stamped on the journal, the
+    #: status body and every preview/place answer.
+    mode: str = "live"
 
     def __post_init__(self) -> None:
         self.state_dir = Path(self.state_dir)
@@ -196,7 +199,8 @@ class ExecService:
         self.bounds = config.bounds
         state = Path(config.state_dir)
         state.mkdir(parents=True, exist_ok=True)
-        self.journal = Journal(state / "journal", sha=config.sha, clock=clock)
+        self.journal = Journal(state / "journal", sha=config.sha, clock=clock,
+                               mode=config.mode)
         self.arming = Arming(state / "STOP", clock=clock)
         self._lock = threading.RLock()
         self._open: dict[str, OpenPosition] = {}
@@ -281,6 +285,7 @@ class ExecService:
             "now": now.isoformat(),
             "now_ct": now.astimezone(CT).strftime("%Y-%m-%d %H:%M:%S CT"),
             "sha": self.config.sha,
+            "mode": self.config.mode,
             "arming": self.arming.status(),
             "day": {
                 "open_positions": day.open_positions,
@@ -374,7 +379,8 @@ class ExecService:
                 return self._refuse(intent, refusal, kind="preview")
             prev = self.broker.preview(intent)
             self._journal_preview(intent, prev)
-            return {"refused": None, "preview": prev.to_dict(), "would_send": prev.accepted}
+            return {"refused": None, "preview": prev.to_dict(), "would_send": prev.accepted,
+                    "mode": self.config.mode}
 
     def _journal_preview(self, intent: OrderIntent, prev: Any) -> None:
         """The shaped preview, and — when the transport kept it — the broker's
@@ -906,7 +912,8 @@ class ExecService:
                             spx=spx, order=order.to_dict())
 
         out: dict[str, Any] = {"refused": None, "order": order.to_dict(),
-                               "preview": prev.to_dict(), "stop_order": None}
+                               "preview": prev.to_dict(), "stop_order": None,
+                               "mode": self.config.mode}
         if order.status is OrderStatus.REJECTED:
             self.journal.record("rejected", intent_id=intent.intent_id,
                                 order_id=order.order_id, detail=order.message)
@@ -1256,7 +1263,7 @@ class ExecService:
     def _refuse(self, intent: OrderIntent, refusal: Refusal, kind: str) -> dict[str, Any]:
         self.journal.record("refused", kind=kind, intent_id=intent.intent_id,
                             symbol=intent.symbol, refused=refusal.to_dict())
-        return {"refused": refusal.to_dict(), "order": None}
+        return {"refused": refusal.to_dict(), "order": None, "mode": self.config.mode}
 
     def _replay(self, intent_id: str) -> dict[str, Any] | None:
         """An intent id the journal has already sent is answered, never re-sent."""

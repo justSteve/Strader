@@ -471,6 +471,8 @@ _STYLE = """
  .card{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:.9em 1em;margin:.6em 0}
  .state{font-size:1.6em;font-weight:700}
  .LOCKED{color:#9ca3af}.ARMED{color:#34d399}.STOOD_DOWN{color:#fbbf24}
+ .paper{background:#fbbf24;color:#111;font-weight:700;padding:.5em .7em;border-radius:6px;margin-bottom:.6em}
+ .live{background:#dc2626;color:#fff;font-weight:700;padding:.5em .7em;border-radius:6px;margin-bottom:.6em}
  .stop-on{color:#f87171;font-weight:700}
  .k{color:#9ca3af;font-size:.9em}
  .big{display:block;width:100%;padding:.9em;font-size:1.25em;border-radius:12px;border:0;
@@ -538,9 +540,15 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     sub = {"LOCKED": "no credential in memory — enter the passphrase to arm",
            "ARMED": f"armed until {until}" if until else "armed",
            "STOOD_DOWN": "stood down — nothing new opens; exits still work"}[state]
-    parts.append(f"<div class=card><div class='state {state}'>{state.replace('_', ' ')}</div>"
+    mode = str(st.get("mode", "live"))
+    mode_line = ("<div class=paper>PAPER — orders are simulated against live quotes; "
+                 "nothing reaches Schwab's order book</div>" if mode == "paper"
+                 else "<div class=live>LIVE — orders reach Schwab</div>")
+    parts.append(f"<div class=card>{mode_line}"
+                 f"<div class='state {state}'>{state.replace('_', ' ')}</div>"
                  f"<div class=k>{esc(sub)}</div>{stop_line}"
-                 f"<div class=k>{esc(st['now_ct'])} · service {esc(st['sha'])}</div></div>")
+                 f"<div class=k>{esc(st['now_ct'])} · service {esc(st['sha'])} · "
+                 f"mode {esc(mode)}</div></div>")
 
     # ── controls ──
     if state == "LOCKED":

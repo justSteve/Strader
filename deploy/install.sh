@@ -124,6 +124,18 @@ install_execd() {
         say "bounds seeded at $EXECD_BOUNDS from execd/bounds.example.yaml"
     fi
 
+    # 5b. the mode file — 'paper' or 'live'. Seeded as paper once, then Steve's.
+    #     Absent also means paper; the service refuses any other word.
+    EXECD_MODE="$EXECD_ETC/mode"
+    if [[ -e "$EXECD_MODE" ]]; then
+        say "mode file exists at $EXECD_MODE: $(tr -d '[:space:]' < "$EXECD_MODE") (yours; not touched)"
+    else
+        run bash -c "printf 'paper\n' > '$EXECD_MODE'"
+        run chown root:"$EXECD_USER" "$EXECD_MODE"
+        run chmod 0640 "$EXECD_MODE"
+        say "mode seeded at $EXECD_MODE: paper (write 'live' there and re-run the install to go live)"
+    fi
+
     # 6. the market credential (app 1, cannot trade): assembled from the repo's
     #    .env and the current market token, plain JSON 0600, execd-owned. Only
     #    when absent — after this the page's re-authorisation rewrites it.

@@ -46,8 +46,12 @@ from .broker import MockBroker
 from .page import DEFAULT_CALLBACK_URL, PAGE_HOST, PAGE_PORT, CredentialFile, create_page
 from .schwab import Credential, SchwabBroker, trading_payload
 from .service import ExecService, ServiceConfig
+from .paper import PaperBroker, read_mode
 from .vault import BadPassphrase, Vault, VaultError
 from .watch import INTERVAL_S as WATCH_INTERVAL_S, Watcher
+
+#: Steve's mode file: ``paper`` or ``live``. Absent means paper.
+DEFAULT_MODE_FILE = "/etc/execd/mode"
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_VAULT = "/var/lib/execd/vault.json"
@@ -165,6 +169,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--callback-url", default=DEFAULT_CALLBACK_URL,
                    help="the OAuth callback both Schwab apps are registered with, for the "
                         "page's re-authorisation (default: %(default)s)")
+    p.add_argument("--mode-file", default=DEFAULT_MODE_FILE,
+                   help="Steve's file saying 'paper' or 'live' (default: %(default)s; absent "
+                        "means paper). Paper: every read and the broker's preview are live, "
+                        "and orders fill in a simulated book against live quotes")
     p.add_argument("--watch-interval", type=float, default=WATCH_INTERVAL_S,
                    help="seconds between SPX-mark reads while a position or working entry "
                         "exists — the exit loop and the fill sweep (default: %(default)s; "
@@ -211,10 +219,20 @@ def main(argv: list[str] | None = None) -> int:
               f"passphrase). Market reads still answer.", file=sys.stderr)
 
     bounds = load_bounds(args.bounds)
+    try:
+        mode = read_mode(args.mode_file)
+    except (OSError, ValueError) as exc:
+        print(f"execd: mode file unreadable — {exc}", file=sys.stderr)
+        return 2
     config = ServiceConfig(state_dir=Path(args.state_dir), bounds=bounds,
-                           sha=installed_sha())
+                           sha=installed_sha(), mode=mode)
     broker = MockBroker() if args.mock else SchwabBroker(underlying=config.index_symbol)
-    service = ExecService(broker, config)
+    # `broker` stays the transport — bound, checked, printed below as before.
+    # The service gets the paper wrapper over it when the mode says so: reads
+    # and the preview pass through, orders never leave the box (st-k6gl).
+    service_broker = (PaperBroker(broker, book_path=Path(args.state_dir) / "paper-book.json")
+                      if mode == "paper" else broker)
+    service = ExecService(service_broker, config)
     market: CredentialFile | None = None
     if isinstance(broker, SchwabBroker):
         broker.bind(service.arming)
@@ -267,8 +285,13 @@ def main(argv: list[str] | None = None) -> int:
               f"refresh wall {broker.token_status().get('refresh_wall')}", file=sys.stderr)
 
     name = "mock" if args.mock else "schwab"
-    print(f"execd {config.sha} on {BIND_HOST}:{args.port} — broker={name}, "
+    print(f"execd {config.sha} on {BIND_HOST}:{args.port} — broker={name}, mode={mode}, "
           f"state={config.state_dir}, arming={service.arming.state.value}", file=sys.stderr)
+    if mode == "paper":
+        print("execd PAPER: quotes, chains, account and the broker's preview are live; "
+              "orders fill in a simulated book against live quotes and never reach "
+              f"Schwab. To go live: write 'live' to {args.mode_file} and restart.",
+              file=sys.stderr)
     if args.watch_interval > 0:
         # The loop that watches a live position: fills picked up, the SPX-mark
         # exit fired. Without it a fill rests its broker stop and then sits

@@ -218,9 +218,19 @@ def repo_sha() -> str:
 
 # ── the read-back ────────────────────────────────────────────────────────
 
+def _mode_prefix(ans: Answer) -> str:
+    """``PAPER `` when the service is simulating orders — on every answer that
+    could otherwise read as real (st-k6gl)."""
+    return "PAPER (simulated) — " if ans.body.get("mode") == "paper" else ""
+
+
 def describe(ans: Answer) -> str:
     """The service's answer in the desk's words. Every branch says that
     nothing was sent, because in every branch nothing was."""
+    return _mode_prefix(ans) + _describe(ans)
+
+
+def _describe(ans: Answer) -> str:
     if ans.status == 200 and ans.preview is not None:
         p = ans.preview
         price = p.get("price")
@@ -246,7 +256,12 @@ def describe(ans: Answer) -> str:
 def describe_place(ans: Answer) -> str:
     """The service's answer to a send, in the desk's words. Says SENT only
     when the service says it sent; every other branch says what happened
-    instead."""
+    instead. In paper mode every line is prefixed so a simulated fill never
+    reads as a real one."""
+    return _mode_prefix(ans) + _describe_place(ans)
+
+
+def _describe_place(ans: Answer) -> str:
     if ans.status == 200 and isinstance(ans.body.get("order"), dict):
         o = ans.body["order"]
         oid = o.get("order_id")

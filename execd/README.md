@@ -115,6 +115,13 @@ be reached.
 | `POST /stand-down` · `POST /stop` | done for the day; the kill switch on |
 | `POST /observe` · `POST /poll-fills` | feed it the SPX mark; pick up a stop that fired — driven in-process by `execd/watch.py` since stage 4 (every 5 s while a position or working entry exists) |
 
+**Paper mode** (`execd/paper.py`, stage 4): `/etc/execd/mode` says `paper` (the
+default, seeded by the install) or `live`. In paper every read and the broker's
+preview are live; `place`/`cancel`/`orders`/`positions`/`fills_since` run
+against a book at `/var/lib/execd/paper-book.json` filled against live quotes.
+`mode` is on every journal line, in `/status`, in every preview/place answer,
+and on the page.
+
 | `GET /marketdata/<kind>` | the raw Schwab body for `quotes`, `chains` or `pricehistory`, query allow-listed to that resource's own parameters — the readers' door (stage 3) |
 
 **What is deliberately absent: `/unlock`, `/resume`, and any re-auth route.**

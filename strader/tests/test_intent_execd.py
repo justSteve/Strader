@@ -266,6 +266,20 @@ def test_describe_place_every_branch():
     assert "Check the page" in describe_place(Answer(500, {"detail": "boom"}))
 
 
+def test_paper_mode_prefixes_every_read_back(tmp_path):
+    """A simulated fill must never read as a real one."""
+    from strader.intent.execd import describe_place
+    prev = _accepted()
+    prev.body["mode"] = "paper"
+    assert describe(prev).startswith("PAPER (simulated) — Execd preview, nothing sent")
+    fill = _filled()
+    fill.body["mode"] = "paper"
+    assert describe_place(fill).startswith("PAPER (simulated) — SENT AND FILLED")
+    refused = Answer(409, {"refused": {"bound": "stop", "reason": "on"}, "mode": "paper"})
+    assert describe_place(refused).startswith("PAPER (simulated) — Execd refused")
+    assert not describe(_accepted()).startswith("PAPER")          # live: no prefix
+
+
 def test_handle_routes_send(tmp_path):
     s = Session(plan_dir=tmp_path, day=DAY)
     assert "No execution service is wired" in s.handle("send")
