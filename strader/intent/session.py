@@ -4,8 +4,11 @@ stand down, show. [st-79z.3 — grammar sketch, survey §5]
 Each verb takes free dictation after it and answers with a read-back. ``arm`` never arms
 by itself: it stages the intent and returns the direction-anchor echo; only ``yes`` arms
 it. ``go`` emits the paste string only when an order has been priced and every intent on
-the plan is confirmed — and it never routes: the ticket is written as data under
-``data/intent/staged/`` and the string is handed back for Steve's own hands.
+the plan is confirmed. The ticket is written as data under ``data/intent/staged/`` and the
+string is handed back for Steve's own hands; when the execution service is wired
+(``execd=``, stage 4's rehearsal, st-k6gl) a single is also handed to the service as an
+intent for a **preview** — the bounds and the broker's own cost line, journaled under the
+intent's id, nothing sent. ``go`` has no way to place: the desk cannot send.
 
 The plan persists after every verb (JSON, one file per day) so a session restart, a
 crash, or a second pane picks up where the last word left off.
@@ -26,6 +29,7 @@ from strader.execution.fd0 import Fd0
 from strader.intent import grammar
 from strader.intent.bracket import NotBracketable, bracket
 from strader.intent.entities import DayPlan, Intent, Order, StructureTemplate
+from strader.intent.execd import DeskExecd, ExecdUnreachable, describe, intent_for, repo_sha
 from strader.intent.readback import anchor_echo, order_line, read_back
 from strader.intent.tos import occ_symbols, render
 
@@ -40,11 +44,15 @@ VERBS = ("read", "mark", "call", "arm", "yes", "no", "fly", "single", "price", "
 
 class Session:
     def __init__(self, plan: DayPlan | None = None, plan_dir: Path | None = None,
-                 day: dt.date | None = None, speak: bool = False) -> None:
+                 day: dt.date | None = None, speak: bool = False,
+                 execd: DeskExecd | None = None) -> None:
         self.plan_dir = plan_dir or DEFAULT_PLAN_DIR
         self.day = day or dt.datetime.now(CT).date()
         self.path = self.plan_dir / f"{self.day.isoformat()}.json"
         self.speak = speak
+        # The execution service, when wired: go previews a single through it.
+        # None means the desk ends at the paste line, as it did before stage 4.
+        self.execd = execd
         if plan is not None:
             self.plan = plan
         elif self.path.is_file():
@@ -394,8 +402,46 @@ class Session:
         self._log(f"go: staged {staged.name} — {string}"
                   + (" +FD0 bracket" if self.plan.bracket else ""))
         self._save()
+        # The staged record is on disk before the service is asked, so a fault
+        # on the wire cannot lose the ticket; the answer is added to it after.
+        execd_text = self._preview_through_execd(order, stamp, staged_record)
+        if "execd" in staged_record:
+            staged.write_text(json.dumps(staged_record, indent=2), encoding="utf-8")
+            self._save()
         return (f"Staged, nothing sent. Paste this into thinkorswim ({status} shape):\n{string}\n"
-                f"Legs: {', '.join(occ_symbols(order))}{bracket_text}")
+                f"Legs: {', '.join(occ_symbols(order))}{bracket_text}{execd_text}")
+
+    def _preview_through_execd(self, order: Order, stamp: str, staged_record: dict) -> str:
+        """Stage 4's rehearsal [st-k6gl]: the priced single goes to the
+        execution service as an intent and comes back as a preview — every
+        bound applied, the broker's own cost line, nothing sent. The intent
+        id is the staged file's stamp, so the record, the service's journal
+        and (later) the one live ticket all carry the same name.
+
+        Returns the lines for the read-back, or an empty string when no
+        service is wired. Never raises: the paste line already stands."""
+        if self.execd is None:
+            return ""
+        intent_id = f"desk-{stamp}"
+        try:
+            intent = intent_for(order, self.plan.bracket, intent_id=intent_id,
+                                engine_sha=repo_sha())
+        except ValueError as e:
+            note = f"Not previewed through execd: {e}. The paste line stands."
+            staged_record["execd"] = {"routed": False, "reason": str(e)}
+            self._log(f"execd: not routed — {e}")
+            return "\n" + note
+        try:
+            ans = self.execd.preview(intent)
+        except ExecdUnreachable as e:
+            staged_record["execd"] = {"routed": True, "intent": intent, "error": str(e)}
+            self._log(f"execd unreachable: {e}")
+            return f"\nExecd not reachable ({e}). Staged only, nothing sent."
+        staged_record["execd"] = {"routed": True, "intent": intent,
+                                  "status": ans.status, "answer": ans.body}
+        text = describe(ans)
+        self._log(f"execd {intent_id}: HTTP {ans.status} — {text.splitlines()[0]}")
+        return "\n" + text
 
     def stand_down(self) -> str:
         self.plan.orders = []

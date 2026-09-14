@@ -88,6 +88,11 @@ class Preview:
     commission_usd: float = 0.0
     accepted: bool = True
     messages: tuple[str, ...] = ()
+    #: The broker's own response body, unshaped, when the transport has one.
+    #: Not part of ``to_dict`` — the service journals it on its own line so
+    #: the first live preview records Schwab's real shape (st-k6gl residue:
+    #: the preview fixture in ``tests/execd/test_schwab.py`` is spec-derived).
+    raw: Any = None
 
     @property
     def total_usd(self) -> float:
@@ -323,9 +328,17 @@ class MockBroker:
             if ch is None:
                 return {"symbol": params.get("symbol"), "status": "FAILED",
                         "callExpDateMap": {}, "putExpDateMap": {}}
-            return {"symbol": params.get("symbol"), "status": "SUCCESS",
-                    "callExpDateMap": ch.get("calls", ch.get("callExpDateMap", {})),
-                    "putExpDateMap": ch.get("puts", ch.get("putExpDateMap", {}))}
+            body: dict[str, Any] = {
+                "symbol": params.get("symbol"), "status": "SUCCESS",
+                "callExpDateMap": ch.get("calls", ch.get("callExpDateMap", {})),
+                "putExpDateMap": ch.get("puts", ch.get("putExpDateMap", {}))}
+            # The live body carries the underlying's price beside the maps;
+            # the desk's live chain reads it (st-k6gl). From the index quote
+            # when the mock holds one.
+            under = self._quotes.get("$" + symbol.upper()) or self._quotes.get(symbol.upper())
+            if under is not None:
+                body["underlyingPrice"] = under.last or under.mid
+            return body
         candles = self._history.get(str(params.get("symbol", "")), [])
         return {"symbol": params.get("symbol"), "candles": candles,
                 "empty": not candles}

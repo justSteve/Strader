@@ -656,6 +656,13 @@ class TestPreview:
         assert (p.cost_usd, p.commission_usd, p.total_usd) == (210.0, 0.65, 210.65)
         assert p.accepted and p.messages == () and p.price == 2.10
 
+    def test_the_raw_body_is_kept_beside_the_shape_and_out_of_the_dict(self, broker, fake):
+        """The first live preview records Schwab's real body (st-k6gl residue);
+        the shaped dict the API answers with does not grow by it."""
+        p = broker.preview(intent())
+        assert p.raw == fake.preview
+        assert "raw" not in p.to_dict()
+
     def test_a_reject_is_carried_not_swallowed(self, broker, fake):
         fake.preview = spec_preview(rejects=["Insufficient buying power"], warns=["Wide spread"])
         p = broker.preview(intent())

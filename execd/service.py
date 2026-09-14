@@ -367,9 +367,16 @@ class ExecService:
             if refusal is not None:
                 return self._refuse(intent, refusal, kind="preview")
             prev = self.broker.preview(intent)
-            self.journal.record("preview", intent_id=intent.intent_id,
-                                preview=prev.to_dict())
+            self._journal_preview(intent, prev)
             return {"refused": None, "preview": prev.to_dict(), "would_send": prev.accepted}
+
+    def _journal_preview(self, intent: OrderIntent, prev: Any) -> None:
+        """The shaped preview, and — when the transport kept it — the broker's
+        raw body on its own line, so a live preview records the real shape
+        the spec-derived fixture stands in for (st-k6gl)."""
+        self.journal.record("preview", intent_id=intent.intent_id, preview=prev.to_dict())
+        if getattr(prev, "raw", None) is not None:
+            self.journal.record("preview_raw", intent_id=intent.intent_id, body=prev.raw)
 
     # ── the one path that transmits ──────────────────────────────────────
     def place(self, intent: OrderIntent) -> dict[str, Any]:
@@ -867,7 +874,7 @@ class ExecService:
             self.journal.record("error", kind="preview", intent_id=intent.intent_id,
                                 detail=str(exc))
             raise
-        self.journal.record("preview", intent_id=intent.intent_id, preview=prev.to_dict())
+        self._journal_preview(intent, prev)
         if not prev.accepted:
             return self._refuse(
                 intent,

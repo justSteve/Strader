@@ -28,16 +28,17 @@ been launched; one is the credential lifecycle that all of them depend on.
 
 | Part | Package | State | Can it transmit an order? |
 |---|---|---|---|
-| **Intent desk** — speak the day, get a paste line | `strader/intent/` | works | No. Ends at the clipboard. |
+| **Intent desk** — speak the day, get a paste line | `strader/intent/` | works; since 2026-09-14 `go` also hands a priced single to execd for a **preview** (§3.11) | No. The desk's client has no place; the paste line stands. |
 | **FD0** — budget-derived stop, exit block, attempt ledger | `strader/execution/` | works, as a library | No. Renders text. |
-| **execd** — the live execution service | `execd/` | stages 1–2 of 5: mock broker, and the Schwab transport (`execd/schwab.py`) | **Built, not yet proven against the account.** The app lacked the Accounts and Trading product on 2026-09-04 (401 on every `/trader` path); nothing sends before stage 4. |
+| **execd** — the live execution service | `execd/` | stages 1–3 of 5 built and installed (2026-09-14): mock broker, the Schwab transport, the systemd unit and the tailnet page; stage 4's preview rehearsal wired | **Yes, by design, and only it** — through `/place`, which nothing in the tree calls yet. Nothing sends before stage 4's one live ticket with Steve at the STOP button. |
 | **Fire server** — ARM → FIRE page on the tailnet | `scripts/fire_server.py` | built, never launched, dry run | No. Journals `transmitted: false`. |
 | **Schwab read feed + token** | `strader/execution/feed.py`, `broker_schwab/`, `scripts/refresh_schwab_token.py` | works, read-only | No. Order calls are removed from the library. |
 
-The two halves that matter for design do not yet meet: the intent desk produces
-a **paste string** for Steve's hands; execd consumes an **OrderIntent JSON** over
-a loopback API. Joining them is stage 5 of the execd epic (`st-47i2`). Nothing in
-the tree does it today.
+The two halves meet on **preview** only (stage 4's rehearsal, `st-k6gl`,
+2026-09-14): the intent desk still produces the **paste string** for Steve's
+hands, and `go` also hands the same ticket to execd as an **OrderIntent JSON**
+over the loopback API for a preview — every bound applied, the broker's own cost
+line, nothing sent. Routing `place` through the desk is stage 5 (`st-47i2`).
 
 ## 2. Every entry point, complete
 
@@ -80,7 +81,11 @@ Source: `strader/intent/cli.py` (entry), `session.py` (verbs), `grammar.py`
 |---|---|---|
 | `--once TEXT` | — | Handle one line, print the read-back, exit 0. |
 | `--speak` | off | Read-backs rendered for the ear: prices spoken, no abbreviations. |
-| `--chain FILE.json` | — | Loads a chain snapshot. **Without it `price` cannot run** and answers `No chain loaded — start with --chain FILE.json to price.` A missing file exits 2. |
+| `--chain FILE.json` | — | Loads a chain snapshot. **Without `--chain`, `price` cannot run** and answers `No chain loaded — start with --chain FILE.json, or --chain live to fetch it through execd.` A missing file exits 2. |
+| `--chain live` | — | `price` fetches the SPX chain through execd's market door (`GET /marketdata/chains`) **at each `price`**, for the day's expiry. Answers while the service is LOCKED. When the service is down: `Could not fetch the live chain: execd unreachable at …`. §3.11. |
+| `--expiry YYYY-MM-DD` | the day | Which expiry the live chain is for. |
+| `--execd URL` | `http://127.0.0.1:8778` (`EXECD_URL`) | Where `go` sends its preview. §3.11. |
+| `--no-execd` | off | `go` ends at the paste line; nothing goes to the service. |
 | `--day YYYY-MM-DD` | today, Central | Which day's plan to open. |
 | `--plan-dir DIR` | `data/intent` (repo-relative) | Where the day's plan JSON lives. |
 | `-v`, `--verbose` | off | `logging` at INFO instead of WARNING. |
@@ -104,8 +109,9 @@ Required per row: `strike`, `bid`, `ask`. Optional: `symbol` (synthesised as
 `implied_volatility` — all greeks default to `0.0`. Required at the top level:
 `expiry` (ISO date), `underlying_price`. `underlying` defaults to `"SPX"`.
 
-**There is no live chain snapshot producer wired to this flag.** `price` reads a
-hand-made file. That is a named gap, not an oversight.
+`--chain live` builds the same `Chain` from Schwab's own chain body through
+execd (`market.ingest.schwab.chain_from_schwab`), so the hand-made file is for
+tests and replays; the desk prices on the live chain since 2026-09-14 (§3.11).
 
 ### 3.3 The verbs
 
@@ -126,7 +132,7 @@ line before the split, because it is two words.
 | `fly` | free text | full read-back | appends a `StructureTemplate` with `vehicle="fly"` |
 | `single` | free text | full read-back | appends a `StructureTemplate` with `vehicle="single"` |
 | `price` | — | order line + paste line + FD0 block | resolves the **last** structure against the loaded chain; sets `plan.orders` and `plan.bracket` |
-| `go` | — | the staged paste line and legs | writes `data/intent/staged/<stamp>-<shape>.json`; **sends nothing** |
+| `go` | — | the staged paste line and legs, then execd's answer (§3.11) | writes `data/intent/staged/<stamp>-<shape>.json`; a single goes to execd as an intent for a **preview**, journaled under `desk-<stamp>`; **sends nothing** |
 | `stand down` | — | `Standing down. Nothing priced, nothing pending.` | clears orders, bracket and pending |
 | `show` | — | full read-back | none beyond rendering |
 | `frame` | `es` \| `spx` | `Bare prices are ES from here on.` | sets `plan.frame_default`; anything else answers `Frame is ES or SPX.` |
@@ -235,7 +241,15 @@ ERROR and swallowed — the session continues (`session.py:58`).
 The `fd0` block on a staged record holds `stop_trigger_spx`, `exit_fields`,
 `max_loss_usd`, and `derivation.as_record()`.
 
-**`data/intent/` does not exist yet.** The desk has never been run for real.
+The `execd` block (present whenever a service is wired) holds `routed`, and
+then either `reason` (a fly: `the service sends single legs only`), or the
+`intent` as sent plus `status` and `answer` (the service's body: `preview` on
+200, `refused.{bound, reason}` on 409), or `intent` plus `error` when the
+service did not answer. The record is written before the service is asked and
+rewritten with the answer, so a fault on the wire cannot lose the ticket.
+
+`data/intent/` is gitignored. The first real run against the installed
+service was 2026-09-14 07:39 CT from a scratch plan directory (§3.11).
 
 ### 3.10 The `DayPlan` shape
 
@@ -264,6 +278,58 @@ Mancini's and Carmine's vocabularies are **separate namespaces**. Nothing in
 this model ever asserts that two sources' levels are the same level.
 
 ---
+
+### 3.11 The join to execd — preview only (stage 4 rehearsal, `st-k6gl`)
+
+`strader/intent/execd.py`. Plain HTTP to the loopback with the standard
+library; imports neither `schwab` nor `broker_schwab`, so the gate hook is
+untouched. Two calls, and no third:
+
+| Call | Route | What comes back |
+|---|---|---|
+| `DeskExecd.chain(expiry)` | `GET /marketdata/chains?symbol=$SPX&contractType=ALL&strikeCount=40&includeUnderlyingQuote=true&fromDate=…&toDate=…` | Schwab's chain body; `live_chain()` turns it into the `Chain` that `price` resolves against. Answers while LOCKED. |
+| `DeskExecd.preview(intent)` | `POST /preview` | 200 with `preview.{price, cost_usd, commission_usd, total_usd, accepted, messages}`; 409 with `refused.{bound, reason}`; 400 malformed; 502 broker down. |
+
+**There is no `DeskExecd.place`**, and `tests/execd/test_desk_join.py`
+asserts its absence. The wall between "priced" and "sent" is crossed by a later
+commit on the same bead, after the rehearsal has been read back against the
+service's journal.
+
+**The intent** (`intent_for`): one OCC leg from `occ_symbols`, `BUY_TO_OPEN`,
+the lot count, `LIMIT` at the priced ask, `source: intent-desk`, `engine_sha`
+(the desk's commit, `-dirty` when the tree is), and — when FD0 built a
+bracket — `stop_spx` (the ticket's `stop_trigger_spx`) and `delta` (the leg's
+delta at compose), the two numbers the service derives the broker-resident
+stop from. A single with no bracket still goes; the service's own
+`protective_stop` bound refuses it, and that refusal is the record. A fly is
+not routed (the service sends single legs only) and the record says so.
+
+**The id** is `desk-<stamp>`, the staged file's stamp, so the desk's record,
+the service's journal lines (`request` kind `preview`, then `preview` or
+`refused`) and, later, the one live ticket carry the same name.
+
+**The read-back** after the paste line, one of:
+
+- `Execd preview, nothing sent: SPXW  260914C07655000 BUY_TO_OPEN x1 LIMIT at 21.20 — cost $2120.00, commission $0.65, total $2120.65; the broker accepts it.` (a rejected preview says `the broker would REJECT it.` and lists the broker's messages)
+- `Execd refused (window): 07:39 CT is before the session opens at 08:30. Nothing sent.`
+- `Execd not reachable (execd unreachable at http://127.0.0.1:8778: …). Staged only, nothing sent.`
+- `Not previewed through execd: the service sends single legs only; this order has 4. The paste line stands.`
+
+**Measured 2026-09-14 07:39 CT** against the installed service (sha aa83668,
+ARMED by Steve at 07:26): `--chain live` returned the day's SPX chain through
+the door; `price` resolved a 1-lot 0DTE call at the ask with an FD0 bracket;
+`go` staged the record and the service journaled `request` then `refused`
+(`window`) under `desk-20260914T073956`. The broker was not asked — the bounds
+come first. The first preview that reaches Schwab needs the session window
+(08:30–14:50 CT) and the service ARMED.
+
+**The raw preview shape.** The bead's residue from `st-p9mx`: the preview,
+place and cancel bodies in `tests/execd/test_schwab.py` are spec-derived. The
+transport now keeps Schwab's raw preview body on the `Preview` (`raw`, outside
+`to_dict`) and the service journals it as a `preview_raw` line under the
+intent id. The installed copy picks this up at the next `bash deploy/install.sh
+--execd`; the first in-window preview after that records the real shape, which
+then replaces the SPEC fixture in the same commit.
 
 ## 4. FD0 — `strader/execution/`
 
@@ -1072,19 +1138,17 @@ Named plainly, because a manual that lets a reader assume otherwise is worse
 than no manual.
 
 - **No console script.** No `strader` command; no `[project.scripts]`.
-- **No client for execd.** Fourteen routes and no command-line caller. Today
-  the operator surface is `curl`.
-- **No join between the intent desk and execd.** `go` writes a paste line;
-  execd takes an `OrderIntent`. Stage 5.
-- **No live chain snapshot for `price`.** It reads a hand-made JSON file.
+- **No general client for execd.** The desk's `DeskExecd` (§3.11) makes two
+  calls, chain and preview; the readers' `ExecdClient` makes the market reads.
+  Everything else — cancel, flatten, stand down — is Steve's page or `curl`.
+- **No `place` from the desk.** `go` previews through execd (§3.11) and
+  cannot send; routing `place` is the live half of stage 4, then stage 5.
 - **No `vertical` or `condor` pricing**, though both are in the `Vehicle` type.
 - **No TOS fixtures**, so every paste shape reports `inferred`.
-- **No recorded Trader API shapes in execd.** The transport is built; account
-  numbers, positions, orders and preview are written to the spec because the app
-  lacked the Accounts and Trading product on 2026-09-04.
-- **No systemd unit, no `deploy/install.sh`, no tailnet page** for execd —
-  stage 3.
-- **`data/intent/` does not exist.** The desk has never been run for real.
+- **No recorded preview, place or cancel shapes in execd.** Account numbers,
+  orders and order-by-id were recorded 2026-09-05; the preview body records
+  itself (`preview_raw`) at the first in-window preview after the next
+  install (§3.11); place and cancel record at the first live ticket.
 - **The market-versus-limit decision, the bounded chase, and the hard-ceiling
   loop** described in Desk's intent v2 are not built. They are planned as paper
   first (`st-p7zw`, `st-kdaq`, `st-uaxf`).

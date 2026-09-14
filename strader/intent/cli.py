@@ -4,12 +4,21 @@
     python -m strader.intent --once "read b-day so far. mancini has ..."
     python -m strader.intent --speak              # read-backs rendered for the ear
     python -m strader.intent --chain FILE.json    # enables 'price' against a chain snapshot
+    python -m strader.intent --chain live         # 'price' fetches today's SPX chain through execd
     python -m strader.intent --day 2026-08-22 --plan-dir data/intent
+    python -m strader.intent --no-execd           # go ends at the paste line, as before stage 4
 
 Verbs: read, mark, call, arm, yes, no, fly, single, price, go, stand down, show, frame,
 basis, replay. A line with no known verb is read as dictation. ``replay`` is the spoken
 door to a region replay [co-j9t1g] — "replay Monday 13:30 to 14:10, sweeps and plan-level
 only" — and prints what the instrument would have said there.
+
+The execution service [st-k6gl, stage 4 rehearsal]: by default ``go`` also hands a priced
+single to execd (``--execd URL``, default the loopback door) for a preview — the bounds
+and the broker's own cost line, journaled under the intent's id, nothing sent. When the
+service does not answer the read-back says so and the paste line stands. ``--chain live``
+fetches the chain through the same door at each ``price``, for the day's expiry
+(``--expiry`` to choose another).
 
 Chain snapshot format (a fixture, or a dump from the feed): {"underlying": "SPX",
 "underlying_price": 6320.5, "expiry": "2026-08-22", "calls": [{"strike": 6300, "bid": 8.1,
@@ -27,6 +36,7 @@ from pathlib import Path
 
 from market.entities.chain import Chain, strike_key
 from market.entities.instrument import Contract
+from strader.intent.execd import DEFAULT_URL, DeskExecd, ExecdUnreachable, live_chain
 from strader.intent.session import Session
 
 
@@ -57,7 +67,13 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="the intent dialect — speak the day, read it back")
     ap.add_argument("--once", help="handle one line and exit")
     ap.add_argument("--speak", action="store_true", help="read-backs for the ear")
-    ap.add_argument("--chain", help="chain snapshot JSON for 'price'")
+    ap.add_argument("--chain", help="chain snapshot JSON for 'price', or 'live' to fetch "
+                                    "the day's SPX chain through execd at each price")
+    ap.add_argument("--expiry", help="YYYY-MM-DD the live chain is for (default: the day)")
+    ap.add_argument("--execd", default=DEFAULT_URL,
+                    help=f"the execution service's door for go's preview (default {DEFAULT_URL})")
+    ap.add_argument("--no-execd", action="store_true",
+                    help="go ends at the paste line; nothing goes to the service")
     ap.add_argument("--day", help="YYYY-MM-DD (default today, Central)")
     ap.add_argument("--plan-dir", help="where the day's plan JSON lives (default data/intent)")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -66,19 +82,34 @@ def main(argv: list[str] | None = None) -> int:
                         format="%(levelname)s %(name)s: %(message)s")
 
     day = dt.date.fromisoformat(args.day) if args.day else None
-    session = Session(plan_dir=Path(args.plan_dir) if args.plan_dir else None, day=day, speak=args.speak)
+    execd = None if args.no_execd else DeskExecd(args.execd)
+    session = Session(plan_dir=Path(args.plan_dir) if args.plan_dir else None, day=day,
+                      speak=args.speak, execd=execd)
     chain = None
-    if args.chain:
+    live = False
+    if args.chain and args.chain.strip().lower() == "live":
+        live = True
+    elif args.chain:
         p = Path(args.chain)
         if not p.is_file():
             print(f"intent: no such chain file: {p}", file=sys.stderr)
             return 2
         chain = load_chain(p)
+    expiry = dt.date.fromisoformat(args.expiry) if args.expiry else session.day
 
     def handle(line: str) -> str:
         if line.strip().lower().startswith("price"):
+            if live:
+                # Fetched at each price, not once at start: the dictation pane
+                # runs one process per line, and a chain is stale in minutes.
+                try:
+                    snapshot = live_chain(DeskExecd(args.execd), expiry)
+                except (ExecdUnreachable, ValueError) as e:
+                    return f"Could not fetch the live chain: {e}"
+                return session.price(snapshot)
             if chain is None:
-                return "No chain loaded — start with --chain FILE.json to price."
+                return ("No chain loaded — start with --chain FILE.json, or --chain live "
+                        "to fetch it through execd.")
             return session.price(chain)
         return session.handle(line)
 

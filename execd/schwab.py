@@ -766,6 +766,7 @@ class SchwabBroker:
             cost_usd=round(abs(float(cost)), 2),
             commission_usd=round(float(balance.get("projectedCommission") or 0.0), 2),
             accepted=not rejected, messages=tuple(messages),
+            raw=body,
         )
 
     def place(self, intent: OrderIntent) -> OrderResult:
