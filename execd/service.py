@@ -172,6 +172,49 @@ class WorkingEntry:
 #: stop under it. Absence has to persist to mean anything. [st-v7oa]
 POSITION_SETTLE_S = 90.0
 
+#: How long a send whose answer never came back is held as unconfirmed before
+#: reconcile, having swept the broker's listing and found nothing matching,
+#: releases the intent. Until then no entry goes out at all: the broker may be
+#: holding an order this service has no id for (finding 25, st-xlz9).
+SEND_SETTLE_S = 60.0
+
+
+@dataclass
+class UnconfirmedSend:
+    """An entry the service sent and got no answer to. The broker may or may
+    not have taken it; only its own listing can say. Written to the journal
+    as ``sending`` before the send and ``send_unknown`` after the error, so a
+    restart carries it (st-xlz9)."""
+
+    intent_id: str
+    symbol: str
+    qty: int
+    limit: float | None
+    right: str
+    stop_spx: float | None
+    delta: float | None
+    at: datetime
+    page_query: dict[str, str] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"intent_id": self.intent_id, "symbol": self.symbol, "qty": self.qty,
+                "limit": self.limit, "right": self.right, "stop_spx": self.stop_spx,
+                "delta": self.delta, "at": self.at.isoformat(),
+                "page_query": dict(self.page_query) if self.page_query else None}
+
+    def matches(self, order: OrderResult) -> bool:
+        """The broker order this send would have become: same contract, same
+        side, same size, same limit, entered no earlier than the send."""
+        if order.side is not Side.BUY_TO_OPEN or order.symbol != self.symbol:
+            return False
+        if order.qty != self.qty:
+            return False
+        if (self.limit is None) != (order.price is None):
+            return False
+        if self.limit is not None and abs(float(order.price or 0.0) - self.limit) > 1e-6:
+            return False
+        return order.submitted_at >= self.at - timedelta(seconds=5)
+
 
 def _filled_qty_of(order: OrderResult) -> int:
     """How many contracts a FILLED order filled. The broker's
@@ -262,6 +305,13 @@ class ExecService:
         #: sells the fill sweep could attribute to no position, by order id,
         #: so each is journaled once
         self._unattributed: set[str] = set()
+        #: entries sent whose answer never came back — intent_id → the send;
+        #: nothing else goes out until reconcile has accounted for each
+        self._unconfirmed: dict[str, UnconfirmedSend] = {}
+        #: working buy orders on this service's instruments that it did not
+        #: send and cannot match to a send — order_id → OrderResult dict,
+        #: journaled once, shown, never adopted
+        self._foreign_orders: dict[str, dict[str, Any]] = {}
         self._last_fill_poll = clock()
         self._recover()
 
@@ -375,6 +425,8 @@ class ExecService:
             # short the account holds, and holdings the positions reader left
             # out — each is a line on the page until it is gone.
             "loose_legs": [{"order_id": k, **v} for k, v in self._loose_legs.items()],
+            "unconfirmed_sends": [s.to_dict() for s in self._unconfirmed.values()],
+            "foreign_orders": list(self._foreign_orders.values()),
             "shorts": [{"symbol": s, "qty": q} for s, q in self._shorts.items()],
             "excluded_positions": dict(getattr(self.broker, "excluded_positions", {}) or {}),
             "pnl": self._day_pnl([v for _p, v in valuations]),
@@ -796,14 +848,112 @@ class ExecService:
             # Fills first. A stop that fired has to be booked against the day's
             # ceiling before the position sweep sees the position is gone.
             self._pick_up_fills()
+            found = self._reconcile_orphans(broker_orders)
             promoted, released = self._reconcile_working(broker_orders)
             exits = self._reconcile_exits(broker_orders)
             loose = self._reconcile_loose_legs(broker_orders)
             adopted, corrected, gone = self._reconcile_positions(broker_positions)
             return {"promoted": promoted, "released": released, "exits": exits,
-                    "loose": loose,
+                    "loose": loose, "found": found,
                     "adopted": adopted, "corrected": corrected, "gone": gone,
                     "error": None}
+
+    def _known_order_ids(self) -> set[str]:
+        ids: set[str] = set(self._working) | set(self._loose_legs)
+        for pos in self._open.values():
+            for oid in (pos.entry_order_id, pos.stop_order_id, pos.target_order_id,
+                        pos.exit_order_id):
+                if oid:
+                    ids.add(oid)
+        return ids
+
+    def _reconcile_orphans(self, broker_orders: dict[str, OrderResult]) -> list[dict[str, Any]]:
+        """The orphan sweep: every order in the broker's listing that this
+        service holds no id for. Three kinds (finding 25, st-xlz9):
+
+        1. **A send whose answer never came back.** Matched by contract, side,
+           size, limit and time to an ``UnconfirmedSend``; it becomes the
+           working entry (or the position, if it already filled) that a
+           returned answer would have made it. Nothing matching after
+           ``SEND_SETTLE_S`` releases the intent: the broker did not take it.
+        2. **A working entry the transport could not name** (``unnamed:…``
+           when the 201 carried no usable Location). Matched the same way and
+           re-keyed, instead of holding its slot forever under an id the
+           listing can never contain.
+        3. **Anything else buying to open on this service's instruments** —
+           journaled once as ``foreign_order`` and shown, never adopted."""
+        found: list[dict[str, Any]] = []
+        known = self._known_order_ids()
+        unknown = [o for oid, o in broker_orders.items()
+                   if oid not in known and oid not in self._foreign_orders]
+        now = self.clock()
+
+        for intent_id, send in sorted(self._unconfirmed.items(), key=lambda kv: kv[1].at):
+            match = next((o for o in unknown if send.matches(o)
+                          and o.status not in (OrderStatus.CANCELED, OrderStatus.REJECTED)), None)
+            if match is None:
+                if (now - send.at).total_seconds() < SEND_SETTLE_S:
+                    continue
+                self._unconfirmed.pop(intent_id, None)
+                self.journal.record("send_resolved", intent_id=intent_id, symbol=send.symbol,
+                                    outcome="not-found",
+                                    detail=f"nothing matching in the broker's listing "
+                                           f"{SEND_SETTLE_S:.0f}s after the send — the "
+                                           f"broker did not take it; the intent may be re-sent")
+                found.append({"intent_id": intent_id, "outcome": "not-found", "order_id": None})
+                continue
+            unknown.remove(match)
+            self._unconfirmed.pop(intent_id, None)
+            self.journal.record("send_resolved", intent_id=intent_id, symbol=send.symbol,
+                                outcome="found", order_id=match.order_id,
+                                status=match.status.value)
+            work = WorkingEntry(
+                order_id=match.order_id, symbol=send.symbol, qty=send.qty,
+                intent_id=intent_id, right=send.right, limit=send.limit,
+                stop_spx=send.stop_spx, delta=send.delta, page_query=send.page_query)
+            self._working[work.order_id] = work
+            self.journal.record("working", kind="entry", intent_id=intent_id,
+                                symbol=work.symbol, qty=work.qty, order_id=work.order_id,
+                                status=match.status.value, limit=work.limit,
+                                stop_spx=work.stop_spx, delta=work.delta,
+                                page_query=work.page_query, found_by="reconcile")
+            found.append({"intent_id": intent_id, "outcome": "found",
+                          "order_id": match.order_id, "status": match.status.value})
+            # _reconcile_working, next, promotes it if it already filled.
+
+        for old_id, work in list(self._working.items()):
+            if not old_id.startswith("unnamed:") or old_id in broker_orders:
+                continue
+            probe = UnconfirmedSend(intent_id=work.intent_id, symbol=work.symbol, qty=work.qty,
+                                    limit=work.limit, right=work.right, stop_spx=work.stop_spx,
+                                    delta=work.delta, at=datetime(2000, 1, 1, tzinfo=timezone.utc))
+            match = next((o for o in unknown if probe.matches(o)), None)
+            if match is None:
+                continue
+            unknown.remove(match)
+            self._working.pop(old_id)
+            self._working[match.order_id] = replace(work, order_id=match.order_id)
+            self.journal.record("working_identified", intent_id=work.intent_id,
+                                symbol=work.symbol, old_order_id=old_id,
+                                order_id=match.order_id, status=match.status.value)
+            found.append({"intent_id": work.intent_id, "outcome": "identified",
+                          "order_id": match.order_id})
+
+        for o in unknown:
+            if o.side is not Side.BUY_TO_OPEN or not o.is_working:
+                continue
+            try:
+                root = parse_occ(o.symbol).root
+            except ValueError:
+                continue
+            if root not in self.bounds.instruments:
+                continue
+            self._foreign_orders[o.order_id] = o.to_dict()
+            self.journal.record("foreign_order", order_id=o.order_id, symbol=o.symbol,
+                                qty=o.qty, price=o.price,
+                                detail="a working buy on this service's instruments that "
+                                       "it did not send — shown, not adopted")
+        return found
 
     def _reconcile_working(
         self, broker_orders: dict[str, OrderResult]
@@ -1020,6 +1170,16 @@ class ExecService:
     def _entry_refusal(self, intent: OrderIntent) -> Refusal | None:
         if (r := self.arming.permits_entry()) is not None:
             return r
+        if self._unconfirmed:
+            # A send with no answer may be resting at the broker under an id
+            # this service does not have. Until reconcile has swept the
+            # listing for it, a second entry is a possible second order —
+            # the same intent id most of all, which _replay cannot see
+            # because no `placed` line was ever written (finding 25, st-xlz9).
+            pending = ", ".join(sorted(self._unconfirmed))
+            return Refusal("send_unconfirmed",
+                           f"an earlier send has no answer from the broker ({pending}) — "
+                           f"nothing else goes out until reconcile has accounted for it")
         quote = self._quote_view(intent.symbol)
         state = self.day_state()
         # The journal's count is today's file; what the service is actually
@@ -1110,7 +1270,26 @@ class ExecService:
                 Refusal("stop", "STOP came on while this entry was being "
                                 "priced — not sending"),
                 kind="place")
-        order = self.broker.place(intent)
+        # The line BEFORE the send. A send that times out after the broker
+        # took it used to leave no trace: no placed line, so a retry of the
+        # same intent went out again, and reconcile — which only looks up ids
+        # it already holds — never found the first (finding 25, st-xlz9).
+        # Now the intent is unconfirmed until the broker's listing is swept.
+        send = UnconfirmedSend(
+            intent_id=intent.intent_id, symbol=intent.symbol, qty=intent.qty,
+            limit=intent.limit, right=intent.occ.right, stop_spx=intent.stop_spx,
+            delta=intent.delta, at=self.clock(),
+            page_query=dict(page_query) if page_query else None)
+        self.journal.record("sending", kind="entry", spx=spx, **send.to_dict())
+        try:
+            order = self.broker.place(intent)
+        except BrokerError as exc:
+            self._unconfirmed[intent.intent_id] = send
+            self.journal.record("send_unknown", intent_id=intent.intent_id,
+                                symbol=intent.symbol, detail=str(exc),
+                                note="the broker may hold this order — no entry goes out "
+                                     "until reconcile has swept the listing for it")
+            raise
         self.journal.record("placed", intent_id=intent.intent_id, kind="entry",
                             spx=spx, order=order.to_dict())
 
@@ -2056,6 +2235,25 @@ class ExecService:
                                              "intent_id": str(e.get("intent_id", ""))}
             elif e.get("event") == "leg_resolved":
                 self._loose_legs.pop(str(e.get("order_id", "")), None)
+            elif e.get("event") == "send_unknown":
+                # The send whose answer never came back. Its shape is on the
+                # `sending` line just before it; hold it until reconcile has
+                # swept the broker's listing (st-xlz9).
+                iid = str(e.get("intent_id", ""))
+                sending = next((s for s in reversed(entries[:entries.index(e)])
+                                if s.get("event") == "sending" and s.get("intent_id") == iid), None)
+                if sending is not None and iid:
+                    query = sending.get("page_query")
+                    self._unconfirmed[iid] = UnconfirmedSend(
+                        intent_id=iid, symbol=str(sending.get("symbol", "")),
+                        qty=int(sending.get("qty", 0) or 0), limit=sending.get("limit"),
+                        right=str(sending.get("right", "")), stop_spx=sending.get("stop_spx"),
+                        delta=sending.get("delta"),
+                        at=_ts_of(sending) or self.clock(),
+                        page_query={str(k): str(v) for k, v in query.items()}
+                        if isinstance(query, dict) else None)
+            elif e.get("event") in ("send_resolved", "placed"):
+                self._unconfirmed.pop(str(e.get("intent_id", "")), None)
             elif e.get("event") == "exit_unfilled":
                 # A close was in flight when the service died. It must come
                 # back known, or the SPX loop re-fires into it. [st-97z1]

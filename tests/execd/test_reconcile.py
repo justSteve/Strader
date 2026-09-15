@@ -35,7 +35,7 @@ from __future__ import annotations
 import pytest
 
 from execd.bounds import Bounds
-from execd.broker import MockBroker, OrderStatus, Position
+from execd.broker import BrokerError, MockBroker, OrderStatus, Position
 from execd.service import POSITION_SETTLE_S, ExecService, ServiceConfig
 
 from .conftest import CALL, PUT, SPX_NOW, entry, exit_intent
@@ -322,3 +322,138 @@ class TestStartUpReconcileWaitsForTheCredential:
     def test_the_mock_still_reconciles_at_construction(self, broker, clock, tmp_path):
         ExecService(broker, ServiceConfig(state_dir=tmp_path, sha="t"), clock=clock)
         assert [c for c in broker.calls if c[0] == "positions"]
+
+
+# ── a send with no answer (2026-09-15 audit, finding 25; st-xlz9) ─────────
+
+class TestASendWithNoAnswer:
+    """The broker took the order; the socket died before the answer. There
+    was no `placed` line, so a retry of the same intent sent it again, and
+    reconcile — a lookup on ids the service already held — never found the
+    first. Now the intent is `sending` before the send, `send_unknown` after
+    the error, held as unconfirmed, and the orphan sweep matches it to the
+    broker's listing by contract, side, size, limit and time."""
+
+    def test_the_timed_out_send_is_journaled_and_holds_the_door(self, armed, broker):
+        broker.accept_then_fail_next = "read timed out"
+        with pytest.raises(BrokerError, match="timed out"):
+            armed.place(entry(intent_id="lost-1"))
+        events = [e["event"] for e in armed.journal.find("lost-1")]
+        assert events[-2:] == ["sending", "send_unknown"]
+        assert [s["intent_id"] for s in armed.status()["unconfirmed_sends"]] == ["lost-1"]
+        # While the listing cannot be read, nothing goes out — the same
+        # intent again least of all (no `placed` line, so _replay is blind).
+        broker.fail_next = "listing unavailable"
+        again = armed.place(entry(intent_id="lost-1"))
+        assert again["refused"]["bound"] == "send_unconfirmed"
+        broker.fail_next = "listing unavailable"
+        other = armed.place(entry(intent_id="lost-2", symbol=PUT))
+        assert other["refused"]["bound"] == "send_unconfirmed"
+        assert len(broker.calls_to("place")) == 1
+        # Once the listing answers, the reconcile every place() runs first
+        # finds the resting order, so the door is now shut by the slot.
+        assert armed.place(entry(intent_id="lost-1"))["refused"]["bound"] == "positions"
+        assert len(broker.calls_to("place")) == 1
+
+    def test_reconcile_finds_the_resting_order_and_it_becomes_the_working_entry(
+            self, armed, broker, clock):
+        broker.accept_then_fail_next = "read timed out"
+        with pytest.raises(BrokerError):
+            armed.place(entry(intent_id="lost-1"))
+        resting = broker.working_orders(CALL)[0]
+        out = armed.reconcile()
+        assert out["found"] == [{"intent_id": "lost-1", "outcome": "found",
+                                 "order_id": resting.order_id, "status": "WORKING"}]
+        assert armed.status()["unconfirmed_sends"] == []
+        work = armed.status()["working"]
+        assert [w["order_id"] for w in work] == [resting.order_id]
+        assert work[0]["intent_id"] == "lost-1" and work[0]["stop_spx"] == SPX_NOW - 12.0
+        resolved = armed.journal.events("send_resolved")
+        assert resolved[0]["outcome"] == "found" and resolved[0]["order_id"] == resting.order_id
+        # the slot is held: a new entry is refused on positions, not on the send
+        assert armed.place(entry(intent_id="next", symbol=PUT))["refused"]["bound"] == "positions"
+        # and when it fills, the usual promotion rests the bracket
+        clock.advance(seconds=1)
+        broker.fill_resting(resting.order_id)
+        armed.reconcile()
+        pos = armed.status()["positions"]
+        assert pos and pos[0]["intent_id"] == "lost-1" and pos[0]["stop_order_id"]
+
+    def test_a_send_the_broker_already_filled_becomes_the_position(self, armed, broker, clock):
+        broker.accept_then_fail_next = "read timed out"
+        with pytest.raises(BrokerError):
+            armed.place(entry(intent_id="lost-1"))
+        resting = broker.working_orders(CALL)[0]
+        clock.advance(seconds=1)
+        broker.fill_resting(resting.order_id)
+        armed.reconcile()
+        pos = armed.status()["positions"]
+        assert [p["intent_id"] for p in pos] == ["lost-1"]
+        assert pos[0]["stop_order_id"] and pos[0]["target_order_id"]
+        assert armed.status()["unconfirmed_sends"] == [] and armed.status()["working"] == []
+
+    def test_nothing_in_the_listing_after_the_settle_window_releases_the_intent(
+            self, armed, broker, clock):
+        real_place = broker.place
+
+        def refuse_after_taking_nothing(intent):
+            raise BrokerError("connect timed out")          # never reached the broker
+
+        broker.place = refuse_after_taking_nothing
+        with pytest.raises(BrokerError):
+            armed.place(entry(intent_id="lost-1"))
+        broker.place = real_place
+        armed.reconcile()
+        assert armed.status()["unconfirmed_sends"]            # too soon to say
+        clock.advance(seconds=61)
+        out = armed.reconcile()
+        assert out["found"] == [{"intent_id": "lost-1", "outcome": "not-found", "order_id": None}]
+        assert armed.journal.events("send_resolved")[0]["outcome"] == "not-found"
+        # the intent may now be re-sent, and _replay does not answer it from the sending line
+        broker.set_quote(CALL, bid=2.00, ask=2.10)          # a fresh quote after the clock moved
+        broker.set_quote("$SPX", bid=SPX_NOW - 0.25, ask=SPX_NOW + 0.25, last=SPX_NOW)
+        sent = armed.place(entry(intent_id="lost-1"))
+        assert sent["order"]["status"] == "FILLED"
+
+    def test_an_unconfirmed_send_survives_a_restart(self, armed, broker, clock, tmp_path):
+        broker.accept_then_fail_next = "read timed out"
+        with pytest.raises(BrokerError):
+            armed.place(entry(intent_id="lost-1"))
+        again = ExecService(broker, armed.config, clock=clock)
+        # The mock needs no credential, so the start-up reconcile ran in the
+        # constructor: the recovered send was swept and found at once. The
+        # journal shows the recovery happened, not a fresh guess.
+        assert again.status()["unconfirmed_sends"] == []
+        assert [w["intent_id"] for w in again.status()["working"]] == ["lost-1"]
+        assert again.journal.events("send_resolved")[-1]["outcome"] == "found"
+        assert again.journal.events("recovered") == []      # it was not a position yet
+
+    def test_a_working_buy_the_service_did_not_send_is_shown_not_adopted(self, armed, broker):
+        from execd.intent import OrderIntent, OrderType, Side
+        broker.rest_limits = True
+        foreign = broker.place(OrderIntent(intent_id="hand-1", symbol=PUT, side=Side.BUY_TO_OPEN,
+                                           qty=2, order_type=OrderType.LIMIT, limit=1.85,
+                                           source="tos"))
+        broker.calls.clear()
+        armed.reconcile()
+        armed.reconcile()
+        shown = armed.status()["foreign_orders"]
+        assert [o["order_id"] for o in shown] == [foreign.order_id]
+        assert len(armed.journal.events("foreign_order")) == 1     # once, not per sweep
+        assert armed.status()["working"] == [] and armed.status()["positions"] == []
+
+    def test_an_unnamed_working_entry_is_identified_from_the_listing(self, armed, broker):
+        """The transport names an order ``unnamed:<intent>`` when the 201
+        carried no Location. Reconcile used to look that id up in a listing
+        that could never contain it and hold the slot forever."""
+        from dataclasses import replace as _replace
+        broker.rest_limits = True
+        armed.place(entry(intent_id="noloc-1"))
+        real_id = broker.working_orders(CALL)[0].order_id
+        # re-key what the service holds to the transport's synthetic id
+        work = armed._working.pop(real_id)
+        armed._working["unnamed:noloc-1"] = _replace(work, order_id="unnamed:noloc-1")
+        out = armed.reconcile()
+        assert out["found"] == [{"intent_id": "noloc-1", "outcome": "identified", "order_id": real_id}]
+        assert [w["order_id"] for w in armed.status()["working"]] == [real_id]
+        assert armed.journal.events("working_identified")[0]["old_order_id"] == "unnamed:noloc-1"

@@ -36,7 +36,7 @@ class TestTheEntryPath:
         assert out["order"]["status"] == "FILLED"
         assert out["order"]["fill_price"] == 2.10
         events = [e["event"] for e in armed.journal.read()]
-        assert events == ["unlock", "request", "preview", "placed", "filled",
+        assert events == ["unlock", "request", "preview", "sending", "placed", "filled",
                           "stop_placed", "target_placed"]
 
     def test_the_fill_becomes_a_tracked_position(self, armed):
@@ -611,7 +611,7 @@ class TestTheJournalReproducesTheDay:
         # fire at the same prices the close is sent at, so none may be live at
         # the broker beside it.
         assert events == [
-            "unlock", "request", "preview", "placed", "filled", "stop_placed",
+            "unlock", "request", "preview", "sending", "placed", "filled", "stop_placed",
             "target_placed", "exit_triggered", "canceled", "canceled", "placed",
             "closed", "stand_down",
         ]
