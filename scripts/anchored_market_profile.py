@@ -131,6 +131,14 @@ def _halt_only(a: datetime, b: datetime) -> bool:
     return halt_open - pad <= a_ct and b_ct <= halt_shut + pad
 
 
+def _utcnow() -> datetime:
+    """The clock ``build`` reads when no ``now_utc`` is passed — one seam so
+    ``main()`` can be pinned to a day in tests instead of drifting with the
+    calendar (the ``today`` anchor fell outside the synthetic window on any
+    day but the one it was written on; st-hny7, st-574q)."""
+    return datetime.now(tz=timezone.utc)
+
+
 def build(now_utc: datetime | None = None, *, anchor: str = "prior",
           bucket_ticks: int = TPO_ROW_TICKS, bracket_min: int = BRACKET_MIN,
           session_day: _date | None = None) -> dict:
@@ -160,7 +168,7 @@ def build(now_utc: datetime | None = None, *, anchor: str = "prior",
     """
     if anchor not in ANCHORS:
         raise ValueError(f"anchor must be one of {', '.join(ANCHORS)}; got {anchor!r}")
-    end_utc = now_utc or datetime.now(tz=timezone.utc)
+    end_utc = now_utc or _utcnow()
     if anchor == "prior" and session_day is not None:
         day, start_utc = session_day, anchor_utc(session_day)
     else:

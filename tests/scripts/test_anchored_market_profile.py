@@ -214,6 +214,7 @@ def test_render_names_the_anchor_and_links_the_other_two(monkeypatch, kind, labe
 
 
 def test_main_takes_an_anchor(monkeypatch, capsys):
+    monkeypatch.setattr(amp, "_utcnow", lambda: NOW)   # pin main()'s clock to the synthetic day
     monkeypatch.setattr(amp, "trades_from_corpus",
                         lambda _s: iter(synthetic_window(
                             {0: [0], 1: [1]}, anchor=ANCHOR_CT["today"])))

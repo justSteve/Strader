@@ -118,7 +118,12 @@ def test_fetch_failure_degrades_to_a_note_not_an_error(tmp_path):
     out = refresh_mod.refresh("2026-08-18", fetch=_dead, quiet=True)
     assert out.rc == 0
     text = (run_mod.DESK_REPORTS / "mancini-es-2026-08-18.md").read_text()
-    assert "Overnight data unavailable (Schwab price history HTTP 401)" in text
+    # Since st-7xzw the fetch is tried per contract and the note carries every
+    # attempt ("no ES contract returned candles: /ESU26: …; /ESZ26: …"), so pin
+    # the note and the underlying reason, not the exact wrapping.
+    assert "Overnight data unavailable (" in text
+    assert "Schwab price history HTTP 401" in text
+    assert "Tape unavailable (" in text            # the reality block degrades the same way
     assert "window unavailable" in out.summary
 
 

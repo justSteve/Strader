@@ -140,6 +140,17 @@ def render_html(payload: dict, template: Path = TEMPLATE) -> str:
     return tpl.replace(MARKER, blob)
 
 
+def register_available() -> bool:
+    """Whether the desk-register seam can be reached from here. ``False`` on a
+    box without COO's tree AND on one where ``/root`` is not readable (a CI
+    runner: ``Path.exists`` raises PermissionError there rather than
+    answering) — either way the page is written and registration is skipped."""
+    try:
+        return DESK_REGISTER.exists()
+    except OSError:
+        return False
+
+
 def publish(page_html: str, out: Path, *, register: bool = False) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page_html, encoding="utf-8")

@@ -103,7 +103,7 @@ def test_script_writes_the_page_and_registers_through_the_seam(rows_dir, tmp_pat
     assert r.returncode == 0, r.stderr
     assert "2 rows (1 printed, 1 estimated), 1 unpriced, 2 rules" in r.stdout
     assert out.exists() and "Blotter" in out.read_text()
-    if bp.DESK_REGISTER.exists():
+    if bp.register_available():        # never raises — a CI runner cannot stat /root
         reg = json.loads(manifest.read_text())
         assert reg["Trading"] == ["myDesk/trading/blotter.html"]
     r2 = subprocess.run([sys.executable, str(ROOT / "scripts" / "blotter_page.py"), "--rows-dir", str(rows_dir),
@@ -121,3 +121,13 @@ def test_script_refuses_a_missing_rows_dir(tmp_path):
     r = subprocess.run([sys.executable, str(ROOT / "scripts" / "blotter_page.py"), "--rows-dir", str(tmp_path / "empty"),
                         "--out", str(tmp_path / "x.html"), "--no-commit"], cwd=ROOT, capture_output=True, text=True)
     assert r.returncode == 1 and "no replay-<day>.jsonl rows" in r.stderr
+
+
+def test_register_available_is_false_when_root_cannot_be_stat_ed(monkeypatch):
+    """A GitHub runner is not root: stat('/root/...') raises PermissionError, and
+    pathlib re-raises it from exists(). The seam check must answer, not raise."""
+    class _Unreadable:
+        def exists(self):
+            raise PermissionError(13, "Permission denied", str(bp.DESK_REGISTER))
+    monkeypatch.setattr(bp, "DESK_REGISTER", _Unreadable())
+    assert bp.register_available() is False
