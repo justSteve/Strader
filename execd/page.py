@@ -898,7 +898,11 @@ def _describe_adjust(out: dict[str, Any]) -> str:
         r = out.get(leg)
         if not isinstance(r, dict):
             continue
-        if r.get("moved"):
+        if r.get("unchanged"):
+            # "Stop moved from 10.30 to 10.30" (2026-09-15 14:07 CT) — say it
+            # stayed, and the service left the leg resting (st-ff5j)
+            parts.append(f"{name} unchanged at {float(r.get('old_price') or 0):.2f}.")
+        elif r.get("moved"):
             line = f"{name} moved from {float(r.get('old_price') or 0):.2f} to {float(r['new_price']):.2f}"
             if leg == "stop" and r.get("stop_spx") is not None:
                 line += f" (SPX cut level now {float(r['stop_spx']):.2f})"

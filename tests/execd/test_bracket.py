@@ -1188,3 +1188,61 @@ class TestFilledQuantityFallback:
         assert _filled_qty_of(OrderResult(order_id="y", status=OrderStatus.FILLED, symbol=CALL,
                                           side=Side.SELL_TO_CLOSE, qty=3, order_type=OrderType.MARKET,
                                           filled_qty=2, fill_price=2.0)) == 2
+
+
+class TestUnchangedLegsAndWaterMarks:
+    """Steve, 2026-09-15 14:07 CT: "Stop moved from 10.30 to 10.30 … the
+    running total showed price at +70 but market order not fired … what's
+    journal show?" The stop was pulled and re-rested twice at the same
+    price, and the journal held no trace of the +70. [st-ff5j]"""
+
+    def test_an_unchanged_stop_is_left_resting_and_said_so(self, page, holding, broker):
+        before = pos_of(holding)
+        adjusted_before = len(holding.journal.events("stop_adjusted"))
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop_price": "1.50",
+                                                  "target_price": "25"})
+        landing = text(page.get(r.headers["Location"]))
+        assert "Stop unchanged at 1.50." in landing and "Target moved from 21.00 to 25.00" in landing
+        after = pos_of(holding)
+        assert after["stop_order_id"] == before["stop_order_id"]
+        assert broker._orders[before["stop_order_id"]].status is OrderStatus.WORKING
+        assert len(holding.journal.events("stop_adjusted")) == adjusted_before
+        ev = holding.journal.events("adjust_unchanged")[-1]
+        assert ev["leg"] == "stop" and ev["price"] == 1.50 and ev["order_id"] == before["stop_order_id"]
+
+    def test_both_unchanged_touches_nothing(self, page, holding, broker):
+        before = pos_of(holding)
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop_price": "1.50",
+                                                  "target_price": "21.00"})
+        landing = text(page.get(r.headers["Location"]))
+        assert "Stop unchanged at 1.50. Target unchanged at 21.00." in landing
+        after = pos_of(holding)
+        assert (after["stop_order_id"], after["target_order_id"]) == (before["stop_order_id"], before["target_order_id"])
+
+    def test_the_water_marks_follow_the_bid_and_land_in_the_closed_line(self, holding, broker, clock):
+        broker.set_quote(CALL, bid=2.80, ask=2.90)
+        clock.advance(seconds=10)
+        holding.status()
+        p = pos_of(holding)
+        assert p["best_net_usd"] == pytest.approx((2.80 - 2.10) * 100 - 1.30)
+        assert p["worst_net_usd"] == p["best_net_usd"] or p["worst_net_usd"] < p["best_net_usd"]
+        best_at = p["best_at"]
+        broker.set_quote(CALL, bid=1.90, ask=2.00)
+        clock.advance(seconds=10)
+        holding.status()
+        p = pos_of(holding)
+        assert p["best_net_usd"] == pytest.approx(68.70) and p["best_at"] == best_at
+        assert p["worst_net_usd"] == pytest.approx((1.90 - 2.10) * 100 - 1.30)
+        holding.flatten()
+        closed = holding.journal.events("closed")[-1]
+        assert closed["best_net_usd"] == pytest.approx(68.70) and closed["best_at"] == best_at
+        assert closed["worst_net_usd"] == pytest.approx(-21.30) and closed["worst_at"]
+
+    def test_the_card_shows_best_and_worst_and_update_goes_dead_on_submit(self, page, holding, broker):
+        broker.set_quote(CALL, bid=2.80, ask=2.90)
+        body = text(page.get("/exec/order"))
+        assert "best <span class='pos'>+$68.70</span> at " in body
+        assert "UPDATING…" in body and "classList.contains('adjust')" in body
+        holding.flatten()
+        after = text(page.get("/exec/order"))
+        assert "best · worst" in after and "+$68.70" in after

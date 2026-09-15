@@ -260,10 +260,36 @@ class OpenPosition:
     #: service opened it; the published per-contract rate for a position it
     #: recovered or adopted. Part of the page's P&L (Steve, 2026-09-14).
     entry_commission_usd: float = 0.0
+    #: the best and worst ``net_if_closed_usd`` this position has shown, and
+    #: when — struck from the valuations the status body computes, so they
+    #: move only while something is reading the status (the page's poll,
+    #: every few seconds while he watches). In memory only; a restart starts
+    #: them again. Written into the ``closed`` line so the record can answer
+    #: "how far did it go my way before the stop took it" (st-ff5j, Steve
+    #: 2026-09-15: "the running total showed price at +70 … not sure that was
+    #: a valid profit mark").
+    best_net_usd: float | None = None
+    best_at: datetime | None = None
+    worst_net_usd: float | None = None
+    worst_at: datetime | None = None
 
     @property
     def exit_in_flight(self) -> bool:
         return bool(self.exit_order_id)
+
+    def mark_water(self, net: float | None, now: datetime) -> None:
+        if net is None:
+            return
+        if self.best_net_usd is None or net > self.best_net_usd:
+            self.best_net_usd, self.best_at = net, now
+        if self.worst_net_usd is None or net < self.worst_net_usd:
+            self.worst_net_usd, self.worst_at = net, now
+
+    def water_dict(self) -> dict[str, Any]:
+        return {"best_net_usd": self.best_net_usd,
+                "best_at": self.best_at.isoformat() if self.best_at else None,
+                "worst_net_usd": self.worst_net_usd,
+                "worst_at": self.worst_at.isoformat() if self.worst_at else None}
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -277,6 +303,7 @@ class OpenPosition:
             "opened_at": self.opened_at.isoformat() if self.opened_at else None,
             "exit_order_id": self.exit_order_id, "exit_reason": self.exit_reason,
             "entry_commission_usd": self.entry_commission_usd,
+            **self.water_dict(),
         }
 
 
@@ -406,6 +433,8 @@ class ExecService:
         now = self.clock()
         day = self.day_state()
         valuations = [(p, self.valuation(p)) for p in list(self._open.values())]
+        for p, v in valuations:
+            p.mark_water(v.get("net_if_closed_usd"), now)
         return {
             "now": now.isoformat(),
             "now_ct": now.astimezone(CT).strftime("%Y-%m-%d %H:%M:%S CT"),
@@ -1667,7 +1696,7 @@ class ExecService:
                             remaining_qty=remaining, intent_id=pos.intent_id,
                             kind=reason, entry_price=pos.entry_price,
                             exit_price=exit_px, pnl_usd=pnl,
-                            order_id=order_id, reason=why)
+                            order_id=order_id, reason=why, **pos.water_dict())
         also_filled: list[dict[str, Any]] = []
         for other_reason, other in (("protective-stop", stop_fill), ("target", target_fill)):
             if other is None:
@@ -2035,17 +2064,43 @@ class ExecService:
             out: dict[str, Any] = {"refused": None, "symbol": symbol, "bid": bid,
                                    "stop": None, "target": None, "closed": None,
                                    "mode": self.config.mode}
+            # A leg already resting at the price asked for is left alone: a
+            # cancel-and-re-rest of an unchanged stop is a moment with no stop
+            # resting and two broker round trips for nothing. 2026-09-15
+            # 14:07 CT the page's UPDATE sent both boxes, the stop unchanged,
+            # and the stop was pulled and re-rested twice at 10.30 (st-ff5j).
             if stop_price is not None:
-                moved = self._move_leg(pos, "stop", float(stop_price), bid)
-                if moved.get("closed") is not None:
-                    return self._adjust_closed(symbol, out, "stop", moved)
-                out["stop"] = moved
+                if self._same_price(pos.stop_price, stop_price) and pos.stop_order_id:
+                    out["stop"] = self._unchanged_leg(pos, "stop")
+                else:
+                    moved = self._move_leg(pos, "stop", float(stop_price), bid)
+                    if moved.get("closed") is not None:
+                        return self._adjust_closed(symbol, out, "stop", moved)
+                    out["stop"] = moved
             if target_price is not None and pos.symbol in self._open:
-                moved = self._move_leg(pos, "target", float(target_price), bid)
-                if moved.get("closed") is not None:
-                    return self._adjust_closed(symbol, out, "target", moved)
-                out["target"] = moved
+                if self._same_price(pos.target_price, target_price) and pos.target_order_id:
+                    out["target"] = self._unchanged_leg(pos, "target")
+                else:
+                    moved = self._move_leg(pos, "target", float(target_price), bid)
+                    if moved.get("closed") is not None:
+                        return self._adjust_closed(symbol, out, "target", moved)
+                    out["target"] = moved
             return out
+
+    @staticmethod
+    def _same_price(resting: float | None, asked: float) -> bool:
+        return resting is not None and abs(float(asked) - float(resting)) < 1e-6
+
+    def _unchanged_leg(self, pos: OpenPosition, leg: str) -> dict[str, Any]:
+        price = pos.stop_price if leg == "stop" else pos.target_price
+        order_id = pos.stop_order_id if leg == "stop" else pos.target_order_id
+        self.journal.record("adjust_unchanged", symbol=pos.symbol, intent_id=pos.intent_id,
+                            leg=leg, price=price, order_id=order_id)
+        out = {"moved": False, "unchanged": True, "old_price": price, "new_price": price,
+               "order_id": order_id}
+        if leg == "stop":
+            out["stop_spx"] = pos.stop_spx
+        return out
 
     def _adjust_refusal(self, pos: OpenPosition, bid: float, new_stop: float | None,
                         new_target: float | None, *, stop_given: bool,

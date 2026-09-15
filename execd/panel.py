@@ -349,6 +349,23 @@ def body_working(service, st, facts, actions, now, bounds) -> str:
     return html
 
 
+def _water_line(p: Mapping[str, Any], now: datetime, *, row: bool = False) -> str:
+    """The best and worst net the position has shown and when — from the
+    status body while it is held, from the ``closed`` line after (st-ff5j).
+    Nothing until a valuation has been struck."""
+    best, worst = p.get("best_net_usd"), p.get("worst_net_usd")
+    if best is None and worst is None:
+        return ""
+    def at(key: str) -> str:
+        t = _parse_ts(p.get(key))
+        return f" at {t.astimezone(CT).strftime('%H:%M:%S')}" if t else ""
+    text = (f"best <span class='{money_class(best)}'>{money(best)}</span>{at('best_at')} · "
+            f"worst <span class='{money_class(worst)}'>{money(worst)}</span>{at('worst_at')}")
+    if row:
+        return f"<tr><td>best · worst</td><td>{text}</td></tr>"
+    return f"<div class=k>{text}</div>"
+
+
 def body_filled(service, st, facts, actions, now) -> str:
     html = ""
     spx = _spx_line(service)
@@ -363,6 +380,7 @@ def body_filled(service, st, facts, actions, now) -> str:
         net = v.get("net_if_closed_usd")
         html += (f"<div class=hero><div class=k>NET NOW</div>"
                  f"<div class='n {money_class(net)}'>{money(net)}</div></div>")
+        html += _water_line(p, now)
         if v.get("bid") is not None:
             line = f"bid {v['bid']:.2f} / ask {v['ask']:.2f} · quote {ago(v.get('quote_age_s'))} old"
         else:
@@ -440,6 +458,9 @@ def body_closed(st, facts, actions, now, order_path) -> str:
     if io:
         rows.append(f"<tr><td>in → out</td><td>{esc(io)}</td></tr>")
     rows.append(f"<tr><td>reason</td><td>{esc(c.get('kind') or c.get('reason') or '—')}</td></tr>")
+    water = _water_line(c, now, row=True)
+    if water:
+        rows.append(water)
     rows.append(_today_row(st))
     html += "<table class=full>" + "".join(rows) + "</table>"
     html += "<div class=actions>" + _link_button(order_path + "?new=1", "NEW ORDER", "quiet") + "</div>"
@@ -574,6 +595,11 @@ PANEL_SCRIPT = """
       + (window.__lots ? '&lots=' + encodeURIComponent(window.__lots) : '')) : '');
     fetch(u, {headers:{'Accept':'application/json'}}).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(apply)
       .catch(function(e){ var up = document.getElementById('updated'); if (up) { up.removeAttribute('data-at'); up.textContent = 'poll failed: ' + (e && e.message ? e.message : e); } }); }
+  // UPDATE once: the button goes dead the moment the form leaves, so a
+  // second tap while the first adjust is still at the broker (four seconds
+  // of cancel-and-rest, 2026-09-15 14:07 CT) is not a second adjust (st-ff5j)
+  document.addEventListener('submit', function(e){ var f = e.target; if (!f || !f.classList || !f.classList.contains('adjust')) return;
+    var b = f.querySelector('button'); if (b) { if (b.disabled) { e.preventDefault(); return; } b.disabled = true; b.textContent = 'UPDATING…'; } });
   var pauseBtn = document.getElementById('pause');
   if (pauseBtn) pauseBtn.addEventListener('click', function(){ paused = !paused; pauseBtn.textContent = paused ? 'resume' : 'pause';
     var u = document.getElementById('updated'); if (u) { if (paused) { u.removeAttribute('data-at'); u.textContent = 'paused'; } else poll(true); } });

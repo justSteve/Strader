@@ -1321,6 +1321,27 @@ the valuation row `at_target_usd` (the same arithmetic as `at_stop_usd`).
 positions; a winner or a scratch gives its attempt back; a working entry
 holds a slot and no attempt.
 
+**An unchanged leg stays; UPDATE once; best and worst** (st-ff5j, Steve
+2026-09-15 14:07 CT: *"Stop moved from 10.30 to 10.30 … the running total
+showed price at +70 but market order not fired … what's journal show?"*).
+The page's UPDATE posts both boxes, so a leg whose box he did not touch
+arrives at the price it already rests at; `adjust` leaves that leg alone —
+no cancel, no re-rest, a journal line `adjust_unchanged` and the answer
+*Stop unchanged at 10.30* — because a cancel-and-re-rest of an unchanged
+stop is a moment with no stop resting and two broker round trips for
+nothing (it happened twice in that minute). The UPDATE button goes dead the
+moment the form leaves (*UPDATING…*), so a second tap while the first
+adjust is at the broker is not a second adjust. And every position keeps
+the best and worst `net_if_closed_usd` it has shown, with the time of each,
+struck from the valuations the status body computes — so they move while
+the page's poll is reading, every few seconds while he watches; in memory
+only, a restart starts them again. They sit under NET NOW on the filled
+card, as a *best · worst* row on the CLOSED card, and in the `closed` line
+(`best_net_usd`, `best_at`, `worst_net_usd`, `worst_at`), so the record can
+answer "how far did it go my way before the stop took it". The take-profit
+is a resting limit at a *price*; NET NOW is what a market sell nets *now*;
+nothing fires at a dollar figure.
+
 **Cancel and re-price.** A working entry on the order page carries one button,
 CANCEL AND RE-PRICE. The page stored the selection query the entry was priced
 from on the `WorkingEntry` at send time (`page_query`, on the `working` journal
