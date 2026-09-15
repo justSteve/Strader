@@ -60,10 +60,10 @@ from .broker import BrokerError
 from .schwab import (VAULT_VERSION, App, Credential, authorize_url, code_from_received_url,
                      exchange, new_client, trading_payload, verify_grant)
 from .intent import OrderIntent
-from .orderform import PREVIEW_TTL_S, Selection, intent_for, price, stamp
+from .orderform import PREVIEW_TTL_S, Selection, intent_for, limit_at, price, stamp
 from .orderpage import (balances_html, fd0_html, journal_html, position_html, preview_fields_html,
                         quote_html, render_order, state_html, strikes_html, ticket_html)
-from .service import ExecService, Refused
+from .service import CONTRACT_MULTIPLIER, ExecService, Refused
 from .vault import BadPassphrase, Vault, VaultError, VaultMissing
 
 #: The page's loopback port. ``tailscale serve --bg --set-path /exec
@@ -432,10 +432,21 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         quote = None
         error = None
         spx = None
+        limit_now = None
+        cost_now = None
         if symbol:
             try:
-                quote = service.quote(symbol).to_dict()
+                q = service.quote(symbol)
+                quote = q.to_dict()
                 spx = service.spx_mark()
+                # the number the ticket's head follows while unlocked (st-2s4u):
+                # the ask on the tick grid, and what that costs — Python's
+                # arithmetic, the script only writes the text
+                if q.ask:
+                    lots = Selection.from_args({"lots": request.args.get("lots")},
+                                               today=_today(), lots_cap=service.bounds.qty_cap).lots
+                    limit_now = limit_at(q.ask)
+                    cost_now = _money(-(limit_now * CONTRACT_MULTIPLIER * lots)).lstrip("-")
             except BrokerError as exc:
                 error = str(exc)
         from .panel import panel_body
@@ -445,6 +456,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 "pnl": st.get("pnl"), "positions": st["positions"],
                 "working": st["working"],
                 "quote": quote, "spx": spx,
+                "limit_now": limit_now, "cost_now": cost_now,
                 "quote_html": quote_html(quote, spx, error),
                 "position_html": position_html(st, _actions()),
                 "state_html": state_html(st, _actions(), now=clock()),
@@ -548,7 +560,9 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         query: dict[str, str] = {}
         for w in service.status()["working"]:
             if w.get("order_id") == order_id and isinstance(w.get("page_query"), dict):
-                query = {str(k): str(v) for k, v in w["page_query"].items()}
+                # the form comes back at the market, not at the price that
+                # did not fill: a lock never rides on a cancel (st-2s4u)
+                query = {str(k): str(v) for k, v in w["page_query"].items() if k != "limit"}
         try:
             service.cancel(order_id)
         except Refused as exc:

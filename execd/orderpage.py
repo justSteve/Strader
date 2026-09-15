@@ -4,7 +4,11 @@ Every element on ``/exec/order`` is here; the numbers come from
 ``execd.orderform`` and the money card from the same status body the
 operations page reads. Works with no script at all (every control is a link
 or a form); the script only keeps the quote, the FD0 block and the position
-fresh without reloading a page that may have a number half-typed on it.
+fresh without reloading a page that may have a number half-typed on it, and
+works the padlock beside the price (st-2s4u): unlocked, the ticket's price
+follows the live ask; locked, it is frozen at his number and PREVIEW sends
+that. Without a script the ticket is priced at the ask when the page loads,
+as before, and there is no lock.
 
 Built for the iPad first: full-width buttons, tap-sized rows, numeric
 keyboards, nothing that needs a hover or a key.
@@ -57,6 +61,10 @@ _ORDER_STYLE = """
  .side a{outline:0}.side a.on{outline:3px solid #e5e7eb}.side a.bear.off{background:#7f1d1d;color:#fca5a5}.side a.bull.off{background:#064e3b;color:#6ee7b7}
  .trow{display:flex;align-items:baseline;justify-content:space-between;gap:.75em;margin:.25em 0}
  .tbig{font-size:1.5em;font-weight:700}.neg{color:#f87171;font-weight:700}.pos{color:#34d399;font-weight:700}
+ button.lock{background:transparent;border:1px solid #374151;border-radius:8px;min-width:44px;height:44px;font-size:1.1em;
+       cursor:pointer;vertical-align:middle;color:#9ca3af;padding:0 .4em;font-family:inherit}
+ button.lock.on{background:#1f2937;border-color:#fbbf24;color:#fbbf24}
+ .tbig #live{font-size:.6em;font-weight:400;vertical-align:middle}
  details.more summary{color:#60a5fa;cursor:pointer;list-style:none}details.more summary::-webkit-details-marker{display:none}
  .detail{display:none;margin-top:.5em}.card:has(details.more[open]) .detail{display:block}
  details.inputs2{margin-top:.5em}details.inputs2 summary{color:#9ca3af;cursor:pointer;font-size:.9em}
@@ -74,6 +82,7 @@ _SCRIPT = """
   window.__sym = %(symbol)s;
   function q(extra){ var d = new FormData(form); var o = {}; d.forEach(function(v,k){ if(v!=='') o[k]=v; });
     for (var k in (extra||{})) o[k]=extra[k]; return new URLSearchParams(o).toString(); }
+  function lockField(){ return form ? form.elements['limit'] : null; }
   function reprice(){ if(!form) return;
     fetch(PRICE + '?' + q(), {headers:{'Accept':'application/json'}}).then(function(r){return r.json();}).then(function(j){
       var f = document.getElementById('fd0'); if (f && j.fd0_html) f.innerHTML = j.fd0_html;
@@ -81,8 +90,27 @@ _SCRIPT = """
       var p = document.getElementById('previewform'); if (p && j.preview_fields_html) p.innerHTML = j.preview_fields_html;
       if (j.contract) window.__sym = j.contract.symbol;
     }).catch(function(){}); }
+  // a new delta is a new contract: the lock goes with the old one
+  function unlockThenReprice(){ var lf = lockField(); if (lf) lf.value = ''; reprice(); }
   if (form) { ['delta','budget','attempts','lots'].forEach(function(n){ var el = form.elements[n];
-    if (el) { el.addEventListener('change', reprice); el.addEventListener('input', function(){ clearTimeout(window.__t); window.__t = setTimeout(reprice, 600); }); } }); }
+    var fn = (n === 'delta') ? unlockThenReprice : reprice;
+    if (el) { el.addEventListener('change', fn); el.addEventListener('input', function(){ clearTimeout(window.__t); window.__t = setTimeout(fn, 600); }); } }); }
+  // the padlock (st-2s4u): the lock is the hidden limit on the form, the
+  // server renders the ticket from it, so a tap only flips the field and
+  // reprices. The chip is inside #fd0 and is re-rendered, hence delegation.
+  document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('#lock') : null;
+    if (!b) return; e.preventDefault(); var lf = lockField(); if (!lf) return;
+    lf.value = lf.value ? '' : (b.getAttribute('data-limit') || ''); reprice(); });
+  // the poll's quote: unlocked, the head follows the ask; locked, the ask
+  // shows beside the locked price
+  window.__lots = form && form.elements['lots'] ? (form.elements['lots'].value || '1') : '1';
+  window.__onQuote = function(j){ if (!j || !j.quote || j.limit_now == null) return;
+    var lf = lockField(); var px = document.getElementById('px'); var cost = document.getElementById('cost');
+    var live = document.getElementById('live'); var lk = document.getElementById('lock');
+    if (lf && lf.value) { if (live) live.textContent = 'ask ' + Number(j.quote.ask).toFixed(2) + ' now'; return; }
+    if (px) px.textContent = Number(j.limit_now).toFixed(2);
+    if (cost && j.cost_now) cost.textContent = j.cost_now;
+    if (lk) lk.setAttribute('data-limit', Number(j.limit_now).toFixed(2)); };
 })();
 </script>
 """
@@ -215,8 +243,19 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
         return f"<div class=bad>{esc(priced.error)}</div>"
     c = priced.contract
     name = contract_name(c.symbol)
-    head = (f"<div class=trow><div class=tbig>{esc(name)} × {priced.lots} at {priced.limit:.2f}</div>"
-            f"<div class=tbig>{money(-(priced.cost_usd or 0)).lstrip('-')}</div></div>")
+    # The price and its padlock (st-2s4u). Unlocked, the poll writes the live
+    # limit into #px and #cost; locked, the number is his and the poll writes
+    # the ask beside it into #live so the drift is visible. The chip's
+    # data-limit is what a tap locks: the number on the screen at that moment.
+    locked = priced.selection.locked
+    lock = (f"<button type=button id=lock class='lock{' on' if locked else ''}' "
+            f"data-limit='{priced.limit:.2f}' aria-label='{'unlock' if locked else 'lock'} the price' "
+            f"title='{'locked — tap to follow the ask' if locked else 'following the ask — tap to lock'}'>"
+            f"{'&#128274;' if locked else '&#128275;'}</button>")
+    live = (f"<span id=live class=k>ask {c.ask_pts:.2f} now</span>" if locked else "<span id=live class=k></span>")
+    head = (f"<div class=trow><div class=tbig>{esc(name)} × {priced.lots} at "
+            f"<span id=px>{priced.limit:.2f}</span> {lock} {live}</div>"
+            f"<div class=tbig id=cost>{money(-(priced.cost_usd or 0)).lstrip('-')}</div></div>")
     if priced.error:
         return f"<div class=card>{head}<div class=bad>{esc(priced.error)}</div></div>"
     t = priced.ticket
@@ -282,7 +321,8 @@ def strikes_html(priced: Priced, order_path: str) -> str:
     rows = []
     for c in priced.contracts:
         chosen = priced.contract is not None and c.symbol == priced.contract.symbol
-        href = _link(order_path, sel.as_query(strike=f"{c.strike:g}", delta=None))
+        # a new strike is a new price: the lock does not travel with it
+        href = _link(order_path, sel.as_query(strike=f"{c.strike:g}", delta=None, limit=None))
         rows.append(
             f"<tr class='{'chosen' if chosen else ''}'>"
             f"<td><a href='{href}'>{c.strike:g}</a></td>"
@@ -429,7 +469,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     tomorrow = next_weekday(today)
     def side_link(side: str, word: str, cls: str) -> str:
         on = " on" if sel.side == side else (" off" if sel.side else "")
-        return (f"<a class='big {cls}{on}' href='{_link(order, sel.as_query(side=side, strike=None))}'>"
+        return (f"<a class='big {cls}{on}' href='{_link(order, sel.as_query(side=side, strike=None, limit=None))}'>"
                 f"{word}</a>")
     parts.append("<div class=side>" + side_link("call", "BULLISH", "bull")
                  + side_link("put", "BEARISH", "bear") + "</div>")
@@ -448,18 +488,28 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
                 f"<form method=post action='{actions['order_preview']}'>"
                 f"<span id=previewform>{preview_fields_html(sel)}</span>"
                 f"<button class='big preview'>PREVIEW</button></form>")
-        # expiry, δ target and RE-PRICE on one row — one GET form, no script needed
+        # expiry, δ target and RE-PRICE on one row — one GET form, no script needed.
+        # The form carries the chosen strike, so RE-PRICE reprices THAT strike
+        # (Steve, 2026-09-15: "simply reprice existing strike" — before st-2s4u
+        # the strike was not on the form and RE-PRICE re-chose by delta), and
+        # the lock as a hidden field the script toggles; the RE-PRICE button's
+        # own field, reprice=1, means at the market and drops the lock.
         delta_val = f"{sel.delta:g}" if sel.delta is not None else ""
+        strike_field = (f"<input type=hidden name=strike value='{sel.strike:g}'>"
+                        if sel.strike is not None else "")
+        limit_val = f"{sel.limit:.2f}" if sel.limit is not None else ""
         parts.append(
             f"<form id=sel method=get action='{order}'>"
             f"<input type=hidden name=side value='{sel.side}'>"
             f"<input type=hidden name=expiry value='{exp.isoformat()}'>"
+            f"{strike_field}"
+            f"<input type=hidden name=limit value='{limit_val}'>"
             "<div class='row exp2'>"
-            f"<a class='chip {'on' if exp == today else ''}' href='{_link(order, sel.as_query(expiry=today.isoformat(), strike=None))}'>today {today.strftime('%m-%d')}</a>"
-            f"<a class='chip {'on' if exp == tomorrow else ''}' href='{_link(order, sel.as_query(expiry=tomorrow.isoformat(), strike=None))}'>next {tomorrow.strftime('%m-%d')}</a>"
+            f"<a class='chip {'on' if exp == today else ''}' href='{_link(order, sel.as_query(expiry=today.isoformat(), strike=None, limit=None))}'>today {today.strftime('%m-%d')}</a>"
+            f"<a class='chip {'on' if exp == tomorrow else ''}' href='{_link(order, sel.as_query(expiry=tomorrow.isoformat(), strike=None, limit=None))}'>next {tomorrow.strftime('%m-%d')}</a>"
             "<span class=grow></span>"
             f"<label class=dl><span class=k>δ</span><input name=delta inputmode=decimal value='{delta_val}' placeholder='spot'></label>"
-            "<button class='chip quiet'>RE-PRICE</button></div>"
+            "<button class='chip quiet' name=reprice value=1>RE-PRICE</button></div>"
             "<details class=inputs2><summary>budget and attempts</summary><div class=inputs>"
             f"<label>FD0 budget $<input name=budget inputmode=decimal value='{sel.budget_usd:g}'></label>"
             f"<label>attempts<input name=attempts inputmode=numeric value='{sel.attempts}'></label>"

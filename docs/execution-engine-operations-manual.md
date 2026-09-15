@@ -1149,7 +1149,32 @@ page (Steve, 2026-09-15); then the tuning — expiry chips, the **δ target** bo
 means nearest to spot) and RE-PRICE on one row, with FD0 budget and attempts
 folded under *budget and attempts* — and the strikes around spot, the chosen
 row marked; after a preview the card shows
-Schwab's cost line and SEND; one line for the day. `/exec/` **is** this page
+Schwab's cost line and SEND; one line for the day.
+
+**The padlock** (st-2s4u; Steve, 2026-09-15: *"the re-price button should
+simply reprice existing strike. not force a new preview. the alternative is
+to leave the price watcher live but give a control to lock price at current
+allowing a submission at that price. this is how TOS platform works. a
+padlock icon toggled between locked and unlocked"*): the ticket's price
+follows the live ask — the poll returns `limit_now` (the ask on the tick
+grid) and its cost, and the script writes them into the head — until the
+padlock beside it is tapped. Locked, the price is frozen at the number that
+was on the screen, the derivation is re-run at that price (the resting stop
+and its net move with it), the live ask shows in small type beside it, and
+PREVIEW sends it as the limit; the service's price band (§3) still judges it
+at preview and at send. The lock is a hidden `limit` field on the form, so
+the server renders the ticket from it and the script only flips the field;
+without a script the ticket is priced at the ask when the page loads and
+there is no lock. RE-PRICE now carries the tapped strike (before st-2s4u it
+did not, and re-chose by delta) and its own field `reprice=1`, which means
+*at the market* and drops the lock; a new strike, expiry, side or δ drops it
+too; a cancel brings the form back at the market. On a PREVIEWED card,
+RE-PRICE previews the same selection again at the market in one tap and
+lands back on the card with a fresh SEND token — the broker's preview runs
+underneath because SEND depends on it; it used to be a link back to the
+unpreviewed form, two taps from SEND. The clock, the quote and the balances
+tick on the fresh page again: the panel script returned early when there
+was no stage card, which froze the page from the st-shhi change to this one. `/exec/` **is** this page
 since st-shhi. Everything that is not placing an order — unlock, clear STOP,
 stand down, lock, the weekly re-authorisation, the grants, the holdings that
 are not this service's, the journal tail — is `/exec/account`, one tap away;
@@ -1160,13 +1185,13 @@ lands back on the trading page.
 |---|---|
 | `GET /exec/` | the trading page — the same render as `/exec/order` (st-shhi) |
 | `GET /exec/account` | the account page: arming, STOP/clear, stand down, lock, re-authorisation, grants, holdings not this service's, the journal tail |
-| `GET /exec/order?side=call\|put&expiry=…&strike=…&delta=…&budget=…&attempts=…&embed=1` | renders the page; `embed=1` drops the shell for a panel; a `delta` key present and empty means nearest to spot, absent means the 0.80 target |
-| `GET /exec/order/price?…` | the priced ticket as JSON plus the FD0, strikes and hidden-field fragments the script swaps in |
-| `GET /exec/order/state?symbol=…` | the status body's live half plus the chosen contract's quote and the SPX mark, with HTML fragments |
-| `POST /exec/order/preview` | `service.preview(intent)`; on a 200, the cost line and a single-use 60 s SEND token |
+| `GET /exec/order?side=call\|put&expiry=…&strike=…&delta=…&budget=…&attempts=…&limit=…&reprice=1&embed=1` | renders the page; `embed=1` drops the shell for a panel; a `delta` key present and empty means nearest to spot, absent means the 0.80 target; `limit` is the padlock's locked price, `reprice=1` (the RE-PRICE button's own field) drops it (st-2s4u) |
+| `GET /exec/order/price?…` | the priced ticket as JSON plus the FD0, strikes and hidden-field fragments the script swaps in; a `limit` prices the ticket at that number instead of the ask |
+| `GET /exec/order/state?symbol=…&lots=…` | the status body's live half plus the chosen contract's quote and the SPX mark, with HTML fragments; with a quote, `limit_now` (the ask on the tick grid) and `cost_now` for the head to follow while unlocked |
+| `POST /exec/order/preview` | `service.preview(intent)`; on a 200, the cost line and a single-use 60 s SEND token; a `limit` in the body is sent as the intent's limit; the PREVIEWED card's RE-PRICE posts here again without one |
 | `POST /exec/order/send` | spends the token, `service.place(the same intent)` with the selection query riding on the working entry, redirects with the result in words |
 | `POST /exec/order/adjust` | UPDATE on the position card: `symbol`, `stop_price`, `target_price` (either may be blank) → `service.adjust`; redirects with what moved (§5.20) |
-| `POST /exec/order/cancel` | CANCEL AND RE-PRICE on the working-entry card: `order_id` → `service.cancel`, then redirects to `/exec/order` with the side/expiry/strike/delta/budget/attempts the entry was priced from, so the form comes back priced fresh (§5.20) |
+| `POST /exec/order/cancel` | CANCEL AND RE-PRICE on the working-entry card: `order_id` → `service.cancel`, then redirects to `/exec/order` with the side/expiry/strike/delta/budget/attempts the entry was priced from — never its lock — so the form comes back priced fresh (§5.20) |
 
 **The choice** (`orderform.choose`): a tapped strike wins; else the delta
 override picks the strike whose |delta| is nearest; else nearest to spot
@@ -1332,7 +1357,7 @@ keeps its stage and its controls.
 | stage | title line | the big number | detail | controls |
 |---|---|---|---|---|
 | no order | nothing held, nothing working | — | last close, today's attempts and headroom | none |
-| PREVIEWED | `C7630 × 1 · buy limit 4.70 = $470.00` | the broker's cost line | rules, SPX cut, most this costs, the stop and target that will rest | SEND (the nonce, once), RE-PRICE |
+| PREVIEWED | `C7630 × 1 · buy limit 4.70 = $470.00` | the broker's cost line | rules, SPX cut, most this costs, the stop and target that will rest | SEND (the nonce, once), RE-PRICE (previews the same strike again at the market, one tap — st-2s4u) |
 | WORKING | `… · buy limit 4.70 · sent 12 s ago` | ask above the limit, `+0.05` | on fill (the SPX cut, the target multiple), the order id | CANCEL AND RE-PRICE — no STOP on a resting order |
 | FILLED | `… · in 4.70 · 1 m 35 s ago` | NET NOW — a market sell after both commissions | bid/ask, quote age, SPX and the cut; the editor: stop and target inputs with the net at each | UPDATE, FLATTEN, STOP |
 | SELLING | `… · in 4.70 · selling` | market sell sent, `4 s ago` | reason, stop · target cancelled, the order id | FLATTEN AGAIN |

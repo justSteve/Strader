@@ -25,9 +25,18 @@ The flow, top to bottom on ``/exec/order``:
    the form), every line of the derivation, the SPX cut level, the limit on
    the service's own tick grid, and the resting stop the service will place
    (``execd.stops.protective_stop_price`` at that limit) with the net there.
+   The ticket's price follows the live ask through the poll until the
+   padlock beside it is tapped (st-2s4u; Steve, 2026-09-15: "a padlock icon
+   toggled between locked and unlocked … this is how TOS platform works").
+   Locked, the price is frozen where it was, the derivation is re-run at
+   that price, the live ask shows beside it, and PREVIEW sends it as the
+   limit; the service's price band still judges it. RE-PRICE keeps the
+   strike and reprices at the market, dropping the lock.
 4. PREVIEW → ``service.preview`` (the rules, then Schwab's own cost line) and
    a single-use 60 s token; SEND with that token → ``service.place`` of the
-   same intent under the same id, ``page-<stamp>``, source ``page``.
+   same intent under the same id, ``page-<stamp>``, source ``page``. RE-PRICE
+   on a previewed ticket previews the same strike again at the market, one
+   tap, and lands previewed with a fresh token.
 5. The open position with its money, from the same status body the
    operations page reads.
 
@@ -93,6 +102,12 @@ class Selection:
     lots: int = 1
     budget_usd: float = DEFAULT_BUDGET_USD
     attempts: int = DEFAULT_ATTEMPTS
+    #: The padlock (st-2s4u). ``None`` is unlocked: the ticket is priced at
+    #: the ask each time it is priced and the head follows the live quote.
+    #: A number is the price he locked, sent as the limit whatever the ask
+    #: does after; the service's price band still judges it at preview and
+    #: send. RE-PRICE, a new strike, a new expiry or a new side drop it.
+    limit: float | None = None
 
     @property
     def right(self) -> str:
@@ -114,11 +129,15 @@ class Selection:
         lots = max(1, min(lots, max(1, lots_cap)))
         budget = _as_float(args.get("budget"))
         attempts = _as_int(args.get("attempts"), DEFAULT_ATTEMPTS)
+        # ``reprice`` is the RE-PRICE button's own field: it means "at the
+        # market", so a lock riding on the same form is dropped.
+        limit = None if args.get("reprice") else _as_float(args.get("limit"))
         return cls(side=side, expiry=expiry,
                    strike=strike if strike and strike > 0 else None,
                    delta=abs(delta) if delta is not None else None, lots=lots,
                    budget_usd=budget if budget and budget > 0 else DEFAULT_BUDGET_USD,
-                   attempts=max(1, attempts))
+                   attempts=max(1, attempts),
+                   limit=round(limit, 2) if limit and limit > 0 else None)
 
     def as_query(self, **override: Any) -> dict[str, str]:
         """The selection as query/hidden fields; ``override`` replaces or,
@@ -130,9 +149,14 @@ class Selection:
             "lots": str(self.lots) if self.lots != 1 else None,
             "budget": f"{self.budget_usd:g}" if self.budget_usd != DEFAULT_BUDGET_USD else None,
             "attempts": str(self.attempts) if self.attempts != DEFAULT_ATTEMPTS else None,
+            "limit": f"{self.limit:.2f}" if self.limit is not None else None,
         }
         d.update(override)
         return {k: str(v) for k, v in d.items() if v is not None}
+
+    @property
+    def locked(self) -> bool:
+        return self.limit is not None
 
 
 def _parse_expiry(word: str, today: date) -> date:
@@ -214,6 +238,13 @@ def choose(contracts: list[Contract], spx: float, *, strike: float | None,
 
 
 # ── the priced ticket ────────────────────────────────────────────────────
+
+def limit_at(ask_pts: float) -> float:
+    """The buy limit the form sends for an ask: the ask rounded up to the
+    service's own tick grid. One place, so the page's live head, the priced
+    ticket and the state poll all say the same number."""
+    return _round_up_to_tick(ask_pts, tick_for(ask_pts))
+
 
 @dataclass
 class Priced:
@@ -301,8 +332,10 @@ def price(service: ExecService, sel: Selection) -> Priced:
     out.contract = c
     # The limit on the service's own tick grid (0.05 under $3, 0.10 at and
     # above), rounded up — the desk sent round(ask, 2) and the engine shows
-    # ceil to 0.05; the service refuses either when it is off the grid.
-    out.limit = _round_up_to_tick(c.ask_pts, tick_for(c.ask_pts))
+    # ceil to 0.05; the service refuses either when it is off the grid. A
+    # locked price (the padlock, st-2s4u) is the limit instead, whatever the
+    # ask is now; the service's price band judges it when it is previewed.
+    out.limit = sel.limit if sel.limit is not None else limit_at(c.ask_pts)
     budget = Budget(total_usd=sel.budget_usd, attempts=sel.attempts)
     try:
         out.ticket = compose([c], spx, budget, contract=c, lots=sel.lots,

@@ -111,7 +111,11 @@ class TestTheCard:
         assert "on fill</td><td>stop" in card and "target 21.00" in card
         assert "action='/exec/order/send'" in card and ">SEND<" in card
         assert "name=nonce value='" in card
-        assert ">RE-PRICE</a>" in card and "href='/exec/order?side=call" in card
+        # RE-PRICE previews the same selection again, one tap (st-2s4u) — a
+        # POST to the preview route carrying the selection, never a lock
+        reprice = card.split(">SEND<")[1]
+        assert ">RE-PRICE</button>" in reprice and "action='/exec/order/preview'" in reprice
+        assert "name=side value='call'" in reprice and "name=limit" not in reprice
         assert "SEND good for 60 s" in card
 
     def test_working_names_the_gap_to_the_ask_and_offers_only_cancel(self, page, armed, broker, clock):
@@ -194,7 +198,7 @@ class TestTheCard:
     def test_a_preview_while_holding_renders_the_ticket_above_the_live_part(self, holding):
         from execd.panel import panel_body
         actions = {n: f"/exec/{n.replace('_', '/')}" for n in (
-            "index", "stop", "flatten", "order", "order_send", "order_adjust", "order_cancel")}
+            "index", "stop", "flatten", "order", "order_send", "order_preview", "order_adjust", "order_cancel")}
         preview = {"preview": {"symbol": PUT, "qty": 1, "price": 1.90, "cost_usd": 190.0,
                                "total_usd": 190.65, "accepted": True}}
         stage, body = panel_body(holding, holding.status(), actions, now=holding.clock(),

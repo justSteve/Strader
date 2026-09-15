@@ -293,6 +293,87 @@ class TestPage:
             assert PASS not in body and "refresh-old" not in body and "acc" not in body.split("access")[0][-3:]
 
 
+class TestThePadlockAndRePrice:
+    """Steve, 2026-09-15: "the re-price button should simply reprice existing
+    strike. not force a new preview. the alternative is to leave the price
+    watcher live but give a control to lock price at current allowing a
+    submission at that price. this is how TOS platform works. a padlock icon
+    toggled between locked and unlocked." [st-2s4u]"""
+
+    def test_a_lock_is_parsed_and_re_price_drops_it(self):
+        s = Selection.from_args({"side": "call", "strike": "6400", "limit": "2.00"}, today=DAY)
+        assert s.limit == 2.00 and s.locked and s.as_query()["limit"] == "2.00"
+        s = Selection.from_args({"side": "call", "strike": "6400", "limit": "2.00", "reprice": "1"}, today=DAY)
+        assert s.limit is None and not s.locked and "limit" not in s.as_query()
+        assert Selection.from_args({"limit": "x"}, today=DAY).limit is None
+        assert Selection.from_args({"limit": "-1"}, today=DAY).limit is None
+        assert Selection(side="call", limit=2.0).as_query(limit=None).get("limit") is None
+
+    def test_a_locked_price_is_the_limit_and_the_stop_derives_from_it(self, armed, chain):
+        live = price(armed, Selection(side="call", expiry=DAY, strike=6400))
+        locked = price(armed, Selection(side="call", expiry=DAY, strike=6400, limit=2.00))
+        assert live.limit == 2.10 and locked.limit == 2.00
+        assert locked.contract.symbol == live.contract.symbol
+        assert locked.cost_usd == 200.0 and locked.stop_price != live.stop_price
+        assert intent_for(locked, intent_id="page-x", engine_sha="t")["limit"] == 2.00
+
+    def test_re_price_keeps_the_tapped_strike(self, order_page):
+        body = text(order_page.get("/exec/order?side=put&strike=6300"))
+        form = body.split("<form id=sel")[1].split("</form>")[0]
+        assert "name=strike value='6300'" in form and "name=reprice value=1>RE-PRICE" in form
+        assert "name=limit value=''" in form
+        # what the RE-PRICE button submits: the strike stays, the box is blank
+        body = text(order_page.get("/exec/order?side=put&expiry=2026-08-26&strike=6300&delta=&limit=&reprice=1"))
+        assert ">6300<" in body.split("<tr class='chosen'>")[1].split("</tr>")[0]
+
+    def test_the_padlock_on_the_ticket(self, order_page):
+        body = text(order_page.get("/exec/order?side=call&strike=6400"))
+        assert "id=lock class='lock'" in body and "&#128275;" in body and "data-limit='2.10'" in body
+        assert "<span id=px>2.10</span>" in body and "id=cost>$210.00" in body
+        assert "<span id=live class=k></span>" in body
+        locked = text(order_page.get("/exec/order?side=call&strike=6400&limit=2.00"))
+        assert "id=lock class='lock on'" in locked and "&#128274;" in locked
+        assert "<span id=px>2.00</span>" in locked and "id=cost>$200.00" in locked
+        assert "ask 2.10 now" in locked
+        # PREVIEW carries the lock; the RE-PRICE form holds it for the script to flip
+        assert "name='limit' value='2.00'" in locked.split("id=previewform")[1].split("</span>")[0]
+        assert "name=limit value='2.00'" in locked.split("<form id=sel")[1].split("</form>")[0]
+        # a strike, an expiry or a side is a new price: the lock does not travel
+        hrefs = [h.split("'")[0] for h in locked.split("href='")[1:]]
+        assert not any("limit=" in h for h in hrefs), hrefs
+
+    def test_preview_sends_the_locked_price_and_re_price_previews_again_at_the_market(
+            self, order_page, armed, chain):
+        r = order_page.post("/exec/order/preview", data={"side": "call", "strike": "6400", "limit": "2.00"})
+        body = text(r)
+        assert "at 2.00 — cost $200.00" in body and "total $200.65" in body and ">SEND<" in body
+        req = [e for e in armed.journal.read() if e.get("event") == "request" and e.get("kind") == "preview"][-1]
+        assert req["intent"]["limit"] == 2.00
+        card = body.split("data-stage=previewed")[1]
+        reprice = card.split(">SEND<")[1].split(">RE-PRICE<")[0]
+        assert "action='/exec/order/preview'" in reprice and "name=strike value='6400'" in reprice
+        assert "name=limit" not in reprice
+        # the one-tap RE-PRICE: previewed again, at the ask, a fresh token
+        import re
+        fields = dict(re.findall(r"name=(\w+) value='([^']*)'", reprice))
+        assert fields == {"side": "call", "expiry": "2026-08-26", "strike": "6400"}
+        r = order_page.post("/exec/order/preview", data=fields)
+        again = text(r)
+        assert "at 2.10 — cost $210.00" in again and ">SEND<" in again and "PREVIEWED" in again
+        assert again.split("name=nonce value='")[1].split("'")[0] != body.split("name=nonce value='")[1].split("'")[0]
+
+    def test_the_state_poll_carries_the_live_limit_and_its_cost(self, order_page):
+        s = order_page.get(f"/exec/order/state?symbol={CALL}&lots=1").json
+        assert s["limit_now"] == 2.10 and s["cost_now"] == "$210.00"
+        s = order_page.get("/exec/order/state").json
+        assert s["limit_now"] is None and s["cost_now"] is None
+
+    def test_the_fresh_page_still_ticks_without_a_stage_card(self, order_page):
+        body = text(order_page.get("/exec/order?side=call"))
+        assert "id=panel" not in body.split("<script>")[0]
+        assert "getElementById('panel') || document.body" in body and "window.__onQuote" in body
+
+
 class TestARefusedSendIsShown:
     """2026-09-15 09:54 CT: Steve previewed, tapped SEND, and saw nothing —
     Schwab's own preview had refused the order (buying power) and the page

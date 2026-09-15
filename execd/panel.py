@@ -295,11 +295,20 @@ def body_previewed(st, actions, preview: Mapping[str, Any], nonce: str, sel_quer
     html += "<table class=full>" + "".join(rows) + "</table>"
     from .orderform import PREVIEW_TTL_S
     html += f"<div class=k style='margin-top:8px'>SEND good for {int(PREVIEW_TTL_S)} s, once</div>"
+    # RE-PRICE here previews the same strike again at the market, one tap,
+    # and lands back on this card with a fresh token (st-2s4u; Steve,
+    # 2026-09-15: "simply reprice existing strike. not force a new preview").
+    # It was a link back to the unpreviewed form, two taps from SEND again.
     html += ("<div class=actions>"
              + _big_button(actions["order_send"], "SEND", "send", {"nonce": nonce})
-             + _link_button(_href(order_path, sel_query), "RE-PRICE", "quiet")
+             + _big_button(actions["order_preview"], "RE-PRICE", "quiet", _at_market(sel_query))
              + "</div>")
     return html
+
+
+def _at_market(sel_query: Mapping[str, str]) -> dict[str, str]:
+    """The selection without its lock: RE-PRICE means at the market."""
+    return {k: v for k, v in sel_query.items() if k != "limit"}
 
 
 def body_working(service, st, facts, actions, now, bounds) -> str:
@@ -440,7 +449,7 @@ def body_closed(st, facts, actions, now, order_path) -> str:
 
 def body_refused(reason: str, order_path: str, sel_query: Mapping[str, str]) -> str:
     return (f"<div class=refusal>{esc(reason)}</div>"
-            "<div class=actions>" + _link_button(_href(order_path, sel_query), "RE-PRICE", "quiet") + "</div>")
+            "<div class=actions>" + _link_button(_href(order_path, _at_market(sel_query)), "RE-PRICE", "quiet") + "</div>")
 
 
 def _href(path: str, params: Mapping[str, str] | None) -> str:
@@ -525,7 +534,10 @@ PANEL_SCRIPT = """
 <script>
 (function(){
   var STATE = %(state)s, POLL = %(poll)d;
-  var panel = document.getElementById('panel'); if (!panel) return;
+  // The card is on the page only when there is a stage to show (st-shhi);
+  // the clock, the quote and the balances still tick without it (st-2s4u —
+  // before this the script returned here and a fresh trading page froze).
+  var panel = document.getElementById('panel') || document.body;
   var paused = false, WORDS = %(words)s, COLORS = %(colors)s;
   function two(n){ return (n < 10 ? '0' : '') + n; }
   function ago(ms){ var s = Math.max(0, Math.floor(ms / 1000));
@@ -548,9 +560,11 @@ PANEL_SCRIPT = """
     var qd = document.getElementById('quote'); if (qd && j.quote_html) qd.innerHTML = j.quote_html;
     var pc = document.getElementById('position'); if (pc && j.position_html !== undefined && !editing()) pc.innerHTML = j.position_html || '';
     var jn = document.getElementById('journal'); if (jn && j.journal_html) jn.innerHTML = j.journal_html;
-    var bl = document.getElementById('balances'); if (bl && j.balances_html) bl.innerHTML = j.balances_html; }
+    var bl = document.getElementById('balances'); if (bl && j.balances_html) bl.innerHTML = j.balances_html;
+    if (window.__onQuote) { try { window.__onQuote(j); } catch (e) {} } }
   function poll(force){ if (!force && (paused || document.visibilityState === 'hidden' || requestScoped())) return;
-    var u = STATE + (window.__sym ? ('?symbol=' + encodeURIComponent(window.__sym)) : '');
+    var u = STATE + (window.__sym ? ('?symbol=' + encodeURIComponent(window.__sym)
+      + (window.__lots ? '&lots=' + encodeURIComponent(window.__lots) : '')) : '');
     fetch(u, {headers:{'Accept':'application/json'}}).then(function(r){return r.json();}).then(apply).catch(function(){}); }
   var pauseBtn = document.getElementById('pause');
   if (pauseBtn) pauseBtn.addEventListener('click', function(){ paused = !paused; pauseBtn.textContent = paused ? 'resume' : 'pause';
