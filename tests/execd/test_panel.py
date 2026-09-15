@@ -174,7 +174,7 @@ class TestTheCard:
         assert "2.10 → 2.30 · held 1 m 39 s" in card
         assert "reason</td><td>flatten" in card
         assert "realized +$20.00 over 1 close(s)" in card
-        assert ">NEW ORDER</a>" in card and "href='/exec/order'" in card
+        assert ">NEW ORDER</a>" in card and "href='/exec/order?new=1'" in card
 
     def test_a_refusal_with_nothing_live_is_the_refused_stage(self, page, armed):
         armed.stop()
@@ -265,3 +265,35 @@ def chain_page_paper(broker, clock, tmp_path):
                       clock=clock)
     app.config["TESTING"] = True
     return app.test_client()
+
+
+class TestNewOrderClearsTheCard:
+    """Steve, 2026-09-15: "New Order button should clear prior order screen
+    before all else." A closed or refused card is history the moment the
+    next order begins — NEW ORDER, or a side picked."""
+
+    def test_closed_stays_until_new_order_or_a_side(self, page, holding, broker, clock):
+        stop_id = pos_of(holding)["stop_order_id"]
+        clock.advance(seconds=1)
+        broker.trigger_stop(stop_id)
+        holding.poll_fills()
+        body = text(page.get("/exec/order"))
+        assert "data-stage=closed" in body                     # the answer, first
+        assert "data-stage=closed" not in text(page.get("/exec/order?new=1"))
+        assert "data-stage=closed" not in text(page.get("/exec/order?side=call"))
+        assert "data-stage=closed" in text(page.get("/exec/order"))   # a plain reload still shows it
+
+    def test_refused_clears_the_same_way(self, page, service, broker):
+        from execd.broker import Preview
+        service.unlock({"t": 1})
+        nonce = text(page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})).split("name=nonce value='")[1].split("'")[0]
+        real = broker.preview
+        broker.preview = lambda intent: Preview(symbol=intent.symbol, side=intent.side, qty=intent.qty,
+                                                order_type=intent.order_type, price=2.10, cost_usd=210.0,
+                                                commission_usd=0.65, accepted=False,
+                                                messages=("reject: not enough buying power",))
+        page.post("/exec/order/send", data={"nonce": nonce})     # refused by the broker's preview
+        broker.preview = real
+        assert "data-stage=refused" in text(page.get("/exec/order"))
+        assert "data-stage=refused" not in text(page.get("/exec/order?new=1"))
+        assert "data-stage=refused" not in text(page.get("/exec/order?side=put"))

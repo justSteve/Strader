@@ -434,7 +434,7 @@ def body_closed(st, facts, actions, now, order_path) -> str:
     rows.append(f"<tr><td>reason</td><td>{esc(c.get('kind') or c.get('reason') or '—')}</td></tr>")
     rows.append(_today_row(st))
     html += "<table class=full>" + "".join(rows) + "</table>"
-    html += "<div class=actions>" + _link_button(order_path, "NEW ORDER", "quiet") + "</div>"
+    html += "<div class=actions>" + _link_button(order_path + "?new=1", "NEW ORDER", "quiet") + "</div>"
     return html
 
 

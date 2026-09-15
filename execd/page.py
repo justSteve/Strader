@@ -406,8 +406,9 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
     def _order_page(sel: Selection, **kw):
         priced = price(service, sel) if sel.side else None
         embed = request.args.get("embed") == "1" or request.form.get("embed") == "1"
+        fresh = request.args.get("new") == "1"
         return render_order(service, _actions(), sel, priced, today=_today(),
-                            embed=embed, **kw)
+                            embed=embed, fresh=fresh, **kw)
 
     @bp.get("/order")
     def order():

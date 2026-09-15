@@ -356,12 +356,17 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
                  priced: Priced | None, *, today, nonce: str | None = None,
                  preview: dict[str, Any] | None = None, preview_text: str | None = None,
                  msg: str | None = None, bad: str | None = None,
-                 embed: bool = False) -> str:
+                 embed: bool = False, fresh: bool = False) -> str:
     from .page import _STYLE, esc as _esc  # noqa: F401 — the shell's style
     st = service.status()
     order = actions["order"]
     parts: list[str] = []
-    if not bad and not msg and nonce is None:
+    # A finished order — closed or refused — stays on the card only until the
+    # next order begins: NEW ORDER (?new=1) or picking a side clears it
+    # (Steve, 2026-09-15: "New Order button should clear prior order screen
+    # before all else").
+    starting_over = fresh or bool(sel.side)
+    if not bad and not msg and nonce is None and not starting_over:
         bad = last_refusal(service, now=service.clock())
     if msg:
         parts.append(f"<div class=msg>{esc(msg)}</div>")
@@ -386,8 +391,9 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     # The stage card only when there is a stage to show: with nothing held,
     # nothing working, no preview and no answer to show, the page opens on
     # the side buttons.
+    finished = ("data-stage=closed" in panel or "data-stage=refused" in panel)
     if live_preview is not None or st["positions"] or st["working"] or bad or msg \
-            or "data-stage=none" not in panel:
+            or ("data-stage=none" not in panel and not (finished and starting_over)):
         parts.append(panel)
 
     # side — one tap
