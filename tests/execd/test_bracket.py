@@ -1246,3 +1246,50 @@ class TestUnchangedLegsAndWaterMarks:
         holding.flatten()
         after = text(page.get("/exec/order"))
         assert "best · worst" in after and "+$68.70" in after
+
+
+class TestAReplayedAdjustTouchesNothing:
+    """Steve, 2026-09-15 14:07 CT: the browser (or the tailnet proxy) re-sent
+    an UPDATE the instant the first one's 303 went out; the service ran it
+    again. And the poll repainted the editor with the old values while the
+    new ones were in flight — "the screen blink and the 104 displayed
+    again". [st-gw5m]"""
+
+    def test_the_same_adjust_inside_the_window_is_answered_from_the_first(self, holding, broker, clock):
+        first = holding.adjust(CALL, stop_price=1.80, target_price=25.0)
+        assert first["stop"]["moved"] and first["target"]["moved"]
+        ids = (pos_of(holding)["stop_order_id"], pos_of(holding)["target_order_id"])
+        calls_before = len(broker.calls)
+        clock.advance(seconds=4)
+        again = holding.adjust(CALL, stop_price=1.80, target_price=25.0)
+        assert again.get("replayed") is True
+        assert again["stop"]["moved"] and again["target"]["moved"]      # the first answer, verbatim
+        assert len(broker.calls) == calls_before                          # nothing at the broker
+        assert (pos_of(holding)["stop_order_id"], pos_of(holding)["target_order_id"]) == ids
+        ev = holding.journal.events("adjust_replayed")[-1]
+        assert ev["stop_price"] == 1.80 and ev["first_at"]
+
+    def test_outside_the_window_it_is_a_new_adjust(self, holding, broker, clock):
+        from execd.service import ADJUST_REPLAY_S
+        holding.adjust(CALL, stop_price=1.80, target_price=25.0)
+        clock.advance(seconds=ADJUST_REPLAY_S + 1)
+        again = holding.adjust(CALL, stop_price=1.80, target_price=25.0)
+        assert not again.get("replayed") and again["stop"]["unchanged"] and again["target"]["unchanged"]
+
+    def test_a_different_adjust_is_never_a_replay(self, holding, broker, clock):
+        holding.adjust(CALL, stop_price=1.80)
+        clock.advance(seconds=2)
+        again = holding.adjust(CALL, stop_price=1.85)
+        assert not again.get("replayed") and again["stop"]["moved"] and again["stop"]["new_price"] == 1.85
+
+    def test_a_refused_adjust_is_not_remembered(self, holding, broker, clock):
+        r = holding.adjust(CALL, stop_price=2.50)          # not below the bid: refused
+        assert r["refused"]
+        broker.set_quote(CALL, bid=2.60, ask=2.70)
+        again = holding.adjust(CALL, stop_price=2.50)
+        assert not again.get("replayed") and again["stop"]["moved"]
+
+    def test_the_script_freezes_the_body_while_an_update_is_in_flight(self, page, holding):
+        body = text(page.get("/exec/order"))
+        assert "var inflight = false;" in body and "inflight = true;" in body
+        assert "!inflight && (changed || !editing())" in body

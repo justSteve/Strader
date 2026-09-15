@@ -1342,6 +1342,18 @@ answer "how far did it go my way before the stop took it". The take-profit
 is a resting limit at a *price*; NET NOW is what a market sell nets *now*;
 nothing fires at a dollar figure.
 
+**A replayed adjust** (st-gw5m). The service log for that minute showed the
+second UPDATE arriving the same second the first one's 303 went out, with
+the browser never fetching the first answer page — a replay by the browser
+or the tailnet proxy after a lost response, not a second tap. `adjust`
+remembers its last completed request (symbol, stop, target, when, answer);
+an identical request inside `ADJUST_REPLAY_S` (20 s) is answered from that
+answer, journaled `adjust_replayed`, and touches nothing at the broker. A
+refused adjust is not remembered; a different request never replays. On
+the page, the poll stops repainting the card body from the moment an
+adjust form is submitted until the page navigates, so the editor no longer
+flashes the server's old values while the new ones are in flight.
+
 **Cancel and re-price.** A working entry on the order page carries one button,
 CANCEL AND RE-PRICE. The page stored the selection query the entry was priced
 from on the `WorkingEntry` at send time (`page_query`, on the `working` journal

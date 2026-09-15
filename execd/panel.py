@@ -581,7 +581,7 @@ PANEL_SCRIPT = """
   function requestScoped(){ var st = stageNow(); return st === 'previewed' || st === 'refused'; }
   function apply(j){ var body = document.getElementById('panelbody');
     var changed = !!(j.panel_stage && stageNow() && j.panel_stage !== stageNow());
-    if (body && j.panel_body_html && (changed || !editing())) body.innerHTML = j.panel_body_html;
+    if (body && j.panel_body_html && !inflight && (changed || !editing())) body.innerHTML = j.panel_body_html;
     if (changed) { var m = document.querySelector('.msg'); if (m) m.parentNode.removeChild(m); }
     var w = document.getElementById('stageword'); if (w && j.panel_stage) { w.textContent = WORDS[j.panel_stage] || j.panel_stage; w.style.color = COLORS[j.panel_stage] || '#e5e7eb'; }
     var u = document.getElementById('updated'); if (u) { u.setAttribute('data-at', String(Date.now())); u.textContent = 'just now'; }
@@ -598,8 +598,13 @@ PANEL_SCRIPT = """
   // UPDATE once: the button goes dead the moment the form leaves, so a
   // second tap while the first adjust is still at the broker (four seconds
   // of cancel-and-rest, 2026-09-15 14:07 CT) is not a second adjust (st-ff5j)
+  // … and from that moment the poll leaves the card body alone, so the
+  // editor does not flash the server's old values while the new ones are on
+  // their way (the 104 he saw twice, 2026-09-15 14:07 CT, st-gw5m)
+  var inflight = false;
   document.addEventListener('submit', function(e){ var f = e.target; if (!f || !f.classList || !f.classList.contains('adjust')) return;
-    var b = f.querySelector('button'); if (b) { if (b.disabled) { e.preventDefault(); return; } b.disabled = true; b.textContent = 'UPDATING…'; } });
+    var b = f.querySelector('button'); if (b) { if (b.disabled) { e.preventDefault(); return; } b.disabled = true; b.textContent = 'UPDATING…'; }
+    inflight = true; });
   var pauseBtn = document.getElementById('pause');
   if (pauseBtn) pauseBtn.addEventListener('click', function(){ paused = !paused; pauseBtn.textContent = paused ? 'resume' : 'pause';
     var u = document.getElementById('updated'); if (u) { if (paused) { u.removeAttribute('data-at'); u.textContent = 'paused'; } else poll(true); } });

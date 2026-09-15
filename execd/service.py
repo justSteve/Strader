@@ -177,6 +177,10 @@ POSITION_SETTLE_S = 90.0
 #: releases the intent. Until then no entry goes out at all: the broker may be
 #: holding an order this service has no id for (finding 25, st-xlz9).
 SEND_SETTLE_S = 60.0
+#: An adjust identical to the last completed one, arriving inside this many
+#: seconds of its answer, is a replay (browser or proxy re-sending after a
+#: lost response) and is answered from that answer (st-gw5m).
+ADJUST_REPLAY_S = 20.0
 
 
 @dataclass
@@ -325,6 +329,8 @@ class ExecService:
         #: bracket legs whose position is gone but whose cancel was never
         #: confirmed — order_id → {symbol, leg, qty, intent_id} (st-7ah8)
         self._loose_legs: dict[str, dict[str, Any]] = {}
+        #: the last completed adjust — (symbol, stop, target), when, its answer (st-gw5m)
+        self._last_adjust: tuple[tuple[Any, Any, Any], datetime, dict[str, Any]] | None = None
         #: what the broker holds short on this service's instruments — symbol
         #: → qty (negative). Never this service's to manage, always its to
         #: show: the one state the bracket exists to prevent (st-7ah8)
@@ -2038,8 +2044,29 @@ class ExecService:
         with self._lock:
             if stop_price is None and target_price is None:
                 raise ValueError("adjust needs a stop_price, a target_price, or both")
+            # A replay — the same request arriving within seconds of the last
+            # one's answer — is answered from that answer and touches nothing.
+            # 2026-09-15 14:07:05 CT: the browser (or the tailnet proxy) re-sent
+            # an UPDATE the instant the first one's 303 went out, and the
+            # service ran it again (st-ff5j, st-gw5m).
+            key = (symbol, stop_price, target_price)
+            last = self._last_adjust
+            if last is not None and last[0] == key and \
+                    (self.clock() - last[1]).total_seconds() <= ADJUST_REPLAY_S:
+                self.journal.record("adjust_replayed", symbol=symbol, stop_price=stop_price,
+                                    target_price=target_price,
+                                    first_at=last[1].isoformat())
+                return {**last[2], "replayed": True}
             self.journal.record("request", kind="adjust", symbol=symbol,
                                 stop_price=stop_price, target_price=target_price)
+            out = self._adjust(symbol, stop_price=stop_price, target_price=target_price)
+            if out.get("refused") is None:
+                self._last_adjust = (key, self.clock(), out)
+            return out
+
+    def _adjust(self, symbol: str, *, stop_price: float | None,
+                target_price: float | None) -> dict[str, Any]:
+        with self._lock:
             if (r := self.arming.permits_exit()) is not None:
                 return self._refuse_adjust(symbol, r)
             pos = self._open.get(symbol)
