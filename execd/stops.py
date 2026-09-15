@@ -149,7 +149,8 @@ def take_profit_price(fill_px: float, multiple: float, basis: str = "premium",
 
     ``premium``
         the target is the fill price times the multiple — a $2.10 fill rests
-        a sell at $21.00. The standing ASSUMPTION until Steve rules.
+        a sell at $21.00. RULED (Steve, 2026-09-15: "10x means ten times
+        the fill premium").
     ``risk``
         the target is the fill price plus the multiple times the distance to
         the resting stop — a $2.10 fill with a $1.50 stop (60c of risk) rests

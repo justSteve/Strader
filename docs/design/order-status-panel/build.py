@@ -54,7 +54,7 @@ def main(out: Path) -> None:
                       "left to right. One ticking clock in the header; every other time is 'x ago'.\n\n"
                       "Names are [C|P][strike]. One net number, commissions included. The filled stage "
                       "is a live editor for the stop and the take-profit target (10x the fill price, "
-                      "the standing assumption on st-fn5y).\n\n"
+                      "ruled by Steve 2026-09-15 on st-fn5y).\n\n"
                       "Numbers are sample values from today's first paper cycle.")},
         ],
         "launch": {"view": "canvas"},

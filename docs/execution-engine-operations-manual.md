@@ -1167,8 +1167,8 @@ is created). The price is `stops.take_profit_price`: on the `premium` basis
 the fill times `take_profit_multiple` (a $2.10 fill → $21.00); on the `risk`
 basis the fill plus the multiple times the distance to the stop ($2.10 with a
 $1.50 stop → $8.10). Rounded **up** to the tick in force at the target. The
-basis is a bounds key (§5.10); **premium is the standing assumption** until
-Steve rules which "10x" he means — that ask is open on st-fn5y. `OpenPosition`
+basis is a bounds key (§5.10); **premium is the ruled basis** (Steve,
+2026-09-15: "10x means ten times the fill premium"; the ask on st-fn5y is closed). `OpenPosition`
 carries `target_order_id` and `target_price`; the journal writes
 `target_placed` (order id, price, basis, multiple, reward) and, when the target
 cannot be derived or the broker refuses or rejects it, `target_unprotected` — a

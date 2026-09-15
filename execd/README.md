@@ -180,8 +180,8 @@ broker, so a dead box still has a stop; beside it, since st-fn5y (Steve,
 in addition to stoplosses"*), it rests a sell limit at the take-profit target —
 the fill price times `take_profit_multiple` on the `premium` basis (a $2.10
 fill rests a sell at $21.00), or the fill plus the multiple times the distance
-to the stop on the `risk` basis; premium is the standing assumption until he
-rules. The two are one bracket and the service works the one-cancels-the-other
+to the stop on the `risk` basis; premium is the ruled basis (Steve, 2026-09-15:
+"10x means ten times the fill premium"). The two are one bracket and the service works the one-cancels-the-other
 itself: when either leg fills, the other comes off before the close is booked;
 a cancel that finds the other leg already filled books that fill against what
 was held and journals anything past it as `oversold`. While the box is alive

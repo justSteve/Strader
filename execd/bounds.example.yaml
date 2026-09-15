@@ -81,8 +81,8 @@ require_protective_stop: true
 #   risk    — the target is the fill price plus the multiple times the
 #             distance to the stop. A $2.10 fill with a $1.50 stop (60 cents
 #             of risk) rests a sell at $8.10.
-# ASSUMPTION: premium. Steve's ruling on premium-vs-risk is pending on
-# st-fn5y; change the basis here when he rules, no code change needed.
+# RULED: premium (Steve, 2026-09-15: "10x means ten times the fill
+# premium"). Flipping the basis here is still a one-line edit, no code change.
 # The multiple must be positive, and above 1 on the premium basis (a target
 # at or under the fill is a sale, not a target). Rounded up to the tick.
 take_profit_multiple: 10.0

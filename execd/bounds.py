@@ -110,8 +110,8 @@ class Bounds:
     #: fill, api should create a resting order at a 10x profit target"). The
     #: target is the fill price times the multiple on the ``premium`` basis,
     #: or the fill plus the multiple times the distance to the stop on the
-    #: ``risk`` basis. ``premium`` is the standing ASSUMPTION; his ruling on
-    #: which "10x" he means is pending on st-fn5y.
+    #: ``risk`` basis. ``premium`` is RULED (Steve, 2026-09-15: "10x means ten
+    #: times the fill premium").
     take_profit_multiple: float = 10.0
     take_profit_basis: str = "premium"
 
