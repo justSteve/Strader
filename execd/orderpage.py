@@ -19,8 +19,9 @@ from typing import Any, Mapping
 from .orderform import (
     DEFAULT_ATTEMPTS, DEFAULT_BUDGET_USD, POLL_S, Priced, Selection, next_weekday,
 )
-from .panel import COLORS, PANEL_SCRIPT, PANEL_STYLE, WORDS, panel_html
-from .service import ExecService
+from .panel import COLORS, PANEL_SCRIPT, PANEL_STYLE, WORDS, contract_name, panel_html
+from .service import CONTRACT_MULTIPLIER, CT, ExecService
+from .stops import take_profit_price
 
 _ORDER_STYLE = """
  .side{display:flex;gap:.6em}.side a{flex:1;text-align:center;text-decoration:none}
@@ -37,6 +38,29 @@ _ORDER_STYLE = """
  .fd0 td:first-child{color:#9ca3af;width:55%}
  button.send{background:#dc2626}button.preview{background:#2563eb}
  .embed body{padding:.5em}
+ .strip{display:flex;align-items:center;justify-content:space-between;gap:.75em;margin:.2em 0 .6em}
+ .strip .l,.strip .r{display:flex;align-items:center;gap:.6em;min-width:0}
+ .strip .badge{font-weight:700;font-size:.8em;padding:4px 8px;border-radius:6px;letter-spacing:.04em}
+ .strip .badge.paper{background:#fbbf24;color:#111}.strip .badge.live{background:#dc2626;color:#fff}
+ .strip .word{font-size:1.15em;font-weight:700}
+ .strip .clock{font-size:1.05em;font-weight:600;color:#9ca3af;font-variant-numeric:tabular-nums}
+ .strip form.inline{margin:0;display:inline}
+ .chip{display:inline-flex;align-items:center;height:44px;padding:0 14px;border-radius:8px;font-weight:700;
+       border:0;font-size:1em;font-family:inherit;text-decoration:none;cursor:pointer}
+ .chip.stopbtn{background:#dc2626;color:#fff}.chip.quiet{background:#1f2937;color:#9ca3af}
+ .chip.stop-on{background:#7f1d1d;color:#fca5a5}
+ .row{display:flex;align-items:center;gap:.6em;flex-wrap:wrap}
+ .row .grow{flex-grow:1}
+ .exp2 a.chip{color:#9ca3af;background:transparent;border:1px solid #374151}.exp2 a.chip.on{background:#1f2937;color:#fff;border-color:#1f2937}
+ .dl{display:flex;align-items:center;gap:.4em}.dl input{width:5em;height:44px;box-sizing:border-box;font-size:1.15em;text-align:center;
+       padding:0 .5em;border-radius:8px;border:1px solid #374151;background:#0b1020;color:#e5e7eb}
+ .side a{outline:0}.side a.on{outline:3px solid #e5e7eb}.side a.bear.off{background:#7f1d1d;color:#fca5a5}.side a.bull.off{background:#064e3b;color:#6ee7b7}
+ .trow{display:flex;align-items:baseline;justify-content:space-between;gap:.75em;margin:.25em 0}
+ .tbig{font-size:1.5em;font-weight:700}.neg{color:#f87171;font-weight:700}.pos{color:#34d399;font-weight:700}
+ details.more summary{color:#60a5fa;cursor:pointer;list-style:none}details.more summary::-webkit-details-marker{display:none}
+ .detail{display:none;margin-top:.5em}.card:has(details.more[open]) .detail{display:block}
+ details.inputs2{margin-top:.5em}details.inputs2 summary{color:#9ca3af;cursor:pointer;font-size:.9em}
+ .foot{display:flex;justify-content:space-between;gap:.75em;color:#9ca3af;font-size:.9em;margin-top:.4em}
 """
 
 _SCRIPT = """
@@ -88,15 +112,88 @@ def esc(v: Any) -> str:
 
 # ── fragments (each also served as JSON for the script) ──────────────────
 
-def state_html(st: dict[str, Any]) -> str:
+def state_html(st: dict[str, Any], actions: Mapping[str, str] | None = None,
+               now: datetime | None = None) -> str:
+    """The strip: the mode badge, the arming word, the one ticking clock, and
+    STOP — the same on every stage (design docs/design/order-page, st-shhi).
+    STOP posts back to this page; clearing it needs the passphrase and lives
+    on the account page, one tap away."""
     a = st["arming"]
     mode = str(st.get("mode", "live"))
-    banner = ("<div class=paper>PAPER — orders are simulated against live quotes</div>"
-              if mode == "paper" else "<div class=live>LIVE — orders reach Schwab</div>")
-    stop = ("<div class=stop-on>STOP IS ON — no new positions</div>" if a["killed"]
-            else "")
-    return (f"{banner}<div class='state {a['state']}'>{a['state'].replace('_', ' ')}</div>"
-            f"{stop}<div class=k>{esc(st['now_ct'])} · {esc(st['sha'])} · {esc(mode)}</div>")
+    badge = ("<span class='badge paper'>PAPER</span>" if mode == "paper"
+             else "<span class='badge live'>LIVE</span>")
+    state = a["state"]
+    word = f"<span class='word {state}'>{state.replace('_', ' ')}</span>"
+    clock = (now.astimezone(CT) if now else datetime.now(CT)).strftime("%H:%M:%S")
+    right = ""
+    if actions:
+        if a["killed"]:
+            right = (f"<a class='chip stop-on' href='{actions['account']}'>STOP ON · clear</a>")
+        else:
+            right = (f"<form method=post action='{actions['stop']}' class=inline>"
+                     "<input type=hidden name=back value='order'>"
+                     "<button class='chip stopbtn'>STOP</button></form>")
+        right += f"<a class='chip quiet' href='{actions['account']}'>account</a>"
+    return (f"<div class=strip><div class=l>{badge}{word}"
+            f"<span id=clock class=clock>{clock}</span></div>"
+            f"<div class=r>{right}</div></div>")
+
+
+def ticket_html(priced: Priced, bounds: Any) -> str:
+    """The ticket in three lines — what will be sent, the cut, the two legs
+    and what each nets — with the derivation behind *more*. Replaces the
+    FD0 table as the thing Steve reads before PREVIEW (st-shhi)."""
+    if priced.error and priced.contract is None:
+        return f"<div class=bad>{esc(priced.error)}</div>"
+    c = priced.contract
+    name = contract_name(c.symbol)
+    head = (f"<div class=trow><div class=tbig>{esc(name)} × {priced.lots} at {priced.limit:.2f}</div>"
+            f"<div class=tbig>{money(-(priced.cost_usd or 0)).lstrip('-')}</div></div>")
+    if priced.error:
+        return f"<div class=card>{head}<div class=bad>{esc(priced.error)}</div></div>"
+    t = priced.ticket
+    d = t.derivation
+    side = "below" if t.right == "CALL" else "above"
+    sign = "≤" if t.right == "CALL" else "≥"
+    if priced.stop_price is not None:
+        stop_txt = (f"stop rests at <b>{priced.stop_price:.2f}</b> → "
+                    f"<span class=neg>{money(priced.net_at_stop_usd)}</span>")
+    else:
+        stop_txt = f"<span class=neg>no resting stop — {esc(priced.stop_note or 'none')}</span>"
+    line2 = (f"<div class=trow><span>cut if SPX {sign} <b>{t.stop_trigger_spx:.2f}</b> "
+             f"<span class=k>({d.stop_distance_spx:.2f} {side})</span></span><span>{stop_txt}</span></div>")
+    target_txt = ""
+    try:
+        multiple = float(getattr(bounds, "take_profit_multiple", 0) or 0)
+        basis = str(getattr(bounds, "take_profit_basis", "premium") or "premium")
+        if multiple > 1 and priced.limit:
+            tp = take_profit_price(priced.limit, multiple, basis, stop_price=priced.stop_price)
+            net = round((tp - priced.limit) * CONTRACT_MULTIPLIER * priced.lots
+                        - priced.commissions_usd, 2)
+            target_txt = (f"target rests at {tp:.2f} <span class=k>({multiple:g}× the fill)</span> → "
+                          f"<span class=pos>{money(net)}</span>")
+    except (ValueError, TypeError):
+        target_txt = ""
+    line3 = (f"<div class='trow k'><span>{target_txt}</span>"
+             "<details class=more><summary>more</summary></details></div>")
+    rows = [
+        ("most this costs", money(-t.max_loss_usd)),
+        ("budget", f"${d.budget_remaining_usd:.2f} / {d.attempts_left} attempt(s) → "
+                   f"${d.budget_remaining_usd / d.attempts_left:.2f} for this one"),
+        ("less friction", f"${d.spread_usd:.2f} spread + ${d.fees_rt_usd:.2f} fees = "
+                          f"${d.attempt_risk_usd:.2f} to risk"),
+        ("in premium", f"{d.stop_premium_pts:.2f} at δ {d.delta_live:.2f} = "
+                       f"{d.stop_distance_spx:.2f} SPX pts"),
+        ("tape noise", f"about {d.noise_floor_spx:.2f} pts"),
+        ("quote", f"{c.bid_pts:.2f} / {c.ask_pts:.2f}, δ {c.abs_delta:.2f}"),
+        ("commissions", f"${priced.commissions_usd:.2f} in and out"),
+    ]
+    detail = "<table class=fd0>" + "".join(
+        f"<tr><td>{esc(k)}</td><td>{v}</td></tr>" for k, v in rows) + "</table>"
+    for w in t.warnings:
+        detail += f"<div class=warn>{esc(w)}</div>"
+    return (f"<div class=card>{head}{line2}{line3}"
+            f"<div class='full detail'>{detail}</div></div>")
 
 
 def strikes_html(priced: Priced, order_path: str) -> str:
@@ -232,51 +329,63 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
                        nonce=nonce if live_preview else None, ticket=ticket, refused=bad)
     if bad and "data-stage=refused" not in panel:
         parts.append(f"<div class=bad>{esc(bad)}</div>")
-    parts.append(panel)
+    # the strip first — the same on every stage (st-shhi)
+    parts.insert(0, state_html(st, actions, now=service.clock()))
+    # The stage card only when there is a stage to show: with nothing held,
+    # nothing working and no preview, the page opens on the side buttons.
+    if live_preview is not None or st["positions"] or st["working"] or bad \
+            or "data-stage=none" not in panel:
+        parts.append(panel)
 
-    # side and expiry
+    # side — one tap
     tomorrow = next_weekday(today)
     def side_link(side: str, word: str, cls: str) -> str:
-        on = " on" if sel.side == side else ""
+        on = " on" if sel.side == side else (" off" if sel.side else "")
         return (f"<a class='big {cls}{on}' href='{_link(order, sel.as_query(side=side, strike=None))}'>"
                 f"{word}</a>")
-    parts.append("<div class=card><div class=side>"
-                 + side_link("call", "BULLISH — calls", "bull")
-                 + side_link("put", "BEARISH — puts", "bear") + "</div>")
-    exp = sel.expiry or today
-    parts.append("<div class='exp k' style='margin-top:.6em'>expiry: "
-                 f"<a class='{'on' if exp == today else ''}' href='{_link(order, sel.as_query(expiry=today.isoformat(), strike=None))}'>today {today.isoformat()}</a>"
-                 f"<a class='{'on' if exp == tomorrow else ''}' href='{_link(order, sel.as_query(expiry=tomorrow.isoformat(), strike=None))}'>next {tomorrow.isoformat()}</a>"
-                 "</div></div>")
+    parts.append("<div class=side>" + side_link("call", "BULLISH", "bull")
+                 + side_link("put", "BEARISH", "bear") + "</div>")
 
+    exp = sel.expiry or today
     if priced is not None and sel.side:
-        # strikes
-        parts.append(f"<div class=card><div id=strikes>{strikes_html(priced, order)}</div></div>")
-        # inputs: delta override, budget, attempts (a GET form so it works without the script)
+        # expiry, δ target and RE-PRICE on one row — one GET form, no script needed
+        delta_val = f"{sel.delta:g}" if sel.delta is not None else ""
         parts.append(
             f"<form id=sel method=get action='{order}'>"
             f"<input type=hidden name=side value='{sel.side}'>"
             f"<input type=hidden name=expiry value='{exp.isoformat()}'>"
-            "<div class=card><div class=inputs>"
-            f"<label>delta override<input name=delta inputmode=decimal placeholder='nearest to spot' value='{sel.delta if sel.delta is not None else ''}'></label>"
+            "<div class='row exp2'>"
+            f"<a class='chip {'on' if exp == today else ''}' href='{_link(order, sel.as_query(expiry=today.isoformat(), strike=None))}'>today {today.strftime('%m-%d')}</a>"
+            f"<a class='chip {'on' if exp == tomorrow else ''}' href='{_link(order, sel.as_query(expiry=tomorrow.isoformat(), strike=None))}'>next {tomorrow.strftime('%m-%d')}</a>"
+            "<span class=grow></span>"
+            f"<label class=dl><span class=k>δ</span><input name=delta inputmode=decimal value='{delta_val}' placeholder='spot'></label>"
+            "<button class='chip quiet'>RE-PRICE</button></div>"
+            "<details class=inputs2><summary>budget and attempts</summary><div class=inputs>"
             f"<label>FD0 budget $<input name=budget inputmode=decimal value='{sel.budget_usd:g}'></label>"
             f"<label>attempts<input name=attempts inputmode=numeric value='{sel.attempts}'></label>"
-            "</div>"
-            f"<div class=k>lots: {sel.lots} (the service's cap)</div>"
-            "<button class='big quiet'>re-price</button></div></form>")
-        # FD0 block
-        parts.append(f"<div class=card><div id=quote>{quote_html(None, priced.spx, None)}</div>"
-                     f"<div id=fd0>{fd0_html(priced)}</div></div>")
-        # preview — the broker's cost line lands in the panel with SEND
+            f"<label>lots<input name=lots inputmode=numeric value='{sel.lots}' disabled></label>"
+            "</div></details></form>")
+        # strikes around spot
+        parts.append(f"<div class=card><div id=strikes>{strikes_html(priced, order)}</div></div>")
+        # the ticket — three lines, the derivation behind more
+        parts.append(f"<div id=fd0>{ticket_html(priced, service.bounds)}</div>")
+        # the one action on this stage
         if priced.contract is not None and priced.ticket is not None:
             if live_preview is not None and preview_text:
                 parts.append(f"<div class=card><div class=k>{esc(preview_text)}</div></div>")
             parts.append(
                 f"<form method=post action='{actions['order_preview']}'>"
                 f"<span id=previewform>{preview_fields_html(sel)}</span>"
-                f"<button class='big preview'>PREVIEW — the broker's cost line</button></form>")
-    else:
-        parts.append("<div class=card><div class=k>pick a side to see the strikes</div></div>")
+                f"<button class='big preview'>PREVIEW</button></form>")
+    elif not sel.side:
+        parts.append("<div class=k style='text-align:center'>pick a side to see the strikes</div>")
+
+    # the day, one line
+    pnl = st.get("pnl") or {}
+    day = st["day"]
+    parts.append(f"<div class=foot><span>today {money(pnl.get('day_usd'))} · "
+                 f"{day['attempts_used']} of {day['attempts_used'] + day['attempts_left']} attempts</span>"
+                 f"<span>headroom ${day['loss_headroom_usd']:.2f}</span></div>")
 
     symbol = (priced.contract.symbol if priced is not None and priced.contract is not None
               else None)
@@ -284,7 +393,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
                          "symbol": json.dumps(symbol)}
               + PANEL_SCRIPT % {"state": json.dumps(actions["order_state"]), "poll": POLL_S,
                                 "words": json.dumps(WORDS), "colors": json.dumps(COLORS)})
-    return _order_page("order", "".join(parts) + script, embed=embed)
+    return _order_page("trade", "".join(parts) + script, embed=embed)
 
 
 def _order_page(title: str, body: str, *, embed: bool) -> str:
@@ -296,4 +405,4 @@ def _order_page(title: str, body: str, *, embed: bool) -> str:
             f"{_STYLE}<style>{_ORDER_STYLE}{PANEL_STYLE}</style></head>")
     if embed:
         return head + f"<body class=embed>{body}</body></html>"
-    return head + f"<body><h1>order</h1>{body}<div class=k>tailnet only</div></body></html>"
+    return head + f"<body>{body}</body></html>"

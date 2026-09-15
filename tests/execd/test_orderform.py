@@ -167,15 +167,20 @@ class TestPage:
     def test_no_side_asks_for_one(self, order_page):
         body = text(order_page.get("/exec/order"))
         assert "pick a side" in body and "BULLISH" in body and "BEARISH" in body
-        assert "<h1>order</h1>" in body and "apple-mobile-web-app-capable" in body
+        assert "<title>trade</title>" in body and "apple-mobile-web-app-capable" in body
+        assert "reauth" not in body and "re-authorise" not in body   # account controls live elsewhere
 
-    def test_a_side_shows_the_strikes_with_the_nearest_chosen(self, order_page):
+    def test_a_side_starts_at_the_delta_target_and_a_blank_box_means_spot(self, order_page):
+        """The δ box starts at 0.80 (Steve, 2026-09-15): the .78 row is chosen.
+        A blank box — the field present and empty — means nearest to spot."""
         body = text(order_page.get("/exec/order?side=call"))
-        assert "tap a strike" in body and "6380" in body
+        assert "tap a strike" in body and "value='0.8'" in body
         chosen = body.split("<tr class='chosen'>")[1].split("</tr>")[0]
-        assert ">6380<" in chosen
-        assert "cut if SPX reaches" in body and "resting stop the service places" in body
+        assert ">6350<" in chosen
+        assert "cut if SPX" in body and "stop rests at" in body and "target rests at" in body
         assert "PREVIEW" in body and "SEND" not in body
+        body = text(order_page.get("/exec/order?side=call&delta="))
+        assert ">6380<" in body.split("<tr class='chosen'>")[1].split("</tr>")[0]
 
     def test_delta_override_and_a_tapped_strike(self, order_page):
         body = text(order_page.get("/exec/order?side=call&delta=0.30"))
@@ -250,7 +255,8 @@ class TestPage:
         app.config["TESTING"] = True
         c = app.test_client()
         body = text(c.get("/exec/order?side=put"))
-        assert "6380" in body and "locked — unlock" in body and "FLATTEN" not in body
+        assert "6400" in body and ">LOCKED<" in body and "FLATTEN" not in body
+        assert "href='/exec/account'" in body
         body = text(c.post("/exec/order/preview", data={"side": "put"}))
         assert "Refused (" in body
 
@@ -271,7 +277,7 @@ class TestPage:
     def test_embed_has_no_shell(self, order_page):
         body = text(order_page.get("/exec/order?side=call&embed=1"))
         assert "<h1>" not in body and "tailnet only" not in body and "class=embed" in body
-        assert "cut if SPX reaches" in body
+        assert "cut if SPX" in body
 
     def test_every_form_and_link_stays_under_exec(self, order_page):
         body = text(order_page.get("/exec/order?side=call&delta=0.3"))

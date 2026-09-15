@@ -1128,16 +1128,32 @@ available … indicate a delta so I can over-ride the default … only the
 essential elements of the order form … eventually this needs to run on an
 iPad."* No model, agent or terminal between his intent and the service.
 
-**The page, top to bottom:** mode banner, arming state, STOP and FLATTEN;
-BULLISH (calls) / BEARISH (puts); expiry (today or the next weekday); the
-strikes around spot with bid, ask and delta, the chosen row marked; the
-inputs (delta override, FD0 budget, attempts); the FD0 block; PREVIEW; after
-a preview, Schwab's cost line and SEND; the open position with its money
-and the day's totals.
+**The page, top to bottom** (refined 2026-09-15, st-shhi — Steve: *"stage
+and submit orders without agent intervention … lots of redundant labels …
+reference to reauth doesn't belong here … a bullish/bearish button and a way
+to override the delta and reprice and send"*; design
+`docs/design/order-page/`): **the strip** — the mode badge, the arming word,
+the one ticking clock, STOP, and an *account* link — the same on every stage;
+the stage card (§5.21) only when there is a stage to show; BULLISH / BEARISH
+as two buttons; expiry chips, the **δ target** box (starts at
+`DEFAULT_DELTA` = 0.80, Steve 2026-09-15 from his 08-19 words; a blank box
+means nearest to spot) and RE-PRICE on one row, with FD0 budget and attempts
+folded under *budget and attempts*; the strikes around spot, the chosen row
+marked; **the ticket** in three lines — what will be sent and its cost, the
+cut and the resting stop's net, the target's net — with the derivation
+behind *more*; PREVIEW as the one action; after a preview the card shows
+Schwab's cost line and SEND; one line for the day. `/exec/` **is** this page
+since st-shhi. Everything that is not placing an order — unlock, clear STOP,
+stand down, lock, the weekly re-authorisation, the grants, the holdings that
+are not this service's, the journal tail — is `/exec/account`, one tap away;
+the strip's STOP and the card's FLATTEN carry `back=order` so their answer
+lands back on the trading page.
 
 | Route | Does |
 |---|---|
-| `GET /exec/order?side=call\|put&expiry=…&strike=…&delta=…&budget=…&attempts=…&embed=1` | renders the page; `embed=1` drops the header and footer for a panel |
+| `GET /exec/` | the trading page — the same render as `/exec/order` (st-shhi) |
+| `GET /exec/account` | the account page: arming, STOP/clear, stand down, lock, re-authorisation, grants, holdings not this service's, the journal tail |
+| `GET /exec/order?side=call\|put&expiry=…&strike=…&delta=…&budget=…&attempts=…&embed=1` | renders the page; `embed=1` drops the shell for a panel; a `delta` key present and empty means nearest to spot, absent means the 0.80 target |
 | `GET /exec/order/price?…` | the priced ticket as JSON plus the FD0, strikes and hidden-field fragments the script swaps in |
 | `GET /exec/order/state?symbol=…` | the status body's live half plus the chosen contract's quote and the SPX mark, with HTML fragments |
 | `POST /exec/order/preview` | `service.preview(intent)`; on a 200, the cost line and a single-use 60 s SEND token |

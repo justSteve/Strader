@@ -61,7 +61,8 @@ from .schwab import (VAULT_VERSION, App, Credential, authorize_url, code_from_re
                      exchange, new_client, trading_payload, verify_grant)
 from .intent import OrderIntent
 from .orderform import PREVIEW_TTL_S, Selection, intent_for, price, stamp
-from .orderpage import fd0_html, position_html, preview_fields_html, quote_html, render_order, state_html, strikes_html
+from .orderpage import (fd0_html, position_html, preview_fields_html, quote_html, render_order,
+                        state_html, strikes_html, ticket_html)
 from .service import ExecService, Refused
 from .vault import BadPassphrase, Vault, VaultError, VaultMissing
 
@@ -217,10 +218,14 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         return http_client if http_client is not None else new_client()
 
     # ── helpers ───────────────────────────────────────────────────────
-    def home(msg: str | None = None, *, bad: bool = False):
+    def home(msg: str | None = None, *, bad: bool = False, back: str | None = None):
+        """After an account action: back to the account page — or to the
+        trading page when the form said ``back=order`` (the strip's STOP and
+        the panel's FLATTEN live there; st-shhi)."""
+        target = "exec.order" if (back or request.form.get("back", "")) == "order" else "exec.account"
         if not msg:
-            return redirect(url_for("exec.index"), code=303)
-        return redirect(url_for("exec.index", **{"bad" if bad else "msg": msg}), code=303)
+            return redirect(url_for(target), code=303)
+        return redirect(url_for(target, **{"bad" if bad else "msg": msg}), code=303)
 
     def passphrase() -> str:
         return request.form.get("passphrase", "")
@@ -250,6 +255,15 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
 
     @bp.get("/")
     def index():
+        """The trading page (st-shhi, Steve 2026-09-15: stage and send with no
+        agent in the loop; the account controls do not belong here)."""
+        return _order_page(_selection(request.args), msg=request.args.get("msg"),
+                           bad=request.args.get("bad"))
+
+    @bp.get("/account")
+    def account():
+        """Arming, STOP/clear, stand down, lock, the weekly re-authorisation,
+        the grants, the journal tail — everything that is not placing an order."""
         return _render_index(service, vault, market, clock, _actions(),
                              msg=request.args.get("msg"), bad=request.args.get("bad"))
 
@@ -311,7 +325,8 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
     @bp.post("/flatten")
     def flatten():
         n = nonces.issue("flatten", CONFIRM_TTL_S)
-        return _render_confirm_flatten(service, n, _actions())
+        return _render_confirm_flatten(service, n, _actions(),
+                                       back=request.form.get("back", ""))
 
     @bp.post("/flatten/confirm")
     def flatten_confirm():
@@ -404,7 +419,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         sel = _selection(request.args)
         priced = price(service, sel)
         body = priced.to_dict()
-        body["fd0_html"] = fd0_html(priced)
+        body["fd0_html"] = ticket_html(priced, service.bounds)
         body["strikes_html"] = strikes_html(priced, url_for("exec.order"))
         body["preview_fields_html"] = preview_fields_html(sel)
         return body
@@ -550,7 +565,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         """Absolute paths for every form, so a page served at ``/exec/flatten``
         posts its confirm to ``/exec/flatten/confirm`` and not to a sibling."""
         return {name: url_for(f"exec.{name}") for name in (
-            "index", "unlock", "stop", "resume", "stand_down", "lock", "flatten",
+            "index", "account", "unlock", "stop", "resume", "stand_down", "lock", "flatten",
             "flatten_confirm", "reauth_link", "reauth_store",
             "order", "order_price", "order_state", "order_preview", "order_send",
             "order_adjust", "order_cancel")}
@@ -713,6 +728,8 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
         parts.append(f"<div class=msg>{esc(msg)}</div>")
     if bad:
         parts.append(f"<div class=bad>{esc(bad)}</div>")
+    parts.append(f"<form method=get action='{a['order']}'>"
+                 "<button class='big quiet'>← trade</button></form>")
 
     # ── state ──
     stop_line = ("<div class=stop-on>STOP IS ON — no new positions</div>"
@@ -983,7 +1000,8 @@ def _render_not_this_services(st: dict[str, Any]) -> str:
             + "".join(f"<div class=row>{ln}</div>" for ln in lines) + "</div>")
 
 
-def _render_confirm_flatten(service: ExecService, nonce: str, a: dict[str, str]) -> str:
+def _render_confirm_flatten(service: ExecService, nonce: str, a: dict[str, str],
+                            back: str = "") -> str:
     st = service.status()
     held = st["positions"]
     if held:
@@ -998,11 +1016,13 @@ def _render_confirm_flatten(service: ExecService, nonce: str, a: dict[str, str])
     if spared:
         listing += ("<div class=k>this will NOT sell — held in the account, not opened here: "
                     + ", ".join(spared) + "</div>")
+    back_field = "<input type=hidden name=back value='order'>" if back == "order" else ""
     body = (f"<div class=card>{listing}</div>"
             f"<form method=post action='{a['flatten_confirm']}'>"
-            f"<input type=hidden name=nonce value='{nonce}'>"
+            f"<input type=hidden name=nonce value='{nonce}'>{back_field}"
             f"<button class='big exit'>CONFIRM — FLATTEN</button></form>"
-            f"<form method=get action='{a['index']}'><button class='big cancel'>cancel</button></form>"
+            f"<form method=get action='{a['order'] if back == 'order' else a['account']}'>"
+            "<button class='big cancel'>cancel</button></form>"
             f"<div class=k>confirm window {int(CONFIRM_TTL_S)}s, single use</div>")
     return _page("FLATTEN — are you sure", body)
 

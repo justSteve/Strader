@@ -160,9 +160,9 @@ class TestUnlock:
 
     def test_the_page_never_shows_a_passphrase_or_token(self, page, service):
         landing(page, page.post("/exec/unlock", data={"passphrase": PASS}))
-        body = text(page.get("/exec/"))
+        body = text(page.get("/exec/account")) + text(page.get("/exec/"))
         for secret in (PASS, "trading-refresh-old", "TSECRET", "MSECRET", "acc"):
-            assert secret not in body.replace("access", "")  # 'acc' is a prefix of that word
+            assert secret not in body.replace("access", "").replace("account", "")  # prefixes
 
 
 # ── stop / resume ─────────────────────────────────────────────────────────
@@ -360,20 +360,20 @@ class TestReauth:
 # ── the surface itself ────────────────────────────────────────────────────
 
 class TestSurface:
-    def test_the_index_reads_while_locked_and_offers_unlock(self, page):
-        body = text(page.get("/exec/"))
+    def test_the_account_page_reads_while_locked_and_offers_unlock(self, page):
+        body = text(page.get("/exec/account"))
         assert "LOCKED" in body and "UNLOCK" in body and "name=passphrase" in body
         assert "FLATTEN" not in body, "nothing to flatten with while locked"
 
-    def test_the_index_armed_offers_stop_flatten_stand_down(self, page):
+    def test_the_account_page_armed_offers_stop_flatten_stand_down(self, page):
         page.post("/exec/unlock", data={"passphrase": PASS})
-        body = text(page.get("/exec/"))
+        body = text(page.get("/exec/account"))
         assert "ARMED" in body and ">STOP<" in body and "FLATTEN" in body
         assert "stand down" in body and "lock — forget" in body
 
-    def test_the_index_shows_the_journal_tail(self, page):
+    def test_the_account_page_shows_the_journal_tail(self, page):
         page.post("/exec/unlock", data={"passphrase": PASS})
-        body = text(page.get("/exec/"))
+        body = text(page.get("/exec/account"))
         assert "Journal" in body and "unlock" in body
 
     def test_root_redirects_to_the_page(self, page):
@@ -384,7 +384,7 @@ class TestSurface:
         app = create_page(service, vault=vault, market=market, clock=clock, monotonic=mono)
         rules = {r.rule for r in app.url_map.iter_rules() if r.endpoint != "static"}
         assert rules == {
-            "/", "/exec/", "/exec/unlock", "/exec/stop", "/exec/resume",
+            "/", "/exec/", "/exec/account", "/exec/unlock", "/exec/stop", "/exec/resume",
             "/exec/stand-down", "/exec/lock", "/exec/flatten", "/exec/flatten/confirm",
             "/exec/reauth/link", "/exec/reauth/store",
             "/exec/order", "/exec/order/price", "/exec/order/state",
@@ -395,7 +395,7 @@ class TestSurface:
 
     def test_every_form_posts_to_an_absolute_exec_path(self, page):
         page.post("/exec/unlock", data={"passphrase": PASS})
-        for body in (text(page.get("/exec/")), text(page.post("/exec/flatten")),
+        for body in (text(page.get("/exec/account")), text(page.post("/exec/flatten")),
                      text(page.get("/exec/order?side=call")),
                      text(page.post("/exec/reauth/link",
                                     data={"app": "trading", "passphrase": PASS}))):
@@ -436,7 +436,7 @@ class TestNotThisServices:
         service.unlock({"t": 1})
         broker.set_position(PUT, qty=1, avg_price=1.85)          # his, not the service's
         service.place(entry())                                     # the service's own
-        body = text(page.get("/exec/"))
+        body = text(page.get("/exec/account"))
         assert "in the account, not this service" in body
         assert "SPXW  260826P06300000".strip() in body and "not opened here" in body
         r = page.post("/exec/flatten")
@@ -451,5 +451,5 @@ class TestNotThisServices:
         service.unlock({"t": 1})
         broker.set_position(PUT, qty=-2, avg_price=1.85)
         service.reconcile()
-        body = text(page.get("/exec/"))
+        body = text(page.get("/exec/account"))
         assert "<b>SHORT SPXW  260826P06300000 × 2</b>" in body and "buy it back by hand" in body

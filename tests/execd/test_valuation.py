@@ -93,12 +93,12 @@ def test_the_page_shows_the_position_and_refreshes_only_while_it_is_open(armed: 
     app.config["TESTING"] = True
     client = app.test_client()
 
-    quiet = client.get("/exec/").get_data(as_text=True)
+    quiet = client.get("/exec/account").get_data(as_text=True)
     assert "http-equiv=refresh" not in quiet and "Open position" not in quiet
 
     armed.place(entry("v-4", stop_spx=SPX_NOW - 3.0))
     broker.set_quote(CALL, bid=2.00, ask=2.10)
-    body = client.get("/exec/").get_data(as_text=True)
+    body = client.get("/exec/account").get_data(as_text=True)
     assert "http-equiv=refresh content=5" in body
     assert "Open position" in body and "SPXW  260914C06400000".replace("260914", "260826") in body
     assert "value at the bid" in body and "$200.00" in body
@@ -128,11 +128,11 @@ def test_a_realized_loss_renders_signed_and_red(armed: ExecService, broker, tmp_
                                                transport=httpx.MockTransport(Schwab())))
     app.config["TESTING"] = True
     client = app.test_client()
-    assert "<td>$0.00</td>" in client.get("/exec/").get_data(as_text=True)
+    assert "<td>$0.00</td>" in client.get("/exec/account").get_data(as_text=True)
 
     armed.place(entry("v-6"))
     broker.set_quote(CALL, bid=1.70, ask=1.80)
     armed.flatten(reason="page")                                  # -$40 realized
-    body = client.get("/exec/").get_data(as_text=True)
+    body = client.get("/exec/account").get_data(as_text=True)
     assert "<td class=neg>-$40.00</td>" in body
     assert "<td class=neg>-$40.00</td>" in body and "$40.00</td>" not in body.replace("-$40.00", "")

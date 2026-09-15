@@ -67,6 +67,12 @@ SOURCE = "page"
 #: change per ticket.
 DEFAULT_BUDGET_USD = 100.0
 DEFAULT_ATTEMPTS = 2
+#: The δ target the form starts at when no delta and no strike is given.
+#: Steve, 2026-09-15 (st-shhi), from his 2026-08-19 words that 0.8 is the
+#: consensus point to buy a single; it replaces "nearest to spot" as the
+#: page's default. ``choose`` itself still answers nearest-to-spot when a
+#: caller passes no delta at all.
+DEFAULT_DELTA = 0.80
 #: A preview's send token lives this long, single use.
 PREVIEW_TTL_S = 60.0
 #: The page polls the quote and the position this often (seconds).
@@ -102,6 +108,8 @@ class Selection:
         delta = _as_float(args.get("delta"))
         if delta is not None and not (0 < abs(delta) <= 1):
             delta = None
+        if delta is None and "delta" not in args and not _as_float(args.get("strike")):
+            delta = DEFAULT_DELTA       # a blank box ('delta' present, empty) means nearest to spot
         lots = _as_int(args.get("lots"), 1)
         lots = max(1, min(lots, max(1, lots_cap)))
         budget = _as_float(args.get("budget"))

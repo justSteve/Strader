@@ -227,7 +227,7 @@ def _arming_line(st: Mapping[str, Any], actions: Mapping[str, str]) -> str:
         return "<div class='k stop-on' style='margin-top:8px'>STOP IS ON — no new positions</div>"
     if a["state"] == "LOCKED":
         return (f"<div class=k style='margin-top:8px'>locked — unlock on "
-                f"<a href='{actions['index']}'>the operations page</a></div>")
+                f"<a href='{actions['account']}'>the account page</a></div>")
     if a["state"] != "ARMED":
         return f"<div class=k style='margin-top:8px'>{esc(a['state'].replace('_', ' ').lower())}</div>"
     return ""
@@ -380,9 +380,9 @@ def body_filled(service, st, facts, actions, now) -> str:
         html += f"<table class=full>{_today_row(st)}</table>"
     html += "<div class=actions>"
     if st["arming"]["state"] != "LOCKED":
-        html += _big_button(actions["flatten"], "FLATTEN", "exit")
+        html += _big_button(actions["flatten"], "FLATTEN", "exit", {"back": "order"})
     if not st["arming"]["killed"]:
-        html += _big_button(actions["stop"], "STOP", "stop")
+        html += _big_button(actions["stop"], "STOP", "stop", {"back": "order"})
     html += "</div>" + _arming_line(st, actions)
     return html
 
@@ -407,7 +407,7 @@ def body_exiting(service, st, facts, actions, now) -> str:
         html += "<table class=full>" + "".join(rows) + "</table>"
     html += "<div class=actions>"
     if st["arming"]["state"] != "LOCKED":
-        html += _big_button(actions["flatten"], "FLATTEN AGAIN", "exit")
+        html += _big_button(actions["flatten"], "FLATTEN AGAIN", "exit", {"back": "order"})
     html += "</div>"
     return html
 
@@ -501,15 +501,14 @@ def panel_html(service: ExecService, st: Mapping[str, Any], actions: Mapping[str
     """The whole card: the header the script owns (stage word, badge, clock,
     refresh, updated, pause, more/less) around the body it polls."""
     stage, body = panel_body(service, st, actions, now=now, order_path=order_path, **kw)
-    mode = str(st.get("mode", "live"))
-    badge = ("<span class='badge paper'>PAPER</span>" if mode == "paper"
-             else "<span class='badge live'>LIVE</span>")
-    clock = now.astimezone(CT).strftime("%H:%M:%S")
+    # The mode badge and the one ticking clock moved to the page's strip on
+    # 2026-09-15 (st-shhi): the card no longer repeats them. The script still
+    # ticks whichever element carries id=clock.
     return (
         "<div id=panel class='card panel'>"
         "<div class=hdr>"
-        f"<div class=l><span id=stageword class=word style='color:{COLORS[stage]}'>{WORDS[stage]}</span>{badge}</div>"
-        f"<div class=r><span id=clock class=clock>{clock}</span>"
+        f"<div class=l><span id=stageword class=word style='color:{COLORS[stage]}'>{WORDS[stage]}</span></div>"
+        "<div class=r>"
         "<button type=button id=refresh class=ico title='refresh now' aria-label='refresh now'>"
         "<svg width=22 height=22 viewBox='0 0 24 24' fill=none stroke=currentColor stroke-width=2 "
         "stroke-linecap=round stroke-linejoin=round><path d='M21 12a9 9 0 1 1-2.64-6.36'></path>"

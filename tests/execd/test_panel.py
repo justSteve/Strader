@@ -25,7 +25,7 @@ from .test_bracket import TRIGGER, holding, page, pos_of, text  # noqa: F401 —
 def panel_of(body: str) -> str:
     """The card, header to the end of its body."""
     assert "<div id=panel " in body, "no panel on the page"
-    return body.split("<div id=panel ")[1].split("<div class=card><div class=side>")[0]
+    return body.split("<div id=panel ")[1].split("<div class=side>")[0]
 
 
 def stage_word(body: str) -> str:
@@ -82,19 +82,22 @@ class TestStage:
 # ── the card on the page ─────────────────────────────────────────────────
 
 class TestTheCard:
-    def test_none_says_so_and_has_no_buttons(self, page):
+    def test_none_shows_no_card_and_the_strip_carries_the_mode(self, page):
+        """With nothing held, nothing working and no preview the page opens on
+        the side buttons: no stage card at all (design docs/design/order-page,
+        st-shhi). The strip carries the mode and the day line the attempts."""
         body = text(page.get("/exec/order"))
-        card = panel_of(body)
-        assert stage_word(body) == "no order"
-        assert "nothing held, nothing working" in card
-        assert "<button class='big" not in card and "attempts 0 of 2 used" in card
-        assert "LIVE" in card and "badge paper" not in card
+        assert "<div id=panel " not in body
+        assert "0 of 2 attempts" in body
+        assert "badge live'>LIVE" in body and "badge paper" not in body
+        assert "BULLISH" in body and "BEARISH" in body
 
     def test_the_header_has_one_clock_and_the_rest_is_ago(self, page, holding, clock):
         body = text(page.get("/exec/order"))
         card = panel_of(body)
-        assert card.count("id=clock") == 1
-        assert "10:00:00" in card                              # the clock, CT
+        assert body.count("id=clock") == 1                     # one clock on the page — in the strip
+        assert "10:00:00" in body                              # the clock, CT
+        assert "id=clock" not in card                          # the card no longer repeats it
         assert "class=ago data-at=" in card                    # the fill, ticking
         assert "id=updated class=ago" in card
         assert ">pause<" in card and ">less<" in card and "id=refresh" in card
@@ -208,7 +211,7 @@ class TestTheCard:
 
     def test_paper_mode_is_the_badge(self, service, chain_page_paper):
         body = text(chain_page_paper.get("/exec/order"))
-        assert "<span class='badge paper'>PAPER</span>" in panel_of(body)
+        assert "<span class='badge paper'>PAPER</span>" in body.split("<div class=side>")[0]   # the strip
         assert "badge live" not in body
 
 
