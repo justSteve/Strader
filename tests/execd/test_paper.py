@@ -203,3 +203,52 @@ def test_read_mode(tmp_path):
     (tmp_path / "m").write_text("yes")
     with pytest.raises(ValueError, match="expected 'paper' or 'live'"):
         read_mode(tmp_path / "m")
+
+
+# ── the close: what expires, expires (2026-09-15 audit, finding 33; st-ee8f) ─
+
+class TestExpiry:
+    """The book carried resting orders and positions in a contract that had
+    expired into the next day and swept them against a quote for a contract
+    that no longer existed. Now an order expires as CANCELED with the word
+    ``expired`` and a position leaves the book through a SELL_TO_CLOSE fill
+    at 0.00, so the service books the loss like any other close."""
+
+    def test_a_resting_order_in_an_expired_contract_is_canceled(self, paper, live, clock):
+        live.set_quote(CALL, bid=2.00, ask=3.00)              # a buy at 2.10 rests
+        r = paper.place(entry(intent_id="p-1", limit=2.10))
+        assert r.status is OrderStatus.WORKING
+        clock.set_ct(9, 0, day=27)                            # the contract expired on the 26th
+        orders = {o.order_id: o for o in paper.orders()}
+        assert orders[r.order_id].status is OrderStatus.CANCELED
+        assert orders[r.order_id].message == "expired"
+
+    def test_a_position_in_an_expired_contract_leaves_the_book_as_a_zero_fill(
+            self, paper, live, clock):
+        r = paper.place(entry(intent_id="p-1", limit=2.10))
+        assert r.status is OrderStatus.FILLED and paper.positions()[0].qty == 1
+        since = clock()
+        clock.set_ct(9, 0, day=27)
+        assert paper.positions() == []
+        fills = paper.fills_since(since)
+        assert len(fills) == 1 and fills[0].symbol == CALL and fills[0].price == 0.0
+        assert fills[0].order_id.startswith("paper-expiry-")
+        # and the book on disk agrees after a reload
+        again = PaperBroker(live, book_path=paper.book_path, clock=clock)
+        assert again.positions() == [] and again.fills_since(since)[0].price == 0.0
+
+    def test_the_service_books_the_expiry_as_a_close(self, paper_service, paper, live, clock):
+        paper_service.place(entry(intent_id="p-1"))
+        assert paper_service.status()["positions"]
+        clock.set_ct(9, 0, day=27)
+        paper_service.unlock({"t": 1})           # a new day's unlock reconciles
+        paper_service.poll_fills()
+        assert paper_service.status()["positions"] == []
+        closed = paper_service.journal.events("closed")
+        assert closed and closed[-1]["exit_price"] == 0.0 and closed[-1]["pnl_usd"] < 0
+
+    def test_nothing_expires_before_its_day(self, paper, live, clock):
+        r = paper.place(entry(intent_id="p-1", limit=2.10))
+        clock.set_ct(15, 30)                                  # same day, after the close
+        assert paper.positions()[0].qty == 1
+        assert {o.order_id: o.status for o in paper.orders()}[r.order_id] is OrderStatus.FILLED

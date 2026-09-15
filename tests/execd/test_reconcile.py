@@ -167,17 +167,57 @@ class TestReconcileResolvesWhatTheBrokerDid:
 
 
 class TestTheBrokerIsTheAuthorityOnPosition:
-    def test_a_position_the_service_never_opened_is_adopted(self, armed, broker):
+    def test_a_position_the_service_never_opened_is_shown_not_adopted(self, armed, broker):
+        """Until 2026-09-15 this was adopted. Finding 30 (st-isx3): the account
+        holds Steve's own spreads, and adopting a leg of one meant FLATTEN
+        would sell it. Now only a contract this service tried to open is
+        adopted; the rest is shown."""
         broker.set_position(PUT, qty=3, avg_price=1.85)
+        armed.reconcile()
+        armed.reconcile()
+        assert [p for p in armed.status()["positions"] if p["symbol"] == PUT] == []
+        assert armed.status()["foreign_positions"] == [{"symbol": PUT, "qty": 3, "avg_price": 1.85}]
+        assert len(armed.journal.events("position_foreign")) == 1        # once, not per sweep
+        assert not armed.journal.events("position_adopted")
+
+    def test_a_position_this_service_opened_and_lost_is_adopted(self, armed, broker, clock):
+        """Adoption is for THIS service's position — the journal says which.
+        Here the send was acknowledged and the service then forgot the working
+        entry (a crash between the `working` line and the fill)."""
+        broker.rest_limits = True
+        armed.place(entry(intent_id="mine-1", symbol=PUT, limit=1.90, stop_spx=SPX_NOW + 12.0))
+        oid = broker.working_orders(PUT)[0].order_id
+        armed._working.clear()                    # the crash
+        broker._orders.pop(oid)                   # the listing no longer carries it either
+        broker.set_position(PUT, qty=1, avg_price=1.90)
         armed.reconcile()
         adopted = [p for p in armed.status()["positions"] if p["symbol"] == PUT]
-        assert adopted and adopted[0]["qty"] == 3
+        assert adopted and adopted[0]["intent_id"] == f"adopted:{PUT}"
         assert armed.journal.events("position_adopted")
-
-    def test_an_adopted_position_is_flagged_as_unprotected(self, armed, broker):
-        broker.set_position(PUT, qty=3, avg_price=1.85)
-        armed.reconcile()
         assert armed.journal.events("stop_unprotected")
+        assert armed.status()["foreign_positions"] == []
+
+    def test_his_butterfly_wings_are_neither_slotted_nor_flattened(self, armed, broker):
+        """The sequence the audit wrote out: +1/-2/+1 by hand, unlock, price
+        the first ticket, tap FLATTEN. The entry door stays open and FLATTEN
+        sells nothing of his."""
+        wing_lo, body, wing_hi = ("SPXW  260826C06390000", "SPXW  260826C06400000",
+                                  "SPXW  260826C06410000")
+        broker.set_position(wing_lo, qty=1, avg_price=5.0)
+        broker.set_position(body, qty=-2, avg_price=2.1)
+        broker.set_position(wing_hi, qty=1, avg_price=0.8)
+        armed.reconcile()
+        st = armed.status()
+        assert st["positions"] == [] and st["day"]["open_positions"] == 0
+        assert {p["symbol"] for p in st["foreign_positions"]} == {wing_lo, wing_hi}
+        assert st["shorts"] == [{"symbol": body, "qty": -2}]
+        # his entry is not refused on positions
+        out = armed.place(entry(intent_id="mine-1"))
+        assert out["refused"] is None and out["order"]["status"] == "FILLED"
+        # FLATTEN sells the service's own contract and nothing of his
+        out = armed.flatten(reason="test")
+        assert [c["symbol"] for c in out["closed"]] == [CALL]
+        assert broker.positions() and {p.symbol for p in broker.positions()} == {wing_lo, body, wing_hi}
 
     def test_a_tracked_size_that_disagrees_with_the_broker_is_corrected(
             self, armed, broker):
@@ -218,12 +258,14 @@ class TestTheBrokerIsTheAuthorityOnPosition:
         armed.reconcile()
         assert broker._orders[stop_id].status is OrderStatus.CANCELED
 
-    def test_flatten_closes_a_position_the_service_never_opened(self, armed, broker):
-        """'Close everything' means everything the broker holds."""
+    def test_flatten_leaves_a_position_the_service_never_opened(self, armed, broker):
+        """'Close everything' means everything THIS service holds. What Steve
+        holds by hand in the same account is his (finding 30, st-isx3)."""
         broker.set_position(PUT, qty=2, avg_price=1.85)
         out = armed.flatten(reason="test")
-        assert [c["symbol"] for c in out["closed"]] == [PUT]
-        assert armed.status()["positions"] == []
+        assert out["closed"] == []
+        assert broker.positions()[0].symbol == PUT
+        assert armed.status()["foreign_positions"][0]["symbol"] == PUT
 
     def test_reconcile_survives_a_broker_that_cannot_be_reached(self, armed, broker):
         armed.place(entry())

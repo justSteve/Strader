@@ -27,7 +27,7 @@ from execd.page import (CONFIRM_TTL_S, REAUTH_TTL_S, CredentialFile, PageRefused
 from execd.service import ExecService
 from execd.vault import Vault
 
-from .conftest import CALL, Clock, entry
+from .conftest import CALL, PUT, Clock, entry
 
 PASS = "correct horse battery"
 WRONG = "wrong horse battery"
@@ -426,3 +426,30 @@ class TestCredentialFile:
 
 def test_page_refused_is_plain():
     assert issubclass(PageRefused, RuntimeError)
+
+
+# ── what the account holds that is not this service's (st-isx3, st-7ah8) ─
+
+class TestNotThisServices:
+    def test_his_own_legs_are_shown_and_flatten_says_it_will_not_sell_them(
+            self, page, service, broker, mono):
+        service.unlock({"t": 1})
+        broker.set_position(PUT, qty=1, avg_price=1.85)          # his, not the service's
+        service.place(entry())                                     # the service's own
+        body = text(page.get("/exec/"))
+        assert "in the account, not this service" in body
+        assert "SPXW  260826P06300000".strip() in body and "not opened here" in body
+        r = page.post("/exec/flatten")
+        confirm = text(r)
+        assert "this will sell" in confirm and "SELL SPXW  260826C06400000 × 1" in confirm
+        assert "this will NOT sell" in confirm and "SPXW  260826P06300000 × 1" in confirm
+        nonce = confirm.split("name=nonce value='")[1].split("'")[0]
+        landing(page, page.post("/exec/flatten/confirm", data={"nonce": nonce}))
+        assert [p.symbol for p in broker.positions()] == [PUT]   # his leg untouched
+
+    def test_a_short_is_shown_in_bold(self, page, service, broker):
+        service.unlock({"t": 1})
+        broker.set_position(PUT, qty=-2, avg_price=1.85)
+        service.reconcile()
+        body = text(page.get("/exec/"))
+        assert "<b>SHORT SPXW  260826P06300000 × 2</b>" in body and "buy it back by hand" in body

@@ -758,6 +758,7 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     # ── the position, with its money ──
     for p in st["positions"]:
         parts.append(_render_position(p))
+    parts.append(_render_not_this_services(st))
 
     # ── the day ──
     pnl = st.get("pnl") or {}
@@ -951,12 +952,52 @@ def _short(v: Any) -> str:
     return s if len(s) <= 80 else s[:77] + "..."
 
 
+def _render_not_this_services(st: dict[str, Any]) -> str:
+    """What the account holds that this service does not own — Steve's own
+    legs, a short, a bracket leg left behind, a send with no answer, a buy it
+    did not place. Each is a line here until it is gone; none is a button
+    (2026-09-15 audit, st-isx3 / st-7ah8 / st-xlz9)."""
+    lines: list[str] = []
+    for p in st.get("foreign_positions") or []:
+        lines.append(f"{esc(p['symbol'].strip())} × {p['qty']} at {float(p['avg_price']):.2f} — "
+                     "held in the account, not opened here; not counted, not flattened")
+    for s in st.get("shorts") or []:
+        lines.append(f"<b>SHORT {esc(s['symbol'].strip())} × {abs(int(s['qty']))}</b> — this "
+                     "service only sells to close; buy it back by hand")
+    for leg in st.get("loose_legs") or []:
+        lines.append(f"{esc(leg['leg'])} {esc(leg['order_id'])} on {esc(leg['symbol'].strip())} — "
+                     "its position is closed and its cancel is not confirmed; asking again")
+    for s in st.get("unconfirmed_sends") or []:
+        lines.append(f"send {esc(s['intent_id'])} on {esc(s['symbol'].strip())} — no answer from "
+                     "the broker; nothing else goes out until the listing accounts for it")
+    for o in st.get("foreign_orders") or []:
+        lines.append(f"working buy {esc(o.get('order_id', ''))} on {esc(str(o.get('symbol', '')).strip())} "
+                     f"× {o.get('qty')} — not sent by this service")
+    excluded = st.get("excluded_positions") or {}
+    if excluded:
+        lines.append("also in the account, not this service's instruments: "
+                     + ", ".join(f"{n} {esc(k.lower())}" for k, n in sorted(excluded.items())))
+    if not lines:
+        return ""
+    return ("<div class=card><div class=k>in the account, not this service's</div>"
+            + "".join(f"<div class=row>{ln}</div>" for ln in lines) + "</div>")
+
+
 def _render_confirm_flatten(service: ExecService, nonce: str, a: dict[str, str]) -> str:
     st = service.status()
     held = st["positions"]
-    listing = ("<pre>" + esc("\n".join(json.dumps(p, separators=(",", ":")) for p in held))
-               + "</pre>" if held else "<div class=k>the service is tracking no position; "
-               "flatten still asks the broker and closes whatever it finds</div>")
+    if held:
+        rows = "".join(f"<div class=row><b>SELL {esc(p['symbol'].strip())} × {p['qty']}</b> at market"
+                       f" — in at {float(p['entry_price']):.2f}</div>" for p in held)
+        listing = f"<div class=k>this will sell</div>{rows}"
+    else:
+        listing = ("<div class=k>the service is tracking no position of its own; flatten "
+                   "asks the broker first and closes what it finds under this service's "
+                   "name</div>")
+    spared = [f"{esc(p['symbol'].strip())} × {p['qty']}" for p in st.get("foreign_positions") or []]
+    if spared:
+        listing += ("<div class=k>this will NOT sell — held in the account, not opened here: "
+                    + ", ".join(spared) + "</div>")
     body = (f"<div class=card>{listing}</div>"
             f"<form method=post action='{a['flatten_confirm']}'>"
             f"<input type=hidden name=nonce value='{nonce}'>"

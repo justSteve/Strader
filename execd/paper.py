@@ -49,7 +49,8 @@ from .broker import (
     Broker, BrokerError, Fill, OrderLeg, OrderResult, OrderStatus, Position,
     Preview, Quote,
 )
-from .intent import OrderIntent, OrderType, Side
+from .bounds import CT
+from .intent import OrderIntent, OrderType, Side, parse_occ
 
 log = logging.getLogger("execd.paper")
 
@@ -158,6 +159,7 @@ class PaperBroker:
     def _sweep(self) -> None:
         """Resting orders against live quotes. A quote that cannot be read
         leaves that order resting; the next read tries again."""
+        self._expire()
         for order in list(self._orders.values()):
             if order.status is not OrderStatus.WORKING:
                 continue
@@ -178,6 +180,55 @@ class PaperBroker:
                 px = q.ask if order.side is Side.BUY_TO_OPEN else q.bid
                 if px > 0:
                     self._fill(order, px)
+
+    def _expire(self) -> None:
+        """What the exchange does at the close and the book did not: a
+        resting order in a contract that has expired is gone, and a position
+        in one is worth nothing. Until 2026-09-15 the book carried both into
+        the next day and swept them against a quote for a contract that no
+        longer existed (finding 33 of the audit, st-ee8f). An order expires
+        as CANCELED with the word ``expired``; a position leaves the book
+        through a SELL_TO_CLOSE fill at 0.00 so the service books the loss
+        the way it books any other close."""
+        today = self.clock().astimezone(CT).date()
+        changed = False
+        for order in list(self._orders.values()):
+            if order.status is not OrderStatus.WORKING:
+                continue
+            try:
+                expiry = parse_occ(order.symbol).expiry
+            except ValueError:
+                continue
+            if expiry < today:
+                self._orders[order.order_id] = replace(order, status=OrderStatus.CANCELED,
+                                                       message="expired")
+                changed = True
+                log.warning("paper: %s expired unfilled (%s, %s)", order.order_id,
+                            order.symbol.strip(), expiry)
+        for symbol, held in list(self._positions.items()):
+            try:
+                expiry = parse_occ(symbol).expiry
+            except ValueError:
+                continue
+            if expiry >= today or held.qty == 0:
+                continue
+            self._seq += 1
+            oid = f"paper-expiry-{self._seq:04d}"
+            side = Side.SELL_TO_CLOSE if held.qty > 0 else Side.BUY_TO_OPEN
+            self._orders[oid] = OrderResult(
+                order_id=oid, status=OrderStatus.FILLED, symbol=symbol, side=side,
+                qty=abs(held.qty), order_type=OrderType.MARKET, price=None,
+                filled_qty=abs(held.qty), fill_price=0.0, submitted_at=self.clock(),
+                message="expired worthless",
+                legs=(OrderLeg(symbol=symbol, instruction=side.value, side=side,
+                               qty=abs(held.qty), leg_id=1),))
+            self._fills.append(Fill(oid, symbol, side, abs(held.qty), 0.0, self.clock(),
+                                    leg_id=1, instruction=side.value))
+            self._positions.pop(symbol, None)
+            changed = True
+            log.warning("paper: %s × %d expired worthless (%s)", symbol.strip(), held.qty, expiry)
+        if changed:
+            self._save()
 
     def _new(self, intent: OrderIntent, status: OrderStatus, *,
              price: float | None = None) -> OrderResult:

@@ -312,6 +312,11 @@ class ExecService:
         #: send and cannot match to a send — order_id → OrderResult dict,
         #: journaled once, shown, never adopted
         self._foreign_orders: dict[str, dict[str, Any]] = {}
+        #: long positions the broker holds on this service's instruments that
+        #: this service never opened — Steve's own legs. symbol → Position.
+        #: Shown on the page, never slotted, never flattened (finding 30,
+        #: st-isx3: adopting them made FLATTEN sell the wings of his butterfly)
+        self._foreign_positions: dict[str, Position] = {}
         self._last_fill_poll = clock()
         self._recover()
 
@@ -427,6 +432,7 @@ class ExecService:
             "loose_legs": [{"order_id": k, **v} for k, v in self._loose_legs.items()],
             "unconfirmed_sends": [s.to_dict() for s in self._unconfirmed.values()],
             "foreign_orders": list(self._foreign_orders.values()),
+            "foreign_positions": [p.to_dict() for p in self._foreign_positions.values()],
             "shorts": [{"symbol": s, "qty": q} for s, q in self._shorts.items()],
             "excluded_positions": dict(getattr(self.broker, "excluded_positions", {}) or {}),
             "pnl": self._day_pnl([v for _p, v in valuations]),
@@ -797,7 +803,13 @@ class ExecService:
                 kind, why = "target", "resting-target"
                 pos.target_order_id = None
             elif pos.stop_order_id or pos.target_order_id:
-                continue    # a sell this service can name neither leg of
+                # A sell on a held symbol from an order this service did not
+                # place — closed by hand in the broker's app, or expired
+                # (paper's expiry fill). Until 2026-09-15 this was skipped and
+                # the position lingered until the gone-sweep dropped it 90 s
+                # later with no P&L booked. It is a close; book it, and
+                # _book_close pulls whatever legs still rest (st-ee8f).
+                kind, why = "external", "closed-outside-this-service"
             else:
                 kind, why = "protective-stop", "resting-stop"
             closed_qty = min(fill.qty, pos.qty) if fill.qty > 0 else pos.qty
@@ -1085,6 +1097,8 @@ class ExecService:
         now = self.clock()
 
         shorts_now: dict[str, int] = {}
+        foreign_now: dict[str, Position] = {}
+        owned = self._owned_symbols()
         for symbol, held in broker_positions.items():
             if held.qty < 0:
                 # A short is not this service's to manage — it only sells to
@@ -1105,6 +1119,22 @@ class ExecService:
                     right = parse_occ(symbol).right
                 except ValueError:
                     continue       # not an option this service can reason about
+                if symbol not in owned:
+                    # Not this service's. Adoption exists for a position THIS
+                    # service opened and lost track of — a journal gone, a
+                    # send with no answer — and the journal says which those
+                    # are. Steve trades spreads by hand in the same account;
+                    # adopting a wing of one and then FLATTENing it left the
+                    # short body naked (finding 30, st-isx3). Shown, not held.
+                    foreign_now[symbol] = held
+                    prior = self._foreign_positions.get(symbol)
+                    if prior is None or prior.qty != held.qty:
+                        self.journal.record("position_foreign", symbol=symbol, qty=held.qty,
+                                            entry_price=held.avg_price,
+                                            detail="held in the account, not opened by this "
+                                                   "service — shown, never slotted, never "
+                                                   "flattened")
+                    continue
                 pos = OpenPosition(
                     symbol=symbol, qty=held.qty, entry_price=held.avg_price,
                     intent_id=f"adopted:{symbol}", right=right, opened_at=now,
@@ -1133,6 +1163,7 @@ class ExecService:
             if symbol not in shorts_now:
                 self.journal.record("short_covered", symbol=symbol, qty=self._shorts[symbol])
         self._shorts = shorts_now
+        self._foreign_positions = foreign_now
 
         for symbol, pos in list(self._open.items()):
             if symbol in broker_positions and broker_positions[symbol].qty > 0:
@@ -1155,6 +1186,26 @@ class ExecService:
             self._cancel_bracket(pos)
             self._open.pop(symbol, None)
         return adopted, corrected, gone
+
+    #: how many journal days back a symbol counts as this service's
+    OWNED_LOOKBACK_DAYS = 7
+
+    def _owned_symbols(self) -> set[str]:
+        """Every contract this service has ever tried to open, over the last
+        week of journals: sent (``sending``), acknowledged (``working``),
+        filled, or adopted under the pre-2026-09-15 rule. Membership is what
+        lets a position the broker reports be adopted; anything else the
+        account holds is Steve's (st-isx3)."""
+        owned: set[str] = set(self._open) | {w.symbol for w in self._working.values()}
+        for day in self.journal.days()[-self.OWNED_LOOKBACK_DAYS:]:
+            for e in self.journal.read(day):
+                ev = e.get("event")
+                if ev in ("sending", "working", "position_adopted") or \
+                        (ev == "filled" and e.get("kind") == "entry"):
+                    sym = str(e.get("symbol", ""))
+                    if sym:
+                        owned.add(sym)
+        return owned
 
     def _broker_qty(self, symbol: str) -> int | None:
         """What the broker says is held, or ``None`` if it could not be asked."""

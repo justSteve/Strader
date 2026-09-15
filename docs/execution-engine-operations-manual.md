@@ -423,11 +423,14 @@ beats a presumption the tape never made.
 
 ## 5. execd — the live execution service
 
-Source: `execd/`, 2,631 lines across 11 modules. Tests: `tests/execd/`,
-**365 passing in 4.58s**, measured 2026-08-30 14:0x CT
-(`api 49 · arming 21 · bounds 66 · intent 25 · journal 23 · service 76 ·
-stops 23 · vault 44 · wall 38`). Epic `st-5qjq`; stage 1 is `st-eznu`. Design of
-record: `docs/a2a/2026-08-30-coo-to-strader-live-execution-service-plan.md`.
+Source: `execd/`, **9,092 lines across 19 modules** (`cat execd/*.py | wc -l`,
+2026-09-15 06:00 CT, at `ab4cea7`; 2,631 across 11 on 2026-08-30). Tests:
+`tests/execd/`, **883 passing in 26 s** (2026-09-15 09:10 CT, after §5.22;
+365 on 08-30, 856 before §5.22). Run `.venv/bin/python -m pytest tests/execd`
+for today's number — this header was left saying 365 for two weeks and the
+audit's finding about that is fair (§12). Epic `st-5qjq`; stage 1 is
+`st-eznu`. Design of record:
+`docs/a2a/2026-08-30-coo-to-strader-live-execution-service-plan.md`.
 
 **Two brokers.** `MockBroker` (stage 1) and `SchwabBroker` (stage 2,
 `execd/schwab.py`, the one module in the package with a transport — `httpx`).
@@ -484,7 +487,7 @@ version. Every journal line carries this sha.
 | POST | `/flatten` | `{"reason": "..."}` optional; **JSON required** | `{"refused": null, "closed": [...], "errors": [...]}` |
 | POST | `/adjust` | `{"symbol": "...", "stop_price": 1.80, "target_price": 25.0}` — at least one price | `{"refused": null, "stop": {moved, old_price, new_price, order_id, stop_spx}, "target": {...}, "closed": null}`; `409` names the refusal (`bracket`, `tick`, `ceiling`, `position`, `exit_in_flight`, `filled`, `armed`); `502` the broker. §5.20 (st-fn5y) |
 | POST | `/stand-down` | `{}`; **JSON required** | the status object |
-| POST | `/stop` | — | the status object. **Ungated on purpose.** |
+| POST | `/stop` | — | the status object. **Ungated on purpose, and takes no lock** — the kill file is touched before anything else, so a STOP during a slow entry refuses the send instead of queueing behind it (st-jm6u, §5.22). |
 | POST | `/observe` | `{"spx": 6320.5}` | `{"spx": …, "fired": [...], "pending": [...]}` |
 | POST | `/poll-fills` | `{}`; **JSON required** | `{"picked_up": [...]}` or `{"picked_up": [], "error": "..."}` |
 
@@ -527,9 +530,20 @@ day:       {open_positions, realized_loss_usd, attempts_used, attempts_left,
 positions: [OpenPosition… — each with stop_order_id, stop_price,
             target_order_id, target_price, entry_spx and a valuation
             carrying at_stop_usd and at_target_usd]
+loose_legs:        [{order_id, symbol, leg, qty, intent_id}] — bracket legs whose
+                   position is closed and whose cancel is not confirmed (§5.22)
+shorts:            [{symbol, qty}] — what the broker holds short on these instruments
+unconfirmed_sends: [{intent_id, symbol, qty, limit, at, …}] — sends with no answer
+foreign_orders:    [OrderResult…] — working buys this service did not send
+foreign_positions: [{symbol, qty, avg_price}] — Steve's own legs, shown, never held
+excluded_positions: {assetType: count} — what positions() left out
 bounds:    {the thirteen bound values}
 journal:   the path to today's file
 ```
+
+The six lists after `positions` are the 2026-09-15 audit's rule that nothing
+the account holds is silent (§5.22). Each is a line on the page's "in the
+account, not this service's" card until it is gone.
 
 ### 5.4 The intent — what a caller may hand the service
 
@@ -612,8 +626,13 @@ is LOCKED, and that is a statement about capability, not policy.
    Journal `preview`.
 6. If the preview is not accepted → `409` with bound `preview_cost` and the
    broker's own messages. Then `check_preview_cost` → `409` on breach.
-7. Read the `$SPX` mark. `broker.place(intent)`. Journal `placed` with the sha,
-   the spx and the order.
+7. Read the `$SPX` mark. Last look at the STOP file. Journal **`sending`**
+   with the intent's shape, then `broker.place(intent)`. A `BrokerError` here
+   journals `send_unknown` and holds the intent as **unconfirmed**: the broker
+   may have taken the order, so every entry — this intent first of all — is
+   refused `send_unconfirmed` until reconcile's orphan sweep (§5.22) has
+   matched it to the listing or found nothing for `SEND_SETTLE_S`. On an
+   answer, journal `placed` with the sha, the spx and the order.
 8. `REJECTED` → journal `rejected`, return with `stop_order: null`.
    Not filled → return with `stop_order: null`.
 9. Filled → build `OpenPosition`, journal `filled` (carrying `stop_spx` and
@@ -818,11 +837,19 @@ sneak in). A GET meeting a 401 refreshes once and retries once; a POST meeting
 one is reported, never repeated. `place` is a 201 with the order id in the
 `Location` header followed by a read of the order (a 400 is a rejection,
 returned, not raised; a 201 without a Location is held WORKING under a
-synthetic id so reconcile finds it); `cancel` is a DELETE followed by the same
-read, so cancelling a stop that already filled reports the fill. `positions()`
-reports options on the index only and counts what it left out in
-`excluded_positions`. No token, key or account identifier reaches a message;
-the account hash reads `<account>` in every path quoted.
+synthetic id, which reconcile's orphan sweep identifies from the listing —
+§5.22); `cancel` is a DELETE followed by the same read **repeated until the
+status is terminal or `CANCEL_CONFIRM_S`** (6 s, twelve polls): Schwab's
+DELETE is an ask, and a `PENDING_CANCEL` is an order the exchange still holds.
+A leg still WORKING at the deadline comes back as such with the broker's word
+in `message`, and the service treats it as not off (§5.22). Cancelling a stop
+that already filled reports the fill. `positions()` admits a leg when its
+**OCC root** is in `roots` — the bounds' `instruments` — and never reads the
+account body's `underlyingSymbol`, which has never been recorded for an
+option leg while every recorded order leg says `SPXW`; what it left out is
+counted in `excluded_positions`, on `/status`. No token, key or account
+identifier reaches a message; the account hash reads `<account>` in every
+path quoted.
 
 **Recorded versus spec-derived.** The market-data shapes were recorded live on
 2026-09-04 (`tests/fixtures/schwab/`, `_capture.json`). The Trader API shapes
@@ -1044,10 +1071,19 @@ preview** go to Schwab exactly as in live mode. `place`, `cancel`, `orders`,
 | stop sell | rests; fills at the bid once the bid is at or under the stop price |
 | cancel | resting → CANCELED; already filled → reported filled (the race) |
 | any order with no live quote | refused — nothing is simulated without a market |
+| the day after a contract's expiry | a resting order in it → CANCELED `expired`; a position in it → a SELL_TO_CLOSE fill at 0.00 (`paper-expiry-NNNN`), which the service books as an `external` close with its loss (st-ee8f) |
 
 Order ids are `paper-NNNN`. Steve's real positions are invisible to the
 service in paper mode, on purpose: paper must not adopt, watch or flatten
-what it did not open. The book persists across a restart.
+what it did not open. The book persists across a restart, and nothing in it
+outlives its contract.
+
+**What paper does not rehearse** (finding 33 of the 2026-09-15 audit): the
+broker's *answers*. The book cancels synchronously, lists an order the
+instant it is placed, stamps fills at the sweep, and cannot time out a send.
+Every high finding of that audit lived in those answers, and §5.22 is what
+the service now does about them; a paper cycle proves the loop closes, not
+that the transport's assumptions hold.
 
 **Every line says so.** `mode: paper` on every journal line, `mode` in
 `/status` and in every `/preview` and `/place` answer, an amber PAPER
@@ -1304,6 +1340,30 @@ the card is in a request-owned stage (a poll would erase the SEND token);
 service, every stage's card on the page, the two request-owned stages against
 live money, the polled body never carrying a request-owned stage, every
 action on the card an absolute `/exec/` path, no secret on the card.
+
+### 5.22 The second audit's six (2026-09-15, Auditor case co-66wtd)
+
+Fifteen days after the first verdict a blind verifier read stages 2–4 and
+returned findings 23–44. Six blocked the first live ticket; five are code
+here and the sixth is a paper cycle on the installed build with Steve's
+passphrase (st-ee8f). Each is a rule now, tested by name:
+
+| bead | rule | where |
+|---|---|---|
+| st-jm6u | **STOP takes no lock.** The kill file is touched before anything else; the journal line and the status read never wait on the service lock, so a STOP from the page during a slow entry refuses the send. | `ExecService.stop`; `test_audit_tail.py::TestStopHasTheLastLook` |
+| st-zm2u | **Positions are admitted by OCC root**, never by the account body's `underlyingSymbol`, which was never recorded for an option leg while every recorded order leg says `SPXW`. `excluded_positions` is on `/status`. | `SchwabBroker.positions`; `test_schwab.py` |
+| st-7ah8 | **A cancel is an ask.** The transport re-reads until terminal or 6 s. A leg still WORKING is not off: `cancel_pending`, the close DEFERs with the bracket resting; `_cancel_leg_quietly` keeps the id; a booked close that cannot confirm a leg carries it as a **loose leg** (`leg_unconfirmed` → `leg_resolved`, on `/status`, rebuilt on restart) that every reconcile re-asks and books `oversold` if it filled. **Shorts** are journaled `short_held` and shown; a sell on a symbol not held is `unattributed_sell`; a sell on a held symbol from an order not this service's is an `external` close; a FILLED order with no quantity books its own size, never the position's. | `service.py` `_pull_leg`, `_book_close`, `_reconcile_loose_legs`, `_reconcile_positions`, `_pick_up_fills`; `test_bracket.py::TestCancelIsAnAsk` |
+| st-xlz9 | **A send is journaled before it goes out** (`sending`); one with no answer (`send_unknown`) holds every entry refused `send_unconfirmed` until the **orphan sweep** matches it to the listing (`send_resolved found` → the working entry or the position) or finds nothing for `SEND_SETTLE_S` (`not-found`, re-sendable). The sweep also identifies an `unnamed:` entry (`working_identified`) and journals any other working buy on these instruments once as `foreign_order`, shown, never adopted. | `_place_entry`, `_entry_refusal`, `_reconcile_orphans`; `test_reconcile.py::TestASendWithNoAnswer` |
+| st-isx3 | **Adopt only what this service tried to open** — a contract with a `sending`, `working` or `filled` line in the last seven journal days. Everything else the account holds long is Steve's: `position_foreign` once, `foreign_positions` on `/status`, a line on the page's "in the account, not this service's" card, never slotted, never flattened; FLATTEN's confirm page names what it will sell and what it will not. | `_owned_symbols`, `_reconcile_positions`; `page._render_not_this_services`, `_render_confirm_flatten`; `test_reconcile.py::TestTheBrokerIsTheAuthorityOnPosition`, `test_page.py::TestNotThisServices` |
+| st-ee8f | **Nothing in the paper book outlives its contract** (§5.17). The paper cycle itself is Steve's to unlock: the two 09-14 cycles ran `5ef0c02`/`28b566f`, before the bracket, the watcher exit, the order page and the panel. | `PaperBroker._expire`; `test_paper.py::TestExpiry` |
+
+Still open from the same verdict and carried by name: Exit Settle Window
+(st-b7i4, findings 26–27), Fresh Mark Before Send (st-xv5e, 32), Page Post
+Guards (st-sk9r, 36), Bracket Past The Close (st-btob, 38), Reconcile Leg
+Ids (st-vqmr, 39), Risk Budget Sums Open (st-s2jj, 40), Wall Test Remaining
+Three (st-10da, 42), Runtime Gate Spellings (st-d1bo, 34/43), Patch Sidecars
+Say Prepared (st-9q41, 44). The case, the evidence and the findings are at
+`justSteve/Auditor` under `cases/co-66wtd/`.
 
 ## 6. The feed and the credential
 

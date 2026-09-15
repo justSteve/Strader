@@ -247,12 +247,46 @@ attempt is a filled position, Steve 2026-09-14) until reconcile learns what
 became of it, so an order resting at the broker can no longer be repeated
 without limit. Filled ones become tracked positions and get the bracket they
 were owed; cancelled and rejected ones give the slot back; ones the broker cannot account for keep it, because holding a slot only
-refuses new risk while forgetting one creates it. Positions found at the broker
-that this service never opened are adopted so `flatten` can close them, and a
-tracked size that disagrees with the broker's is corrected to the broker's. A
-position must be absent from the broker's account for `POSITION_SETTLE_S` before
-it is believed closed — a positions endpoint lagging a fill it just reported is
-ordinary, and treating that as a close would cancel the stop under a live trade.
+refuses new risk while forgetting one creates it. A position found at the broker
+that **this service tried to open** — any contract in the last week of journals
+with a `sending`, `working` or `filled` line — and lost track of is adopted so
+`flatten` can close it. Anything else the account holds on this service's
+instruments is **Steve's**: shown on the page and on `/status` as
+`foreign_positions`, journaled once as `position_foreign`, never slotted and
+never flattened. (Until 2026-09-15 every long leg was adopted; the audit's
+finding 30 wrote out the morning he holds a butterfly by hand, unlocks, and
+FLATTEN sells the wings — st-isx3.) A tracked size that disagrees with the
+broker's is corrected to the broker's. A position must be absent from the
+broker's account for `POSITION_SETTLE_S` before it is believed closed — a
+positions endpoint lagging a fill it just reported is ordinary, and treating
+that as a close would cancel the stop under a live trade.
+
+**A send is journaled before it goes out.** `sending` carries the intent's
+shape; if the broker's answer never comes back (`send_unknown`) the intent is
+held as unconfirmed — every entry is refused `send_unconfirmed`, the same
+intent most of all — until reconcile's **orphan sweep** has matched it to the
+broker's listing by contract, side, size, limit and time (`send_resolved
+found`, and it becomes the working entry or the position) or found nothing
+after `SEND_SETTLE_S` (`send_resolved not-found`; the intent may be re-sent).
+The sweep also identifies an `unnamed:` working entry from the listing and
+journals any other working buy on these instruments once as `foreign_order`,
+shown, never adopted (finding 25, st-xlz9).
+
+**A cancel is an ask.** The transport re-reads after its DELETE until the
+status is terminal or `CANCEL_CONFIRM_S`; a leg still `WORKING` at the deadline
+is **not off** — `cancel_pending` is journaled, a close in progress is
+DEFERRED with the bracket still resting, and a leg an already-booked close
+could not confirm is carried as a **loose leg** (`leg_unconfirmed`, on
+`/status`, rebuilt on restart) that every reconcile asks after until it is
+`leg_resolved` — or, if it filled after the position closed, booked
+`oversold`. What the broker holds short is journaled `short_held` and shown;
+a `SELL_TO_CLOSE` fill on a symbol not held is journaled `unattributed_sell`
+once; a sell on a held symbol from an order this service did not place is
+booked as an `external` close (finding 24, 29, 39; st-7ah8).
+
+**STOP takes no lock.** `service.stop()` touches the kill file before anything
+else and never takes the service lock, so a STOP from the page during a slow
+entry refuses the send instead of queueing behind it (finding 35, st-jm6u).
 
 This is the fix for finding 1 of the 2026-08-30 independent audit
 (`st-v7oa`): the service transmitted on what was *requested* and counted on what
@@ -268,7 +302,10 @@ bound, `preview`, `placed`, `working`, `entry_resolved`, `filled`,
 `stop_placed`, `stop_unprotected`, `target_placed`, `target_unprotected`,
 `stop_adjusted`, `target_adjusted`, `oversold`, `exit_triggered`, `exit_unfilled`,
 `exit_resolved`, `closed` with its P&L, `canceled`, `position_adopted`,
-`position_corrected`, `position_gone`, `reconcile_unknown`, `exit_unverified`,
+`position_foreign`, `position_corrected`, `position_gone`, `reconcile_unknown`,
+`exit_unverified`, `sending`, `send_unknown`, `send_resolved`,
+`working_identified`, `foreign_order`, `cancel_pending`, `leg_unconfirmed`,
+`leg_resolved`, `short_held`, `short_covered`, `unattributed_sell`,
 `unlock`, `stand_down`, `stop`, `recovered`.
 It is the audit "trust the process" rests on, and on the first live day it is
 read back against Schwab's own order history before there is a second.
@@ -291,10 +328,19 @@ learns which one it holds. What it does that the mock does not:
 - **Retries nothing that sends.** A GET that meets a 401 refreshes once and
   retries once; a POST that meets one is reported, and the service's reconcile
   finds out what went in.
-- **Reports positions in the index's options only.** The service adopts every
-  position it is shown so `flatten` reaches it; a share position in the same
-  account is not this service's to flatten, so it is not shown. What was left
-  out is counted in `excluded_positions` for the status page.
+- **Reports positions by OCC root, never by the account body's
+  `underlyingSymbol`.** A leg is this service's to see when
+  `parse_occ(symbol).root` is in `roots` — the bounds' `instruments` in
+  production, SPX and SPXW by default. The account body's `underlyingSymbol`
+  has never been recorded for an option leg, while every recorded *order* leg
+  for an SPXW contract says `SPXW`; the old filter on `SPX` would have
+  excluded the service's own position and cancelled its bracket ninety
+  seconds after the first live fill (finding 23, st-zm2u). A share position
+  is not this service's to flatten, so it is not shown; what was left out is
+  counted in `excluded_positions`, which `/status` and the page carry.
+- **A cancel is re-read until it is terminal** (`CANCEL_CONFIRM_S`, twelve
+  polls at `CANCEL_POLL_S`); a `PENDING_CANCEL` at the deadline comes back
+  `WORKING` with the broker's word in `message` (st-7ah8).
 - **Never puts a secret in a message.** No token, key or account identifier
   reaches a log or an exception; the account hash is `<account>` in every path
   it quotes.
