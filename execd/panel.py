@@ -226,8 +226,7 @@ def _arming_line(st: Mapping[str, Any], actions: Mapping[str, str]) -> str:
     if a.get("killed"):
         return "<div class='k stop-on' style='margin-top:8px'>STOP IS ON — no new positions</div>"
     if a["state"] == "LOCKED":
-        return (f"<div class=k style='margin-top:8px'>locked — unlock on "
-                f"<a href='{actions['account']}'>the account page</a></div>")
+        return ""   # the passphrase box sits under the strip (st-2hei)
     if a["state"] != "ARMED":
         return f"<div class=k style='margin-top:8px'>{esc(a['state'].replace('_', ' ').lower())}</div>"
     return ""

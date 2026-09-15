@@ -1175,16 +1175,28 @@ underneath because SEND depends on it; it used to be a link back to the
 unpreviewed form, two taps from SEND. The clock, the quote and the balances
 tick on the fresh page again: the panel script returned early when there
 was no stage card, which froze the page from the st-shhi change to this one. `/exec/` **is** this page
-since st-shhi. Everything that is not placing an order — unlock, clear STOP,
-stand down, lock, the weekly re-authorisation, the grants, the holdings that
+since st-shhi. Everything that is not placing an order — clear STOP,
+stand down, lock, the weekly re-authorisation, the holdings that
 are not this service's, the journal tail — is `/exec/account`, one tap away;
 the strip's STOP and the card's FLATTEN carry `back=order` so their answer
-lands back on the trading page.
+lands back on the trading page. **Since st-2hei** (Steve, 2026-09-15: *"if
+panel is locked the Passphrase should be displayed. way too many words in
+execd screen … no need to define PAPER. Still don't need 'GRANTS' section.
+Still looking for Options Buying Power amt"*): a LOCKED service puts the
+passphrase box and UNLOCK on the trading page itself, under the strip, with
+`back=order`; when the service is armed that same place carries *option
+buying power* in bold with *available* beside it (the money line left the
+foot — and while locked the account cannot be read, which is why the number
+was missing); the `PAPER (simulated) —` prefix is gone from every answer,
+the strip's badge is the word; the account page lost its PAPER/LIVE
+definition lines, its explanatory sub-lines, the *Schwab grants* card, the
+vault path and the URL footer — the state word, the buttons, *Today*, a
+folded *re-authorise (weekly)* and the journal remain.
 
 | Route | Does |
 |---|---|
 | `GET /exec/` | the trading page — the same render as `/exec/order` (st-shhi) |
-| `GET /exec/account` | the account page: arming, STOP/clear, stand down, lock, re-authorisation, grants, holdings not this service's, the journal tail |
+| `GET /exec/account` | the account page: arming, STOP/clear, stand down, lock, re-authorisation (folded), holdings not this service's, the journal tail — no grants card since st-2hei |
 | `GET /exec/order?side=call\|put&expiry=…&strike=…&delta=…&budget=…&attempts=…&limit=…&reprice=1&embed=1` | renders the page; `embed=1` drops the shell for a panel; a `delta` key present and empty means nearest to spot, absent means the 0.80 target; `limit` is the padlock's locked price, `reprice=1` (the RE-PRICE button's own field) drops it (st-2s4u) |
 | `GET /exec/order/price?…` | the priced ticket as JSON plus the FD0, strikes and hidden-field fragments the script swaps in; a `limit` prices the ticket at that number instead of the ask |
 | `GET /exec/order/state?symbol=…&lots=…` | the status body's live half plus the chosen contract's quote and the SPX mark, with HTML fragments; with a quote, `limit_now` (the ask on the tick grid) and `cost_now` for the head to follow while unlocked |

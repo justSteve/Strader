@@ -69,6 +69,8 @@ _ORDER_STYLE = """
  .detail{display:none;margin-top:.5em}.card:has(details.more[open]) .detail{display:block}
  details.inputs2{margin-top:.5em}details.inputs2 summary{color:#9ca3af;cursor:pointer;font-size:.9em}
  .foot{display:flex;justify-content:space-between;gap:.75em;color:#9ca3af;font-size:.9em;margin-top:.4em}
+ .money{display:flex;justify-content:space-between;align-items:baseline;gap:.75em;margin:0 0 .6em;font-size:1.05em}
+ .money b{font-size:1.2em}
  details.journalbox{margin-top:.6em}details.journalbox summary{list-style:none;display:inline-flex}
  details.journalbox summary::-webkit-details-marker{display:none}
  #journal pre{white-space:pre-wrap;word-break:break-all;font-size:.8em;color:#cbd5e1;margin:0}
@@ -196,8 +198,32 @@ def last_refusal(service: ExecService, now: datetime | None = None) -> str | Non
     if when is not None and (now - when).total_seconds() > RECENT_ANSWER_S:
         return None
     r = last.get("refused") or {}
-    word = "PAPER (simulated) — " if last.get("mode") == "paper" else ""
+    word = ""   # the strip's badge says PAPER; no prefix (Steve, 2026-09-15, st-2hei)
     return f"{word}Refused ({r.get('bound')}): {r.get('reason')}. Nothing sent."
+
+
+#: The trading grant's wall is worth a line on the trading page from this
+#: many days out — the seven-day token lifecycle is the live feed's failure
+#: point, and the grants card that used to show it is gone (st-2hei).
+WALL_ALERT_DAYS = 2.0
+
+
+def wall_alert_html(st: dict[str, Any], now: datetime) -> str:
+    """One red line when the trading grant's refresh wall is inside
+    ``WALL_ALERT_DAYS`` or past — read from the armed credential, or from
+    the wall the journal last saw while LOCKED. Nothing otherwise."""
+    from .page import _fmt_wall
+    cred = st.get("credential") or {}
+    wall = cred.get("refresh_wall") if cred.get("armed") else cred.get("last_known_trading_wall")
+    if not wall:
+        return ""
+    try:
+        left = (datetime.fromisoformat(str(wall)) - now).total_seconds() / 86400
+    except ValueError:
+        return ""
+    if left > WALL_ALERT_DAYS:
+        return ""
+    return f"<div class=bad>trading grant: {_fmt_wall(str(wall), now)}</div>"
 
 
 def usd(v: Any) -> str:
@@ -211,11 +237,11 @@ def balances_html(b: dict[str, Any] | None) -> str:
     preview checks an option buy against) and option buying power (the
     non-marginable figure). One line; an unreadable account says so."""
     if not b:
-        return "<span>account: not read</span>"
+        return "<span class=k>account not read</span>"
     if b.get("error"):
-        return f"<span>account: {esc(b['error'])}</span>"
-    return (f"<span>option buying power {usd(b.get('option_buying_power'))}</span>"
-            f"<span>available funds {usd(b.get('available_funds'))}</span>")
+        return f"<span class=k>account: {esc(b['error'])}</span>"
+    return (f"<span>option buying power <b>{usd(b.get('option_buying_power'))}</b></span>"
+            f"<span class=k>available {usd(b.get('available_funds'))}</span>")
 
 
 def journal_html(service: ExecService, n: int = 20) -> str:
@@ -455,8 +481,19 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
                        nonce=nonce if live_preview else None, ticket=ticket, refused=bad)
     if bad and "data-stage=refused" not in panel:
         parts.append(f"<div class=bad>{esc(bad)}</div>")
-    # the strip first — the same on every stage (st-shhi)
-    parts.insert(0, state_html(st, actions, now=service.clock()))
+    # the strip first — the same on every stage (st-shhi); under it, the
+    # passphrase box when the service is LOCKED (Steve, 2026-09-15: "if panel
+    # is locked the Passphrase should be displayed") or the account's money
+    # when it can be read — the number he looks for first, at the top, not
+    # in the foot (st-2hei)
+    top = [state_html(st, actions, now=service.clock()),
+           wall_alert_html(st, service.clock())]
+    if st["arming"]["state"] == "LOCKED":
+        from .page import unlock_form
+        top.append(unlock_form(actions["unlock"], back="order"))
+    else:
+        top.append(f"<div class=money id=balances>{balances_html(st.get('balances'))}</div>")
+    parts[0:0] = top
     # The stage card only when there is a stage to show: with nothing held,
     # nothing working, no preview and no answer to show, the page opens on
     # the side buttons.
@@ -526,7 +563,6 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     parts.append(f"<div class=foot><span>today {money(pnl.get('day_usd'))} · "
                  f"{day['attempts_used']} of {day['attempts_used'] + day['attempts_left']} attempts</span>"
                  f"<span>headroom ${day['loss_headroom_usd']:.2f}</span></div>")
-    parts.append(f"<div class=foot id=balances>{balances_html(st.get('balances'))}</div>")
     # the journal, one tap away, kept fresh by the poll
     parts.append("<details id=journalbox class=journalbox><summary class='chip quiet'>journal</summary>"
                  f"<div class=card id=journal>{journal_html(service)}</div></details>")

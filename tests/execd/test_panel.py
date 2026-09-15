@@ -314,14 +314,14 @@ class TestTheAccountsMoney:
         service.unlock({"t": 1})
         service._balances_cache = None            # the unlock's status read came before the money
         body = text(page.get("/exec/order?side=call&delta=0.3"))
-        assert "option buying power $150.00" in body and "available funds $150.00" in body
+        assert "option buying power <b>$150.00</b>" in body and "available $150.00" in body
         assert "this needs $210.00 and the account has $150.00 available" in body
         broker.set_balances(available_funds=1607.24, option_buying_power=1607.24)
         service._balances_cache = None
         body = text(page.get("/exec/order?side=call&delta=0.3"))
         assert "available funds $1,607.24 — $1,397.24 after this" in body
         j = page.get("/exec/order/state").get_json()
-        assert "option buying power $1,607.24" in j["balances_html"]
+        assert "option buying power <b>$1,607.24</b>" in j["balances_html"]
 
     def test_a_broker_that_cannot_say_is_said_not_hidden(self, page, service, broker):
         service.unlock({"t": 1})

@@ -105,7 +105,7 @@ def test_the_page_shows_the_position_and_refreshes_only_while_it_is_open(armed: 
     assert "NET IF CLOSED NOW" in body and "-$11.30" in body
     assert "commissions, in and out" in body and "$1.30" in body
     assert "at the stop" in body and "stop 1.20" in body
-    assert "unrealized, net if closed now" in body
+    assert "unrealized, net" in body
     assert "pos-down" in body
 
 

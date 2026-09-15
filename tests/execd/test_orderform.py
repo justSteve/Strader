@@ -272,7 +272,9 @@ class TestPage:
         app.config["TESTING"] = True
         c = app.test_client()
         body = text(c.post("/exec/order/preview", data={"side": "call", "delta": "0.3"}))
-        assert "PAPER (simulated) — Preview from Schwab" in body and "<span class='badge paper'>PAPER</span>" in body
+        # the badge is the word; no "(simulated)" prefix (Steve, 2026-09-15, st-2hei)
+        assert "Preview from Schwab" in body and "<span class='badge paper'>PAPER</span>" in body
+        assert "simulated" not in body
 
     def test_embed_has_no_shell(self, order_page):
         body = text(order_page.get("/exec/order?side=call&embed=1"))
@@ -372,6 +374,69 @@ class TestThePadlockAndRePrice:
         body = text(order_page.get("/exec/order?side=call"))
         assert "id=panel" not in body.split("<script>")[0]
         assert "getElementById('panel') || document.body" in body and "window.__onQuote" in body
+
+
+class TestLockedInPlaceAndFewerWords:
+    """Steve, 2026-09-15: "if panel is locked the Passphrase should be
+    displayed. way too many words in execd screen, static clock, no need to
+    define PAPER. Still don't need 'GRANTS' section. Still looking for
+    Options Buying Power amt." [st-2hei]"""
+
+    def _locked_client(self, service, clock, mono, tmp_path):
+        vault = Vault(tmp_path / "vault.json")
+        vault.store(vault_payload(), PASS)
+        mfile = tmp_path / "market.json"
+        mfile.write_text(json.dumps(market_payload()))
+        market = CredentialFile(mfile)
+        market.load()
+        app = create_page(service, vault=vault, market=market, callback_url=CALLBACK,
+                          clock=clock, monotonic=mono)
+        app.config["TESTING"] = True
+        return app.test_client()
+
+    def test_a_locked_trading_page_unlocks_in_place(self, service, chain, clock, mono, tmp_path):
+        c = self._locked_client(service, clock, mono, tmp_path)
+        body = text(c.get("/exec/order"))
+        strip_end = body.index("</div></div>", body.index("class=strip")) + len("</div></div>")
+        after = body[strip_end:strip_end + 400]
+        assert "action='/exec/unlock'" in after and "name=back value='order'" in after
+        assert "name=passphrase" in after and ">UNLOCK<" in after
+        assert "account page" not in body and "account:" not in body and "unlock on" not in body
+        r = c.post("/exec/unlock", data={"passphrase": PASS, "back": "order"})
+        assert r.status_code == 303 and r.headers["Location"].startswith("/exec/order")
+        landing = text(c.get(r.headers["Location"]))
+        assert "Armed until" in landing and "action='/exec/unlock'" not in landing
+
+    def test_the_money_sits_under_the_strip_when_armed(self, order_page, armed, chain):
+        armed._balances_cache = (armed.clock(), {"available_funds": 1234.5,
+                                                 "option_buying_power": 2345.0})
+        body = text(order_page.get("/exec/order?side=call"))
+        money = body.index("class=money id=balances")
+        assert body.index("class=strip") < money < body.index("class=side")
+        assert "option buying power <b>$2,345.00</b>" in body and "available $1,234.50" in body
+        assert "class=foot id=balances" not in body
+
+    def test_a_near_or_past_wall_is_one_red_line_on_the_trading_page(self, order_page, armed):
+        """The grants card is gone; the wall it showed is the live feed's
+        failure point, so it survives as one line, only when it matters."""
+        from execd.orderpage import wall_alert_html
+        now = armed.clock()
+        far = {"credential": {"armed": True, "refresh_wall": (now + dt.timedelta(days=5)).isoformat()}}
+        near = {"credential": {"armed": True, "refresh_wall": (now + dt.timedelta(days=1)).isoformat()}}
+        past = {"credential": {"armed": False, "last_known_trading_wall": (now - dt.timedelta(days=1)).isoformat()}}
+        assert wall_alert_html(far, now) == ""
+        assert "hours left" in wall_alert_html(near, now) and "class=bad" in wall_alert_html(near, now)
+        assert "PAST THE WALL" in wall_alert_html(past, now)
+        assert wall_alert_html({"credential": None}, now) == ""
+
+    def test_the_account_page_has_no_definitions_and_no_grants(self, order_page):
+        body = text(order_page.get("/exec/account"))
+        for words in ("grants", "simulated", "orders reach Schwab", "enter the passphrase",
+                      "tailnet only", "vault present", "blocks new positions",
+                      "asks once more", "forget the credential", "do both in one sitting"):
+            assert words not in body, words
+        assert "<span class='badge live'>LIVE</span>" in body and ">STOP<" in body
+        assert "re-authorise (weekly)" in body and ">Today<" in body
 
 
 class TestARefusedSendIsShown:

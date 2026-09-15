@@ -369,7 +369,7 @@ class TestSurface:
         page.post("/exec/unlock", data={"passphrase": PASS})
         body = text(page.get("/exec/account"))
         assert "ARMED" in body and ">STOP<" in body and "FLATTEN" in body
-        assert "stand down" in body and "lock — forget" in body
+        assert ">stand down<" in body and ">lock<" in body
 
     def test_the_account_page_shows_the_journal_tail(self, page):
         page.post("/exec/unlock", data={"passphrase": PASS})

@@ -487,7 +487,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
             text = f"Refused ({r.get('bound')}): {r.get('reason')}. Nothing sent."
             return _order_page(sel, bad=text)
         p = out["preview"]
-        word = "PAPER (simulated) — " if out.get("mode") == "paper" else ""
+        word = ""   # the strip's badge says PAPER; no prefix (Steve, 2026-09-15, st-2hei)
         text = (f"{word}Preview from Schwab: {str(p.get('symbol', '')).strip()} x{p.get('qty')} "
                 f"at {float(p.get('price') or 0):.2f} — cost ${float(p.get('cost_usd') or 0):.2f}, "
                 f"commission ${float(p.get('commission_usd') or 0):.2f}, total "
@@ -682,8 +682,9 @@ _STYLE = """
  .LOCKED{color:#9ca3af}.ARMED{color:#34d399}.STOOD_DOWN{color:#fbbf24}
  .pos-up{border-left:6px solid #34d399}.pos-down{border-left:6px solid #f87171}
  td.neg{color:#f87171;font-weight:700}td.pos{color:#34d399;font-weight:700}
- .paper{background:#fbbf24;color:#111;font-weight:700;padding:.5em .7em;border-radius:6px;margin-bottom:.6em}
- .live{background:#dc2626;color:#fff;font-weight:700;padding:.5em .7em;border-radius:6px;margin-bottom:.6em}
+ .staterow{display:flex;align-items:center;gap:.6em}
+ .badge{font-weight:700;font-size:.8em;padding:4px 8px;border-radius:6px;letter-spacing:.04em}
+ .badge.paper{background:#fbbf24;color:#111}.badge.live{background:#dc2626;color:#fff}
  .stop-on{color:#f87171;font-weight:700}
  .k{color:#9ca3af;font-size:.9em}
  .big{display:block;width:100%;padding:.9em;font-size:1.25em;border-radius:12px;border:0;
@@ -737,13 +738,24 @@ def _fmt_wall(iso: str | None, now: datetime) -> str:
     return f"{days:.1f} days left ({when})"
 
 
+def unlock_form(action: str, back: str | None = None) -> str:
+    """The passphrase box and UNLOCK — on the account page, and on the
+    trading page whenever the service is LOCKED (Steve, 2026-09-15: "if panel
+    is locked the Passphrase should be displayed"). ``back=order`` brings the
+    answer to the trading page."""
+    back_field = f"<input type=hidden name=back value='{esc(back)}'>" if back else ""
+    return (f"<form method=post action='{action}'>{back_field}"
+            "<input type=password name=passphrase placeholder='passphrase' "
+            "autocomplete=current-password required>"
+            "<button class='big arm'>UNLOCK</button></form>")
+
+
 def _render_index(service: ExecService, vault: Vault, market: CredentialFile | None,
                   clock: Callable[[], datetime], a: dict[str, str], *,
                   msg: str | None, bad: str | None) -> str:
     st = service.status()
     arming = st["arming"]
     state = arming["state"]
-    now = clock()
     day = st["day"]
     parts: list[str] = []
 
@@ -754,46 +766,39 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     parts.append(f"<form method=get action='{a['order']}'>"
                  "<button class='big quiet'>← trade</button></form>")
 
-    # ── state ──
-    stop_line = ("<div class=stop-on>STOP IS ON — no new positions</div>"
-                 if arming["killed"] else "<div class=k>STOP is off</div>")
+    # ── state ── (Steve, 2026-09-15: "way too many words in execd screen …
+    # no need to define PAPER" — the badge is the word, the state is the
+    # word, and the only sentence left is STOP when it is on)
+    stop_line = ("<div class=stop-on>STOP IS ON</div>" if arming["killed"] else "")
     until = arming.get("expires_at_ct")
-    sub = {"LOCKED": "no credential in memory — enter the passphrase to arm",
-           "ARMED": f"armed until {until}" if until else "armed",
-           "STOOD_DOWN": "stood down — nothing new opens; exits still work"}[state]
+    sub = {"LOCKED": "", "ARMED": f"until {until}" if until else "",
+           "STOOD_DOWN": "exits only"}[state]
     mode = str(st.get("mode", "live"))
-    mode_line = ("<div class=paper>PAPER — orders are simulated against live quotes; "
-                 "nothing reaches Schwab's order book</div>" if mode == "paper"
-                 else "<div class=live>LIVE — orders reach Schwab</div>")
-    parts.append(f"<div class=card>{mode_line}"
-                 f"<div class='state {state}'>{state.replace('_', ' ')}</div>"
-                 f"<div class=k>{esc(sub)}</div>{stop_line}"
-                 f"<div class=k>{esc(st['now_ct'])} · service {esc(st['sha'])} · "
-                 f"mode {esc(mode)}</div></div>")
+    mode_badge = ("<span class='badge paper'>PAPER</span>" if mode == "paper"
+                  else "<span class='badge live'>LIVE</span>")
+    parts.append(f"<div class=card><div class=staterow>{mode_badge}"
+                 f"<span class='state {state}'>{state.replace('_', ' ')}</span>"
+                 f"<span class=k>{esc(sub)}</span></div>{stop_line}"
+                 f"<div class=k>service {esc(st['sha'])}</div></div>")
 
     # ── controls ──
     if state == "LOCKED":
-        parts.append(f"<form method=post action='{a['unlock']}'>"
-                     "<input type=password name=passphrase placeholder='vault passphrase' "
-                     "autocomplete=current-password required>"
-                     "<button class='big arm'>UNLOCK — arm until the close</button></form>")
+        parts.append(unlock_form(a["unlock"]))
     if not arming["killed"]:
-        parts.append(f"<form method=post action='{a['stop']}'><button class='big stop'>STOP</button>"
-                     "<div class=k>blocks new positions; never blocks getting out</div></form>")
+        parts.append(f"<form method=post action='{a['stop']}'><button class='big stop'>STOP</button></form>")
     else:
         parts.append(f"<form method=post action='{a['resume']}'>"
-                     "<input type=password name=passphrase placeholder='vault passphrase' "
+                     "<input type=password name=passphrase placeholder='passphrase' "
                      "autocomplete=current-password required>"
                      "<button class='big quiet'>clear STOP</button></form>")
     if state != "LOCKED":
         parts.append(f"<form method=post action='{a['flatten']}'>"
-                     "<button class='big exit'>FLATTEN — close everything</button>"
-                     "<div class=k>asks once more on the next page</div></form>")
+                     "<button class='big exit'>FLATTEN</button></form>")
         if state == "ARMED":
             parts.append(f"<form method=post action='{a['stand_down']}'>"
-                         "<button class='big quiet'>stand down for the day</button></form>")
+                         "<button class='big quiet'>stand down</button></form>")
         parts.append(f"<form method=post action='{a['lock']}'>"
-                     "<button class='big cancel'>lock — forget the credential</button></form>")
+                     "<button class='big cancel'>lock</button></form>")
 
     # ── the position, with its money ──
     for p in st["positions"]:
@@ -803,15 +808,15 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     # ── the day ──
     pnl = st.get("pnl") or {}
     rows = [
-        ("open positions", day["open_positions"]),
-        ("realized today", f"{_money(pnl.get('realized_usd'))} over {pnl.get('closes', 0)} close(s)"),
-        ("unrealized, net if closed now", _money(pnl.get("unrealized_net_usd"))),
-        ("day, realized + unrealized", _money(pnl.get("day_usd"))),
+        ("open", day["open_positions"]),
+        ("realized", f"{_money(pnl.get('realized_usd'))} over {pnl.get('closes', 0)} close(s)"),
+        ("unrealized, net", _money(pnl.get("unrealized_net_usd"))),
+        ("day", _money(pnl.get("day_usd"))),
         # Signed and red when there is one: "$40.00" read as a gain (Steve,
         # 2026-09-14); a loss against the ceiling is "-$40.00" in red.
-        ("realized loss against the ceiling",
+        ("loss vs ceiling",
          _money(-day["realized_loss_usd"]) if day["realized_loss_usd"] else "$0.00"),
-        ("headroom to the ceiling", f"${day['loss_headroom_usd']:.2f}"),
+        ("headroom", f"${day['loss_headroom_usd']:.2f}"),
         ("attempts", f"{day['attempts_used']} used, {day['attempts_left']} left"),
     ]
     parts.append("<h2>Today</h2><div class=card><table>" + "".join(
@@ -821,26 +826,17 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
         lines = ["working " + json.dumps(w, separators=(",", ":")) for w in st["working"]]
         parts.append("<div class=card><pre>" + esc("\n".join(lines)) + "</pre></div>")
 
-    # ── credentials ──
-    cred = st.get("credential") or {}
-    trading_line = (_fmt_wall(cred.get("refresh_wall"), now) if cred.get("armed")
-                    else esc(cred.get("detail") or "locked — unlock to see its wall"))
-    mk = cred.get("market") or {}
-    market_line = (_fmt_wall(mk.get("refresh_wall"), now) if mk.get("armed")
-                   else esc(mk.get("detail") or "no market credential loaded"))
-    parts.append("<h2>Schwab grants</h2><div class=card><table>"
-                 f"<tr><td>trading app</td><td>{trading_line}</td></tr>"
-                 f"<tr><td>market-data app</td><td>{market_line}</td></tr>"
-                 f"<tr><td>vault</td><td>{'present' if vault.exists else 'MISSING'} — "
-                 f"{esc(str(vault.path))}</td></tr></table></div>")
+    # ── re-authorisation ── (the grants card is gone — Steve, 2026-09-15:
+    # "Still don't need 'GRANTS' section"; the walls are the service's to
+    # alert on, [ALERT] one line, not a table for him to read)
     parts.append(
-        "<details><summary>re-authorise an app (weekly; do both in one sitting)</summary>"
+        "<details><summary>re-authorise (weekly)</summary>"
         f"<div class=card><form method=post action='{a['reauth_link']}'>"
-        "<label><input type=radio name=app value=trading checked> trading app</label> &nbsp; "
-        "<label><input type=radio name=app value=market> market-data app</label>"
-        "<input type=password name=passphrase placeholder='vault passphrase' "
+        "<label><input type=radio name=app value=trading checked> trading</label> &nbsp; "
+        "<label><input type=radio name=app value=market> market data</label>"
+        "<input type=password name=passphrase placeholder='passphrase' "
         "autocomplete=current-password required style='margin-top:.5em'>"
-        "<button class='big quiet'>show the login link</button></form></div></details>")
+        "<button class='big quiet'>login link</button></form></div></details>")
 
     # ── journal ──
     tail = service.journal.tail(12)
@@ -849,9 +845,8 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
                  + " ".join(f"{k}={_short(v)}" for k, v in e.items()
                             if k not in ("ts", "ts_ct", "event", "sha"))
                  for e in reversed(tail)]
-        parts.append("<h2>Journal, latest first</h2><div class=card><pre>"
+        parts.append("<h2>Journal</h2><div class=card><pre>"
                      + esc("\n".join(lines)) + "</pre></div>")
-    parts.append(f"<div class=k>{esc(PAGE_URL)} · tailnet only</div>")
     live_money = bool(st["positions"] or st["working"])
     return _page("execd", "".join(parts), refresh_s=5 if live_money else None)
 
@@ -859,7 +854,7 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
 def _describe_place(out: dict[str, Any]) -> str:
     """The service's answer to a send, in plain words — the desk's wording,
     kept here because the installed service has no ``strader/``."""
-    word = "PAPER (simulated) — " if out.get("mode") == "paper" else ""
+    word = ""   # the strip's badge says PAPER; no prefix (Steve, 2026-09-15, st-2hei)
     if out.get("refused"):
         r = out["refused"]
         return f"{word}Refused ({r.get('bound')}): {r.get('reason')}. Nothing sent."
@@ -897,7 +892,7 @@ def _describe_place(out: dict[str, Any]) -> str:
 
 def _describe_adjust(out: dict[str, Any]) -> str:
     """The service's answer to an UPDATE, in plain words."""
-    word = "PAPER (simulated) — " if out.get("mode") == "paper" else ""
+    word = ""   # the strip's badge says PAPER; no prefix (Steve, 2026-09-15, st-2hei)
     parts: list[str] = []
     for leg, name in (("stop", "Stop"), ("target", "Target")):
         r = out.get(leg)
