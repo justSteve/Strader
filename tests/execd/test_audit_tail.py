@@ -158,6 +158,43 @@ class TestStopHasTheLastLook:
         assert "while this entry was being priced" in out["refused"]["reason"]
         assert [kw for kw in broker.calls_to("place")] == []
 
+    def test_a_stop_from_the_page_during_a_slow_preview_blocks_the_send(self, armed, broker):
+        """Finding 35 of the 2026-09-15 audit (st-jm6u): the first fix only
+        saw a STOP file touched from a shell. ``service.stop()`` — what the
+        page, the iPad and the API call — took the service lock, and ``place``
+        holds that lock across the whole entry, so a STOP pressed during a
+        slow preview queued behind the send it was meant to stop. Here the
+        preview blocks until STOP has been *pressed through the service* from
+        another thread; the send must then be refused."""
+        import threading
+
+        in_preview = threading.Event()
+        release = threading.Event()
+        real_preview = broker.preview
+
+        def slow_preview(intent):
+            in_preview.set()
+            assert release.wait(5), "the STOP thread never released the preview"
+            return real_preview(intent)
+
+        broker.preview = slow_preview
+        result: dict = {}
+        placer = threading.Thread(
+            target=lambda: result.update(armed.place(entry(intent_id="lastlook-2"))))
+        placer.start()
+        assert in_preview.wait(5)
+        # STOP pressed on the page while the entry is being priced. Before
+        # st-jm6u this call blocked here until place() had sent the order.
+        stopper = threading.Thread(target=armed.stop)
+        stopper.start()
+        stopper.join(2)
+        assert not stopper.is_alive(), "STOP waited behind the entry's lock"
+        assert armed.arming.killed
+        release.set()
+        placer.join(5)
+        assert result["refused"]["bound"] == "stop"
+        assert [kw for kw in broker.calls_to("place")] == []
+
 
 class TestMidnightDoesNotFreeASlot:
     """Finding 9, the rollover half: the day's count is rebuilt from today's

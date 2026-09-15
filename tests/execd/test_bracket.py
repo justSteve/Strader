@@ -1033,3 +1033,158 @@ class TestThePage:
         landing = text(page.get(r.headers["Location"]))
         assert "Protective stop resting" in landing and "Take-profit resting" in landing
         assert "at 21.00" in landing
+
+
+# ── a cancel is an ask (2026-09-15 audit, findings 24, 28, 29; st-7ah8) ──
+
+class TestCancelIsAnAsk:
+    """The transport's cancel is a DELETE the broker acknowledges and works;
+    the read that follows can say PENDING_CANCEL, which is an order the
+    exchange still holds. Until 2026-09-15 ``_pull_leg`` booked every
+    non-FILLED answer as "the leg is off", so the market close went out
+    beside a live stop, both sold, and the short was invisible."""
+
+    def test_a_pending_cancel_defers_the_close_and_keeps_the_stop(self, holding, broker):
+        broker.cancel_pending = True
+        out = holding.observe(NEAR_STOP - 1)
+        fired = out["fired"][0]
+        assert fired["status"] == "DEFERRED" and fired["closed"] is False
+        assert sells(broker) == []                         # nothing sent beside a live stop
+        assert pos_of(holding)["stop_order_id"] is not None
+        assert holding.journal.events("cancel_pending")
+        assert legs(broker)["stop"]                        # still resting at the broker
+
+    def test_once_the_cancel_is_done_the_close_goes_out(self, holding, broker):
+        broker.cancel_pending = True
+        holding.observe(NEAR_STOP - 1)
+        stop_id = pos_of(holding)["stop_order_id"]
+        broker.cancel_pending = False
+        broker.resolve_pending_cancel(stop_id)
+        out = holding.observe(NEAR_STOP - 1)
+        assert out["fired"][0]["closed"] is True
+        assert len(sells(broker)) == 1
+        assert holding.status()["positions"] == []
+
+    def test_a_leg_left_behind_by_a_close_is_carried_as_loose_until_reconcile_sees_it_off(
+            self, holding, broker, clock):
+        """The stop fills at the broker; the target's cancel is only
+        acknowledged. The close is booked, the position dropped — and the
+        target is NOT forgotten: it is loose, on /status and in the journal,
+        and reconcile keeps asking after it until it is terminal."""
+        stop_id = pos_of(holding)["stop_order_id"]
+        target_id = pos_of(holding)["target_order_id"]
+        broker.cancel_pending = True
+        clock.advance(seconds=1)
+        broker.trigger_stop(stop_id)
+        holding.poll_fills()
+        assert holding.status()["positions"] == []
+        loose = holding.status()["loose_legs"]
+        assert [l["order_id"] for l in loose] == [target_id]
+        assert loose[0]["leg"] == "take-profit"
+        assert holding.journal.events("leg_unconfirmed")
+        # a second sweep, still pending: still loose
+        holding.reconcile()
+        assert holding.status()["loose_legs"]
+        # the exchange finishes the cancel
+        broker.cancel_pending = False
+        broker.resolve_pending_cancel(target_id)
+        out = holding.reconcile()
+        assert out["loose"] == [{"symbol": CALL, "order_id": target_id,
+                                 "leg": "take-profit", "outcome": "canceled"}]
+        assert holding.status()["loose_legs"] == []
+        assert holding.journal.events("leg_resolved")
+
+    def test_a_loose_leg_that_fills_is_a_short_and_is_never_silent(self, holding, broker, clock):
+        stop_id = pos_of(holding)["stop_order_id"]
+        target_id = pos_of(holding)["target_order_id"]
+        broker.cancel_pending = True
+        clock.advance(seconds=1)
+        broker.trigger_stop(stop_id)
+        holding.poll_fills()
+        assert holding.status()["loose_legs"]
+        # the pending cancel loses the race: the target fills after the close
+        broker.cancel_pending = False
+        broker.set_quote(CALL, bid=21.50, ask=21.60)
+        broker.fill_resting(target_id)
+        holding.reconcile()
+        over = holding.journal.events("oversold")
+        assert over and over[0]["order_id"] == target_id and over[0]["leg"] == "take-profit"
+        assert holding.status()["loose_legs"] == []
+        # the broker now holds a short, and the page can see it
+        assert holding.status()["shorts"] == [{"symbol": CALL, "qty": -1}]
+        assert holding.journal.events("short_held")
+        # it is not adopted, not flattened, and the slot count is honest
+        assert holding.status()["positions"] == []
+
+    def test_a_loose_leg_survives_a_restart(self, holding, broker, clock, tmp_path):
+        stop_id = pos_of(holding)["stop_order_id"]
+        target_id = pos_of(holding)["target_order_id"]
+        broker.cancel_pending = True
+        clock.advance(seconds=1)
+        broker.trigger_stop(stop_id)
+        holding.poll_fills()
+        again = ExecService(broker, holding.config, clock=clock)
+        assert [l["order_id"] for l in again.status()["loose_legs"]] == [target_id]
+        broker.cancel_pending = False
+        broker.resolve_pending_cancel(target_id)
+        again.reconcile()
+        assert again.status()["loose_legs"] == []
+
+    def test_a_sell_on_a_symbol_not_held_is_journaled_once_not_dropped(self, armed, broker):
+        """Finding 29: a SELL_TO_CLOSE the sweep could attribute to no
+        position was ``continue``d. It is the last chance to see a short."""
+        from execd.broker import Fill
+        broker._fills.append(Fill("foreign-9", PUT, Side.SELL_TO_CLOSE, 1, 1.85,
+                                  armed.clock() + __import__("datetime").timedelta(seconds=1)))
+        armed.poll_fills()
+        armed.poll_fills()
+        lines = armed.journal.events("unattributed_sell")
+        assert len(lines) == 1 and lines[0]["order_id"] == "foreign-9" and lines[0]["symbol"] == PUT
+
+    def test_a_cancel_that_errors_keeps_the_leg_id_so_no_second_stop_is_rested(
+            self, holding, broker, clock):
+        """Finding 39's mirror: ``_cancel_leg_quietly`` cleared the id on a
+        BrokerError, so a cancel that timed out but succeeded was forgotten
+        and the next re-rest put a second stop beside the first."""
+        stop_id = pos_of(holding)["stop_order_id"]
+        # the target fills at the broker; the fill sweep books it and
+        # _book_close then cancels the stop — and that cancel errors
+        target_id = pos_of(holding)["target_order_id"]
+        broker.set_quote(CALL, bid=21.50, ask=21.60)
+        clock.advance(seconds=1)
+        broker.fill_resting(target_id)
+        real_cancel = broker.cancel
+        errored: list[str] = []
+
+        def cancel_once_erroring(order_id):
+            if not errored:
+                errored.append(order_id)
+                raise BrokerError("socket closed")
+            return real_cancel(order_id)
+
+        broker.cancel = cancel_once_erroring
+        holding.poll_fills()
+        assert errored == [stop_id]
+        # the position is closed (target filled the whole size) and the stop,
+        # whose cancel errored, is loose — not forgotten
+        assert holding.status()["positions"] == []
+        assert [l["order_id"] for l in holding.status()["loose_legs"]] == [stop_id]
+        assert len(legs(broker)["stop"]) == 1              # one stop at the broker, not two
+        holding.reconcile()                                # the retry cancels it
+        assert holding.status()["loose_legs"] == [] and legs(broker)["stop"] == []
+
+
+class TestFilledQuantityFallback:
+    """01 §6 of the 2026-08-30 audit, never closed: ``filled_qty or pos.qty``
+    booked a full close for a FILLED order whose body carried no quantity.
+    The fallback is the order's own size, never the position's."""
+
+    def test_a_filled_order_with_no_quantity_books_its_own_size(self):
+        from execd.service import _filled_qty_of
+        o = OrderResult(order_id="x", status=OrderStatus.FILLED, symbol=CALL,
+                        side=Side.SELL_TO_CLOSE, qty=1, order_type=OrderType.MARKET,
+                        filled_qty=0, fill_price=2.0)
+        assert _filled_qty_of(o) == 1
+        assert _filled_qty_of(OrderResult(order_id="y", status=OrderStatus.FILLED, symbol=CALL,
+                                          side=Side.SELL_TO_CLOSE, qty=3, order_type=OrderType.MARKET,
+                                          filled_qty=2, fill_price=2.0)) == 2

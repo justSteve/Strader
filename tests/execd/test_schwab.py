@@ -183,6 +183,10 @@ class FakeSchwab:
         self.place_detail = "rejected by validation"
         self.fail_get_order_once = False
         self.cancel_status = 200
+        #: a DELETE is acknowledged, not done: the order reads PENDING_CANCEL
+        #: for this many GETs before it reads CANCELED (finding 24, st-7ah8).
+        #: -1 = pending forever.
+        self.pending_cancel_reads = 0
         self.positions: list[dict[str, Any]] = []
         self.preview = spec_preview()
         self.fill_on_place: list[tuple[float, float, str]] | None = None
@@ -273,7 +277,12 @@ class FakeSchwab:
                     return schwab_error(503, "temporarily unavailable")
                 if oid not in self.orders:
                     return schwab_error(404, "order not found")
-                return httpx.Response(200, json=self.orders[oid])
+                o = self.orders[oid]
+                if o["status"] == "PENDING_CANCEL" and self.pending_cancel_reads == 0:
+                    o["status"] = "CANCELED"
+                elif o["status"] == "PENDING_CANCEL" and self.pending_cancel_reads > 0:
+                    self.pending_cancel_reads -= 1
+                return httpx.Response(200, json=o)
             if request.method == "DELETE":
                 if self.cancel_status >= 500:
                     return schwab_error(self.cancel_status, "server error")
@@ -281,7 +290,7 @@ class FakeSchwab:
                 if o is None:
                     return schwab_error(404, "order not found")
                 if o["status"] in ("WORKING", "ACCEPTED", "QUEUED"):
-                    o["status"] = "CANCELED"
+                    o["status"] = "PENDING_CANCEL" if self.pending_cancel_reads else "CANCELED"
                     o["cancelable"] = False
                     return httpx.Response(200)
                 return schwab_error(400, "order is not cancelable")
@@ -636,6 +645,31 @@ class TestAccount:
         assert got["SPXW  260904P07600000"].qty == -1
         assert broker.excluded_positions == {"EQUITY": 1, "OPTION": 1}
 
+    def test_positions_admit_by_occ_root_not_by_the_underlying_field(self, broker, fake):
+        """Finding 23 (st-zm2u). The account body's ``underlyingSymbol`` for an
+        option leg has never been recorded; every recorded ORDER leg for an
+        SPXW contract says ``SPXW``, and the old filter admitted only ``SPX``
+        — it would have excluded the service's own position and cancelled
+        its bracket ninety seconds after the first live fill. Whatever the
+        field says, an SPXW or SPX root is admitted and any other is not."""
+        fake.positions = [
+            spec_position(CALL, 1, 0, 2.10, underlying="SPXW"),               # what the order legs say
+            spec_position("SPX   260918C07700000", 1, 0, 9.0, underlying="$SPX"),
+            spec_position("SPXW  260904P07600000", 1, 0, 1.50, underlying=""),   # field absent
+            spec_position("NDXP  260904C20000000", 1, 0, 3.0, underlying="$NDX"),
+            spec_position("SPY   260918C00500000", 1, 0, 3.0, underlying="SPX"),   # lies about it
+        ]
+        got = {p.symbol for p in broker.positions()}
+        assert got == {CALL, "SPX   260918C07700000", "SPXW  260904P07600000"}
+        assert broker.excluded_positions == {"OPTION": 2}
+        assert broker.roots == frozenset({"SPX", "SPXW"})
+
+    def test_the_roots_come_from_the_bounds_in_production(self, fake, cred):
+        b = SchwabBroker(lambda: cred, clock=lambda: NOW, roots=("SPX",),
+                         transport=httpx.MockTransport(fake.handler))
+        fake.positions = [spec_position(CALL, 1, 0, 2.10, underlying="SPXW")]
+        assert b.positions() == [] and b.excluded_positions == {"OPTION": 1}
+
     def test_positions_asks_for_the_positions_field(self, broker, fake):
         broker.positions()
         method, path, params, _b, _a = fake.calls[-1]
@@ -735,6 +769,37 @@ class TestCancel:
         placed = broker.place(intent())
         r = broker.cancel(placed.order_id)
         assert r.status is OrderStatus.FILLED and r.fill_price == 2.08
+
+    def test_a_pending_cancel_is_re_read_until_it_is_done(self, fake, cred):
+        """Finding 24 (st-7ah8): the DELETE is an ask. Two reads say
+        PENDING_CANCEL, the third says CANCELED; the transport sleeps between
+        reads and returns the terminal answer."""
+        naps: list[float] = []
+        broker = SchwabBroker(lambda: cred, clock=lambda: NOW, sleep=naps.append,
+                              transport=httpx.MockTransport(fake.handler))
+        placed = broker.place(intent())
+        fake.pending_cancel_reads = 2
+        r = broker.cancel(placed.order_id)
+        assert r.status is OrderStatus.CANCELED
+        after_delete = [c for c in fake.calls[[c[0] for c in fake.calls].index("DELETE"):]]
+        gets = [c for c in after_delete if c[0] == "GET" and c[1].endswith(placed.order_id)]
+        assert len(gets) == 3 and naps == [S.CANCEL_POLL_S, S.CANCEL_POLL_S]
+
+    def test_a_cancel_still_pending_at_the_deadline_is_returned_as_working(self, fake, cred):
+        """The other half: a cancel the exchange never confirms comes back
+        WORKING with the broker's own word, so the service treats the leg as
+        still resting — never as off."""
+        naps: list[float] = []
+        broker = SchwabBroker(lambda: cred, clock=lambda: NOW, sleep=naps.append,
+                              transport=httpx.MockTransport(fake.handler))
+        placed = broker.place(intent())
+        fake.pending_cancel_reads = -1
+        r = broker.cancel(placed.order_id)
+        assert r.status is OrderStatus.WORKING and r.is_working
+        assert r.message == "PENDING_CANCEL"
+        polls = int(S.CANCEL_CONFIRM_S / S.CANCEL_POLL_S)
+        assert len(naps) == polls - 1
+        assert sum(naps) < S.TIMEOUT_S      # never longer than one request timeout
 
     def test_a_broker_outage_on_cancel_is_a_broker_error(self, broker, fake):
         placed = broker.place(intent())

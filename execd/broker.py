@@ -264,6 +264,12 @@ class MockBroker:
         #   a real broker acknowledges a market order before reporting its fill,
         #   and the service has to survive that gap (finding 2, st-97z1)
         self.partial_fill_qty: int | None = None   # next fill takes only this many
+        self.cancel_pending: bool = False      # standing: a cancel is acknowledged, not
+        #   done — the order stays WORKING with the broker's word PENDING_CANCEL until
+        #   ``resolve_pending_cancel`` (finding 24, st-7ah8: Schwab's DELETE is an ask)
+        self.accept_then_fail_next: str | None = None   # the next place() is taken by
+        #   the broker and then the socket dies: the order rests, the caller gets a
+        #   BrokerError (finding 25, st-xlz9)
 
     # ── setup ────────────────────────────────────────────────────────────
     def set_quote(self, symbol: str, bid: float, ask: float,
@@ -361,6 +367,13 @@ class MockBroker:
         if (msg := self.reject_next) is not None:
             self.reject_next = None
             return self._store(self._new_order(intent, OrderStatus.REJECTED, message=msg))
+        if (msg := self.accept_then_fail_next) is not None:
+            # The broker took the order; the answer never reached the caller.
+            self.accept_then_fail_next = None
+            self._store(self._new_order(intent, OrderStatus.WORKING,
+                                        price=intent.limit if intent.order_type is OrderType.LIMIT
+                                        else intent.stop_price))
+            raise BrokerError(msg)
 
         if intent.order_type is OrderType.STOP:
             # A protective stop rests at the broker until price reaches it —
@@ -407,6 +420,10 @@ class MockBroker:
             # Not an error: a stop that already filled is a race the service
             # must survive, so cancelling it reports what actually happened.
             return order
+        if self.cancel_pending:
+            pending = replace(order, message="PENDING_CANCEL")
+            self._orders[order_id] = pending
+            return pending
         canceled = replace(order, status=OrderStatus.CANCELED)
         self._orders[order_id] = canceled
         return canceled
@@ -464,6 +481,18 @@ class MockBroker:
         rejected = replace(order, status=OrderStatus.REJECTED, message=message)
         self._orders[order_id] = rejected
         return rejected
+
+    def resolve_pending_cancel(self, order_id: str) -> OrderResult:
+        """The exchange finished the cancel a ``cancel_pending`` broker only
+        acknowledged."""
+        order = self._orders.get(order_id)
+        if order is None:
+            raise BrokerError(f"no such order: {order_id}")
+        if order.status is not OrderStatus.WORKING:
+            return order
+        canceled = replace(order, status=OrderStatus.CANCELED, message="")
+        self._orders[order_id] = canceled
+        return canceled
 
     def working_orders(self, symbol: str | None = None) -> list[OrderResult]:
         return [o for o in self._orders.values()

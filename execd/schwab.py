@@ -86,7 +86,7 @@ import httpx
 from .arming import Locked
 from .broker import (MARKET_READS, BrokerError, Fill, OrderLeg, OrderResult, OrderStatus,
                      Position, Preview, Quote)
-from .intent import OrderIntent, OrderType, Side
+from .intent import OrderIntent, OrderType, Side, parse_occ
 
 API = "https://api.schwabapi.com"
 TOKEN_ENDPOINT = f"{API}/v1/oauth/token"
@@ -106,6 +106,14 @@ TIMEOUT_S = 15.0
 #: How far back ``orders()`` looks. Two days: a resting order entered before
 #: midnight is still the service's business the next morning (finding 9).
 ORDERS_LOOKBACK = timedelta(days=2)
+
+#: A cancel is an ask. After the DELETE the order is re-read until its status
+#: is terminal or this long has passed; a non-terminal answer at the deadline
+#: is returned as such and the service treats the leg as still resting
+#: (finding 24, st-7ah8). Six seconds is under one watcher tick short of the
+#: request timeout, so a slow cancel cannot stack behind the next sweep.
+CANCEL_CONFIRM_S = 6.0
+CANCEL_POLL_S = 0.5
 
 CONTRACT_MULTIPLIER = 100
 
@@ -477,13 +485,22 @@ class SchwabBroker:
                  market_credential_source: Callable[[], Any] | None = None,
                  clock: Callable[[], datetime] = _utcnow,
                  underlying: str = "$SPX", account_index: int = 0,
+                 roots: tuple[str, ...] | None = None,
                  transport: httpx.BaseTransport | None = None,
-                 timeout_s: float = TIMEOUT_S) -> None:
+                 timeout_s: float = TIMEOUT_S,
+                 sleep: Callable[[float], None] = time.sleep) -> None:
         self.credential_source = credential_source
         self.market_credential_source = market_credential_source
         self.clock = clock
         self.underlying = underlying
+        #: the OCC roots whose positions are this service's to see — the
+        #: bounds' ``instruments`` in production. Defaults to the index and
+        #: its weekly root, which is what SPX/SPXW are to each other.
+        base = underlying.lstrip("$").upper()
+        self.roots: frozenset[str] = frozenset(r.upper() for r in roots) if roots \
+            else frozenset({base, base + "W"})
         self.account_index = account_index
+        self._sleep = sleep
         self._client = httpx.Client(base_url=API, timeout=timeout_s, transport=transport)
         self._lock = threading.RLock()
         # in-memory only, per app, keyed on the refresh token they were derived
@@ -821,7 +838,18 @@ class SchwabBroker:
         """Spec-derived: ``DELETE .../orders/{id}`` → 200 empty; then a read.
         A DELETE the broker refuses (already filled, already gone) is not an
         error here: the read that follows says what actually happened, which
-        is the race the stop logic is written to survive."""
+        is the race the stop logic is written to survive.
+
+        **The DELETE is an ask, not an answer.** Schwab acknowledges a cancel
+        and works it: the read that follows can say ``PENDING_CANCEL``, which
+        is an order the exchange still holds — it can still fill. So the read
+        is repeated until the status is terminal (``FILLED``, ``CANCELED``,
+        ``REJECTED``, ``EXPIRED``) or :data:`CANCEL_CONFIRM_S` has passed. A
+        result that is still :attr:`~execd.broker.OrderResult.is_working` at
+        the deadline is returned as such, with the broker's own word in
+        ``message``, and the service treats it as *not off* (finding 24 of the
+        2026-09-15 audit, st-7ah8: booking a pending cancel as done sent the
+        market close out beside a live stop)."""
         h = self.account_hash()
         path = f"/trader/v1/accounts/{h}/orders/{order_id}"
         app = app_for(path)
@@ -831,7 +859,13 @@ class SchwabBroker:
         if r.status_code in (401, 403) or r.status_code >= 500:
             raise BrokerError(f"schwab DELETE {self._scrub(path)}: HTTP {r.status_code} "
                               f"{_error_detail(r)}".rstrip())
-        return self._get_order(h, order_id)
+        polls = max(1, int(CANCEL_CONFIRM_S / CANCEL_POLL_S))
+        for i in range(polls):
+            result = self._get_order(h, order_id)
+            if not result.is_working or i == polls - 1:
+                return result
+            self._sleep(CANCEL_POLL_S)
+        raise AssertionError("unreachable")  # pragma: no cover
 
     def orders(self) -> list[OrderResult]:
         return [self._to_result(o) for o in self._orders_raw()]
@@ -841,11 +875,17 @@ class SchwabBroker:
         ``{securitiesAccount: {positions: [{longQuantity, shortQuantity,
         averagePrice, instrument: {assetType, symbol, underlyingSymbol}}]}}``.
 
-        Only options on ``underlying`` are reported. The service adopts any
-        position it is shown so that flatten reaches it (st-v7oa); a share
-        position in the same account is not this service's to flatten, so it
-        is not shown. What was left out is counted in
-        :attr:`excluded_positions` for the status page."""
+        Only options whose OCC root is in :attr:`roots` are reported — the
+        same test every bound makes on an intent. The account body's
+        ``underlyingSymbol`` is **not** consulted: it has never been recorded
+        for an option leg (the 2026-09-05 account fixtures hold no positions),
+        while every recorded *order* leg for an SPXW contract says ``SPXW``,
+        and a filter on ``SPX`` would have excluded the service's own position
+        and cancelled its bracket ninety seconds after the first live fill
+        (finding 23 of the 2026-09-15 audit, st-zm2u). A share position in
+        the same account is not this service's to flatten, so it is not shown.
+        What was left out is counted in :attr:`excluded_positions`, which
+        ``/status`` carries as ``excluded_positions`` so it is visible."""
         h = self.account_hash()
         body = self._json(self._request("GET", f"/trader/v1/accounts/{h}",
                                         params={"fields": "positions"}), "positions")
@@ -854,14 +894,17 @@ class SchwabBroker:
             raise BrokerError("schwab account body carries no securitiesAccount")
         out: list[Position] = []
         excluded: dict[str, int] = {}
-        want = self.underlying.lstrip("$").upper()
         for p in acct.get("positions") or []:
             if not isinstance(p, dict):
                 continue
             inst = p.get("instrument") or {}
             asset = str(inst.get("assetType") or "UNKNOWN")
-            under = str(inst.get("underlyingSymbol") or "").lstrip("$").upper()
-            if asset != "OPTION" or (under and under != want):
+            symbol = str(inst.get("symbol") or "")
+            try:
+                root = parse_occ(symbol).root if asset == "OPTION" else ""
+            except ValueError:
+                root = ""
+            if asset != "OPTION" or root not in self.roots:
                 excluded[asset] = excluded.get(asset, 0) + 1
                 continue
             qty = int(round(float(p.get("longQuantity") or 0.0) - float(p.get("shortQuantity") or 0.0)))

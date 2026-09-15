@@ -173,6 +173,15 @@ class WorkingEntry:
 POSITION_SETTLE_S = 90.0
 
 
+def _filled_qty_of(order: OrderResult) -> int:
+    """How many contracts a FILLED order filled. The broker's
+    ``filledQuantity`` when it carries one; the order's own size when it does
+    not — a FILLED order fills what it asked for. Never the *position's* size:
+    ``filled_qty or pos.qty`` booked a full close for a partial the body did
+    not size (audit 2026-08-30 01 §6, never closed; st-7ah8)."""
+    return order.filled_qty if order.filled_qty > 0 else order.qty
+
+
 @dataclass
 class OpenPosition:
     """What the service must remember about a live position to protect it."""
@@ -243,6 +252,16 @@ class ExecService:
         self._lock = threading.RLock()
         self._open: dict[str, OpenPosition] = {}
         self._working: dict[str, WorkingEntry] = {}
+        #: bracket legs whose position is gone but whose cancel was never
+        #: confirmed — order_id → {symbol, leg, qty, intent_id} (st-7ah8)
+        self._loose_legs: dict[str, dict[str, Any]] = {}
+        #: what the broker holds short on this service's instruments — symbol
+        #: → qty (negative). Never this service's to manage, always its to
+        #: show: the one state the bracket exists to prevent (st-7ah8)
+        self._shorts: dict[str, int] = {}
+        #: sells the fill sweep could attribute to no position, by order id,
+        #: so each is journaled once
+        self._unattributed: set[str] = set()
         self._last_fill_poll = clock()
         self._recover()
 
@@ -304,11 +323,21 @@ class ExecService:
 
     def stop(self) -> dict[str, Any]:
         """STOP on. Reachable from the API and from Steve's phone: turning the
-        kill switch on is the one control that must never be gated."""
-        with self._lock:
-            self.arming.stop()
-            self.journal.record("stop", killed=True)
-            return self.status()
+        kill switch on is the one control that must never be gated.
+
+        The kill file is written **before** the service lock is taken. ``place``
+        holds that lock across every broker round trip of an entry — reconcile,
+        the quote, the preview, the send — and a STOP that waited for it landed
+        after the order it was meant to stop (finding 35 of the 2026-09-15
+        audit, the half of finding 10 the first fix did not reach; st-jm6u).
+        Nothing here takes the service lock at all: the touch is atomic and
+        idempotent, the journal has its own lock, and the status read is a
+        snapshot the page can afford to see mid-entry. Waiting for the lock
+        even to journal would hold the page's STOP response open until the
+        entry returned from the broker — true, but late."""
+        self.arming.stop()
+        self.journal.record("stop", killed=True)
+        return self.status()
 
     def resume(self) -> dict[str, Any]:
         """STOP off. Page-only — an agent must not be able to undo the switch."""
@@ -341,6 +370,13 @@ class ExecService:
             # they were not — two reads, two bids, two different nets).
             "positions": [{**p.to_dict(), "valuation": v} for p, v in valuations],
             "working": [w.to_dict() for w in self._working.values()],
+            # The three things that must never be silent (2026-09-15 audit,
+            # st-7ah8 / st-zm2u): a leg resting with no position behind it, a
+            # short the account holds, and holdings the positions reader left
+            # out — each is a line on the page until it is gone.
+            "loose_legs": [{"order_id": k, **v} for k, v in self._loose_legs.items()],
+            "shorts": [{"symbol": s, "qty": q} for s, q in self._shorts.items()],
+            "excluded_positions": dict(getattr(self.broker, "excluded_positions", {}) or {}),
             "pnl": self._day_pnl([v for _p, v in valuations]),
             "bounds": self.bounds.to_dict(),
             "journal": str(self.journal.path_for()),
@@ -678,8 +714,23 @@ class ExecService:
         self._last_fill_poll = now
         picked: list[dict[str, Any]] = []
         for fill in fills:
+            if fill.side is not Side.SELL_TO_CLOSE:
+                continue
             pos = self._open.get(fill.symbol)
-            if pos is None or fill.side is not Side.SELL_TO_CLOSE:
+            if pos is None:
+                # A sell on a symbol this service is not holding. Until
+                # 2026-09-15 this was dropped on the floor, which is how a
+                # stop that filled after its position was closed became an
+                # invisible short (finding 29, st-7ah8). It is journaled
+                # once, loud; a loose leg's fill is booked by reconcile.
+                if fill.order_id in self._loose_legs or fill.order_id in self._unattributed:
+                    continue
+                self._unattributed.add(fill.order_id)
+                self.journal.record("unattributed_sell", symbol=fill.symbol,
+                                    order_id=fill.order_id, qty=fill.qty, price=fill.price,
+                                    detail="a SELL_TO_CLOSE filled on a symbol this service "
+                                           "holds no position in — if it is this service's "
+                                           "leg the account is short; check the broker")
                 continue
             if fill.order_id == pos.exit_order_id:
                 # The close this service sent and was waiting on. [st-97z1]
@@ -697,7 +748,7 @@ class ExecService:
                 continue    # a sell this service can name neither leg of
             else:
                 kind, why = "protective-stop", "resting-stop"
-            closed_qty = min(fill.qty or pos.qty, pos.qty)
+            closed_qty = min(fill.qty, pos.qty) if fill.qty > 0 else pos.qty
             booked = self._book_close(pos, order_id=fill.order_id, exit_px=fill.price,
                                       closed_qty=closed_qty, reason=kind, why=why)
             picked.append({"symbol": pos.symbol, "exit_price": fill.price,
@@ -747,8 +798,10 @@ class ExecService:
             self._pick_up_fills()
             promoted, released = self._reconcile_working(broker_orders)
             exits = self._reconcile_exits(broker_orders)
+            loose = self._reconcile_loose_legs(broker_orders)
             adopted, corrected, gone = self._reconcile_positions(broker_positions)
             return {"promoted": promoted, "released": released, "exits": exits,
+                    "loose": loose,
                     "adopted": adopted, "corrected": corrected, "gone": gone,
                     "error": None}
 
@@ -783,7 +836,7 @@ class ExecService:
         """A working entry filled while nothing was watching. Book it, then owe
         it the same protective stop a synchronous fill would have got."""
         fill_px = order.fill_price if order.fill_price is not None else (work.limit or 0.0)
-        qty = order.filled_qty or work.qty
+        qty = min(_filled_qty_of(order), work.qty)
         try:
             spx = self.spx_mark()
         except BrokerError:
@@ -881,8 +934,20 @@ class ExecService:
         gone: list[str] = []
         now = self.clock()
 
+        shorts_now: dict[str, int] = {}
         for symbol, held in broker_positions.items():
-            if held.qty <= 0:      # a short is not this service's to manage
+            if held.qty < 0:
+                # A short is not this service's to manage — it only sells to
+                # close — but it is the one state the bracket exists to
+                # prevent, so it is never silent: journaled when it appears or
+                # changes size, carried on /status as ``shorts`` (st-7ah8).
+                shorts_now[symbol] = held.qty
+                if self._shorts.get(symbol) != held.qty:
+                    self.journal.record("short_held", symbol=symbol, qty=held.qty,
+                                        detail="the account is short this contract; this "
+                                               "service cannot buy to close — by hand")
+                continue
+            if held.qty == 0:
                 continue
             pos = self._open.get(symbol)
             if pos is None:
@@ -914,8 +979,13 @@ class ExecService:
                 pos.qty = held.qty
                 self._rest_bracket(pos)
 
+        for symbol in list(self._shorts):
+            if symbol not in shorts_now:
+                self.journal.record("short_covered", symbol=symbol, qty=self._shorts[symbol])
+        self._shorts = shorts_now
+
         for symbol, pos in list(self._open.items()):
-            if symbol in broker_positions:
+            if symbol in broker_positions and broker_positions[symbol].qty > 0:
                 pos.missing_since = None
                 continue
             if pos.missing_since is None:
@@ -1310,7 +1380,7 @@ class ExecService:
         """Book a close the broker reported as an order — a filled market
         close, or a leg found filled by a cancel. See ``_book_close``."""
         exit_px = order.fill_price if order.fill_price is not None else 0.0
-        closed_qty = min(order.filled_qty or pos.qty, pos.qty)
+        closed_qty = min(_filled_qty_of(order), pos.qty)
         return self._book_close(pos, order_id=order.order_id, exit_px=exit_px,
                                 closed_qty=closed_qty, reason=reason, why=reason)
 
@@ -1354,9 +1424,14 @@ class ExecService:
         restopped = retargeted = None
         if remaining:
             pos.qty = remaining
-            restopped = self._rest_stop_at(pos, pos.stop_price)
-            retargeted = self._rest_target_at(pos, pos.target_price)
+            # A leg whose cancel is not confirmed is still resting at its old
+            # size; re-resting beside it would be two legs for one position.
+            if pos.stop_order_id is None:
+                restopped = self._rest_stop_at(pos, pos.stop_price)
+            if pos.target_order_id is None:
+                retargeted = self._rest_target_at(pos, pos.target_price)
         else:
+            self._release_loose_legs(pos)
             self._open.pop(pos.symbol, None)
 
         return {"symbol": pos.symbol, "qty": closed_qty, "remaining_qty": remaining,
@@ -1374,7 +1449,7 @@ class ExecService:
         excess — both legs filled, a short — is ``oversold``. Returns what is
         still held afterwards."""
         held = pos.qty if remaining is None else remaining
-        qty = min(order.filled_qty or held, held)
+        qty = min(_filled_qty_of(order), held)
         px = order.fill_price if order.fill_price is not None else 0.0
         if qty > 0:
             pnl = self._pnl_usd(pos, px, qty)
@@ -1383,7 +1458,7 @@ class ExecService:
                                 kind=reason, entry_price=pos.entry_price,
                                 exit_price=px, pnl_usd=pnl, order_id=order.order_id,
                                 reason=reason, detail="found filled by the cancel")
-        excess = (order.filled_qty or 0) - qty
+        excess = _filled_qty_of(order) - qty
         if excess > 0:
             self.journal.record(
                 "oversold", symbol=pos.symbol, intent_id=pos.intent_id,
@@ -1410,9 +1485,21 @@ class ExecService:
         if not order_id:
             return None, None
         result = self.broker.cancel(order_id)
-        setattr(pos, attr, None)
         if result.is_filled:
+            setattr(pos, attr, None)
             return None, result
+        if result.is_working:
+            # The broker acknowledged the cancel and has not done it: the leg
+            # is still at the exchange and can still fill. Booking it as off
+            # here sent a market close out beside a live stop (finding 24 of
+            # the 2026-09-15 audit, st-7ah8). The id stays on the position and
+            # the caller decides — DEFER a close, or carry the leg as loose.
+            self.journal.record("cancel_pending", kind=self._LEG_KIND[leg],
+                                symbol=pos.symbol, order_id=order_id,
+                                status=result.message or result.status.value)
+            raise BrokerError(f"cancel of the {self._LEG_KIND[leg]} {order_id} is not "
+                              f"confirmed — the broker says {result.message or 'WORKING'}")
+        setattr(pos, attr, None)
         self.journal.record("canceled", kind=self._LEG_KIND[leg],
                             symbol=pos.symbol, order_id=order_id)
         return result.to_dict(), None
@@ -1420,17 +1507,84 @@ class ExecService:
     def _cancel_leg_quietly(self, pos: OpenPosition, leg: str) -> tuple[dict[str, Any] | None,
                                                                       OrderResult | None]:
         """``_pull_leg`` for callers that are already past the point of
-        refusing: a broker that cannot be reached is journaled and the leg is
-        forgotten, because a close that has happened cannot wait on it."""
+        refusing: a broker that cannot be reached, or a cancel it has not yet
+        done, is journaled and the leg is **kept** — its id stays on the
+        position so the next sweep can ask again. Until 2026-09-15 the id was
+        cleared here, so a cancel that timed out but succeeded was forgotten
+        and the next ``_rest_bracket`` rested a second stop beside the first
+        (finding 39's mirror, st-7ah8). A position that is dropped with a leg
+        still on it hands the leg to ``_loose_legs`` (see ``_book_close``)."""
         attr = self._LEG_ATTR[leg]
         order_id = getattr(pos, attr)
         try:
             return self._pull_leg(pos, leg)
         except BrokerError as exc:
-            setattr(pos, attr, None)
             self.journal.record("error", kind=f"cancel-{leg}", symbol=pos.symbol,
                                 order_id=order_id, detail=str(exc))
             return None, None
+
+    def _release_loose_legs(self, pos: OpenPosition) -> None:
+        """A position is being dropped with a leg still on it — a cancel the
+        broker acknowledged and has not done, or one that errored. The leg is
+        still at the exchange and, with the position gone, is a sell with
+        nothing behind it: a short waiting for a print. It is carried in
+        ``_loose_legs`` and in the journal until ``reconcile`` sees it
+        terminal, and the page shows it until then (st-7ah8)."""
+        for leg in ("stop", "target"):
+            order_id = getattr(pos, self._LEG_ATTR[leg])
+            if not order_id:
+                continue
+            self._loose_legs[order_id] = {"symbol": pos.symbol, "leg": self._LEG_KIND[leg],
+                                          "qty": pos.qty, "intent_id": pos.intent_id}
+            self.journal.record("leg_unconfirmed", kind=self._LEG_KIND[leg],
+                                symbol=pos.symbol, order_id=order_id, qty=pos.qty,
+                                intent_id=pos.intent_id,
+                                detail="the position is closed but this leg's cancel was "
+                                       "not confirmed — it may still be resting at the broker")
+
+    def _reconcile_loose_legs(self, broker_orders: dict[str, OrderResult]) -> list[dict[str, Any]]:
+        """Every loose leg against the broker's listing. Working → ask the
+        broker to cancel it again; canceled/rejected/absent → resolved;
+        filled → the account is **short**, journaled ``oversold`` and loud."""
+        resolved: list[dict[str, Any]] = []
+        for order_id, leg in list(self._loose_legs.items()):
+            order = broker_orders.get(order_id)
+            outcome: str
+            if order is None:
+                outcome = "gone"
+            elif order.is_filled:
+                outcome = "filled"
+                self.journal.record(
+                    "oversold", symbol=leg["symbol"], intent_id=leg["intent_id"],
+                    order_id=order_id, qty=order.filled_qty or leg["qty"],
+                    price=order.fill_price, leg=leg["leg"],
+                    detail=f"a {leg['leg']} whose cancel was never confirmed filled after "
+                           f"the position closed — the account is short "
+                           f"{order.filled_qty or leg['qty']} {leg['symbol'].strip()}; this "
+                           f"service only sells to close, so it must be bought back by hand")
+            elif order.is_working:
+                try:
+                    again = self.broker.cancel(order_id)
+                except BrokerError as exc:
+                    self.journal.record("error", kind="cancel-loose", symbol=leg["symbol"],
+                                        order_id=order_id, detail=str(exc))
+                    continue
+                if again.is_working:
+                    continue           # still pending; ask again next sweep
+                if again.is_filled:
+                    self._loose_legs.pop(order_id, None)
+                    self._reconcile_loose_legs({order_id: again})   # books the oversold
+                    self._loose_legs.pop(order_id, None)
+                    continue
+                outcome = again.status.value.lower()
+            else:
+                outcome = order.status.value.lower()
+            self._loose_legs.pop(order_id, None)
+            self.journal.record("leg_resolved", kind=leg["leg"], symbol=leg["symbol"],
+                                order_id=order_id, outcome=outcome, intent_id=leg["intent_id"])
+            resolved.append({"symbol": leg["symbol"], "order_id": order_id,
+                             "leg": leg["leg"], "outcome": outcome})
+        return resolved
 
     def _cancel_protective_stop(self, pos: OpenPosition) -> dict[str, Any] | None:
         canceled, fill = self._cancel_leg_quietly(pos, "stop")
@@ -1891,6 +2045,17 @@ class ExecService:
                 )
             elif e.get("event") == "position_gone":
                 self._open.pop(str(e.get("symbol", "")), None)
+            elif e.get("event") == "leg_unconfirmed":
+                # A leg left at the broker when its position closed. It comes
+                # back as loose so reconcile keeps asking after it (st-7ah8).
+                oid = str(e.get("order_id", ""))
+                if oid:
+                    self._loose_legs[oid] = {"symbol": str(e.get("symbol", "")),
+                                             "leg": str(e.get("kind", "")),
+                                             "qty": int(e.get("qty", 0) or 0),
+                                             "intent_id": str(e.get("intent_id", ""))}
+            elif e.get("event") == "leg_resolved":
+                self._loose_legs.pop(str(e.get("order_id", "")), None)
             elif e.get("event") == "exit_unfilled":
                 # A close was in flight when the service died. It must come
                 # back known, or the SPX loop re-fires into it. [st-97z1]

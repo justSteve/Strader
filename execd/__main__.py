@@ -226,7 +226,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     config = ServiceConfig(state_dir=Path(args.state_dir), bounds=bounds,
                            sha=installed_sha(), mode=mode)
-    broker = MockBroker() if args.mock else SchwabBroker(underlying=config.index_symbol)
+    broker = MockBroker() if args.mock else SchwabBroker(underlying=config.index_symbol,
+                                                          roots=bounds.instruments)
     # `broker` stays the transport — bound, checked, printed below as before.
     # The service gets the paper wrapper over it when the mode says so: reads
     # and the preview pass through, orders never leave the box (st-k6gl).
