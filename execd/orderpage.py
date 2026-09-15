@@ -61,6 +61,9 @@ _ORDER_STYLE = """
  .detail{display:none;margin-top:.5em}.card:has(details.more[open]) .detail{display:block}
  details.inputs2{margin-top:.5em}details.inputs2 summary{color:#9ca3af;cursor:pointer;font-size:.9em}
  .foot{display:flex;justify-content:space-between;gap:.75em;color:#9ca3af;font-size:.9em;margin-top:.4em}
+ details.journalbox{margin-top:.6em}details.journalbox summary{list-style:none;display:inline-flex}
+ details.journalbox summary::-webkit-details-marker{display:none}
+ #journal pre{white-space:pre-wrap;word-break:break-all;font-size:.8em;color:#cbd5e1;margin:0}
 """
 
 _SCRIPT = """
@@ -137,6 +140,53 @@ def state_html(st: dict[str, Any], actions: Mapping[str, str] | None = None,
     return (f"<div class=strip><div class=l>{badge}{word}"
             f"<span id=clock class=clock>{clock}</span></div>"
             f"<div class=r>{right}</div></div>")
+
+
+#: A refusal younger than this is still the page's answer, even when the
+#: redirect that carried it lost its query on the way (2026-09-15 09:54 CT:
+#: the service journaled the refusal, the browser arrived at /exec/order
+#: with no message, and Steve saw nothing).
+RECENT_ANSWER_S = 10 * 60
+
+
+def last_refusal(service: ExecService, now: datetime | None = None) -> str | None:
+    """The most recent journaled refusal of a send or a preview, if it is the
+    latest thing the service did and it is recent — so the REFUSED stage
+    renders from the record, not only from the redirect's query."""
+    tail = service.journal.tail(3)
+    if not tail:
+        return None
+    last = tail[-1]
+    if last.get("event") != "refused" or last.get("kind") not in ("place", "preview"):
+        return None
+    at = last.get("ts")
+    try:
+        when = datetime.fromisoformat(at) if isinstance(at, str) else None
+    except ValueError:
+        when = None
+    now = now or datetime.now(CT)
+    if when is not None and (now - when).total_seconds() > RECENT_ANSWER_S:
+        return None
+    r = last.get("refused") or {}
+    word = "PAPER (simulated) — " if last.get("mode") == "paper" else ""
+    return f"{word}Refused ({r.get('bound')}): {r.get('reason')}. Nothing sent."
+
+
+def journal_html(service: ExecService, n: int = 20) -> str:
+    """The day's journal, latest first, in one line per event — the same
+    rendering as the account page's tail. On the trading page it sits behind
+    one tap (Steve, 2026-09-15: "i should have a button that expands
+    journal") and the poll keeps it fresh."""
+    from .page import _short
+    tail = service.journal.tail(n)
+    if not tail:
+        return "<div class=k>nothing journaled today</div>"
+    lines = []
+    for e in reversed(tail):
+        fields = " ".join(f"{k}={_short(v)}" for k, v in e.items()
+                          if k not in ("ts", "ts_ct", "event", "sha", "mode", "preview_raw", "body"))
+        lines.append(f"{e.get('ts_ct', '')[11:19]} {e.get('event', '')} {fields}")
+    return "<pre>" + esc("\n".join(lines)) + "</pre>"
 
 
 def ticket_html(priced: Priced, bounds: Any) -> str:
@@ -311,6 +361,8 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     st = service.status()
     order = actions["order"]
     parts: list[str] = []
+    if not bad and not msg and nonce is None:
+        bad = last_refusal(service, now=service.clock())
     if msg:
         parts.append(f"<div class=msg>{esc(msg)}</div>")
 
@@ -332,8 +384,9 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     # the strip first — the same on every stage (st-shhi)
     parts.insert(0, state_html(st, actions, now=service.clock()))
     # The stage card only when there is a stage to show: with nothing held,
-    # nothing working and no preview, the page opens on the side buttons.
-    if live_preview is not None or st["positions"] or st["working"] or bad \
+    # nothing working, no preview and no answer to show, the page opens on
+    # the side buttons.
+    if live_preview is not None or st["positions"] or st["working"] or bad or msg \
             or "data-stage=none" not in panel:
         parts.append(panel)
 
@@ -388,6 +441,9 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     parts.append(f"<div class=foot><span>today {money(pnl.get('day_usd'))} · "
                  f"{day['attempts_used']} of {day['attempts_used'] + day['attempts_left']} attempts</span>"
                  f"<span>headroom ${day['loss_headroom_usd']:.2f}</span></div>")
+    # the journal, one tap away, kept fresh by the poll
+    parts.append("<details id=journalbox class=journalbox><summary class='chip quiet'>journal</summary>"
+                 f"<div class=card id=journal>{journal_html(service)}</div></details>")
 
     symbol = (priced.contract.symbol if priced is not None and priced.contract is not None
               else None)

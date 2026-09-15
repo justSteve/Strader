@@ -61,8 +61,8 @@ from .schwab import (VAULT_VERSION, App, Credential, authorize_url, code_from_re
                      exchange, new_client, trading_payload, verify_grant)
 from .intent import OrderIntent
 from .orderform import PREVIEW_TTL_S, Selection, intent_for, price, stamp
-from .orderpage import (fd0_html, position_html, preview_fields_html, quote_html, render_order,
-                        state_html, strikes_html, ticket_html)
+from .orderpage import (fd0_html, journal_html, position_html, preview_fields_html, quote_html,
+                        render_order, state_html, strikes_html, ticket_html)
 from .service import ExecService, Refused
 from .vault import BadPassphrase, Vault, VaultError, VaultMissing
 
@@ -446,7 +446,8 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 "quote": quote, "spx": spx,
                 "quote_html": quote_html(quote, spx, error),
                 "position_html": position_html(st, _actions()),
-                "state_html": state_html(st),
+                "state_html": state_html(st, _actions(), now=clock()),
+                "journal_html": journal_html(service),
                 # the status panel (st-4ezg): the stage and the card's body
                 "panel_stage": stage, "panel_body_html": body}
 
@@ -501,6 +502,12 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                                     f"orders before sending again."), code=303)
         except ValueError as exc:
             return redirect(url_for("exec.order", bad=f"Not sent: {exc}"), code=303)
+        if out.get("refused"):
+            # A refusal the service answered (a bound, or the broker's own
+            # preview saying no) is the red box and the REFUSED stage — not a
+            # green message. 2026-09-15 09:54 CT: Schwab refused a send for
+            # buying power and the page showed Steve nothing.
+            return redirect(url_for("exec.order", bad=_describe_place(out)), code=303)
         return redirect(url_for("exec.order", msg=_describe_place(out)), code=303)
 
     # ── the bracket's live editor and the working entry's cancel (st-fn5y) ──

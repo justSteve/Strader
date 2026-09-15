@@ -291,3 +291,59 @@ class TestPage:
                      text(order_page.get("/exec/order/price?side=call")),
                      text(order_page.get(f"/exec/order/state?symbol={CALL}"))):
             assert PASS not in body and "refresh-old" not in body and "acc" not in body.split("access")[0][-3:]
+
+
+class TestARefusedSendIsShown:
+    """2026-09-15 09:54 CT: Steve previewed, tapped SEND, and saw nothing —
+    Schwab's own preview had refused the order (buying power) and the page
+    swallowed it. A refused send must land as the red box AND the REFUSED
+    stage, and the journal must be one tap away on the trading page."""
+
+    def test_a_refused_send_lands_red_with_the_refused_stage_and_the_journal(
+            self, order_page, armed, chain):
+        from execd.broker import Preview
+        r = order_page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
+        nonce = text(r).split("name=nonce value='")[1].split("'")[0]
+        real = chain.preview
+
+        def rejecting(intent):
+            p = real(intent)
+            return Preview(symbol=p.symbol, side=p.side, qty=p.qty, order_type=p.order_type,
+                           price=p.price, cost_usd=p.cost_usd, commission_usd=p.commission_usd,
+                           accepted=False,
+                           messages=("reject: You do not have enough available cash/buying "
+                                     "power for this order.",))
+        chain.preview = rejecting
+        r = order_page.post("/exec/order/send", data={"nonce": nonce})
+        assert r.status_code == 303 and "bad=" in r.headers["Location"], r.headers["Location"]
+        landing = text(order_page.get(r.headers["Location"]))
+        assert "<div class=bad>" in landing or "data-stage=refused" in landing
+        assert "buying" in landing and "Nothing sent" in landing
+        assert "data-stage=refused" in landing
+        assert not any(c[0] == "place" for c in chain.calls)
+        # the journal is on the trading page, latest first, behind one tap
+        assert "<details id=journalbox" in landing and "refused" in landing.split("id=journalbox")[1]
+        j = order_page.get(f"/exec/order/state?symbol={CALL}").json
+        assert "journal_html" in j and "refused" in j["journal_html"]
+
+    def test_a_recent_refusal_renders_from_the_journal_even_with_no_message(
+            self, order_page, armed, chain, clock):
+        """The redirect's query can be lost on the way (it was, 09:54 CT).
+        The page reads its own record: a refusal that is the latest thing the
+        service did, and recent, IS the REFUSED stage."""
+        from execd.broker import Preview
+        r = order_page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
+        nonce = text(r).split("name=nonce value='")[1].split("'")[0]
+        real = chain.preview
+        chain.preview = lambda intent: Preview(symbol=intent.symbol, side=intent.side, qty=intent.qty,
+                                               order_type=intent.order_type, price=2.10, cost_usd=210.0,
+                                               commission_usd=0.65, accepted=False,
+                                               messages=("reject: not enough buying power",))
+        order_page.post("/exec/order/send", data={"nonce": nonce})   # refused by the broker's preview
+        chain.preview = real
+        assert armed.journal.tail(1)[-1]["event"] == "refused"
+        plain = text(order_page.get("/exec/order"))          # no msg, no bad on the query
+        assert "data-stage=refused" in plain and "buying power" in plain
+        clock.advance(minutes=11)
+        later = text(order_page.get("/exec/order"))
+        assert "data-stage=refused" not in later               # an old refusal is history
