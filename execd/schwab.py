@@ -870,6 +870,32 @@ class SchwabBroker:
     def orders(self) -> list[OrderResult]:
         return [self._to_result(o) for o in self._orders_raw()]
 
+    def balances(self) -> dict[str, float | None]:
+        """The account's money, from ``securitiesAccount.currentBalances`` —
+        recorded 2026-09-05 (``tests/fixtures/schwab/account_positions.json``).
+        Schwab's own words, not ours: ``availableFunds`` is what its preview
+        checks an option buy against ("not enough available cash/buying
+        power", 2026-09-15 09:54 CT); ``buyingPowerNonMarginableTrade`` is
+        the buying power for a non-marginable buy, which an option is. Both
+        are carried, named for what they are (Steve, 2026-09-15: "display
+        account's option buying power"; st-shhi)."""
+        h = self.account_hash()
+        body = self._json(self._request("GET", f"/trader/v1/accounts/{h}"), "balances")
+        acct = body.get("securitiesAccount") if isinstance(body, dict) else None
+        if not isinstance(acct, dict):
+            raise BrokerError("schwab account body carries no securitiesAccount")
+        cur = acct.get("currentBalances") or {}
+
+        def num(key: str) -> float | None:
+            v = cur.get(key)
+            return float(v) if isinstance(v, (int, float)) else None
+
+        return {"available_funds": num("availableFunds"),
+                "option_buying_power": num("buyingPowerNonMarginableTrade"),
+                "buying_power": num("buyingPower"),
+                "cash_balance": num("cashBalance"),
+                "liquidation_value": num("liquidationValue")}
+
     def positions(self) -> list[Position]:
         """Spec-derived: ``GET .../accounts/{hash}?fields=positions`` →
         ``{securitiesAccount: {positions: [{longQuantity, shortQuantity,

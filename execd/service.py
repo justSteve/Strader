@@ -443,7 +443,31 @@ class ExecService:
             # of a file once the files are gone (st-p8k8). Absent for a broker
             # that has no grants to report on.
             "credential": self._credential_status(),
+            # The account's money in Schwab's own words, cached briefly so a
+            # page polling every few seconds does not become an account read
+            # every few seconds (st-shhi).
+            "balances": self._balances_cached(now),
         }
+
+    #: how long a balances read is reused before the broker is asked again
+    BALANCES_TTL_S = 15.0
+
+    def _balances_cached(self, now: datetime) -> dict[str, Any] | None:
+        read = getattr(self.broker, "balances", None)
+        if not callable(read):
+            return None
+        cached = getattr(self, "_balances_cache", None)
+        if cached is not None and (now - cached[0]).total_seconds() < self.BALANCES_TTL_S:
+            return cached[1]
+        try:
+            out: dict[str, Any] = dict(read())
+            out["error"] = None
+        except Exception as exc:  # a broker that cannot say is reported, not hidden
+            out = {"available_funds": None, "option_buying_power": None,
+                   "error": str(exc)}
+        out["as_of"] = now.isoformat()
+        self._balances_cache = (now, out)
+        return out
 
     def _credential_status(self) -> dict[str, Any] | None:
         status = getattr(self.broker, "token_status", None)

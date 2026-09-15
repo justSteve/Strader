@@ -86,7 +86,10 @@ def spec_account(positions: list[dict[str, Any]]) -> dict[str, Any]:
                                   "roundTrips": 0, "isDayTrader": False,
                                   "isClosingOnlyRestricted": False, "pfcbFlag": False,
                                   "positions": positions,
-                                  "currentBalances": {"cashBalance": 25000.0}}}
+                                  # the recorded 2026-09-05 shape, sample values
+                                  "currentBalances": {"cashBalance": 25000.0, "availableFunds": 1607.24,
+                                                      "buyingPowerNonMarginableTrade": 1607.24,
+                                                      "buyingPower": 3214.48, "liquidationValue": 1607.24}}}
 
 
 def spec_order(order_id: int, *, status: str, symbol: str = CALL, instruction: str = "BUY_TO_OPEN",
@@ -669,6 +672,17 @@ class TestAccount:
                          transport=httpx.MockTransport(fake.handler))
         fake.positions = [spec_position(CALL, 1, 0, 2.10, underlying="SPXW")]
         assert b.positions() == [] and b.excluded_positions == {"OPTION": 1}
+
+    def test_balances_are_schwabs_own_words(self, broker, fake):
+        """Steve, 2026-09-15: display the account's option buying power. The
+        recorded currentBalances body has no field by that name; the two that
+        matter are availableFunds (what the preview refuses against) and
+        buyingPowerNonMarginableTrade (an option buy is non-marginable)."""
+        b = broker.balances()
+        assert b == {"available_funds": 1607.24, "option_buying_power": 1607.24,
+                     "buying_power": 3214.48, "cash_balance": 25000.0, "liquidation_value": 1607.24}
+        method, path, params, _b, _a = fake.calls[-1]
+        assert (method, path, params) == ("GET", f"/trader/v1/accounts/{ACCT_HASH}", {})
 
     def test_positions_asks_for_the_positions_field(self, broker, fake):
         broker.positions()

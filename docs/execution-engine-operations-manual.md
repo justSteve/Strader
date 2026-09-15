@@ -537,6 +537,12 @@ unconfirmed_sends: [{intent_id, symbol, qty, limit, at, …}] — sends with no 
 foreign_orders:    [OrderResult…] — working buys this service did not send
 foreign_positions: [{symbol, qty, avg_price}] — Steve's own legs, shown, never held
 excluded_positions: {assetType: count} — what positions() left out
+balances:  {available_funds, option_buying_power, buying_power, cash_balance,
+            liquidation_value, error, as_of} — the account's money in Schwab's
+            words (currentBalances.availableFunds, which its preview refuses an
+            option buy against, and buyingPowerNonMarginableTrade), read at
+            most every BALANCES_TTL_S = 15 s; on the trading page's foot and
+            against the ticket before PREVIEW (Steve, 2026-09-15; st-shhi)
 bounds:    {the thirteen bound values}
 journal:   the path to today's file
 ```

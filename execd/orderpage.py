@@ -172,6 +172,24 @@ def last_refusal(service: ExecService, now: datetime | None = None) -> str | Non
     return f"{word}Refused ({r.get('bound')}): {r.get('reason')}. Nothing sent."
 
 
+def usd(v: Any) -> str:
+    """An unsigned dollar figure — a balance, a cost — never the signed P&L
+    form ``money`` gives."""
+    return f"${float(v):,.2f}" if isinstance(v, (int, float)) else "—"
+
+
+def balances_html(b: dict[str, Any] | None) -> str:
+    """The account's money in Schwab's own words: available funds (what its
+    preview checks an option buy against) and option buying power (the
+    non-marginable figure). One line; an unreadable account says so."""
+    if not b:
+        return "<span>account: not read</span>"
+    if b.get("error"):
+        return f"<span>account: {esc(b['error'])}</span>"
+    return (f"<span>option buying power {usd(b.get('option_buying_power'))}</span>"
+            f"<span>available funds {usd(b.get('available_funds'))}</span>")
+
+
 def journal_html(service: ExecService, n: int = 20) -> str:
     """The day's journal, latest first, in one line per event — the same
     rendering as the account page's tail. On the trading page it sits behind
@@ -189,7 +207,7 @@ def journal_html(service: ExecService, n: int = 20) -> str:
     return "<pre>" + esc("\n".join(lines)) + "</pre>"
 
 
-def ticket_html(priced: Priced, bounds: Any) -> str:
+def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = None) -> str:
     """The ticket in three lines — what will be sent, the cut, the two legs
     and what each nets — with the derivation behind *more*. Replaces the
     FD0 table as the thing Steve reads before PREVIEW (st-shhi)."""
@@ -226,6 +244,17 @@ def ticket_html(priced: Priced, bounds: Any) -> str:
         target_txt = ""
     line3 = (f"<div class='trow k'><span>{target_txt}</span>"
              "<details class=more><summary>more</summary></details></div>")
+    # The account's money against this ticket, before PREVIEW asks Schwab —
+    # the refusal of 2026-09-15 09:54 CT was exactly this arithmetic.
+    money_line = ""
+    avail = (balances or {}).get("available_funds")
+    if isinstance(avail, (int, float)) and priced.cost_usd is not None:
+        if priced.cost_usd > avail:
+            money_line = (f"<div class=bad>this needs {usd(priced.cost_usd)} and the "
+                          f"account has {usd(avail)} available — Schwab will refuse it</div>")
+        else:
+            money_line = (f"<div class=k>available funds {usd(avail)} — "
+                          f"{usd(avail - priced.cost_usd)} after this</div>")
     rows = [
         ("most this costs", money(-t.max_loss_usd)),
         ("budget", f"${d.budget_remaining_usd:.2f} / {d.attempts_left} attempt(s) → "
@@ -242,7 +271,7 @@ def ticket_html(priced: Priced, bounds: Any) -> str:
         f"<tr><td>{esc(k)}</td><td>{v}</td></tr>" for k, v in rows) + "</table>"
     for w in t.warnings:
         detail += f"<div class=warn>{esc(w)}</div>"
-    return (f"<div class=card>{head}{line2}{line3}"
+    return (f"<div class=card>{head}{line2}{line3}{money_line}"
             f"<div class='full detail'>{detail}</div></div>")
 
 
@@ -410,7 +439,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
         # the decision first (Steve, 2026-09-15: PREVIEW in the upper portion):
         # the ticket and PREVIEW, then the tuning — expiry, δ, RE-PRICE — and the strikes
         # the ticket — three lines, the derivation behind more
-        parts.append(f"<div id=fd0>{ticket_html(priced, service.bounds)}</div>")
+        parts.append(f"<div id=fd0>{ticket_html(priced, service.bounds, st.get('balances'))}</div>")
         # the one action on this stage
         if priced.contract is not None and priced.ticket is not None:
             if live_preview is not None and preview_text:
@@ -447,6 +476,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     parts.append(f"<div class=foot><span>today {money(pnl.get('day_usd'))} · "
                  f"{day['attempts_used']} of {day['attempts_used'] + day['attempts_left']} attempts</span>"
                  f"<span>headroom ${day['loss_headroom_usd']:.2f}</span></div>")
+    parts.append(f"<div class=foot id=balances>{balances_html(st.get('balances'))}</div>")
     # the journal, one tap away, kept fresh by the poll
     parts.append("<details id=journalbox class=journalbox><summary class='chip quiet'>journal</summary>"
                  f"<div class=card id=journal>{journal_html(service)}</div></details>")

@@ -285,6 +285,25 @@ class MockBroker:
     def set_position(self, symbol: str, qty: int, avg_price: float) -> None:
         self._positions[symbol] = Position(symbol, qty, avg_price)
 
+    def set_balances(self, **money: float) -> None:
+        """What ``balances()`` answers: ``available_funds``,
+        ``option_buying_power``, ``buying_power``, ``cash_balance``,
+        ``liquidation_value``. Unset → ``balances()`` raises, like a broker
+        that cannot say."""
+        self._balances = dict(money)
+
+    def balances(self) -> dict[str, float | None]:
+        self._record("balances")
+        if (msg := self.fail_next) is not None:
+            self.fail_next = None
+            raise BrokerError(msg)
+        b = getattr(self, "_balances", None)
+        if b is None:
+            raise BrokerError("no balances set on the mock")
+        keys = ("available_funds", "option_buying_power", "buying_power", "cash_balance",
+                "liquidation_value")
+        return {k: b.get(k) for k in keys}
+
     def set_history(self, symbol: str, candles: list[dict[str, Any]]) -> None:
         """Candles ``market_read("pricehistory")`` answers for ``symbol``, in
         Schwab's own shape (``open high low close volume datetime``)."""

@@ -61,8 +61,8 @@ from .schwab import (VAULT_VERSION, App, Credential, authorize_url, code_from_re
                      exchange, new_client, trading_payload, verify_grant)
 from .intent import OrderIntent
 from .orderform import PREVIEW_TTL_S, Selection, intent_for, price, stamp
-from .orderpage import (fd0_html, journal_html, position_html, preview_fields_html, quote_html,
-                        render_order, state_html, strikes_html, ticket_html)
+from .orderpage import (balances_html, fd0_html, journal_html, position_html, preview_fields_html,
+                        quote_html, render_order, state_html, strikes_html, ticket_html)
 from .service import ExecService, Refused
 from .vault import BadPassphrase, Vault, VaultError, VaultMissing
 
@@ -420,7 +420,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         sel = _selection(request.args)
         priced = price(service, sel)
         body = priced.to_dict()
-        body["fd0_html"] = ticket_html(priced, service.bounds)
+        body["fd0_html"] = ticket_html(priced, service.bounds, service.status().get("balances"))
         body["strikes_html"] = strikes_html(priced, url_for("exec.order"))
         body["preview_fields_html"] = preview_fields_html(sel)
         return body
@@ -449,6 +449,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 "position_html": position_html(st, _actions()),
                 "state_html": state_html(st, _actions(), now=clock()),
                 "journal_html": journal_html(service),
+                "balances_html": balances_html(st.get("balances")),
                 # the status panel (st-4ezg): the stage and the card's body
                 "panel_stage": stage, "panel_body_html": body}
 

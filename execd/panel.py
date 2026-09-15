@@ -547,7 +547,8 @@ PANEL_SCRIPT = """
     var u = document.getElementById('updated'); if (u) { u.setAttribute('data-at', String(Date.now())); u.textContent = 'just now'; }
     var qd = document.getElementById('quote'); if (qd && j.quote_html) qd.innerHTML = j.quote_html;
     var pc = document.getElementById('position'); if (pc && j.position_html !== undefined && !editing()) pc.innerHTML = j.position_html || '';
-    var jn = document.getElementById('journal'); if (jn && j.journal_html) jn.innerHTML = j.journal_html; }
+    var jn = document.getElementById('journal'); if (jn && j.journal_html) jn.innerHTML = j.journal_html;
+    var bl = document.getElementById('balances'); if (bl && j.balances_html) bl.innerHTML = j.balances_html; }
   function poll(force){ if (!force && (paused || document.visibilityState === 'hidden' || requestScoped())) return;
     var u = STATE + (window.__sym ? ('?symbol=' + encodeURIComponent(window.__sym)) : '');
     fetch(u, {headers:{'Accept':'application/json'}}).then(function(r){return r.json();}).then(apply).catch(function(){}); }
