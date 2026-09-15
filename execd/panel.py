@@ -549,11 +549,19 @@ PANEL_SCRIPT = """
     var now = Date.now(); var els = panel.querySelectorAll('.ago[data-at]');
     for (var i = 0; i < els.length; i++) { var at = parseInt(els[i].getAttribute('data-at'), 10);
       if (!isNaN(at)) els[i].textContent = ago(now - at) + ' ago'; } }
-  function editing(){ var a = document.activeElement; return !!(a && a.tagName === 'INPUT' && panel.contains(a)); }
-  function requestScoped(){ var b = panel.querySelector('#panelbody .body');
-    var st = b ? b.getAttribute('data-stage') : ''; return st === 'previewed' || st === 'refused'; }
+  // An input he is typing in is protected from the poll — but only while it
+  // is DIRTY (its value differs from what the server rendered) and only while
+  // the stage is the same. 2026-09-15 13:21 CT: the stop filled 31 s after
+  // the entry, the poll fetched the CLOSED card every 3 s, and the page kept
+  // the FILLED editor because a bracket input had focus (st-f3y3).
+  function editing(){ var a = document.activeElement;
+    return !!(a && a.tagName === 'INPUT' && panel.contains(a) && a.value !== a.defaultValue); }
+  function stageNow(){ var b = panel.querySelector('#panelbody .body'); return b ? (b.getAttribute('data-stage') || '') : ''; }
+  function requestScoped(){ var st = stageNow(); return st === 'previewed' || st === 'refused'; }
   function apply(j){ var body = document.getElementById('panelbody');
-    if (body && j.panel_body_html && !editing()) body.innerHTML = j.panel_body_html;
+    var changed = !!(j.panel_stage && stageNow() && j.panel_stage !== stageNow());
+    if (body && j.panel_body_html && (changed || !editing())) body.innerHTML = j.panel_body_html;
+    if (changed) { var m = document.querySelector('.msg'); if (m) m.parentNode.removeChild(m); }
     var w = document.getElementById('stageword'); if (w && j.panel_stage) { w.textContent = WORDS[j.panel_stage] || j.panel_stage; w.style.color = COLORS[j.panel_stage] || '#e5e7eb'; }
     var u = document.getElementById('updated'); if (u) { u.setAttribute('data-at', String(Date.now())); u.textContent = 'just now'; }
     var qd = document.getElementById('quote'); if (qd && j.quote_html) qd.innerHTML = j.quote_html;
@@ -564,7 +572,8 @@ PANEL_SCRIPT = """
   function poll(force){ if (!force && (paused || document.visibilityState === 'hidden' || requestScoped())) return;
     var u = STATE + (window.__sym ? ('?symbol=' + encodeURIComponent(window.__sym)
       + (window.__lots ? '&lots=' + encodeURIComponent(window.__lots) : '')) : '');
-    fetch(u, {headers:{'Accept':'application/json'}}).then(function(r){return r.json();}).then(apply).catch(function(){}); }
+    fetch(u, {headers:{'Accept':'application/json'}}).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(apply)
+      .catch(function(e){ var up = document.getElementById('updated'); if (up) { up.removeAttribute('data-at'); up.textContent = 'poll failed: ' + (e && e.message ? e.message : e); } }); }
   var pauseBtn = document.getElementById('pause');
   if (pauseBtn) pauseBtn.addEventListener('click', function(){ paused = !paused; pauseBtn.textContent = paused ? 'resume' : 'pause';
     var u = document.getElementById('updated'); if (u) { if (paused) { u.removeAttribute('data-at'); u.textContent = 'paused'; } else poll(true); } });

@@ -439,6 +439,37 @@ class TestLockedInPlaceAndFewerWords:
         assert "re-authorise (weekly)" in body and ">Today<" in body
 
 
+class TestAStageChangeAlwaysPaints:
+    """Steve, 2026-09-15 13:21 CT: "the stop was hit immediately but the
+    message panel didn't display it." The service log shows the poll fetching
+    the CLOSED card every 3 s; the page kept the FILLED editor because a
+    bracket input had focus. [st-f3y3]"""
+
+    def test_the_poll_returns_closed_on_the_first_tick_after_a_stop_fill(self, order_page, armed, chain, clock):
+        r = order_page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
+        nonce = text(r).split("name=nonce value='")[1].split("'")[0]
+        landing = r = order_page.post("/exec/order/send", data={"nonce": nonce})
+        page = text(order_page.get(r.headers["Location"]))
+        assert "data-stage=filled" in page and "class=msg" in page
+        p = armed.status()["positions"][0]
+        clock.advance(seconds=31)
+        chain.fill_resting(p["stop_order_id"])
+        armed.poll_fills()
+        s = order_page.get(f"/exec/order/state?symbol={p['symbol']}&lots=1").json
+        assert s["panel_stage"] == "closed" and "P&amp;L" in s["panel_body_html"]
+        assert "-$35.00" in s["panel_body_html"] and "protective-stop" in s["panel_body_html"]
+
+    def test_the_script_paints_a_stage_change_over_a_focused_input_and_drops_the_stale_message(self, order_page):
+        body = text(order_page.get("/exec/order?side=call"))
+        script = body.split("var STATE = ")[1]
+        # the guard holds only for a dirty input, and never across a stage change
+        assert "a.value !== a.defaultValue" in script
+        assert "(changed || !editing())" in script
+        assert "document.querySelector('.msg')" in script and "removeChild(m)" in script
+        # a failed poll is said, not swallowed
+        assert "poll failed" in script and "throw new Error('HTTP '" in script
+
+
 class TestARefusedSendIsShown:
     """2026-09-15 09:54 CT: Steve previewed, tapped SEND, and saw nothing —
     Schwab's own preview had refused the order (buying power) and the page
