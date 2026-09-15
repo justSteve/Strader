@@ -1,0 +1,13 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "pick and price", "x": 0, "y": 0, "w": 576, "h": 900 },
+    { "file": "Previewed.dc.html", "title": "previewed — send", "x": 672, "y": 0, "w": 576, "h": 640 },
+    { "file": "Filled.dc.html", "title": "filled — manage", "x": 1344, "y": 0, "w": 576, "h": 660 },
+    { "file": "Account.dc.html", "title": "account (off the trading page)", "x": 2016, "y": 0, "w": 576, "h": 700 }
+  ],
+  "annotations": [
+    { "id": "brief", "x": 0, "y": -300, "w": 720,
+      "text": "The trading page, refined (Steve, 2026-09-15): stage and send an order with no agent in the loop.\n\nOne strip on every stage: PAPER/LIVE, the arming state, one clock, STOP. Then only what the stage needs. Pick a side with one tap; expiry, the delta target and RE-PRICE on one row; strikes around spot — tap one or type a delta; the ticket as three lines (what, the cut, the two legs); one action per stage — PREVIEW, then SEND, then UPDATE / FLATTEN.\n\nGone from the trading page: the FD0 budget and attempts inputs (behind 'more'), the 'lots' line, the quote line that repeated the ticket, the derivation table, the sha/mode footer, and every account control — unlock, stand down, lock, the weekly Schwab re-authorisation — which live on the account page, one tap away.\n\nNumbers are sample values from the 09-14 paper cycle; the target is 10× the fill as ruled." }
+  ],
+  "launch": { "view": "canvas" }
+}

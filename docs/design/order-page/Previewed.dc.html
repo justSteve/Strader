@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #0b1020; color: #e5e7eb; font-family: -apple-system, system-ui, sans-serif; font-size: 16px; }
+    a { color: #e5e7eb; text-decoration: none; } a:hover { color: #ffffff; }
+  </style>
+</helmet>
+<div style="padding: 16px; width: 576px; box-sizing: border-box; background: #0b1020; min-height: 100%; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="background: #fbbf24; color: #111111; font-weight: 700; font-size: .8em; padding: 4px 8px; border-radius: 6px; letter-spacing: .04em;">PAPER</div>
+      <div style="font-size: 1.15em; font-weight: 700; color: #34d399;">ARMED</div>
+      <div style="font-size: 1.05em; font-weight: 600; color: #9ca3af; font-variant-numeric: tabular-nums;">09:41:52 CT</div>
+    </div>
+    <a href="#" style="display: flex; align-items: center; justify-content: center; height: 44px; padding: 0 14px; background: #dc2626; color: #ffffff; font-weight: 700; border-radius: 8px; letter-spacing: .04em;">STOP</a>
+  </div>
+
+  <!-- the ticket, now with the broker's word on it -->
+  <div style="background: #111827; border: 1px solid #60a5fa; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+      <div style="font-size: 1.6em; font-weight: 700; color: #60a5fa;">PREVIEWED</div>
+      <div style="color: #9ca3af; font-size: .9em;">priced 09:41:49 · good for 60 s</div>
+    </div>
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+      <div style="font-size: 1.5em; font-weight: 700;">BUY C6400 × 1 at 2.10</div>
+      <div style="font-size: 1.5em; font-weight: 700;">$210.65</div>
+    </div>
+    <div style="color: #9ca3af;">Schwab accepts it: $210.00 + $0.65 commission. Nothing sent yet.</div>
+    <div style="display: flex; justify-content: space-between; gap: 12px;">
+      <span>cut if SPX ≤ <b>6368.00</b></span>
+      <span>stop 1.50 → <span style="color: #f87171; font-weight: 700;">−$61.30</span> · target 21.00 → <span style="color: #34d399; font-weight: 700;">+$1,888.70</span></span>
+    </div>
+  </div>
+
+  <a href="#" style="display: flex; align-items: center; justify-content: center; height: 64px; background: #dc2626; color: #ffffff; font-size: 1.4em; font-weight: 700; border-radius: 10px; letter-spacing: .04em;">SEND</a>
+  <a href="#" style="display: flex; align-items: center; justify-content: center; height: 48px; background: #1f2937; color: #9ca3af; font-size: 1.05em; font-weight: 700; border-radius: 10px;">back — re-price</a>
+
+  <!-- what was picked, in one line; tap to change and the preview is dropped -->
+  <div style="display: flex; align-items: center; gap: 10px; color: #9ca3af; font-size: .95em;">
+    <span style="background: #059669; color: #ffffff; font-weight: 700; padding: 4px 10px; border-radius: 6px;">BULLISH</span>
+    <span>today 09-15</span><span>·</span><span>δ 0.30</span><span>·</span><span>SPX 6380.25</span>
+  </div>
+
+  <div style="color: #9ca3af; font-size: .9em; display: flex; justify-content: space-between; gap: 12px;">
+    <span>today $0.00 · 0 of 10 attempts</span><span>headroom $500.00</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

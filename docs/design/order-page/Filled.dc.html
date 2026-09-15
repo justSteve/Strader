@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #0b1020; color: #e5e7eb; font-family: -apple-system, system-ui, sans-serif; font-size: 16px; }
+    a { color: #e5e7eb; text-decoration: none; } a:hover { color: #ffffff; }
+    input { font-family: inherit; }
+  </style>
+</helmet>
+<div style="padding: 16px; width: 576px; box-sizing: border-box; background: #0b1020; min-height: 100%; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="background: #fbbf24; color: #111111; font-weight: 700; font-size: .8em; padding: 4px 8px; border-radius: 6px; letter-spacing: .04em;">PAPER</div>
+      <div style="font-size: 1.15em; font-weight: 700; color: #34d399;">ARMED</div>
+      <div style="font-size: 1.05em; font-weight: 600; color: #9ca3af; font-variant-numeric: tabular-nums;">09:47:20 CT</div>
+    </div>
+    <a href="#" style="display: flex; align-items: center; justify-content: center; height: 44px; padding: 0 14px; background: #dc2626; color: #ffffff; font-weight: 700; border-radius: 8px; letter-spacing: .04em;">STOP</a>
+  </div>
+
+  <div style="background: #111827; border: 1px solid #34d399; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+      <div style="font-size: 1.6em; font-weight: 700; color: #34d399;">FILLED</div>
+      <div style="color: #9ca3af; font-size: .9em;">in at 2.10 · 5 min ago</div>
+    </div>
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+      <div style="font-size: 1.5em; font-weight: 700;">C6400 × 1</div>
+      <div style="font-size: 2em; font-weight: 700; color: #34d399;">+$12.35</div>
+    </div>
+    <div style="display: flex; justify-content: space-between; gap: 12px; color: #9ca3af; font-size: .95em;">
+      <span>bid 2.24 · SPX 6383.10</span><span>net if closed now, commissions in</span>
+    </div>
+
+    <!-- the two legs, editable in place -->
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 4px;">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div style="display: flex; justify-content: space-between; color: #9ca3af; font-size: .9em;"><span>stop</span><span style="color: #f87171; font-weight: 700;">−$61.30</span></div>
+        <input value="1.50" inputmode="decimal" style="width: 100%; height: 48px; box-sizing: border-box; font-size: 1.2em; padding: 0 12px; border-radius: 8px; border: 1px solid #374151; background: #0b1020; color: #e5e7eb;">
+        <div style="color: #9ca3af; font-size: .85em;">cut if SPX ≤ 6368.00</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div style="display: flex; justify-content: space-between; color: #9ca3af; font-size: .9em;"><span>target</span><span style="color: #34d399; font-weight: 700;">+$1,888.70</span></div>
+        <input value="21.00" inputmode="decimal" style="width: 100%; height: 48px; box-sizing: border-box; font-size: 1.2em; padding: 0 12px; border-radius: 8px; border: 1px solid #374151; background: #0b1020; color: #e5e7eb;">
+        <div style="color: #9ca3af; font-size: .85em;">10× the fill</div>
+      </div>
+    </div>
+    <a href="#" style="display: flex; align-items: center; justify-content: center; height: 48px; background: #1f2937; color: #e5e7eb; font-weight: 700; border-radius: 8px; border: 1px solid #374151;">UPDATE</a>
+  </div>
+
+  <a href="#" style="display: flex; align-items: center; justify-content: center; height: 60px; background: #b45309; color: #ffffff; font-size: 1.3em; font-weight: 700; border-radius: 10px; letter-spacing: .04em;">FLATTEN</a>
+
+  <div style="color: #9ca3af; font-size: .9em; display: flex; justify-content: space-between; gap: 12px;">
+    <span>today $0.00 · 1 of 10 attempts</span><span>headroom $500.00</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #0b1020; color: #e5e7eb; font-family: -apple-system, system-ui, sans-serif; font-size: 16px; }
+    a { color: #e5e7eb; text-decoration: none; } a:hover { color: #ffffff; }
+    input { font-family: inherit; }
+  </style>
+</helmet>
+<div style="padding: 16px; width: 576px; box-sizing: border-box; background: #0b1020; min-height: 100%; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="background: #fbbf24; color: #111111; font-weight: 700; font-size: .8em; padding: 4px 8px; border-radius: 6px; letter-spacing: .04em;">PAPER</div>
+      <div style="font-size: 1.15em; font-weight: 700; color: #9ca3af;">LOCKED</div>
+      <div style="font-size: 1.05em; font-weight: 600; color: #9ca3af; font-variant-numeric: tabular-nums;">08:12:04 CT</div>
+    </div>
+    <a href="#" style="display: flex; align-items: center; justify-content: center; height: 44px; padding: 0 14px; background: #1f2937; color: #9ca3af; font-weight: 700; border-radius: 8px;">← trade</a>
+  </div>
+
+  <div style="background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="color: #9ca3af; font-size: .9em; text-transform: uppercase; letter-spacing: .08em;">arm for today</div>
+    <input type="password" placeholder="passphrase" style="width: 100%; height: 48px; box-sizing: border-box; font-size: 1.2em; padding: 0 12px; border-radius: 8px; border: 1px solid #374151; background: #0b1020; color: #e5e7eb;">
+    <a href="#" style="display: flex; align-items: center; justify-content: center; height: 56px; background: #059669; color: #ffffff; font-size: 1.2em; font-weight: 700; border-radius: 10px;">UNLOCK — until the close</a>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+      <a href="#" style="display: flex; align-items: center; justify-content: center; height: 44px; background: #374151; color: #e5e7eb; font-weight: 700; border-radius: 8px;">stand down</a>
+      <a href="#" style="display: flex; align-items: center; justify-content: center; height: 44px; background: #1f2937; color: #9ca3af; font-weight: 700; border-radius: 8px;">lock</a>
+    </div>
+  </div>
+
+  <div style="background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="color: #9ca3af; font-size: .9em; text-transform: uppercase; letter-spacing: .08em;">schwab grants — weekly</div>
+    <div style="display: flex; justify-content: space-between; gap: 12px;"><span>trading app</span><span style="color: #9ca3af;">wall Sun 09-21 06:10</span></div>
+    <div style="display: flex; justify-content: space-between; gap: 12px;"><span>market app</span><span style="color: #9ca3af;">wall Sat 09-20 22:41</span></div>
+    <a href="#" style="display: flex; align-items: center; justify-content: center; height: 44px; background: #1f2937; color: #e5e7eb; font-weight: 700; border-radius: 8px; border: 1px solid #374151;">re-authorise…</a>
+  </div>
+
+  <div style="background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;">
+    <div style="color: #9ca3af; font-size: .9em; text-transform: uppercase; letter-spacing: .08em;">in the account, not this service's</div>
+    <div>P6300 × 1 at 1.85 — held by hand; not counted, not flattened</div>
+  </div>
+
+  <div style="color: #9ca3af; font-size: .9em;">f673398 · paper · tailnet only</div>
+</div>
+</x-dc>
+</body>
+</html>
