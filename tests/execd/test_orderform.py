@@ -227,7 +227,7 @@ class TestPage:
         assert [c[0] for c in chain.calls if c[0] == "place"] == ["place", "place", "place"]
         # the position, its money and the bracket editor are on the page now
         assert "FILLED" in landing and "NET NOW" in landing and "C6400 × 1" in landing
-        assert "value='21.00'" in landing and ">UPDATE<" in landing
+        assert "value='21.00'" in landing and ">SET<" in landing
         assert "name=stop_price" in landing and "name=target_price" in landing
 
     def test_a_stale_send_token_refuses(self, order_page, mono):

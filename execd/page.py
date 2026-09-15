@@ -427,8 +427,13 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
 
     @bp.get("/order/state")
     def order_state():
+        return _state_payload(request.args.get("symbol") or "", request.args.get("lots"))
+
+    def _state_payload(symbol: str, lots_arg: Any) -> dict[str, Any]:
+        """The status body's live half plus the chosen contract's quote, with
+        the HTML fragments the page's script paints — what the poll reads,
+        and what an in-place adjust answers with (st-bmaz)."""
         st = service.status()
-        symbol = request.args.get("symbol") or ""
         quote = None
         error = None
         spx = None
@@ -443,7 +448,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 # the ask on the tick grid, and what that costs — Python's
                 # arithmetic, the script only writes the text
                 if q.ask:
-                    lots = Selection.from_args({"lots": request.args.get("lots")},
+                    lots = Selection.from_args({"lots": lots_arg},
                                                today=_today(), lots_cap=service.bounds.qty_cap).lots
                     limit_now = limit_at(q.ask)
                     cost_now = _money(-(limit_now * CONTRACT_MULTIPLIER * lots)).lstrip("-")
@@ -527,29 +532,41 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
     # ── the bracket's live editor and the working entry's cancel (st-fn5y) ──
     @bp.post("/order/adjust")
     def order_adjust():
-        """UPDATE on the position card: both trigger conditions, one button.
-        Steve, 2026-09-14: "a live editor allowing an update to both"."""
+        """SET on the position card: the stop or the target, one leg per
+        form, Enter sends it (Steve, 2026-09-15: "It'll be one or the other
+        … just hit enter to submit", st-bmaz; before that one UPDATE for
+        both, 2026-09-14). Answers JSON — the outcome in words plus the
+        state payload the poll paints — when the form says ``ajax=1`` or the
+        request accepts JSON; otherwise the redirect the plain form needs."""
         symbol = request.form.get("symbol", "")
+        wants_json = (request.form.get("ajax") == "1"
+                      or "application/json" in (request.headers.get("Accept") or ""))
+        msg = bad = None
         try:
             stop = _form_price("stop_price")
             target = _form_price("target_price")
             if stop is None and target is None:
-                return redirect(url_for("exec.order", bad="Nothing to update: enter a stop, "
-                                        "a target, or both."), code=303)
-            out = service.adjust(symbol, stop_price=stop, target_price=target)
+                bad = "Nothing to update: enter a stop or a target."
+            else:
+                out = service.adjust(symbol, stop_price=stop, target_price=target)
+                if out.get("refused"):
+                    r = out["refused"]
+                    bad = f"Refused ({r.get('bound')}): {r.get('reason')}."
+                else:
+                    msg = _describe_adjust(out)
         except Refused as exc:
-            return redirect(url_for("exec.order", bad=f"Refused ({exc.refusal.bound}): "
-                                    f"{exc.refusal.reason}. Nothing changed."), code=303)
+            bad = f"Refused ({exc.refusal.bound}): {exc.refusal.reason}. Nothing changed."
         except BrokerError as exc:
-            return redirect(url_for("exec.order", bad=f"The broker could not be reached: {exc}. "
-                                    f"Read the position card before trying again."), code=303)
+            bad = (f"The broker could not be reached: {exc}. Read the position card "
+                   f"before trying again.")
         except ValueError as exc:
-            return redirect(url_for("exec.order", bad=f"Not updated: {exc}"), code=303)
-        if out.get("refused"):
-            r = out["refused"]
-            return redirect(url_for("exec.order", bad=f"Refused ({r.get('bound')}): "
-                                    f"{r.get('reason')}."), code=303)
-        return redirect(url_for("exec.order", msg=_describe_adjust(out)), code=303)
+            bad = f"Not updated: {exc}"
+        if wants_json:
+            return {"ok": bad is None, "msg": msg, "bad": bad,
+                    **_state_payload(symbol, request.form.get("lots"))}
+        if bad:
+            return redirect(url_for("exec.order", bad=bad), code=303)
+        return redirect(url_for("exec.order", msg=msg), code=303)
 
     @bp.post("/order/cancel")
     def order_cancel():

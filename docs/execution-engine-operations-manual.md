@@ -1202,7 +1202,7 @@ folded *re-authorise (weekly)* and the journal remain.
 | `GET /exec/order/state?symbol=…&lots=…` | the status body's live half plus the chosen contract's quote and the SPX mark, with HTML fragments; with a quote, `limit_now` (the ask on the tick grid) and `cost_now` for the head to follow while unlocked |
 | `POST /exec/order/preview` | `service.preview(intent)`; on a 200, the cost line and a single-use 60 s SEND token; a `limit` in the body is sent as the intent's limit; the PREVIEWED card's RE-PRICE posts here again without one |
 | `POST /exec/order/send` | spends the token, `service.place(the same intent)` with the selection query riding on the working entry, redirects with the result in words |
-| `POST /exec/order/adjust` | UPDATE on the position card: `symbol`, `stop_price`, `target_price` (either may be blank) → `service.adjust`; redirects with what moved (§5.20) |
+| `POST /exec/order/adjust` | SET on the position card: `symbol` and `stop_price` or `target_price` (one leg per form since st-bmaz) → `service.adjust`; redirects with what moved, or answers JSON (`ok`, `msg`, `bad`, the state payload) when the form says `ajax=1` or the request accepts JSON (§5.20) |
 | `POST /exec/order/cancel` | CANCEL AND RE-PRICE on the working-entry card: `order_id` → `service.cancel`, then redirects to `/exec/order` with the side/expiry/strike/delta/budget/attempts the entry was priced from — never its lock — so the form comes back priced fresh (§5.20) |
 
 **The choice** (`orderform.choose`): a tapped strike wins; else the delta
@@ -1341,6 +1341,24 @@ card, as a *best · worst* row on the CLOSED card, and in the `closed` line
 answer "how far did it go my way before the stop took it". The take-profit
 is a resting limit at a *price*; NET NOW is what a market sell nets *now*;
 nothing fires at a dollar figure.
+
+**One leg, Enter sends it, painted in place** (st-bmaz; Steve, 2026-09-15:
+*"there isn't going to be a scenario where i want to change both take
+profit and stop loss. It'll be one or the other. I'd like to be able to
+enter the value in either and just hit enter to submit … let's look to
+make this as instant as possible"*). The editor is two forms, stop and
+target, each its own input (`enterkeyhint=go`) with a SET button; Enter in
+either sends that leg alone. The script posts it by fetch (`ajax=1`,
+`Accept: application/json`), disables the leg while it is out, and paints
+the answer into the card: the outcome line at the top (green *moved* /
+*unchanged*, red *refused*), the body repainted from the same answer — no
+navigation, no blink. Without a script the plain form posts and the page
+redirects as before. `POST /exec/order/adjust` answers JSON when asked:
+`ok`, `msg`, `bad`, plus the state payload `/exec/order/state` returns. On
+the service side the paper book's sweep, which every cancel runs, reads
+one quote per symbol per sweep instead of one per resting order — two
+resting legs on one contract were two Schwab reads, 1.2 s of the 3 s an
+UPDATE took on 2026-09-15.
 
 **A replayed adjust** (st-gw5m). The service log for that minute showed the
 second UPDATE arriving the same second the first one's 303 went out, with

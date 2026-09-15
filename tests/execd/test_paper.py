@@ -252,3 +252,24 @@ class TestExpiry:
         clock.set_ct(15, 30)                                  # same day, after the close
         assert paper.positions()[0].qty == 1
         assert {o.order_id: o.status for o in paper.orders()}[r.order_id] is OrderStatus.FILLED
+
+
+class TestOneQuotePerSymbolPerSweep:
+    """Every cancel sweeps the book first; a bracket is two resting orders on
+    one contract, and the sweep read a live quote for each — 1.2 s of the
+    3 s an UPDATE took on 2026-09-15 (st-bmaz)."""
+
+    def test_two_resting_orders_on_one_contract_cost_one_quote(self, paper, live):
+        paper.place(entry("p-q1", limit=1.50))
+        paper.place(entry("p-q2", limit=1.40))
+        assert [o.status for o in paper.orders()] == [OrderStatus.WORKING, OrderStatus.WORKING]
+        before = len(live_calls(live, "quote"))
+        paper.orders()                                   # one sweep
+        assert len(live_calls(live, "quote")) == before + 1
+
+    def test_two_contracts_still_cost_two(self, paper, live):
+        paper.place(entry("p-q3", limit=1.50))
+        paper.place(entry("p-q4", symbol=PUT, limit=1.20))
+        before = len(live_calls(live, "quote"))
+        paper.orders()
+        assert len(live_calls(live, "quote")) == before + 2

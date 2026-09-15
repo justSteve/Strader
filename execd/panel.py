@@ -65,7 +65,11 @@ PANEL_STYLE = """
  .panel .editor label{display:flex;flex-direction:column;gap:4px;color:#9ca3af;font-size:.9em}
  .panel .editor input{width:100%;box-sizing:border-box;font-size:1.1em;padding:.6em;border-radius:8px;border:1px solid #374151;background:#0b1020;color:#e5e7eb}
  .panel .editor .money{font-size:.9em;font-weight:700}
- .panel button.update{display:block;width:100%;margin:8px 0 0;min-height:44px;padding:8px;font-size:1em;border-radius:8px;border:1px solid #374151;font-weight:700;cursor:pointer;background:#1f2937;color:#e5e7eb;font-family:inherit}
+ .panel .editor form{margin:0}.panel .legrow{display:flex;gap:6px;align-items:stretch}
+ .panel .editor button.set{min-height:44px;padding:0 12px;border-radius:8px;border:1px solid #374151;font-weight:700;cursor:pointer;background:#1f2937;color:#e5e7eb;font-family:inherit}
+ .panel .editor button.set:disabled{opacity:.5}
+ .panel #adjustnote{margin-top:8px;min-height:1.2em}.panel #adjustnote.bad{background:#7f1d1d;border:1px solid #ef4444;border-radius:8px;padding:.4em .7em;color:#fecaca}
+ .panel #adjustnote.ok{color:#34d399}
  .panel .refusal{margin-top:12px;background:#7f1d1d;border:1px solid #ef4444;border-radius:10px;padding:.7em 1em}
  .panel.compact .full{display:none}
 """
@@ -397,12 +401,21 @@ def body_filled(service, st, facts, actions, now) -> str:
                      if p.get("stop_price") is not None else "<span class='money neg'>NO STOP RESTING</span>")
         target_note = (f"<span class='money {money_class(v.get('at_target_usd'))}'>{money(v.get('at_target_usd'))}</span>"
                        if p.get("target_price") is not None else "<span class='money amber'>NO TARGET RESTING</span>")
-        html += (f"<form method=post action='{actions['order_adjust']}' class='full adjust'>"
-                 f"<input type=hidden name=symbol value='{esc(sym)}'>"
-                 "<div class=editor>"
-                 f"<label>stop<input name=stop_price inputmode=decimal value='{stop_val}'>{stop_note}</label>"
-                 f"<label>target<input name=target_price inputmode=decimal value='{target_val}'>{target_note}</label>"
-                 "</div><button class=update>UPDATE</button></form>")
+        # One leg at a time (Steve, 2026-09-15: "It'll be one or the other.
+        # I'd like to be able to enter the value in either and just hit
+        # enter to submit … make this as instant as possible", st-bmaz):
+        # each leg is its own form, Enter sends it, SET is the tap target;
+        # the script posts it by fetch and paints the answer into the card.
+        def leg_form(leg: str, val: str, note: str) -> str:
+            return (f"<form method=post action='{actions['order_adjust']}' class='adjust leg' data-leg={leg}>"
+                    f"<input type=hidden name=symbol value='{esc(sym)}'>"
+                    "<input type=hidden name=ajax value=''>"
+                    f"<label>{leg}<span class=legrow>"
+                    f"<input name={leg}_price inputmode=decimal enterkeyhint=go autocomplete=off value='{val}'>"
+                    f"<button class=set aria-label='set the {leg}'>SET</button></span>{note}</label></form>")
+        html += ("<div id=adjustnote class=k></div><div class=editor>"
+                 + leg_form("stop", stop_val, stop_note)
+                 + leg_form("target", target_val, target_note) + "</div>")
         html += f"<table class=full>{_today_row(st)}</table>"
     html += "<div class=actions>"
     if st["arming"]["state"] != "LOCKED":
@@ -602,9 +615,25 @@ PANEL_SCRIPT = """
   // editor does not flash the server's old values while the new ones are on
   // their way (the 104 he saw twice, 2026-09-15 14:07 CT, st-gw5m)
   var inflight = false;
+  // One leg, sent by fetch, painted in place: no navigation, no blink, the
+  // answer at the top of the card (st-bmaz). Without a script the same form
+  // posts and the page redirects as before.
+  function note(text, bad){ var n = document.getElementById('adjustnote'); if (!n) return;
+    n.textContent = text || ''; n.className = 'k ' + (bad ? 'bad' : 'ok'); }
   document.addEventListener('submit', function(e){ var f = e.target; if (!f || !f.classList || !f.classList.contains('adjust')) return;
-    var b = f.querySelector('button'); if (b) { if (b.disabled) { e.preventDefault(); return; } b.disabled = true; b.textContent = 'UPDATING…'; }
-    inflight = true; });
+    var b = f.querySelector('button'); if (b && b.disabled) { e.preventDefault(); return; }
+    if (!window.fetch || !window.FormData) { if (b) { b.disabled = true; b.textContent = '…'; } inflight = true; return; }
+    e.preventDefault();
+    var fd = new FormData(f); fd.set('ajax', '1');
+    var inputs = f.querySelectorAll('input,button'); for (var i = 0; i < inputs.length; i++) inputs[i].disabled = true;
+    if (b) b.textContent = '…';
+    inflight = true; note('sending…', false);
+    fetch(f.getAttribute('action'), {method: 'POST', body: fd, headers: {'Accept': 'application/json'}})
+      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(j){ inflight = false; apply(j); note(j.bad || j.msg || '', !!j.bad); })
+      .catch(function(err){ inflight = false;
+        for (var i = 0; i < inputs.length; i++) inputs[i].disabled = false; if (b) b.textContent = 'SET';
+        note('not sent — ' + (err && err.message ? err.message : err) + '; the card may be stale, refresh', true); }); });
   var pauseBtn = document.getElementById('pause');
   if (pauseBtn) pauseBtn.addEventListener('click', function(){ paused = !paused; pauseBtn.textContent = paused ? 'resume' : 'pause';
     var u = document.getElementById('updated'); if (u) { if (paused) { u.removeAttribute('data-at'); u.textContent = 'paused'; } else poll(true); } });

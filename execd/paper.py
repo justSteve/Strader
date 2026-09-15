@@ -160,13 +160,22 @@ class PaperBroker:
         """Resting orders against live quotes. A quote that cannot be read
         leaves that order resting; the next read tries again."""
         self._expire()
+        # One live read per symbol per sweep: a bracket is two resting orders
+        # on one contract, and every cancel runs a sweep first, so a moved
+        # leg was paying for two Schwab quotes it did not need — 1.2 s of the
+        # 3 s an UPDATE took on 2026-09-15 (st-bmaz).
+        quotes: dict[str, Quote | None] = {}
         for order in list(self._orders.values()):
             if order.status is not OrderStatus.WORKING:
                 continue
-            try:
-                q = self.live.quote(order.symbol)
-            except BrokerError as exc:
-                log.warning("paper: sweep skipped %s — %s", order.symbol, exc)
+            if order.symbol not in quotes:
+                try:
+                    quotes[order.symbol] = self.live.quote(order.symbol)
+                except BrokerError as exc:
+                    log.warning("paper: sweep skipped %s — %s", order.symbol, exc)
+                    quotes[order.symbol] = None
+            q = quotes[order.symbol]
+            if q is None:
                 continue
             if order.order_type is OrderType.STOP:
                 if order.price is not None and q.bid <= order.price and q.bid > 0:

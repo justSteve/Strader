@@ -929,9 +929,9 @@ class TestThePage:
         body = text(page.get("/exec/order"))
         assert "FILLED" in body and "NET NOW" in body
         assert "value='21.00'" in body and "value='1.50'" in body
-        assert "action='/exec/order/adjust'" in body and ">UPDATE<" in body
-        assert "name=stop_price inputmode=decimal value='1.50'" in body
-        assert "name=target_price inputmode=decimal value='21.00'" in body
+        assert "action='/exec/order/adjust'" in body and ">SET<" in body
+        assert "name=stop_price inputmode=decimal enterkeyhint=go autocomplete=off value='1.50'" in body
+        assert "name=target_price inputmode=decimal enterkeyhint=go autocomplete=off value='21.00'" in body
         assert f"name=symbol value='{CALL}'" in body
 
     def test_the_state_json_carries_the_target_and_the_editor_fragment(self, page, holding):
@@ -976,7 +976,7 @@ class TestThePage:
         broker.rest_market = True
         holding.observe(TRIGGER)
         body = text(page.get("/exec/order"))
-        assert "SELLING" in body and "FLATTEN AGAIN" in body and ">UPDATE<" not in body
+        assert "SELLING" in body and "FLATTEN AGAIN" in body and ">SET<" not in body
 
     def test_cancel_and_re_price_brings_the_form_back_priced_from_the_selection(
             self, page, armed, broker):
@@ -1242,7 +1242,7 @@ class TestUnchangedLegsAndWaterMarks:
         broker.set_quote(CALL, bid=2.80, ask=2.90)
         body = text(page.get("/exec/order"))
         assert "best <span class='pos'>+$68.70</span> at " in body
-        assert "UPDATING…" in body and "classList.contains('adjust')" in body
+        assert "b.textContent = '…'" in body and "classList.contains('adjust')" in body
         holding.flatten()
         after = text(page.get("/exec/order"))
         assert "best · worst" in after and "+$68.70" in after
@@ -1293,3 +1293,47 @@ class TestAReplayedAdjustTouchesNothing:
         body = text(page.get("/exec/order"))
         assert "var inflight = false;" in body and "inflight = true;" in body
         assert "!inflight && (changed || !editing())" in body
+
+
+class TestOneLegEnterToSend:
+    """Steve, 2026-09-15: "there isn't going to be a scenario where i want
+    to change both take profit and stop loss. It'll be one or the other.
+    I'd like to be able to enter the value in either and just hit enter to
+    submit … make this as instant as possible." [st-bmaz]"""
+
+    def test_the_card_has_one_form_per_leg_and_no_update_button(self, page, holding):
+        body = text(page.get("/exec/order"))
+        card = body.split("<div id=panel ")[1].split("<div class=side>")[0]
+        forms = card.split("class='adjust leg'")
+        assert len(forms) == 3 and ">UPDATE<" not in card
+        assert "data-leg=stop" in card and "data-leg=target" in card
+        assert card.count("enterkeyhint=go") == 2 and card.count(">SET<") == 2
+        assert "id=adjustnote" in card
+        stop_form = card.split("data-leg=stop")[1].split("</form>")[0]
+        assert "name=stop_price" in stop_form and "name=target_price" not in stop_form
+
+    def test_an_ajax_set_answers_in_place_with_the_repainted_card(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "target_price": "25", "ajax": "1"})
+        assert r.status_code == 200
+        j = r.json
+        assert j["ok"] is True and j["msg"] == "Target moved from 21.00 to 25.00." and j["bad"] is None
+        assert j["panel_stage"] == "filled" and "value='25.00'" in j["panel_body_html"]
+        assert "value='1.50'" in j["panel_body_html"]              # the stop untouched
+        assert pos_of(holding)["target_price"] == 25.0 and pos_of(holding)["stop_price"] == 1.50
+
+    def test_an_ajax_refusal_is_words_not_a_redirect(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop_price": "2.50"},
+                      headers={"Accept": "application/json"})
+        assert r.status_code == 200
+        j = r.json
+        assert j["ok"] is False and "Refused (bracket)" in j["bad"] and "not below the 2.00 bid" in j["bad"]
+        assert j["panel_stage"] == "filled" and pos_of(holding)["stop_price"] == 1.50
+
+    def test_the_plain_form_still_redirects(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop_price": "1.80"})
+        assert r.status_code == 303 and "msg=Stop+moved" in r.headers["Location"]
+
+    def test_the_script_sends_a_leg_by_fetch_and_paints_the_answer(self, page, holding):
+        body = text(page.get("/exec/order"))
+        assert "fd.set('ajax', '1')" in body and "headers: {'Accept': 'application/json'}" in body
+        assert "note(j.bad || j.msg || '', !!j.bad)" in body

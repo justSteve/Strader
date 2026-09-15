@@ -144,10 +144,10 @@ class TestTheCard:
         v = pos_of(holding)["valuation"]
         assert "NET NOW" in card and f"+${v['net_if_closed_usd']:.2f}" in card
         assert "SPX 6380.00, cut " in card
-        assert "name=stop_price inputmode=decimal value='1.50'" in card
-        assert "name=target_price inputmode=decimal value='21.00'" in card
+        assert "name=stop_price inputmode=decimal enterkeyhint=go autocomplete=off value='1.50'" in card
+        assert "name=target_price inputmode=decimal enterkeyhint=go autocomplete=off value='21.00'" in card
         assert f"{v['at_stop_usd']:+,.2f}".replace("+", "+$").replace("-", "-$") in card
-        assert ">UPDATE<" in card
+        assert ">SET<" in card
         assert "action='/exec/flatten'" in card and ">FLATTEN<" in card
         assert "action='/exec/stop'" in card and ">STOP<" in card
         # no footer, no explanatory line under the controls
@@ -163,7 +163,7 @@ class TestTheCard:
         assert "C6400 × 1 · in 2.10 · selling" in card
         assert "market sell sent" in card and "4 s ago" in card
         assert "reason</td><td>spx-stop" in card and "stop · target</td><td>cancelled" in card
-        assert "FLATTEN AGAIN" in card and ">UPDATE<" not in card and ">STOP<" not in card
+        assert "FLATTEN AGAIN" in card and ">SET<" not in card and ">STOP<" not in card
 
     def test_closed_shows_the_last_close_and_offers_a_new_order(self, page, holding, broker, clock):
         clock.advance(seconds=99)
@@ -191,7 +191,7 @@ class TestTheCard:
     def test_a_refusal_with_money_live_keeps_the_editor_in_reach(self, page, holding):
         r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop_price": "abc"})
         body = text(page.get(r.headers["Location"]))
-        assert stage_word(body) == "FILLED" and ">UPDATE<" in body
+        assert stage_word(body) == "FILLED" and ">SET<" in body
         assert "<div class=bad>Not updated:" in body
         assert "data-stage=refused" not in body
 
@@ -205,7 +205,7 @@ class TestTheCard:
                                  order_path="/exec/order", sel_query={"side": "put"},
                                  preview=preview, nonce="n-1")
         assert stage == "previewed"
-        assert body.index(">SEND<") < body.index(">UPDATE<")
+        assert body.index(">SEND<") < body.index(">SET<")
         assert "P6300 × 1 · buy limit 1.90" in body and "NET NOW" in body and ">FLATTEN<" in body
 
     def test_stop_on_is_said_and_stop_is_not_offered_again(self, page, holding):
@@ -226,7 +226,7 @@ class TestTheStateJson:
         s = page.get("/exec/order/state").get_json()
         assert s["panel_stage"] == "filled"
         assert s["panel_body_html"].startswith("<div class=body data-stage=filled>")
-        assert ">UPDATE<" in s["panel_body_html"] and "NET NOW" in s["panel_body_html"]
+        assert ">SET<" in s["panel_body_html"] and "NET NOW" in s["panel_body_html"]
 
     def test_the_polled_body_never_carries_a_request_owned_stage(self, page, armed):
         page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
