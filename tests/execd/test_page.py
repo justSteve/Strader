@@ -396,7 +396,7 @@ class TestSurface:
     def test_every_form_posts_to_an_absolute_exec_path(self, page):
         page.post("/exec/unlock", data={"passphrase": PASS})
         for body in (text(page.get("/exec/")), text(page.post("/exec/flatten")),
-                     text(page.get("/exec/order")),
+                     text(page.get("/exec/order?side=call")),
                      text(page.post("/exec/reauth/link",
                                     data={"app": "trading", "passphrase": PASS}))):
             actions = [a.split("'")[0] for a in body.split("action='")[1:]]

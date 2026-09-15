@@ -19,6 +19,7 @@ from typing import Any, Mapping
 from .orderform import (
     DEFAULT_ATTEMPTS, DEFAULT_BUDGET_USD, POLL_S, Priced, Selection, next_weekday,
 )
+from .panel import COLORS, PANEL_SCRIPT, PANEL_STYLE, WORDS, panel_html
 from .service import ExecService
 
 _ORDER_STYLE = """
@@ -41,8 +42,9 @@ _ORDER_STYLE = """
 _SCRIPT = """
 <script>
 (function(){
-  var PRICE = %(price)s, STATE = %(state)s, POLL = %(poll)d;
+  var PRICE = %(price)s;
   var form = document.getElementById('sel');
+  window.__sym = %(symbol)s;
   function q(extra){ var d = new FormData(form); var o = {}; d.forEach(function(v,k){ if(v!=='') o[k]=v; });
     for (var k in (extra||{})) o[k]=extra[k]; return new URLSearchParams(o).toString(); }
   function reprice(){ if(!form) return;
@@ -52,17 +54,8 @@ _SCRIPT = """
       var p = document.getElementById('previewform'); if (p && j.preview_fields_html) p.innerHTML = j.preview_fields_html;
       if (j.contract) window.__sym = j.contract.symbol;
     }).catch(function(){}); }
-  function editing(el){ var a = document.activeElement; return !!(el && a && a.tagName === 'INPUT' && el.contains(a)); }
-  function poll(){ if (document.visibilityState === 'hidden') return;
-    var u = STATE + (window.__sym ? ('?symbol=' + encodeURIComponent(window.__sym)) : '');
-    fetch(u, {headers:{'Accept':'application/json'}}).then(function(r){return r.json();}).then(function(j){
-      var qd = document.getElementById('quote'); if (qd && j.quote_html) qd.innerHTML = j.quote_html;
-      var pc = document.getElementById('position'); if (pc && !editing(pc)) pc.innerHTML = j.position_html || '';
-      var st = document.getElementById('state'); if (st && j.state_html) st.innerHTML = j.state_html;
-    }).catch(function(){}); }
   if (form) { ['delta','budget','attempts','lots'].forEach(function(n){ var el = form.elements[n];
     if (el) { el.addEventListener('change', reprice); el.addEventListener('input', function(){ clearTimeout(window.__t); window.__t = setTimeout(reprice, 600); }); } }); }
-  setInterval(poll, POLL * 1000);
 })();
 </script>
 """
@@ -223,18 +216,23 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     parts: list[str] = []
     if msg:
         parts.append(f"<div class=msg>{esc(msg)}</div>")
-    if bad:
-        parts.append(f"<div class=bad>{esc(bad)}</div>")
 
-    # state, STOP, FLATTEN — within reach while a ticket is live
-    parts.append(f"<div class=card><div id=state>{state_html(st)}</div>")
-    if not st["arming"]["killed"]:
-        parts.append(f"<form method=post action='{actions['stop']}'><button class='big stop'>STOP</button></form>")
-    if st["arming"]["state"] != "LOCKED":
-        parts.append(f"<form method=post action='{actions['flatten']}'><button class='big exit'>FLATTEN</button></form>")
-    else:
-        parts.append(f"<div class=k>locked — unlock on <a href='{actions['index']}'>the operations page</a></div>")
-    parts.append("</div>")
+    # the status panel — one card, the stage the order is in, its controls
+    # (st-4ezg; design docs/design/order-status-panel). A refusal with
+    # nothing live is the card's REFUSED stage; with money live it is the
+    # red box above the card, and the card keeps its controls.
+    ticket = None
+    if priced is not None and priced.ticket is not None:
+        ticket = {"stop_trigger_spx": priced.ticket.stop_trigger_spx,
+                  "max_loss_usd": priced.ticket.max_loss_usd,
+                  "stop_price": priced.stop_price}
+    live_preview = preview if (nonce and preview is not None and not preview.get("refused")) else None
+    panel = panel_html(service, st, actions, now=service.clock(), order_path=order,
+                       sel_query=sel.as_query(), preview=live_preview,
+                       nonce=nonce if live_preview else None, ticket=ticket, refused=bad)
+    if bad and "data-stage=refused" not in panel:
+        parts.append(f"<div class=bad>{esc(bad)}</div>")
+    parts.append(panel)
 
     # side and expiry
     tomorrow = next_weekday(today)
@@ -269,18 +267,10 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
         # FD0 block
         parts.append(f"<div class=card><div id=quote>{quote_html(None, priced.spx, None)}</div>"
                      f"<div id=fd0>{fd0_html(priced)}</div></div>")
-        # preview / send
+        # preview — the broker's cost line lands in the panel with SEND
         if priced.contract is not None and priced.ticket is not None:
-            if nonce and preview is not None:
-                parts.append(f"<div class=card><div class=cost>{esc(preview_text or '')}</div>")
-                if preview.get("refused"):
-                    parts.append("<div class=k>fix and preview again</div></div>")
-                else:
-                    parts.append(
-                        f"<form method=post action='{actions['order_send']}'>"
-                        f"<input type=hidden name=nonce value='{nonce}'>"
-                        f"<button class='big send'>SEND — one order</button>"
-                        f"<div class=k>this button is good for one minute, once</div></form></div>")
+            if live_preview is not None and preview_text:
+                parts.append(f"<div class=card><div class=k>{esc(preview_text)}</div></div>")
             parts.append(
                 f"<form method=post action='{actions['order_preview']}'>"
                 f"<span id=previewform>{preview_fields_html(sel)}</span>"
@@ -288,11 +278,12 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     else:
         parts.append("<div class=card><div class=k>pick a side to see the strikes</div></div>")
 
-    # the position with its bracket editor, the working entry, and the day
-    parts.append(f"<div id=position>{position_html(st, actions)}</div>")
-
-    script = _SCRIPT % {"price": json.dumps(actions["order_price"]),
-                        "state": json.dumps(actions["order_state"]), "poll": POLL_S}
+    symbol = (priced.contract.symbol if priced is not None and priced.contract is not None
+              else None)
+    script = (_SCRIPT % {"price": json.dumps(actions["order_price"]),
+                         "symbol": json.dumps(symbol)}
+              + PANEL_SCRIPT % {"state": json.dumps(actions["order_state"]), "poll": POLL_S,
+                                "words": json.dumps(WORDS), "colors": json.dumps(COLORS)})
     return _order_page("order", "".join(parts) + script, embed=embed)
 
 
@@ -302,7 +293,7 @@ def _order_page(title: str, body: str, *, embed: bool) -> str:
             f"<title>{esc(title)}</title>"
             "<meta name=apple-mobile-web-app-capable content=yes>"
             "<meta name=apple-mobile-web-app-status-bar-style content=black>"
-            f"{_STYLE}<style>{_ORDER_STYLE}</style></head>")
+            f"{_STYLE}<style>{_ORDER_STYLE}{PANEL_STYLE}</style></head>")
     if embed:
         return head + f"<body class=embed>{body}</body></html>"
     return head + f"<body><h1>order</h1>{body}<div class=k>tailnet only</div></body></html>"

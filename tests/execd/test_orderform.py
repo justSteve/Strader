@@ -196,7 +196,7 @@ class TestPage:
         body = text(r)
         assert r.status_code == 200
         assert "Preview from Schwab" in body and "total $210.65" in body and "accepts it" in body
-        assert "SEND — one order" in body
+        assert ">SEND<" in body and "PREVIEWED" in body
         nonce = body.split("name=nonce value='")[1].split("'")[0]
         assert not any(c[0] == "place" for c in chain.calls)
 
@@ -221,8 +221,8 @@ class TestPage:
         assert "used already" in text(order_page.get(r.headers["Location"]))
         assert [c[0] for c in chain.calls if c[0] == "place"] == ["place", "place", "place"]
         # the position, its money and the bracket editor are on the page now
-        assert "Open position" in landing and "NET IF CLOSED NOW" in landing
-        assert "at the target" in landing and ">UPDATE<" in landing
+        assert "FILLED" in landing and "NET NOW" in landing and "C6400 × 1" in landing
+        assert "value='21.00'" in landing and ">UPDATE<" in landing
         assert "name=stop_price" in landing and "name=target_price" in landing
 
     def test_a_stale_send_token_refuses(self, order_page, mono):
@@ -236,7 +236,7 @@ class TestPage:
     def test_a_refused_preview_says_so_and_offers_no_send(self, order_page, armed):
         armed.stop()
         body = text(order_page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"}))
-        assert "Refused (" in body and "Nothing sent" in body and "SEND — one order" not in body
+        assert "Refused (" in body and "Nothing sent" in body and ">SEND<" not in body
 
     def test_locked_shows_the_strikes_but_no_flatten_and_refuses_a_preview(self, service, chain, clock, mono, tmp_path):
         vault = Vault(tmp_path / "vault.json")
@@ -266,7 +266,7 @@ class TestPage:
         app.config["TESTING"] = True
         c = app.test_client()
         body = text(c.post("/exec/order/preview", data={"side": "call", "delta": "0.3"}))
-        assert "PAPER (simulated) — Preview from Schwab" in body and "PAPER — orders are simulated" in body
+        assert "PAPER (simulated) — Preview from Schwab" in body and "<span class='badge paper'>PAPER</span>" in body
 
     def test_embed_has_no_shell(self, order_page):
         body = text(order_page.get("/exec/order?side=call&embed=1"))

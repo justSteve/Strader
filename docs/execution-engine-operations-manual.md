@@ -1243,6 +1243,68 @@ trigger for a call and a put, the API's four status codes, recovery, the
 attempts rule through the service, the paper book's target fill, and the
 page's editor and cancel.
 
+### 5.21 The status panel — one card, seven stages (st-4ezg)
+
+Steve, 2026-09-14, reviewing `/exec/order`: *"the complete status of the
+order, plus controls to alter or refresh its rendering … optimize for the
+obvious … the panel can re-size according to context."* COO drew it as a
+design canvas (`docs/design/order-status-panel/`, seven artboards from one
+template, revised twice on his review); on 2026-09-15 ("install is fired.
+let's code the bracket") it became code: `execd/panel.py`, the card at the
+top of the order page, replacing the state card, the preview card and the
+position card that were there.
+
+**The stage is read, never kept.** `panel.stage_of` looks at the status body
+and the day's journal (`panel.journal_facts`: when each working entry was
+sent, when each close went out, when each position filled, the last `closed`
+line) and names one of seven: `none` (nothing held, nothing working),
+`working` (an entry rests at the broker), `filled` (a position, no close in
+flight), `exiting` (a close is in flight — the word on the card is SELLING),
+`closed` (nothing live, a `closed` line today). Two stages belong to the
+request, not the service: `previewed` (a PREVIEW just came back, the SEND
+token is live) and `refused` (the page has a refusal to show). Those two never
+hide money that is live — a preview while a position is held or an entry
+works renders the ticket *above* the live part under the PREVIEWED word; a
+refusal while something is live is the red box above the card and the card
+keeps its stage and its controls.
+
+**What each stage shows** (the detail rows fold under `less`):
+
+| stage | title line | the big number | detail | controls |
+|---|---|---|---|---|
+| no order | nothing held, nothing working | — | last close, today's attempts and headroom | none |
+| PREVIEWED | `C7630 × 1 · buy limit 4.70 = $470.00` | the broker's cost line | rules, SPX cut, most this costs, the stop and target that will rest | SEND (the nonce, once), RE-PRICE |
+| WORKING | `… · buy limit 4.70 · sent 12 s ago` | ask above the limit, `+0.05` | on fill (the SPX cut, the target multiple), the order id | CANCEL AND RE-PRICE — no STOP on a resting order |
+| FILLED | `… · in 4.70 · 1 m 35 s ago` | NET NOW — a market sell after both commissions | bid/ask, quote age, SPX and the cut; the editor: stop and target inputs with the net at each | UPDATE, FLATTEN, STOP |
+| SELLING | `… · in 4.70 · selling` | market sell sent, `4 s ago` | reason, stop · target cancelled, the order id | FLATTEN AGAIN |
+| CLOSED | `… · closed 40 s ago` | P&L, commissions in | in → out and the hold time, reason, today's line | NEW ORDER |
+| REFUSED | the refusal, in the service's words | — | — | RE-PRICE |
+
+**The rules from the review, in every stage.** One clock, in the header,
+Central time, ticking; every other time on the card is *x ago* and ticks too
+(`<span class=ago data-at=…>`, the server's reading in the text and the
+instant in the attribute). A contract is `C7630` / `P7600`
+(`panel.contract_name`, off `parse_occ`; a symbol that is not OCC comes back
+trimmed). One net number — the same `net_if_closed_usd` as the position row,
+never gross with a footnote. No footers: the card is as tall as its stage.
+PAPER or LIVE is a badge beside the stage word. STOP IS ON and *locked —
+unlock on the operations page* are one line inside the card when they apply.
+
+**The script.** Server-rendered, so the card works with no script — every
+control is a form or a link. The script ticks the clock and the *ago* spans
+once a second; polls `GET /exec/order/state` every `POLL_S` seconds and swaps
+the body (`panel_body_html`, with `panel_stage` for the header word) unless
+an input on the card has focus, the page is hidden, the card is paused, or
+the card is in a request-owned stage (a poll would erase the SEND token);
+*pause*/*resume* stops and restarts that with the *updated* stamp saying
+`paused`; the refresh button polls now regardless; *more*/*less* toggles a
+`compact` class that hides the `.full` rows, remembered in `localStorage`.
+
+`tests/execd/test_panel.py` — the names and the units, the stage off the
+service, every stage's card on the page, the two request-owned stages against
+live money, the polled body never carrying a request-owned stage, every
+action on the card an absolute `/exec/` path, no secret on the card.
+
 ## 6. The feed and the credential
 
 ### 6.1 Preflight

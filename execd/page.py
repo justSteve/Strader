@@ -422,13 +422,18 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 spx = service.spx_mark()
             except BrokerError as exc:
                 error = str(exc)
+        from .panel import panel_body
+        stage, body = panel_body(service, st, _actions(), now=clock(),
+                                 order_path=url_for("exec.order"))
         return {"mode": st["mode"], "arming": st["arming"], "day": st["day"],
                 "pnl": st.get("pnl"), "positions": st["positions"],
                 "working": st["working"],
                 "quote": quote, "spx": spx,
                 "quote_html": quote_html(quote, spx, error),
                 "position_html": position_html(st, _actions()),
-                "state_html": state_html(st)}
+                "state_html": state_html(st),
+                # the status panel (st-4ezg): the stage and the card's body
+                "panel_stage": stage, "panel_body_html": body}
 
     @bp.post("/order/preview")
     def order_preview():

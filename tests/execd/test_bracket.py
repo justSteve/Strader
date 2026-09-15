@@ -927,8 +927,8 @@ def text(r) -> str:
 class TestThePage:
     def test_the_position_card_shows_the_target_and_the_editor(self, page, holding):
         body = text(page.get("/exec/order"))
-        assert "at the target" in body and "target 21.00" in body
-        assert "at the stop" in body and "stop 1.50" in body
+        assert "FILLED" in body and "NET NOW" in body
+        assert "value='21.00'" in body and "value='1.50'" in body
         assert "action='/exec/order/adjust'" in body and ">UPDATE<" in body
         assert "name=stop_price inputmode=decimal value='1.50'" in body
         assert "name=target_price inputmode=decimal value='21.00'" in body
@@ -976,7 +976,7 @@ class TestThePage:
         broker.rest_market = True
         holding.observe(TRIGGER)
         body = text(page.get("/exec/order"))
-        assert "exit in flight" in body and ">UPDATE<" not in body
+        assert "SELLING" in body and "FLATTEN AGAIN" in body and ">UPDATE<" not in body
 
     def test_cancel_and_re_price_brings_the_form_back_priced_from_the_selection(
             self, page, armed, broker):
@@ -987,7 +987,7 @@ class TestThePage:
         r = page.post("/exec/order/send", data={"nonce": nonce})
         landing = text(page.get(r.headers["Location"]))
         assert "not filled yet" in landing and "the bracket rests when it fills" in landing
-        assert "Working entry" in landing and "CANCEL AND RE-PRICE" in landing
+        assert "WORKING" in landing and "CANCEL AND RE-PRICE" in landing
         assert "action='/exec/order/cancel'" in landing
         w = armed.status()["working"][0]
         assert w["page_query"] == {"side": "call", "expiry": "2026-08-26",
@@ -1001,7 +1001,7 @@ class TestThePage:
         assert "expiry=2026-08-26" in where
         landing = text(page.get(where))
         assert f"Cancelled {w['order_id']}" in landing
-        assert "Working entry" not in landing
+        assert "data-stage=working" not in landing
         assert "PREVIEW" in landing and ">6400<" in landing.split("<tr class='chosen'>")[1].split("</tr>")[0]
         assert armed.status()["working"] == []
         assert armed.journal.events("entry_resolved")[-1]["outcome"] == "canceled"
@@ -1023,8 +1023,8 @@ class TestThePage:
 
     def test_the_page_has_no_explanatory_text_under_the_bracket_controls(self, page, holding):
         body = text(page.get("/exec/order"))
-        card = body.split("<h2>Open position</h2>")[1].split("</form>")[0]
-        assert "<div class=k>" not in card.split("<form")[1]
+        form = body.split("action='/exec/order/adjust'")[1].split("</form>")[0]
+        assert "<div class=k>" not in form
 
     def test_the_landing_message_names_the_bracket_after_a_fill(self, page, armed):
         r = page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
