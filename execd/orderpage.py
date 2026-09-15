@@ -348,6 +348,18 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
 
     exp = sel.expiry or today
     if priced is not None and sel.side:
+        # the decision first (Steve, 2026-09-15: PREVIEW in the upper portion):
+        # the ticket and PREVIEW, then the tuning — expiry, δ, RE-PRICE — and the strikes
+        # the ticket — three lines, the derivation behind more
+        parts.append(f"<div id=fd0>{ticket_html(priced, service.bounds)}</div>")
+        # the one action on this stage
+        if priced.contract is not None and priced.ticket is not None:
+            if live_preview is not None and preview_text:
+                parts.append(f"<div class=card><div class=k>{esc(preview_text)}</div></div>")
+            parts.append(
+                f"<form method=post action='{actions['order_preview']}'>"
+                f"<span id=previewform>{preview_fields_html(sel)}</span>"
+                f"<button class='big preview'>PREVIEW</button></form>")
         # expiry, δ target and RE-PRICE on one row — one GET form, no script needed
         delta_val = f"{sel.delta:g}" if sel.delta is not None else ""
         parts.append(
@@ -367,16 +379,6 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             "</div></details></form>")
         # strikes around spot
         parts.append(f"<div class=card><div id=strikes>{strikes_html(priced, order)}</div></div>")
-        # the ticket — three lines, the derivation behind more
-        parts.append(f"<div id=fd0>{ticket_html(priced, service.bounds)}</div>")
-        # the one action on this stage
-        if priced.contract is not None and priced.ticket is not None:
-            if live_preview is not None and preview_text:
-                parts.append(f"<div class=card><div class=k>{esc(preview_text)}</div></div>")
-            parts.append(
-                f"<form method=post action='{actions['order_preview']}'>"
-                f"<span id=previewform>{preview_fields_html(sel)}</span>"
-                f"<button class='big preview'>PREVIEW</button></form>")
     elif not sel.side:
         parts.append("<div class=k style='text-align:center'>pick a side to see the strikes</div>")
 

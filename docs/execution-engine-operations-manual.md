@@ -1135,13 +1135,14 @@ to override the delta and reprice and send"*; design
 `docs/design/order-page/`): **the strip** — the mode badge, the arming word,
 the one ticking clock, STOP, and an *account* link — the same on every stage;
 the stage card (§5.21) only when there is a stage to show; BULLISH / BEARISH
-as two buttons; expiry chips, the **δ target** box (starts at
+as two buttons; **the ticket** in three lines — what will be sent and its cost, the
+cut and the resting stop's net, the target's net — with the derivation
+behind *more*, and PREVIEW as the one action, in the upper portion of the
+page (Steve, 2026-09-15); then the tuning — expiry chips, the **δ target** box (starts at
 `DEFAULT_DELTA` = 0.80, Steve 2026-09-15 from his 08-19 words; a blank box
 means nearest to spot) and RE-PRICE on one row, with FD0 budget and attempts
-folded under *budget and attempts*; the strikes around spot, the chosen row
-marked; **the ticket** in three lines — what will be sent and its cost, the
-cut and the resting stop's net, the target's net — with the derivation
-behind *more*; PREVIEW as the one action; after a preview the card shows
+folded under *budget and attempts* — and the strikes around spot, the chosen
+row marked; after a preview the card shows
 Schwab's cost line and SEND; one line for the day. `/exec/` **is** this page
 since st-shhi. Everything that is not placing an order — unlock, clear STOP,
 stand down, lock, the weekly re-authorisation, the grants, the holdings that
