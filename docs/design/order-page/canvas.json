@@ -1,7 +1,7 @@
 {
   "artboards": [
     { "file": "Main.dc.html", "title": "pick and price", "x": 0, "y": 0, "w": 576, "h": 900 },
-    { "file": "Previewed.dc.html", "title": "previewed — send", "x": 672, "y": 0, "w": 576, "h": 640 },
+    { "file": "retired-Previewed.dc.html", "title": "previewed — retired with the PREVIEW step (st-igw0, 2026-09-16)", "x": 672, "y": 0, "w": 576, "h": 640 },
     { "file": "Filled.dc.html", "title": "filled — manage", "x": 1344, "y": 0, "w": 576, "h": 660 },
     { "file": "Account.dc.html", "title": "account (off the trading page)", "x": 2016, "y": 0, "w": 576, "h": 700 }
   ],

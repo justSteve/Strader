@@ -388,7 +388,7 @@ class TestSurface:
             "/exec/stand-down", "/exec/lock", "/exec/flatten", "/exec/flatten/confirm",
             "/exec/reauth/link", "/exec/reauth/store",
             "/exec/order", "/exec/order/price", "/exec/order/state",
-            "/exec/order/preview", "/exec/order/send",
+            "/exec/order/send",
             # st-fn5y: the bracket's UPDATE and the working entry's CANCEL AND RE-PRICE
             "/exec/order/adjust", "/exec/order/cancel",
         }

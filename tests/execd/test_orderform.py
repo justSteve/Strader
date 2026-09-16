@@ -2,7 +2,7 @@
 
 The choice rules (nearest to spot, a delta override, a tapped strike), the
 priced ticket (the engine's derivation, the service's tick grid, the resting
-stop), and the page: side → strikes → FD0 → preview → send, over the real
+stop), and the page: side → strikes → FD0 → send, over the real
 routes and the mock broker, with the same journal the live ticket writes.
 """
 
@@ -19,7 +19,7 @@ from execd.page import CredentialFile, create_page
 from execd.service import ExecService
 from execd.vault import Vault
 
-from .conftest import CALL, PUT, SPX_NOW, Clock, schwab_chain_maps
+from .conftest import CALL, PUT, SPX_NOW, Clock, page_send, schwab_chain_maps
 from .test_page import CALLBACK, PASS, Schwab, market_payload, vault_payload
 
 DAY = dt.date(2026, 8, 26)
@@ -178,7 +178,7 @@ class TestPage:
         chosen = body.split("<tr class='chosen'>")[1].split("</tr>")[0]
         assert ">6350<" in chosen
         assert "cut if SPX" in body and "stop rests at" in body and "target rests at" in body
-        assert "PREVIEW" in body and "SEND" not in body
+        assert ">SEND<" in body and "PREVIEW" not in body and "name=nonce value='" in body
         body = text(order_page.get("/exec/order?side=call&delta="))
         assert ">6380<" in body.split("<tr class='chosen'>")[1].split("</tr>")[0]
 
@@ -196,16 +196,16 @@ class TestPage:
         assert s["quote"]["ask"] == 2.10 and s["spx"] == SPX_NOW
         assert s["arming"]["state"] == "ARMED" and "position_html" in s and "bid 2.00" in s["quote_html"]
 
-    def test_preview_then_send_walks_the_whole_ticket(self, order_page, armed, chain):
-        r = order_page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
-        body = text(r)
-        assert r.status_code == 200
-        assert "Preview from Schwab" in body and "total $210.65" in body and "accepts it" in body
-        assert ">SEND<" in body and "PREVIEWED" in body
-        nonce = body.split("name=nonce value='")[1].split("'")[0]
+    def test_send_walks_the_whole_ticket_in_one_tap(self, order_page, armed, chain):
+        """SEND is the ticket's one action (st-igw0): the page carries a
+        single-use token, the send prices the selection at that moment and
+        places it, and the service runs the broker's own preview inside."""
+        page = text(order_page.get("/exec/order?side=call&delta=0.3"))
+        assert ">SEND<" in page and "PREVIEW" not in page and "action='/exec/order/send'" in page
+        nonce = page.split("name=nonce value='")[1].split("'")[0]
         assert not any(c[0] == "place" for c in chain.calls)
 
-        r = order_page.post("/exec/order/send", data={"nonce": nonce})
+        r = order_page.post("/exec/order/send", data={"side": "call", "delta": "0.3", "nonce": nonce})
         assert r.status_code == 303
         landing = text(order_page.get(r.headers["Location"]))
         assert "SENT AND FILLED" in landing and "Protective stop resting" in landing
@@ -217,33 +217,59 @@ class TestPage:
         assert [c[0] for c in chain.calls if c[0] == "place"] == ["place", "place", "place"]
         ids = {e.get("intent_id") for e in armed.journal.read() if e.get("intent_id")}
         page_ids = [i for i in ids if str(i).startswith("page-")]
-        assert len(page_ids) == 1
+        assert len(page_ids) == 1 and page_ids[0].endswith("-" + nonce[:6])
         events = [e["event"] for e in armed.journal.find(page_ids[0])]
+        # the broker's own preview runs inside the place — no page step for it
         assert events[:2] == ["request", "preview"] and "placed" in events and "filled" in events
+        assert armed.journal.find(page_ids[0])[0]["kind"] == "place"
         assert armed.journal.find(page_ids[0])[0]["intent"]["source"] == "page"
-        # the same nonce is dead
-        r = order_page.post("/exec/order/send", data={"nonce": nonce})
-        assert "used already" in text(order_page.get(r.headers["Location"]))
+        # the same token again is a replay: answered with what happened, never sent twice
+        r = order_page.post("/exec/order/send", data={"side": "call", "delta": "0.3", "nonce": nonce})
+        again = text(order_page.get(r.headers["Location"]))
+        assert "SENT AND FILLED" in again
         assert [c[0] for c in chain.calls if c[0] == "place"] == ["place", "place", "place"]
         # the position, its money and the bracket editor are on the page now
         assert "FILLED" in landing and "NET NOW" in landing and "C6400 × 1" in landing
         assert "value='21.00'" in landing and ">SET<" in landing
         assert "name=stop_price" in landing and "name=target_price" in landing
 
-    def test_a_stale_send_token_refuses(self, order_page, mono):
-        from execd.orderform import PREVIEW_TTL_S
-        body = text(order_page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"}))
+    def test_a_send_answered_in_place_paints_the_card_and_re_arms_the_button(self, order_page, armed, chain):
+        page = text(order_page.get("/exec/order?side=call&delta=0.3"))
+        assert "<div id=panel hidden " in page and "<div id=answer></div>" in page
+        nonce = page.split("name=nonce value='")[1].split("'")[0]
+        r = order_page.post("/exec/order/send", data={"side": "call", "delta": "0.3", "nonce": nonce, "ajax": "1"})
+        assert r.status_code == 200
+        j = r.json
+        assert j["ok"] is True and "SENT AND FILLED" in j["msg"] and j["bad"] is None
+        assert j["panel_stage"] == "filled" and "NET NOW" in j["panel_body_html"]
+        assert j["send_nonce"] and j["send_nonce"] != nonce and j["replayed"] is False
+        assert j["quote"]["ask"] == 2.10                                # the chosen contract's quote rides along
+        # the script: fetch on the send form, paint, unhide, re-arm
+        assert "classList.contains('sendform')" in page and "pn.hidden = false" in page
+        assert "n.value = j.send_nonce" in page and "SENDING…" in page
+
+    def test_an_unknown_token_is_refused_and_a_spent_one_replays(self, order_page, armed, chain):
+        r = order_page.post("/exec/order/send", data={"side": "call", "delta": "0.3", "nonce": "bogus", "ajax": "1"})
+        j = r.json
+        assert j["ok"] is False and "reload the page" in j["bad"] and not any(c[0] == "place" for c in chain.calls)
+
+    def test_a_stale_send_token_refuses(self, order_page, mono, chain):
+        from execd.orderform import SEND_NONCE_TTL_S
+        body = text(order_page.get("/exec/order?side=call&delta=0.3"))
         nonce = body.split("name=nonce value='")[1].split("'")[0]
-        mono.t += PREVIEW_TTL_S + 1
-        r = order_page.post("/exec/order/send", data={"nonce": nonce})
+        mono.t += SEND_NONCE_TTL_S + 1
+        r = order_page.post("/exec/order/send", data={"side": "call", "delta": "0.3", "nonce": nonce})
         assert "older than" in text(order_page.get(r.headers["Location"]))
+        assert not any(c[0] == "place" for c in chain.calls)
 
-    def test_a_refused_preview_says_so_and_offers_no_send(self, order_page, armed):
+    def test_a_refused_send_says_so(self, order_page, armed, chain):
         armed.stop()
-        body = text(order_page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"}))
-        assert "Refused (" in body and "Nothing sent" in body and ">SEND<" not in body
+        r = page_send(order_page, {"side": "call", "delta": "0.3"})
+        body = text(order_page.get(r.headers["Location"]))
+        assert "Refused (" in body and "Nothing sent" in body and "data-stage=refused" in body
+        assert not any(c[0] == "place" for c in chain.calls)
 
-    def test_locked_shows_the_strikes_but_no_flatten_and_refuses_a_preview(self, service, chain, clock, mono, tmp_path):
+    def test_locked_shows_the_strikes_but_no_flatten_and_refuses_a_send(self, service, chain, clock, mono, tmp_path):
         vault = Vault(tmp_path / "vault.json")
         vault.store(vault_payload(), PASS)
         mfile = tmp_path / "market.json"
@@ -257,10 +283,10 @@ class TestPage:
         body = text(c.get("/exec/order?side=put"))
         assert "6400" in body and ">LOCKED<" in body and "FLATTEN" not in body
         assert "href='/exec/account'" in body
-        body = text(c.post("/exec/order/preview", data={"side": "put"}))
-        assert "Refused (" in body
+        r = page_send(c, {"side": "put"})
+        assert "Refused (" in text(c.get(r.headers["Location"]))
 
-    def test_paper_mode_prefixes_the_preview(self, service, chain, clock, mono, tmp_path):
+    def test_paper_mode_is_the_badge_and_the_send_fills_in_the_book(self, service, chain, clock, mono, tmp_path):
         from execd.service import ServiceConfig
         from execd.paper import PaperBroker
         paper = PaperBroker(chain, clock=clock)
@@ -271,10 +297,11 @@ class TestPage:
         app = create_page(svc, vault=vault, market=None, callback_url=CALLBACK, clock=clock, monotonic=mono)
         app.config["TESTING"] = True
         c = app.test_client()
-        body = text(c.post("/exec/order/preview", data={"side": "call", "delta": "0.3"}))
+        r = page_send(c, {"side": "call", "delta": "0.3"})
+        body = text(c.get(r.headers["Location"]))
         # the badge is the word; no "(simulated)" prefix (Steve, 2026-09-15, st-2hei)
-        assert "Preview from Schwab" in body and "<span class='badge paper'>PAPER</span>" in body
-        assert "simulated" not in body
+        assert "SENT AND FILLED" in body and "<span class='badge paper'>PAPER</span>" in body
+        assert "simulated" not in body and svc.status()["positions"][0]["symbol"] == CALL
 
     def test_embed_has_no_shell(self, order_page):
         body = text(order_page.get("/exec/order?side=call&embed=1"))
@@ -337,32 +364,20 @@ class TestThePadlockAndRePrice:
         assert "id=lock class='lock on'" in locked and "&#128274;" in locked
         assert "<span id=px>2.00</span>" in locked and "id=cost>$200.00" in locked
         assert "ask 2.10 now" in locked
-        # PREVIEW carries the lock; the RE-PRICE form holds it for the script to flip
-        assert "name='limit' value='2.00'" in locked.split("id=previewform")[1].split("</span>")[0]
+        # SEND carries the lock; the RE-PRICE form holds it for the script to flip
+        assert "name='limit' value='2.00'" in locked.split("id=sendfields")[1].split("</span>")[0]
         assert "name=limit value='2.00'" in locked.split("<form id=sel")[1].split("</form>")[0]
         # a strike, an expiry or a side is a new price: the lock does not travel
         hrefs = [h.split("'")[0] for h in locked.split("href='")[1:]]
         assert not any("limit=" in h for h in hrefs), hrefs
 
-    def test_preview_sends_the_locked_price_and_re_price_previews_again_at_the_market(
-            self, order_page, armed, chain):
-        r = order_page.post("/exec/order/preview", data={"side": "call", "strike": "6400", "limit": "2.00"})
-        body = text(r)
-        assert "at 2.00 — cost $200.00" in body and "total $200.65" in body and ">SEND<" in body
-        req = [e for e in armed.journal.read() if e.get("event") == "request" and e.get("kind") == "preview"][-1]
+    def test_send_sends_the_locked_price(self, order_page, armed, chain):
+        r = page_send(order_page, {"side": "call", "strike": "6400", "limit": "2.00"})
+        landing = text(order_page.get(r.headers["Location"]))
+        assert "1 at 2.00 ($200.00)" in landing
+        req = [e for e in armed.journal.read() if e.get("event") == "request" and e.get("kind") == "place"][-1]
         assert req["intent"]["limit"] == 2.00
-        card = body.split("data-stage=previewed")[1]
-        reprice = card.split(">SEND<")[1].split(">RE-PRICE<")[0]
-        assert "action='/exec/order/preview'" in reprice and "name=strike value='6400'" in reprice
-        assert "name=limit" not in reprice
-        # the one-tap RE-PRICE: previewed again, at the ask, a fresh token
-        import re
-        fields = dict(re.findall(r"name=(\w+) value='([^']*)'", reprice))
-        assert fields == {"side": "call", "expiry": "2026-08-26", "strike": "6400"}
-        r = order_page.post("/exec/order/preview", data=fields)
-        again = text(r)
-        assert "at 2.10 — cost $210.00" in again and ">SEND<" in again and "PREVIEWED" in again
-        assert again.split("name=nonce value='")[1].split("'")[0] != body.split("name=nonce value='")[1].split("'")[0]
+        assert armed.status()["positions"][0]["entry_price"] == 2.00
 
     def test_the_state_poll_carries_the_live_limit_and_its_cost(self, order_page):
         s = order_page.get(f"/exec/order/state?symbol={CALL}&lots=1").json
@@ -372,7 +387,7 @@ class TestThePadlockAndRePrice:
 
     def test_the_fresh_page_still_ticks_without_a_stage_card(self, order_page):
         body = text(order_page.get("/exec/order?side=call"))
-        assert "id=panel" not in body.split("<script>")[0]
+        assert "<div id=panel hidden " in body.split("<script>")[0]   # on the page, hidden, until a stage arrives (st-igw0)
         assert "getElementById('panel') || document.body" in body and "window.__onQuote" in body
 
 
@@ -446,9 +461,7 @@ class TestAStageChangeAlwaysPaints:
     bracket input had focus. [st-f3y3]"""
 
     def test_the_poll_returns_closed_on_the_first_tick_after_a_stop_fill(self, order_page, armed, chain, clock):
-        r = order_page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
-        nonce = text(r).split("name=nonce value='")[1].split("'")[0]
-        landing = r = order_page.post("/exec/order/send", data={"nonce": nonce})
+        r = page_send(order_page, {"side": "call", "delta": "0.3"})
         page = text(order_page.get(r.headers["Location"]))
         assert "data-stage=filled" in page and "class=msg" in page
         p = armed.status()["positions"][0]
@@ -471,7 +484,7 @@ class TestAStageChangeAlwaysPaints:
 
 
 class TestARefusedSendIsShown:
-    """2026-09-15 09:54 CT: Steve previewed, tapped SEND, and saw nothing —
+    """2026-09-15 09:54 CT: Steve tapped SEND and saw nothing —
     Schwab's own preview had refused the order (buying power) and the page
     swallowed it. A refused send must land as the red box AND the REFUSED
     stage, and the journal must be one tap away on the trading page."""
@@ -479,8 +492,6 @@ class TestARefusedSendIsShown:
     def test_a_refused_send_lands_red_with_the_refused_stage_and_the_journal(
             self, order_page, armed, chain):
         from execd.broker import Preview
-        r = order_page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
-        nonce = text(r).split("name=nonce value='")[1].split("'")[0]
         real = chain.preview
 
         def rejecting(intent):
@@ -491,7 +502,7 @@ class TestARefusedSendIsShown:
                            messages=("reject: You do not have enough available cash/buying "
                                      "power for this order.",))
         chain.preview = rejecting
-        r = order_page.post("/exec/order/send", data={"nonce": nonce})
+        r = page_send(order_page, {"side": "call", "delta": "0.3"})
         assert r.status_code == 303 and "bad=" in r.headers["Location"], r.headers["Location"]
         landing = text(order_page.get(r.headers["Location"]))
         assert "<div class=bad>" in landing or "data-stage=refused" in landing
@@ -509,14 +520,12 @@ class TestARefusedSendIsShown:
         The page reads its own record: a refusal that is the latest thing the
         service did, and recent, IS the REFUSED stage."""
         from execd.broker import Preview
-        r = order_page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
-        nonce = text(r).split("name=nonce value='")[1].split("'")[0]
         real = chain.preview
         chain.preview = lambda intent: Preview(symbol=intent.symbol, side=intent.side, qty=intent.qty,
                                                order_type=intent.order_type, price=2.10, cost_usd=210.0,
                                                commission_usd=0.65, accepted=False,
                                                messages=("reject: not enough buying power",))
-        order_page.post("/exec/order/send", data={"nonce": nonce})   # refused by the broker's preview
+        page_send(order_page, {"side": "call", "delta": "0.3"})   # refused by the broker's preview
         chain.preview = real
         assert armed.journal.tail(1)[-1]["event"] == "refused"
         plain = text(order_page.get("/exec/order"))          # no msg, no bad on the query

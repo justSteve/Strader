@@ -60,8 +60,8 @@ from .broker import BrokerError
 from .schwab import (VAULT_VERSION, App, Credential, authorize_url, code_from_received_url,
                      exchange, new_client, trading_payload, verify_grant)
 from .intent import OrderIntent
-from .orderform import PREVIEW_TTL_S, Selection, intent_for, limit_at, price, stamp
-from .orderpage import (balances_html, fd0_html, journal_html, position_html, preview_fields_html,
+from .orderform import SEND_NONCE_TTL_S, Selection, intent_for, limit_at, price, stamp
+from .orderpage import (balances_html, fd0_html, journal_html, position_html, send_fields_html,
                         quote_html, render_order, state_html, strikes_html, ticket_html)
 from .service import CONTRACT_MULTIPLIER, ExecService, Refused
 from .vault import BadPassphrase, Vault, VaultError, VaultMissing
@@ -407,8 +407,11 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         priced = price(service, sel) if sel.side else None
         embed = request.args.get("embed") == "1" or request.form.get("embed") == "1"
         fresh = request.args.get("new") == "1"
+        # the SEND token rides with the ticket, single use (st-igw0)
+        send_nonce = (nonces.issue("send", SEND_NONCE_TTL_S)
+                      if priced is not None and priced.ticket is not None else None)
         return render_order(service, _actions(), sel, priced, today=_today(),
-                            embed=embed, fresh=fresh, **kw)
+                            embed=embed, fresh=fresh, send_nonce=send_nonce, **kw)
 
     @bp.get("/order")
     def order():
@@ -422,14 +425,14 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         body = priced.to_dict()
         body["fd0_html"] = ticket_html(priced, service.bounds, service.status().get("balances"))
         body["strikes_html"] = strikes_html(priced, url_for("exec.order"))
-        body["preview_fields_html"] = preview_fields_html(sel)
+        body["send_fields_html"] = send_fields_html(sel)
         return body
 
     @bp.get("/order/state")
     def order_state():
         return _state_payload(request.args.get("symbol") or "", request.args.get("lots"))
 
-    def _state_payload(symbol: str, lots_arg: Any) -> dict[str, Any]:
+    def _state_payload(symbol: str, lots_arg: Any, *, refused: str | None = None) -> dict[str, Any]:
         """The status body's live half plus the chosen contract's quote, with
         the HTML fragments the page's script paints — what the poll reads,
         and what an in-place adjust answers with (st-bmaz)."""
@@ -454,10 +457,14 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                     cost_now = _money(-(limit_now * CONTRACT_MULTIPLIER * lots)).lstrip("-")
             except BrokerError as exc:
                 error = str(exc)
-        from .panel import panel_body
+        from .panel import journal_facts, panel_body
         stage, body = panel_body(service, st, _actions(), now=clock(),
-                                 order_path=url_for("exec.order"))
+                                 order_path=url_for("exec.order"), refused=refused)
+        last_close = journal_facts(service).get("last_close") or {}
         return {"mode": st["mode"], "arming": st["arming"], "day": st["day"],
+                # the stamp of the day's last close, so a card NEW ORDER
+                # dismissed stays dismissed under the poll (st-igw0)
+                "last_close_ts": last_close.get("ts"),
                 "pnl": st.get("pnl"), "positions": st["positions"],
                 "working": st["working"],
                 "quote": quote, "spx": spx,
@@ -470,64 +477,76 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 # the status panel (st-4ezg): the stage and the card's body
                 "panel_stage": stage, "panel_body_html": body}
 
-    @bp.post("/order/preview")
-    def order_preview():
-        sel = _selection(request.form)
-        priced = price(service, sel)
-        try:
-            intent = intent_for(priced, intent_id=f"page-{stamp(clock())}",
-                                engine_sha=service.config.sha)
-        except ValueError as exc:
-            return _order_page(sel, bad=f"Not previewed: {exc}")
-        try:
-            out = service.preview(OrderIntent.from_dict(intent))
-        except Refused as exc:
-            return _order_page(sel, bad=f"Refused ({exc.refusal.bound}): {exc.refusal.reason}. Nothing sent.")
-        except BrokerError as exc:
-            return _order_page(sel, bad=f"The broker could not be reached: {exc}. Nothing sent.")
-        except ValueError as exc:
-            return _order_page(sel, bad=f"Not previewed: {exc}")
-        if out.get("refused"):
-            r = out["refused"]
-            text = f"Refused ({r.get('bound')}): {r.get('reason')}. Nothing sent."
-            return _order_page(sel, bad=text)
-        p = out["preview"]
-        word = ""   # the strip's badge says PAPER; no prefix (Steve, 2026-09-15, st-2hei)
-        text = (f"{word}Preview from Schwab: {str(p.get('symbol', '')).strip()} x{p.get('qty')} "
-                f"at {float(p.get('price') or 0):.2f} — cost ${float(p.get('cost_usd') or 0):.2f}, "
-                f"commission ${float(p.get('commission_usd') or 0):.2f}, total "
-                f"${float(p.get('total_usd') or 0):.2f}; "
-                + ("the broker accepts it." if p.get("accepted") else "the broker would REJECT it: "
-                   + "; ".join(p.get("messages") or [])))
-        nonce = nonces.issue("send", PREVIEW_TTL_S, intent=intent, query=sel.as_query())
-        return _order_page(sel, nonce=nonce, preview=out, preview_text=text)
+    #: The outcome of every SEND this process has answered, by its token —
+    #: so a replay of a spent token (the browser or the proxy re-sending
+    #: after a lost response, seen 2026-09-15 14:07 CT on an adjust) is
+    #: answered with what happened, never sent twice (st-igw0).
+    sent_outcomes: dict[str, dict[str, Any]] = {}
 
     @bp.post("/order/send")
     def order_send():
-        item = nonces.spend(request.form.get("nonce", ""), "send")
-        if item is None:
-            return redirect(url_for("exec.order", bad=f"That SEND was used already or is older "
-                                    f"than {int(PREVIEW_TTL_S)} s — preview again."), code=303)
-        intent = item.extra.get("intent") or {}
+        """SEND — the ticket's one action (Steve, 2026-09-16: "I want to
+        remove the preview step as well. anything we can do to shorten the
+        submission after the decision has been made"). The form carries the
+        selection and a single-use token issued with the page; the ticket is
+        priced at this moment (the locked price or the ask) and placed; the
+        service runs the broker's own preview inside the place. Answers JSON
+        in place when asked (``ajax=1`` / Accept), else redirects."""
+        wants_json = (request.form.get("ajax") == "1"
+                      or "application/json" in (request.headers.get("Accept") or ""))
+        token = request.form.get("nonce", "")
+        sel = _selection(request.form)
+
+        def answer(msg: str | None, bad: str | None, *, replayed: bool = False):
+            if wants_json:
+                return {"ok": bad is None, "msg": msg, "bad": bad, "replayed": replayed,
+                        "send_nonce": nonces.issue("send", SEND_NONCE_TTL_S),
+                        **_state_payload(sel_symbol(sel), request.form.get("lots"), refused=bad)}
+            if bad:
+                return redirect(url_for("exec.order", bad=bad), code=303)
+            return redirect(url_for("exec.order", msg=msg), code=303)
+
+        if nonces.spend(token, "send") is None:
+            done = sent_outcomes.get(token)
+            if done is not None:
+                return answer(done.get("msg"), done.get("bad"), replayed=True)
+            return answer(None, f"That SEND was used already or is older than "
+                                f"{int(SEND_NONCE_TTL_S // 3600)} h — reload the page and send again.")
+        msg = bad = None
         try:
-            out = service.place(OrderIntent.from_dict(intent),
-                                page_query=item.extra.get("query") or None)
+            priced = price(service, sel)
+            intent = intent_for(priced, intent_id=f"page-{stamp(clock())}-{token[:6]}",
+                                engine_sha=service.config.sha)
+            out = service.place(OrderIntent.from_dict(intent), page_query=sel.as_query())
+            if out.get("refused"):
+                # A refusal the service answered (a bound, or the broker's own
+                # preview saying no) is the red box and the REFUSED stage — not a
+                # green message. 2026-09-15 09:54 CT: Schwab refused a send for
+                # buying power and the page showed Steve nothing.
+                bad = _describe_place(out)
+            else:
+                msg = _describe_place(out)
         except Refused as exc:
-            return redirect(url_for("exec.order", bad=f"Refused ({exc.refusal.bound}): "
-                                    f"{exc.refusal.reason}. Nothing sent."), code=303)
+            bad = f"Refused ({exc.refusal.bound}): {exc.refusal.reason}. Nothing sent."
         except BrokerError as exc:
-            return redirect(url_for("exec.order", bad=f"The broker could not be reached: {exc}. "
-                                    f"Nothing was sent that the service knows of — check the "
-                                    f"orders before sending again."), code=303)
+            bad = (f"The broker could not be reached: {exc}. Nothing was sent that the "
+                   f"service knows of — check the orders before sending again.")
         except ValueError as exc:
-            return redirect(url_for("exec.order", bad=f"Not sent: {exc}"), code=303)
-        if out.get("refused"):
-            # A refusal the service answered (a bound, or the broker's own
-            # preview saying no) is the red box and the REFUSED stage — not a
-            # green message. 2026-09-15 09:54 CT: Schwab refused a send for
-            # buying power and the page showed Steve nothing.
-            return redirect(url_for("exec.order", bad=_describe_place(out)), code=303)
-        return redirect(url_for("exec.order", msg=_describe_place(out)), code=303)
+            bad = f"Not sent: {exc}"
+        sent_outcomes[token] = {"msg": msg, "bad": bad}
+        if len(sent_outcomes) > 500:
+            for k in list(sent_outcomes)[:-250]:
+                sent_outcomes.pop(k, None)
+        return answer(msg, bad)
+
+    def sel_symbol(sel: Selection) -> str:
+        """The chosen contract's symbol for the state payload's quote, or
+        nothing — a send that refused before pricing has none."""
+        try:
+            priced = price(service, sel) if sel.side else None
+        except Exception:  # pricing is for the quote line only here
+            return ""
+        return priced.contract.symbol if priced is not None and priced.contract is not None else ""
 
     # ── the bracket's live editor and the working entry's cancel (st-fn5y) ──
     @bp.post("/order/adjust")
@@ -607,7 +626,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         return {name: url_for(f"exec.{name}") for name in (
             "index", "account", "unlock", "stop", "resume", "stand_down", "lock", "flatten",
             "flatten_confirm", "reauth_link", "reauth_store",
-            "order", "order_price", "order_state", "order_preview", "order_send",
+            "order", "order_price", "order_state", "order_send",
             "order_adjust", "order_cancel")}
 
     app.register_blueprint(bp)

@@ -5,7 +5,7 @@ has to mean in code: every stage is read off the service and the day's
 journal; the names are ``C6400``; every time but the header clock is *x ago*;
 one net number, commissions included; the filled stage is the bracket's live
 editor; a working entry has CANCEL AND RE-PRICE and no STOP; a refusal or a
-preview never hides money that is live; the state JSON carries the stage and
+refusal never hides money that is live; the state JSON carries the stage and
 the body the script polls.
 """
 
@@ -18,7 +18,7 @@ import pytest
 from execd.panel import ago, contract_name, journal_facts, stage_of
 from execd.service import ExecService
 
-from .conftest import CALL, PUT, SPX_NOW, entry
+from .conftest import CALL, PUT, SPX_NOW, entry, page_send
 from .test_bracket import TRIGGER, holding, page, pos_of, text  # noqa: F401 — fixtures
 
 
@@ -74,20 +74,18 @@ class TestStage:
 
     def test_the_request_owned_stages_win_over_a_resting_service(self, armed: ExecService):
         st, facts = armed.status(), journal_facts(armed)
-        assert stage_of(st, facts, previewed=True) == "previewed"
         assert stage_of(st, facts, refused=True) == "refused"
-        assert stage_of(st, facts, previewed=True, refused=True) == "refused"
 
 
 # ── the card on the page ─────────────────────────────────────────────────
 
 class TestTheCard:
     def test_none_shows_no_card_and_the_strip_carries_the_mode(self, page):
-        """With nothing held, nothing working and no preview the page opens on
+        """With nothing held, nothing working and no answer the page opens on
         the side buttons: no stage card at all (design docs/design/order-page,
         st-shhi). The strip carries the mode and the day line the attempts."""
         body = text(page.get("/exec/order"))
-        assert "<div id=panel " not in body
+        assert "<div id=panel hidden " in body and "<div id=panel class" not in body   # hidden until a stage arrives (st-igw0)
         assert "0 of 2 attempts" in body
         assert "badge live'>LIVE" in body and "badge paper" not in body
         assert "BULLISH" in body and "BEARISH" in body
@@ -102,27 +100,9 @@ class TestTheCard:
         assert "id=updated class=ago" in card
         assert ">pause<" in card and ">less<" in card and "id=refresh" in card
 
-    def test_previewed_carries_the_cost_line_send_and_re_price(self, page):
-        body = text(page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"}))
-        card = panel_of(body)
-        assert stage_word(body) == "PREVIEWED"
-        assert "C6400 × 1 · buy limit 2.10 = $210.00" in card
-        assert "broker's cost line" in card and "$210.65" in card
-        assert "on fill</td><td>stop" in card and "target 21.00" in card
-        assert "action='/exec/order/send'" in card and ">SEND<" in card
-        assert "name=nonce value='" in card
-        # RE-PRICE previews the same selection again, one tap (st-2s4u) — a
-        # POST to the preview route carrying the selection, never a lock
-        reprice = card.split(">SEND<")[1]
-        assert ">RE-PRICE</button>" in reprice and "action='/exec/order/preview'" in reprice
-        assert "name=side value='call'" in reprice and "name=limit" not in reprice
-        assert "SEND good for 60 s" in card
-
     def test_working_names_the_gap_to_the_ask_and_offers_only_cancel(self, page, armed, broker, clock):
         broker.rest_limits = True
-        r = page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
-        nonce = text(r).split("name=nonce value='")[1].split("'")[0]
-        page.post("/exec/order/send", data={"nonce": nonce})
+        page_send(page, {"side": "call", "delta": "0.3"})
         clock.advance(seconds=12)
         broker.set_quote(CALL, bid=2.00, ask=2.15)
         body = text(page.get("/exec/order"))
@@ -182,7 +162,8 @@ class TestTheCard:
 
     def test_a_refusal_with_nothing_live_is_the_refused_stage(self, page, armed):
         armed.stop()
-        body = text(page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"}))
+        r = page_send(page, {"side": "call", "delta": "0.3"})
+        body = text(page.get(r.headers["Location"]))
         card = panel_of(body)
         assert stage_word(body) == "REFUSED"
         assert "Refused (" in card and ">RE-PRICE</a>" in card
@@ -194,19 +175,6 @@ class TestTheCard:
         assert stage_word(body) == "FILLED" and ">SET<" in body
         assert "<div class=bad>Not updated:" in body
         assert "data-stage=refused" not in body
-
-    def test_a_preview_while_holding_renders_the_ticket_above_the_live_part(self, holding):
-        from execd.panel import panel_body
-        actions = {n: f"/exec/{n.replace('_', '/')}" for n in (
-            "index", "stop", "flatten", "order", "order_send", "order_preview", "order_adjust", "order_cancel")}
-        preview = {"preview": {"symbol": PUT, "qty": 1, "price": 1.90, "cost_usd": 190.0,
-                               "total_usd": 190.65, "accepted": True}}
-        stage, body = panel_body(holding, holding.status(), actions, now=holding.clock(),
-                                 order_path="/exec/order", sel_query={"side": "put"},
-                                 preview=preview, nonce="n-1")
-        assert stage == "previewed"
-        assert body.index(">SEND<") < body.index(">SET<")
-        assert "P6300 × 1 · buy limit 1.90" in body and "NET NOW" in body and ">FLATTEN<" in body
 
     def test_stop_on_is_said_and_stop_is_not_offered_again(self, page, holding):
         holding.stop()
@@ -229,13 +197,14 @@ class TestTheStateJson:
         assert ">SET<" in s["panel_body_html"] and "NET NOW" in s["panel_body_html"]
 
     def test_the_polled_body_never_carries_a_request_owned_stage(self, page, armed):
-        page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
+        armed.stop()
+        page_send(page, {"side": "call", "delta": "0.3"})       # refused: a request-owned stage
         s = page.get("/exec/order/state").get_json()
         assert s["panel_stage"] == "none"
 
     def test_every_action_on_the_card_is_an_absolute_exec_path(self, page, holding):
         for body in (text(page.get("/exec/order")),
-                     text(page.post("/exec/order/preview", data={"side": "put", "delta": "0.3"}))):
+                     text(page.get("/exec/order?side=put&delta=0.3"))):
             card = panel_of(body)
             actions = [a.split("'")[0] for a in card.split("action='")[1:]]
             hrefs = [a.split("'")[0] for a in card.split("href='")[1:]]
@@ -290,13 +259,12 @@ class TestNewOrderClearsTheCard:
     def test_refused_clears_the_same_way(self, page, service, broker):
         from execd.broker import Preview
         service.unlock({"t": 1})
-        nonce = text(page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})).split("name=nonce value='")[1].split("'")[0]
         real = broker.preview
         broker.preview = lambda intent: Preview(symbol=intent.symbol, side=intent.side, qty=intent.qty,
                                                 order_type=intent.order_type, price=2.10, cost_usd=210.0,
                                                 commission_usd=0.65, accepted=False,
                                                 messages=("reject: not enough buying power",))
-        page.post("/exec/order/send", data={"nonce": nonce})     # refused by the broker's preview
+        page_send(page, {"side": "call", "delta": "0.3"})       # refused by the broker's preview
         broker.preview = real
         assert "data-stage=refused" in text(page.get("/exec/order"))
         assert "data-stage=refused" not in text(page.get("/exec/order?new=1"))
@@ -327,3 +295,26 @@ class TestTheAccountsMoney:
         service.unlock({"t": 1})
         body = text(page.get("/exec/order"))
         assert "account: no balances set on the mock" in body
+
+
+class TestADismissedCloseStaysDismissedUnderThePoll:
+    """The card is on the page hidden when there is nothing to show (st-igw0,
+    so a SEND answered in place can paint into it). A close NEW ORDER
+    dismissed must not come back on the next poll."""
+
+    def test_the_page_marks_the_dismissed_close_and_the_poll_names_it(self, page, holding, broker, clock):
+        stop_id = pos_of(holding)["stop_order_id"]
+        clock.advance(seconds=1)
+        broker.trigger_stop(stop_id)
+        holding.poll_fills()
+        ts = holding.journal.events("closed")[-1]["ts"]
+        fresh = text(page.get("/exec/order?new=1"))
+        assert f"<div id=panel hidden data-dismissed='{ts}' " in fresh
+        assert "data-stage=none" in fresh and "data-stage=closed" not in fresh
+        s = page.get("/exec/order/state").get_json()
+        assert s["panel_stage"] == "closed" and s["last_close_ts"] == ts
+        script = fresh.split("var STATE = ")[1]
+        assert "data-dismissed" in script and "String(j.last_close_ts || '')" in script
+        # a plain reload still shows the answer, unmarked
+        plain = text(page.get("/exec/order"))
+        assert "data-stage=closed" in plain and "data-dismissed=" not in plain.split("<script>")[0]

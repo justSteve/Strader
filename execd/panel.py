@@ -6,7 +6,7 @@ rendering … optimize for the obvious … the panel can re-size according to
 context"*). This is that design in code: the same card changes shape as the
 order moves through its life —
 
-    none → previewed → working → filled → exiting → closed        (refused)
+    none → working → filled → exiting → closed                    (refused)
 
 — and every stage is read off the service's status body plus the day's
 journal, never off a state the page keeps for itself. The rules from the
@@ -34,12 +34,15 @@ from typing import Any, Mapping
 from .intent import parse_occ
 from .service import ExecService, CT
 
-STAGES = ("none", "previewed", "working", "filled", "exiting", "closed", "refused")
+#: Six stages since st-igw0 — PREVIEWED went with the PREVIEW step; SEND is
+#: one tap from the decision and the broker's own preview runs inside the
+#: service's place.
+STAGES = ("none", "working", "filled", "exiting", "closed", "refused")
 
-WORDS = {"none": "no order", "previewed": "PREVIEWED", "working": "WORKING",
+WORDS = {"none": "no order", "working": "WORKING",
          "filled": "FILLED", "exiting": "SELLING", "closed": "CLOSED",
          "refused": "REFUSED"}
-COLORS = {"none": "#9ca3af", "previewed": "#60a5fa", "working": "#fbbf24",
+COLORS = {"none": "#9ca3af", "working": "#fbbf24",
           "filled": "#34d399", "exiting": "#fbbf24", "closed": "#9ca3af",
           "refused": "#f87171"}
 
@@ -169,14 +172,11 @@ def journal_facts(service: ExecService) -> dict[str, Any]:
 
 
 def stage_of(st: Mapping[str, Any], facts: Mapping[str, Any], *,
-             previewed: bool = False, refused: bool = False) -> str:
-    """Which of the seven stages the card is in. A refusal and a preview are
-    the page's own (they belong to this request); everything else is read
-    off the service."""
+             refused: bool = False) -> str:
+    """Which of the six stages the card is in. A refusal is the page's own
+    (it belongs to this request); everything else is read off the service."""
     if refused:
         return "refused"
-    if previewed:
-        return "previewed"
     positions = st.get("positions") or []
     if any(p.get("exit_order_id") for p in positions):
         return "exiting"
@@ -258,54 +258,6 @@ def body_none(st, facts, actions, now) -> str:
     html = ("<div class=k style='margin-top:12px'>nothing held, nothing working</div>"
             + _arming_line(st, actions))
     html += f"<table class=full>{_last_row(facts, now)}{_today_row(st)}</table>"
-    return html
-
-
-def body_previewed(st, actions, preview: Mapping[str, Any], nonce: str, sel_query: Mapping[str, str],
-                   order_path: str, bounds: Mapping[str, Any],
-                   ticket: Mapping[str, Any] | None = None) -> str:
-    """The ticket as the broker priced it, SEND (the nonce, once) and
-    RE-PRICE. ``ticket`` is the page's own derivation for the detail rows —
-    the SPX cut, the most it can cost, the stop that will rest."""
-    p = preview.get("preview") or {}
-    sym = contract_name(str(p.get("symbol", "")))
-    qty = p.get("qty")
-    limit = float(p.get("price") or 0)
-    cost = float(p.get("cost_usd") or 0)
-    total = float(p.get("total_usd") or 0)
-    ticket = ticket or {}
-    html = (f"<div class=title>{esc(sym)} × {qty} · buy limit {limit:.2f} = ${cost:,.2f}</div>"
-            f"<div class=hero><div class=k>broker's cost line</div>"
-            f"<div class='n plain'>${total:,.2f}</div></div>")
-    rows = ["<tr><td>rules</td><td>all passed</td></tr>"]
-    if ticket.get("stop_trigger_spx") is not None:
-        rows.append(f"<tr><td>cut if SPX reaches</td><td>{float(ticket['stop_trigger_spx']):.2f}</td></tr>")
-    if ticket.get("max_loss_usd") is not None:
-        rows.append(f"<tr><td>most this costs</td><td class=neg>{money(-float(ticket['max_loss_usd']))}</td></tr>")
-    on_fill = []
-    if ticket.get("stop_price") is not None:
-        on_fill.append(f"stop {float(ticket['stop_price']):.2f}")
-    mult = bounds.get("take_profit_multiple")
-    if isinstance(mult, (int, float)) and limit > 0 and bounds.get("take_profit_basis", "premium") == "premium":
-        from .stops import take_profit_price
-        try:
-            on_fill.append(f"target {take_profit_price(limit, float(mult)):.2f}")
-        except ValueError:
-            pass
-    if on_fill:
-        rows.append(f"<tr><td>on fill</td><td>{' · '.join(on_fill)}</td></tr>")
-    rows.append(_today_row(st))
-    html += "<table class=full>" + "".join(rows) + "</table>"
-    from .orderform import PREVIEW_TTL_S
-    html += f"<div class=k style='margin-top:8px'>SEND good for {int(PREVIEW_TTL_S)} s, once</div>"
-    # RE-PRICE here previews the same strike again at the market, one tap,
-    # and lands back on this card with a fresh token (st-2s4u; Steve,
-    # 2026-09-15: "simply reprice existing strike. not force a new preview").
-    # It was a link back to the unpreviewed form, two taps from SEND again.
-    html += ("<div class=actions>"
-             + _big_button(actions["order_send"], "SEND", "send", {"nonce": nonce})
-             + _big_button(actions["order_preview"], "RE-PRICE", "quiet", _at_market(sel_query))
-             + "</div>")
     return html
 
 
@@ -494,35 +446,30 @@ def _href(path: str, params: Mapping[str, str] | None) -> str:
 
 def panel_body(service: ExecService, st: Mapping[str, Any], actions: Mapping[str, str], *,
                now: datetime, order_path: str, sel_query: Mapping[str, str] | None = None,
-               preview: Mapping[str, Any] | None = None, nonce: str | None = None,
-               ticket: Mapping[str, Any] | None = None,
-               refused: str | None = None) -> tuple[str, str]:
+               refused: str | None = None, dismissed: bool = False) -> tuple[str, str]:
     """``(stage, body_html)`` for the card, off the status body and the
     day's journal.
 
-    A preview and a refusal belong to this request, and the card shows them
-    — but never at the price of hiding money that is live. A preview while a
-    position is held or an entry is working renders the ticket *above* the
-    live part, under the PREVIEWED word; a refusal while something is live
-    is the page's red box above the card, not a stage, so the editor and
-    the exit buttons stay in reach."""
+    A refusal belongs to this request, and the card shows it — but never at
+    the price of hiding money that is live: a refusal while something is
+    live is the page's red box above the card, not a stage, so the editor
+    and the exit buttons stay in reach."""
     facts = journal_facts(service)
     live = stage_of(st, facts)
-    previewed = bool(nonce and preview is not None and not preview.get("refused"))
     if refused and live in ("none", "closed"):
         stage = "refused"
-    elif previewed:
-        stage = "previewed"
     else:
         stage = live
+    if dismissed and stage in ("closed", "refused"):
+        # NEW ORDER, or a side picked: the finished card is over (Steve,
+        # 2026-09-15); the card renders as no order and the page marks the
+        # close it dismissed so the poll does not bring it back (st-igw0)
+        stage = "none"
     bounds = st.get("bounds") or {}
     sel_query = sel_query or {}
     body = ""
     if stage == "refused":
         body = body_refused(refused or "", order_path, sel_query)
-    elif stage == "previewed":
-        body = body_previewed(st, actions, preview or {}, nonce or "", sel_query, order_path, bounds,
-                              ticket=ticket)
     # the live part always renders while money is live; the resting stages
     # only when nothing of this request sits in front of them
     if live == "working":
@@ -591,12 +538,19 @@ PANEL_SCRIPT = """
   function editing(){ var a = document.activeElement;
     return !!(a && a.tagName === 'INPUT' && panel.contains(a) && a.value !== a.defaultValue); }
   function stageNow(){ var b = panel.querySelector('#panelbody .body'); return b ? (b.getAttribute('data-stage') || '') : ''; }
-  function requestScoped(){ var st = stageNow(); return st === 'previewed' || st === 'refused'; }
+  function requestScoped(){ return stageNow() === 'refused'; }
   function apply(j){ var body = document.getElementById('panelbody');
     var changed = !!(j.panel_stage && stageNow() && j.panel_stage !== stageNow());
-    if (body && j.panel_body_html && !inflight && (changed || !editing())) body.innerHTML = j.panel_body_html;
+    // the card is on the page hidden while there is nothing to show; a stage
+    // arriving from the poll or from a SEND answered in place unhides it (st-igw0)
+    var pn = document.getElementById('panel');
+    // a close he dismissed with NEW ORDER stays dismissed: the page carries its stamp
+    var dismissed = !!(pn && j.panel_stage === 'closed' && pn.getAttribute('data-dismissed')
+                       && pn.getAttribute('data-dismissed') === String(j.last_close_ts || ''));
+    if (pn && j.panel_stage && j.panel_stage !== 'none' && !dismissed) pn.hidden = false;
+    if (body && j.panel_body_html && !dismissed && !inflight && (changed || !editing())) body.innerHTML = j.panel_body_html;
     if (changed) { var m = document.querySelector('.msg'); if (m) m.parentNode.removeChild(m); }
-    var w = document.getElementById('stageword'); if (w && j.panel_stage) { w.textContent = WORDS[j.panel_stage] || j.panel_stage; w.style.color = COLORS[j.panel_stage] || '#e5e7eb'; }
+    var w = document.getElementById('stageword'); if (w && j.panel_stage && !dismissed) { w.textContent = WORDS[j.panel_stage] || j.panel_stage; w.style.color = COLORS[j.panel_stage] || '#e5e7eb'; }
     var u = document.getElementById('updated'); if (u) { u.setAttribute('data-at', String(Date.now())); u.textContent = 'just now'; }
     var qd = document.getElementById('quote'); if (qd && j.quote_html) qd.innerHTML = j.quote_html;
     var pc = document.getElementById('position'); if (pc && j.position_html !== undefined && !editing()) pc.innerHTML = j.position_html || '';
@@ -620,6 +574,26 @@ PANEL_SCRIPT = """
   // posts and the page redirects as before.
   function note(text, bad){ var n = document.getElementById('adjustnote'); if (!n) return;
     n.textContent = text || ''; n.className = 'k ' + (bad ? 'bad' : 'ok'); }
+  // SEND, one tap, answered in place (st-igw0): the button goes dead while
+  // the order is out, the answer lands in #answer above the card, the card
+  // paints from the same answer, and a fresh token arms the button again.
+  function answerBox(text, bad){ var a = document.getElementById('answer'); if (!a) return;
+    a.innerHTML = ''; if (!text) return; var d = document.createElement('div'); d.className = bad ? 'bad' : 'msg';
+    d.textContent = text; a.appendChild(d); var old = document.querySelector('.msg:not(#answer .msg)'); if (old && !bad) old.parentNode.removeChild(old); }
+  document.addEventListener('submit', function(e){ var f = e.target; if (!f || !f.classList || !f.classList.contains('sendform')) return;
+    var b = f.querySelector('button'); if (b && b.disabled) { e.preventDefault(); return; }
+    if (!window.fetch || !window.FormData) { if (b) { b.disabled = true; b.textContent = 'SENDING…'; } return; }
+    e.preventDefault();
+    var fd = new FormData(f); fd.set('ajax', '1');
+    if (b) { b.disabled = true; b.textContent = 'SENDING…'; }
+    fetch(f.getAttribute('action'), {method: 'POST', body: fd, headers: {'Accept': 'application/json'}})
+      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(j){ apply(j); answerBox(j.bad || j.msg || '', !!j.bad);
+        var n = f.querySelector('input[name=nonce]'); if (n && j.send_nonce) n.value = j.send_nonce;
+        if (b) { b.disabled = false; b.textContent = 'SEND'; }
+        if (window.__panelPoll) window.__panelPoll(true); })
+      .catch(function(err){ if (b) { b.disabled = false; b.textContent = 'SEND'; }
+        answerBox('not sent, or not answered — ' + (err && err.message ? err.message : err) + '. Read the card before sending again.', true); }); });
   document.addEventListener('submit', function(e){ var f = e.target; if (!f || !f.classList || !f.classList.contains('adjust')) return;
     var b = f.querySelector('button'); if (b && b.disabled) { e.preventDefault(); return; }
     if (!window.fetch || !window.FormData) { if (b) { b.disabled = true; b.textContent = '…'; } inflight = true; return; }

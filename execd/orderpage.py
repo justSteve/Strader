@@ -6,7 +6,7 @@ operations page reads. Works with no script at all (every control is a link
 or a form); the script only keeps the quote, the FD0 block and the position
 fresh without reloading a page that may have a number half-typed on it, and
 works the padlock beside the price (st-2s4u): unlocked, the ticket's price
-follows the live ask; locked, it is frozen at his number and PREVIEW sends
+follows the live ask; locked, it is frozen at his number and SEND sends
 that. Without a script the ticket is priced at the ask when the page loads,
 as before, and there is no lock.
 
@@ -23,7 +23,7 @@ from typing import Any, Mapping
 from .orderform import (
     DEFAULT_ATTEMPTS, DEFAULT_BUDGET_USD, POLL_S, Priced, Selection, next_weekday,
 )
-from .panel import COLORS, PANEL_SCRIPT, PANEL_STYLE, WORDS, contract_name, panel_html
+from .panel import COLORS, PANEL_SCRIPT, PANEL_STYLE, WORDS, contract_name, panel_html, stage_of as panel_stage_of
 from .service import CONTRACT_MULTIPLIER, CT, ExecService
 from .stops import take_profit_price
 
@@ -40,7 +40,7 @@ _ORDER_STYLE = """
  .inputs label{display:block;color:#9ca3af;font-size:.9em}
  .warn{color:#fbbf24}.cost{font-size:1.15em;font-weight:700}
  .fd0 td:first-child{color:#9ca3af;width:55%}
- button.send{background:#dc2626}button.preview{background:#2563eb}
+ button.send{background:#dc2626}button.send:disabled{opacity:.6}
  .embed body{padding:.5em}
  .strip{display:flex;align-items:center;justify-content:space-between;gap:.75em;margin:.2em 0 .6em}
  .strip .l,.strip .r{display:flex;align-items:center;gap:.6em;min-width:0}
@@ -89,7 +89,7 @@ _SCRIPT = """
     fetch(PRICE + '?' + q(), {headers:{'Accept':'application/json'}}).then(function(r){return r.json();}).then(function(j){
       var f = document.getElementById('fd0'); if (f && j.fd0_html) f.innerHTML = j.fd0_html;
       var s = document.getElementById('strikes'); if (s && j.strikes_html) s.innerHTML = j.strikes_html;
-      var p = document.getElementById('previewform'); if (p && j.preview_fields_html) p.innerHTML = j.preview_fields_html;
+      var p = document.getElementById('sendfields'); if (p && j.send_fields_html) p.innerHTML = j.send_fields_html;
       if (j.contract) window.__sym = j.contract.symbol;
     }).catch(function(){}); }
   // a new delta is a new contract: the lock goes with the old one
@@ -180,7 +180,8 @@ RECENT_ANSWER_S = 10 * 60
 
 
 def last_refusal(service: ExecService, now: datetime | None = None) -> str | None:
-    """The most recent journaled refusal of a send or a preview, if it is the
+    """The most recent journaled refusal of a send (a bound, or the broker's
+    own preview inside the place), if it is the
     latest thing the service did and it is recent — so the REFUSED stage
     renders from the record, not only from the redirect's query."""
     tail = service.journal.tail(3)
@@ -264,7 +265,7 @@ def journal_html(service: ExecService, n: int = 20) -> str:
 def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = None) -> str:
     """The ticket in three lines — what will be sent, the cut, the two legs
     and what each nets — with the derivation behind *more*. Replaces the
-    FD0 table as the thing Steve reads before PREVIEW (st-shhi)."""
+    FD0 table as the thing Steve reads before SEND (st-shhi)."""
     if priced.error and priced.contract is None:
         return f"<div class=bad>{esc(priced.error)}</div>"
     c = priced.contract
@@ -309,7 +310,7 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
         target_txt = ""
     line3 = (f"<div class='trow k'><span>{target_txt}</span>"
              "<details class=more><summary>more</summary></details></div>")
-    # The account's money against this ticket, before PREVIEW asks Schwab —
+    # The account's money against this ticket, before SEND asks Schwab —
     # the refusal of 2026-09-15 09:54 CT was exactly this arithmetic.
     money_line = ""
     avail = (balances or {}).get("available_funds")
@@ -440,7 +441,9 @@ def working_html(w: dict[str, Any], cancel_action: str | None) -> str:
     return html + "</div>"
 
 
-def preview_fields_html(sel: Selection) -> str:
+def send_fields_html(sel: Selection) -> str:
+    """The selection as the SEND form's hidden fields — kept fresh by the
+    script so SEND carries what the ticket shows (the lock included)."""
     return "".join(f"<input type=hidden name='{k}' value='{esc(v)}'>"
                    for k, v in sel.as_query().items())
 
@@ -448,8 +451,7 @@ def preview_fields_html(sel: Selection) -> str:
 # ── the page ─────────────────────────────────────────────────────────────
 
 def render_order(service: ExecService, actions: Mapping[str, str], sel: Selection,
-                 priced: Priced | None, *, today, nonce: str | None = None,
-                 preview: dict[str, Any] | None = None, preview_text: str | None = None,
+                 priced: Priced | None, *, today, send_nonce: str | None = None,
                  msg: str | None = None, bad: str | None = None,
                  embed: bool = False, fresh: bool = False) -> str:
     from .page import _STYLE, esc as _esc  # noqa: F401 — the shell's style
@@ -461,7 +463,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     # (Steve, 2026-09-15: "New Order button should clear prior order screen
     # before all else").
     starting_over = fresh or bool(sel.side)
-    if not bad and not msg and nonce is None and not starting_over:
+    if not bad and not msg and not starting_over:
         bad = last_refusal(service, now=service.clock())
     if msg:
         parts.append(f"<div class=msg>{esc(msg)}</div>")
@@ -470,15 +472,15 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     # (st-4ezg; design docs/design/order-status-panel). A refusal with
     # nothing live is the card's REFUSED stage; with money live it is the
     # red box above the card, and the card keeps its controls.
-    ticket = None
-    if priced is not None and priced.ticket is not None:
-        ticket = {"stop_trigger_spx": priced.ticket.stop_trigger_spx,
-                  "max_loss_usd": priced.ticket.max_loss_usd,
-                  "stop_price": priced.stop_price}
-    live_preview = preview if (nonce and preview is not None and not preview.get("refused")) else None
+    from .panel import journal_facts
+    facts = journal_facts(service)
+    live_stage = panel_stage_of(st, facts, refused=bad)
+    dismissed = starting_over and live_stage in ("closed", "refused")
     panel = panel_html(service, st, actions, now=service.clock(), order_path=order,
-                       sel_query=sel.as_query(), preview=live_preview,
-                       nonce=nonce if live_preview else None, ticket=ticket, refused=bad)
+                       sel_query=sel.as_query(), refused=bad, dismissed=dismissed)
+    if dismissed:
+        stamp_ = str((facts.get("last_close") or {}).get("ts") or "")
+        panel = panel.replace("<div id=panel ", f"<div id=panel data-dismissed='{esc(stamp_)}' ", 1)
     if bad and "data-stage=refused" not in panel:
         parts.append(f"<div class=bad>{esc(bad)}</div>")
     # the strip first — the same on every stage (st-shhi); under it, the
@@ -494,13 +496,13 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     else:
         top.append(f"<div class=money id=balances>{balances_html(st.get('balances'))}</div>")
     parts[0:0] = top
-    # The stage card only when there is a stage to show: with nothing held,
-    # nothing working, no preview and no answer to show, the page opens on
-    # the side buttons.
-    finished = ("data-stage=closed" in panel or "data-stage=refused" in panel)
-    if live_preview is not None or st["positions"] or st["working"] or bad or msg \
-            or ("data-stage=none" not in panel and not (finished and starting_over)):
-        parts.append(panel)
+    # The stage card shows only when there is a stage to show: with nothing
+    # held, nothing working and no answer to show, the page opens on the
+    # side buttons. The card is still on the page, hidden, so a SEND answered
+    # in place has somewhere to paint (st-igw0).
+    show = (st["positions"] or st["working"] or bad or msg or "data-stage=none" not in panel)
+    parts.append(panel if show else panel.replace("<div id=panel ", "<div id=panel hidden ", 1))
+    parts.append("<div id=answer></div>")
 
     # side — one tap
     tomorrow = next_weekday(today)
@@ -513,18 +515,21 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
 
     exp = sel.expiry or today
     if priced is not None and sel.side:
-        # the decision first (Steve, 2026-09-15: PREVIEW in the upper portion):
-        # the ticket and PREVIEW, then the tuning — expiry, δ, RE-PRICE — and the strikes
-        # the ticket — three lines, the derivation behind more
+        # the decision first (Steve, 2026-09-15: the action in the upper
+        # portion): the ticket and SEND, then the tuning — expiry, δ, RE-PRICE
+        # — and the strikes. The ticket — three lines, the derivation behind more
         parts.append(f"<div id=fd0>{ticket_html(priced, service.bounds, st.get('balances'))}</div>")
-        # the one action on this stage
-        if priced.contract is not None and priced.ticket is not None:
-            if live_preview is not None and preview_text:
-                parts.append(f"<div class=card><div class=k>{esc(preview_text)}</div></div>")
+        # the one action on this stage: SEND, one tap from the decision
+        # (st-igw0 — the PREVIEW step is gone; the service runs the broker's
+        # own preview inside every place). The script sends it by fetch and
+        # paints the answer; the plain form redirects.
+        if priced.contract is not None and priced.ticket is not None and send_nonce:
             parts.append(
-                f"<form method=post action='{actions['order_preview']}'>"
-                f"<span id=previewform>{preview_fields_html(sel)}</span>"
-                f"<button class='big preview'>PREVIEW</button></form>")
+                f"<form method=post action='{actions['order_send']}' class=sendform>"
+                f"<span id=sendfields>{send_fields_html(sel)}</span>"
+                f"<input type=hidden name=nonce value='{esc(send_nonce)}'>"
+                "<input type=hidden name=ajax value=''>"
+                "<button class='big send'>SEND</button></form>")
         # expiry, δ target and RE-PRICE on one row — one GET form, no script needed.
         # The form carries the chosen strike, so RE-PRICE reprices THAT strike
         # (Steve, 2026-09-15: "simply reprice existing strike" — before st-2s4u

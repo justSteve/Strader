@@ -142,3 +142,14 @@ def schwab_chain_maps(expiry: str = "2026-08-26") -> dict:
         "6400.0": [leg("SPXW", 6400, "P", 22.0, 22.4, -0.70)],
     }
     return {"calls": {key: calls}, "puts": {key: puts}}
+
+
+def page_send(client, data: dict):
+    """SEND from the trading page the way the form does (st-igw0): render
+    the ticket for the selection, take the single-use token it carries, and
+    post the selection with that token. Returns the send's response."""
+    from urllib.parse import urlencode
+    body = client.get("/exec/order?" + urlencode(data)).get_data(as_text=True)
+    assert "name=nonce value='" in body, "the page carried no SEND token"
+    nonce = body.split("name=nonce value='")[1].split("'")[0]
+    return client.post("/exec/order/send", data={**data, "nonce": nonce})

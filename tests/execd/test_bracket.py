@@ -41,7 +41,7 @@ from execd.paper import PaperBroker
 from execd.service import ExecService, Refused, ServiceConfig
 from execd.stops import take_profit_price
 
-from .conftest import CALL, PUT, SPX_NOW, entry, exit_intent, schwab_chain_maps
+from .conftest import CALL, PUT, SPX_NOW, entry, exit_intent, page_send, schwab_chain_maps
 
 #: the conftest entry with a two-point SPX stop at 0.30 delta: fill 2.10,
 #: stop 1.50, target 21.00 on the premium basis
@@ -981,10 +981,7 @@ class TestThePage:
     def test_cancel_and_re_price_brings_the_form_back_priced_from_the_selection(
             self, page, armed, broker):
         broker.rest_limits = True
-        r = page.post("/exec/order/preview", data={"side": "call", "delta": "0.3",
-                                                   "budget": "150"})
-        nonce = text(r).split("name=nonce value='")[1].split("'")[0]
-        r = page.post("/exec/order/send", data={"nonce": nonce})
+        r = page_send(page, {"side": "call", "delta": "0.3", "budget": "150"})
         landing = text(page.get(r.headers["Location"]))
         assert "not filled yet" in landing and "the bracket rests when it fills" in landing
         assert "WORKING" in landing and "CANCEL AND RE-PRICE" in landing
@@ -1002,7 +999,7 @@ class TestThePage:
         landing = text(page.get(where))
         assert f"Cancelled {w['order_id']}" in landing
         assert "data-stage=working" not in landing
-        assert "PREVIEW" in landing and ">6400<" in landing.split("<tr class='chosen'>")[1].split("</tr>")[0]
+        assert ">SEND<" in landing and ">6400<" in landing.split("<tr class='chosen'>")[1].split("</tr>")[0]
         assert armed.status()["working"] == []
         assert armed.journal.events("entry_resolved")[-1]["outcome"] == "canceled"
         assert armed.status()["day"]["open_positions"] == 0
@@ -1027,9 +1024,7 @@ class TestThePage:
         assert "<div class=k>" not in form
 
     def test_the_landing_message_names_the_bracket_after_a_fill(self, page, armed):
-        r = page.post("/exec/order/preview", data={"side": "call", "delta": "0.3"})
-        nonce = text(r).split("name=nonce value='")[1].split("'")[0]
-        r = page.post("/exec/order/send", data={"nonce": nonce})
+        r = page_send(page, {"side": "call", "delta": "0.3"})
         landing = text(page.get(r.headers["Location"]))
         assert "Protective stop resting" in landing and "Take-profit resting" in landing
         assert "at 21.00" in landing

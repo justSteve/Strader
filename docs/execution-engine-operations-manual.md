@@ -1143,8 +1143,8 @@ the one ticking clock, STOP, and an *account* link — the same on every stage;
 the stage card (§5.21) only when there is a stage to show; BULLISH / BEARISH
 as two buttons; **the ticket** in three lines — what will be sent and its cost, the
 cut and the resting stop's net, the target's net — with the derivation
-behind *more*, and PREVIEW as the one action, in the upper portion of the
-page (Steve, 2026-09-15); then the tuning — expiry chips, the **δ target** box (starts at
+behind *more*, and SEND as the one action, in the upper portion of the
+page (Steve, 2026-09-15; PREVIEW until st-igw0, 2026-09-16); then the tuning — expiry chips, the **δ target** box (starts at
 `DEFAULT_DELTA` = 0.80, Steve 2026-09-15 from his 08-19 words; a blank box
 means nearest to spot) and RE-PRICE on one row, with FD0 budget and attempts
 folded under *budget and attempts* — and the strikes around spot, the chosen
@@ -1168,11 +1168,25 @@ without a script the ticket is priced at the ask when the page loads and
 there is no lock. RE-PRICE now carries the tapped strike (before st-2s4u it
 did not, and re-chose by delta) and its own field `reprice=1`, which means
 *at the market* and drops the lock; a new strike, expiry, side or δ drops it
-too; a cancel brings the form back at the market. On a PREVIEWED card,
-RE-PRICE previews the same selection again at the market in one tap and
-lands back on the card with a fresh SEND token — the broker's preview runs
-underneath because SEND depends on it; it used to be a link back to the
-unpreviewed form, two taps from SEND. The clock, the quote and the balances
+too; a cancel brings the form back at the market.
+
+**SEND, one tap, no PREVIEW** (st-igw0; Steve, 2026-09-16: *"I want to
+remove the preview step as well. anything we can do to shorten the
+submission after the decision has been made"*). The service runs the
+broker's own preview inside every `place` (`preview_cost`, §3), so the
+page's PREVIEW was a second human step, not a second check; it is gone,
+with the PREVIEWED stage and `/exec/order/preview`. SEND posts the
+selection (kept fresh by the script, priced at that moment at the locked
+price or the ask) and a single-use token issued with the page
+(`SEND_NONCE_TTL_S`, four hours — it exists to stop a replay or a double
+send, not to time him out); the intent id is `page-<stamp>-<token>` so the
+service's own replay guard holds too. The script sends by fetch, the button
+goes dead while the order is out, the answer lands above the card, the card
+paints from the same answer (it is on the page hidden until a stage
+arrives), and a fresh token arms the button again; the plain form still
+redirects. A spent token sent again is answered with what happened — never
+sent twice. A card NEW ORDER dismissed carries the stamp of the close it
+dismissed, and the poll leaves it dismissed. The clock, the quote and the balances
 tick on the fresh page again: the panel script returned early when there
 was no stage card, which froze the page from the st-shhi change to this one. `/exec/` **is** this page
 since st-shhi. Everything that is not placing an order — clear STOP,
@@ -1200,8 +1214,7 @@ folded *re-authorise (weekly)* and the journal remain.
 | `GET /exec/order?side=call\|put&expiry=…&strike=…&delta=…&budget=…&attempts=…&limit=…&reprice=1&embed=1` | renders the page; `embed=1` drops the shell for a panel; a `delta` key present and empty means nearest to spot, absent means the 0.80 target; `limit` is the padlock's locked price, `reprice=1` (the RE-PRICE button's own field) drops it (st-2s4u) |
 | `GET /exec/order/price?…` | the priced ticket as JSON plus the FD0, strikes and hidden-field fragments the script swaps in; a `limit` prices the ticket at that number instead of the ask |
 | `GET /exec/order/state?symbol=…&lots=…` | the status body's live half plus the chosen contract's quote and the SPX mark, with HTML fragments; with a quote, `limit_now` (the ask on the tick grid) and `cost_now` for the head to follow while unlocked |
-| `POST /exec/order/preview` | `service.preview(intent)`; on a 200, the cost line and a single-use 60 s SEND token; a `limit` in the body is sent as the intent's limit; the PREVIEWED card's RE-PRICE posts here again without one |
-| `POST /exec/order/send` | spends the token, `service.place(the same intent)` with the selection query riding on the working entry, redirects with the result in words |
+| `POST /exec/order/send` | SEND: the selection plus the page's single-use `nonce` → priced now, `service.place(intent)` (the broker's own preview inside) with the selection query riding on the working entry; redirects with the result in words, or answers JSON (`ok`, `msg`, `bad`, `send_nonce`, the state payload) when asked; a spent token replays its outcome (st-igw0) |
 | `POST /exec/order/adjust` | SET on the position card: `symbol` and `stop_price` or `target_price` (one leg per form since st-bmaz) → `service.adjust`; redirects with what moved, or answers JSON (`ok`, `msg`, `bad`, the state payload) when the form says `ajax=1` or the request accepts JSON (§5.20) |
 | `POST /exec/order/cancel` | CANCEL AND RE-PRICE on the working-entry card: `order_id` → `service.cancel`, then redirects to `/exec/order` with the side/expiry/strike/delta/budget/attempts the entry was priced from — never its lock — so the form comes back priced fresh (§5.20) |
 
@@ -1378,7 +1391,7 @@ from on the `WorkingEntry` at send time (`page_query`, on the `working` journal
 line, recovered across a restart, never part of the intent and never sent to
 the broker); the cancel goes through `service.cancel`, and the redirect lands
 on `/exec/order` with that query, so the form comes back priced fresh, ready
-to PREVIEW and SEND. An entry the desk or the API sent has no query and lands
+to SEND. An entry the desk or the API sent has no query and lands
 on the bare form.
 
 `tests/execd/test_bracket.py` is what all of this has to mean: the arithmetic
@@ -1390,7 +1403,7 @@ trigger for a call and a put, the API's four status codes, recovery, the
 attempts rule through the service, the paper book's target fill, and the
 page's editor and cancel.
 
-### 5.21 The status panel — one card, seven stages (st-4ezg)
+### 5.21 The status panel — one card, six stages (st-4ezg; seven until st-igw0)
 
 Steve, 2026-09-14, reviewing `/exec/order`: *"the complete status of the
 order, plus controls to alter or refresh its rendering … optimize for the
@@ -1407,20 +1420,17 @@ sent, when each close went out, when each position filled, the last `closed`
 line) and names one of seven: `none` (nothing held, nothing working),
 `working` (an entry rests at the broker), `filled` (a position, no close in
 flight), `exiting` (a close is in flight — the word on the card is SELLING),
-`closed` (nothing live, a `closed` line today). Two stages belong to the
-request, not the service: `previewed` (a PREVIEW just came back, the SEND
-token is live) and `refused` (the page has a refusal to show). Those two never
-hide money that is live — a preview while a position is held or an entry
-works renders the ticket *above* the live part under the PREVIEWED word; a
-refusal while something is live is the red box above the card and the card
-keeps its stage and its controls.
+`closed` (nothing live, a `closed` line today). One stage belongs to the
+request, not the service: `refused` (the page has a refusal to show). It
+never hides money that is live — a refusal while something is live is the
+red box above the card and the card keeps its stage and its controls.
+(`previewed` went with the PREVIEW step, st-igw0.)
 
 **What each stage shows** (the detail rows fold under `less`):
 
 | stage | title line | the big number | detail | controls |
 |---|---|---|---|---|
 | no order | nothing held, nothing working | — | last close, today's attempts and headroom | none |
-| PREVIEWED | `C7630 × 1 · buy limit 4.70 = $470.00` | the broker's cost line | rules, SPX cut, most this costs, the stop and target that will rest | SEND (the nonce, once), RE-PRICE (previews the same strike again at the market, one tap — st-2s4u) |
 | WORKING | `… · buy limit 4.70 · sent 12 s ago` | ask above the limit, `+0.05` | on fill (the SPX cut, the target multiple), the order id | CANCEL AND RE-PRICE — no STOP on a resting order |
 | FILLED | `… · in 4.70 · 1 m 35 s ago` | NET NOW — a market sell after both commissions | bid/ask, quote age, SPX and the cut; the editor: stop and target inputs with the net at each | UPDATE, FLATTEN, STOP |
 | SELLING | `… · in 4.70 · selling` | market sell sent, `4 s ago` | reason, stop · target cancelled, the order id | FLATTEN AGAIN |

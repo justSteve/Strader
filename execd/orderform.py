@@ -29,14 +29,17 @@ The flow, top to bottom on ``/exec/order``:
    padlock beside it is tapped (st-2s4u; Steve, 2026-09-15: "a padlock icon
    toggled between locked and unlocked … this is how TOS platform works").
    Locked, the price is frozen where it was, the derivation is re-run at
-   that price, the live ask shows beside it, and PREVIEW sends it as the
+   that price, the live ask shows beside it, and SEND sends it as the
    limit; the service's price band still judges it. RE-PRICE keeps the
    strike and reprices at the market, dropping the lock.
-4. PREVIEW → ``service.preview`` (the rules, then Schwab's own cost line) and
-   a single-use 60 s token; SEND with that token → ``service.place`` of the
-   same intent under the same id, ``page-<stamp>``, source ``page``. RE-PRICE
-   on a previewed ticket previews the same strike again at the market, one
-   tap, and lands previewed with a fresh token.
+4. SEND → ``service.place`` of the ticket as priced at that moment (the
+   locked price or the ask), under the id ``page-<stamp>-<token>``, source
+   ``page``. The service runs the broker's own preview inside every place,
+   so there is no PREVIEW step on the page (Steve, 2026-09-16: "I want to
+   remove the preview step as well. anything we can do to shorten the
+   submission after the decision has been made", st-igw0). The SEND token
+   is issued with the page, single use, and a replay of a spent token is
+   answered from its remembered outcome — never sent twice.
 5. The open position with its money, from the same status body the
    operations page reads.
 
@@ -82,8 +85,10 @@ DEFAULT_ATTEMPTS = 2
 #: page's default. ``choose`` itself still answers nearest-to-spot when a
 #: caller passes no delta at all.
 DEFAULT_DELTA = 0.80
-#: A preview's send token lives this long, single use.
-PREVIEW_TTL_S = 60.0
+#: A SEND token is issued with the page and lives this long, single use —
+#: long, because it exists to stop a replay or a double send, not to time
+#: him out (st-igw0: the PREVIEW step is gone, SEND is the one action).
+SEND_NONCE_TTL_S = 4 * 3600.0
 #: The page polls the quote and the position this often (seconds).
 POLL_S = 3
 
