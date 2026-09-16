@@ -231,7 +231,7 @@ class TestPage:
         # the position, its money and the bracket editor are on the page now
         assert "FILLED" in landing and "NET NOW" in landing and "C6400 × 1" in landing
         assert "value='21.00'" in landing and ">SET<" in landing
-        assert "name=stop_price" in landing and "name=target_price" in landing
+        assert "name=stop inputmode" in landing and "name=target inputmode" in landing
 
     def test_a_send_answered_in_place_paints_the_card_and_re_arms_the_button(self, order_page, armed, chain):
         page = text(order_page.get("/exec/order?side=call&delta=0.3"))

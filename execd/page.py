@@ -562,12 +562,21 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                       or "application/json" in (request.headers.get("Accept") or ""))
         msg = bad = None
         try:
-            stop = _form_price("stop_price")
-            target = _form_price("target_price")
-            if stop is None and target is None:
+            # The box takes either form (st-2j3m). Steve's rule, 2026-09-16:
+            # a value with a '.' is a dollar price (10.30); one without is an
+            # SPX level (7585). ``stop_price`` / ``target_price`` stay dollars
+            # for a caller that names the form.
+            legs: dict[str, float | None] = {"stop_price": _form_price("stop_price"),
+                                             "target_price": _form_price("target_price"),
+                                             "stop_spx": None, "target_spx": None}
+            for leg in ("stop", "target"):
+                parsed = _form_leg(leg)
+                if parsed is not None:
+                    legs[f"{leg}_{parsed[0]}"] = parsed[1]
+            if all(v is None for v in legs.values()):
                 bad = "Nothing to update: enter a stop or a target."
             else:
-                out = service.adjust(symbol, stop_price=stop, target_price=target)
+                out = service.adjust(symbol, **legs)
                 if out.get("refused"):
                     r = out["refused"]
                     bad = f"Refused ({r.get('bound')}): {r.get('reason')}."
@@ -619,6 +628,23 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
             return float(raw)
         except ValueError:
             raise ValueError(f"{name.replace('_', ' ')} must be a number, not {raw!r}") from None
+
+    def _form_leg(leg: str) -> tuple[str, float] | None:
+        """The ``stop`` / ``target`` box, read by Steve's rule (st-2j3m): a
+        '.' in it makes it a dollar price, none makes it an SPX level.
+        ``("price", 10.30)`` or ``("spx", 7585.0)``; nothing for an empty box."""
+        raw = (request.form.get(leg) or "").strip()
+        if not raw:
+            return None
+        kind = "price" if "." in raw else "spx"
+        try:
+            value = float(raw)
+        except ValueError:
+            raise ValueError(f"{leg} must be a number — a price with a '.' (10.30) or an "
+                             f"SPX level without one (7585) — not {raw!r}") from None
+        if kind == "spx" and not value.is_integer():
+            raise ValueError(f"{leg} {raw!r} is not a whole SPX level")
+        return kind, value
 
     def _actions() -> dict[str, str]:
         """Absolute paths for every form, so a page served at ``/exec/flatten``
@@ -934,14 +960,33 @@ def _describe_adjust(out: dict[str, Any]) -> str:
         r = out.get(leg)
         if not isinstance(r, dict):
             continue
+        level = r.get(f"{leg}_spx")
         if r.get("unchanged"):
             # "Stop moved from 10.30 to 10.30" (2026-09-15 14:07 CT) — say it
             # stayed, and the service left the leg resting (st-ff5j)
-            parts.append(f"{name} unchanged at {float(r.get('old_price') or 0):.2f}.")
+            line = f"{name} unchanged at {float(r.get('old_price') or 0):.2f}"
+            if level is not None and r.get("given") == "spx":
+                line += f" (SPX {float(level):.2f})"
+            parts.append(line + ".")
+        elif r.get("level_only"):
+            # the level moved, the resting leg did not (st-2j3m)
+            if level is None:
+                parts.append(f"{name} is now the resting {float(r['new_price']):.2f} alone — "
+                             f"nothing fires on the SPX mark for it.")
+            else:
+                parts.append(f"{name} SPX level set to {float(level):.2f}; the resting "
+                             f"{float(r['new_price']):.2f} {leg} is unchanged.")
         elif r.get("moved"):
-            line = f"{name} moved from {float(r.get('old_price') or 0):.2f} to {float(r['new_price']):.2f}"
-            if leg == "stop" and r.get("stop_spx") is not None:
-                line += f" (SPX cut level now {float(r['stop_spx']):.2f})"
+            # the answer says which form set it (st-2j3m)
+            if r.get("given") == "spx" and level is not None:
+                line = (f"{name} set by SPX {float(level):.2f} → rests at "
+                        f"{float(r['new_price']):.2f} (was {float(r.get('old_price') or 0):.2f})")
+            else:
+                line = f"{name} moved from {float(r.get('old_price') or 0):.2f} to {float(r['new_price']):.2f}"
+                if leg == "stop" and level is not None:
+                    line += f" (SPX cut level now {float(level):.2f})"
+                elif leg == "target" and r.get("old_target_spx") is not None:
+                    line += " (a price: nothing fires on the SPX mark for it now)"
             parts.append(line + ".")
         else:
             parts.append(f"{name} NOT moved: {r.get('error') or 'no reason given'}.")
@@ -1004,6 +1049,8 @@ def _render_position(p: dict[str, Any], adjust_action: str | None = None) -> str
         rows.append(("at the target", "NO TARGET — the journal says why"))
     if p.get("stop_spx") is not None:
         rows.append(("SPX cut level", f"{p['stop_spx']:.2f}"))
+    if p.get("target_spx") is not None:
+        rows.append(("SPX target level", f"{p['target_spx']:.2f}"))
     if p.get("exit_order_id"):
         rows.append(("exit in flight", f"order {p['exit_order_id']} ({p.get('exit_reason')})"))
     cls = "pos-up" if isinstance(v.get("net_if_closed_usd"), (int, float)) and v["net_if_closed_usd"] >= 0 else "pos-down"
@@ -1016,9 +1063,11 @@ def _render_position(p: dict[str, Any], adjust_action: str | None = None) -> str
         html += (f"<form method=post action='{adjust_action}' class=adjust>"
                  f"<input type=hidden name=symbol value='{esc(p['symbol'])}'>"
                  "<div class=bracket>"
-                 f"<label>stop<input name=stop_price inputmode=decimal value='{stop_val}'></label>"
-                 f"<label>target<input name=target_price inputmode=decimal value='{target_val}'></label>"
-                 "</div><button class='big quiet'>UPDATE</button></form>")
+                 f"<label>stop<input name=stop inputmode=decimal value='{stop_val}'></label>"
+                 f"<label>target<input name=target inputmode=decimal value='{target_val}'></label>"
+                 "</div><button class='big quiet'>UPDATE</button>"
+                 "<div class=k>a number with a '.' is a price (10.30); without one it is an "
+                 "SPX level (7585)</div></form>")
     return html + "</div>"
 
 

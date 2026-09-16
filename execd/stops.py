@@ -187,6 +187,57 @@ def take_profit_price(fill_px: float, multiple: float, basis: str = "premium",
     return round(price, 2)
 
 
+def _sign_for(right: str) -> int:
+    """+1 when the option gains as SPX rises (a call), −1 when it gains as SPX
+    falls (a put). Raises on anything else rather than defaulting."""
+    r = (right or "").upper()
+    if r in ("C", "CALL"):
+        return 1
+    if r in ("P", "PUT"):
+        return -1
+    raise ValueError(f"right must be CALL or PUT, not {right!r}")
+
+
+def premium_at_level(fill_px: float, delta_abs: float, entry_spx: float,
+                     level: float, right: str, tick: float = PREMIUM_TICK_PTS) -> float:
+    """The option's price when SPX stands at ``level``, walked from the level
+    the entry filled at through the entry's delta — **signed**, so a level on
+    the winning side of the entry mark gives a price above the fill and one
+    on the losing side a price below it. [st-2j3m]
+
+    This is the one walk behind an SPX-level stop and an SPX-level target
+    alike (Steve, 2026-09-16: "a path to define a SPX target strike for both
+    stop loss and take profit"); it is the forward of ``_stop_spx_for`` in
+    the service, which walks a dollar stop back to its level. The same
+    first-order estimate as :func:`premium_at_stop`, and rounded the same
+    way, **up** to the tick in force — the tighter of the two valid ticks
+    for a stop, a floor rather than an undershoot for a target.
+
+    Raises ``ValueError`` when the walk lands at or below zero: that is a
+    level so far on the losing side that the option is worth nothing there,
+    and no order can rest at nothing."""
+    fill_px = float(fill_px)
+    delta_abs = abs(float(delta_abs))
+    if fill_px <= 0:
+        raise ValueError(f"fill price must be positive, not {fill_px}")
+    if not (0 < delta_abs <= 1):
+        raise ValueError(f"delta must be within (0, 1], not {delta_abs}")
+    raw = fill_px + _sign_for(right) * (float(level) - float(entry_spx)) * delta_abs
+    if raw <= 0:
+        raise ValueError(
+            f"SPX {float(level):g} walks the option to {raw:.2f} — nothing can rest there")
+    return _round_up_to_tick(raw, tick)
+
+
+def target_reached(right: str, spx: float, target_spx: float) -> bool:
+    """Has the index reached the take-profit level? The mirror of
+    :func:`exit_triggered`: a call's target is above the market and is
+    reached on the way up, a put's below and on the way down. [st-2j3m]"""
+    if _sign_for(right) > 0:
+        return float(spx) >= float(target_spx)
+    return float(spx) <= float(target_spx)
+
+
 def exit_triggered(right: str, spx: float, stop_spx: float) -> bool:
     """Has the index reached the cut?
 

@@ -930,8 +930,8 @@ class TestThePage:
         assert "FILLED" in body and "NET NOW" in body
         assert "value='21.00'" in body and "value='1.50'" in body
         assert "action='/exec/order/adjust'" in body and ">SET<" in body
-        assert "name=stop_price inputmode=decimal enterkeyhint=go autocomplete=off value='1.50'" in body
-        assert "name=target_price inputmode=decimal enterkeyhint=go autocomplete=off value='21.00'" in body
+        assert "name=stop inputmode=decimal enterkeyhint=go autocomplete=off value='1.50'" in body
+        assert "name=target inputmode=decimal enterkeyhint=go autocomplete=off value='21.00'" in body
         assert f"name=symbol value='{CALL}'" in body
 
     def test_the_state_json_carries_the_target_and_the_editor_fragment(self, page, holding):
@@ -1305,7 +1305,7 @@ class TestOneLegEnterToSend:
         assert card.count("enterkeyhint=go") == 2 and card.count(">SET<") == 2
         assert "id=adjustnote" in card
         stop_form = card.split("data-leg=stop")[1].split("</form>")[0]
-        assert "name=stop_price" in stop_form and "name=target_price" not in stop_form
+        assert "name=stop inputmode" in stop_form and "name=target inputmode" not in stop_form
 
     def test_an_ajax_set_answers_in_place_with_the_repainted_card(self, page, holding):
         r = page.post("/exec/order/adjust", data={"symbol": CALL, "target_price": "25", "ajax": "1"})
@@ -1332,3 +1332,328 @@ class TestOneLegEnterToSend:
         body = text(page.get("/exec/order"))
         assert "fd.set('ajax', '1')" in body and "headers: {'Accept': 'application/json'}" in body
         assert "note(j.bad || j.msg || '', !!j.bad)" in body
+
+
+# ── E. either leg as an SPX level (st-2j3m) ──────────────────────────────
+
+class TestSpxLevelBracket:
+    """Steve, 2026-09-16: "i'd like to have a path to define a SPX target
+    strike for both stop loss and take profit … the operator will include a
+    '.' in the form submission when asking for dollar amt." A level is
+    walked into the price that rests; the level is what the loop watches.
+    The ``holding`` fixture: fill 2.10 at SPX 6380, delta 0.30, bid 2.00 /
+    ask 2.10 (a 0.33-point noise floor), stop 1.50 at 6378, target 21.00.
+    [st-2j3m]"""
+
+    def test_a_stop_given_as_a_level_rests_the_walked_price_and_watches_the_level(
+            self, holding, broker):
+        before = pos_of(holding)
+        out = holding.adjust(CALL, stop_spx=SPX_NOW - 4)
+        assert out["refused"] is None
+        s = out["stop"]
+        assert s["moved"] and s["given"] == "spx"
+        assert (s["old_price"], s["new_price"]) == (1.50, 0.90)      # 2.10 − 4 × 0.30
+        assert (s["old_stop_spx"], s["stop_spx"]) == (NEAR_STOP, SPX_NOW - 4)
+        after = pos_of(holding)
+        assert after["stop_price"] == 0.90 and after["stop_spx"] == SPX_NOW - 4
+        assert after["stop_order_id"] != before["stop_order_id"]
+        assert legs(broker)["stop"][0].price == 0.90
+        line = holding.journal.events("stop_adjusted")[-1]
+        assert line["given"] == "spx" and line["new_stop_spx"] == SPX_NOW - 4
+        assert line["new_price"] == 0.90
+        assert holding.journal.events("stop_placed")[-1]["stop_spx"] == SPX_NOW - 4
+        # the loop fires at the level, not before
+        assert holding.observe(SPX_NOW - 3.9)["fired"] == []
+        fired = holding.observe(SPX_NOW - 4)["fired"][0]
+        assert fired["closed"] is True and fired["reason"] == "spx-stop"
+
+    def test_a_put_stop_level_sits_above_the_market(self, armed, broker):
+        armed.place(entry(intent_id="lv-p", symbol=PUT, limit=1.90,
+                          stop_spx=SPX_NOW + 2.0, delta=0.30))
+        out = armed.adjust(PUT, stop_spx=SPX_NOW + 4)
+        assert out["refused"] is None
+        assert out["stop"]["new_price"] == 0.70                        # 1.90 − 4 × 0.30
+        assert pos_of(armed)["stop_spx"] == SPX_NOW + 4
+        assert armed.observe(SPX_NOW + 3.9)["fired"] == []
+        assert armed.observe(SPX_NOW + 4)["fired"][0]["closed"] is True
+
+    def test_a_target_given_as_a_level_rests_the_walked_limit_and_the_loop_fires_at_it(
+            self, holding, broker):
+        out = holding.adjust(CALL, target_spx=SPX_NOW + 20)
+        assert out["refused"] is None
+        t = out["target"]
+        assert t["moved"] and t["given"] == "spx"
+        assert (t["old_price"], t["new_price"]) == (21.00, 8.10)     # 2.10 + 20 × 0.30
+        assert (t["old_target_spx"], t["target_spx"]) == (None, SPX_NOW + 20)
+        p = pos_of(holding)
+        assert p["target_price"] == 8.10 and p["target_spx"] == SPX_NOW + 20
+        assert legs(broker)["target"][0].price == 8.10
+        placed = holding.journal.events("target_placed")[-1]
+        assert placed["target_spx"] == SPX_NOW + 20 and placed["kind"] == "adjusted"
+        adjusted = holding.journal.events("target_adjusted")[-1]
+        assert adjusted["given"] == "spx" and adjusted["new_target_spx"] == SPX_NOW + 20
+        # the mark reaches the level: both legs off, a market close, named
+        stop_id, target_id = p["stop_order_id"], p["target_order_id"]
+        assert holding.observe(SPX_NOW + 19.9)["fired"] == []
+        fired = holding.observe(SPX_NOW + 20)["fired"][0]
+        assert fired["closed"] is True and fired["reason"] == "spx-target"
+        assert holding.journal.events("target_triggered")[-1]["target_spx"] == SPX_NOW + 20
+        assert holding.journal.events("closed")[-1]["kind"] == "spx-target"
+        assert broker._orders[stop_id].status is OrderStatus.CANCELED
+        assert broker._orders[target_id].status is OrderStatus.CANCELED
+        assert holding.status()["positions"] == []
+
+    def test_the_resting_limit_is_the_target_s_floor_when_the_bid_gets_there_first(
+            self, holding, broker, clock):
+        holding.adjust(CALL, target_spx=SPX_NOW + 20)
+        p = pos_of(holding)
+        clock.advance(minutes=1)
+        broker.fill_resting(p["target_order_id"])
+        holding.poll_fills()
+        assert holding.journal.events("closed")[-1]["kind"] == "target"
+        assert holding.status()["positions"] == []
+        assert holding.observe(SPX_NOW + 20)["fired"] == []
+
+    def test_a_target_given_in_dollars_after_a_level_clears_the_level(self, holding, broker):
+        holding.adjust(CALL, target_spx=SPX_NOW + 20)
+        out = holding.adjust(CALL, target_price=25.0)
+        t = out["target"]
+        assert t["moved"] and t["given"] == "price"
+        assert t["old_target_spx"] == SPX_NOW + 20 and t["target_spx"] is None
+        assert pos_of(holding)["target_spx"] is None
+        assert holding.observe(SPX_NOW + 20)["fired"] == []          # nothing fires on a price
+        assert holding.journal.events("target_adjusted")[-1]["new_target_spx"] is None
+
+    def test_a_level_whose_price_already_rests_moves_the_level_alone(self, holding, broker):
+        holding.adjust(CALL, stop_spx=SPX_NOW - 4)                  # rests 0.90
+        p = pos_of(holding)
+        cancels = len(broker.calls_to("cancel"))
+        out = holding.adjust(CALL, stop_spx=SPX_NOW - 4.01)         # 0.897 → 0.90: the same tick
+        s = out["stop"]
+        assert s["moved"] and s["level_only"] and s["new_price"] == 0.90
+        assert s["stop_spx"] == SPX_NOW - 4.01 and s["old_stop_spx"] == SPX_NOW - 4
+        assert len(broker.calls_to("cancel")) == cancels
+        assert pos_of(holding)["stop_order_id"] == p["stop_order_id"]
+        assert pos_of(holding)["stop_spx"] == SPX_NOW - 4.01
+        line = holding.journal.events("stop_adjusted")[-1]
+        assert line["level_only"] is True and line["new_order_id"] == p["stop_order_id"]
+        assert holding.observe(SPX_NOW - 4.0)["fired"] == []
+        assert holding.observe(SPX_NOW - 4.01)["fired"][0]["closed"] is True
+
+    def test_a_dollar_target_at_the_resting_price_clears_the_level_without_the_broker(
+            self, holding, broker):
+        holding.adjust(CALL, target_spx=SPX_NOW + 20)                # rests 8.10
+        cancels = len(broker.calls_to("cancel"))
+        out = holding.adjust(CALL, target_price=8.10)
+        t = out["target"]
+        assert t["level_only"] and t["target_spx"] is None and t["given"] == "price"
+        assert len(broker.calls_to("cancel")) == cancels
+        assert pos_of(holding)["target_spx"] is None
+        assert holding.observe(SPX_NOW + 20)["fired"] == []
+
+    def test_the_same_level_again_is_unchanged(self, holding, broker):
+        holding.adjust(CALL, stop_spx=SPX_NOW - 4)
+        holding.adjust(CALL, target_spx=SPX_NOW + 20)
+        cancels = len(broker.calls_to("cancel"))
+        out = holding.adjust(CALL, stop_spx=SPX_NOW - 4, target_spx=SPX_NOW + 20)
+        assert out["stop"]["unchanged"] and out["stop"]["stop_spx"] == SPX_NOW - 4
+        assert out["target"]["unchanged"] and out["target"]["target_spx"] == SPX_NOW + 20
+        assert out["stop"]["given"] == "spx"
+        assert len(broker.calls_to("cancel")) == cancels
+        assert holding.journal.events("adjust_unchanged")[-1]["level"] == SPX_NOW + 20
+
+    def test_a_dollar_stop_still_walks_its_level_back_and_a_raised_stop_walks_above_the_entry(
+            self, holding, broker):
+        broker.set_quote(CALL, bid=5.00, ask=5.10)
+        out = holding.adjust(CALL, stop_price=3.00)                  # 0.90 above the fill
+        assert out["stop"]["given"] == "price"
+        assert out["stop"]["stop_spx"] == SPX_NOW + 3.0              # (2.10 − 3.00)/0.30 = −3
+        assert holding.observe(SPX_NOW + 3.1)["fired"] == []
+        assert holding.observe(SPX_NOW + 3.0)["fired"][0]["closed"] is True
+
+    @pytest.mark.parametrize("kwargs, words", [
+        (dict(stop_spx=SPX_NOW + 5), "a call's stop sits below the market"),
+        (dict(stop_spx=SPX_NOW), "not below the 6380.00 mark"),
+        (dict(target_spx=SPX_NOW - 5), "a call's target sits above the market"),
+        (dict(target_spx=SPX_NOW), "not above the 6380.00 mark"),
+        (dict(stop_spx=SPX_NOW - 0.2), "inside the 0.33-point noise floor"),
+        (dict(target_spx=SPX_NOW + 0.3), "inside the 0.33-point noise floor"),
+        (dict(stop_spx=SPX_NOW - 10), "walks to no price this stop can rest at"),
+    ])
+    def test_a_level_that_cannot_be_a_trigger_is_refused_in_words(
+            self, holding, broker, kwargs, words):
+        before = pos_of(holding)
+        out = holding.adjust(CALL, **kwargs)
+        assert out["refused"]["bound"] == "level" and words in out["refused"]["reason"]
+        after = pos_of(holding)
+        assert (after["stop_order_id"], after["target_order_id"]) == \
+            (before["stop_order_id"], before["target_order_id"])
+        assert (after["stop_spx"], after["target_spx"]) == (NEAR_STOP, None)
+        assert broker.calls_to("cancel") == []
+        assert holding.journal.events("refused")[-1]["kind"] == "adjust"
+
+    def test_a_put_level_on_the_wrong_side_is_refused_the_other_way(self, armed):
+        armed.place(entry(intent_id="lv-p2", symbol=PUT, limit=1.90,
+                          stop_spx=SPX_NOW + 2.0, delta=0.30))
+        out = armed.adjust(PUT, stop_spx=SPX_NOW - 5)
+        assert out["refused"]["bound"] == "level"
+        assert "a put's stop sits above the market" in out["refused"]["reason"]
+        out = armed.adjust(PUT, target_spx=SPX_NOW + 5)
+        assert "a put's target sits below the market" in out["refused"]["reason"]
+
+    def test_the_walked_price_meets_the_bid_refusal_worded_with_the_level(self, holding, broker):
+        broker.set_quote("$SPX", bid=SPX_NOW + 9.75, ask=SPX_NOW + 10.25, last=SPX_NOW + 10)
+        out = holding.adjust(CALL, stop_spx=SPX_NOW + 9)             # walks to 4.80, bid 2.00
+        assert out["refused"]["bound"] == "bracket"
+        assert "a stop at SPX 6389 (which walks to 4.80) is not below the 2.00 bid" \
+            in out["refused"]["reason"]
+
+    def test_a_position_with_no_delta_cannot_take_a_level(self, holding):
+        holding._open[CALL].delta = None
+        out = holding.adjust(CALL, stop_spx=SPX_NOW - 4)
+        assert out["refused"]["bound"] == "level"
+        assert "give the stop in dollars" in out["refused"]["reason"]
+        assert holding.adjust(CALL, stop_price=1.80)["refused"] is None   # dollars still work
+
+    def test_a_leg_is_a_price_or_a_level_never_both(self, holding):
+        with pytest.raises(ValueError, match="a price or an SPX level, not both"):
+            holding.adjust(CALL, stop_price=1.80, stop_spx=SPX_NOW - 4)
+        with pytest.raises(ValueError, match="a price or an SPX level, not both"):
+            holding.adjust(CALL, target_price=25.0, target_spx=SPX_NOW + 20)
+
+    def test_a_level_adjust_replays_like_a_price_one(self, holding, broker, clock):
+        first = holding.adjust(CALL, stop_spx=SPX_NOW - 4)
+        calls = len(broker.calls)
+        clock.advance(seconds=3)
+        again = holding.adjust(CALL, stop_spx=SPX_NOW - 4)
+        assert again.get("replayed") is True and again["stop"]["new_price"] == first["stop"]["new_price"]
+        assert len(broker.calls) == calls
+        assert holding.journal.events("adjust_replayed")[-1]["stop_spx"] == SPX_NOW - 4
+
+    def test_the_status_carries_the_target_level(self, holding):
+        holding.adjust(CALL, target_spx=SPX_NOW + 20)
+        p = pos_of(holding)
+        assert p["target_spx"] == SPX_NOW + 20
+        assert holding.valuation(holding._open[CALL])["at_target_usd"] == pytest.approx(
+            (8.10 - 2.10) * 100 - 1.30)
+
+    def test_a_restart_rebuilds_both_levels(self, broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        first = ExecService(broker, config, clock=clock)
+        first.unlock({"token": "x"})
+        first.place(entry(intent_id="lv-rec", stop_spx=NEAR_STOP, delta=0.30))
+        first.adjust(CALL, stop_spx=SPX_NOW - 4, target_spx=SPX_NOW + 20)
+        first.adjust(CALL, stop_spx=SPX_NOW - 4.01)                 # level only, no re-rest
+        moved = pos_of(first)
+
+        second = ExecService(broker, config, clock=clock)
+        after = pos_of(second)
+        assert (after["stop_order_id"], after["target_order_id"]) == \
+            (moved["stop_order_id"], moved["target_order_id"])
+        assert (after["stop_price"], after["target_price"]) == (0.90, 8.10)
+        assert after["stop_spx"] == SPX_NOW - 4.01 and after["target_spx"] == SPX_NOW + 20
+        second.unlock({"token": "x"})
+        assert second.observe(SPX_NOW + 20)["fired"][0]["reason"] == "spx-target"
+
+    def test_a_restart_after_the_level_was_cleared_carries_no_level(self, broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        first = ExecService(broker, config, clock=clock)
+        first.unlock({"token": "x"})
+        first.place(entry(intent_id="lv-rec2", stop_spx=NEAR_STOP, delta=0.30))
+        first.adjust(CALL, target_spx=SPX_NOW + 20)
+        first.adjust(CALL, target_price=8.10)                         # clears the level in place
+        second = ExecService(broker, config, clock=clock)
+        assert pos_of(second)["target_spx"] is None
+        second.unlock({"token": "x"})
+        assert second.observe(SPX_NOW + 20)["fired"] == []
+
+
+class TestSpxLevelOverTheApi:
+    @pytest.fixture
+    def client(self, holding):
+        return create_app(holding).test_client()
+
+    @staticmethod
+    def post(client, payload):
+        return client.post("/adjust", data=json.dumps(payload), content_type="application/json")
+
+    def test_a_level_for_either_leg_is_accepted(self, client, holding):
+        r = self.post(client, {"symbol": CALL, "stop_spx": SPX_NOW - 4, "target_spx": "6400"})
+        assert r.status_code == 200
+        assert r.json["stop"]["new_price"] == 0.90 and r.json["stop"]["stop_spx"] == SPX_NOW - 4
+        assert r.json["target"]["new_price"] == 8.10 and r.json["target"]["target_spx"] == 6400.0
+        assert pos_of(holding)["target_spx"] == 6400.0
+
+    def test_a_level_refusal_is_a_409_naming_the_bound(self, client):
+        r = self.post(client, {"symbol": CALL, "stop_spx": SPX_NOW + 5})
+        assert r.status_code == 409 and r.json["refused"]["bound"] == "level"
+
+    def test_both_forms_for_one_leg_is_a_400(self, client):
+        r = self.post(client, {"symbol": CALL, "stop_price": 1.80, "stop_spx": SPX_NOW - 4})
+        assert r.status_code == 400 and r.json["error"] == "bad_request"
+
+
+class TestSpxLevelOnThePage:
+    """The box takes either form, told apart by the '.' (Steve's rule); the
+    answer says which was set; the card shows both forms of each leg."""
+
+    def test_a_number_without_a_point_is_an_spx_level(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop": "6376", "ajax": "1"})
+        j = r.json
+        assert j["ok"] is True
+        assert j["msg"] == "Stop set by SPX 6376.00 → rests at 0.90 (was 1.50)."
+        p = pos_of(holding)
+        assert p["stop_price"] == 0.90 and p["stop_spx"] == 6376.0
+
+    def test_a_number_with_a_point_is_dollars(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop": "1.80", "ajax": "1"})
+        assert r.json["msg"] == "Stop moved from 1.50 to 1.80 (SPX cut level now 6379.00)."
+        assert pos_of(holding)["stop_price"] == 1.80
+
+    def test_a_target_level_and_then_a_dollar_target_say_which_fires(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "target": "6400", "ajax": "1"})
+        assert r.json["msg"] == "Target set by SPX 6400.00 → rests at 8.10 (was 21.00)."
+        card = r.json["panel_body_html"]
+        assert "value='8.10'" in card and "<span class=level>SPX 6400.00</span>" in card
+        assert "<span class=level>SPX 6378.00</span>" in card            # the stop's, beside it
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "target": "25.0", "ajax": "1"})
+        assert r.json["msg"] == ("Target moved from 8.10 to 25.00 (a price: nothing fires on "
+                                 "the SPX mark for it now).")
+        assert "SPX 6400.00" not in r.json["panel_body_html"]
+
+    def test_a_level_that_only_moves_the_level_says_so(self, page, holding):
+        page.post("/exec/order/adjust", data={"symbol": CALL, "stop": "6376", "ajax": "1"})
+        holding._last_adjust = None
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "target": "8.10", "ajax": "1"})
+        # 8.10 in dollars where 21.00 rests: a real move; then a level that walks to 8.10
+        assert r.json["msg"] == "Target moved from 21.00 to 8.10."
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "target": "6400", "ajax": "1"})
+        assert r.json["msg"] == "Target SPX level set to 6400.00; the resting 8.10 target is unchanged."
+
+    def test_a_level_refusal_is_words(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop": "6385", "ajax": "1"})
+        assert r.json["ok"] is False
+        assert "Refused (level): a call's stop sits below the market" in r.json["bad"]
+
+    def test_a_point_in_a_level_sized_number_is_read_as_dollars_and_refused_in_words(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop": "6376.5", "ajax": "1"})
+        assert r.json["ok"] is False and "a stop at 6376.50 is not below the 2.00 bid" in r.json["bad"]
+
+    @pytest.mark.parametrize("raw, words", [
+        ("abc", "stop must be a number"),
+        ("1e-1", "not a whole SPX level"),
+    ])
+    def test_a_value_that_is_neither_is_said_back(self, page, holding, raw, words):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop": raw, "ajax": "1"})
+        assert r.json["ok"] is False and words in r.json["bad"]
+
+    def test_the_named_dollar_fields_still_work(self, page, holding):
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop_price": "1.80", "ajax": "1"})
+        assert r.json["ok"] is True and pos_of(holding)["stop_price"] == 1.80
+
+    def test_the_card_states_the_rule_and_shows_the_stop_level(self, page, holding):
+        body = text(page.get("/exec/order"))
+        card = body.split("<div id=panel ")[1].split("<div class=side>")[0]
+        assert "a number with a '.' is a price (10.30); without one it is an SPX level (7585)" in card
+        assert "<span class=level>SPX 6378.00</span>" in card
+        assert "name=stop inputmode=decimal" in card and "name=target inputmode=decimal" in card

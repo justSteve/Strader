@@ -124,8 +124,8 @@ class TestTheCard:
         v = pos_of(holding)["valuation"]
         assert "NET NOW" in card and f"+${v['net_if_closed_usd']:.2f}" in card
         assert "SPX 6380.00, cut " in card
-        assert "name=stop_price inputmode=decimal enterkeyhint=go autocomplete=off value='1.50'" in card
-        assert "name=target_price inputmode=decimal enterkeyhint=go autocomplete=off value='21.00'" in card
+        assert "name=stop inputmode=decimal enterkeyhint=go autocomplete=off value='1.50'" in card
+        assert "name=target inputmode=decimal enterkeyhint=go autocomplete=off value='21.00'" in card
         assert f"{v['at_stop_usd']:+,.2f}".replace("+", "+$").replace("-", "-$") in card
         assert ">SET<" in card
         assert "action='/exec/flatten'" in card and ">FLATTEN<" in card

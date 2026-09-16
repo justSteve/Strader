@@ -11,8 +11,8 @@ import pytest
 
 from execd.stops import (
     PREMIUM_TICK_PTS, PREMIUM_TICK_PTS_ABOVE_3, TICK_BOUNDARY_PTS, exit_triggered,
-    premium_at_stop, protective_stop_price, risk_usd, stop_distance_spx,
-    stop_is_consistent, tick_for,
+    premium_at_level, premium_at_stop, protective_stop_price, risk_usd, stop_distance_spx,
+    stop_is_consistent, target_reached, tick_for,
 )
 
 
@@ -163,3 +163,51 @@ class TestSignConsistency:
 
     def test_a_put_stop_below_spot_is_already_triggered(self):
         assert not stop_is_consistent("P", spx_now=6380.0, stop_spx=6368.0)
+
+
+class TestPremiumAtLevel:
+    """One signed walk behind an SPX-level stop and target alike (st-2j3m)."""
+
+    def test_a_call_level_below_the_entry_mark_walks_below_the_fill(self):
+        # 4 points below at 0.30 delta = 1.20 off a 2.10 fill
+        assert premium_at_level(2.10, 0.30, 6380.0, 6376.0, "C") == 0.90
+
+    def test_a_call_level_above_the_entry_mark_walks_above_the_fill(self):
+        assert premium_at_level(2.10, 0.30, 6380.0, 6400.0, "C") == 8.10
+
+    def test_a_put_is_the_mirror(self):
+        assert premium_at_level(1.90, 0.30, 6380.0, 6384.0, "P") == 0.70
+        assert premium_at_level(1.90, 0.30, 6380.0, 6360.0, "PUT") == 7.90
+
+    def test_it_rounds_up_to_the_tick_in_force(self):
+        # 2.10 − 4.01 × 0.30 = 0.897 → 0.90; 2.10 + 3.17 × 0.30 = 3.051 → 3.10
+        assert premium_at_level(2.10, 0.30, 6380.0, 6375.99, "C") == 0.90
+        assert premium_at_level(2.10, 0.30, 6380.0, 6383.17, "C") == 3.10
+
+    def test_a_level_that_walks_to_nothing_raises(self):
+        with pytest.raises(ValueError, match="walks the option to"):
+            premium_at_level(2.10, 0.30, 6380.0, 6370.0, "C")
+
+    @pytest.mark.parametrize("kwargs, match", [
+        (dict(fill_px=0.0, delta_abs=0.3, right="C"), "fill price must be positive"),
+        (dict(fill_px=2.1, delta_abs=0.0, right="C"), "delta must be within"),
+        (dict(fill_px=2.1, delta_abs=0.3, right="X"), "right must be CALL or PUT"),
+    ])
+    def test_unusable_inputs_raise(self, kwargs, match):
+        with pytest.raises(ValueError, match=match):
+            premium_at_level(entry_spx=6380.0, level=6376.0, **kwargs)
+
+
+class TestTargetReached:
+    def test_a_call_target_is_reached_on_the_way_up(self):
+        assert target_reached("C", 6400.0, 6400.0)
+        assert target_reached("CALL", 6401.0, 6400.0)
+        assert not target_reached("C", 6399.9, 6400.0)
+
+    def test_a_put_target_is_reached_on_the_way_down(self):
+        assert target_reached("P", 6360.0, 6360.0)
+        assert not target_reached("PUT", 6360.1, 6360.0)
+
+    def test_an_unknown_right_raises(self):
+        with pytest.raises(ValueError):
+            target_reached("?", 6400.0, 6400.0)

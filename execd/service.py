@@ -70,8 +70,8 @@ from .broker import (
 from .intent import OrderIntent, OrderType, Side, parse_occ
 from .journal import Journal
 from .stops import (
-    CONTRACT_MULTIPLIER, exit_triggered, on_tick, protective_stop_price, risk_usd,
-    stop_is_consistent, take_profit_price,
+    CONTRACT_MULTIPLIER, exit_triggered, on_tick, premium_at_level, protective_stop_price,
+    risk_usd, stop_is_consistent, take_profit_price, target_reached,
 )
 
 
@@ -247,6 +247,12 @@ class OpenPosition:
     #: journal says why under ``target_unprotected``.
     target_order_id: str | None = None
     target_price: float | None = None
+    #: the SPX level the take-profit was set at, when it was set as one
+    #: (st-2j3m): the loop fires a market close when the mark reaches it,
+    #: while the resting limit at ``target_price`` stays the protection if
+    #: the box dies. ``None`` for a target given as a price — a dollar target
+    #: is the resting limit alone, and nothing fires on the mark for it.
+    target_spx: float | None = None
     #: the index level when the entry filled; with ``delta`` it is what lets
     #: an adjusted stop price move the SPX-mark trigger with it
     entry_spx: float | None = None
@@ -302,6 +308,7 @@ class OpenPosition:
             "stop_spx": self.stop_spx, "delta": self.delta,
             "stop_order_id": self.stop_order_id, "stop_price": self.stop_price,
             "target_order_id": self.target_order_id, "target_price": self.target_price,
+            "target_spx": self.target_spx,
             "entry_spx": self.entry_spx,
             "entry_order_id": self.entry_order_id,
             "opened_at": self.opened_at.isoformat() if self.opened_at else None,
@@ -777,12 +784,20 @@ class ExecService:
 
         This is the accurate stop while the box is alive; the resting bracket
         at the broker is what survives it not being. When it fires, both
-        resting legs come off before the close goes on (``_market_close``)."""
+        resting legs come off before the close goes on (``_market_close``).
+
+        A take-profit set as an SPX level (st-2j3m) fires here too, the same
+        way: the mark reaches ``target_spx``, both legs come off, a market
+        close goes on, reason ``spx-target``. The resting limit at the broker
+        is the target's floor under this loop the way the resting stop is the
+        stop's — whichever reaches first is the exit, and the ``closed`` line
+        names which. A target given as a price has no level and nothing
+        fires on the mark for it."""
         with self._lock:
             fired: list[dict[str, Any]] = []
             pending: list[dict[str, Any]] = []
             for pos in list(self._open.values()):
-                if pos.stop_spx is None:
+                if pos.stop_spx is None and pos.target_spx is None:
                     continue
                 if pos.exit_in_flight:
                     # A close is already working at the broker. Firing again
@@ -792,19 +807,29 @@ class ExecService:
                                     "order_id": pos.exit_order_id,
                                     "reason": pos.exit_reason})
                     continue
-                if exit_triggered(pos.right, spx, pos.stop_spx):
+                reason = None
+                if pos.stop_spx is not None and exit_triggered(pos.right, spx, pos.stop_spx):
+                    reason = "spx-stop"
                     self.journal.record("exit_triggered", symbol=pos.symbol,
                                         spx=spx, stop_spx=pos.stop_spx,
                                         intent_id=pos.intent_id)
-                    try:
-                        fired.append(self._market_close(pos, reason="spx-stop"))
-                    except (BrokerError, Refused) as exc:
-                        # One position's trouble must not stop the loop watching
-                        # the others. The stop was re-rested before this raised.
-                        self.journal.record("error", kind="spx-stop",
-                                            symbol=pos.symbol, detail=str(exc))
-                        fired.append({"symbol": pos.symbol, "closed": False,
-                                      "error": str(exc)})
+                elif pos.target_spx is not None and target_reached(pos.right, spx, pos.target_spx):
+                    reason = "spx-target"
+                    self.journal.record("target_triggered", symbol=pos.symbol,
+                                        spx=spx, target_spx=pos.target_spx,
+                                        target_price=pos.target_price,
+                                        intent_id=pos.intent_id)
+                if reason is None:
+                    continue
+                try:
+                    fired.append(self._market_close(pos, reason=reason))
+                except (BrokerError, Refused) as exc:
+                    # One position's trouble must not stop the loop watching
+                    # the others. The bracket was re-rested before this raised.
+                    self.journal.record("error", kind=reason,
+                                        symbol=pos.symbol, detail=str(exc))
+                    fired.append({"symbol": pos.symbol, "closed": False,
+                                  "error": str(exc)})
             return {"spx": spx, "fired": fired, "pending": pending}
 
     def poll_fills(self) -> dict[str, Any]:
@@ -2001,6 +2026,7 @@ class ExecService:
             return None
         b = self.bounds
         line = dict(symbol=pos.symbol, intent_id=pos.intent_id, target_price=price,
+                    target_spx=pos.target_spx,
                     basis=b.take_profit_basis, multiple=b.take_profit_multiple,
                     qty=pos.qty, order_id=result.order_id, kind=kind,
                     reward_usd=round((price - pos.entry_price) * CONTRACT_MULTIPLIER * pos.qty, 2),
@@ -2020,7 +2046,8 @@ class ExecService:
 
     # ── the live editor: both trigger conditions ─────────────────────────
     def adjust(self, symbol: str, *, stop_price: float | None = None,
-               target_price: float | None = None) -> dict[str, Any]:
+               target_price: float | None = None, stop_spx: float | None = None,
+               target_spx: float | None = None) -> dict[str, Any]:
         """Move the resting stop, the resting target, or both. [st-fn5y]
 
         Steve, 2026-09-14: *"The screen should be a live editor allowing an
@@ -2040,32 +2067,59 @@ class ExecService:
         Moving the stop price also moves the SPX-mark trigger the loop
         watches, by the same delta walk in reverse from the level the entry
         filled at, so the two stops stay one stop. Journaled as
-        ``stop_adjusted`` / ``target_adjusted`` with old and new."""
+        ``stop_adjusted`` / ``target_adjusted`` with old and new.
+
+        **Either leg may be given as an SPX level instead** (st-2j3m; Steve,
+        2026-09-16: "a path to define a SPX target strike for both stop loss
+        and take profit"): ``stop_spx`` / ``target_spx``, one form per leg,
+        never both. A level is walked into the option price through the
+        entry's delta from the level the entry filled at
+        (``stops.premium_at_level``), and that price is what rests at the
+        broker; the level itself is what the SPX loop watches — the stop's
+        trigger, or a ``target_spx`` the loop fires a market close on when
+        the mark reaches it, the resting limit staying the floor under it.
+        A level is refused, bound ``level``, when the position has no delta
+        or entry mark to walk from, when it is on the wrong side of the mark
+        for the right (it would fire at once), when it sits inside the noise
+        floor (the spread walked through delta — the market fidgets that far
+        on nothing), or when it walks to a price nothing can rest at; the
+        price it walks to then meets the same refusals a price given in
+        dollars does, worded with the level. A level whose price is the one
+        already resting moves the level alone, without a broker round trip."""
         with self._lock:
-            if stop_price is None and target_price is None:
+            if stop_price is None and target_price is None and \
+                    stop_spx is None and target_spx is None:
                 raise ValueError("adjust needs a stop_price, a target_price, or both")
+            for leg, price, level in (("stop", stop_price, stop_spx),
+                                      ("target", target_price, target_spx)):
+                if price is not None and level is not None:
+                    raise ValueError(f"the {leg} is a price or an SPX level, not both")
             # A replay — the same request arriving within seconds of the last
             # one's answer — is answered from that answer and touches nothing.
             # 2026-09-15 14:07:05 CT: the browser (or the tailnet proxy) re-sent
             # an UPDATE the instant the first one's 303 went out, and the
             # service ran it again (st-ff5j, st-gw5m).
-            key = (symbol, stop_price, target_price)
+            key = (symbol, stop_price, target_price, stop_spx, target_spx)
             last = self._last_adjust
             if last is not None and last[0] == key and \
                     (self.clock() - last[1]).total_seconds() <= ADJUST_REPLAY_S:
                 self.journal.record("adjust_replayed", symbol=symbol, stop_price=stop_price,
-                                    target_price=target_price,
+                                    target_price=target_price, stop_spx=stop_spx,
+                                    target_spx=target_spx,
                                     first_at=last[1].isoformat())
                 return {**last[2], "replayed": True}
             self.journal.record("request", kind="adjust", symbol=symbol,
-                                stop_price=stop_price, target_price=target_price)
-            out = self._adjust(symbol, stop_price=stop_price, target_price=target_price)
+                                stop_price=stop_price, target_price=target_price,
+                                stop_spx=stop_spx, target_spx=target_spx)
+            out = self._adjust(symbol, stop_price=stop_price, target_price=target_price,
+                               stop_spx=stop_spx, target_spx=target_spx)
             if out.get("refused") is None:
                 self._last_adjust = (key, self.clock(), out)
             return out
 
     def _adjust(self, symbol: str, *, stop_price: float | None,
-                target_price: float | None) -> dict[str, Any]:
+                target_price: float | None, stop_spx: float | None = None,
+                target_spx: float | None = None) -> dict[str, Any]:
         with self._lock:
             if (r := self.arming.permits_exit()) is not None:
                 return self._refuse_adjust(symbol, r)
@@ -2081,11 +2135,33 @@ class ExecService:
                     f"cancel that close first, or let it fill"))
             q = self.broker.quote(symbol)          # a BrokerError propagates: 502
             bid = float(q.bid)
+            # A leg given as an SPX level is walked into its price first; the
+            # price then meets every refusal a dollar price does (st-2j3m).
+            if stop_spx is not None or target_spx is not None:
+                try:
+                    mark = self.spx_mark()
+                except BrokerError as exc:
+                    return self._refuse_adjust(symbol, Refusal(
+                        "level", f"no {self.config.index_symbol} mark to place an SPX "
+                                 f"level against ({exc}) — give the leg in dollars"))
+                spread = max(float(q.ask) - bid, 0.0)
+                if stop_spx is not None:
+                    stop_price, r = self._price_at_level(pos, "stop", float(stop_spx),
+                                                         mark, spread)
+                    if r is not None:
+                        return self._refuse_adjust(symbol, r)
+                if target_spx is not None:
+                    target_price, r = self._price_at_level(pos, "target", float(target_spx),
+                                                           mark, spread)
+                    if r is not None:
+                        return self._refuse_adjust(symbol, r)
             new_stop = pos.stop_price if stop_price is None else float(stop_price)
             new_target = pos.target_price if target_price is None else float(target_price)
             if (r := self._adjust_refusal(pos, bid, new_stop, new_target,
                                           stop_given=stop_price is not None,
-                                          target_given=target_price is not None)) is not None:
+                                          target_given=target_price is not None,
+                                          stop_level=stop_spx,
+                                          target_level=target_spx)) is not None:
                 return self._refuse_adjust(symbol, r)
 
             out: dict[str, Any] = {"refused": None, "symbol": symbol, "bid": bid,
@@ -2096,42 +2172,154 @@ class ExecService:
             # resting and two broker round trips for nothing. 2026-09-15
             # 14:07 CT the page's UPDATE sent both boxes, the stop unchanged,
             # and the stop was pulled and re-rested twice at 10.30 (st-ff5j).
+            # A level already set is unchanged the same way; a new level whose
+            # price is the resting one moves the level alone (st-2j3m).
             if stop_price is not None:
-                if self._same_price(pos.stop_price, stop_price) and pos.stop_order_id:
-                    out["stop"] = self._unchanged_leg(pos, "stop")
+                if pos.stop_order_id and (
+                        self._same_price(pos.stop_spx, stop_spx) if stop_spx is not None
+                        else self._same_price(pos.stop_price, stop_price)):
+                    out["stop"] = self._unchanged_leg(
+                        pos, "stop", given="spx" if stop_spx is not None else "price")
+                elif stop_spx is not None and pos.stop_order_id and \
+                        self._same_price(pos.stop_price, stop_price):
+                    out["stop"] = self._move_level_only(pos, "stop", float(stop_spx), bid)
                 else:
-                    moved = self._move_leg(pos, "stop", float(stop_price), bid)
+                    moved = self._move_leg(pos, "stop", float(stop_price), bid,
+                                           level=stop_spx)
                     if moved.get("closed") is not None:
                         return self._adjust_closed(symbol, out, "stop", moved)
                     out["stop"] = moved
             if target_price is not None and pos.symbol in self._open:
-                if self._same_price(pos.target_price, target_price) and pos.target_order_id:
-                    out["target"] = self._unchanged_leg(pos, "target")
+                if pos.target_order_id and (
+                        self._same_price(pos.target_spx, target_spx) if target_spx is not None
+                        else self._same_price(pos.target_price, target_price)
+                        and pos.target_spx is None):
+                    out["target"] = self._unchanged_leg(
+                        pos, "target", given="spx" if target_spx is not None else "price")
+                elif pos.target_order_id and self._same_price(pos.target_price, target_price):
+                    # the price already rests; only the level changes (a new
+                    # one, or none — a dollar target has no level to fire on)
+                    out["target"] = self._move_level_only(
+                        pos, "target", None if target_spx is None else float(target_spx), bid)
                 else:
-                    moved = self._move_leg(pos, "target", float(target_price), bid)
+                    moved = self._move_leg(pos, "target", float(target_price), bid,
+                                           level=target_spx)
                     if moved.get("closed") is not None:
                         return self._adjust_closed(symbol, out, "target", moved)
                     out["target"] = moved
             return out
 
     @staticmethod
-    def _same_price(resting: float | None, asked: float) -> bool:
-        return resting is not None and abs(float(asked) - float(resting)) < 1e-6
+    def _same_price(resting: float | None, asked: float | None) -> bool:
+        return resting is not None and asked is not None and \
+            abs(float(asked) - float(resting)) < 1e-6
 
-    def _unchanged_leg(self, pos: OpenPosition, leg: str) -> dict[str, Any]:
+    @staticmethod
+    def _right_word(right: str) -> str:
+        return "call" if (right or "").upper() in ("C", "CALL") else "put"
+
+    def _price_at_level(self, pos: OpenPosition, leg: str, level: float, mark: float,
+                        spread: float) -> tuple[float | None, Refusal | None]:
+        """Walk an SPX level into the option price that leg rests at, or say
+        in words why it cannot be. [st-2j3m]
+
+        Four refusals, all bound ``level``: the position carries no delta or
+        entry mark to walk from (adopted, or recovered without one); the
+        level is on the wrong side of the mark for the right — a call's stop
+        sits below the market and its target above, a put's the mirror — so
+        it would fire the moment the loop saw it; the level is inside the
+        noise floor, the spread walked through delta, which is how far the
+        index moves on nothing (``compose.noise_floor_spx``'s spread term —
+        the service holds no minute bars, so the tape's own fidget is not in
+        it here); or the walk lands at a price nothing can rest at."""
+        word = self._right_word(pos.right)
+        if pos.delta is None or pos.entry_spx is None or pos.entry_price <= 0:
+            return None, Refusal(
+                "level", f"this position carries no delta or entry mark to walk an SPX "
+                         f"level into a price — give the {leg} in dollars")
+        delta = abs(float(pos.delta))
+        if leg == "stop":
+            if not stop_is_consistent(pos.right, mark, level):
+                side = "below" if word == "call" else "above"
+                return None, Refusal(
+                    "level", f"a {word}'s stop sits {side} the market, and SPX {level:g} is "
+                             f"not {side} the {mark:.2f} mark — it would fire at once")
+        elif target_reached(pos.right, mark, level):
+            side = "above" if word == "call" else "below"
+            return None, Refusal(
+                "level", f"a {word}'s target sits {side} the market, and SPX {level:g} is "
+                         f"not {side} the {mark:.2f} mark — it would fire at once")
+        floor = spread / delta if delta > 0 else 0.0
+        distance = abs(mark - level)
+        if floor > 0 and distance < floor:
+            return None, Refusal(
+                "level", f"SPX {level:g} is {distance:.2f} points from the {mark:.2f} mark, "
+                         f"inside the {floor:.2f}-point noise floor (the {spread:.2f} spread "
+                         f"walked through the {delta:.2f} delta) — the market moves that far "
+                         f"on nothing")
+        try:
+            price = premium_at_level(pos.entry_price, delta, pos.entry_spx, level, pos.right)
+        except ValueError as exc:
+            return None, Refusal(
+                "level", f"SPX {level:g} walks to no price this {leg} can rest at: {exc}")
+        return price, None
+
+    def _unchanged_leg(self, pos: OpenPosition, leg: str, *,
+                       given: str = "price") -> dict[str, Any]:
         price = pos.stop_price if leg == "stop" else pos.target_price
         order_id = pos.stop_order_id if leg == "stop" else pos.target_order_id
+        level = pos.stop_spx if leg == "stop" else pos.target_spx
         self.journal.record("adjust_unchanged", symbol=pos.symbol, intent_id=pos.intent_id,
-                            leg=leg, price=price, order_id=order_id)
+                            leg=leg, price=price, order_id=order_id, level=level, given=given)
         out = {"moved": False, "unchanged": True, "old_price": price, "new_price": price,
-               "order_id": order_id}
+               "order_id": order_id, "given": given}
         if leg == "stop":
             out["stop_spx"] = pos.stop_spx
+        else:
+            out["target_spx"] = pos.target_spx
         return out
+
+    def _move_level_only(self, pos: OpenPosition, leg: str, level: float | None,
+                         bid: float) -> dict[str, Any]:
+        """A new SPX level that walks to the price already resting: the loop's
+        trigger moves, the broker is not touched. A target's level is cleared
+        the same way (``None``) when the target is given again in dollars at
+        the price already resting — the resting limit stands alone. [st-2j3m]"""
+        if leg == "stop":
+            old_level, pos.stop_spx = pos.stop_spx, level
+            price, order_id = pos.stop_price, pos.stop_order_id
+            self.journal.record("stop_adjusted", symbol=pos.symbol, intent_id=pos.intent_id,
+                                old_price=price, new_price=price, old_order_id=order_id,
+                                new_order_id=order_id, old_stop_spx=old_level,
+                                new_stop_spx=level, given="spx", level_only=True,
+                                bid=bid, qty=pos.qty)
+            return {"moved": True, "level_only": True, "old_price": price, "new_price": price,
+                    "order_id": order_id, "stop_spx": level, "old_stop_spx": old_level,
+                    "given": "spx"}
+        old_level, pos.target_spx = pos.target_spx, level
+        price, order_id = pos.target_price, pos.target_order_id
+        given = "spx" if level is not None else "price"
+        self.journal.record("target_adjusted", symbol=pos.symbol, intent_id=pos.intent_id,
+                            old_price=price, new_price=price, old_order_id=order_id,
+                            new_order_id=order_id, old_target_spx=old_level,
+                            new_target_spx=level, given=given, level_only=True,
+                            bid=bid, qty=pos.qty)
+        return {"moved": True, "level_only": True, "old_price": price, "new_price": price,
+                "order_id": order_id, "target_spx": level, "old_target_spx": old_level,
+                "given": given}
 
     def _adjust_refusal(self, pos: OpenPosition, bid: float, new_stop: float | None,
                         new_target: float | None, *, stop_given: bool,
-                        target_given: bool) -> Refusal | None:
+                        target_given: bool, stop_level: float | None = None,
+                        target_level: float | None = None) -> Refusal | None:
+        # a leg given as an SPX level is named by both forms in the refusal,
+        # so "a stop at 2.05" never puzzles someone who typed 6378 (st-2j3m)
+        def name(label: str, price: float) -> str:
+            level = stop_level if label == "stop" else target_level
+            if level is not None:
+                return f"a {label} at SPX {level:g} (which walks to {price:.2f})"
+            return f"a {label} at {price:.2f}"
+
         for label, price, given in (("stop", new_stop, stop_given),
                                     ("target", new_target, target_given)):
             if not given or price is None:
@@ -2146,14 +2334,16 @@ class ExecService:
                     f"{label} {price:.2f} is not on the {tick:.2f} grid SPX options "
                     f"quote in {'at and above' if tick > 0.05 else 'below'} $3.00")
         if stop_given and new_stop is not None and new_stop >= bid:
-            return Refusal("bracket", f"a stop at {new_stop:.2f} is not below the "
+            return Refusal("bracket", f"{name('stop', new_stop)} is not below the "
                                       f"{bid:.2f} bid — it would fill at once")
         if target_given and new_target is not None and new_target <= bid:
-            return Refusal("bracket", f"a target at {new_target:.2f} is not above the "
+            return Refusal("bracket", f"{name('target', new_target)} is not above the "
                                       f"{bid:.2f} bid — it would fill at once")
         if new_stop is not None and new_target is not None and new_stop >= new_target:
-            return Refusal("bracket", f"the stop ({new_stop:.2f}) must sit below the "
-                                      f"target ({new_target:.2f})")
+            stop_word = f"SPX {stop_level:g} → {new_stop:.2f}" if stop_level is not None else f"{new_stop:.2f}"
+            target_word = f"SPX {target_level:g} → {new_target:.2f}" if target_level is not None else f"{new_target:.2f}"
+            return Refusal("bracket", f"the stop ({stop_word}) must sit below the "
+                                      f"target ({target_word})")
         if stop_given and new_stop is not None:
             risk = risk_usd(pos.entry_price, new_stop, pos.qty)
             state = self.day_state()
@@ -2161,7 +2351,7 @@ class ExecService:
             if risk > headroom:
                 return Refusal(
                     "ceiling",
-                    f"a stop at {new_stop:.2f} puts ${risk:.2f} at risk on this position, "
+                    f"{name('stop', new_stop)} puts ${risk:.2f} at risk on this position, "
                     f"and the day has ${headroom:.2f} of its "
                     f"${self.bounds.daily_loss_ceiling_usd:.2f} ceiling left")
         return None
@@ -2193,11 +2383,16 @@ class ExecService:
         return f"{sign}${abs(v):,.2f}"
 
     def _move_leg(self, pos: OpenPosition, leg: str, new_price: float,
-                  bid: float) -> dict[str, Any]:
+                  bid: float, *, level: float | None = None) -> dict[str, Any]:
         """Cancel one leg and rest it at the new price. Returns what happened;
-        ``closed`` is set when the cancel found the leg filled."""
+        ``closed`` is set when the cancel found the leg filled. ``level`` is
+        the SPX level the price was walked from when the leg was given as
+        one (st-2j3m): the stop's trigger becomes exactly that level rather
+        than the price walked back; the target's level is set (or, for a
+        target given in dollars, cleared) beside the resting limit."""
         old_price = pos.stop_price if leg == "stop" else pos.target_price
         old_id = getattr(pos, self._LEG_ATTR[leg])
+        given = "spx" if level is not None else "price"
         try:
             _canceled, fill = self._pull_leg(pos, leg)
         except BrokerError as exc:
@@ -2210,7 +2405,7 @@ class ExecService:
 
         if leg == "stop":
             old_spx = pos.stop_spx
-            new_spx = self._stop_spx_for(pos, new_price)
+            new_spx = level if level is not None else self._stop_spx_for(pos, new_price)
             if new_spx is not None:
                 pos.stop_spx = new_spx
             placed = self._rest_stop_at(pos, new_price, kind="adjusted")
@@ -2221,49 +2416,56 @@ class ExecService:
                 pos.stop_spx = old_spx
                 self._rest_stop_at(pos, old_price, kind="restored")
                 return {"moved": False, "old_price": old_price, "new_price": new_price,
-                        "order_id": pos.stop_order_id,
+                        "order_id": pos.stop_order_id, "given": given,
                         "error": "the broker would not rest the stop at the new price; "
                                  "the old stop is back"}
             self.journal.record("stop_adjusted", symbol=pos.symbol, intent_id=pos.intent_id,
                                 old_price=old_price, new_price=new_price,
                                 old_order_id=old_id, new_order_id=pos.stop_order_id,
                                 old_stop_spx=old_spx, new_stop_spx=pos.stop_spx,
-                                bid=bid, qty=pos.qty)
+                                given=given, bid=bid, qty=pos.qty)
             return {"moved": True, "old_price": old_price, "new_price": new_price,
-                    "order_id": pos.stop_order_id, "stop_spx": pos.stop_spx}
+                    "order_id": pos.stop_order_id, "stop_spx": pos.stop_spx,
+                    "old_stop_spx": old_spx, "given": given}
 
+        old_spx = pos.target_spx
+        pos.target_spx = level           # None for a dollar target: nothing fires on the mark
         placed = self._rest_target_at(pos, new_price, kind="adjusted")
         if placed is None:
+            pos.target_spx = old_spx
             self._rest_target_at(pos, old_price, kind="restored")
             return {"moved": False, "old_price": old_price, "new_price": new_price,
-                    "order_id": pos.target_order_id,
+                    "order_id": pos.target_order_id, "given": given,
                     "error": "the broker would not rest the take-profit at the new "
                              "price; the old one is back"}
         if placed.get("closed") is not None:
             # the bid ran through the new target as it landed: that is the exit
             return {"moved": True, "old_price": old_price, "new_price": new_price,
-                    "closed": placed["closed"]}
+                    "given": given, "closed": placed["closed"]}
         self.journal.record("target_adjusted", symbol=pos.symbol, intent_id=pos.intent_id,
                             old_price=old_price, new_price=new_price,
                             old_order_id=old_id, new_order_id=pos.target_order_id,
-                            bid=bid, qty=pos.qty)
+                            old_target_spx=old_spx, new_target_spx=pos.target_spx,
+                            given=given, bid=bid, qty=pos.qty)
         return {"moved": True, "old_price": old_price, "new_price": new_price,
-                "order_id": pos.target_order_id}
+                "order_id": pos.target_order_id, "target_spx": pos.target_spx,
+                "old_target_spx": old_spx, "given": given}
 
     def _stop_spx_for(self, pos: OpenPosition, stop_price: float) -> float | None:
         """The SPX level that corresponds to an option-price stop, by the
         entry's delta walked backwards from the level the entry filled at:
-        the inverse of ``stops.premium_at_stop``. ``None`` when the position
-        has no delta or no entry mark (adopted, or recovered without one), in
-        which case the SPX loop keeps whatever level it had."""
+        the inverse of ``stops.premium_at_level``. Signed since st-2j3m — a
+        stop raised above the fill (a call's, after the market has moved up)
+        walks to a level on the winning side of the entry mark, and the loop
+        must watch that level, not the one the wider stop had. ``None`` when
+        the position has no delta or no entry mark (adopted, or recovered
+        without one), in which case the SPX loop keeps whatever level it had."""
         if pos.delta is None or pos.entry_spx is None or pos.entry_price <= 0:
             return None
         delta = abs(float(pos.delta))
         if delta <= 0:
             return None
         distance = (pos.entry_price - float(stop_price)) / delta
-        if distance <= 0:
-            return None
         r = (pos.right or "").upper()
         if r in ("C", "CALL"):
             return round(float(pos.entry_spx) - distance, 2)
@@ -2333,9 +2535,19 @@ class ExecService:
                 pos = self._open.get(str(e.get("symbol", "")))
                 if pos is not None:
                     pos.target_price = e.get("target_price")
+                    pos.target_spx = e.get("target_spx")
                     # a target that filled the moment it landed never rested;
                     # the closed line that follows drops the position anyway
                     pos.target_order_id = None if e.get("filled_at_once") else e.get("order_id")
+            elif e.get("event") in ("stop_adjusted", "target_adjusted") and e.get("level_only"):
+                # a level moved without the leg being re-rested (st-2j3m):
+                # no *_placed line follows, so the level is read from here
+                pos = self._open.get(str(e.get("symbol", "")))
+                if pos is not None:
+                    if e.get("event") == "stop_adjusted":
+                        pos.stop_spx = e.get("new_stop_spx")
+                    else:
+                        pos.target_spx = e.get("new_target_spx")
             elif e.get("event") == "canceled" and e.get("kind") in ("protective-stop", "take-profit"):
                 # A leg that came off and was not put back (a close in flight
                 # when the service died) must not come back as a resting id.

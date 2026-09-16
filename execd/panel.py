@@ -68,6 +68,8 @@ PANEL_STYLE = """
  .panel .editor label{display:flex;flex-direction:column;gap:4px;color:#9ca3af;font-size:.9em}
  .panel .editor input{width:100%;box-sizing:border-box;font-size:1.1em;padding:.6em;border-radius:8px;border:1px solid #374151;background:#0b1020;color:#e5e7eb}
  .panel .editor .money{font-size:.9em;font-weight:700}
+ .panel .editor .level{font-size:.85em;color:#9ca3af;margin-left:.6em}
+ .panel .hint{margin-top:6px;font-size:.8em;color:#6b7280}
  .panel .editor form{margin:0}.panel .legrow{display:flex;gap:6px;align-items:stretch}
  .panel .editor button.set{min-height:44px;padding:0 12px;border-radius:8px;border:1px solid #374151;font-weight:700;cursor:pointer;background:#1f2937;color:#e5e7eb;font-family:inherit}
  .panel .editor button.set:disabled{opacity:.5}
@@ -349,25 +351,35 @@ def body_filled(service, st, facts, actions, now) -> str:
         # the live editor (st-fn5y) — both trigger conditions, one button
         stop_val = f"{p['stop_price']:.2f}" if p.get("stop_price") is not None else ""
         target_val = f"{p['target_price']:.2f}" if p.get("target_price") is not None else ""
+        # each leg shows both forms — the resting price in the box, the SPX
+        # level beside the money: "stop 10.30 · SPX 7585.03" (st-2j3m)
         stop_note = (f"<span class='money {money_class(v.get('at_stop_usd'))}'>{money(v.get('at_stop_usd'))}</span>"
                      if p.get("stop_price") is not None else "<span class='money neg'>NO STOP RESTING</span>")
+        if p.get("stop_spx") is not None:
+            stop_note += f"<span class=level>SPX {float(p['stop_spx']):.2f}</span>"
         target_note = (f"<span class='money {money_class(v.get('at_target_usd'))}'>{money(v.get('at_target_usd'))}</span>"
                        if p.get("target_price") is not None else "<span class='money amber'>NO TARGET RESTING</span>")
+        if p.get("target_spx") is not None:
+            target_note += f"<span class=level>SPX {float(p['target_spx']):.2f}</span>"
         # One leg at a time (Steve, 2026-09-15: "It'll be one or the other.
         # I'd like to be able to enter the value in either and just hit
         # enter to submit … make this as instant as possible", st-bmaz):
         # each leg is its own form, Enter sends it, SET is the tap target;
         # the script posts it by fetch and paints the answer into the card.
+        # The box takes a price or an SPX level, told apart by the '.'
+        # (Steve, 2026-09-16, st-2j3m); the route reads it by that rule.
         def leg_form(leg: str, val: str, note: str) -> str:
             return (f"<form method=post action='{actions['order_adjust']}' class='adjust leg' data-leg={leg}>"
                     f"<input type=hidden name=symbol value='{esc(sym)}'>"
                     "<input type=hidden name=ajax value=''>"
                     f"<label>{leg}<span class=legrow>"
-                    f"<input name={leg}_price inputmode=decimal enterkeyhint=go autocomplete=off value='{val}'>"
+                    f"<input name={leg} inputmode=decimal enterkeyhint=go autocomplete=off value='{val}'>"
                     f"<button class=set aria-label='set the {leg}'>SET</button></span>{note}</label></form>")
         html += ("<div id=adjustnote class=k></div><div class=editor>"
                  + leg_form("stop", stop_val, stop_note)
-                 + leg_form("target", target_val, target_note) + "</div>")
+                 + leg_form("target", target_val, target_note) + "</div>"
+                 "<div class='k hint'>a number with a '.' is a price (10.30); without one it "
+                 "is an SPX level (7585)</div>")
         html += f"<table class=full>{_today_row(st)}</table>"
     html += "<div class=actions>"
     if st["arming"]["state"] != "LOCKED":

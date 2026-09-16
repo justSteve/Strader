@@ -485,7 +485,7 @@ version. Every journal line carries this sha.
 | POST | `/place` | an intent object | §5.6 |
 | POST | `/cancel` | `{"order_id": "..."}` | `{"refused": null, "order": {...}}` |
 | POST | `/flatten` | `{"reason": "..."}` optional; **JSON required** | `{"refused": null, "closed": [...], "errors": [...]}` |
-| POST | `/adjust` | `{"symbol": "...", "stop_price": 1.80, "target_price": 25.0}` — at least one price | `{"refused": null, "stop": {moved, old_price, new_price, order_id, stop_spx}, "target": {...}, "closed": null}`; `409` names the refusal (`bracket`, `tick`, `ceiling`, `position`, `exit_in_flight`, `filled`, `armed`); `502` the broker. §5.20 (st-fn5y) |
+| POST | `/adjust` | `{"symbol": "...", "stop_price": 1.80, "target_price": 25.0}` — at least one; a leg may instead be an SPX level, `"stop_spx": 6376` / `"target_spx": 6400`, never both forms for one leg (st-2j3m) | `{"refused": null, "stop": {moved, old_price, new_price, order_id, stop_spx, given}, "target": {…, target_spx, given}, "closed": null}`; `409` names the refusal (`bracket`, `tick`, `ceiling`, `level`, `position`, `exit_in_flight`, `filled`, `armed`); `502` the broker. §5.20 (st-fn5y) |
 | POST | `/stand-down` | `{}`; **JSON required** | the status object |
 | POST | `/stop` | — | the status object. **Ungated on purpose, and takes no lock** — the kill file is touched before anything else, so a STOP during a slow entry refuses the send instead of queueing behind it (st-jm6u, §5.22). |
 | POST | `/observe` | `{"spx": 6320.5}` | `{"spx": …, "fired": [...], "pending": [...]}` |
@@ -696,7 +696,7 @@ Every line carries `ts`, `ts_ct`, `event`, `sha`.
 
 Events: `request` · `refused` · `preview` · `placed` · `rejected` · `filled` ·
 `stop_placed` · `stop_unprotected` · `target_placed` · `target_unprotected` ·
-`stop_adjusted` · `target_adjusted` · `oversold` · `exit_triggered` ·
+`stop_adjusted` · `target_adjusted` · `oversold` · `exit_triggered` · `target_triggered` ·
 `exit_unfilled` · `closed` · `canceled` · `flattened` · `replayed` · `error` ·
 `unlock` · `stand_down` · `lock` · `stop` · `resume` · `recovered` ·
 `unreadable`. The five with `target`, `adjusted` and `oversold` are the
@@ -921,7 +921,8 @@ because the check hit `/trader/v1` and 401'd.
 ### 5.12 Recovery
 
 `_recover()` runs in the constructor. It replays today's journal and rebuilds
-`_open` from `filled`+`kind=entry`, `stop_placed`, `target_placed`, the legs'
+`_open` from `filled`+`kind=entry`, `stop_placed`, `target_placed` (with its
+`target_spx`), a level-only `stop_adjusted` / `target_adjusted`, the legs'
 `canceled` lines and `closed` lines (and `_working` from `working` lines,
 with the page's `page_query`), then journals `recovered` if anything survived. The service comes back **LOCKED**, so
 it cannot open anything; what it must not do is come back not knowing a position
@@ -1394,14 +1395,78 @@ on `/exec/order` with that query, so the form comes back priced fresh, ready
 to SEND. An entry the desk or the API sent has no query and lands
 on the bare form.
 
+**Either leg as an SPX level** (st-2j3m; Steve, 2026-09-16, early: *"i'd
+like to have a path to define a SPX target strike for both stop loss and
+take profit … to streamline the code that decides if it's dealing with a
+SPX strike or a dollar amount we can make it a requirement that the operator
+will include a '.' in the form submission when asking for dollar amt."*).
+His rule, and the page's: **a value with a '.' is a dollar option price
+(10.30); a value without one is an SPX level (7585)**. The stop and target
+boxes are named `stop` and `target` and take either; the route reads the box
+by the rule and sends the service `stop_price` / `target_price` (dollars) or
+`stop_spx` / `target_spx` (a level); `stop_price` / `target_price` posted by
+name stay dollars. A level with a '.' in it (`6376.5`) is dollars by the
+rule and meets the bid refusal in words; a level that is not whole
+(`1e-1`) is said back. The hint under the editor states the rule.
+
+A level is walked into the option price through the entry's delta from the
+level the entry filled at — `stops.premium_at_level`, one **signed** walk
+for both legs: a level on the winning side of the entry mark gives a price
+above the fill, one on the losing side a price below it, rounded up to the
+tick in force. That price is what rests at the broker; the level is what the
+SPX loop watches. For the **stop**, `stop_spx` becomes exactly the level
+given (a dollar stop still walks its level back by `_stop_spx_for`, now
+signed too, so a stop raised above the fill moves the trigger onto the
+winning side of the entry mark instead of leaving the wider level in
+place). For the **target**, the level is a new `OpenPosition.target_spx`:
+`observe` fires a market close, reason `spx-target`, journaled
+`target_triggered`, when the mark reaches it (a call's on the way up, a
+put's on the way down — `stops.target_reached`), taking both legs off first
+the way the stop's does; the resting limit at the walked price stays the
+floor under it, so whichever reaches first is the exit and the `closed`
+line's `kind` says which (`spx-target` or `target`). A target given in
+dollars has **no** level — nothing fires on the mark for a price, as before
+— so a dollar target after a level clears the level, and the answer says so.
+
+The refusals, bound `level`, in words: the position carries no delta or
+entry mark to walk from (adopted, or recovered without one — *give the leg
+in dollars*); the level is on the wrong side of the mark for the right (*a
+call's stop sits below the market, and SPX 6385 is not below the 6380.00
+mark — it would fire at once*; the target and the put are the mirrors); the
+level is inside the noise floor — the spread walked through delta,
+`compose.noise_floor_spx`'s spread term (the service holds no minute bars,
+so the tape's own fidget is not in it here); the walk lands at a price
+nothing can rest at. The walked price then meets every refusal a dollar
+price does, worded with both forms: *a stop at SPX 6389 (which walks to
+4.80) is not below the 2.00 bid*. A level whose walked price is the one
+already resting moves the level alone — no cancel, no re-rest, a
+`stop_adjusted` / `target_adjusted` line with `level_only`, which recovery
+reads since no `*_placed` line follows. The same level again is
+`adjust_unchanged`.
+
+The card shows both forms of each leg — the resting price in the box, *SPX
+6376.00* beside the money — and the answer line says which was set: *Stop
+set by SPX 6376.00 → rests at 0.90 (was 1.50)*; *Target SPX level set to
+6400.00; the resting 8.10 target is unchanged*; *Target moved from 8.10 to
+25.00 (a price: nothing fires on the SPX mark for it now)*. The journal
+lines carry both: `stop_adjusted` and `target_adjusted` have `given`
+(`price` / `spx`), old and new price and level; `target_placed` has
+`target_spx`; `target_triggered` has the level, the mark and the resting
+price; `adjust_unchanged` the level. The status JSON carries `target_spx`.
+
 `tests/execd/test_bracket.py` is what all of this has to mean: the arithmetic
 on both bases, the target on the fill and at reconcile, the warning branches,
 OCO both ways, both legs filled, both cancels before the close, every failure
 branch putting both back, partial exits resizing both, the guarded cancel,
 every adjust refusal, a leg that filled before it could move, the moved SPX
 trigger for a call and a put, the API's four status codes, recovery, the
-attempts rule through the service, the paper book's target fill, and the
-page's editor and cancel.
+attempts rule through the service, the paper book's target fill, the
+page's editor and cancel, and — for the SPX level — the walk for both legs
+and both rights, the loop firing at the level, the resting limit winning the
+race, the level cleared by a dollar target, the level-only move, every
+`level` refusal in words, the replay, the API, recovery of both levels, and
+the page's '.' rule with its answers. `tests/execd/test_stops.py` holds the
+signed walk's arithmetic and rounding.
 
 ### 5.21 The status panel — one card, six stages (st-4ezg; seven until st-igw0)
 

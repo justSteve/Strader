@@ -145,15 +145,18 @@ def create_app(service: ExecService) -> Flask:
     @app.post("/adjust")
     def adjust():
         """Move the resting stop, the resting target, or both, under a live
-        position (st-fn5y). ``{"symbol", "stop_price"?, "target_price"?}`` —
-        at least one price. 409 names the refusal; 502 the broker."""
+        position (st-fn5y). ``{"symbol", "stop_price"?, "target_price"?,
+        "stop_spx"?, "target_spx"?}`` — at least one; a leg is a price or an
+        SPX level, not both (st-2j3m). 409 names the refusal; 502 the broker."""
         body = _body()
         symbol = body.get("symbol")
         if not symbol:
             raise ValueError("adjust needs a symbol")
         return _answer(service.adjust(str(symbol),
                                       stop_price=_optional_price(body, "stop_price"),
-                                      target_price=_optional_price(body, "target_price")))
+                                      target_price=_optional_price(body, "target_price"),
+                                      stop_spx=_optional_price(body, "stop_spx"),
+                                      target_spx=_optional_price(body, "target_spx")))
 
     @app.post("/stand-down")
     def stand_down():
