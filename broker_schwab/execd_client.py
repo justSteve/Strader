@@ -44,6 +44,14 @@ TIMEOUT_S = float(os.environ.get("EXECD_TIMEOUT_S", "20"))
 #: What ``create_client`` spends deciding whether the service is up.
 PROBE_TIMEOUT_S = 1.5
 
+#: The second look when the first one found nothing. The service answers one
+#: request at a time, so a probe can queue behind a Schwab call that a slow
+#: link is stretching to several seconds — 2026-09-16, 2 to 5 s per call, and
+#: the level tracker fell to a token file that had moved into the service,
+#: then paged Steve about a token that was fine [st-5fs4]. A refused connection
+#: still comes back at once; only a queued probe spends this budget.
+PATIENT_PROBE_TIMEOUT_S = float(os.environ.get("EXECD_PATIENT_PROBE_S", "12"))
+
 Fetch = Callable[[str, float], tuple[int, bytes]]
 
 

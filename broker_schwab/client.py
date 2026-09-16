@@ -59,8 +59,21 @@ def create_client():
         raise RuntimeError(f"{MODE_ENV}={mode!r} is not one of auto, execd, legacy")
 
     if mode != "legacy":
-        from broker_schwab.execd_client import EXECD_URL, ExecdClient, service_status
+        from broker_schwab.execd_client import (EXECD_URL, PATIENT_PROBE_TIMEOUT_S,
+                                                PROBE_TIMEOUT_S, ExecdClient,
+                                                service_status)
         status = service_status(EXECD_URL)
+        if status is None:
+            # The service serves one request at a time; on a slow link the
+            # quick probe queues behind a Schwab call and times out while the
+            # service is fine. Look once more with patience before deciding
+            # it is down — falling back on a false negative reaches for a
+            # token file that no longer lives in the repo [st-5fs4].
+            status = service_status(EXECD_URL, timeout_s=PATIENT_PROBE_TIMEOUT_S)
+            if status is not None:
+                log.warning("execd at %s answered only on the patient probe "
+                            "(quiet past %.1f s) — queued behind a slow upstream call",
+                            EXECD_URL, PROBE_TIMEOUT_S)
         if status is not None:
             log.info("market data via execd at %s (service %s)", EXECD_URL,
                      status.get("sha", "?"))
@@ -68,8 +81,10 @@ def create_client():
         if mode == "execd":
             raise RuntimeError(
                 f"{MODE_ENV}=execd but the execution service does not answer at "
-                f"{EXECD_URL}; is strader-execd.service running?")
-        log.info("execd not answering at %s; market data via the token file", EXECD_URL)
+                f"{EXECD_URL} within {PATIENT_PROBE_TIMEOUT_S:.0f} s; "
+                "is strader-execd.service running?")
+        log.warning("execd not answering at %s within %.0f s; market data via the token file",
+                    EXECD_URL, PATIENT_PROBE_TIMEOUT_S)
 
     return _legacy_client()
 
@@ -105,8 +120,10 @@ def _legacy_client():
 
     if not token_path.exists():
         raise RuntimeError(
-            f"Token not found at {token_path}. "
-            "Run scripts/refresh_schwab_token.py to authenticate first."
+            f"Token not found at {token_path}. If the market token has moved "
+            "into the execution service, this means execd did not answer "
+            "(check strader-execd.service); otherwise run "
+            "scripts/refresh_schwab_token.py to authenticate first."
         )
 
     return auth.client_from_token_file(str(token_path), api_key, app_secret)

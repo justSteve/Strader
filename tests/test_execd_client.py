@@ -153,6 +153,44 @@ class TestCreateClient:
         monkeypatch.setattr(factory, "_legacy_client", lambda: sentinel)
         assert factory.create_client() is sentinel
 
+    def test_a_slow_service_is_found_on_the_patient_probe(self, monkeypatch, fetch):
+        # 2026-09-16: the quick probe queued behind a Schwab call on a slow
+        # link, timed out, and the level tracker fell to a token file that had
+        # moved into the service — then paged Steve about a token that was
+        # fine. The second probe waits; a refused socket still returns at
+        # once, so a dead service costs nothing extra. [st-5fs4]
+        from broker_schwab import execd_client as ec
+        timeouts = []
+
+        def queued(url, timeout):
+            timeouts.append(timeout)
+            if timeout <= ec.PROBE_TIMEOUT_S:
+                raise TimeoutError("timed out")
+            return fetch(url, timeout)
+
+        monkeypatch.setattr("broker_schwab.execd_client._fetch", queued)
+        monkeypatch.delenv(factory.MODE_ENV, raising=False)
+        monkeypatch.setattr(factory, "_legacy_client",
+                            lambda: (_ for _ in ()).throw(AssertionError("legacy path")))
+        c = factory.create_client()
+        assert isinstance(c, ExecdClient)
+        assert timeouts == [ec.PROBE_TIMEOUT_S, ec.PATIENT_PROBE_TIMEOUT_S]
+        assert ec.PATIENT_PROBE_TIMEOUT_S > ec.PROBE_TIMEOUT_S
+
+    def test_a_dead_service_is_probed_twice_then_left(self, monkeypatch):
+        timeouts = []
+
+        def down(url, timeout):
+            timeouts.append(timeout)
+            raise OSError("refused")
+
+        monkeypatch.setattr("broker_schwab.execd_client._fetch", down)
+        monkeypatch.delenv(factory.MODE_ENV, raising=False)
+        sentinel = object()
+        monkeypatch.setattr(factory, "_legacy_client", lambda: sentinel)
+        assert factory.create_client() is sentinel
+        assert len(timeouts) == 2
+
     def test_execd_mode_refuses_to_fall_back(self, monkeypatch):
         def down(url, timeout):
             raise OSError("refused")
