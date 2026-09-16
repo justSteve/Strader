@@ -929,6 +929,23 @@ it cannot open anything; what it must not do is come back not knowing a position
 is live, because then the SPX-mark loop stops watching it and `flatten` misses
 it.
 
+**A close is booked once** (st-4b0p, 2026-09-16 10:19:29 CT). The service
+keeps every order id it has booked a close on (`_booked_exits`, written by
+`_book_close` and `_book_found_fill`, rebuilt here from the day's `closed`
+lines), and the fill sweep skips a fill on any of them. The window
+`fills_since` is asked for is bounded by the clock reading taken *before*
+the broker call, and a fill made inside that call (the paper book's sweep;
+a real broker's fill between the two reads) carries a later time, so the
+next window returns it again — that is how the flatten's own market fill
+came back as `unattributed_sell` four minutes later, and how the put's stop
+fill, paper-0032, was booked twice. The second booking was possible
+because `reconcile` had read `broker.positions()` *before* its fill sweep;
+the sweep crossed the stop a second later, the stale snapshot still held
+the contract, and `_reconcile_positions` adopted the position that had
+just been closed. `reconcile` now reads positions after the sweep. The two
+`closed` lines of 10:19 stand — the journal is append-only — and the day's
+paper tally carries one close and $30 more than happened.
+
 ### 5.13 The vault (stage 2's first piece, already landed)
 
 `execd/vault.py`. A single file holding a JSON payload encrypted with
@@ -1328,7 +1345,12 @@ filled at (`_stop_spx_for`, the inverse of `stops.premium_at_stop`), so the
 two stops stay one stop; the journal line `stop_adjusted` carries old and new
 for both, `target_adjusted` for the target. The page's poll leaves the
 position card alone while one of its inputs has focus, so a number half-typed
-is never wiped. The status JSON carries `target_price`, `target_order_id` and
+is never wiped — and since st-4b0p a typed, unsent number in a SET box is
+carried across every repaint whether or not the box still has focus
+(`keepTyped` / `restoreTyped` in the panel script, with focus and caret):
+on 2026-09-16 10:19 CT a target strike was typed, focus left the box, the
+3 s repaint put the resting price back, and the Enter that followed sent
+nothing — the journal holds no request for it. The status JSON carries `target_price`, `target_order_id` and
 the valuation row `at_target_usd` (the same arithmetic as `at_stop_usd`).
 
 **Attempts count losing fills only.** §5.8. Ten `max_attempts` are ten losing

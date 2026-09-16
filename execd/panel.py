@@ -550,6 +550,24 @@ PANEL_SCRIPT = """
   function editing(){ var a = document.activeElement;
     return !!(a && a.tagName === 'INPUT' && panel.contains(a) && a.value !== a.defaultValue); }
   function stageNow(){ var b = panel.querySelector('#panelbody .body'); return b ? (b.getAttribute('data-stage') || '') : ''; }
+  // A number typed into a SET box outlives the repaint. editing() holds the
+  // poll off only while the box has focus; the moment focus leaves (a tap
+  // elsewhere, eyes off the screen) the next repaint used to put the resting
+  // price back and an Enter after that sent nothing — 2026-09-16 10:19 CT, a
+  // target strike typed, Enter, "the dollar amount stayed in the input", no
+  // request in the journal (st-4b0p). Typed and unsent is kept, name by name.
+  function keepTyped(root){ var out = []; if (!root) return out;
+    var ins = root.querySelectorAll('form.adjust input[name]');
+    for (var i = 0; i < ins.length; i++) { var a = ins[i];
+      if (a.type === 'hidden' || a.value === a.defaultValue) continue;
+      out.push({name: a.name, value: a.value, focused: document.activeElement === a,
+                start: a.selectionStart, end: a.selectionEnd}); }
+    return out; }
+  function restoreTyped(root, kept){ if (!root || !kept || !kept.length) return;
+    for (var i = 0; i < kept.length; i++) { var k = kept[i];
+      var a = root.querySelector('form.adjust input[name="' + k.name + '"]'); if (!a) continue;
+      a.value = k.value;
+      if (k.focused) { try { a.focus(); if (k.start !== null) a.setSelectionRange(k.start, k.end); } catch (e) {} } } }
   function requestScoped(){ return stageNow() === 'refused'; }
   function apply(j){ var body = document.getElementById('panelbody');
     var changed = !!(j.panel_stage && stageNow() && j.panel_stage !== stageNow());
@@ -560,12 +578,12 @@ PANEL_SCRIPT = """
     var dismissed = !!(pn && j.panel_stage === 'closed' && pn.getAttribute('data-dismissed')
                        && pn.getAttribute('data-dismissed') === String(j.last_close_ts || ''));
     if (pn && j.panel_stage && j.panel_stage !== 'none' && !dismissed) pn.hidden = false;
-    if (body && j.panel_body_html && !dismissed && !inflight && (changed || !editing())) body.innerHTML = j.panel_body_html;
+    if (body && j.panel_body_html && !dismissed && !inflight && (changed || !editing())) { var kept = keepTyped(body); body.innerHTML = j.panel_body_html; restoreTyped(body, kept); }
     if (changed) { var m = document.querySelector('.msg'); if (m) m.parentNode.removeChild(m); }
     var w = document.getElementById('stageword'); if (w && j.panel_stage && !dismissed) { w.textContent = WORDS[j.panel_stage] || j.panel_stage; w.style.color = COLORS[j.panel_stage] || '#e5e7eb'; }
     var u = document.getElementById('updated'); if (u) { u.setAttribute('data-at', String(Date.now())); u.textContent = 'just now'; }
     var qd = document.getElementById('quote'); if (qd && j.quote_html) qd.innerHTML = j.quote_html;
-    var pc = document.getElementById('position'); if (pc && j.position_html !== undefined && !editing()) pc.innerHTML = j.position_html || '';
+    var pc = document.getElementById('position'); if (pc && j.position_html !== undefined && !editing()) { var keptp = keepTyped(pc); pc.innerHTML = j.position_html || ''; restoreTyped(pc, keptp); }
     var jn = document.getElementById('journal'); if (jn && j.journal_html) jn.innerHTML = j.journal_html;
     var bl = document.getElementById('balances'); if (bl && j.balances_html) bl.innerHTML = j.balances_html;
     if (window.__onQuote) { try { window.__onQuote(j); } catch (e) {} } }

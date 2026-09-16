@@ -318,3 +318,18 @@ class TestADismissedCloseStaysDismissedUnderThePoll:
         # a plain reload still shows the answer, unmarked
         plain = text(page.get("/exec/order"))
         assert "data-stage=closed" in plain and "data-dismissed=" not in plain.split("<script>")[0]
+
+
+class TestATypedNumberOutlivesTheRepaint:
+    """2026-09-16 10:19 CT (st-4b0p): a target strike typed into the SET box,
+    Enter, and "the dollar amount stayed in the input" — no adjust request
+    in the journal. Focus had left the box, so the 3 s repaint put the
+    resting price back before the Enter. Typed and unsent is now carried
+    across the repaint, name by name, with focus and caret."""
+
+    def test_the_script_keeps_typed_values_across_a_repaint(self, page, armed):
+        body = text(page.get("/exec/order"))
+        assert "function keepTyped(root)" in body and "function restoreTyped(root, kept)" in body
+        assert "a.value === a.defaultValue" in body
+        assert "var kept = keepTyped(body); body.innerHTML = j.panel_body_html; restoreTyped(body, kept);" in body
+        assert "var keptp = keepTyped(pc); pc.innerHTML = j.position_html || ''; restoreTyped(pc, keptp);" in body

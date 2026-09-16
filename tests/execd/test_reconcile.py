@@ -499,3 +499,86 @@ class TestASendWithNoAnswer:
         assert out["found"] == [{"intent_id": "noloc-1", "outcome": "identified", "order_id": real_id}]
         assert [w["order_id"] for w in armed.status()["working"]] == [real_id]
         assert armed.journal.events("working_identified")[0]["old_order_id"] == "unnamed:noloc-1"
+
+
+class TestACloseIsBookedOnce:
+    """2026-09-16 10:19:29 CT (st-4b0p): the put's stop filled inside the
+    fill sweep that reconcile runs, a second after reconcile had read the
+    broker's positions. The stale snapshot still held the contract, so the
+    position was adopted the moment it had been closed, and the next poll —
+    whose window still covered the fill — booked the same order id against
+    the adopted position. Three closes for two orders, the day's realized
+    debited twice. Four minutes earlier the flatten's own market fill had
+    come back through the sweep as ``unattributed_sell``. Same cause."""
+
+    @staticmethod
+    def stop_id(svc: ExecService) -> str:
+        return svc.status()["positions"][0]["stop_order_id"]
+
+    def test_a_stop_that_fills_inside_reconciles_own_sweep_is_not_adopted(
+            self, armed, broker, clock, monkeypatch):
+        armed.place(entry(intent_id="race-1", stop_spx=SPX_NOW - 2.0, delta=0.30))
+        sid = self.stop_id(armed)
+        clock.advance(seconds=5)
+        real_fills_since = broker.fills_since
+        crossed = {"done": False}
+
+        def fills_since(since):
+            # the paper book's sweep fills the stop while the fill window is
+            # being read — after orders() and any positions() read before it
+            if not crossed["done"]:
+                crossed["done"] = True
+                broker.fill_resting(sid)
+            return real_fills_since(since)
+
+        monkeypatch.setattr(broker, "fills_since", fills_since)
+        out = armed.reconcile()
+        assert out["adopted"] == []
+        assert armed.status()["positions"] == []
+        closed = armed.journal.events("closed")
+        assert len(closed) == 1 and closed[0]["order_id"] == sid and closed[0]["pnl_usd"] == -60.0
+        assert not armed.journal.events("position_adopted")
+        assert armed.day_state().realized_loss_usd == 60.0
+
+    def test_a_fill_the_broker_reports_twice_is_booked_once(self, armed, broker, clock):
+        armed.place(entry(intent_id="twice-1", stop_spx=SPX_NOW - 2.0, delta=0.30))
+        sid = self.stop_id(armed)
+        clock.advance(seconds=5)
+        broker.fill_resting(sid)
+        first = armed.poll_fills()
+        assert first["picked_up"][0]["order_id"] == sid
+        armed._last_fill_poll = clock() - __import__("datetime").timedelta(minutes=5)   # the window re-covers it
+        again = armed.poll_fills()
+        assert again["picked_up"] == []
+        assert len(armed.journal.events("closed")) == 1
+        assert not armed.journal.events("unattributed_sell")
+
+    def test_the_services_own_market_close_is_never_unattributed(self, armed, broker, clock):
+        armed.place(entry(intent_id="flat-1", stop_spx=SPX_NOW - 2.0, delta=0.30))
+        clock.advance(seconds=5)
+        armed.flatten()
+        exit_id = armed.journal.events("closed")[-1]["order_id"]
+        armed._last_fill_poll = clock() - __import__("datetime").timedelta(minutes=5)
+        armed.poll_fills()
+        armed.reconcile()
+        assert not armed.journal.events("unattributed_sell")
+        assert len(armed.journal.events("closed")) == 1
+        assert exit_id in armed._booked_exits
+
+    def test_a_restart_remembers_what_was_booked(self, broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        first = ExecService(broker, config, clock=clock)
+        first.unlock({"token": "x"})
+        first.place(entry(intent_id="rec-once", stop_spx=SPX_NOW - 2.0, delta=0.30))
+        sid = self.stop_id(first)
+        clock.advance(seconds=5)
+        broker.fill_resting(sid)
+        first.poll_fills()
+        assert len(first.journal.events("closed")) == 1
+
+        second = ExecService(broker, config, clock=clock)
+        second.unlock({"token": "x"})
+        second._last_fill_poll = clock() - __import__("datetime").timedelta(minutes=5)
+        second.poll_fills()
+        assert len(second.journal.events("closed")) == 1
+        assert not second.journal.events("unattributed_sell")

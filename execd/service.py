@@ -357,6 +357,14 @@ class ExecService:
         #: Shown on the page, never slotted, never flattened (finding 30,
         #: st-isx3: adopting them made FLATTEN sell the wings of his butterfly)
         self._foreign_positions: dict[str, Position] = {}
+        #: order ids this service has already booked a close on, so a fill the
+        #: broker reports twice — or reports after the close was booked from
+        #: the place answer — is never booked again. 2026-09-16 10:19:29 CT a
+        #: stop fill landed between reconcile's position read and its fill
+        #: sweep; the stale snapshot adopted the position and the next poll
+        #: booked the same fill against it: three closes for two orders.
+        #: Rebuilt from the day's ``closed`` lines at recovery.
+        self._booked_exits: set[str] = set()
         self._last_fill_poll = clock()
         self._recover()
 
@@ -858,6 +866,15 @@ class ExecService:
         for fill in fills:
             if fill.side is not Side.SELL_TO_CLOSE:
                 continue
+            if fill.order_id in self._booked_exits:
+                # Already booked — from the place answer (a market close, a
+                # target that filled as it landed) or an earlier sweep. A fill
+                # made inside the broker call carries a time after the `now`
+                # read above it, so the next window returns it again; the
+                # flatten fill paper-0030 came back as `unattributed_sell`
+                # four minutes later and stop fill paper-0032 was booked
+                # twice (2026-09-16). Silent: it is the same event.
+                continue
             pos = self._open.get(fill.symbol)
             if pos is None:
                 # A sell on a symbol this service is not holding. Until
@@ -935,7 +952,6 @@ class ExecService:
         with self._lock:
             try:
                 broker_orders = {o.order_id: o for o in self.broker.orders()}
-                broker_positions = {p.symbol: p for p in self.broker.positions()}
             except BrokerError as exc:
                 self.journal.record("error", kind="reconcile", detail=str(exc))
                 return {"promoted": [], "released": [], "adopted": [],
@@ -944,6 +960,18 @@ class ExecService:
             # Fills first. A stop that fired has to be booked against the day's
             # ceiling before the position sweep sees the position is gone.
             self._pick_up_fills()
+            # The positions are read AFTER the fill sweep: a stop that fills
+            # between a position read and the sweep leaves a snapshot that
+            # still holds the contract, and the sweep below would adopt a
+            # position this service just closed (2026-09-16 10:19:29 CT —
+            # the paper book's sweep inside fills_since crossed the stop a
+            # second after positions() had been read).
+            try:
+                broker_positions = {p.symbol: p for p in self.broker.positions()}
+            except BrokerError as exc:
+                self.journal.record("error", kind="reconcile", detail=str(exc))
+                return {"promoted": [], "released": [], "adopted": [],
+                        "corrected": [], "error": str(exc)}
             found = self._reconcile_orphans(broker_orders)
             promoted, released = self._reconcile_working(broker_orders)
             exits = self._reconcile_exits(broker_orders)
@@ -1718,6 +1746,7 @@ class ExecService:
         sell contracts Steve does not own. So a partial exit cancels both and
         rests new ones at the same prices for what is left. The mock never
         fills partially unless asked; a real broker does."""
+        self._booked_exits.add(order_id)
         stop_canceled, stop_fill = self._cancel_leg_quietly(pos, "stop")
         target_canceled, target_fill = self._cancel_leg_quietly(pos, "target")
 
@@ -1767,6 +1796,7 @@ class ExecService:
         px = order.fill_price if order.fill_price is not None else 0.0
         if qty > 0:
             pnl = self._pnl_usd(pos, px, qty)
+            self._booked_exits.add(order.order_id)
             self.journal.record("closed", symbol=pos.symbol, qty=qty,
                                 remaining_qty=held - qty, intent_id=pos.intent_id,
                                 kind=reason, entry_price=pos.entry_price,
@@ -2638,6 +2668,8 @@ class ExecService:
             elif e.get("event") == "closed":
                 symbol = str(e.get("symbol", ""))
                 remaining = e.get("remaining_qty")
+                if e.get("order_id"):
+                    self._booked_exits.add(str(e["order_id"]))
                 pos = self._open.get(symbol)
                 if remaining and pos is not None:
                     pos.qty = int(remaining)
