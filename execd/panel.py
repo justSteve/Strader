@@ -353,12 +353,20 @@ def body_filled(service, st, facts, actions, now) -> str:
         target_val = f"{p['target_price']:.2f}" if p.get("target_price") is not None else ""
         # each leg shows both forms — the resting price in the box, the SPX
         # level beside the money: "stop 10.30 · SPX 7585.03" (st-2j3m)
+        # Each note is the broker's answer, not the id alone: a leg the
+        # listing has not reported for LEG_SETTLE_S says so, and a leg with
+        # no order behind it is NO ... RESTING whatever price it was last at
+        # (audit findings 39 and 41, st-vqmr).
         stop_note = (f"<span class='money {money_class(v.get('at_stop_usd'))}'>{money(v.get('at_stop_usd'))}</span>"
-                     if p.get("stop_price") is not None else "<span class='money neg'>NO STOP RESTING</span>")
+                     if p.get("stop_state") else "<span class='money neg'>NO STOP RESTING</span>")
+        if p.get("stop_state") == "unaccounted":
+            stop_note += "<span class='money neg'>NOT IN THE BROKER'S LISTING</span>"
         if p.get("stop_spx") is not None:
             stop_note += f"<span class=level>SPX {float(p['stop_spx']):.2f}</span>"
         target_note = (f"<span class='money {money_class(v.get('at_target_usd'))}'>{money(v.get('at_target_usd'))}</span>"
-                       if p.get("target_price") is not None else "<span class='money amber'>NO TARGET RESTING</span>")
+                       if p.get("target_state") else "<span class='money amber'>NO TARGET RESTING</span>")
+        if p.get("target_state") == "unaccounted":
+            target_note += "<span class='money amber'>NOT IN THE BROKER'S LISTING</span>"
         if p.get("target_spx") is not None:
             target_note += f"<span class=level>SPX {float(p['target_spx']):.2f}</span>"
         # One leg at a time (Steve, 2026-09-15: "It'll be one or the other.

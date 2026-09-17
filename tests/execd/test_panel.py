@@ -133,6 +133,26 @@ class TestTheCard:
         # no footer, no explanatory line under the controls
         assert "tailnet only" not in card
 
+    def test_the_stop_note_is_the_brokers_answer_not_the_id(self, page, holding, broker, clock):
+        """Findings 39 and 41 (st-vqmr): the card keyed NO STOP RESTING on the
+        price, so a stop the broker had cancelled still showed its money."""
+        from execd.service import LEG_SETTLE_S
+        p = pos_of(holding)
+        sid = p["stop_order_id"]
+        saved = broker._orders.pop(sid)
+        holding.reconcile()                            # first seen missing
+        clock.advance(seconds=LEG_SETTLE_S + 1)
+        holding.reconcile()                            # still missing past the window
+        card = panel_of(text(page.get("/exec/order")))
+        assert "NOT IN THE BROKER'S LISTING" in card and "NO STOP RESTING" not in card
+        broker._orders[sid] = saved
+        holding.reconcile()
+        card = panel_of(text(page.get("/exec/order")))
+        assert "NOT IN THE BROKER'S LISTING" not in card
+        holding._open[CALL].stop_order_id = None      # no order behind the price
+        card = panel_of(text(page.get("/exec/order")))
+        assert "NO STOP RESTING" in card
+
     def test_exiting_shows_the_send_time_and_flatten_again(self, page, holding, broker, clock):
         broker.rest_market = True
         holding.observe(TRIGGER)

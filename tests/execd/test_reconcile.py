@@ -582,3 +582,136 @@ class TestACloseIsBookedOnce:
         second.poll_fills()
         assert len(second.journal.events("closed")) == 1
         assert not second.journal.events("unattributed_sell")
+
+
+class TestTheLegsAreReconciled:
+    """Audit finding 39 (st-vqmr): the leg ids were believed, never reconciled.
+    A stop the broker cancelled, expired, rejected after acceptance, or Steve
+    cancelled by hand in the Schwab app was reported resting until the next
+    cancel, and a restart restored the id from the journal unchecked."""
+
+    @staticmethod
+    def pos(svc):
+        return svc.status()["positions"][0]
+
+    @staticmethod
+    def kill(broker, order_id, status="CANCELED", word=None):
+        from dataclasses import replace
+        from execd.broker import OrderStatus
+        broker._orders[order_id] = replace(broker._orders[order_id],
+                                           status=OrderStatus[status], message=word or status)
+
+    def test_a_stop_cancelled_by_hand_is_re_rested_loud(self, armed, broker):
+        armed.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        p = self.pos(armed)
+        sid = p["stop_order_id"]
+        self.kill(broker, sid)                       # by hand in the Schwab app
+        out = armed.reconcile()
+        assert out["legs"][0]["outcome"] == "canceled" and out["legs"][0]["rerested"]
+        p2 = self.pos(armed)
+        assert p2["stop_order_id"] and p2["stop_order_id"] != sid
+        assert broker._orders[p2["stop_order_id"]].is_working
+        assert p2["stop_price"] == p["stop_price"] and p2["stop_state"] == "resting"
+        lost = armed.journal.events("leg_lost")[0]
+        assert lost["order_id"] == sid and lost["kind"] == "protective-stop"
+        assert lost["outcome"] == "canceled" and "re-resting" in lost["detail"]
+        assert armed.journal.events("stop_placed")[-1]["kind"] == "re-rested"
+
+    def test_an_expired_target_is_re_rested(self, armed, broker):
+        armed.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        p = self.pos(armed)
+        tid = p["target_order_id"]
+        self.kill(broker, tid, word="EXPIRED")       # the transport maps EXPIRED to CANCELED
+        armed.reconcile()
+        p2 = self.pos(armed)
+        assert p2["target_order_id"] and p2["target_order_id"] != tid
+        assert p2["target_price"] == p["target_price"] and p2["target_state"] == "resting"
+        lost = armed.journal.events("leg_lost")[0]
+        assert lost["kind"] == "take-profit" and lost["broker_status"] == "EXPIRED"
+        assert armed.journal.events("target_placed")[-1]["kind"] == "re-rested"
+
+    def test_a_leg_the_broker_kills_twice_is_left_off_loud(self, armed, broker, clock):
+        armed.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        self.kill(broker, self.pos(armed)["stop_order_id"])
+        armed.reconcile()
+        clock.advance(seconds=5)
+        self.kill(broker, self.pos(armed)["stop_order_id"])
+        armed.reconcile()
+        p = self.pos(armed)
+        assert p["stop_order_id"] is None and p["stop_state"] is None
+        assert len(armed.journal.events("stop_placed")) == 2          # no third
+        line = armed.journal.events("stop_unprotected")[-1]
+        assert "again" in line["detail"] and "SPX-mark loop" in line["detail"]
+        assert len(armed.status()["positions"]) == 1                  # still held, still watched
+
+    def test_a_leg_found_filled_by_the_sweep_is_booked_as_the_close(self, armed, broker):
+        """The fill sweep's window can miss a fill; the listing cannot."""
+        from execd.broker import OrderStatus
+        armed.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        p = self.pos(armed)
+        sid, tid = p["stop_order_id"], p["target_order_id"]
+        broker.fill_resting(sid)
+        broker._fills.clear()                          # the sweep's window will not see it
+        out = armed.reconcile()
+        assert out["legs"][0]["outcome"] == "filled"
+        assert armed.status()["positions"] == []
+        closed = armed.journal.events("closed")[-1]
+        assert closed["order_id"] == sid and closed["kind"] == "protective-stop"
+        assert closed["exit_price"] == broker._orders[sid].fill_price
+        assert broker._orders[tid].status is OrderStatus.CANCELED   # the other leg came off
+
+    def test_a_leg_missing_from_the_listing_is_kept_and_said_after_the_window(
+            self, armed, broker, clock):
+        from execd.service import LEG_SETTLE_S
+        armed.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        p = self.pos(armed)
+        sid = p["stop_order_id"]
+        saved = broker._orders.pop(sid)                # the listing lags, or the leg is gone
+        assert armed.reconcile()["legs"] == []
+        assert self.pos(armed)["stop_state"] == "resting"
+        assert not armed.journal.events("leg_unaccounted")
+        clock.advance(seconds=LEG_SETTLE_S + 1)
+        out = armed.reconcile()
+        assert out["legs"] == [{"symbol": CALL, "leg": "protective-stop",
+                                "order_id": sid, "outcome": "unaccounted"}]
+        p2 = self.pos(armed)
+        assert p2["stop_order_id"] == sid and p2["stop_state"] == "unaccounted"
+        assert len(armed.journal.events("stop_placed")) == 1          # not re-rested
+        armed.reconcile()
+        assert len(armed.journal.events("leg_unaccounted")) == 1      # said once
+        assert "UPDATE the stop" in armed.journal.events("leg_unaccounted")[0]["detail"]
+        broker._orders[sid] = saved                    # back in the listing
+        armed.reconcile()
+        assert self.pos(armed)["stop_state"] == "resting"
+        assert armed.journal.events("leg_listed")[0]["order_id"] == sid
+
+    def test_a_terminal_leg_is_not_re_rested_while_a_close_is_in_flight(self, armed, broker):
+        armed.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        pos = armed._open[CALL]
+        broker.rest_market = True
+        close = broker.place(exit_intent())            # a market sell working at the broker
+        pos.exit_order_id, pos.exit_reason = close.order_id, "spx-stop"
+        self.kill(broker, pos.stop_order_id)
+        out = armed.reconcile()
+        row = [r for r in out["legs"] if r["leg"] == "protective-stop"][0]
+        assert row["outcome"] == "canceled" and row["rerested"] is None
+        assert pos.stop_order_id is None
+        assert len(armed.journal.events("stop_placed")) == 1
+        assert "close is in flight" in armed.journal.events("leg_lost")[0]["detail"]
+
+    def test_a_restart_checks_the_leg_ids_it_recovered(self, broker, clock, tmp_path):
+        """_recover restored stop_order_id from the last stop_placed line with
+        no check (04 §5, second bullet). The reconcile the unlock runs now
+        looks it up."""
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        first = ExecService(broker, config, clock=clock)
+        first.unlock({"token": "x"})
+        first.place(entry(intent_id="rec-leg", stop_spx=SPX_NOW - 2.0, delta=0.30))
+        sid = self.pos(first)["stop_order_id"]
+        self.kill(broker, sid)                         # cancelled by hand while the box was down
+        second = ExecService(broker, config, clock=clock)   # recovers the id, then reconciles
+        second.unlock({"token": "x"})
+        p = self.pos(second)
+        assert p["stop_order_id"] and p["stop_order_id"] != sid
+        assert broker._orders[p["stop_order_id"]].is_working
+        assert second.journal.events("leg_lost")[0]["order_id"] == sid

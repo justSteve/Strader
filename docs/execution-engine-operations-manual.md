@@ -1549,6 +1549,41 @@ race, the level cleared by a dollar target, the level-only move, every
 the page's '.' rule with its answers. `tests/execd/test_stops.py` holds the
 signed walk's arithmetic and rounding.
 
+**The legs are reconciled, not believed** (st-vqmr, audit finding 39 with
+41's note; 04 §5 second bullet). Until 2026-09-17 `reconcile()` settled
+working entries, the in-flight close and the positions — never
+`stop_order_id` / `target_order_id`. A leg the broker had cancelled, expired
+(Schwab's `EXPIRED` arrives as `CANCELED`), rejected after acceptance, or
+that Steve cancelled by hand in the Schwab app was reported resting until
+the next cancel, and `_recover()` restored the id from the last
+`stop_placed` line unchecked. Now every pass of `reconcile` (the watcher's
+every 5 s while exposed, and the reconcile that opens every `place`) looks
+both ids up in the listing:
+
+- **working** — nothing; a leg that had been unlisted is `leg_listed`.
+- **filled** — the fill sweep usually books it first; this is the backstop
+  for a fill its window missed, booked through the same close path (the
+  other leg comes off, `closed` kind `protective-stop` / `target`).
+- **canceled / rejected** — `leg_lost` (the broker's own word in
+  `broker_status`), and the leg is re-rested at its standing price, `kind:
+  re-rested` on its `stop_placed` / `target_placed` line. Not while a close
+  is in flight (a stop beside a working market sell is a double sell). Not a
+  third time: a leg re-rested inside `LEG_REREST_COOLDOWN_S` (300 s) and
+  killed again stays off, `stop_unprotected` / `target_unprotected` say so,
+  and the SPX-mark loop is the exit.
+- **absent from the listing** — kept. After `LEG_SETTLE_S` (90 s, the same
+  grace a fresh position gets) it is `leg_unaccounted`, once, and the
+  position's `stop_state` / `target_state` reads `unaccounted` instead of
+  `resting`. It is **not** re-rested: a second stop beside one the listing
+  merely lags is a short waiting for a print. If it is really gone, UPDATE
+  the leg (which rests it again) or FLATTEN.
+
+The card reads the state, not the id: the money at the stop is shown only
+while `stop_state` is set, with NOT IN THE BROKER'S LISTING beside it when
+it is `unaccounted`; a position whose stop has no order behind it says NO
+STOP RESTING whatever price it was last at (finding 41 — it used to key on
+the price). Same for the target.
+
 ### 5.21 The status panel — one card, six stages (st-4ezg; seven until st-igw0)
 
 Steve, 2026-09-14, reviewing `/exec/order`: *"the complete status of the

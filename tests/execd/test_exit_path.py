@@ -164,7 +164,10 @@ class TestTheStopComesOffFirst:
         assert methods.index("cancel") < len(methods) - 1 - methods[::-1].index("place")
 
     def test_a_manual_exit_finding_the_stop_already_filled_sends_nothing(
-            self, holding, broker):
+            self, holding, broker, monkeypatch):
+        # the reconcile that opens every place would find this fill in the
+        # listing first (st-vqmr); stubbed so the race is the cancel's to find
+        monkeypatch.setattr(holding, "reconcile", lambda: {})
         stop_id = holding.status()["positions"][0]["stop_order_id"]
         broker.fill_resting(stop_id)
         out = holding.place(exit_intent(intent_id="manual-late"))

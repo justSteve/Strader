@@ -182,6 +182,17 @@ POSITION_SETTLE_S = 90.0
 MARK_BAND_PCT = 1.0
 MARK_BAND_WINDOW_S = 300.0
 
+#: How long a resting leg may be missing from the broker's listing before it
+#: is journaled as unaccounted for (the listing lags a fresh rest the same
+#: way it lags a fresh fill — POSITION_SETTLE_S is the same grace). The id is
+#: kept and the leg is NOT re-rested: a second stop beside one that is merely
+#: unlisted is a short waiting for a print (audit finding 39, st-vqmr).
+LEG_SETTLE_S = POSITION_SETTLE_S
+#: A leg the broker reports CANCELED or REJECTED — not this service's cancel —
+#: is re-rested once; cancelled again inside this window it is left off, loud,
+#: rather than rested a third time against a broker that keeps killing it.
+LEG_REREST_COOLDOWN_S = 300.0
+
 #: How long a send whose answer never came back is held as unconfirmed before
 #: reconcile, having swept the broker's listing and found nothing matching,
 #: releases the intent. Until then no entry goes out at all: the broker may be
@@ -270,6 +281,16 @@ class OpenPosition:
     opened_at: datetime | None = None
     #: first time the broker failed to report this position, or ``None``
     missing_since: datetime | None = None
+    #: the bracket's legs against the broker's listing (st-vqmr): first time
+    #: each resting leg was missing from it, whether it has been missing past
+    #: ``LEG_SETTLE_S`` (the card says so), and when this service last
+    #: re-rested it after the broker reported it terminal
+    stop_unlisted_since: datetime | None = None
+    target_unlisted_since: datetime | None = None
+    stop_unaccounted: bool = False
+    target_unaccounted: bool = False
+    stop_rerested_at: datetime | None = None
+    target_rerested_at: datetime | None = None
     #: the close this service has sent and not yet seen resolve. While this is
     #: set the SPX-mark loop does not fire again — re-sending a market close
     #: every tick until one fills was finding 2 of the 2026-08-30 audit, an
@@ -297,6 +318,16 @@ class OpenPosition:
     def exit_in_flight(self) -> bool:
         return bool(self.exit_order_id)
 
+    def leg_state(self, leg: str) -> str | None:
+        """What the card may say about a leg: ``resting`` (an id this service
+        holds and the broker's listing has not contradicted), ``unaccounted``
+        (an id the listing has not reported for ``LEG_SETTLE_S``), ``None``
+        (no leg — nothing resting). The word comes from the listing, not from
+        the id alone (audit finding 41, st-vqmr)."""
+        if not getattr(self, f"{leg}_order_id"):
+            return None
+        return "unaccounted" if getattr(self, f"{leg}_unaccounted") else "resting"
+
     def mark_water(self, net: float | None, now: datetime) -> None:
         if net is None:
             return
@@ -317,7 +348,9 @@ class OpenPosition:
             "intent_id": self.intent_id, "right": self.right,
             "stop_spx": self.stop_spx, "delta": self.delta,
             "stop_order_id": self.stop_order_id, "stop_price": self.stop_price,
+            "stop_state": self.leg_state("stop"),
             "target_order_id": self.target_order_id, "target_price": self.target_price,
+            "target_state": self.leg_state("target"),
             "target_spx": self.target_spx,
             "entry_spx": self.entry_spx,
             "entry_order_id": self.entry_order_id,
@@ -1039,10 +1072,11 @@ class ExecService:
             found = self._reconcile_orphans(broker_orders)
             promoted, released = self._reconcile_working(broker_orders)
             exits = self._reconcile_exits(broker_orders)
+            legs = self._reconcile_legs(broker_orders)
             loose = self._reconcile_loose_legs(broker_orders)
             adopted, corrected, gone = self._reconcile_positions(broker_positions)
             return {"promoted": promoted, "released": released, "exits": exits,
-                    "loose": loose, "found": found,
+                    "legs": legs, "loose": loose, "found": found,
                     "adopted": adopted, "corrected": corrected, "gone": gone,
                     "error": None}
 
@@ -1251,6 +1285,125 @@ class ExecService:
             resolved.append({"symbol": pos.symbol, "order_id": order_id,
                              "outcome": outcome, "closed": False})
         return resolved
+
+    def _reconcile_legs(self, broker_orders: dict[str, OrderResult]) -> list[dict[str, Any]]:
+        """Each tracked position's resting legs against the broker's listing.
+
+        Until 2026-09-17 the leg ids were believed, never reconciled: the
+        service learned a leg's true state only when it cancelled it or when
+        the fill sweep happened to catch its execution, so a stop the broker
+        had cancelled, expired, rejected after acceptance, or Steve had
+        cancelled by hand in the Schwab app was reported resting until the
+        next cancel — and ``_recover`` restored the id from the journal with
+        no check (audit finding 39, 04 §5 second bullet, st-vqmr). The same
+        loop ``_reconcile_working`` is:
+
+        - **working** — nothing to do; a leg that had been unlisted is
+          listed again.
+        - **filled** — the fill sweep usually books it first; this is the
+          backstop for a fill its window missed, booked through ``_settle``
+          like a found close.
+        - **canceled / rejected** — not this service's cancel (that clears
+          the id as it goes). Journaled ``leg_lost``, loud; the leg is
+          re-rested at its standing price unless a close is in flight, or it
+          was re-rested inside ``LEG_REREST_COOLDOWN_S`` and the broker has
+          killed it again — then it stays off, ``stop_unprotected`` /
+          ``target_unprotected`` say so, and the SPX-mark loop is the exit.
+        - **absent** — kept, and after ``LEG_SETTLE_S`` journaled
+          ``leg_unaccounted`` once; the card reads ``stop_state`` /
+          ``target_state`` and says the listing does not show it. Not
+          re-rested: a second stop beside one the listing merely lags is
+          a short waiting for a print."""
+        out: list[dict[str, Any]] = []
+        now = self.clock()
+        for pos in list(self._open.values()):
+            for leg in ("stop", "target"):
+                id_attr = self._LEG_ATTR[leg]
+                order_id = getattr(pos, id_attr)
+                if not order_id:
+                    continue
+                kind = self._LEG_KIND[leg]
+                word = {"stop": "protective stop", "target": "take-profit"}[leg]
+                unlisted_attr, unacc_attr = f"{leg}_unlisted_since", f"{leg}_unaccounted"
+                order = broker_orders.get(order_id)
+                if order is None:
+                    since = getattr(pos, unlisted_attr)
+                    if since is None:
+                        setattr(pos, unlisted_attr, now)
+                        continue
+                    if getattr(pos, unacc_attr) or (now - since).total_seconds() < LEG_SETTLE_S:
+                        continue
+                    setattr(pos, unacc_attr, True)
+                    self.journal.record(
+                        "leg_unaccounted", kind=kind, symbol=pos.symbol, order_id=order_id,
+                        intent_id=pos.intent_id, unlisted_since=since.isoformat(),
+                        detail=f"the broker's listing has not reported the resting {word} "
+                               f"{order_id} for {(now - since).total_seconds():.0f} s — the id is "
+                               f"kept and the leg is not re-rested (a second {word} beside one "
+                               f"the listing merely lags is a short); the card says so. "
+                               f"If it is gone, UPDATE the {leg} to rest it again, or FLATTEN")
+                    out.append({"symbol": pos.symbol, "leg": kind, "order_id": order_id,
+                                "outcome": "unaccounted"})
+                    continue
+                if getattr(pos, unlisted_attr) is not None:
+                    if getattr(pos, unacc_attr):
+                        self.journal.record("leg_listed", kind=kind, symbol=pos.symbol,
+                                            order_id=order_id, status=order.status.value,
+                                            detail=f"the {word} is back in the broker's listing")
+                    setattr(pos, unlisted_attr, None)
+                    setattr(pos, unacc_attr, False)
+                if order.is_working:
+                    continue
+                if order.is_filled:
+                    setattr(pos, id_attr, None)
+                    # the closed line's vocabulary: protective-stop / target
+                    close_kind = "protective-stop" if leg == "stop" else "target"
+                    out.append({"symbol": pos.symbol, "leg": kind, "order_id": order_id,
+                                "outcome": "filled",
+                                **self._settle(pos, order, reason=close_kind)})
+                    break            # the position is closed or resized; its other leg went with it
+                outcome = order.status.value.lower()
+                setattr(pos, id_attr, None)
+                in_flight = pos.exit_in_flight
+                rerested_at = getattr(pos, f"{leg}_rerested_at")
+                again = (rerested_at is not None
+                         and (now - rerested_at).total_seconds() < LEG_REREST_COOLDOWN_S)
+                self.journal.record(
+                    "leg_lost", kind=kind, symbol=pos.symbol, order_id=order_id,
+                    intent_id=pos.intent_id, outcome=outcome, broker_status=order.message,
+                    detail=f"the broker reports the resting {word} {order_id} "
+                           f"{order.status.value} and this service did not cancel it — "
+                           f"cancelled by hand, expired, or rejected after acceptance; "
+                           + ("a close is in flight, so it is not re-rested"
+                              if in_flight else
+                              f"it was re-rested {(now - rerested_at).total_seconds():.0f} s ago "
+                              f"and killed again — not resting a third"
+                              if again else "re-resting it at its standing price"))
+                row = {"symbol": pos.symbol, "leg": kind, "order_id": order_id,
+                       "outcome": outcome, "rerested": None}
+                if in_flight:
+                    out.append(row)
+                    continue
+                if again:
+                    self.journal.record(
+                        f"{leg}_unprotected", symbol=pos.symbol, intent_id=pos.intent_id,
+                        qty=pos.qty, **{f"{leg}_price": getattr(pos, f"{leg}_price")},
+                        detail=f"the re-rested {word} was {order.status.value} again within "
+                               f"{LEG_REREST_COOLDOWN_S:.0f} s — left off; "
+                               + ("the SPX-mark loop is the exit while the box is alive"
+                                  if leg == "stop" else "the stop still stands"))
+                    out.append(row)
+                    continue
+                setattr(pos, f"{leg}_rerested_at", now)
+                if leg == "stop":
+                    rested = self._rest_stop_at(pos, pos.stop_price, kind="re-rested")
+                else:
+                    rested = self._rest_target_at(pos, pos.target_price, kind="re-rested")
+                row["rerested"] = getattr(pos, id_attr) if rested is not None else None
+                out.append(row)
+                if pos.symbol not in self._open:
+                    break            # the re-rested leg filled as it landed
+        return out
 
     def _resolve_working(self, order_id: str, outcome: str, detail: str = "") -> None:
         work = self._working.pop(order_id, None)

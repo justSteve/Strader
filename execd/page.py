@@ -1032,7 +1032,10 @@ def _render_position(p: dict[str, Any], adjust_action: str | None = None) -> str
     rows.append(("NET IF CLOSED NOW", _money(v.get("net_if_closed_usd"))))
     if p.get("stop_price") is not None:
         rows.append(("at the stop", f"stop {p['stop_price']:.2f} → net {_money(v.get('at_stop_usd'))}"
-                     + (f" (order {p['stop_order_id']})" if p.get("stop_order_id") else " (NO STOP RESTING)")))
+                     + (f" (order {p['stop_order_id']} — NOT IN THE BROKER'S LISTING)"
+                        if p.get("stop_state") == "unaccounted" else
+                        f" (order {p['stop_order_id']})" if p.get("stop_state") else
+                        " (NO STOP RESTING)")))
     else:
         rows.append(("at the stop", "NO STOP — the position is unprotected"))
     if p.get("target_price") is not None:

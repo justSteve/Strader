@@ -371,12 +371,30 @@ class TestTheCloseTakesBothLegsOff:
         assert broker._orders[p["stop_order_id"]].status is OrderStatus.CANCELED
         assert broker._orders[p["target_order_id"]].status is OrderStatus.CANCELED
 
-    def test_a_manual_exit_finding_the_target_filled_sends_nothing(self, holding, broker):
+    def test_a_manual_exit_finding_the_target_filled_sends_nothing(self, holding, broker, monkeypatch):
+        """The fill lands between the reconcile that opens every place and
+        the cancel: the cancel finds it. (The reconcile is stubbed here so
+        the race is the cancel's to find — the reconcile's own path is the
+        next test.)"""
+        monkeypatch.setattr(holding, "reconcile", lambda: {})
         broker.fill_resting(pos_of(holding)["target_order_id"])
         out = holding.place(exit_intent(intent_id="br-late"))
         assert out["order"] is None
         assert out["closed"]["reason"] == "target"
         assert "take-profit had already filled" in out["note"]
+        assert sells(broker) == []
+
+    def test_a_manual_exit_after_the_target_filled_finds_it_already_booked(self, holding, broker):
+        """The reconcile that opens every place reads the listing, finds the
+        take-profit FILLED and books the close (st-vqmr); the exit then has
+        nothing to close and is refused rather than sent."""
+        broker.fill_resting(pos_of(holding)["target_order_id"])
+        out = holding.place(exit_intent(intent_id="br-late"))
+        assert out["order"] is None
+        assert out["refused"]["bound"] == "qty" and "position of 0" in out["refused"]["reason"]
+        closed = holding.journal.events("closed")[-1]
+        assert closed["kind"] == "target" and closed["qty"] == 1
+        assert holding.status()["positions"] == []
         assert sells(broker) == []
 
     def test_flatten_takes_both_legs_off(self, holding, broker):

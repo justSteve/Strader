@@ -190,7 +190,11 @@ zero, not more than 1 % from the last mark accepted inside five minutes
 (`mark_refused` / `mark_accepted` in the journal, st-xv5e). A broker that refuses the
 resting stop is journaled as `stop_unprotected` — loud, because the position is
 live; a target that cannot be derived or rested is `target_unprotected` — a
-warning, because the stop still stands. When an exit fills only partly, both
+warning, because the stop still stands. Every reconcile looks both leg ids up in
+the broker's listing (st-vqmr): a leg the broker cancelled or expired is `leg_lost`
+and re-rested once, a leg found filled is booked as the close, a leg the listing
+has not shown for 90 s is `leg_unaccounted` and the card says so — kept, not
+re-rested. When an exit fills only partly, both
 resting legs — sized for the whole position — are cancelled and re-rested at
 the smaller size, because a leg larger than the position would sell contracts
 Steve no longer owns. Both legs are edited from the page, never pulled apart:
