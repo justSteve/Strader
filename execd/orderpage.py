@@ -56,7 +56,7 @@ _ORDER_STYLE = """
  .row{display:flex;align-items:center;gap:.6em;flex-wrap:wrap}
  .row .grow{flex-grow:1}
  .exp2 a.chip{color:#9ca3af;background:transparent;border:1px solid #374151}.exp2 a.chip.on{background:#1f2937;color:#fff;border-color:#1f2937}
- .dl{display:flex;align-items:center;gap:.4em}.dl input{width:5em;height:44px;box-sizing:border-box;font-size:1.15em;text-align:center;
+ .dl{display:flex;align-items:center;gap:.4em}.dl.stopl input{width:6.2em}.dl input{width:5em;height:44px;box-sizing:border-box;font-size:1.15em;text-align:center;
        padding:0 .5em;border-radius:8px;border:1px solid #374151;background:#0b1020;color:#e5e7eb}
  .side a{outline:0}.side a.on{outline:3px solid #e5e7eb}.side a.bear.off{background:#7f1d1d;color:#fca5a5}.side a.bull.off{background:#064e3b;color:#6ee7b7}
  .trow{display:flex;align-items:baseline;justify-content:space-between;gap:.75em;margin:.25em 0}
@@ -91,12 +91,26 @@ _SCRIPT = """
       var s = document.getElementById('strikes'); if (s && j.strikes_html) s.innerHTML = j.strikes_html;
       var p = document.getElementById('sendfields'); if (p && j.send_fields_html) p.innerHTML = j.send_fields_html;
       if (j.contract) window.__sym = j.contract.symbol;
+      if (window.__followStop) window.__followStop(j);
     }).catch(function(){}); }
   // a new delta is a new contract: the lock goes with the old one
   function unlockThenReprice(){ var lf = lockField(); if (lf) lf.value = ''; reprice(); }
   if (form) { ['delta','budget','attempts','lots'].forEach(function(n){ var el = form.elements[n];
     var fn = (n === 'delta') ? unlockThenReprice : reprice;
     if (el) { el.addEventListener('change', fn); el.addEventListener('input', function(){ clearTimeout(window.__t); window.__t = setTimeout(fn, 600); }); } }); }
+  // the stop box (st-m3bl): the visible box follows FD0's derived stop
+  // until he types in it; from then on the hidden `stop` on this form
+  // carries his text — dollars with a '.', an SPX level without — and the
+  // ticket is repriced from it. Cleared, it goes back to following.
+  var stopBox = document.getElementById('stopbox');
+  function stopField(){ return form ? form.elements['stop'] : null; }
+  function stopTouched(){ var sf = stopField(); return !!(sf && sf.value); }
+  if (stopBox) { stopBox.addEventListener('input', function(){ var sf = stopField(); if (!sf) return;
+      sf.value = stopBox.value.trim(); clearTimeout(window.__t); window.__t = setTimeout(reprice, 600); });
+    stopBox.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); clearTimeout(window.__t); reprice(); stopBox.blur(); } }); }
+  window.__followStop = function(j){ if (!stopBox || stopTouched() || !j || j.stop_price == null) return;
+    if (document.activeElement === stopBox) return;
+    var v = Number(j.stop_price).toFixed(2); stopBox.value = v; stopBox.setAttribute('data-derived', v); };
   // the padlock (st-2s4u): the lock is the hidden limit on the form, the
   // server renders the ticket from it, so a tap only flips the field and
   // reprices. The chip is inside #fd0 and is re-rendered, hence delegation.
@@ -294,8 +308,17 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
                     f"<span class=neg>{money(priced.net_at_stop_usd)}</span>")
     else:
         stop_txt = f"<span class=neg>no resting stop — {esc(priced.stop_note or 'none')}</span>"
+    # a stop of his own is marked as his, and by which form (st-m3bl)
+    own = ""
+    if priced.stop_set_by == "price":
+        own = " <span class=k id=ownstop>· your price</span>"
+    elif priced.stop_set_by == "spx":
+        own = " <span class=k id=ownstop>· your level</span>"
     line2 = (f"<div class=trow><span>cut if SPX {sign} <b>{t.stop_trigger_spx:.2f}</b> "
-             f"<span class=k>({d.stop_distance_spx:.2f} {side})</span></span><span>{stop_txt}</span></div>")
+             f"<span class=k>({d.stop_distance_spx:.2f} {side})</span>{own}</span><span>{stop_txt}</span></div>")
+    for w in t.warnings:
+        if w.startswith("YOUR STOP RISKS"):
+            line2 += f"<div class=warn>{esc(w)}</div>"
     target_txt = ""
     try:
         multiple = float(getattr(bounds, "take_profit_multiple", 0) or 0)
@@ -349,7 +372,7 @@ def strikes_html(priced: Priced, order_path: str) -> str:
     for c in priced.contracts:
         chosen = priced.contract is not None and c.symbol == priced.contract.symbol
         # a new strike is a new price: the lock does not travel with it
-        href = _link(order_path, sel.as_query(strike=f"{c.strike:g}", delta=None, limit=None))
+        href = _link(order_path, sel.as_query(strike=f"{c.strike:g}", delta=None, limit=None, stop=None))
         rows.append(
             f"<tr class='{'chosen' if chosen else ''}'>"
             f"<td><a href='{href}'>{c.strike:g}</a></td>"
@@ -508,7 +531,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     tomorrow = next_weekday(today)
     def side_link(side: str, word: str, cls: str) -> str:
         on = " on" if sel.side == side else (" off" if sel.side else "")
-        return (f"<a class='big {cls}{on}' href='{_link(order, sel.as_query(side=side, strike=None, limit=None))}'>"
+        return (f"<a class='big {cls}{on}' href='{_link(order, sel.as_query(side=side, strike=None, limit=None, stop=None))}'>"
                 f"{word}</a>")
     parts.append("<div class=side>" + side_link("call", "BULLISH", "bull")
                  + side_link("put", "BEARISH", "bear") + "</div>")
@@ -540,17 +563,28 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
         strike_field = (f"<input type=hidden name=strike value='{sel.strike:g}'>"
                         if sel.strike is not None else "")
         limit_val = f"{sel.limit:.2f}" if sel.limit is not None else ""
+        # the stop box (st-m3bl): pre-filled with FD0's derived dollar stop
+        # and following it until touched; touched, the hidden `stop` carries
+        # the text as typed and the rule is applied when the ticket is priced
+        # — a '.' is dollars, none is an SPX level. The visible box has no
+        # name of its own, so an untouched box never overrides anything.
+        derived = f"{priced.stop_price:.2f}" if priced.stop_price is not None else ""
+        stop_val = sel.stop if sel.stop else derived
         parts.append(
             f"<form id=sel method=get action='{order}'>"
             f"<input type=hidden name=side value='{sel.side}'>"
             f"<input type=hidden name=expiry value='{exp.isoformat()}'>"
             f"{strike_field}"
             f"<input type=hidden name=limit value='{limit_val}'>"
+            f"<input type=hidden name=stop value='{esc(sel.stop or '')}'>"
             "<div class='row exp2'>"
-            f"<a class='chip {'on' if exp == today else ''}' href='{_link(order, sel.as_query(expiry=today.isoformat(), strike=None, limit=None))}'>today {today.strftime('%m-%d')}</a>"
-            f"<a class='chip {'on' if exp == tomorrow else ''}' href='{_link(order, sel.as_query(expiry=tomorrow.isoformat(), strike=None, limit=None))}'>next {tomorrow.strftime('%m-%d')}</a>"
+            f"<a class='chip {'on' if exp == today else ''}' href='{_link(order, sel.as_query(expiry=today.isoformat(), strike=None, limit=None, stop=None))}'>today {today.strftime('%m-%d')}</a>"
+            f"<a class='chip {'on' if exp == tomorrow else ''}' href='{_link(order, sel.as_query(expiry=tomorrow.isoformat(), strike=None, limit=None, stop=None))}'>next {tomorrow.strftime('%m-%d')}</a>"
             "<span class=grow></span>"
             f"<label class=dl><span class=k>δ</span><input name=delta inputmode=decimal value='{delta_val}' placeholder='spot'></label>"
+            f"<label class='dl stopl' title=\"a '.' makes it a price (8.30); none makes it an SPX level (7610)\">"
+            f"<span class=k>stop</span><input id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off "
+            f"value='{esc(stop_val)}' data-derived='{derived}'></label>"
             "<button class='chip quiet' name=reprice value=1>RE-PRICE</button></div>"
             "<details class=inputs2><summary>budget and attempts</summary><div class=inputs>"
             f"<label>FD0 budget $<input name=budget inputmode=decimal value='{sel.budget_usd:g}'></label>"

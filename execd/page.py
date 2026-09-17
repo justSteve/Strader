@@ -60,7 +60,8 @@ from .broker import BrokerError
 from .schwab import (VAULT_VERSION, App, Credential, authorize_url, code_from_received_url,
                      exchange, new_client, trading_payload, verify_grant)
 from .intent import OrderIntent
-from .orderform import SEND_NONCE_TTL_S, Selection, intent_for, limit_at, price, stamp
+from .orderform import (SEND_NONCE_TTL_S, Selection, intent_for, limit_at, parse_leg_text, price,
+                        stamp)
 from .orderpage import (balances_html, fd0_html, journal_html, position_html, send_fields_html,
                         quote_html, render_order, state_html, strikes_html, ticket_html)
 from .service import CONTRACT_MULTIPLIER, ExecService, Refused
@@ -636,15 +637,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         raw = (request.form.get(leg) or "").strip()
         if not raw:
             return None
-        kind = "price" if "." in raw else "spx"
-        try:
-            value = float(raw)
-        except ValueError:
-            raise ValueError(f"{leg} must be a number — a price with a '.' (10.30) or an "
-                             f"SPX level without one (7585) — not {raw!r}") from None
-        if kind == "spx" and not value.is_integer():
-            raise ValueError(f"{leg} {raw!r} is not a whole SPX level")
-        return kind, value
+        return parse_leg_text(raw, leg)
 
     def _actions() -> dict[str, str]:
         """Absolute paths for every form, so a page served at ``/exec/flatten``

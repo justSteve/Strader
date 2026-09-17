@@ -533,3 +533,127 @@ class TestARefusedSendIsShown:
         clock.advance(minutes=11)
         later = text(order_page.get("/exec/order"))
         assert "data-stage=refused" not in later               # an old refusal is history
+
+
+class TestAStopOfHisOwn:
+    """Steve, 2026-09-17: "permit me to input a stop loss strike price in
+    addition to the existing hard-coded dollar amount. just add an input on
+    the SEND screen pre-populated with the dollar amount. over-riding that
+    follows the same rule as updating - absent a decimal point means a
+    strike price." The conftest chain: the 6400 call at 2.00/2.10, δ 0.30,
+    SPX 6380. [st-m3bl]"""
+
+    def test_the_selection_carries_the_text_as_typed_and_drops_it_with_the_contract(self):
+        s = Selection.from_args({"side": "call", "strike": "6400", "stop": " 6376 "}, today=DAY)
+        assert s.stop == "6376" and s.as_query()["stop"] == "6376"
+        assert "stop" not in s.as_query(stop=None)
+        s = Selection.from_args({"side": "call", "strike": "6400", "stop": "1.50", "reprice": "1"}, today=DAY)
+        assert s.stop == "1.50"                                    # RE-PRICE keeps his stop
+        assert Selection.from_args({"side": "call", "stop": ""}, today=DAY).stop is None
+
+    def test_a_price_is_the_resting_stop_and_its_level_is_walked_back(self, armed, chain):
+        base = price(armed, Selection(side="call", expiry=DAY, strike=6400))
+        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="1.50"))
+        assert p.error is None and p.stop_set_by == "price"
+        assert p.stop_price == 1.50 and p.ticket.stop_trigger_spx == 6378.0    # (2.10 − 1.50)/0.30 = 2 pts
+        assert p.stop_price != base.stop_price
+        d = p.ticket.derivation
+        assert d.stop_premium_pts == 0.60 and d.attempt_risk_usd == 60.0 and d.stop_distance_spx == 2.0
+        assert p.net_at_stop_usd == pytest.approx(-60.0 - 1.30)
+        assert p.ticket.template_fields != base.ticket.template_fields
+        i = intent_for(p, intent_id="page-x", engine_sha="t")
+        assert i["stop_spx"] == 6378.0 and i["limit"] == 2.10
+        assert p.to_dict()["stop_set_by"] == "price" and p.to_dict()["stop_text"] == "1.50"
+
+    def test_a_level_is_the_trigger_and_its_price_is_walked_forward(self, armed, chain):
+        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="6376"))
+        assert p.error is None and p.stop_set_by == "spx"
+        assert p.ticket.stop_trigger_spx == 6376.0 and p.stop_price == 0.90   # 2.10 − 4 × 0.30
+        assert p.ticket.derivation.stop_distance_spx == 4.0
+        assert intent_for(p, intent_id="page-x", engine_sha="t")["stop_spx"] == 6376.0
+        assert any(w.startswith("YOUR STOP RISKS $120.00") for w in p.ticket.warnings)
+
+    def test_a_put_level_sits_above_the_market(self, armed, chain):
+        p = price(armed, Selection(side="put", expiry=DAY, strike=6300, stop="6384"))
+        assert p.error is None and p.ticket.stop_trigger_spx == 6384.0
+        assert p.stop_price == round(p.limit - 4 * p.contract.abs_delta, 2) or p.stop_price > 0
+
+    def test_a_stop_inside_the_noise_floor_is_warned_not_refused(self, armed, chain):
+        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="2.05"))
+        assert p.error is None and p.stop_price == 2.05
+        assert any(w.startswith("STOP INSIDE THE NOISE FLOOR") for w in p.ticket.warnings)
+        assert sum(1 for w in p.ticket.warnings if w.startswith("STOP INSIDE")) == 1
+
+    @pytest.mark.parametrize("raw, words", [
+        ("1.83", "not on the 0.05 grid"),
+        ("2.10", "not below the 2.10 limit"),
+        ("2.50", "not below the 2.10 limit"),
+        ("0.00", "must be positive"),
+        ("6385", "a call's stop sits below the market, and SPX 6385 is not below the 6380.00 mark"),
+        ("abc", "must be a number"),
+        ("1e-1", "not a whole SPX level"),
+    ])
+    def test_a_stop_that_cannot_be_one_is_words_on_the_ticket_and_no_send(self, armed, chain, raw, words):
+        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop=raw))
+        assert p.error and p.error.startswith("your stop:") and words in p.error
+        assert p.contract is not None                     # the ticket still shows the contract
+        with pytest.raises(ValueError, match="your stop"):
+            intent_for(p, intent_id="page-x", engine_sha="t")
+
+    def test_a_level_past_zero_rests_one_tick_and_says_so(self, armed, chain):
+        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="6370"))
+        assert p.error is None and p.stop_price == 0.05 and p.ticket.stop_trigger_spx == 6370.0
+        assert any(w.startswith("SPX 6370 WALKS THE OPTION BELOW ZERO") for w in p.ticket.warnings)
+
+    def test_the_box_is_on_the_page_pre_filled_with_the_derived_stop(self, order_page, armed, chain):
+        base = price(armed, Selection(side="call", expiry=DAY, strike=6400))
+        body = text(order_page.get("/exec/order?side=call&strike=6400"))
+        form = body.split("<form id=sel")[1].split("</form>")[0]
+        assert f"id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off value='{base.stop_price:.2f}' data-derived='{base.stop_price:.2f}'" in form
+        assert "name=stop value=''" in form
+        assert "makes it a price (8.30); none makes it an SPX level (7610)" in form
+        assert "your price" not in body and "your level" not in body
+        assert "function stopField()" in body and "window.__followStop = function(j)" in body
+        assert "fd.set('stop', sf.elements['stop'].value || '')" in body
+
+    def test_his_stop_rides_the_form_the_ticket_and_no_link(self, order_page):
+        body = text(order_page.get("/exec/order?side=call&strike=6400&stop=1.50"))
+        form = body.split("<form id=sel")[1].split("</form>")[0]
+        assert "name=stop value='1.50'" in form and "id=stopbox" in form and "value='1.50' data-derived=" in form
+        assert "cut if SPX ≤ <b>6378.00</b>" in body and "stop rests at <b>1.50</b>" in body
+        assert "id=ownstop>· your price</span>" in body
+        assert "name='stop' value='1.50'" in body.split("id=sendfields")[1].split("</span>")[0]
+        hrefs = [h.split("'")[0] for h in body.split("href='")[1:]]
+        assert not any("stop=" in h for h in hrefs), hrefs
+        level = text(order_page.get("/exec/order?side=call&strike=6400&stop=6376"))
+        assert "id=ownstop>· your level</span>" in level and "stop rests at <b>0.90</b>" in level
+        assert "YOUR STOP RISKS $120.00" in level
+
+    def test_the_price_json_carries_the_stop_for_the_box_to_follow(self, order_page):
+        j = order_page.get("/exec/order/price?side=call&strike=6400").json
+        assert j["stop_set_by"] is None and j["stop_text"] is None and j["stop_price"]
+        j = order_page.get("/exec/order/price?side=call&strike=6400&stop=6376").json
+        assert j["stop_set_by"] == "spx" and j["stop_price"] == 0.90 and j["stop_spx"] == 6376.0
+        assert "name='stop' value='6376'" in j["send_fields_html"]
+
+    def test_send_rests_his_price_and_watches_its_level(self, order_page, armed, chain):
+        r = page_send(order_page, {"side": "call", "strike": "6400", "stop": "1.50"})
+        landing = text(order_page.get(r.headers["Location"]))
+        assert "Not sent" not in landing and "Refused" not in landing
+        p = armed.status()["positions"][0]
+        assert p["stop_price"] == 1.50 and p["stop_spx"] == 6378.0
+        req = [e for e in armed.journal.read() if e.get("event") == "request" and e.get("kind") == "place"][-1]
+        assert req["intent"]["stop_spx"] == 6378.0
+        assert armed.journal.events("sending")[-1]["page_query"]["stop"] == "1.50"
+
+    def test_send_rests_the_walked_price_for_his_level(self, order_page, armed, chain):
+        page_send(order_page, {"side": "call", "strike": "6400", "stop": "6376"})
+        p = armed.status()["positions"][0]
+        assert p["stop_spx"] == 6376.0 and p["stop_price"] == 0.90
+        assert armed.observe(SPX_NOW - 3.9)["fired"] == []
+        assert armed.observe(SPX_NOW - 4.0)["fired"][0]["closed"] is True
+
+    def test_a_bad_stop_is_not_sent(self, order_page, armed, chain):
+        r = page_send(order_page, {"side": "call", "strike": "6400", "stop": "6385"})
+        assert r.status_code == 303 and "bad=Not+sent:+your+stop" in r.headers["Location"]
+        assert armed.status()["positions"] == [] and armed.status()["working"] == []

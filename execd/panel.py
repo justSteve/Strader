@@ -615,6 +615,9 @@ PANEL_SCRIPT = """
     if (!window.fetch || !window.FormData) { if (b) { b.disabled = true; b.textContent = 'SENDING…'; } return; }
     e.preventDefault();
     var fd = new FormData(f); fd.set('ajax', '1');
+    // the stop box's text rides every SEND as typed, even if the reprice
+    // that refreshes the hidden fields has not come back yet (st-m3bl)
+    var sf = document.getElementById('sel'); if (sf && sf.elements['stop']) fd.set('stop', sf.elements['stop'].value || '');
     if (b) { b.disabled = true; b.textContent = 'SENDING…'; }
     fetch(f.getAttribute('action'), {method: 'POST', body: fd, headers: {'Accept': 'application/json'}})
       .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })

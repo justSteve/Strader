@@ -1277,6 +1277,41 @@ this sits well under it) and Flask's dev server under an all-day poll.
 refused preview, LOCKED, paper mode, the embed variant, and no secret in any
 page or JSON body.
 
+**A stop of his own on the SEND screen** (st-m3bl; Steve, 2026-09-17:
+*"permit me to input a stop loss strike price in addition to the existing
+hard-coded dollar amount. just add an input on the SEND screen pre-populated
+with the dollar amount. over-riding that follows the same rule as updating -
+absent a decimal point means a strike price."*). The tuning row under SEND
+carries a **stop** box beside δ, pre-filled with FD0's derived resting stop
+and following it on every reprice until he types in it. Typed, its text
+rides the selection as `stop` (a hidden field on the RE-PRICE form, in the
+SEND form's fields, and set on every SEND by the script as typed — the
+`Selection.stop` string, kept raw), and `price` applies the rule once,
+`orderform.parse_leg_text`, the same function the position card's SET boxes
+use: **a '.' is a dollar option price, none is an SPX level.** Dollars
+become the resting stop as typed, and the intent's level is the walk back
+from spot through the contract's delta at the limit (the inverse of
+`protective_stop_price`), so the service still receives an SPX level and
+rests his number when the fill is at the limit with the mark where it was —
+a better fill or a moved mark re-walks from the level, which is the
+instrument. A level is the trigger as typed and the resting price is the
+walk forward. Either way the ticket's cut, resting stop, net and *most this
+costs* follow it, marked *· your price* / *· your level*, and the
+derivation's distance, premium and risk are re-struck so the service's
+ceiling check sees the stop he set. Refused in words on the ticket, and
+SEND then answers *Not sent: your stop …*: a price off the tick grid, at or
+above the limit, or not positive; a level on the wrong side of spot for the
+right; text that is neither form. Warned, not refused: a stop inside the
+noise floor (as FD0 warns for its own); a stop that risks more than the
+attempt was funded for (*YOUR STOP RISKS $120.00 — this attempt was funded
+for $38.70*, shown on the ticket's cut line — the budget was his rule and
+this box is him overriding it knowingly); a level that walks the option
+below zero, which rests one tick as FD0's own would, the SPX loop at his
+level being the stop. A new side, expiry or strike drops the box like the
+lock; RE-PRICE keeps it; the working entry's `page_query` carries it, so
+CANCEL AND RE-PRICE brings it back. `tests/execd/test_orderform.py::
+TestAStopOfHisOwn`.
+
 ### 5.20 The bracket — take-profit, one-cancels-the-other, the live editor (st-fn5y)
 
 Steve, 2026-09-14: *"Future filled orders will result in resting 'take
