@@ -13,6 +13,7 @@ import pytest
 from execd.service import ExecService
 
 from .conftest import CALL, SPX_NOW, entry
+from .conftest import same_origin  # noqa: E402
 
 
 def test_valuation_counts_every_part_of_the_order(armed: ExecService, broker):
@@ -91,15 +92,17 @@ def test_the_page_shows_the_position_and_refreshes_only_while_it_is_open(armed: 
                       http_client=httpx.Client(base_url="https://api.schwabapi.com",
                                                transport=httpx.MockTransport(Schwab())))
     app.config["TESTING"] = True
-    client = app.test_client()
+    client = same_origin(app.test_client())
 
     quiet = client.get("/exec/account").get_data(as_text=True)
-    assert "http-equiv=refresh" not in quiet and "Open position" not in quiet
+    assert "location.reload()" not in quiet and "Open position" not in quiet
 
     armed.place(entry("v-4", stop_spx=SPX_NOW - 3.0))
     broker.set_quote(CALL, bid=2.00, ask=2.10)
     body = client.get("/exec/account").get_data(as_text=True)
-    assert "http-equiv=refresh content=5" in body
+    # a script, not a meta refresh: the reload waits while a box has focus (st-sk9r)
+    assert "var s=5;" in body and "location.reload()" in body and "http-equiv" not in body
+    assert "a.type==='password'" in body
     assert "Open position" in body and "SPXW  260914C06400000".replace("260914", "260826") in body
     assert "value at the bid" in body and "$200.00" in body
     assert "NET IF CLOSED NOW" in body and "-$11.30" in body
@@ -127,7 +130,7 @@ def test_a_realized_loss_renders_signed_and_red(armed: ExecService, broker, tmp_
                       http_client=httpx.Client(base_url="https://api.schwabapi.com",
                                                transport=httpx.MockTransport(Schwab())))
     app.config["TESTING"] = True
-    client = app.test_client()
+    client = same_origin(app.test_client())
     assert "<td>$0.00</td>" in client.get("/exec/account").get_data(as_text=True)
 
     armed.place(entry("v-6"))

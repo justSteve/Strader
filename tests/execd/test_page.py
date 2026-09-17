@@ -27,7 +27,8 @@ from execd.page import (CONFIRM_TTL_S, REAUTH_TTL_S, CredentialFile, PageRefused
 from execd.service import ExecService
 from execd.vault import Vault
 
-from .conftest import CALL, PUT, Clock, entry
+from .conftest import CALL, PUT, SPX_NOW, Clock, entry
+from .conftest import same_origin  # noqa: E402
 
 PASS = "correct horse battery"
 WRONG = "wrong horse battery"
@@ -112,7 +113,7 @@ def page(service: ExecService, vault: Vault, market: CredentialFile, schwab: Sch
                                                transport=httpx.MockTransport(schwab)),
                       clock=clock, monotonic=mono)
     app.config["TESTING"] = True
-    return app.test_client()
+    return same_origin(app.test_client())
 
 
 def text(r) -> str:
@@ -148,7 +149,7 @@ class TestUnlock:
     def test_no_vault_says_so_in_plain_words(self, service, market, tmp_path, clock, mono):
         app = create_page(service, vault=tmp_path / "absent.json", market=market,
                           clock=clock, monotonic=mono)
-        c = app.test_client()
+        c = same_origin(app.test_client())
         body = landing(c, c.post("/exec/unlock", data={"passphrase": PASS}))
         assert "no vault" in body and "execd_vault_init" in body
         assert service.arming.state is ArmState.LOCKED
@@ -189,6 +190,111 @@ class TestStop:
 
 
 # ── stand down, lock, flatten ─────────────────────────────────────────────
+
+class TestFromThisPageOnly:
+    """Audit finding 36 (st-sk9r): a form auto-submitted by any other page in
+    a browser on the tailnet reached /exec/order/adjust and moved the stop.
+    Every state-changing post must now come from this page."""
+
+    @staticmethod
+    def bare(page):
+        page.environ_base.pop("HTTP_SEC_FETCH_SITE", None)
+        return page
+
+    def test_a_cross_site_post_is_refused_and_changes_nothing(self, page, service):
+        page.post("/exec/unlock", data={"passphrase": PASS})
+        r = page.post("/exec/stand-down", headers={"Sec-Fetch-Site": "cross-site"})
+        assert r.status_code == 403
+        assert "another site, not from this page" in text(r) and "Nothing changed" in text(r)
+        assert service.arming.state is ArmState.ARMED
+        line = service.journal.events("refused")[-1]
+        assert line["kind"] == "cross-site" and line["path"] == "/exec/stand-down"
+
+    def test_a_cross_site_adjust_moves_nothing(self, page, service, broker):
+        page.post("/exec/unlock", data={"passphrase": PASS})
+        service.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        before = service.status()["positions"][0]["stop_price"]
+        r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop": "0.05"},
+                      headers={"Sec-Fetch-Site": "cross-site"})
+        assert r.status_code == 403
+        assert service.status()["positions"][0]["stop_price"] == before
+        assert not [e for e in service.journal.read() if e.get("event") == "stop_placed"
+                    and e.get("kind") not in ("entry",)]
+
+    def test_a_post_that_says_nothing_about_where_it_came_from_is_refused(self, page, service):
+        page.post("/exec/unlock", data={"passphrase": PASS})
+        r = self.bare(page).post("/exec/stand-down")
+        assert r.status_code == 403 and "neither where it came from" in text(r)
+        assert service.arming.state is ArmState.ARMED
+
+    def test_without_sec_fetch_site_an_origin_naming_this_host_is_this_page(self, page, service):
+        page.post("/exec/unlock", data={"passphrase": PASS})
+        bare = self.bare(page)
+        r = bare.post("/exec/stand-down", headers={"Origin": "http://localhost"})
+        assert r.status_code == 303 and service.arming.state is ArmState.STOOD_DOWN
+        # the tailnet name the proxy says it was addressed to counts too
+        r = bare.post("/exec/lock", headers={"Origin": "https://mydesk-1.tail89f676.ts.net",
+                                             "X-Forwarded-Host": "mydesk-1.tail89f676.ts.net"})
+        assert r.status_code == 303 and service.arming.state is ArmState.LOCKED
+
+    def test_an_origin_naming_another_host_is_refused(self, page, service):
+        page.post("/exec/unlock", data={"passphrase": PASS})
+        r = self.bare(page).post("/exec/stand-down", headers={"Origin": "https://evil.example"})
+        assert r.status_code == 403 and "sent by evil.example" in text(r)
+        assert service.arming.state is ArmState.ARMED
+
+    def test_stop_is_exempt_because_it_can_only_stop_new_risk(self, page, service):
+        page.post("/exec/unlock", data={"passphrase": PASS})
+        r = page.post("/exec/stop", headers={"Sec-Fetch-Site": "cross-site"})
+        assert r.status_code == 303 and service.arming.killed
+
+    def test_reads_are_not_gated(self, page):
+        r = page.get("/exec/account", headers={"Sec-Fetch-Site": "cross-site"})
+        assert r.status_code == 200
+
+
+class TestLockConfirmsWhileExposed:
+    """Finding 36's second half: LOCKED refuses exits and the watcher skips,
+    so one tap with a position live stranded him with only the broker's stop."""
+
+    def test_flat_it_is_the_one_tap_it_always_was(self, page, service):
+        page.post("/exec/unlock", data={"passphrase": PASS})
+        body = landing(page, page.post("/exec/lock"))
+        assert "Locked." in body and service.arming.state is ArmState.LOCKED
+
+    def test_with_a_position_live_it_asks_first(self, page, service):
+        page.post("/exec/unlock", data={"passphrase": PASS})
+        service.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        r = page.post("/exec/lock")
+        assert r.status_code == 200 and service.arming.state is ArmState.ARMED
+        body = text(r)
+        assert "are you sure" in body and "you are holding" in body and f"{CALL.strip()} × 1" in body
+        assert "the SPX-mark exit does not fire" in body
+        assert "action='/exec/lock/confirm'" in body and "CONFIRM — LOCK" in body
+        nonce = body.split("name=nonce value='")[1].split("'")[0]
+        landed = landing(page, page.post("/exec/lock/confirm", data={"nonce": nonce}))
+        assert service.arming.state is ArmState.LOCKED
+        assert "Locked with a position live" in landed
+
+    def test_a_spent_or_old_confirm_does_not_lock(self, page, service, mono):
+        page.post("/exec/unlock", data={"passphrase": PASS})
+        service.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        body = text(page.post("/exec/lock"))
+        nonce = body.split("name=nonce value='")[1].split("'")[0]
+        mono.t += CONFIRM_TTL_S + 1
+        landed = landing(page, page.post("/exec/lock/confirm", data={"nonce": nonce}))
+        assert "used already or is older" in landed and service.arming.state is ArmState.ARMED
+        landed = landing(page, page.post("/exec/lock/confirm", data={"nonce": "made-up"}))
+        assert service.arming.state is ArmState.ARMED
+
+    def test_the_trading_page_comes_back_to_the_trading_page(self, page, service):
+        page.post("/exec/unlock", data={"passphrase": PASS})
+        service.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        body = text(page.post("/exec/lock", data={"back": "order"}))
+        nonce = body.split("name=nonce value='")[1].split("'")[0]
+        r = page.post("/exec/lock/confirm", data={"nonce": nonce, "back": "order"})
+        assert r.status_code == 303 and "/exec/order" in r.headers["Location"]
+
 
 class TestReduceCapability:
     def test_stand_down_and_lock_need_nothing(self, page, service):
@@ -352,7 +458,7 @@ class TestReauth:
 
     def test_market_reauth_without_a_market_file_says_so(self, service, vault, clock, mono):
         app = create_page(service, vault=vault, market=None, clock=clock, monotonic=mono)
-        c = app.test_client()
+        c = same_origin(app.test_client())
         r = c.post("/exec/reauth/link", data={"app": "market", "passphrase": PASS})
         assert r.status_code == 303 and "without+a+market+credential" in r.headers["Location"]
 
@@ -385,7 +491,8 @@ class TestSurface:
         rules = {r.rule for r in app.url_map.iter_rules() if r.endpoint != "static"}
         assert rules == {
             "/", "/exec/", "/exec/account", "/exec/unlock", "/exec/stop", "/exec/resume",
-            "/exec/stand-down", "/exec/lock", "/exec/flatten", "/exec/flatten/confirm",
+            "/exec/stand-down", "/exec/lock", "/exec/lock/confirm",
+            "/exec/flatten", "/exec/flatten/confirm",
             "/exec/reauth/link", "/exec/reauth/store",
             "/exec/order", "/exec/order/price", "/exec/order/state",
             "/exec/order/send",

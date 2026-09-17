@@ -296,6 +296,9 @@ class Priced:
     #: ``"spx"`` for a stop of his own (st-m3bl)
     stop_set_by: str | None = None
     error: str | None = None
+    #: when the ask this ticket is priced from was read — the service's clock
+    #: at pricing, shown beside SEND (st-sk9r, audit note 37)
+    priced_at: datetime | None = None
 
     # ── money ──
     @property
@@ -350,7 +353,7 @@ def price(service: ExecService, sel: Selection) -> Priced:
     """Everything the form shows, from the live chain and the engine. Never
     raises: a fault is on ``.error`` in plain words, with whatever was
     priced before it."""
-    out = Priced(selection=sel)
+    out = Priced(selection=sel, priced_at=service.clock())
     if sel.side is None or sel.expiry is None:
         out.error = "pick BULLISH or BEARISH"
         return out

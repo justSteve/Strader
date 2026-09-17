@@ -126,6 +126,8 @@ _SCRIPT = """
     if (lf && lf.value) { if (live) live.textContent = 'ask ' + Number(j.quote.ask).toFixed(2) + ' now'; return; }
     if (px) px.textContent = Number(j.limit_now).toFixed(2);
     if (cost && j.cost_now) cost.textContent = j.cost_now;
+    var pr = document.getElementById('priced'); if (pr && j.quote.as_of) { try {
+      pr.textContent = 'priced ' + new Date(j.quote.as_of).toLocaleTimeString('en-GB', {hour12: false, timeZone: 'America/Chicago'}); } catch (e) {} }
     if (lk) lk.setAttribute('data-limit', Number(j.limit_now).toFixed(2)); };
 })();
 </script>
@@ -294,8 +296,13 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
             f"title='{'locked — tap to follow the ask' if locked else 'following the ask — tap to lock'}'>"
             f"{'&#128274;' if locked else '&#128275;'}</button>")
     live = (f"<span id=live class=k>ask {c.ask_pts:.2f} now</span>" if locked else "<span id=live class=k></span>")
+    # when the number on the screen was read (st-sk9r): the ask's time while
+    # following, the moment of the lock while locked; the poll keeps it current
+    when = (f"priced {priced.priced_at.astimezone(CT).strftime('%H:%M:%S')}"
+            if priced.priced_at is not None else "")
     head = (f"<div class=trow><div class=tbig>{esc(name)} × {priced.lots} at "
-            f"<span id=px>{priced.limit:.2f}</span> {lock} {live}</div>"
+            f"<span id=px>{priced.limit:.2f}</span> {lock} {live} "
+            f"<span id=priced class=k>{when}</span></div>"
             f"<div class=tbig id=cost>{money(-(priced.cost_usd or 0)).lstrip('-')}</div></div>")
     if priced.error:
         return f"<div class=card>{head}<div class=bad>{esc(priced.error)}</div></div>"

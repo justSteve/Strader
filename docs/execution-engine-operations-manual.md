@@ -1037,13 +1037,35 @@ funnel) at `https://mydesk-1.tail89f676.ts.net/exec/`. One rule: every action
 that adds capability takes the passphrase; every action that reduces it does
 not.
 
+**And every state-changing post must come from this page** (st-sk9r, audit
+finding 36). The page's routes are form posts by design, and a form
+auto-submitted by any other page rendered in a browser on any tailnet device
+reached `/exec/order/adjust` and moved the protective stop — down to the
+day's headroom — with no passphrase, no nonce and no origin check: finding
+15's mechanism, moved from the loopback API to the tailnet page. A
+`before_request` on the blueprint now refuses every POST whose
+`Sec-Fetch-Site` is not `same-origin` (every browser he uses sends it with
+a form posted from this page); a browser that does not send it must name
+this host in `Origin` (the host the request reached, or the one
+`X-Forwarded-Host` says the proxy was addressed to). The refusal is a 403
+page in words, journaled `refused kind=cross-site` with the path. STOP is
+exempt, as on the API: a hostile page firing it can only stop new risk, and
+his phone reaching it must not depend on a header. Reads are not gated.
+Two more from the same finding's notes: the account page's 5 s reload while
+money is moving is a script that waits while a box has focus (a passphrase
+half-typed, a value changed) instead of the meta refresh that wiped the
+field mid-word; and the ticket says `priced HH:MM:SS` beside the price —
+the time the ask was read, which the poll keeps current while following
+and which stays at the moment of the lock while locked.
+
 | Action | Passphrase | What it does |
 |---|---|---|
 | UNLOCK | yes | opens the vault, arms until today's close (`ExecService.unlock`) |
 | STOP | no | touches the kill file; one tap from a phone |
 | clear STOP | yes | `ExecService.resume` |
 | FLATTEN | no, but a second page with a single-use 60 s confirm | `ExecService.flatten` |
-| stand down / lock | no | `stand_down` / `lock` |
+| stand down | no | `stand_down` |
+| lock | no; with a position or working entry live, a second page with a single-use 60 s confirm (st-sk9r) | `lock` — LOCKED refuses exits and the watcher skips, so one tap with a position live would leave only the broker's stop |
 | re-authorise (either app) | yes, twice: for the link and for the store | `authorize_url` → Steve logs in → pastes the landing address → `exchange` → `verify_grant` against the app's own family → stored: the trading grant back into the vault under the same passphrase (and swapped into memory if armed), the market grant to its file |
 
 A wrong passphrase is journaled as `refused` with bound `passphrase`, costs a

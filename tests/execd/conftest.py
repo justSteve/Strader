@@ -153,3 +153,12 @@ def page_send(client, data: dict):
     assert "name=nonce value='" in body, "the page carried no SEND token"
     nonce = body.split("name=nonce value='")[1].split("'")[0]
     return client.post("/exec/order/send", data={**data, "nonce": nonce})
+
+
+def same_origin(client):
+    """A page test client that posts the way a form on the page does: with
+    ``Sec-Fetch-Site: same-origin``, which the page requires of every
+    state-changing post (st-sk9r). Tests of the gate itself send their own
+    headers."""
+    client.environ_base["HTTP_SEC_FETCH_SITE"] = "same-origin"
+    return client

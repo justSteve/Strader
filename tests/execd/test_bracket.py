@@ -42,6 +42,7 @@ from execd.service import ExecService, Refused, ServiceConfig
 from execd.stops import take_profit_price
 
 from .conftest import CALL, PUT, SPX_NOW, entry, exit_intent, page_send, schwab_chain_maps
+from .conftest import same_origin  # noqa: E402
 
 #: the conftest entry with a two-point SPX stop at 0.30 delta: fill 2.10,
 #: stop 1.50, target 21.00 on the premium basis
@@ -935,7 +936,7 @@ def page(armed: ExecService, broker, clock, tmp_path):
                                                transport=httpx.MockTransport(Schwab())),
                       clock=clock)
     app.config["TESTING"] = True
-    return app.test_client()
+    return same_origin(app.test_client())
 
 
 def text(r) -> str:

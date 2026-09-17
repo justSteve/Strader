@@ -20,6 +20,7 @@ from execd.service import ExecService
 from execd.vault import Vault
 
 from .conftest import CALL, PUT, SPX_NOW, Clock, page_send, schwab_chain_maps
+from .conftest import same_origin  # noqa: E402
 from .test_page import CALLBACK, PASS, Schwab, market_payload, vault_payload
 
 DAY = dt.date(2026, 8, 26)
@@ -54,7 +55,7 @@ def order_page(armed: ExecService, chain, clock: Clock, mono, tmp_path):
                                                transport=httpx.MockTransport(Schwab())),
                       clock=clock, monotonic=mono)
     app.config["TESTING"] = True
-    return app.test_client()
+    return same_origin(app.test_client())
 
 
 def text(r) -> str:
@@ -279,7 +280,7 @@ class TestPage:
         app = create_page(service, vault=vault, market=market, callback_url=CALLBACK,
                           clock=clock, monotonic=mono)
         app.config["TESTING"] = True
-        c = app.test_client()
+        c = same_origin(app.test_client())
         body = text(c.get("/exec/order?side=put"))
         assert "6400" in body and ">LOCKED<" in body and "FLATTEN" not in body
         assert "href='/exec/account'" in body
@@ -296,7 +297,7 @@ class TestPage:
         vault.store(vault_payload(), PASS)
         app = create_page(svc, vault=vault, market=None, callback_url=CALLBACK, clock=clock, monotonic=mono)
         app.config["TESTING"] = True
-        c = app.test_client()
+        c = same_origin(app.test_client())
         r = page_send(c, {"side": "call", "delta": "0.3"})
         body = text(c.get(r.headers["Location"]))
         # the badge is the word; no "(simulated)" prefix (Steve, 2026-09-15, st-2hei)
@@ -355,6 +356,15 @@ class TestThePadlockAndRePrice:
         body = text(order_page.get("/exec/order?side=put&expiry=2026-08-26&strike=6300&delta=&limit=&reprice=1"))
         assert ">6300<" in body.split("<tr class='chosen'>")[1].split("</tr>")[0]
 
+    def test_the_ticket_says_when_it_was_priced(self, order_page):
+        """Beside the price, the time the ask was read — 'priced HH:MM:SS' in
+        Chicago time, from the service's clock (st-sk9r, audit note 37); the
+        poll's script rewrites it from the quote's as_of while following."""
+        body = text(order_page.get("/exec/order?side=call&strike=6400"))
+        head = body.split("<div class=trow>")[1].split("</div></div>")[0]
+        assert "<span id=priced class=k>priced 10:00:00</span>" in head   # MIDSESSION, 15:00 UTC
+        assert "getElementById('priced')" in body and "timeZone: 'America/Chicago'" in body
+
     def test_the_padlock_on_the_ticket(self, order_page):
         body = text(order_page.get("/exec/order?side=call&strike=6400"))
         assert "id=lock class='lock'" in body and "&#128275;" in body and "data-limit='2.10'" in body
@@ -407,7 +417,7 @@ class TestLockedInPlaceAndFewerWords:
         app = create_page(service, vault=vault, market=market, callback_url=CALLBACK,
                           clock=clock, monotonic=mono)
         app.config["TESTING"] = True
-        return app.test_client()
+        return same_origin(app.test_client())
 
     def test_a_locked_trading_page_unlocks_in_place(self, service, chain, clock, mono, tmp_path):
         c = self._locked_client(service, clock, mono, tmp_path)

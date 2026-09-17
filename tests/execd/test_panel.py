@@ -19,6 +19,7 @@ from execd.panel import ago, contract_name, journal_facts, stage_of
 from execd.service import ExecService
 
 from .conftest import CALL, PUT, SPX_NOW, entry, page_send
+from .conftest import same_origin  # noqa: E402
 from .test_bracket import TRIGGER, holding, page, pos_of, text  # noqa: F401 — fixtures
 
 
@@ -257,7 +258,7 @@ def chain_page_paper(broker, clock, tmp_path):
                                                transport=httpx.MockTransport(Schwab())),
                       clock=clock)
     app.config["TESTING"] = True
-    return app.test_client()
+    return same_origin(app.test_client())
 
 
 class TestNewOrderClearsTheCard:

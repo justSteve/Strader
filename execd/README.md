@@ -48,7 +48,10 @@ in the same process on `127.0.0.1:8779`, tailnet only, funnel never — holds
 what the API deliberately lacks. One rule: every action that *adds*
 capability takes the passphrase (UNLOCK, clear STOP, store a re-authorised
 grant); every action that *reduces* it does not (STOP, FLATTEN with a
-single-use confirm, stand down, lock). The weekly re-authorisation of both
+single-use confirm, stand down, lock — which confirms the same way while a position is
+live, since LOCKED refuses exits). Every state-changing post must come from the page
+itself: `Sec-Fetch-Site: same-origin`, or an `Origin` naming this host, else a 403 in
+words (st-sk9r); STOP alone is exempt. The weekly re-authorisation of both
 Schwab apps runs there: the page shows the login link, Steve pastes the
 landing address, the service exchanges the code, proves the grant against the
 app's own family (`verify_grant`) and only then stores it — the trading grant

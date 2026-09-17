@@ -231,6 +231,30 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
     def passphrase() -> str:
         return request.form.get("passphrase", "")
 
+    @bp.before_request
+    def from_this_page_only():
+        """Every state-changing post must come from this page. The API's rule
+        (``_require_json``, finding 15 of the 2026-08-30 audit) applied to the
+        page, whose routes are form posts by design: a form auto-submitted by
+        any other page rendered in a browser on the tailnet reached
+        ``/exec/order/adjust`` and moved the protective stop with no
+        passphrase, no nonce and no origin check (audit finding 36, st-sk9r).
+        ``Sec-Fetch-Site: same-origin`` is what every browser he uses sends
+        with a form posted from this page; a browser that does not send it
+        must say the same with ``Origin``. STOP is exempt, as on the API: a
+        hostile page firing it can only stop new risk, and his phone reaching
+        it must not depend on a header."""
+        if request.method != "POST" or request.endpoint == "exec.stop":
+            return None
+        why = _not_from_this_page(request)
+        if why is None:
+            return None
+        service.journal.record("refused", kind="cross-site", path=request.path,
+                               refused={"bound": "origin", "reason": why})
+        return _page("Not from this page",
+                     f"<div class=card><div class=bad>{esc(why)}</div>"
+                     "<div class=k>Nothing changed.</div></div>"), 403
+
     def open_vault(pw: str) -> dict[str, Any]:
         """Open the vault or raise a :class:`PageRefused` with plain words.
         A wrong passphrase and a tampered file are the same error by the
@@ -320,8 +344,26 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
 
     @bp.post("/lock")
     def lock():
+        # LOCKED refuses exits and the watcher skips: with a position live,
+        # one tap here would strand him with only the broker's stop until he
+        # types the passphrase. So while anything is held or working, LOCK
+        # confirms the way FLATTEN does (audit finding 36, st-sk9r); flat, it
+        # is the one tap it always was.
+        if service.has_exposure():
+            n = nonces.issue("lock", CONFIRM_TTL_S)
+            return _render_confirm_lock(service, n, _actions(),
+                                        back=request.form.get("back", ""))
         service.lock()
         return home("Locked. The credential is out of memory; the passphrase brings it back.")
+
+    @bp.post("/lock/confirm")
+    def lock_confirm():
+        if nonces.spend(request.form.get("nonce", ""), "lock") is None:
+            return home(f"That LOCK confirm was used already or is older than "
+                        f"{int(CONFIRM_TTL_S)} seconds. Still armed.", bad=True)
+        service.lock()
+        return home("Locked with a position live. The SPX-mark exit is off until you "
+                    "unlock; the stop resting at the broker is the protection.")
 
     @bp.post("/flatten")
     def flatten():
@@ -643,8 +685,8 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         """Absolute paths for every form, so a page served at ``/exec/flatten``
         posts its confirm to ``/exec/flatten/confirm`` and not to a sibling."""
         return {name: url_for(f"exec.{name}") for name in (
-            "index", "account", "unlock", "stop", "resume", "stand_down", "lock", "flatten",
-            "flatten_confirm", "reauth_link", "reauth_store",
+            "index", "account", "unlock", "stop", "resume", "stand_down", "lock", "lock_confirm",
+            "flatten", "flatten_confirm", "reauth_link", "reauth_store",
             "order", "order_price", "order_state", "order_send",
             "order_adjust", "order_cancel")}
 
@@ -768,10 +810,40 @@ _STYLE = """
 def _page(title: str, body: str, *, refresh_s: int | None = None) -> str:
     # The page reloads itself only while there is money moving on it — a
     # position or a working entry — so the unrealized P&L is live and a
-    # passphrase being typed on a quiet page is never wiped.
-    meta = f"<meta http-equiv=refresh content={int(refresh_s)}>" if refresh_s else ""
+    # passphrase being typed on a quiet page is never wiped. On a live page
+    # the reload waits while a box has focus (a passphrase half-typed, a
+    # value changed) and goes the second it is left — the meta refresh it
+    # replaced wiped the passphrase field mid-word (audit note 37, st-sk9r).
+    reload = (f"<script>(function(){{var s={int(refresh_s)};function go(){{var a=document.activeElement;"
+              "if(a&&a.tagName==='INPUT'&&(a.type==='password'||a.value!==a.defaultValue))"
+              "{setTimeout(go,1000);return;}location.reload();}setTimeout(go,s*1000);})();</script>"
+              if refresh_s else "")
     return (f"<!doctype html><html><head><meta charset=utf-8><title>{esc(title)}</title>"
-            f"{meta}{_STYLE}</head><body><h1>{esc(title)}</h1>{body}</body></html>")
+            f"{_STYLE}</head><body><h1>{esc(title)}</h1>{body}{reload}</body></html>")
+
+
+def _not_from_this_page(req: Any) -> str | None:
+    """Why a post is refused as not from this page, or ``None`` when it is.
+    ``Sec-Fetch-Site`` decides when present (every current browser sends
+    it); without it, ``Origin`` must name this host — the host the request
+    reached, or the one the tailnet proxy says it was addressed to."""
+    site = req.headers.get("Sec-Fetch-Site")
+    if site is not None:
+        if site == "same-origin":
+            return None
+        where = {"cross-site": "another site", "same-site": "another page on this site",
+                 "none": "outside any page"}.get(site, site)
+        return f"this request came from {where}, not from this page — refused"
+    origin = req.headers.get("Origin")
+    if not origin:
+        return ("this request says neither where it came from (Sec-Fetch-Site) nor "
+                "what page sent it (Origin) — refused")
+    sent_from = origin.split('://', 1)[-1].split('/', 1)[0].lower()   # the host[:port]
+    hosts = {h.lower() for h in (req.host, req.headers.get("X-Forwarded-Host", "")) if h}
+    hosts |= {h.split(":", 1)[0] for h in hosts}
+    if sent_from in hosts or sent_from.split(":", 1)[0] in hosts:
+        return None
+    return f"this request was sent by {esc(sent_from) or 'an unnamed page'}, not by this page — refused"
 
 
 def _fmt_wall(iso: str | None, now: datetime) -> str:
@@ -1128,6 +1200,29 @@ def _render_confirm_flatten(service: ExecService, nonce: str, a: dict[str, str],
             "<button class='big cancel'>cancel</button></form>"
             f"<div class=k>confirm window {int(CONFIRM_TTL_S)}s, single use</div>")
     return _page("FLATTEN — are you sure", body)
+
+
+def _render_confirm_lock(service: ExecService, nonce: str, a: dict[str, str],
+                         back: str = "") -> str:
+    st = service.status()
+    rows = "".join(f"<div class=row><b>{esc(p['symbol'].strip())} × {p['qty']}</b>"
+                   f" — in at {float(p['entry_price']):.2f}</div>" for p in st["positions"])
+    rows += "".join(f"<div class=row><b>{esc(w['symbol'].strip())} × {w['qty']}</b> working</div>"
+                    for w in st.get("working") or [])
+    listing = (f"<div class=k>you are holding</div>{rows}"
+               "<div class=k>LOCKED takes the credential out of memory: the SPX-mark exit "
+               "does not fire, FLATTEN and the bracket's UPDATE are dead, and the stop "
+               "resting at the broker is the only protection until you unlock. To get "
+               "flat first, cancel and FLATTEN.</div>")
+    back_field = "<input type=hidden name=back value='order'>" if back == "order" else ""
+    body = (f"<div class=card>{listing}</div>"
+            f"<form method=post action='{a['lock_confirm']}'>"
+            f"<input type=hidden name=nonce value='{nonce}'>{back_field}"
+            f"<button class='big cancel'>CONFIRM — LOCK</button></form>"
+            f"<form method=get action='{a['order'] if back == 'order' else a['account']}'>"
+            "<button class='big quiet'>cancel</button></form>"
+            f"<div class=k>confirm window {int(CONFIRM_TTL_S)}s, single use</div>")
+    return _page("LOCK with a position live — are you sure", body)
 
 
 def _render_reauth(target: App, link: str, state: str, a: dict[str, str]) -> str:
