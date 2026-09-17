@@ -211,6 +211,21 @@ FILL_OVERLAP_S = 60.0
 #: releases the intent. Until then no entry goes out at all: the broker may be
 #: holding an order this service has no id for (finding 25, st-xlz9).
 SEND_SETTLE_S = 60.0
+#: How many days of journals a restart reads back for a position still
+#: open. _recover read today's file only, so a position held past the close
+#: — a next-day contract, or a close that failed — came back the next
+#: morning as nothing, was adopted from the broker with no stop_spx and no
+#: bracket, and neither exit existed (audit finding 38, st-btob; 03 §1).
+RECOVER_LOOKBACK_DAYS = 7
+#: The journal events that carry a position's life across days. A working
+#: entry, an unconfirmed send and the day's counts are today's alone: a
+#: buy order from a prior session is dead at the exchange, and recovering
+#: it would hold a slot for an order the listing can never show.
+_CARRIED_EVENTS = frozenset((
+    "filled", "stop_placed", "target_placed", "stop_adjusted", "target_adjusted",
+    "canceled", "position_adopted", "position_gone", "position_corrected",
+    "leg_unconfirmed", "leg_resolved", "exit_unfilled", "exit_resolved", "closed",
+))
 #: An adjust identical to the last completed one, arriving inside this many
 #: seconds of its answer, is a replay (browser or proxy re-sending after a
 #: lost response) and is answered from that answer (st-gw5m).
@@ -2806,12 +2821,27 @@ class ExecService:
         return None
 
     def _recover(self) -> None:
-        """Rebuild open positions from today's journal after a restart.
+        """Rebuild open positions from the journal after a restart.
 
         The service comes back LOCKED, so it cannot open anything; what it must
         not do is come back not knowing a position is live, because then the
-        SPX-mark loop stops watching it and flatten misses it."""
-        entries = self.journal.read()
+        SPX-mark loop stops watching it and flatten misses it.
+
+        The position-carrying events of the last ``RECOVER_LOOKBACK_DAYS`` are
+        replayed before today's file, so a position opened on a prior day and
+        never closed comes back with its stop_spx, delta and leg ids (which
+        the reconcile at the unlock then checks against the listing, st-vqmr)
+        instead of being adopted from the broker with no exit at all
+        (finding 38, st-btob). A position closed on a prior day is dropped by
+        its ``closed`` line as it is replayed."""
+        today = self.journal.today()
+        entries: list[dict[str, Any]] = []
+        for day in self.journal.days()[-RECOVER_LOOKBACK_DAYS:]:
+            if day >= today:
+                continue
+            entries.extend(e for e in self.journal.read(day)
+                           if e.get("event") in _CARRIED_EVENTS)
+        entries.extend(self.journal.read())
         for e in entries:
             if e.get("event") == "filled" and e.get("kind") == "entry":
                 symbol = str(e.get("symbol", ""))
@@ -2955,6 +2985,15 @@ class ExecService:
                     pos.exit_reason = None
                 else:
                     self._open.pop(symbol, None)
+        for pos in self._open.values():
+            opened = pos.opened_at.astimezone(CT).date() if pos.opened_at else None
+            if opened is not None and opened < today:
+                self.journal.record(
+                    "position_carried", symbol=pos.symbol, qty=pos.qty,
+                    intent_id=pos.intent_id, opened_on=opened.isoformat(),
+                    stop_order_id=pos.stop_order_id, target_order_id=pos.target_order_id,
+                    detail=f"recovered from {opened.isoformat()}'s journal — held past that "
+                           f"day's close; the reconcile checks its legs against the listing")
         if self._open or self._working:
             self.journal.record("recovered",
                                 positions=[p.to_dict() for p in self._open.values()],

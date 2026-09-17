@@ -757,3 +757,98 @@ class TestTheFillSweepOverlaps:
             assert armed.poll_fills()["picked_up"] == []
         assert len(armed.journal.events("closed")) == 1
         assert not armed.journal.events("unattributed_sell")
+
+
+class TestARestartReadsBackForAPositionHeldPastTheClose:
+    """Audit finding 38 (st-btob): _recover read today's journal only, so a
+    position held overnight came back as nothing and was adopted from the
+    broker with no stop_spx, no delta and no bracket."""
+
+    @staticmethod
+    def restart(broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        svc = ExecService(broker, config, clock=clock)
+        return config, svc
+
+    def test_a_position_opened_yesterday_comes_back_with_its_exits(self, broker, clock, tmp_path):
+        config, first = self.restart(broker, clock, tmp_path)
+        first.unlock({"token": "x"})
+        first.place(entry(intent_id="held-1", stop_spx=SPX_NOW - 2.0, delta=0.30))
+        before = first.status()["positions"][0]
+        clock.set_ct(8, 0, day=27)                      # the next morning
+        second = ExecService(broker, config, clock=clock)
+        after = second.status()["positions"][0]
+        assert after["intent_id"] == "held-1"           # recovered, not adopted
+        assert after["stop_spx"] == before["stop_spx"] and after["delta"] == 0.30
+        assert after["stop_order_id"] == before["stop_order_id"]
+        assert after["target_order_id"] == before["target_order_id"]
+        assert not second.journal.events("position_adopted")
+        carried = second.journal.events("position_carried")[0]
+        assert carried["symbol"] == CALL and carried["opened_on"] == "2026-08-26"
+        assert second.journal.today().isoformat() == "2026-08-27"
+
+    def test_a_position_closed_yesterday_is_not_recovered(self, broker, clock, tmp_path):
+        config, first = self.restart(broker, clock, tmp_path)
+        first.unlock({"token": "x"})
+        first.place(entry(intent_id="held-2", stop_spx=SPX_NOW - 2.0, delta=0.30))
+        first.flatten(reason="test")
+        clock.set_ct(8, 0, day=27)
+        second = ExecService(broker, config, clock=clock)
+        assert second.status()["positions"] == []
+        assert not second.journal.events("position_carried")
+
+    def test_yesterdays_working_entry_is_not_recovered(self, broker, clock, tmp_path):
+        """A buy order from a prior session is dead at the exchange; recovering
+        it would hold a slot for an order the listing can never show."""
+        config, first = self.restart(broker, clock, tmp_path)
+        first.unlock({"token": "x"})
+        broker.rest_limits = True
+        first.place(entry(intent_id="held-3", stop_spx=SPX_NOW - 2.0, delta=0.30))
+        assert first.status()["working"]
+        clock.set_ct(8, 0, day=27)
+        broker._orders.clear()                          # the exchange dropped it at the close
+        second = ExecService(broker, config, clock=clock)
+        assert second.status()["working"] == [] and second.status()["positions"] == []
+
+    def test_the_legs_expired_overnight_are_re_rested_at_the_first_reconcile(
+            self, broker, clock, tmp_path):
+        """Finding 38's step 2: the exchange expired both DAY legs at the close
+        (EXPIRED arrives as CANCELED). The leg reconcile (st-vqmr) finds them
+        and rests them again, so the carried position is not bare."""
+        from dataclasses import replace
+        from execd.broker import OrderStatus
+        config, first = self.restart(broker, clock, tmp_path)
+        first.unlock({"token": "x"})
+        first.place(entry(intent_id="held-4", stop_spx=SPX_NOW - 2.0, delta=0.30))
+        p = first.status()["positions"][0]
+        for oid in (p["stop_order_id"], p["target_order_id"]):
+            broker._orders[oid] = replace(broker._orders[oid], status=OrderStatus.CANCELED,
+                                          message="EXPIRED")
+        clock.set_ct(8, 0, day=27)
+        second = ExecService(broker, config, clock=clock)   # the mock reconciles here
+        after = second.status()["positions"][0]
+        assert after["stop_order_id"] not in (None, p["stop_order_id"])
+        assert after["target_order_id"] not in (None, p["target_order_id"])
+        assert broker._orders[after["stop_order_id"]].is_working
+        lost = second.journal.events("leg_lost")
+        assert {e["broker_status"] for e in lost} == {"EXPIRED"} and len(lost) == 2
+
+    def test_the_lookback_is_a_week(self, broker, clock, tmp_path):
+        from execd.service import RECOVER_LOOKBACK_DAYS
+        config, first = self.restart(broker, clock, tmp_path)
+        first.unlock({"token": "x"})
+        first.place(entry(intent_id="held-5", stop_spx=SPX_NOW - 2.0, delta=0.30))
+        # a quiet journal for each of the next ten days, then a restart
+        assert RECOVER_LOOKBACK_DAYS == 7
+        clock.set_ct(8, 0, day=5, month=9)
+        for day in range(27, 32):
+            (tmp_path / "execd" / "journal" / f"2026-08-{day}.jsonl").write_text("")
+        for day in range(1, 5):
+            (tmp_path / "execd" / "journal" / f"2026-09-0{day}.jsonl").write_text("")
+        second = ExecService(broker, config, clock=clock)
+        # 08-26 is now the 11th file back: outside the week, so not replayed —
+        # and outside the position sweep's own week (OWNED_LOOKBACK_DAYS), so
+        # the broker's holding is shown as not this service's, not adopted
+        assert not second.journal.events("position_carried")
+        assert second.status()["positions"] == []
+        assert [p["symbol"] for p in second.status()["foreign_positions"]] == [CALL]

@@ -227,7 +227,9 @@ standing while it rests.
 
 **The day is derived from the journal, not remembered.** Open positions, the
 realized-loss ceiling and the attempts used are rebuilt by reading the file
-(`execd/journal.py`), so a restart recovers them. Losses only debit the ceiling;
+(`execd/journal.py`), so a restart recovers them — reading back a week for a
+position held past a close, which comes back with its levels and leg ids as
+`position_carried` (st-btob). Losses only debit the ceiling;
 a winner does not raise it. Attempts follow Steve's 2026-09-14 rule (st-fn5y):
 *"an 'attempt' is a 'filled position'. Any attempt that breaks even or better
 doesn't decrement the counter"* — so an attempt is held by a filled position

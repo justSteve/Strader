@@ -920,7 +920,7 @@ because the check hit `/trader/v1` and 401'd.
 
 ### 5.12 Recovery
 
-`_recover()` runs in the constructor. It replays today's journal and rebuilds
+`_recover()` runs in the constructor. It replays the journal and rebuilds
 `_open` from `filled`+`kind=entry`, `stop_placed`, `target_placed` (with its
 `target_spx`), a level-only `stop_adjusted` / `target_adjusted`, the legs'
 `canceled` lines and `closed` lines (and `_working` from `working` lines,
@@ -928,6 +928,25 @@ with the page's `page_query`), then journals `recovered` if anything survived. T
 it cannot open anything; what it must not do is come back not knowing a position
 is live, because then the SPX-mark loop stops watching it and `flatten` misses
 it.
+
+**It reads back a week for a position held past the close** (st-btob, audit
+finding 38; 03 §1). Until 2026-09-17 it read today's file only, so a
+position opened on a prior day and not closed — a next-day contract held
+overnight, a close that failed at the bell — came back the next morning as
+nothing, was adopted from the broker with no `stop_spx`, no `delta` and no
+bracket, and neither exit existed. Now the position-carrying events of the
+last `RECOVER_LOOKBACK_DAYS` (7) journals are replayed before today's: a
+position still open at the end of them comes back with its levels and its
+leg ids, journaled `position_carried` with the day it was opened, and the
+reconcile at the unlock checks those ids against the listing (§5.20) — the
+DAY legs the exchange expired at the close are `leg_lost` and re-rested.
+A position closed on a prior day is dropped by its own `closed` line. A
+working entry, an unconfirmed send and the day's counts are today's alone:
+a buy order from a prior session is dead at the exchange, and recovering it
+would hold a slot for an order the listing can never show. Whether a
+position may be held past the close at all — flat-by-close at 14:55 CT
+(recommended) or GTC legs — is Steve's ruling on st-9j8e; until it lands
+the legs stay DAY.
 
 **An in-flight close gets the same grace a position does** (st-b7i4, audit
 finding 26). Until 2026-09-17 `_reconcile_exits` declared a close `unknown`
