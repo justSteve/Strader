@@ -1407,6 +1407,27 @@ lock; RE-PRICE keeps it; the working entry's `page_query` carries it, so
 CANCEL AND RE-PRICE brings it back. `tests/execd/test_orderform.py::
 TestAStopOfHisOwn`.
 
+**The ticket is one quote, in plain words** (st-hzr6, Steve 2026-09-17:
+"lots about this text wall that doesn't make sense … priced at 60 but max
+loss is 50? reference to spread? noise? … no, i don't see an input box. and
+padlock's function is flaky"). Measured on the P7615 ticket: the ticket was
+rendered on the 0.70 ask (stop 0.35, net at the stop −$36.30) and the poll
+then rewrote only the head's price and cost to 0.60 / $60 — one ticket,
+two quotes. Now, unlocked, a moved ask reprices the whole ticket (at most
+every 4 s, never while a box has focus); the poll never rewrites the head
+alone. Every row is in words: *to buy it*, *the most this attempt may lose*
+(this was "most this costs" — it is the attempt's funding, spread and fees
+included, not the price of the contract), *of that* (the bid-ask gap and
+fees), *the move* (the rest turned into SPX points through delta — the
+cut), *wobble allowance* (this was the noise floor; the "spread only"
+warning is folded into it), *bid / ask*; the cut line reads "cut if SPX
+rises to / falls to"; the legs say "if it fills there". The padlock flips
+on the tap before the server answers, a second tap inside half a second is
+the same tap, and reprice answers are numbered so a stale one never paints
+(on the slow link his taps landed as pairs a second apart, each pair
+sending the same state twice). The δ and stop boxes are drawn with a
+visible border, and the stop box is labelled *stop: strike or price*.
+
 ### 5.20 The bracket — take-profit, one-cancels-the-other, the live editor (st-fn5y)
 
 Steve, 2026-09-14: *"Future filled orders will result in resting 'take

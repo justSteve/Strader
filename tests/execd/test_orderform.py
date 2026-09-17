@@ -178,7 +178,7 @@ class TestPage:
         assert "tap a strike" in body and "value='0.8'" in body
         chosen = body.split("<tr class='chosen'>")[1].split("</tr>")[0]
         assert ">6350<" in chosen
-        assert "cut if SPX" in body and "stop rests at" in body and "target rests at" in body
+        assert "cut if SPX" in body and "stop rests at" in body and "take-profit rests at" in body
         assert ">SEND<" in body and "PREVIEW" not in body and "name=nonce value='" in body
         body = text(order_page.get("/exec/order?side=call&delta="))
         assert ">6380<" in body.split("<tr class='chosen'>")[1].split("</tr>")[0]
@@ -363,7 +363,25 @@ class TestThePadlockAndRePrice:
         body = text(order_page.get("/exec/order?side=call&strike=6400"))
         head = body.split("<div class=trow>")[1].split("</div></div>")[0]
         assert "<span id=priced class=k>priced 10:00:00</span>" in head   # MIDSESSION, 15:00 UTC
-        assert "getElementById('priced')" in body and "timeZone: 'America/Chicago'" in body
+        # the poll never rewrites the head alone: a moved ask reprices the whole ticket (st-hzr6)
+        assert "window.__lastReprice" in body and "px.textContent" not in body
+
+    def test_the_ticket_is_in_plain_words(self, order_page):
+        """Steve, 2026-09-17: 'priced at 60 but max loss is 50? reference to
+        spread? noise?' — every row says what the number is."""
+        body = text(order_page.get("/exec/order?side=call&strike=6400"))
+        for phrase in ("to buy it", "the most this attempt may lose", "is the bid-ask gap and",
+                       "is left for the move against you", "where the cut goes",
+                       "wobble allowance", "bid / ask", "if it fills there",
+                       "cut if SPX falls to", "below spot)"):
+            assert phrase in body, phrase
+        for gone in ("most this costs", "less friction", "tape noise", "Noise floor",
+                     "in premium", "NOISE FLOOR"):
+            assert gone not in body, gone
+        # the boxes are drawn as boxes and the stop box says what it takes
+        assert "border:2px solid #9ca3af" in body and "stop: strike or price</span><input id=stopbox" in body
+        # the padlock answers the tap and a second tap inside half a second is the same tap
+        assert "window.__lockTap" in body and "b.classList.toggle('on', !!lf.value)" in body
 
     def test_the_padlock_on_the_ticket(self, order_page):
         body = text(order_page.get("/exec/order?side=call&strike=6400"))
@@ -630,7 +648,7 @@ class TestAStopOfHisOwn:
         body = text(order_page.get("/exec/order?side=call&strike=6400&stop=1.50"))
         form = body.split("<form id=sel")[1].split("</form>")[0]
         assert "name=stop value='1.50'" in form and "id=stopbox" in form and "value='1.50' data-derived=" in form
-        assert "cut if SPX ≤ <b>6378.00</b>" in body and "stop rests at <b>1.50</b>" in body
+        assert "cut if SPX falls to <b>6378.00</b>" in body and "stop rests at <b>1.50</b>" in body
         assert "id=ownstop>· your price</span>" in body
         assert "name='stop' value='1.50'" in body.split("id=sendfields")[1].split("</span>")[0]
         hrefs = [h.split("'")[0] for h in body.split("href='")[1:]]

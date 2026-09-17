@@ -57,7 +57,7 @@ _ORDER_STYLE = """
  .row .grow{flex-grow:1}
  .exp2 a.chip{color:#9ca3af;background:transparent;border:1px solid #374151}.exp2 a.chip.on{background:#1f2937;color:#fff;border-color:#1f2937}
  .dl{display:flex;align-items:center;gap:.4em}.dl.stopl input{width:6.2em}.dl input{width:5em;height:44px;box-sizing:border-box;font-size:1.15em;text-align:center;
-       padding:0 .5em;border-radius:8px;border:1px solid #374151;background:#0b1020;color:#e5e7eb}
+       padding:0 .5em;border-radius:8px;border:2px solid #9ca3af;background:#111827;color:#e5e7eb}
  .side a{outline:0}.side a.on{outline:3px solid #e5e7eb}.side a.bear.off{background:#7f1d1d;color:#fca5a5}.side a.bull.off{background:#064e3b;color:#6ee7b7}
  .trow{display:flex;align-items:baseline;justify-content:space-between;gap:.75em;margin:.25em 0}
  .tbig{font-size:1.5em;font-weight:700}.neg{color:#f87171;font-weight:700}.pos{color:#34d399;font-weight:700}
@@ -85,8 +85,13 @@ _SCRIPT = """
   function q(extra){ var d = new FormData(form); var o = {}; d.forEach(function(v,k){ if(v!=='') o[k]=v; });
     for (var k in (extra||{})) o[k]=extra[k]; return new URLSearchParams(o).toString(); }
   function lockField(){ return form ? form.elements['limit'] : null; }
-  function reprice(){ if(!form) return;
+  // Every reprice is numbered and only the newest answer paints (st-hzr6):
+  // on a slow link two answers a second apart arrived out of order and the
+  // ticket showed one state while the form held the other.
+  var seq = 0; window.__lastReprice = 0;
+  function reprice(){ if(!form) return; var mine = ++seq; window.__lastReprice = Date.now();
     fetch(PRICE + '?' + q(), {headers:{'Accept':'application/json'}}).then(function(r){return r.json();}).then(function(j){
+      if (mine !== seq) return;
       var f = document.getElementById('fd0'); if (f && j.fd0_html) f.innerHTML = j.fd0_html;
       var s = document.getElementById('strikes'); if (s && j.strikes_html) s.innerHTML = j.strikes_html;
       var p = document.getElementById('sendfields'); if (p && j.send_fields_html) p.innerHTML = j.send_fields_html;
@@ -114,21 +119,30 @@ _SCRIPT = """
   // the padlock (st-2s4u): the lock is the hidden limit on the form, the
   // server renders the ticket from it, so a tap only flips the field and
   // reprices. The chip is inside #fd0 and is re-rendered, hence delegation.
+  // The tap answers at once — the icon flips before the server is asked —
+  // and a second tap inside half a second is the same tap (st-hzr6: on a
+  // slow link the chain read took a second, nothing changed, he tapped
+  // again, and the pair toggled the lock off again).
   document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('#lock') : null;
     if (!b) return; e.preventDefault(); var lf = lockField(); if (!lf) return;
-    lf.value = lf.value ? '' : (b.getAttribute('data-limit') || ''); reprice(); });
-  // the poll's quote: unlocked, the head follows the ask; locked, the ask
-  // shows beside the locked price
+    var now = Date.now(); if (now - (window.__lockTap || 0) < 500) return; window.__lockTap = now;
+    lf.value = lf.value ? '' : (b.getAttribute('data-limit') || '');
+    b.classList.toggle('on', !!lf.value); b.innerHTML = lf.value ? '&#128274;' : '&#128275;';
+    reprice(); });
+  // The poll's quote. Locked, the ask shows beside the locked price. Unlocked,
+  // the ticket follows the ask by being priced again as one piece: the head
+  // used to be rewritten alone, so the price said 0.60 while the stop, the
+  // net and the cost below it still stood on 0.70 (st-hzr6). Repriced at
+  // most every 4 s, never while a box has focus.
+  function editing(){ var a = document.activeElement; return !!(a && a.tagName === 'INPUT' && form && form.contains(a)); }
   window.__lots = form && form.elements['lots'] ? (form.elements['lots'].value || '1') : '1';
   window.__onQuote = function(j){ if (!j || !j.quote || j.limit_now == null) return;
-    var lf = lockField(); var px = document.getElementById('px'); var cost = document.getElementById('cost');
-    var live = document.getElementById('live'); var lk = document.getElementById('lock');
+    var lf = lockField(); var live = document.getElementById('live'); var lk = document.getElementById('lock');
     if (lf && lf.value) { if (live) live.textContent = 'ask ' + Number(j.quote.ask).toFixed(2) + ' now'; return; }
-    if (px) px.textContent = Number(j.limit_now).toFixed(2);
-    if (cost && j.cost_now) cost.textContent = j.cost_now;
-    var pr = document.getElementById('priced'); if (pr && j.quote.as_of) { try {
-      pr.textContent = 'priced ' + new Date(j.quote.as_of).toLocaleTimeString('en-GB', {hour12: false, timeZone: 'America/Chicago'}); } catch (e) {} }
-    if (lk) lk.setAttribute('data-limit', Number(j.limit_now).toFixed(2)); };
+    var shown = lk ? lk.getAttribute('data-limit') : null;
+    if (shown === Number(j.limit_now).toFixed(2)) return;
+    if (editing() || Date.now() - window.__lastReprice < 4000) return;
+    reprice(); };
 })();
 </script>
 """
@@ -308,11 +322,15 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
         return f"<div class=card>{head}<div class=bad>{esc(priced.error)}</div></div>"
     t = priced.ticket
     d = t.derivation
+    # Every line in words Steve reads without a glossary (st-hzr6, 2026-09-17:
+    # "lots about this text wall that doesn't make sense"). A long call is cut
+    # when SPX falls to the level, a long put when it rises to it.
     side = "below" if t.right == "CALL" else "above"
-    sign = "≤" if t.right == "CALL" else "≥"
+    verb = "falls to" if t.right == "CALL" else "rises to"
     if priced.stop_price is not None:
         stop_txt = (f"stop rests at <b>{priced.stop_price:.2f}</b> → "
-                    f"<span class=neg>{money(priced.net_at_stop_usd)}</span>")
+                    f"<span class=neg>{money(priced.net_at_stop_usd)}</span> "
+                    f"<span class=k>if it fills there</span>")
     else:
         stop_txt = f"<span class=neg>no resting stop — {esc(priced.stop_note or 'none')}</span>"
     # a stop of his own is marked as his, and by which form (st-m3bl)
@@ -321,8 +339,8 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
         own = " <span class=k id=ownstop>· your price</span>"
     elif priced.stop_set_by == "spx":
         own = " <span class=k id=ownstop>· your level</span>"
-    line2 = (f"<div class=trow><span>cut if SPX {sign} <b>{t.stop_trigger_spx:.2f}</b> "
-             f"<span class=k>({d.stop_distance_spx:.2f} {side})</span>{own}</span><span>{stop_txt}</span></div>")
+    line2 = (f"<div class=trow><span>cut if SPX {verb} <b>{t.stop_trigger_spx:.2f}</b> "
+             f"<span class=k>({d.stop_distance_spx:.2f} {side} spot)</span>{own}</span><span>{stop_txt}</span></div>")
     for w in t.warnings:
         if w.startswith("YOUR STOP RISKS"):
             line2 += f"<div class=warn>{esc(w)}</div>"
@@ -334,8 +352,8 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
             tp = take_profit_price(priced.limit, multiple, basis, stop_price=priced.stop_price)
             net = round((tp - priced.limit) * CONTRACT_MULTIPLIER * priced.lots
                         - priced.commissions_usd, 2)
-            target_txt = (f"target rests at {tp:.2f} <span class=k>({multiple:g}× the fill)</span> → "
-                          f"<span class=pos>{money(net)}</span>")
+            target_txt = (f"take-profit rests at {tp:.2f} <span class=k>({multiple:g}× the fill)</span> → "
+                          f"<span class=pos>{money(net)}</span> <span class=k>if it fills there</span>")
     except (ValueError, TypeError):
         target_txt = ""
     line3 = (f"<div class='trow k'><span>{target_txt}</span>"
@@ -351,21 +369,34 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
         else:
             money_line = (f"<div class=k>available funds {usd(avail)} — "
                           f"{usd(avail - priced.cost_usd)} after this</div>")
+    # The derivation, top to bottom, the way the money actually flows: what
+    # the contract costs; what this attempt is allowed to lose; what of that
+    # the market takes before the trade moves; the rest, turned into SPX
+    # points through delta — which is where the cut goes.
     rows = [
-        ("most this costs", money(-t.max_loss_usd)),
-        ("budget", f"${d.budget_remaining_usd:.2f} / {d.attempts_left} attempt(s) → "
-                   f"${d.budget_remaining_usd / d.attempts_left:.2f} for this one"),
-        ("less friction", f"${d.spread_usd:.2f} spread + ${d.fees_rt_usd:.2f} fees = "
-                          f"${d.attempt_risk_usd:.2f} to risk"),
-        ("in premium", f"{d.stop_premium_pts:.2f} at δ {d.delta_live:.2f} = "
-                       f"{d.stop_distance_spx:.2f} SPX pts"),
-        ("tape noise", f"about {d.noise_floor_spx:.2f} pts"),
-        ("quote", f"{c.bid_pts:.2f} / {c.ask_pts:.2f}, δ {c.abs_delta:.2f}"),
-        ("commissions", f"${priced.commissions_usd:.2f} in and out"),
+        ("to buy it", f"${priced.cost_usd or 0:.2f} at {priced.limit:.2f}, plus "
+                      f"${priced.commissions_usd:.2f} commissions in and out"),
+        ("the most this attempt may lose",
+         f"${t.max_loss_usd:.2f} — the budget of ${d.budget_remaining_usd:.2f} "
+         f"over {d.attempts_left} attempt(s) left"),
+        ("of that", f"${d.spread_usd:.2f} is the bid-ask gap and ${d.fees_rt_usd:.2f} fees; "
+                    f"${d.attempt_risk_usd:.2f} is left for the move against you"),
+        ("the move", f"${d.attempt_risk_usd:.2f} is {d.stop_premium_pts:.2f} of premium; "
+                     f"at delta {d.delta_live:.2f} that is {d.stop_distance_spx:.2f} SPX points "
+                     f"— where the cut goes"),
+        ("wobble allowance", f"about {d.noise_floor_spx:.2f} SPX points — the cut should sit "
+                             f"outside it (worked out from the bid-ask gap alone)"),
+        ("bid / ask", f"{c.bid_pts:.2f} / {c.ask_pts:.2f}, delta {c.abs_delta:.2f}"),
     ]
     detail = "<table class=fd0>" + "".join(
         f"<tr><td>{esc(k)}</td><td>{v}</td></tr>" for k, v in rows) + "</table>"
     for w in t.warnings:
+        if w.startswith("Noise floor used the spread only"):
+            continue                    # said in the wobble row; nothing to act on
+        if w.startswith("STOP INSIDE THE NOISE FLOOR"):
+            w = (f"the cut sits inside the wobble allowance — {d.stop_distance_spx:.2f} SPX "
+                 f"points of room against about {d.noise_floor_spx:.2f}; ordinary wobble can "
+                 f"take it out without the trade being wrong")
         detail += f"<div class=warn>{esc(w)}</div>"
     return (f"<div class=card>{head}{line2}{line3}{money_line}"
             f"<div class='full detail'>{detail}</div></div>")
@@ -590,7 +621,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             "<span class=grow></span>"
             f"<label class=dl><span class=k>δ</span><input name=delta inputmode=decimal value='{delta_val}' placeholder='spot'></label>"
             f"<label class='dl stopl' title=\"a '.' makes it a price (8.30); none makes it an SPX level (7610)\">"
-            f"<span class=k>stop</span><input id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off "
+            f"<span class=k>stop: strike or price</span><input id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off "
             f"value='{esc(stop_val)}' data-derived='{derived}'></label>"
             "<button class='chip quiet' name=reprice value=1>RE-PRICE</button></div>"
             "<details class=inputs2><summary>budget and attempts</summary><div class=inputs>"
