@@ -715,3 +715,45 @@ class TestTheLegsAreReconciled:
         assert p["stop_order_id"] and p["stop_order_id"] != sid
         assert broker._orders[p["stop_order_id"]].is_working
         assert second.journal.events("leg_lost")[0]["order_id"] == sid
+
+
+class TestTheFillSweepOverlaps:
+    """Audit finding 27 (st-b7i4): the sweep's watermark was the poll clock
+    while the fill's stamp is the exchange's, so a fill listed late was
+    skipped by every later sweep."""
+
+    def test_a_fill_listed_after_the_watermark_passed_it_is_still_booked(
+            self, armed, broker, clock):
+        from execd.service import FILL_OVERLAP_S
+        armed.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        sid = armed.status()["positions"][0]["stop_order_id"]
+        clock.advance(seconds=1)
+        broker.fill_resting(sid)                       # executed at T, at the exchange
+        late = broker._fills.pop()                     # ...but not yet in the listing
+        saved = broker._orders[sid]
+        from dataclasses import replace
+        from execd.broker import OrderStatus
+        broker._orders[sid] = replace(saved, status=OrderStatus.WORKING, filled_qty=0, fill_price=None)
+        clock.advance(seconds=5)
+        assert armed.poll_fills()["picked_up"] == []   # the watermark moves to T+6
+        broker._fills.append(late)                     # now the listing has it, stamped T
+        broker._orders[sid] = saved
+        clock.advance(seconds=5)
+        assert FILL_OVERLAP_S > 11
+        picked = armed.poll_fills()["picked_up"]
+        assert picked and picked[0]["order_id"] == sid
+        assert armed.status()["positions"] == []
+        assert len(armed.journal.events("closed")) == 1
+
+    def test_the_overlap_returns_each_fill_again_and_it_is_booked_once(
+            self, armed, broker, clock):
+        armed.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        sid = armed.status()["positions"][0]["stop_order_id"]
+        clock.advance(seconds=1)
+        broker.fill_resting(sid)
+        assert armed.poll_fills()["picked_up"]
+        for _ in range(3):
+            clock.advance(seconds=5)
+            assert armed.poll_fills()["picked_up"] == []
+        assert len(armed.journal.events("closed")) == 1
+        assert not armed.journal.events("unattributed_sell")

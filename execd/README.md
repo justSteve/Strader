@@ -253,7 +253,10 @@ attempt is a filled position, Steve 2026-09-14) until reconcile learns what
 became of it, so an order resting at the broker can no longer be repeated
 without limit. Filled ones become tracked positions and get the bracket they
 were owed; cancelled and rejected ones give the slot back; ones the broker cannot account for keep it, because holding a slot only
-refuses new risk while forgetting one creates it. A position found at the broker
+refuses new risk while forgetting one creates it. A close this service sent and the
+listing does not show is kept in flight for 90 s before it is declared unknown (st-b7i4),
+and the fill sweep's window overlaps the last poll by 60 s so a fill listed late is
+still booked. A position found at the broker
 that **this service tried to open** — any contract in the last week of journals
 with a `sending`, `working` or `filled` line — and lost track of is adopted so
 `flatten` can close it. Anything else the account holds on this service's

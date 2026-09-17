@@ -192,6 +192,19 @@ LEG_SETTLE_S = POSITION_SETTLE_S
 #: is re-rested once; cancelled again inside this window it is left off, loud,
 #: rather than rested a third time against a broker that keeps killing it.
 LEG_REREST_COOLDOWN_S = 300.0
+#: How long a close this service sent may be missing from the broker's
+#: listing before it is declared unknown, cleared, and the bracket re-rested.
+#: Until 2026-09-17 it was cleared on ONE absent listing while positions got
+#: POSITION_SETTLE_S for the same broker's lag — and the bracket went back on
+#: beside a working market sell, with observe() free to fire a second one
+#: (audit finding 26, st-b7i4). The same grace, for the same reason.
+EXIT_SETTLE_S = POSITION_SETTLE_S
+#: The fill sweep asks the broker for fills since the last poll minus this,
+#: not since the last poll: a fill stamped with the exchange's clock at T and
+#: listed only after the sweep at T+1 had moved the watermark past it was
+#: skipped by every later sweep (audit finding 27, st-b7i4). Repeats are
+#: dropped on (order_id, leg_id, at).
+FILL_OVERLAP_S = 60.0
 
 #: How long a send whose answer never came back is held as unconfirmed before
 #: reconcile, having swept the broker's listing and found nothing matching,
@@ -287,6 +300,8 @@ class OpenPosition:
     #: re-rested it after the broker reported it terminal
     stop_unlisted_since: datetime | None = None
     target_unlisted_since: datetime | None = None
+    #: first time the broker's listing failed to report the in-flight close
+    exit_unlisted_since: datetime | None = None
     stop_unaccounted: bool = False
     target_unaccounted: bool = False
     stop_rerested_at: datetime | None = None
@@ -394,6 +409,9 @@ class ExecService:
         #: the last mark ``observe`` acted on, and when — the band a new mark
         #: is judged against (st-xv5e)
         self._last_mark: tuple[float, datetime] | None = None
+        #: every execution leg the fill sweep has seen, as (order_id, leg_id,
+        #: at): the overlapping window returns each one again (st-b7i4)
+        self._swept_fills: set[tuple[str, int | None, str]] = set()
         self._mark_refused_streak = 0
         #: working buy orders on this service's instruments that it did not
         #: send and cannot match to a send — order_id → OrderResult dict,
@@ -951,7 +969,7 @@ class ExecService:
         the position is gone. Reversed, a losing trade would vanish from the
         ceiling it was supposed to debit. Booking goes through ``_book_close``,
         which takes the *other* leg of the bracket off first (st-fn5y)."""
-        since = self._last_fill_poll
+        since = self._last_fill_poll - timedelta(seconds=FILL_OVERLAP_S)
         now = self.clock()
         try:
             fills = self.broker.fills_since(since)
@@ -963,6 +981,10 @@ class ExecService:
         for fill in fills:
             if fill.side is not Side.SELL_TO_CLOSE:
                 continue
+            key = (fill.order_id, fill.leg_id, fill.at.isoformat())
+            if key in self._swept_fills:
+                continue                # the overlap's own repeat; the same event
+            self._swept_fills.add(key)
             if fill.order_id in self._booked_exits:
                 # Already booked — from the place answer (a market close, a
                 # target that filled as it landed) or an earlier sweep. A fill
@@ -1260,6 +1282,19 @@ class ExecService:
             if not order_id:
                 continue
             order = broker_orders.get(order_id)
+            if order is None:
+                # Absent has to persist to mean anything — the same rule the
+                # position sweep applies to the same broker's listing. Meanwhile
+                # the close stays in flight: observe() does not fire again and
+                # the bracket stays off (finding 26, st-b7i4).
+                since = pos.exit_unlisted_since
+                if since is None:
+                    pos.exit_unlisted_since = self.clock()
+                    continue
+                if (self.clock() - since).total_seconds() < EXIT_SETTLE_S:
+                    continue
+            else:
+                pos.exit_unlisted_since = None
             if order is not None and order.is_working:
                 continue
             if order is not None and order.is_filled:
@@ -1272,8 +1307,10 @@ class ExecService:
                 continue
             outcome = order.status.value.lower() if order is not None else "unknown"
             detail = (order.message if order is not None
-                      else "the broker does not report this order — clearing it "
-                           "so the exit path is free to fire again")
+                      else f"the broker's listing has not reported this close for "
+                           f"{EXIT_SETTLE_S:.0f} s — clearing it so the exit path is "
+                           f"free to fire again")
+            pos.exit_unlisted_since = None
             self.journal.record("exit_resolved", symbol=pos.symbol,
                                 order_id=order_id, outcome=outcome,
                                 reason=pos.exit_reason, detail=detail)

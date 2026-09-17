@@ -929,6 +929,28 @@ it cannot open anything; what it must not do is come back not knowing a position
 is live, because then the SPX-mark loop stops watching it and `flatten` misses
 it.
 
+**An in-flight close gets the same grace a position does** (st-b7i4, audit
+finding 26). Until 2026-09-17 `_reconcile_exits` declared a close `unknown`
+on **one** listing that did not contain it, cleared it and re-rested the
+bracket — beside a market sell the broker was still working, with
+`observe()` then free to fire a second one: two market sells and a stop for
+one contract, on the same listing lag the position sweep already gives
+`POSITION_SETTLE_S` to. Now an absent close is kept for `EXIT_SETTLE_S`
+(90 s, `exit_unlisted_since` on the position): the loop reports it
+`pending` and the bracket stays off. A close the listing still does not
+show after that is the old trade-off, taken late rather than at once —
+`exit_resolved` outcome `unknown`, cleared, bracket back on. A terminal
+`canceled` / `rejected` is resolved at once, as before.
+
+**The fill sweep's window overlaps** (st-b7i4, audit finding 27). The
+watermark was the poll clock while a fill's stamp is the exchange's: a fill
+executed at *T* and listed only after the sweep at *T+1* had moved the
+watermark past it was skipped by every later sweep, and was booked, if at
+all, ninety seconds later by the gone-sweep's cancel finding it filled. The
+sweep now asks for fills since the last poll minus `FILL_OVERLAP_S` (60 s)
+and drops repeats on `(order_id, leg_id, at)`; the leg reconcile above
+(st-vqmr) is the second net, booking a leg the listing shows `FILLED`.
+
 **A close is booked once** (st-4b0p, 2026-09-16 10:19:29 CT). The service
 keeps every order id it has booked a close on (`_booked_exits`, written by
 `_book_close` and `_book_found_fill`, rebuilt here from the day's `closed`

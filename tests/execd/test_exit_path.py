@@ -99,6 +99,48 @@ class TestOneCloseAtATime:
         assert closed["kind"] == "spx-stop"
         assert holding.status()["positions"] == []
 
+    def test_a_close_missing_from_the_listing_stays_in_flight_for_the_window(
+            self, holding, broker, clock):
+        """Finding 26 (st-b7i4): one absent listing used to clear the close and
+        re-rest the bracket beside a working market sell, and the next tick
+        fired a second one — two market sells and a stop for one contract."""
+        from execd.service import EXIT_SETTLE_S
+        broker.rest_market = True
+        out = holding.observe(TRIGGER)
+        close_id = out["fired"][0]["order_id"]
+        hidden = broker._orders.pop(close_id)          # the listing lags the send
+        sells_before = len(sells(broker))
+        holding.reconcile()
+        p = holding.status()["positions"][0]
+        assert p["exit_order_id"] == close_id           # still in flight
+        assert p["stop_order_id"] is None               # the bracket stayed off
+        assert not holding.journal.events("exit_resolved")
+        assert holding.observe(TRIGGER)["pending"]      # the loop waits, does not fire again
+        clock.advance(seconds=EXIT_SETTLE_S - 1)
+        holding.reconcile()
+        assert holding.status()["positions"][0]["exit_order_id"] == close_id
+        assert len(sells(broker)) == sells_before
+        # the listing catches up: the close is still working, nothing changes
+        broker._orders[close_id] = hidden
+        holding.reconcile()
+        assert holding.status()["positions"][0]["exit_order_id"] == close_id
+        assert not holding.journal.events("exit_resolved")
+
+    def test_a_close_missing_past_the_window_is_cleared_and_the_bracket_re_rested(
+            self, holding, broker, clock):
+        from execd.service import EXIT_SETTLE_S
+        broker.rest_market = True
+        out = holding.observe(TRIGGER)
+        close_id = out["fired"][0]["order_id"]
+        broker._orders.pop(close_id)
+        holding.reconcile()                             # first seen missing
+        clock.advance(seconds=EXIT_SETTLE_S + 1)
+        holding.reconcile()
+        line = holding.journal.events("exit_resolved")[-1]
+        assert line["order_id"] == close_id and line["outcome"] == "unknown"
+        p = holding.status()["positions"][0]
+        assert p["exit_order_id"] is None and p["stop_order_id"] is not None
+
     def test_a_close_the_broker_cancelled_frees_the_loop_to_fire_again(
             self, holding, broker):
         broker.rest_market = True
