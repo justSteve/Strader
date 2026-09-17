@@ -60,9 +60,13 @@ DESK_REPORTS = Path("/root/projects/COO/myDesk/reports/mancini")
 DESK_REFRESH = Path("/root/projects/COO/myDesk/trading/trading-desk-refresh.sh")
 # Browser view of the same plan [st-lo2]. Steve keeps a tab parked on this
 # address and refreshes it in place, so the parse re-renders it rather than
-# opening anything. COO affirmed the /tmp/desk-<slug>.html mapping as contract
-# in reply to st-qx4 — moving it breaks a bookmark no error will explain.
-DESK_HTML = Path("/tmp/desk-mancini-latest-es-plan.html")
+# opening anything. The contract address was /tmp/desk-<slug>.html (COO, in
+# reply to st-qx4) until Steve moved it to /var/moo/desk on 2026-08-03
+# [co-gsbnb]: /tmp is wiped on a WSL restart, so every parked tab went stale
+# on reboot. This constant kept the old address until 2026-09-17, when the
+# 08:01 parse rendered the day's plan to /tmp while the parked page stayed on
+# the previous day [st-vbry]. desk-html.sh's header carries the same history.
+DESK_HTML = Path("/var/moo/desk/desk-mancini-latest-es-plan.html")
 DESK_HTML_SCRIPT = Path("/root/projects/COO/tmuxMOO/bin/desk-html.sh")
 # Deadlines for the two COO scripts a parse shells out to. Both run in their
 # own process group and the group is killed on the deadline, so a stuck
