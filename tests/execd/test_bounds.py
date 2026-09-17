@@ -177,6 +177,20 @@ class TestTheRiskBudget:
         assert check_risk_budget(entry(limit=2.10, qty=2), Bounds(qty_cap=2),
                                  spent, 0.05).bound == "ceiling"
 
+    def test_the_headroom_counts_what_is_already_held(self):
+        """Finding 40 (st-s2jj): at max_open_positions 2, two $400-risk
+        positions cleared a $500 ceiling because nothing subtracted the
+        first one's worst case."""
+        r = check_risk_budget(entry(limit=2.10), Bounds(), NO_STATE, 0.05, open_risk_usd=300.0)
+        assert r.bound == "ceiling"
+        assert "$205.00" in r.reason and "$200.00" in r.reason
+        assert "$300.00 at risk on what is held" in r.reason
+        assert check_risk_budget(entry(limit=2.10), Bounds(), NO_STATE, 0.05,
+                                 open_risk_usd=295.0) is None
+        spent = DayState(realized_loss_usd=100.0)
+        assert check_risk_budget(entry(limit=2.10), Bounds(), spent, 0.05,
+                                 open_risk_usd=200.0).bound == "ceiling"
+
     def test_a_contract_too_dear_for_the_whole_ceiling_is_refused_on_day_one(self):
         # $8.40 to a $0.05 stop is $835, over the ceiling before anything is lost.
         r = check_risk_budget(entry(limit=8.40), Bounds(), NO_STATE, stop_price=0.05)

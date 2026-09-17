@@ -444,7 +444,8 @@ def check_exit(intent: OrderIntent, bounds: Bounds,
 
 
 def check_risk_budget(
-    intent: OrderIntent, bounds: Bounds, state: DayState, stop_price: float
+    intent: OrderIntent, bounds: Bounds, state: DayState, stop_price: float,
+    *, open_risk_usd: float = 0.0,
 ) -> Refusal | None:
     """What this one entry can lose, against what the day has left. [st-2j80]
 
@@ -467,17 +468,26 @@ def check_risk_budget(
     market close filled worse than the stop, can still realize more than the
     number computed here. It bounds what the service knowingly puts at risk,
     which is the part it controls.
+
+    ``open_risk_usd`` is what the positions already held can still lose to
+    their stops. Until 2026-09-17 nothing subtracted it, and the claim that
+    the sum of the day's worst cases fits the ceiling was true only because
+    ``max_open_positions`` was 1 (audit finding 40, st-s2jj): at 2, two
+    $400-risk positions cleared a $500 ceiling with every bound passing.
     """
     from .stops import risk_usd      # local: bounds stays importable on its own
 
     risk = risk_usd(intent.limit or 0.0, stop_price, intent.qty)
-    headroom = round(bounds.daily_loss_ceiling_usd - state.realized_loss_usd, 2)
+    headroom = round(bounds.daily_loss_ceiling_usd - state.realized_loss_usd
+                     - open_risk_usd, 2)
     if risk > headroom:
+        held = (f" after ${state.realized_loss_usd:.2f} lost and ${open_risk_usd:.2f} "
+                f"at risk on what is held" if open_risk_usd else "")
         return Refusal(
             "ceiling",
             f"this entry risks ${risk:.2f} to its stop at ${stop_price:.2f}, and "
             f"the day has ${headroom:.2f} of its ${bounds.daily_loss_ceiling_usd:.2f} "
-            f"ceiling left",
+            f"ceiling left{held}",
         )
     return None
 

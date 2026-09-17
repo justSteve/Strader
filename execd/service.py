@@ -1668,7 +1668,35 @@ class ExecService:
         except ValueError as exc:
             return Refusal("protective_stop",
                            f"no resting stop can be derived for this entry: {exc}")
-        return check_risk_budget(intent, self.bounds, self.day_state(), stop_price)
+        open_risk, bare = self._open_risk_usd()
+        if bare:
+            # A held position with no stop — adopted, or one whose stop would
+            # not rest — has no worst case to sum. Its risk is unbounded, so
+            # the entry door stays shut until it has a stop or is flat
+            # (finding 40's second note, st-s2jj).
+            return Refusal(
+                "ceiling",
+                f"{', '.join(sym.strip() for sym in bare)} is held with no stop — its "
+                f"risk is unbounded, so nothing new opens until it has a stop or is flat")
+        return check_risk_budget(intent, self.bounds, self.day_state(), stop_price,
+                                 open_risk_usd=open_risk)
+
+    def _open_risk_usd(self, *, except_symbol: str | None = None) -> tuple[float, list[str]]:
+        """What the positions already held can still lose to their stops, and
+        the symbols of any that carry no stop price at all (unbounded). A stop
+        price counts whether or not its order is confirmed resting: the
+        SPX-mark loop watches the level either way, and the ceiling is a
+        bound on what the service knowingly risks (st-s2jj)."""
+        total = 0.0
+        bare: list[str] = []
+        for pos in self._open.values():
+            if pos.symbol == except_symbol:
+                continue
+            if pos.stop_price is None:
+                bare.append(pos.symbol)
+                continue
+            total += risk_usd(pos.entry_price, pos.stop_price, pos.qty)
+        return round(total, 2), bare
 
     def _place_entry(self, intent: OrderIntent, *,
                      page_query: dict[str, str] | None = None) -> dict[str, Any]:
@@ -2670,13 +2698,17 @@ class ExecService:
         if stop_given and new_stop is not None:
             risk = risk_usd(pos.entry_price, new_stop, pos.qty)
             state = self.day_state()
-            headroom = round(self.bounds.daily_loss_ceiling_usd - state.realized_loss_usd, 2)
+            # the other positions' worst cases come off the headroom too (st-s2jj)
+            others, _bare = self._open_risk_usd(except_symbol=pos.symbol)
+            headroom = round(self.bounds.daily_loss_ceiling_usd - state.realized_loss_usd
+                             - others, 2)
             if risk > headroom:
+                held = f" and ${others:.2f} at risk on the other positions held" if others else ""
                 return Refusal(
                     "ceiling",
                     f"{name('stop', new_stop)} puts ${risk:.2f} at risk on this position, "
                     f"and the day has ${headroom:.2f} of its "
-                    f"${self.bounds.daily_loss_ceiling_usd:.2f} ceiling left")
+                    f"${self.bounds.daily_loss_ceiling_usd:.2f} ceiling left{held}")
         return None
 
     def _refuse_adjust(self, symbol: str, refusal: Refusal) -> dict[str, Any]:

@@ -790,6 +790,14 @@ entry at its limit, which is the most a buy can pay and therefore the most it
 can lose, walks it down to the stop the entry would rest, and refuses if that
 exceeds the headroom left. Checked against the *remaining* headroom, which is
 what makes the sum of the day's worst cases fit inside the ceiling.
+The headroom subtracts the worst cases of the positions already held as
+well as the losses already realized (`_open_risk_usd`, st-s2jj, audit
+finding 40): until 2026-09-17 it subtracted realized loss only, and the
+claim held because `max_open_positions` was 1. `adjust` counts the *other*
+positions' worst cases the same way when a stop is moved wider. A position
+held with no stop price — adopted, or a stop that would not rest — has no
+worst case to sum: its risk is unbounded, and no new entry opens until it
+has a stop or is flat.
 
 The same ruling raised the ceiling from $100 to $500. At $100 the bound could
 never bind: a $2.10 SPX call with a twelve-point stop risks $205 whatever the

@@ -747,3 +747,53 @@ class TestCancel:
     def test_cancelling_an_unknown_order_reaches_the_broker_and_fails_loudly(self, armed):
         with pytest.raises(BrokerError):
             armed.cancel("no-such-order")
+
+
+class TestTheCeilingCountsWhatIsHeld:
+    """Audit finding 40 (st-s2jj): check_risk_budget and adjust subtracted
+    realized loss only, so the 'sum of the day's worst cases' claim held by
+    max_open_positions being 1. Pinned here at 2."""
+
+    def svc(self, broker, clock, tmp_path, ceiling: float):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha",
+                               bounds=Bounds(daily_loss_ceiling_usd=ceiling, max_open_positions=2))
+        svc = ExecService(broker, config, clock=clock)
+        svc.unlock({"token": "x"})
+        # the call: 2.10 in, stop 1.50 → $60 at risk
+        svc.place(entry(intent_id="held-call", stop_spx=SPX_NOW - 2.0, delta=0.30))
+        assert svc.journal.events("stop_placed")[0]["risk_usd"] == 60.0
+        return svc
+
+    @staticmethod
+    def put():
+        # 1.90 in, stop 1.35 (on the grid) → $55 at risk
+        return entry(intent_id="held-put", symbol=PUT, limit=1.90, stop_spx=SPX_NOW + 2.0, delta=0.28)
+
+    def test_a_second_entry_must_fit_beside_the_first(self, broker, clock, tmp_path):
+        svc = self.svc(broker, clock, tmp_path, ceiling=100.0)
+        out = svc.place(self.put())
+        assert out["refused"]["bound"] == "ceiling"
+        assert "$55.00" in out["refused"]["reason"] and "$40.00" in out["refused"]["reason"]
+        assert "$60.00 at risk on what is held" in out["refused"]["reason"]
+        assert len(svc.status()["positions"]) == 1
+
+    def test_a_second_entry_that_fits_beside_the_first_opens(self, broker, clock, tmp_path):
+        svc = self.svc(broker, clock, tmp_path, ceiling=120.0)
+        assert svc.place(self.put())["refused"] is None
+        assert len(svc.status()["positions"]) == 2
+
+    def test_widening_one_stop_counts_the_other_position(self, broker, clock, tmp_path):
+        svc = self.svc(broker, clock, tmp_path, ceiling=200.0)
+        assert svc.place(self.put())["refused"] is None       # $60 + $55 held
+        out = svc.adjust(CALL, stop_price=0.10)               # $200 on the call alone
+        assert out["refused"]["bound"] == "ceiling"
+        assert "$55.00 at risk on the other positions held" in out["refused"]["reason"]
+        assert "$145.00" in out["refused"]["reason"]
+        assert svc.adjust(CALL, stop_price=1.00)["refused"] is None   # $110 ≤ $145
+
+    def test_a_held_position_with_no_stop_shuts_the_entry_door(self, broker, clock, tmp_path):
+        svc = self.svc(broker, clock, tmp_path, ceiling=500.0)
+        svc._open[CALL].stop_price = None          # a stop that would not rest, or adopted
+        out = svc.place(self.put())
+        assert out["refused"]["bound"] == "ceiling"
+        assert "held with no stop" in out["refused"]["reason"] and "unbounded" in out["refused"]["reason"]
