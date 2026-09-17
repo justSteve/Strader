@@ -1069,6 +1069,30 @@ journal line per outage and a `watch: broker back` line when it clears; an
 unexpected exception is logged and the loop continues. It never opens
 anything — `reconcile` and `observe` are exit-class.
 
+**The mark is judged before it is acted on** (st-xv5e, audit finding 32).
+`spx_mark()` raises `BrokerError` for a quote with no price in it, where it
+used to return 0.0 — and at an index of zero every long call is past its
+cut, so `observe()` would have market-sold each one for nothing. The watcher
+treats that as a broker outage (one `error kind=watch` line, the resting
+stop stays the exit). `observe()` itself refuses a mark that is not a
+positive finite number, and a mark more than `MARK_BAND_PCT` (1 %) from the
+last one it accepted when that one is younger than `MARK_BAND_WINDOW_S`
+(300 s): a quote that is wrong rather than moved fires the same way a move
+does. A refused mark is `mark_refused` in the journal, once per streak, with
+the reason; the mark that ends the streak is `mark_accepted` with the count.
+While a mark is refused the bracket at the broker is the exit; a genuine
+gap of more than 1 % is acted on once the window has passed — five minutes
+in which the resting stop, not the loop, is the protection.
+
+The same finding's other half is in `_place_entry` (§5.6): the cut is
+checked once more against the fresh mark the send is journaled with, after
+the preview round trip. Cycle 1 on 2026-09-14 was sent with SPX at 7630.88
+against a call stop at 7631.13 — born past its cut, the stop resting one
+tick under the fill — because the only check ran on a mark read before the
+preview. That entry is now refused (`protective_stop`, "SPX moved through
+the cut while this entry was being priced"), and so is a send whose mark
+cannot be read at all.
+
 Reaches the running service at the next install (`installExecd`).
 
 ### 5.17 Paper mode (stage 4, st-k6gl)

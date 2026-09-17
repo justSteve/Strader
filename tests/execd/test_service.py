@@ -190,6 +190,54 @@ class TestTheProtectiveStop:
         assert out["refused"]["bound"] == "protective_stop"
         assert sent_orders(broker) == []
 
+    def test_a_quote_with_no_price_in_it_is_no_mark(self, armed, broker):
+        """``last or mid`` used to hand back 0.0 for an empty quote, and every
+        caller then compared a stop to the index at zero (finding 32)."""
+        broker.set_quote("$SPX", bid=0.0, ask=0.0, last=0.0)
+        with pytest.raises(BrokerError, match="no usable"):
+            armed.spx_mark()
+        out = armed.place(entry())
+        assert out["refused"]["bound"] == "protective_stop"
+        assert sent_orders(broker) == []
+
+    def test_an_entry_whose_cut_is_crossed_while_it_is_priced_is_refused_at_the_send(
+            self, armed, broker, monkeypatch):
+        """Finding 32 (st-xv5e): cycle 1 on 2026-09-14 passed the consistency
+        check on one mark, the broker previewed, and the send read a fresh
+        mark already through the cut — the position was born past it. The
+        cut is checked again on the mark the send is journaled with."""
+        real_preview = broker.preview
+
+        def preview(intent):
+            out = real_preview(intent)
+            # the index moves through the cut during the preview round trip
+            broker.set_quote("$SPX", bid=SPX_NOW - 12.75, ask=SPX_NOW - 12.25,
+                             last=SPX_NOW - 12.5)
+            return out
+
+        monkeypatch.setattr(broker, "preview", preview)
+        out = armed.place(entry(stop_spx=SPX_NOW - 12))
+        assert out["refused"]["bound"] == "protective_stop"
+        assert "moved through the cut" in out["refused"]["reason"]
+        assert sent_orders(broker) == []
+        assert armed.status()["positions"] == []
+        line = armed.journal.events("refused")[-1]
+        assert line["kind"] == "place" and "moved through the cut" in line["refused"]["reason"]
+
+    def test_a_mark_lost_during_the_preview_refuses_the_send(self, armed, broker, monkeypatch):
+        real_preview = broker.preview
+
+        def preview(intent):
+            out = real_preview(intent)
+            broker._quotes.pop("$SPX")
+            return out
+
+        monkeypatch.setattr(broker, "preview", preview)
+        out = armed.place(entry())
+        assert out["refused"]["bound"] == "protective_stop"
+        assert "at the send" in out["refused"]["reason"]
+        assert sent_orders(broker) == []
+
     def test_a_broker_that_refuses_the_resting_stop_is_loud(self, armed, broker, monkeypatch):
         """The position is live and unprotected. That must be in the journal
         under its own event, not swallowed as a warning."""
@@ -405,6 +453,53 @@ class TestTheSpxExitLoop:
         before = len(sent_orders(broker))
         assert armed.observe(SPX_NOW - 11.0)["fired"] == []
         assert len(sent_orders(broker)) == before
+
+    def test_a_zero_mark_fires_nothing(self, armed, broker):
+        """Finding 32 (st-xv5e): at spx == 0 every long call is past its cut,
+        and observe() used to market-sell each one for nothing."""
+        armed.place(entry(stop_spx=SPX_NOW - 12))
+        before = len(sent_orders(broker))
+        out = armed.observe(0.0)
+        assert out["fired"] == [] and "not a price" in out["refused"]
+        assert len(sent_orders(broker)) == before
+        assert len(armed.status()["positions"]) == 1
+        line = armed.journal.events("mark_refused")[0]
+        assert line["spx"] == 0.0 and "not a price" in line["detail"]
+
+    @pytest.mark.parametrize("bad", [-1.0, float("nan"), float("inf"), "seven"])
+    def test_a_mark_that_is_not_a_price_fires_nothing(self, armed, broker, bad):
+        armed.place(entry(stop_spx=SPX_NOW - 12))
+        out = armed.observe(bad)
+        assert out["fired"] == [] and out["refused"]
+        assert len(armed.status()["positions"]) == 1
+
+    def test_a_mark_far_from_the_last_is_refused_until_the_window_passes(
+            self, armed, broker, clock):
+        """A quote that is wrong rather than moved fires the same way a real
+        move does. Inside the window the resting bracket is the exit; a
+        genuine gap is accepted once the window has passed."""
+        from execd.service import MARK_BAND_WINDOW_S
+        armed.place(entry(stop_spx=SPX_NOW - 12))
+        assert armed.observe(SPX_NOW)["refused"] is None
+        clock.advance(seconds=5)
+        out = armed.observe(SPX_NOW * 0.98)         # 2 % in five seconds
+        assert out["fired"] == [] and "from the last mark accepted" in out["refused"]
+        assert len(armed.status()["positions"]) == 1
+        assert len(armed.journal.events("mark_refused")) == 1
+        clock.advance(seconds=5)
+        assert armed.observe(SPX_NOW * 0.98)["refused"]   # still inside the window
+        assert len(armed.journal.events("mark_refused")) == 1   # one line per streak
+        clock.advance(seconds=MARK_BAND_WINDOW_S)
+        out = armed.observe(SPX_NOW * 0.98)
+        assert out["refused"] is None and out["fired"][0]["closed"] is True
+        assert armed.journal.events("mark_accepted")[0]["refused"] == 2
+
+    def test_a_mark_inside_the_band_is_acted_on(self, armed, broker, clock):
+        armed.place(entry(stop_spx=SPX_NOW - 12))
+        assert armed.observe(SPX_NOW)["refused"] is None
+        clock.advance(seconds=5)
+        out = armed.observe(SPX_NOW - 12.5)          # ~0.2 %: a move, not a bad quote
+        assert out["refused"] is None and out["fired"][0]["closed"] is True
 
     def test_a_put_fires_on_the_way_up(self, armed, broker):
         armed.place(entry(symbol=PUT, limit=1.90, stop_spx=SPX_NOW + 12, delta=0.28))

@@ -53,6 +53,7 @@ exists to close. See its docstring. [st-v7oa]
 
 from __future__ import annotations
 
+import math
 import threading
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
@@ -171,6 +172,15 @@ class WorkingEntry:
 #: and treating that lag as a close would drop a live position and cancel the
 #: stop under it. Absence has to persist to mean anything. [st-v7oa]
 POSITION_SETTLE_S = 90.0
+
+#: A mark further than this from the last one ``observe`` accepted, and
+#: younger than ``MARK_BAND_WINDOW_S``, is a bad quote before it is a market
+#: move: at ``spx == 0`` every long call is past its cut and the loop would
+#: market-sell each one for nothing (audit finding 32 / 04 §7, st-xv5e).
+#: The resting bracket at the broker is the exit while a mark is refused; a
+#: genuine gap is accepted once the window has passed.
+MARK_BAND_PCT = 1.0
+MARK_BAND_WINDOW_S = 300.0
 
 #: How long a send whose answer never came back is held as unconfirmed before
 #: reconcile, having swept the broker's listing and found nothing matching,
@@ -348,6 +358,10 @@ class ExecService:
         #: entries sent whose answer never came back — intent_id → the send;
         #: nothing else goes out until reconcile has accounted for each
         self._unconfirmed: dict[str, UnconfirmedSend] = {}
+        #: the last mark ``observe`` acted on, and when — the band a new mark
+        #: is judged against (st-xv5e)
+        self._last_mark: tuple[float, datetime] | None = None
+        self._mark_refused_streak = 0
         #: working buy orders on this service's instruments that it did not
         #: send and cannot match to a send — order_id → OrderResult dict,
         #: journaled once, shown, never adopted
@@ -645,9 +659,19 @@ class ExecService:
         return self.broker.positions()
 
     def spx_mark(self) -> float:
-        """The index level the stops are denominated in."""
+        """The index level the stops are denominated in.
+
+        A quote with no price in it is no mark — ``BrokerError``, the same as
+        no quote at all — rather than the 0.0 that ``last or mid`` used to
+        hand back, which every caller then compared to a stop as if it were
+        the index at zero (finding 32, st-xv5e)."""
         q = self.broker.quote(self.config.index_symbol)
-        return q.last or q.mid
+        mark = q.last or q.mid
+        if not (isinstance(mark, (int, float)) and math.isfinite(mark) and mark > 0):
+            raise BrokerError(
+                f"no usable {self.config.index_symbol} mark — last {q.last!r}, "
+                f"bid {q.bid!r}, ask {q.ask!r}")
+        return float(mark)
 
     # ── preview ──────────────────────────────────────────────────────────
     def preview(self, intent: OrderIntent) -> dict[str, Any]:
@@ -804,6 +828,19 @@ class ExecService:
         with self._lock:
             fired: list[dict[str, Any]] = []
             pending: list[dict[str, Any]] = []
+            if (why := self._mark_refusal(spx)) is not None:
+                # Journaled once per streak: the watcher asks every 5 s and a
+                # dead feed would otherwise write a line each pass.
+                if self._mark_refused_streak == 0:
+                    last = self._last_mark[0] if self._last_mark else None
+                    self.journal.record("mark_refused", spx=spx, last_spx=last, detail=why)
+                self._mark_refused_streak += 1
+                return {"spx": spx, "fired": fired, "pending": pending, "refused": why}
+            if self._mark_refused_streak:
+                self.journal.record("mark_accepted", spx=spx,
+                                    refused=self._mark_refused_streak)
+                self._mark_refused_streak = 0
+            self._last_mark = (float(spx), self.clock())
             for pos in list(self._open.values()):
                 if pos.stop_spx is None and pos.target_spx is None:
                     continue
@@ -838,7 +875,34 @@ class ExecService:
                                         symbol=pos.symbol, detail=str(exc))
                     fired.append({"symbol": pos.symbol, "closed": False,
                                   "error": str(exc)})
-            return {"spx": spx, "fired": fired, "pending": pending}
+            return {"spx": spx, "fired": fired, "pending": pending, "refused": None}
+
+    def _mark_refusal(self, spx: Any) -> str | None:
+        """A mark the exit loop must not act on: not a number, not a price
+        (zero, negative, infinite), or — inside ``MARK_BAND_WINDOW_S`` of the
+        last mark accepted — further from it than ``MARK_BAND_PCT``. Finding
+        32 (st-xv5e): at ``spx == 0`` every long call is past its cut and the
+        loop would market-sell each one for nothing, and a quote that is
+        wrong rather than moved fires the same way. The resting bracket at
+        the broker is the exit while a mark is refused; a genuine gap is
+        accepted once the window has passed."""
+        try:
+            mark = float(spx)
+        except (TypeError, ValueError):
+            return f"mark {spx!r} is not a number — not acting on it"
+        if not (math.isfinite(mark) and mark > 0):
+            return f"mark {spx!r} is not a price — not acting on it"
+        if self._last_mark is not None:
+            last, at = self._last_mark
+            age = (self.clock() - at).total_seconds()
+            if age < MARK_BAND_WINDOW_S:
+                moved = abs(mark - last)
+                band = last * MARK_BAND_PCT / 100.0
+                if moved > band:
+                    return (f"mark {mark:g} is {moved:.2f} from the last mark accepted "
+                            f"({last:g}, {age:.0f} s ago) — more than {MARK_BAND_PCT:g} % "
+                            f"— not acting on it until {MARK_BAND_WINDOW_S:.0f} s have passed")
+        return None
 
     def poll_fills(self) -> dict[str, Any]:
         """Pick up fills the service did not initiate — a resting protective
@@ -1422,7 +1486,31 @@ class ExecService:
         if (r := check_preview_cost(intent, prev.total_usd, self.bounds)) is not None:
             return self._refuse(intent, r, kind="place")
 
-        spx = self.spx_mark()
+        try:
+            spx = self.spx_mark()
+        except BrokerError as exc:
+            return self._refuse(
+                intent,
+                Refusal("protective_stop",
+                        f"no {self.config.index_symbol} mark at the send ({exc}) — "
+                        "not sending"),
+                kind="place")
+        # The cut was checked against a mark read before the preview, a broker
+        # round trip ago. Cycle 1 on 2026-09-14 was sent with the index already
+        # through its cut — 7630.88 against a call stop at 7631.13 — and was
+        # born past it; with the watcher live it would have been market-sold
+        # on the first pass, bought at the ask and sold at the bid for nothing
+        # (audit finding 32, st-xv5e). Last look at the cut, on the mark the
+        # send is journaled with.
+        if intent.stop_spx is not None and not stop_is_consistent(
+                intent.occ.right, spx, intent.stop_spx):
+            return self._refuse(
+                intent,
+                Refusal("protective_stop",
+                        f"SPX moved through the cut while this entry was being priced — "
+                        f"a {intent.occ.right_word} stop at {intent.stop_spx:g} is already "
+                        f"triggered with SPX at {spx:g} — not sending"),
+                kind="place")
         # The STOP file was checked when the bounds ran, three broker
         # round-trips ago. It is one touch from Steve's phone, and the touch
         # that lands while an entry is being priced must win (audit finding

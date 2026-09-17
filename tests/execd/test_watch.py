@@ -60,6 +60,21 @@ def test_a_broker_outage_is_journaled_once_and_retried(armed: ExecService, broke
     assert [e for e in armed.journal.read() if e.get("event") == "watch"][-1]["detail"] == "broker back"
 
 
+def test_a_dead_mark_is_a_broker_outage_not_an_exit(armed: ExecService, broker):
+    """An index quote with no price in it used to reach observe() as 0.0 and
+    fire every long call's stop (finding 32, st-xv5e). Now it is no mark:
+    one watch error line, the position untouched, the resting stop the exit."""
+    armed.place(entry("w-3", stop_spx=SPX_NOW - 12))
+    sent = len(broker.calls_to("place"))
+    w = Watcher(armed)
+    broker.set_quote("$SPX", bid=0.0, ask=0.0, last=0.0)
+    r = w.once()
+    assert "error" in r and "no usable" in r["error"]
+    assert len(broker.calls_to("place")) == sent
+    assert len(armed.status()["positions"]) == 1
+    assert not [e for e in armed.journal.read() if e.get("event") == "exit_triggered"]
+
+
 def test_the_loop_survives_a_pass_that_raises(armed: ExecService, monkeypatch):
     calls = []
 

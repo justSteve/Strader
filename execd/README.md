@@ -185,7 +185,9 @@ to the stop on the `risk` basis; premium is the ruled basis (Steve, 2026-09-15:
 itself: when either leg fills, the other comes off before the close is booked;
 a cancel that finds the other leg already filled books that fill against what
 was held and journals anything past it as `oversold`. While the box is alive
-`observe(spx)` runs the accurate SPX-mark exit. A broker that refuses the
+`observe(spx)` runs the accurate SPX-mark exit — on a mark it will act on: not
+zero, not more than 1 % from the last mark accepted inside five minutes
+(`mark_refused` / `mark_accepted` in the journal, st-xv5e). A broker that refuses the
 resting stop is journaled as `stop_unprotected` — loud, because the position is
 live; a target that cannot be derived or rested is `target_unprotected` — a
 warning, because the stop still stands. When an exit fills only partly, both
