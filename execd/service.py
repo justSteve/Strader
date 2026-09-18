@@ -501,6 +501,16 @@ class ExecService:
             # service came back LOCKED (see _recover): now there is a
             # credential to ask the broker with.
             self.reconcile()
+            # And the day's close-out, if the hour has passed (st-9j8e). Two
+            # things depend on this being here rather than only in the
+            # watcher. A position that survived the bell while the service was
+            # LOCKED is closed the moment there is a credential to close it
+            # with, instead of up to a watch interval later. And an unlock
+            # after the hour with nothing held MARKS THE DAY, so the
+            # after-hours entry he unlocked in order to send (st-hlah, ruled
+            # the same day) is not swept by a close-out that had never
+            # reached its own hour.
+            self.flat_by_close()
             return self.status()
 
     def _needs_credential(self) -> bool:

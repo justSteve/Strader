@@ -17,6 +17,15 @@ from execd.watch import Watcher
 from .conftest import CALL, SPX_NOW, entry
 
 
+def refresh_quotes(service, broker):
+    """Re-stamp the mock's quotes at the clock's current reading. Moving the
+    test clock forward hours makes every quote stale, and the price band
+    refuses to price against a stale quote — which is correct, and not what
+    an after-hours test is about."""
+    broker.set_quote(CALL, bid=2.00, ask=2.10)
+    broker.set_quote("$SPX", bid=SPX_NOW - 0.25, ask=SPX_NOW + 0.25, last=SPX_NOW)
+
+
 @contextmanager
 def no_exits(broker, monkeypatch):
     """A broker that takes everything except a close — the shape of an outage
@@ -221,6 +230,42 @@ class TestFlatByClose:
         alert = flat_by_close_alert(st)
         assert "past 14:55 CT and still here" in alert and "C6400" in alert
         assert flat_by_close_alert({"flat_by_close": {"due": False}}) == ""
+
+    def test_an_entry_sent_after_the_sweep_is_his_and_is_left_alone(
+            self, armed: ExecService, broker, clock):
+        """The other half of the same day's ruling: Steve also accepted
+        after-hours sends (st-hlah), and in paper they fill. The sweep is ONE
+        event — reaching 14:55 marks the day whether or not there was
+        anything to close — so a position opened at 15:30 to exercise the
+        pipe is not sold the moment it fills."""
+        clock.set_ct(14, 55)
+        assert Watcher(armed).once()["skipped"] == "flat"     # nothing held
+        assert armed.flat_by_close_status()["done"] is True   # the day is marked
+
+        clock.set_ct(15, 30)
+        refresh_quotes(armed, broker)
+        # the morning's arming ended at the close; he arms again to test
+        armed.unlock({"token": "x"})
+        armed.place(entry("f-10"))
+        assert len(armed.status()["positions"]) == 1
+        r = Watcher(armed).once()
+        assert "flat_by_close" not in r
+        assert len(armed.status()["positions"]) == 1, "his after-hours entry was swept"
+
+    def test_an_unlock_after_the_hour_marks_the_day_and_closes_what_survived(
+            self, service: ExecService, broker, clock):
+        """Unlocking is the first moment a LOCKED service can close anything,
+        so the close-out runs there too — and when there is nothing to close
+        it marks the day, so the entry he unlocked in order to send is
+        safe."""
+        clock.set_ct(15, 30)
+        refresh_quotes(service, broker)
+        service.unlock({"token": "x"})
+        assert service.flat_by_close_status()["done"] is True
+        service.place(entry("f-11"))
+        assert len(service.status()["positions"]) == 1
+        assert service.flat_by_close()["acted"] is False
+        assert len(service.status()["positions"]) == 1
 
     def test_locked_says_so_and_leaves_the_position_alone(
             self, armed: ExecService, clock):

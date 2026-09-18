@@ -1195,6 +1195,17 @@ of an after-hours market order is journaled where he can see it. **LOCKED can
 do nothing here** — with no credential in memory there is nothing to transmit
 with — and it does not mark the day done.
 
+**The sweep is one event, and everything after it is his.** Steve ruled flat
+and accepted after-hours sends (st-hlah) on the same day, and in paper an
+after-hours entry fills. Those two would fight if the close-out were a
+standing rule rather than a moment: an entry sent at 15:30 to exercise the
+pipe would be sold as soon as it filled. So **reaching the hour marks the
+day whether or not there was anything to close** — which is why the watcher
+asks before its exposure check, not after, and why `unlock()` asks too. An
+unlock after the hour closes whatever survived the bell (the first moment
+there is a credential to close it with) and, finding nothing, marks the day,
+so the entry he unlocked in order to send is safe.
+
 Journal: `flat_by_close` when a sweep starts (with what was held and
 working), `flat_by_close_done` with what it managed, `error kind=flat_by_close`
 for each failure, plus `flatten`'s own `request` / `flattened` lines with
