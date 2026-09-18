@@ -1,5 +1,21 @@
 # DaysActivity - 2026-09-18
 
+## 15:03 - Session Handoff [Desk Memo Sent]
+
+**Summary**: Sent Desk a session-summary memo covering both ICM explorations and logged it in the ledger; no other work since the 14:58 handoff.
+
+**Open Work**:
+- **OKF Sources Key Collision** (st-3nal) — still OPEN, one word from Steve. Rename the local `sources:` key (register ids) before it collides with published OKF v0.2's citation `sources`. Recommended Yes; natural moment is st-ts3o.
+- Schwab refresh token expires 2026-09-19 09:16 CT (st-g585).
+- Desk memo `20260918T150219__Strader__status-icm-okf-eve-convergence-and-icm-in-the-narrator` is `expects_reply: false`, so it owes nothing — but `a2a_inbox.py` counts it among the 16 awaited from peers until Desk answers or it ages out. The other 15 are unchanged, oldest 16 sessions.
+
+**Files Changed**:
+docs/a2a/inbox.md
+/mnt/c/Users/steve/zgent-bridge/Desk/inbox/20260918T150219__Strader__status-icm-okf-eve-convergence-and-icm-in-the-narrator.md
+
+---
+
+
 ## 14:58 - Session Handoff [ICM / OKF / Folders and Files]
 
 **Summary**: Answered Steve's "Folders and Files" recall question out of claude-monitor's index, then delivered the two explorations it prompted — ICM applied to the narrating-orderflow skill, and a Fable-run convergence analysis of ICM, OKF and vercel/eve — and closed with a live effort-vs-effect read on the last ten minutes of ES.
