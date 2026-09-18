@@ -748,6 +748,60 @@ class TestCancel:
         with pytest.raises(BrokerError):
             armed.cancel("no-such-order")
 
+    def test_a_confirmed_cancel_says_so_and_resolves_the_entry(self, armed, broker):
+        broker.rest_limits = True
+        out = armed.place(entry())
+        result = armed.cancel(out["order"]["order_id"])
+        assert result["confirmed"] is True
+        assert armed.status()["working"] == []
+
+    def test_a_cancel_the_broker_has_not_finished_is_not_off(self, armed, broker):
+        """Schwab acknowledges a cancel and then works it: the read can say
+        PENDING_CANCEL, which is an order the exchange still holds and can
+        still fill. Until st-jdg5 this path journaled `canceled`, dropped the
+        working entry and told Steve it was gone — which is how a live
+        position appears out of an order he believes he pulled."""
+        broker.rest_limits = True
+        out = armed.place(entry("c-1"))
+        oid = out["order"]["order_id"]
+        broker.cancel_pending = True
+
+        result = armed.cancel(oid)
+        assert result["confirmed"] is False
+        assert result["order"]["status"] == "WORKING"
+        # the entry is STILL the service's: on the card, and cancellable again
+        assert [w["order_id"] for w in armed.status()["working"]] == [oid]
+        events = [e["event"] for e in armed.journal.read()]
+        assert "cancel_unconfirmed" in events and "canceled" not in events
+
+        # the exchange finishes it; the second ask is confirmed and resolves
+        broker.resolve_pending_cancel(oid)
+        broker.cancel_pending = False
+        assert armed.cancel(oid)["confirmed"] is True
+        assert armed.status()["working"] == []
+
+    def test_a_cancel_that_lost_the_race_keeps_the_entry_so_its_bracket_rests(
+            self, armed, broker):
+        """The other race: it filled before the cancel arrived. The working
+        entry is deliberately NOT resolved — it carries the stop level and the
+        delta, so the ordinary fill path promotes it WITH its bracket. Resolved
+        as cancelled, the fill would be adopted instead, and an adopted
+        position has no stop derivable from it (`stop_unprotected`)."""
+        broker.rest_limits = True
+        out = armed.place(entry("c-2"))
+        oid = out["order"]["order_id"]
+        broker.fill_resting(oid)                      # it filled at the exchange
+
+        result = armed.cancel(oid)
+        assert result["confirmed"] is False and result["filled"] is True
+        events = [e["event"] for e in armed.journal.read()]
+        assert "cancel_too_late" in events
+        assert "stop_unprotected" not in events, "the fill was adopted, not promoted"
+
+        pos = armed.status()["positions"]
+        assert len(pos) == 1 and pos[0]["stop_order_id"] and pos[0]["target_order_id"]
+        assert armed.status()["working"] == []
+
 
 class TestTheCeilingCountsWhatIsHeld:
     """Audit finding 40 (st-s2jj): check_risk_budget and adjust subtracted

@@ -1030,6 +1030,62 @@ class TestThePage:
         assert where.startswith("/exec/order?") and "side=" not in where
         assert armed.status()["working"] == []
 
+    def test_the_working_screen_asks_the_broker_rather_than_believing_itself(
+            self, page, armed, broker):
+        """Steve, 2026-09-18, on reading the first ticket back: "that would
+        mean i was looking at 'waiting for a fill' after the fill had
+        executed". In paper it could not happen — the book has no clock and
+        only fills when read — but live it can, because the watcher
+        reconciles every 5 s and this poll paints every 3 s. A screen that
+        says "not filled yet" about an order that is gone is a CANCEL aimed
+        at nothing, so the poll reconciles while anything is working. [st-jdg5]"""
+        broker.rest_limits = True
+        page_send(page, {"side": "call", "delta": "0.3"})
+        w = armed.status()["working"][0]
+        # the broker fills it and tells nobody, the way Schwab does
+        broker.fill_resting(w["order_id"])
+        assert armed.status()["working"], "the service has not noticed yet"
+
+        j = page.get(f"/exec/order/state?symbol={CALL}&side=call&delta=0.3").json
+        assert j["working"] == [], "the poll still believed its own stale state"
+        assert j["positions"] and j["positions"][0]["stop_order_id"]
+        assert j["panel_stage"] == "filled"
+
+    def test_an_unconfirmed_cancel_does_not_re_prime_the_form(self, page, armed, broker):
+        """A cancel the broker has taken but not finished (PENDING_CANCEL at
+        Schwab) leaves an order that can still fill. The page must not say
+        "Cancelled" and must not come back priced for another send, because
+        re-priming the form beside a live order is how one order becomes two.
+        The working card stays, so he can ask again. [st-jdg5]"""
+        broker.rest_limits = True
+        r = page_send(page, {"side": "call", "delta": "0.3"})
+        w = armed.status()["working"][0]
+        broker.cancel_pending = True
+
+        r = page.post("/exec/order/cancel", data={"order_id": w["order_id"]})
+        where = r.headers["Location"]
+        assert "side=call" not in where, "the form was re-primed beside a live order"
+        landing = text(page.get(where))
+        assert "Not confirmed" in landing and "can still fill" in landing
+        assert "Cancelled" not in landing
+        assert "data-stage=working" in landing and "CANCEL AND RE-PRICE" in landing
+        assert [x["order_id"] for x in armed.status()["working"]] == [w["order_id"]]
+
+    def test_a_cancel_that_lost_the_race_says_the_position_is_open(
+            self, page, armed, broker):
+        broker.rest_limits = True
+        page_send(page, {"side": "call", "delta": "0.3"})
+        w = armed.status()["working"][0]
+        broker.fill_resting(w["order_id"])
+
+        r = page.post("/exec/order/cancel", data={"order_id": w["order_id"]})
+        landing = text(page.get(r.headers["Location"]))
+        assert "Too late" in landing and "filled before the cancel" in landing
+        assert "Cancelled" not in landing
+        # and it is a proper position: the bracket rested, nothing adopted
+        pos = armed.status()["positions"]
+        assert len(pos) == 1 and pos[0]["stop_order_id"] and pos[0]["target_order_id"]
+
     def test_cancelling_a_bracket_leg_from_the_page_is_refused(self, page, holding):
         target_id = pos_of(holding)["target_order_id"]
         r = page.post("/exec/order/cancel", data={"order_id": target_id})

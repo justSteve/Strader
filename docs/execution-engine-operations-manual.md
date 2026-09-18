@@ -1383,7 +1383,48 @@ folded *re-authorise (weekly)* and the journal remain.
 | `GET /exec/order/state?symbol=…&lots=…&side=…&strike=…&…` | the status body's live half plus the chosen contract's quote and the SPX mark, with HTML fragments; with a quote, `limit_now` (the ask on the tick grid) and `cost_now`. **Carrying the selection** (the trading page's poll does, st-644f) prices the ticket here from one bounded chain read and adds `fd0_html`, `strikes_html`, `send_fields_html`, `contract` and `stop_price` — that is the auto-reprice. Without a selection (the operations page) nothing changes |
 | `POST /exec/order/send` | SEND: the selection plus the page's single-use `nonce` → priced now, `service.place(intent)` (the broker's own preview inside) with the selection query riding on the working entry; redirects with the result in words, or answers JSON (`ok`, `msg`, `bad`, `send_nonce`, the state payload) when asked; a spent token replays its outcome (st-igw0) |
 | `POST /exec/order/adjust` | SET on the position card: `symbol` and `stop_price` or `target_price` (one leg per form since st-bmaz) → `service.adjust`; redirects with what moved, or answers JSON (`ok`, `msg`, `bad`, the state payload) when the form says `ajax=1` or the request accepts JSON (§5.20) |
-| `POST /exec/order/cancel` | CANCEL AND RE-PRICE on the working-entry card: `order_id` → `service.cancel`, then redirects to `/exec/order` with the side/expiry/strike/delta/stop the entry was priced from — never its lock — so the form comes back priced fresh (§5.20) |
+| `POST /exec/order/cancel` | CANCEL AND RE-PRICE on the working-entry card: `order_id` → `service.cancel`, then redirects to `/exec/order` with the side/expiry/strike/delta/stop the entry was priced from — never its lock — so the form comes back priced fresh (§5.20). **Only a cancel the broker CONFIRMED re-primes the form** (st-jdg5) — see *Cancelling an order that has not filled*, below |
+
+**The working screen shows the broker, not the belief** (st-jdg5). Steve, on
+reading the first paper ticket back: *"that would mean i was looking at
+'waiting for a fill' after the fill had executed"*. In **paper** he could not
+have been: `PaperBroker` has no clock of its own, `_sweep()` runs only when
+something reads the book, and `_fill` stamps the fill with the clock at that
+instant — so the fill and its discovery are the same event by construction. In
+**live** he could, by about eight seconds: Schwab fills on its own clock, the
+watcher reconciles every `INTERVAL_S` (5 s), the page polls every `POLL_S`
+(3 s), and the page's poll reads `service.status()`, which is what this service
+*believes*. A screen that says "not filled yet" about an order that is gone is
+a CANCEL aimed at nothing. So `_state_payload` now calls `reconcile()` first
+whenever `service.has_working()` — one broker read per poll, and only for the
+seconds an entry is actually out there, which are the seconds that decide what
+he taps.
+
+**Cancelling an order that has not filled** (st-jdg5). The working stage
+carries one control, CANCEL AND RE-PRICE, and no STOP or FLATTEN, because
+nothing is held yet. **A cancel is a request, not an answer**: the transport
+sends `DELETE .../orders/{id}` and then re-reads the order until the status is
+terminal or `CANCEL_CONFIRM_S` has passed, because Schwab acknowledges a cancel
+and then *works* it. Three answers come back, and `ExecService.cancel` now
+reports which in the `confirmed` key:
+
+| Broker says | `confirmed` | What happens |
+|---|---|---|
+| `CANCELED` / `REJECTED` | `true` | The order is off. The working entry resolves and the form comes back priced from the selection it was sent from, at the market, never at the lock. |
+| still working (`PENDING_CANCEL`, and every other non-terminal status) | `false` | **Not off.** The exchange still holds it and it can still fill. Nothing resolves, `cancel_unconfirmed` is journaled with the broker's own word, and the page says so and does **not** re-prime the form. |
+| `FILLED` | `false`, plus `filled` | Too late. The working entry is **kept on purpose**, so the ordinary fill path promotes it with its bracket; `cancel_too_late` is journaled and `reconcile` runs at once. |
+
+Until 2026-09-18 this path read none of that: it journaled `canceled`, dropped
+the working entry and told him it was gone, whatever the broker said. The
+transport had always known better and the bracket paths were taught to read it
+by finding 24 of the 2026-09-15 audit — the one Steve actually taps was not.
+Two live failures followed from it. A pending cancel would have left him a
+position he believed he had pulled, beside a form primed to send another. A
+cancel that lost the race would have filed the entry as cancelled and let the
+fill be **adopted** a moment later — and an adopted position carries
+`stop_unprotected`, because the stop level and the delta live on the order that
+was just discarded. Re-priming the form beside an order that can still fill is
+how one order becomes two, so neither of the unconfirmed answers does it.
 
 **What the page will not tell him** (st-644f; Steve, 2026-09-18, at the
 page: *"you are still showing headroom and attempts. remove all aspects of

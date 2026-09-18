@@ -493,7 +493,19 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         on the strike that is loaded (auto-reprice)" — and it costs one
         market read where the quote-only answer cost two, because the chain
         body carries the underlying's price with it. Without a selection
-        (the operations page) nothing changes."""
+        (the operations page) nothing changes.
+
+        **While an entry is working the broker is asked first** (st-jdg5).
+        The status body is what this service BELIEVES, and belief lags: the
+        watcher reconciles every 5 s and this poll paints every 3 s, so a fill
+        Schwab made can sit unseen for about eight seconds — during which the
+        screen says "not filled yet" and CANCEL is a tap aimed at an order
+        that is already gone. The paper book hides this completely, because it
+        has no clock and only fills when it is read. One reconcile per poll,
+        and only while something is actually working, buys the screen the
+        broker's own truth for the seconds when it decides what he taps."""
+        if service.has_working():
+            service.reconcile()          # reports a broker failure, never raises
         st = service.status()
         quote = None
         error = None
@@ -691,7 +703,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 # did not fill: a lock never rides on a cancel (st-2s4u)
                 query = {str(k): str(v) for k, v in w["page_query"].items() if k != "limit"}
         try:
-            service.cancel(order_id)
+            out = service.cancel(order_id)
         except Refused as exc:
             return redirect(url_for("exec.order", bad=f"Refused ({exc.refusal.bound}): "
                                     f"{exc.refusal.reason}. Nothing changed."), code=303)
@@ -700,6 +712,21 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                                     f"Nothing cancelled that the service knows of."), code=303)
         except ValueError as exc:
             return redirect(url_for("exec.order", bad=f"Not cancelled: {exc}"), code=303)
+        # Only a cancel the broker CONFIRMED brings the form back priced for
+        # another go. The other two answers leave the selection alone, because
+        # re-priming the form beside an order that can still fill is how one
+        # order becomes two (st-jdg5).
+        if out.get("filled"):
+            return redirect(url_for("exec.order", bad=(
+                f"Too late — {order_id} filled before the cancel reached the broker. "
+                f"The position is open and its stop and target are resting. "
+                f"Use the card to get out.")), code=303)
+        if not out.get("confirmed", True):
+            status = str((out.get("order") or {}).get("status", "working"))
+            return redirect(url_for("exec.order", bad=(
+                f"Not confirmed — the broker took the cancel and still holds {order_id} "
+                f"({status}). It can still fill. Nothing was re-priced; watch the card "
+                f"and ask again if it is still there.")), code=303)
         return redirect(url_for("exec.order", **query, msg=f"Cancelled {order_id}."), code=303)
 
     def _form_price(name: str) -> float | None:

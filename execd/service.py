@@ -738,6 +738,13 @@ class ExecService:
         with self._lock:
             return bool(self._open or self._working)
 
+    def has_working(self) -> bool:
+        """Is an entry out at the broker, unresolved? The page asks before
+        every poll, because while one is working the screen must show the
+        BROKER's state and not this service's belief. [st-jdg5]"""
+        with self._lock:
+            return bool(self._working)
+
     def quote(self, symbol: str) -> Quote:
         return self.broker.quote(symbol)
 
@@ -833,7 +840,18 @@ class ExecService:
         the same reason: the bracket is edited with :meth:`adjust`, never
         pulled apart. The ways out that exist all handle both properly: an
         exit and flatten cancel them in the same motion they close the
-        position they protect."""
+        position they protect.
+
+        **The answer has three shapes, and the caller is told which** (the
+        ``confirmed`` key; st-jdg5). ``CANCELED`` / ``REJECTED`` is off:
+        resolved, and the form may be re-priced. Still working — Schwab
+        acknowledges a cancel and then *works* it, so the read can say
+        ``PENDING_CANCEL`` — is **not** off: the exchange still holds the
+        order and it can still fill, so nothing is resolved and
+        ``confirmed`` is false. ``FILLED`` is too late: the working entry is
+        left in place on purpose so the ordinary fill path promotes it with
+        its bracket, rather than the fill being adopted afterwards with no
+        stop derivable from it."""
         with self._lock:
             if (r := self.arming.permits_exit()) is not None:
                 self.journal.record("refused", kind="cancel", order_id=order_id,
@@ -862,6 +880,41 @@ class ExecService:
                                         refused=refusal.to_dict())
                     raise Refused(refusal)
             result = self.broker.cancel(order_id)
+
+            # A cancel is a REQUEST, and the answer has three shapes. Until
+            # st-jdg5 this path read none of them: it journaled ``canceled``,
+            # dropped the working entry and told him it was gone, whatever the
+            # broker actually said. The transport has always known better — it
+            # polls to a deadline and hands back the broker's own word — and
+            # the bracket paths were taught to read it by finding 24 of the
+            # 2026-09-15 audit. This, the one Steve taps, was not. [st-jdg5]
+            if result.is_working:
+                # PENDING_CANCEL and every other non-terminal status: Schwab
+                # has the cancel and still has the ORDER. It can still fill.
+                # Nothing is resolved and nothing is re-priced — the entry
+                # stays working, so the card keeps showing it and he can ask
+                # again. Telling him it was cancelled here is how a live
+                # position appears out of an order he believes he pulled.
+                self.journal.record("cancel_unconfirmed", order_id=order_id,
+                                    status=result.status.value,
+                                    detail=result.message or "the broker still holds it",
+                                    order=result.to_dict())
+                return {"refused": None, "order": result.to_dict(), "confirmed": False}
+            if result.status is OrderStatus.FILLED:
+                # The cancel lost the race. The working entry is deliberately
+                # NOT resolved: it still carries the stop level and the delta,
+                # so the ordinary fill path promotes it to a position AND
+                # rests its bracket. Resolving it as cancelled would leave the
+                # broker's fill to be adopted instead — a live position with
+                # ``stop_unprotected`` against it, which is the worst state
+                # this service has.
+                self.journal.record("cancel_too_late", order_id=order_id,
+                                    detail="it filled before the cancel reached the broker",
+                                    order=result.to_dict())
+                self.reconcile()
+                return {"refused": None, "order": result.to_dict(), "confirmed": False,
+                        "filled": True}
+
             self.journal.record("canceled", order_id=order_id, order=result.to_dict())
             for pos in self._open.values():
                 if pos.exit_order_id == order_id:
@@ -877,7 +930,7 @@ class ExecService:
             if order_id in self._working:
                 self._resolve_working(order_id, outcome="canceled",
                                       detail="cancelled by request")
-            return {"refused": None, "order": result.to_dict()}
+            return {"refused": None, "order": result.to_dict(), "confirmed": True}
 
     def flatten(self, reason: str = "flatten") -> dict[str, Any]:
         """Close everything at market, taking both halves of every bracket
