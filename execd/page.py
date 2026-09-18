@@ -466,26 +466,61 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         sel = _selection(request.args)
         priced = price(service, sel)
         body = priced.to_dict()
-        body["fd0_html"] = ticket_html(priced, service.bounds, service.status().get("balances"))
-        body["strikes_html"] = strikes_html(priced, url_for("exec.order"))
+        balances = service.status().get("balances")
+        body["fd0_html"] = ticket_html(priced, service.bounds, balances)
+        # the strikes the account can pay for, the same filter the poll uses
+        body["strikes_html"] = strikes_html(priced, url_for("exec.order"), balances)
         body["send_fields_html"] = send_fields_html(sel)
         return body
 
     @bp.get("/order/state")
     def order_state():
-        return _state_payload(request.args.get("symbol") or "", request.args.get("lots"))
+        sel = _selection(request.args)
+        return _state_payload(request.args.get("symbol") or "", request.args.get("lots"),
+                              sel=sel if sel.side else None)
 
-    def _state_payload(symbol: str, lots_arg: Any, *, refused: str | None = None) -> dict[str, Any]:
+    def _state_payload(symbol: str, lots_arg: Any, *, refused: str | None = None,
+                       sel: Selection | None = None) -> dict[str, Any]:
         """The status body's live half plus the chosen contract's quote, with
         the HTML fragments the page's script paints — what the poll reads,
-        and what an in-place adjust answers with (st-bmaz)."""
+        and what an in-place adjust answers with (st-bmaz).
+
+        When the caller carries a selection (the trading page's poll does,
+        st-644f), the ticket is priced here from one bounded chain read and
+        the answer carries the whole ticket, the strikes and SEND's hidden
+        fields. That is what makes the loaded strike follow the market
+        without a tap — Steve, 2026-09-18, "include real-time price updates
+        on the strike that is loaded (auto-reprice)" — and it costs one
+        market read where the quote-only answer cost two, because the chain
+        body carries the underlying's price with it. Without a selection
+        (the operations page) nothing changes."""
         st = service.status()
         quote = None
         error = None
         spx = None
         limit_now = None
         cost_now = None
-        if symbol:
+        extra: dict[str, Any] = {}
+        priced = price(service, sel) if sel is not None and sel.side else None
+        if priced is not None:
+            spx = priced.spx or None
+            c = priced.contract
+            if c is not None:
+                quote = {"symbol": c.symbol, "bid": c.bid_pts, "ask": c.ask_pts,
+                         "mid": round((c.bid_pts + c.ask_pts) / 2, 4), "last": None,
+                         "age_s": 0.0}
+                limit_now = limit_at(c.ask_pts)
+                cost_now = _money(-(limit_now * CONTRACT_MULTIPLIER * priced.lots)).lstrip("-")
+            error = priced.error
+            extra = {
+                "fd0_html": ticket_html(priced, service.bounds, st.get("balances")),
+                "strikes_html": strikes_html(priced, url_for("exec.order"),
+                                             st.get("balances")),
+                "send_fields_html": send_fields_html(sel),
+                "contract": priced.to_dict().get("contract"),
+                "stop_price": priced.stop_price,
+            }
+        elif symbol:
             try:
                 q = service.quote(symbol)
                 quote = q.to_dict()
@@ -518,7 +553,10 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 "journal_html": journal_html(service),
                 "balances_html": balances_html(st.get("balances")),
                 # the status panel (st-4ezg): the stage and the card's body
-                "panel_stage": stage, "panel_body_html": body}
+                "panel_stage": stage, "panel_body_html": body,
+                # the ticket, the strikes and SEND's fields when the caller
+                # carried a selection to price (st-644f)
+                **extra}
 
     #: The outcome of every SEND this process has answered, by its token —
     #: so a replay of a spent token (the browser or the proxy re-sending
@@ -544,7 +582,8 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
             if wants_json:
                 return {"ok": bad is None, "msg": msg, "bad": bad, "replayed": replayed,
                         "send_nonce": nonces.issue("send", SEND_NONCE_TTL_S),
-                        **_state_payload(sel_symbol(sel), request.form.get("lots"), refused=bad)}
+                        **_state_payload(sel_symbol(sel), request.form.get("lots"),
+                                         refused=bad, sel=sel if sel.side else None)}
             if bad:
                 return redirect(url_for("exec.order", bad=bad), code=303)
             return redirect(url_for("exec.order", msg=msg), code=303)
@@ -964,13 +1003,13 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
         ("realized", f"{_money(pnl.get('realized_usd'))} over {pnl.get('closes', 0)} close(s)"),
         ("unrealized, net", _money(pnl.get("unrealized_net_usd"))),
         ("day", _money(pnl.get("day_usd"))),
-        # Signed and red when there is one: "$40.00" read as a gain (Steve,
-        # 2026-09-14); a loss against the ceiling is "-$40.00" in red.
-        ("loss vs ceiling",
-         _money(-day["realized_loss_usd"]) if day["realized_loss_usd"] else "$0.00"),
-        ("headroom", f"${day['loss_headroom_usd']:.2f}"),
-        ("attempts", f"{day['attempts_used']} used, {day['attempts_left']} left"),
     ]
+    # No ceiling, no headroom, no attempts. Steve, 2026-09-18: "you are
+    # _still showing headroom and attempts. remove all aspects of that"
+    # (st-644f), after st-bafu removed the order form's own copy — "I don't
+    # need that level of hand holding". The bounds still refuse an entry past
+    # the day's ceiling or its attempt count, and /status still reports both
+    # for the heartbeats; they are simply not on a page he reads.
     parts.append("<h2>Today</h2><div class=card><table>" + "".join(
         f"<tr><td>{esc(k)}</td><td{_money_class(v)}>{esc(str(v))}</td></tr>" for k, v in rows)
         + "</table></div>")

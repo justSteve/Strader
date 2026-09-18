@@ -357,6 +357,121 @@ class TestPage:
             assert PASS not in body and "refresh-old" not in body and "acc" not in body.split("access")[0][-3:]
 
 
+class TestOnlyWhatHeCanBuyAndOnlyToday:
+    """Steve, 2026-09-18, at the page (st-644f): "you are _still showing
+    headroom and attempts. remove all aspects of that. Also - in the list of
+    strike you offer, exclude any that exceed limit of the available funds.
+    also - remove the 'next' button. also - remove the timestamp the order was
+    armed. also - include real-time price updates on the strike that is loaded
+    (auto-reprice)."
+
+    The chain in ``schwab_chain_maps``: 6350 asks 32.40 ($3,240 a contract),
+    6360 24.30, 6370 16.80, 6380 10.20, 6390 5.20, 6400 2.10, 6410 0.90,
+    6420 0.40."""
+
+    def _funds(self, armed, chain, usd: float) -> None:
+        chain.set_balances(available_funds=usd, option_buying_power=usd)
+        armed._balances_cache = None
+
+    def test_a_strike_the_account_cannot_pay_for_is_not_offered(
+            self, order_page, armed, chain):
+        """$1,000 buys the 6390 and below in price, not the 6380 and up."""
+        self._funds(armed, chain, 1000.0)
+        body = text(order_page.get("/exec/order?side=call&strike=6400"))
+        table = body.split("<table class=strikes>")[1].split("</table>")[0]
+        assert ">6390<" in table and ">6400<" in table and ">6420<" in table
+        for dear in (">6350<", ">6360<", ">6370<", ">6380<"):
+            assert dear not in table, f"{dear} costs more than the account has"
+        assert "4 strikes above the $1,000.00 the account has, not shown" in body
+
+    def test_the_loaded_strike_stays_even_when_it_is_too_dear(
+            self, order_page, armed, chain):
+        """The row he is standing on never vanishes under him — it is marked
+        instead, and the ticket says what Schwab will do with it."""
+        self._funds(armed, chain, 1000.0)
+        body = text(order_page.get("/exec/order?side=call&strike=6350"))
+        table = body.split("<table class=strikes>")[1].split("</table>")[0]
+        chosen = table.split("<tr class='chosen'>")[1].split("</tr>")[0]
+        assert ">6350<" in chosen and "over the account" in chosen
+        assert "this needs $3,240.00 and the account has $1,000.00" in body
+
+    def test_an_account_that_cannot_be_read_hides_no_strike(
+            self, order_page, armed, chain):
+        """The mock answers no balances at all, the way a broker that cannot
+        say does. A page that dropped every strike because it could not reach
+        Schwab would be worse than one that shows them all."""
+        armed._balances_cache = None
+        body = text(order_page.get("/exec/order?side=call&strike=6400"))
+        table = body.split("<table class=strikes>")[1].split("</table>")[0]
+        for strike in (">6350<", ">6380<", ">6420<"):
+            assert strike in table
+        assert "not shown" not in body
+
+    def test_more_lots_buys_fewer_strikes(self, order_page, armed, chain):
+        """The filter is the ask times a hundred times the lots, not the ask
+        alone. With the cap at one lot the page cannot ask for two, so the
+        arithmetic is checked directly."""
+        from execd.orderpage import affordable
+        from execd.orderform import price
+
+        self._funds(armed, chain, 1000.0)
+        p = price(armed, Selection.from_args({"side": "call", "strike": "6390"},
+                                             today=DAY, lots_cap=1))
+        assert affordable(p.contract, 1, 1000.0) and not affordable(p.contract, 2, 1000.0)
+
+    def test_no_next_expiry_button(self, order_page):
+        body = text(order_page.get("/exec/order?side=call&delta=0.3"))
+        assert ">next " not in body, "the 'next' expiry chip is gone (st-644f)"
+        assert ">08-26<" in body, "the expiry is still said, as a label"
+        assert "expiry=2026-08-27" not in body
+
+    def test_nothing_counts_attempts_or_headroom_at_him(
+            self, order_page, armed, chain):
+        """Not on the trading page, not on the operations page, not in the
+        card. The bounds still hold both and /status still reports them."""
+        page_send(order_page, {"side": "call", "delta": "0.3"})
+        for path in ("/exec/order?side=call&delta=0.3", "/exec/", "/exec/order"):
+            body = text(order_page.get(path))
+            assert "attempts" not in body, path
+            assert "headroom" not in body, path
+        st = armed.status()
+        assert st["day"]["attempts_left"] >= 0 and st["day"]["loss_headroom_usd"] > 0
+
+    def test_the_poll_prices_the_loaded_strike_and_answers_with_the_ticket(
+            self, order_page, armed, chain):
+        """Auto-reprice: the poll carries the selection, so what comes back is
+        this ticket priced now — head, stop, cost and strikes as one piece —
+        and the page paints it without a tap. A poll with no selection (the
+        operations page) still answers with the quote alone."""
+        j = order_page.get(f"/exec/order/state?symbol={CALL}&side=call&strike=6400").json
+        assert j["quote"]["ask"] == 2.10 and j["spx"] == SPX_NOW
+        assert "2.10" in j["fd0_html"] and "stop loss" in j["fd0_html"]
+        assert ">6400<" in j["strikes_html"] and "send_fields_html" in j
+        assert j["contract"]["symbol"] == CALL and j["stop_price"] is not None
+
+        # the ask moves and the very next poll says so — no tap, no reprice call
+        maps = schwab_chain_maps()
+        row = maps["calls"]["2026-08-26:0"]["6400.0"][0]
+        row["bid"], row["ask"] = 3.00, 3.20
+        chain.set_chain("SPXW", maps)
+        chain.set_quote(CALL, bid=3.00, ask=3.20)
+        j2 = order_page.get(f"/exec/order/state?symbol={CALL}&side=call&strike=6400").json
+        assert "3.20" in j2["fd0_html"] and j2["quote"]["ask"] == 3.20
+
+        plain = order_page.get(f"/exec/order/state?symbol={CALL}").json
+        assert "fd0_html" not in plain and plain["quote"]["ask"] == 3.20
+
+    def test_the_poll_reads_the_market_once(self, order_page, armed, chain):
+        """One bounded chain read answers the whole poll: the ticket, the
+        strikes and the underlying's price all come out of it. The quote-only
+        answer took two reads — the contract and the index — so this is
+        cheaper per poll, which matters at one poll every three seconds."""
+        before = len(chain.calls)
+        order_page.get(f"/exec/order/state?symbol={CALL}&side=call&strike=6400")
+        reads = [c for c in chain.calls[before:] if c[0] in ("quote", "chain", "market_read")]
+        assert sum(1 for c in reads if c[0] == "quote") == 0, reads
+
+
 class TestThePadlockAndRePrice:
     """Steve, 2026-09-15: "the re-price button should simply reprice existing
     strike. not force a new preview. the alternative is to leave the price

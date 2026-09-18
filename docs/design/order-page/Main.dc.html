@@ -17,12 +17,13 @@
 </helmet>
 <div style="padding: 16px; width: 576px; box-sizing: border-box; background: #0b1020; min-height: 100%; display: flex; flex-direction: column; gap: 12px;">
 
-  <!-- the strip: mode, state, clock, STOP — always the same, on every stage -->
+  <!-- the strip: mode, state, STOP — always the same, on every stage.
+       No clock since st-644f (Steve, 2026-09-18: "remove the timestamp the
+       order was armed") — beside ARMED it read as when it was armed. -->
   <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
     <div style="display: flex; align-items: center; gap: 10px;">
       <div style="background: #fbbf24; color: #111111; font-weight: 700; font-size: .8em; padding: 4px 8px; border-radius: 6px; letter-spacing: .04em;">PAPER</div>
       <div style="font-size: 1.15em; font-weight: 700; color: #34d399;">ARMED</div>
-      <div style="font-size: 1.05em; font-weight: 600; color: #9ca3af; font-variant-numeric: tabular-nums;">09:41:07 CT</div>
     </div>
     <div style="display: flex; align-items: center; gap: 8px;">
       <a href="#" style="display: flex; align-items: center; justify-content: center; height: 44px; padding: 0 14px; background: #dc2626; color: #ffffff; font-weight: 700; border-radius: 8px; letter-spacing: .04em;">STOP</a>
@@ -57,11 +58,11 @@
   <!-- the one action on this stage -->
   <a href="#" style="display: flex; align-items: center; justify-content: center; height: 60px; background: #dc2626; color: #ffffff; font-size: 1.3em; font-weight: 700; border-radius: 10px;">SEND</a>
 
-  <!-- expiry + delta + the stop box + re-price: one row. The stop box starts at the price a
+  <!-- the expiry as a label (no 'next' chip since st-644f) + delta + the stop
+       box + re-price: one row. The stop box starts at the price a
        flat $20 loss rests at (32.40 − 0.20); a '.' is a price, none is an SPX level (st-m3bl) -->
   <div style="display: flex; align-items: center; gap: 10px;">
-    <a href="#" style="display: flex; align-items: center; height: 44px; padding: 0 14px; background: #1f2937; color: #ffffff; font-weight: 700; border-radius: 8px;">today 09-15</a>
-    <a href="#" style="display: flex; align-items: center; height: 44px; padding: 0 14px; background: transparent; color: #9ca3af; border: 1px solid #374151; border-radius: 8px;">next 09-16</a>
+    <span style="display: flex; align-items: center; height: 44px; padding: 0 14px; background: #1f2937; color: #ffffff; font-weight: 700; border-radius: 8px;">09-15</span>
     <div style="flex-grow: 1;"></div>
     <div style="display: flex; align-items: center; gap: 6px;">
       <span style="color: #9ca3af; font-size: 1.1em;">δ</span>
@@ -88,7 +89,7 @@
   </div>
 
   <div style="color: #9ca3af; font-size: .9em; display: flex; justify-content: space-between; gap: 12px;">
-    <span>today $0.00 · 0 of 10 attempts</span><span>headroom $500.00</span>
+    <span>today $0.00</span>
   </div>
 </div>
 </x-dc>

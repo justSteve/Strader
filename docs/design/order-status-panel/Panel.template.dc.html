@@ -33,7 +33,6 @@
         </sc-if>
       </div>
       <div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
-        <div style="font-size: 1.15em; font-weight: 600; color: #9ca3af; font-variant-numeric: tabular-nums; letter-spacing: .02em;">{{ clock }}</div>
         <button onClick="{{ refresh }}" title="refresh now" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background: #1f2937; color: #e5e7eb; border: 0; border-radius: 8px; cursor: pointer;">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path></svg>
         </button>
@@ -54,7 +53,7 @@
       <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
         <table style="margin-top: 8px;">
           <tr><td>last</td><td>C7630 closed 5 m 10 s ago, +$48.70</td></tr>
-          <tr><td>today</td><td>attempts 0 of 10 used · headroom $500.00</td></tr>
+          <tr><td>today</td><td>realized $0.00 over 1 close(s)</td></tr>
         </table>
       </sc-if>
     </sc-if>

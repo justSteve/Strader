@@ -84,19 +84,25 @@ class TestTheCard:
     def test_none_shows_no_card_and_the_strip_carries_the_mode(self, page):
         """With nothing held, nothing working and no answer the page opens on
         the side buttons: no stage card at all (design docs/design/order-page,
-        st-shhi). The strip carries the mode and the day line the attempts."""
+        st-shhi). The strip carries the mode, and nothing on the page counts
+        attempts at him (st-644f)."""
         body = text(page.get("/exec/order"))
         assert "<div id=panel hidden " in body and "<div id=panel class" not in body   # hidden until a stage arrives (st-igw0)
-        assert "0 of 2 attempts" in body
+        assert "attempts" not in body and "headroom" not in body
         assert "badge live'>LIVE" in body and "badge paper" not in body
         assert "BULLISH" in body and "BEARISH" in body
 
-    def test_the_header_has_one_clock_and_the_rest_is_ago(self, page, holding, clock):
+    def test_no_clock_beside_the_arming_word_and_the_card_still_ticks(
+            self, page, holding, clock):
+        """Steve, 2026-09-18: "remove the timestamp the order was armed"
+        (st-644f). The strip's ticking clock sat immediately after the ARMED
+        word, with no label, and read as the moment the service was armed. It
+        is gone from the whole page; the card's relative 'ago' stamps, which
+        say how old a fill or a poll is, stay."""
         body = text(page.get("/exec/order"))
         card = panel_of(body)
-        assert body.count("id=clock") == 1                     # one clock on the page — in the strip
-        assert "10:00:00" in body                              # the clock, CT
-        assert "id=clock" not in card                          # the card no longer repeats it
+        assert "id=clock" not in body                          # no clock anywhere on the page
+        # the position's own best/worst water marks are labelled and stay
         assert "class=ago data-at=" in card                    # the fill, ticking
         assert "id=updated class=ago" in card
         assert ">pause<" in card and ">less<" in card and "id=refresh" in card

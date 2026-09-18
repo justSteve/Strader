@@ -20,7 +20,7 @@ import json
 from datetime import datetime
 from typing import Any, Mapping
 
-from .orderform import POLL_S, Priced, Selection, next_weekday
+from .orderform import POLL_S, Priced, Selection
 from .panel import COLORS, PANEL_SCRIPT, PANEL_STYLE, WORDS, contract_name, panel_html, stage_of as panel_stage_of
 from .service import CONTRACT_MULTIPLIER, CT, ExecService
 from .stops import take_profit_price
@@ -42,7 +42,6 @@ _ORDER_STYLE = """
  .strip .badge{font-weight:700;font-size:.8em;padding:4px 8px;border-radius:6px;letter-spacing:.04em}
  .strip .badge.paper{background:#fbbf24;color:#111}.strip .badge.live{background:#dc2626;color:#fff}
  .strip .word{font-size:1.15em;font-weight:700}
- .strip .clock{font-size:1.05em;font-weight:600;color:#9ca3af;font-variant-numeric:tabular-nums}
  .strip form.inline{margin:0;display:inline}
  .chip{display:inline-flex;align-items:center;height:44px;padding:0 14px;border-radius:8px;font-weight:700;
        border:0;font-size:1em;font-family:inherit;text-decoration:none;cursor:pointer}
@@ -80,16 +79,31 @@ _SCRIPT = """
   // Every reprice is numbered and only the newest answer paints (st-hzr6):
   // on a slow link two answers a second apart arrived out of order and the
   // ticket showed one state while the form held the other.
-  var seq = 0; window.__lastReprice = 0;
+  var seq = 0; window.__lastReprice = 0; var outstanding = 0;
+  // Paint the ticket, the strikes and SEND's hidden fields as ONE piece.
+  // Shared by the explicit reprice below and by the poll (st-644f), because
+  // a head rewritten over a stale body is the st-hzr6 bug: the price said
+  // 0.60 while the stop, the net and the cost under it still stood on 0.70.
+  window.__paintTicket = function(j){ if (!j) return;
+    var f = document.getElementById('fd0'); if (f && j.fd0_html) f.innerHTML = j.fd0_html;
+    var s = document.getElementById('strikes'); if (s && j.strikes_html) s.innerHTML = j.strikes_html;
+    var p = document.getElementById('sendfields'); if (p && j.send_fields_html) p.innerHTML = j.send_fields_html;
+    if (j.contract) window.__sym = j.contract.symbol;
+    if (window.__followStop) window.__followStop(j); };
   function reprice(){ if(!form) return; var mine = ++seq; window.__lastReprice = Date.now();
+    outstanding++;
     fetch(PRICE + '?' + q(), {headers:{'Accept':'application/json'}}).then(function(r){return r.json();}).then(function(j){
+      outstanding--;
       if (mine !== seq) return;
-      var f = document.getElementById('fd0'); if (f && j.fd0_html) f.innerHTML = j.fd0_html;
-      var s = document.getElementById('strikes'); if (s && j.strikes_html) s.innerHTML = j.strikes_html;
-      var p = document.getElementById('sendfields'); if (p && j.send_fields_html) p.innerHTML = j.send_fields_html;
-      if (j.contract) window.__sym = j.contract.symbol;
-      if (window.__followStop) window.__followStop(j);
-    }).catch(function(){}); }
+      window.__paintTicket(j);
+    }).catch(function(){ outstanding--; }); }
+  // What the poll sends so its answer is priced from this selection, and
+  // when it must keep its hands off the ticket: a box with something typed
+  // in it, or a reprice of his own still on its way back.
+  window.__pollQuery = function(){ return form ? q() : ''; };
+  window.__formBusy = function(){ return outstanding > 0 || editing(); };
+  // A poll answer older than the newest explicit reprice must not paint.
+  window.__pollSeq = function(){ return seq; };
   // a new delta is a new contract: the lock goes with the old one
   function unlockThenReprice(){ var lf = lockField(); if (lf) lf.value = ''; reprice(); }
   if (form) { ['delta'].forEach(function(n){ var el = form.elements[n];
@@ -121,20 +135,17 @@ _SCRIPT = """
     lf.value = lf.value ? '' : (b.getAttribute('data-limit') || '');
     b.classList.toggle('on', !!lf.value); b.innerHTML = lf.value ? '&#128274;' : '&#128275;';
     reprice(); });
-  // The poll's quote. Locked, the ask shows beside the locked price. Unlocked,
-  // the ticket follows the ask by being priced again as one piece: the head
-  // used to be rewritten alone, so the price said 0.60 while the stop, the
-  // net and the cost below it still stood on 0.70 (st-hzr6). Repriced at
-  // most every 4 s, never while a box has focus.
+  // The loaded strike is repriced by the poll itself now (st-644f; Steve,
+  // 2026-09-18: "include real-time price updates on the strike that is
+  // loaded (auto-reprice)"). The poll carries this form's selection, the
+  // service prices it from the same chain read the quote comes from, and
+  // the answer paints the whole ticket. That is one market read every poll
+  // where the old path took two — a quote and an index quote — and then a
+  // third when the ask moved far enough to trigger a reprice of its own.
+  // Locked, the server renders the live ask beside the locked price, so the
+  // padlock needs nothing here either.
   function editing(){ var a = document.activeElement; return !!(a && a.tagName === 'INPUT' && form && form.contains(a)); }
   window.__lots = form && form.elements['lots'] ? (form.elements['lots'].value || '1') : '1';
-  window.__onQuote = function(j){ if (!j || !j.quote || j.limit_now == null) return;
-    var lf = lockField(); var live = document.getElementById('live'); var lk = document.getElementById('lock');
-    if (lf && lf.value) { if (live) live.textContent = 'ask ' + Number(j.quote.ask).toFixed(2) + ' now'; return; }
-    var shown = lk ? lk.getAttribute('data-limit') : null;
-    if (shown === Number(j.limit_now).toFixed(2)) return;
-    if (editing() || Date.now() - window.__lastReprice < 4000) return;
-    reprice(); };
 })();
 </script>
 """
@@ -169,17 +180,22 @@ def esc(v: Any) -> str:
 
 def state_html(st: dict[str, Any], actions: Mapping[str, str] | None = None,
                now: datetime | None = None) -> str:
-    """The strip: the mode badge, the arming word, the one ticking clock, and
-    STOP — the same on every stage (design docs/design/order-page, st-shhi).
-    STOP posts back to this page; clearing it needs the passphrase and lives
-    on the account page, one tap away."""
+    """The strip: the mode badge, the arming word, and STOP — the same on
+    every stage (design docs/design/order-page, st-shhi). STOP posts back to
+    this page; clearing it needs the passphrase and lives on the account
+    page, one tap away.
+
+    No clock. The ticking time used to sit beside the arming word, where it
+    read as the moment the service was armed; Steve, 2026-09-18: "remove the
+    timestamp the order was armed" (st-644f). The one time still on this page
+    is the ticket's own ``priced HH:MM:SS``, which says when the number he is
+    about to send was read — that one he asked to keep (st-bafu)."""
     a = st["arming"]
     mode = str(st.get("mode", "live"))
     badge = ("<span class='badge paper'>PAPER</span>" if mode == "paper"
              else "<span class='badge live'>LIVE</span>")
     state = a["state"]
     word = f"<span class='word {state}'>{state.replace('_', ' ')}</span>"
-    clock = (now.astimezone(CT) if now else datetime.now(CT)).strftime("%H:%M:%S")
     right = ""
     if actions:
         if a["killed"]:
@@ -189,8 +205,7 @@ def state_html(st: dict[str, Any], actions: Mapping[str, str] | None = None,
                      "<input type=hidden name=back value='order'>"
                      "<button class='chip stopbtn'>STOP</button></form>")
         right += f"<a class='chip quiet' href='{actions['account']}'>account</a>"
-    return (f"<div class=strip><div class=l>{badge}{word}"
-            f"<span id=clock class=clock>{clock}</span></div>"
+    return (f"<div class=strip><div class=l>{badge}{word}</div>"
             f"<div class=r>{right}</div></div>")
 
 
@@ -326,22 +341,71 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
     return f"<div class=card>{head}{line2}{line3}{short}</div>"
 
 
-def strikes_html(priced: Priced, order_path: str) -> str:
+def spendable(balances: dict[str, Any] | None) -> float | None:
+    """What the account can put into a new long option right now, in Schwab's
+    own words: ``available_funds``, or option buying power when the account
+    body carries no available figure. ``None`` means the account could not be
+    read — and an unread account hides nothing, because a page that quietly
+    dropped every strike because it could not reach Schwab would be worse
+    than one that shows them all."""
+    if not balances or balances.get("error"):
+        return None
+    for key in ("available_funds", "option_buying_power"):
+        v = balances.get(key)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return float(v)
+    return None
+
+
+def affordable(c: Any, lots: int, funds: float | None) -> bool:
+    """Can the account buy ``lots`` of this contract at its ask? The ask, not
+    the mid: the ask is what the form sends as the limit."""
+    if funds is None:
+        return True
+    return c.ask_pts * CONTRACT_MULTIPLIER * max(1, lots) <= funds
+
+
+def strikes_html(priced: Priced, order_path: str,
+                 balances: dict[str, Any] | None = None) -> str:
+    """The strikes around spot — only the ones the account can pay for.
+
+    Steve, 2026-09-18: "in the list of strike you offer, exclude any that
+    exceed limit of the available funds" (st-644f). A strike whose ask times
+    a hundred times the lots is more than the account has is not an offer,
+    it is a refusal waiting at Schwab; the ticket already says so for the one
+    that is loaded, and now the list does not lead him there at all. The
+    loaded strike always stays in the list even when it is too dear, so
+    tapping a row never makes the row he is on disappear. An account that
+    could not be read filters nothing."""
     sel = priced.selection
     if not priced.contracts:
         return "<div class=k>no strikes to show</div>"
+    funds = spendable(balances)
+    chosen_sym = priced.contract.symbol if priced.contract is not None else None
+    shown = [c for c in priced.contracts
+             if affordable(c, priced.lots, funds) or c.symbol == chosen_sym]
+    head = f"<div class=k>SPX {priced.spx:.2f} · tap a strike</div>"
+    if not shown:
+        return (head + f"<div class=k>no strike here costs less than the "
+                f"{usd(funds)} the account has</div>")
     rows = []
-    for c in priced.contracts:
-        chosen = priced.contract is not None and c.symbol == priced.contract.symbol
+    for c in shown:
+        chosen = chosen_sym is not None and c.symbol == chosen_sym
+        dear = not affordable(c, priced.lots, funds)
         # a new strike is a new price: the lock does not travel with it
         href = _link(order_path, sel.as_query(strike=f"{c.strike:g}", delta=None, limit=None, stop=None))
         rows.append(
             f"<tr class='{'chosen' if chosen else ''}'>"
             f"<td><a href='{href}'>{c.strike:g}</a></td>"
             f"<td><a href='{href}'>{c.bid_pts:.2f} / {c.ask_pts:.2f}</a></td>"
-            f"<td><a href='{href}'>δ {abs(c.delta):.2f}</a></td></tr>")
-    return (f"<div class=k>SPX {priced.spx:.2f} · tap a strike</div>"
-            "<table class=strikes>" + "".join(rows) + "</table>")
+            f"<td><a href='{href}'>δ {abs(c.delta):.2f}"
+            + ("<span class=warn> · over the account</span>" if dear else "")
+            + "</a></td></tr>")
+    left_out = len(priced.contracts) - len(shown)
+    tail = (f"<div class=k>{left_out} strike{'' if left_out == 1 else 's'} "
+            f"above the {usd(funds)} the account has, not shown</div>"
+            if left_out > 0 else "")
+    return head + "<table class=strikes>" + "".join(rows) + "</table>" + tail
 
 
 def quote_html(q: dict[str, Any] | None, spx: float | None, error: str | None) -> str:
@@ -360,16 +424,20 @@ def position_html(st: dict[str, Any], actions: Mapping[str, str] | None = None) 
     render with no controls (a read-only surface)."""
     from .page import _render_position
     pnl = st.get("pnl") or {}
-    day = st["day"]
     adjust = actions.get("order_adjust") if actions else None
     cancel = actions.get("order_cancel") if actions else None
     html = "".join(_render_position(p, adjust) for p in st["positions"])
     for w in st["working"]:
         html += working_html(w, cancel)
+    # Money only. No attempts, no headroom: Steve, 2026-09-18, "you are
+    # _still showing headroom and attempts. remove all aspects of that"
+    # (st-644f) — the second time he has asked (st-bafu took the form's own
+    # copy of the calculation out; these were the service's). The bounds
+    # still refuse an entry past the ceiling or the attempt count; narrating
+    # them is not this page's job.
     html += (f"<div class=k>today: realized {money(pnl.get('realized_usd'))} over "
              f"{pnl.get('closes', 0)} close(s) · unrealized {money(pnl.get('unrealized_net_usd'))} · "
-             f"day {money(pnl.get('day_usd'))} · attempts {day['attempts_used']} used, "
-             f"{day['attempts_left']} left · headroom ${day['loss_headroom_usd']:.2f}</div>")
+             f"day {money(pnl.get('day_usd'))}</div>")
     return html
 
 
@@ -458,7 +526,6 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     parts.append("<div id=answer></div>")
 
     # side — one tap
-    tomorrow = next_weekday(today)
     def side_link(side: str, word: str, cls: str) -> str:
         on = " on" if sel.side == side else (" off" if sel.side else "")
         return (f"<a class='big {cls}{on}' href='{_link(order, sel.as_query(side=side, strike=None, limit=None, stop=None))}'>"
@@ -509,9 +576,13 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             f"{strike_field}{lots_field}"
             f"<input type=hidden name=limit value='{limit_val}'>"
             f"<input type=hidden name=stop value='{esc(sel.stop or '')}'>"
+            # The expiry is the day, said once, not a button. There is no
+            # 'next' chip: Steve, 2026-09-18, "remove the 'next' button"
+            # (st-644f) — he trades the session he is in. A URL that carries
+            # another expiry is still priced and still shown here, so
+            # nothing is lost but the tap that offered it.
             "<div class='row exp2'>"
-            f"<a class='chip {'on' if exp == today else ''}' href='{_link(order, sel.as_query(expiry=today.isoformat(), strike=None, limit=None, stop=None))}'>today {today.strftime('%m-%d')}</a>"
-            f"<a class='chip {'on' if exp == tomorrow else ''}' href='{_link(order, sel.as_query(expiry=tomorrow.isoformat(), strike=None, limit=None, stop=None))}'>next {tomorrow.strftime('%m-%d')}</a>"
+            f"<span class='chip on'>{exp.strftime('%m-%d')}</span>"
             "<span class=grow></span>"
             f"<label class=dl><span class=k>δ</span><input name=delta inputmode=decimal value='{delta_val}' placeholder='spot'></label>"
             f"<label class='dl stopl' title=\"a '.' makes it a price (8.30); none makes it an SPX level (7610)\">"
@@ -519,17 +590,16 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             f"value='{esc(stop_val)}' data-derived='{derived}'></label>"
             "<button class='chip quiet' name=reprice value=1>RE-PRICE</button></div>"
             "</form>")
-        # strikes around spot
-        parts.append(f"<div class=card><div id=strikes>{strikes_html(priced, order)}</div></div>")
+        # strikes around spot — only the ones the account can pay for (st-644f)
+        parts.append("<div class=card><div id=strikes>"
+                     f"{strikes_html(priced, order, st.get('balances'))}</div></div>")
     elif not sel.side:
         parts.append("<div class=k style='text-align:center'>pick a side to see the strikes</div>")
 
-    # the day, one line
+    # the day, one line: the money and nothing else (st-644f — no attempts,
+    # no headroom; see position_html)
     pnl = st.get("pnl") or {}
-    day = st["day"]
-    parts.append(f"<div class=foot><span>today {money(pnl.get('day_usd'))} · "
-                 f"{day['attempts_used']} of {day['attempts_used'] + day['attempts_left']} attempts</span>"
-                 f"<span>headroom ${day['loss_headroom_usd']:.2f}</span></div>")
+    parts.append(f"<div class=foot><span>today {money(pnl.get('day_usd'))}</span></div>")
     # the journal, one tap away, kept fresh by the poll
     parts.append("<details id=journalbox class=journalbox><summary class='chip quiet'>journal</summary>"
                  f"<div class=card id=journal>{journal_html(service)}</div></details>")

@@ -1252,15 +1252,18 @@ and submit orders without agent intervention … lots of redundant labels …
 reference to reauth doesn't belong here … a bullish/bearish button and a way
 to override the delta and reprice and send"*; design
 `docs/design/order-page/`): **the strip** — the mode badge, the arming word,
-the one ticking clock, STOP, and an *account* link — the same on every stage;
+STOP, and an *account* link — the same on every stage (no clock since
+st-644f);
 the stage card (§5.21) only when there is a stage to show; BULLISH / BEARISH
 as two buttons; **the ticket**, stripped to the decision since st-bafu (below) —
 what will be sent and its cost, the stop as the dollars it loses, the
 take-profit's net — and SEND as the one action, in the upper portion of the
-page (Steve, 2026-09-15; PREVIEW until st-igw0, 2026-09-16); then the tuning — expiry chips, the **δ target** box (starts at
+page (Steve, 2026-09-15; PREVIEW until st-igw0, 2026-09-16); then the tuning — the expiry as a label (the *next* chip
+went with st-644f), the **δ target** box (starts at
 `DEFAULT_DELTA` = 0.80, Steve 2026-09-15 from his 08-19 words; a blank box
 means nearest to spot), the stop box and RE-PRICE on one row — and the
-strikes around spot, the chosen row marked; one line for the day.
+strikes around spot the account can pay for, the chosen row marked; one line
+for the day, which is money and nothing else.
 
 **The padlock** (st-2s4u; Steve, 2026-09-15: *"the re-price button should
 simply reprice existing strike. not force a new preview. the alternative is
@@ -1310,7 +1313,7 @@ execd screen … no need to define PAPER. Still don't need 'GRANTS' section.
 Still looking for Options Buying Power amt"*): a LOCKED service puts the
 passphrase box and UNLOCK on the trading page itself, under the strip, with
 `back=order`; when the service is armed that same place carries *option
-buying power* in bold with *available* beside it (the money line left the
+buying power* in bold, one figure since st-bafu (the money line left the
 foot — and while locked the account cannot be read, which is why the number
 was missing); the `PAPER (simulated) —` prefix is gone from every answer,
 the strip's badge is the word; the account page lost its PAPER/LIVE
@@ -1324,10 +1327,49 @@ folded *re-authorise (weekly)* and the journal remain.
 | `GET /exec/account` | the account page: arming, STOP/clear, stand down, lock, re-authorisation (folded), holdings not this service's, the journal tail — no grants card since st-2hei |
 | `GET /exec/order?side=call\|put&expiry=…&strike=…&delta=…&stop=…&limit=…&reprice=1&embed=1` | renders the page; `embed=1` drops the shell for a panel; a `delta` key present and empty means nearest to spot, absent means the 0.80 target; `limit` is the padlock's locked price, `reprice=1` (the RE-PRICE button's own field) drops it (st-2s4u) |
 | `GET /exec/order/price?…` | the priced ticket as JSON plus the ticket (`fd0_html`, the name kept), strikes and hidden-field fragments the script swaps in; a `limit` prices the ticket at that number instead of the ask |
-| `GET /exec/order/state?symbol=…&lots=…` | the status body's live half plus the chosen contract's quote and the SPX mark, with HTML fragments; with a quote, `limit_now` (the ask on the tick grid) and `cost_now` for the head to follow while unlocked |
+| `GET /exec/order/state?symbol=…&lots=…&side=…&strike=…&…` | the status body's live half plus the chosen contract's quote and the SPX mark, with HTML fragments; with a quote, `limit_now` (the ask on the tick grid) and `cost_now`. **Carrying the selection** (the trading page's poll does, st-644f) prices the ticket here from one bounded chain read and adds `fd0_html`, `strikes_html`, `send_fields_html`, `contract` and `stop_price` — that is the auto-reprice. Without a selection (the operations page) nothing changes |
 | `POST /exec/order/send` | SEND: the selection plus the page's single-use `nonce` → priced now, `service.place(intent)` (the broker's own preview inside) with the selection query riding on the working entry; redirects with the result in words, or answers JSON (`ok`, `msg`, `bad`, `send_nonce`, the state payload) when asked; a spent token replays its outcome (st-igw0) |
 | `POST /exec/order/adjust` | SET on the position card: `symbol` and `stop_price` or `target_price` (one leg per form since st-bmaz) → `service.adjust`; redirects with what moved, or answers JSON (`ok`, `msg`, `bad`, the state payload) when the form says `ajax=1` or the request accepts JSON (§5.20) |
 | `POST /exec/order/cancel` | CANCEL AND RE-PRICE on the working-entry card: `order_id` → `service.cancel`, then redirects to `/exec/order` with the side/expiry/strike/delta/stop the entry was priced from — never its lock — so the form comes back priced fresh (§5.20) |
+
+**What the page will not tell him** (st-644f; Steve, 2026-09-18, at the
+page: *"you are still showing headroom and attempts. remove all aspects of
+that"* — the second time, after st-bafu took the form's own copy out). The
+day's headroom against the `daily_loss_ceiling_usd` and the attempts used
+against `max_attempts` are off every surface: the trading page's foot and
+its position line, the status card's *today* row, and the operations page's
+*Today* card. **The bounds are untouched** — an entry past the ceiling or
+past the attempt count is still refused, in the refusal's own words, and
+`GET /status` still carries `day.loss_headroom_usd` and
+`day.attempts_left` for the heartbeats and the audit. What went is the
+counting-at-him, not the counting.
+
+**Only strikes he can buy** (st-644f; Steve: *"in the list of strike you
+offer, exclude any that exceed limit of the available funds"*). A row is
+shown when `ask × 100 × lots` is at or under the account's
+`available_funds` — `option_buying_power` when the balances body carries no
+available figure. Three rules keep it honest: the **loaded strike always
+stays**, marked *over the account*, so tapping a row never makes the row he
+is standing on vanish; a line under the table says **how many were left
+out** and against what figure; and an account that **could not be read**
+filters nothing, because a page that hid the market because it could not
+reach Schwab would be worse than one that showed all of it. The ticket's own
+*this needs $X and the account has $Y* line (the refusal of 2026-09-15
+09:54 CT) still stands for the one that is loaded.
+
+**Auto-reprice** (st-644f; Steve: *"include real-time price updates on the
+strike that is loaded"*). The poll now carries the form's selection, so
+`/exec/order/state` prices the ticket itself and answers with the whole
+thing — head, stop, take-profit, cost, the strikes and SEND's hidden fields
+— and the script paints it as **one piece**, which is what stops the
+st-hzr6 split state (a head rewritten over a stale body) coming back. It is
+also *cheaper*: one bounded chain read per poll, where the quote-only answer
+took two market reads (the contract and the index) and then a third whenever
+the ask moved far enough to trigger a reprice of its own. The paint is held
+off while a box has something typed in it or a reprice of his own is still
+out, and an answer that crossed a newer reprice is dropped rather than
+painted. Locked, the server renders the live ask beside the locked price, so
+the padlock needs nothing from the script either.
 
 **The choice** (`orderform.choose`): a tapped strike wins; else the delta
 override picks the strike whose |delta| is nearest; else nearest to spot

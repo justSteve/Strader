@@ -12,8 +12,10 @@ order moves through its life —
 journal, never off a state the page keeps for itself. The rules from the
 review hold in every stage:
 
-* one ticking clock, in the header, Central time; every other time on the
-  card is *x ago* and ticks too;
+* every time on the card is *x ago*, and it ticks. There is no clock: the
+  strip's ticking wall clock sat beside the arming word and read as the
+  moment the service was armed, and Steve had it removed (2026-09-18,
+  st-644f). ``tick()`` still paints ``#clock`` if a page ever carries one;
 * a contract is named ``C7630`` / ``P7600`` — right and strike, nothing else;
 * one net number, commissions included (``NET NOW`` is what a market sell
   nets after both commissions, the same arithmetic as the position row);
@@ -194,16 +196,16 @@ def stage_of(st: Mapping[str, Any], facts: Mapping[str, Any], *,
 # ── the card ─────────────────────────────────────────────────────────────
 
 def _today_row(st: Mapping[str, Any]) -> str:
-    day = st["day"]
+    """The day as money, and only money. The attempts used and the headroom
+    left came off on Steve's word (2026-09-18: "you are _still showing
+    headroom and attempts. remove all aspects of that", st-644f); the bounds
+    still hold both, they are simply not counted at him. With no close yet
+    there is nothing to say, and the row does not appear."""
     pnl = st.get("pnl") or {}
-    used = day["attempts_used"]
-    total = used + day["attempts_left"]
-    parts = []
-    if pnl.get("closes"):
-        parts.append(f"realized {money(pnl.get('realized_usd'))} over {pnl['closes']} close(s)")
-    parts.append(f"attempts {used} of {total} used")
-    parts.append(f"headroom ${day['loss_headroom_usd']:,.2f}")
-    return f"<tr><td>today</td><td>{esc(' · '.join(parts))}</td></tr>"
+    if not pnl.get("closes"):
+        return ""
+    body = f"realized {money(pnl.get('realized_usd'))} over {pnl['closes']} close(s)"
+    return f"<tr><td>today</td><td>{esc(body)}</td></tr>"
 
 
 def _last_row(facts: Mapping[str, Any], now: datetime) -> str:
@@ -594,11 +596,29 @@ PANEL_SCRIPT = """
     var pc = document.getElementById('position'); if (pc && j.position_html !== undefined && !editing()) { var keptp = keepTyped(pc); pc.innerHTML = j.position_html || ''; restoreTyped(pc, keptp); }
     var jn = document.getElementById('journal'); if (jn && j.journal_html) jn.innerHTML = j.journal_html;
     var bl = document.getElementById('balances'); if (bl && j.balances_html) bl.innerHTML = j.balances_html;
+    // The order form's ticket and strikes, priced from this same answer
+    // (st-644f). Held off while a box has something typed in it or a
+    // reprice of his own is still out, and dropped outright when a newer
+    // reprice began while the poll was away: a stale paint over a fresh
+    // price is the one thing worse than a slow one.
+    if (j.fd0_html && window.__paintTicket && !(window.__formBusy && window.__formBusy())
+        && !(window.__pollSeq && j.__seq !== undefined && j.__seq !== window.__pollSeq())) {
+      try { window.__paintTicket(j); } catch (e) {} }
     if (window.__onQuote) { try { window.__onQuote(j); } catch (e) {} } }
   function poll(force){ if (!force && (paused || document.visibilityState === 'hidden' || requestScoped())) return;
-    var u = STATE + (window.__sym ? ('?symbol=' + encodeURIComponent(window.__sym)
-      + (window.__lots ? '&lots=' + encodeURIComponent(window.__lots) : '')) : '');
-    fetch(u, {headers:{'Accept':'application/json'}}).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(apply)
+    var parts = [];
+    if (window.__sym) { parts.push('symbol=' + encodeURIComponent(window.__sym));
+      if (window.__lots) parts.push('lots=' + encodeURIComponent(window.__lots)); }
+    // the order page hands the poll its selection, so what comes back is
+    // this ticket priced now, not just a quote (st-644f)
+    var mine = window.__pollQuery ? window.__pollQuery() : '';
+    if (mine) parts.push(mine);
+    var u = STATE + (parts.length ? '?' + parts.join('&') : '');
+    // the reprice counter as it stood when this poll left, so an answer that
+    // crosses a reprice of his own is dropped rather than painted
+    var atSeq = window.__pollSeq ? window.__pollSeq() : undefined;
+    fetch(u, {headers:{'Accept':'application/json'}}).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(j){ if (atSeq !== undefined) j.__seq = atSeq; apply(j); })
       .catch(function(e){ var up = document.getElementById('updated'); if (up) { up.removeAttribute('data-at'); up.textContent = 'poll failed: ' + (e && e.message ? e.message : e); } }); }
   // UPDATE once: the button goes dead the moment the form leaves, so a
   // second tap while the first adjust is still at the broker (four seconds
