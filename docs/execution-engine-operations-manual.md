@@ -1391,10 +1391,18 @@ reading the first paper ticket back: *"that would mean i was looking at
 have been: `PaperBroker` has no clock of its own, `_sweep()` runs only when
 something reads the book, and `_fill` stamps the fill with the clock at that
 instant — so the fill and its discovery are the same event by construction. In
-**live** he could, by about eight seconds: Schwab fills on its own clock, the
-watcher reconciles every `INTERVAL_S` (5 s), the page polls every `POLL_S`
-(3 s), and the page's poll reads `service.status()`, which is what this service
-*believes*. A screen that says "not filled yet" about an order that is gone is
+**live** he could, by about eight seconds — **and the cause is this client, not
+Schwab**. Schwab pushes order events: its streamer carries an `ACCT_ACTIVITY`
+subscription, and this repo already vendors a client for it
+(`lib/schwab-py/schwab/streaming.py`, `account_activity_sub()`). `execd`
+subscribes to none of it — every call in `execd/schwab.py` is a REST GET, POST
+or DELETE — so the service learns of a fill only when it asks. The watcher
+reconciles every `INTERVAL_S` (5 s), the page polls every `POLL_S` (3 s), and
+the page's poll reads `service.status()`, which is what this service
+*believes*. (Corrected 2026-09-18 on Steve's challenge: the first version of
+this paragraph said Schwab "tells nobody", which was an unmeasured claim about
+the vendor standing in for a measured fact about our own transport. The
+standing fix is the stream, st-8bls; the poll tightening below is a stopgap.) A screen that says "not filled yet" about an order that is gone is
 a CANCEL aimed at nothing. So `_state_payload` now calls `reconcile()` first
 whenever `service.has_working()` — one broker read per poll, and only for the
 seconds an entry is actually out there, which are the seconds that decide what
