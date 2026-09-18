@@ -1000,20 +1000,19 @@ class TestThePage:
     def test_cancel_and_re_price_brings_the_form_back_priced_from_the_selection(
             self, page, armed, broker):
         broker.rest_limits = True
-        r = page_send(page, {"side": "call", "delta": "0.3", "budget": "150"})
+        r = page_send(page, {"side": "call", "delta": "0.3", "lots": "1"})
         landing = text(page.get(r.headers["Location"]))
         assert "not filled yet" in landing and "the bracket rests when it fills" in landing
         assert "WORKING" in landing and "CANCEL AND RE-PRICE" in landing
         assert "action='/exec/order/cancel'" in landing
         w = armed.status()["working"][0]
-        assert w["page_query"] == {"side": "call", "expiry": "2026-08-26",
-                                   "delta": "0.3", "budget": "150"}
+        assert w["page_query"] == {"side": "call", "expiry": "2026-08-26", "delta": "0.3"}
         assert armed.journal.events("working")[0]["page_query"] == w["page_query"]
 
         r = page.post("/exec/order/cancel", data={"order_id": w["order_id"]})
         assert r.status_code == 303
         where = r.headers["Location"]
-        assert "side=call" in where and "delta=0.3" in where and "budget=150" in where
+        assert "side=call" in where and "delta=0.3" in where and "budget" not in where
         assert "expiry=2026-08-26" in where
         landing = text(page.get(where))
         assert f"Cancelled {w['order_id']}" in landing

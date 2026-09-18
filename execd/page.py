@@ -62,7 +62,7 @@ from .schwab import (VAULT_VERSION, App, Credential, authorize_url, code_from_re
 from .intent import OrderIntent
 from .orderform import (SEND_NONCE_TTL_S, Selection, intent_for, limit_at, parse_leg_text, price,
                         stamp)
-from .orderpage import (balances_html, fd0_html, journal_html, position_html, send_fields_html,
+from .orderpage import (balances_html, journal_html, position_html, send_fields_html,
                         quote_html, render_order, state_html, strikes_html, ticket_html)
 from .service import CONTRACT_MULTIPLIER, ExecService, Refused
 from .vault import BadPassphrase, Vault, VaultError, VaultMissing
@@ -452,7 +452,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         fresh = request.args.get("new") == "1"
         # the SEND token rides with the ticket, single use (st-igw0)
         send_nonce = (nonces.issue("send", SEND_NONCE_TTL_S)
-                      if priced is not None and priced.ticket is not None else None)
+                      if priced is not None and priced.ready else None)
         return render_order(service, _actions(), sel, priced, today=_today(),
                             embed=embed, fresh=fresh, send_nonce=send_nonce, **kw)
 
@@ -865,6 +865,31 @@ def _fmt_wall(iso: str | None, now: datetime) -> str:
     return f"{days:.1f} days left ({when})"
 
 
+#: The trading grant's wall is worth a line from this many days out — the
+#: seven-day token lifecycle is the live feed's failure point, and the grants
+#: card that used to show it is gone (st-2hei).
+WALL_ALERT_DAYS = 2.0
+
+
+def wall_alert_html(st: dict[str, Any], now: datetime) -> str:
+    """One red line when the trading grant's refresh wall is inside
+    ``WALL_ALERT_DAYS`` or past — read from the armed credential, or from
+    the wall the journal last saw while LOCKED. Nothing otherwise. On the
+    account page, above the re-authorisation it asks for; it left the order
+    form on Steve's word (2026-09-17, st-bafu)."""
+    cred = st.get("credential") or {}
+    wall = cred.get("refresh_wall") if cred.get("armed") else cred.get("last_known_trading_wall")
+    if not wall:
+        return ""
+    try:
+        left = (datetime.fromisoformat(str(wall)) - now).total_seconds() / 86400
+    except ValueError:
+        return ""
+    if left > WALL_ALERT_DAYS:
+        return ""
+    return f"<div class=bad>trading grant: {_fmt_wall(str(wall), now)}</div>"
+
+
 def unlock_form(action: str, back: str | None = None) -> str:
     """The passphrase box and UNLOCK — on the account page, and on the
     trading page whenever the service is LOCKED (Steve, 2026-09-15: "if panel
@@ -956,6 +981,7 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     # ── re-authorisation ── (the grants card is gone — Steve, 2026-09-15:
     # "Still don't need 'GRANTS' section"; the walls are the service's to
     # alert on, [ALERT] one line, not a table for him to read)
+    parts.append(wall_alert_html(st, service.clock()))
     parts.append(
         "<details><summary>re-authorise (weekly)</summary>"
         f"<div class=card><form method=post action='{a['reauth_link']}'>"

@@ -1254,15 +1254,13 @@ to override the delta and reprice and send"*; design
 `docs/design/order-page/`): **the strip** — the mode badge, the arming word,
 the one ticking clock, STOP, and an *account* link — the same on every stage;
 the stage card (§5.21) only when there is a stage to show; BULLISH / BEARISH
-as two buttons; **the ticket** in three lines — what will be sent and its cost, the
-cut and the resting stop's net, the target's net — with the derivation
-behind *more*, and SEND as the one action, in the upper portion of the
+as two buttons; **the ticket**, stripped to the decision since st-bafu (below) —
+what will be sent and its cost, the stop as the dollars it loses, the
+take-profit's net — and SEND as the one action, in the upper portion of the
 page (Steve, 2026-09-15; PREVIEW until st-igw0, 2026-09-16); then the tuning — expiry chips, the **δ target** box (starts at
 `DEFAULT_DELTA` = 0.80, Steve 2026-09-15 from his 08-19 words; a blank box
-means nearest to spot) and RE-PRICE on one row, with FD0 budget and attempts
-folded under *budget and attempts* — and the strikes around spot, the chosen
-row marked; after a preview the card shows
-Schwab's cost line and SEND; one line for the day.
+means nearest to spot), the stop box and RE-PRICE on one row — and the
+strikes around spot, the chosen row marked; one line for the day.
 
 **The padlock** (st-2s4u; Steve, 2026-09-15: *"the re-price button should
 simply reprice existing strike. not force a new preview. the alternative is
@@ -1324,12 +1322,12 @@ folded *re-authorise (weekly)* and the journal remain.
 |---|---|
 | `GET /exec/` | the trading page — the same render as `/exec/order` (st-shhi) |
 | `GET /exec/account` | the account page: arming, STOP/clear, stand down, lock, re-authorisation (folded), holdings not this service's, the journal tail — no grants card since st-2hei |
-| `GET /exec/order?side=call\|put&expiry=…&strike=…&delta=…&budget=…&attempts=…&limit=…&reprice=1&embed=1` | renders the page; `embed=1` drops the shell for a panel; a `delta` key present and empty means nearest to spot, absent means the 0.80 target; `limit` is the padlock's locked price, `reprice=1` (the RE-PRICE button's own field) drops it (st-2s4u) |
-| `GET /exec/order/price?…` | the priced ticket as JSON plus the FD0, strikes and hidden-field fragments the script swaps in; a `limit` prices the ticket at that number instead of the ask |
+| `GET /exec/order?side=call\|put&expiry=…&strike=…&delta=…&stop=…&limit=…&reprice=1&embed=1` | renders the page; `embed=1` drops the shell for a panel; a `delta` key present and empty means nearest to spot, absent means the 0.80 target; `limit` is the padlock's locked price, `reprice=1` (the RE-PRICE button's own field) drops it (st-2s4u) |
+| `GET /exec/order/price?…` | the priced ticket as JSON plus the ticket (`fd0_html`, the name kept), strikes and hidden-field fragments the script swaps in; a `limit` prices the ticket at that number instead of the ask |
 | `GET /exec/order/state?symbol=…&lots=…` | the status body's live half plus the chosen contract's quote and the SPX mark, with HTML fragments; with a quote, `limit_now` (the ask on the tick grid) and `cost_now` for the head to follow while unlocked |
 | `POST /exec/order/send` | SEND: the selection plus the page's single-use `nonce` → priced now, `service.place(intent)` (the broker's own preview inside) with the selection query riding on the working entry; redirects with the result in words, or answers JSON (`ok`, `msg`, `bad`, `send_nonce`, the state payload) when asked; a spent token replays its outcome (st-igw0) |
 | `POST /exec/order/adjust` | SET on the position card: `symbol` and `stop_price` or `target_price` (one leg per form since st-bmaz) → `service.adjust`; redirects with what moved, or answers JSON (`ok`, `msg`, `bad`, the state payload) when the form says `ajax=1` or the request accepts JSON (§5.20) |
-| `POST /exec/order/cancel` | CANCEL AND RE-PRICE on the working-entry card: `order_id` → `service.cancel`, then redirects to `/exec/order` with the side/expiry/strike/delta/budget/attempts the entry was priced from — never its lock — so the form comes back priced fresh (§5.20) |
+| `POST /exec/order/cancel` | CANCEL AND RE-PRICE on the working-entry card: `order_id` → `service.cancel`, then redirects to `/exec/order` with the side/expiry/strike/delta/stop the entry was priced from — never its lock — so the form comes back priced fresh (§5.20) |
 
 **The choice** (`orderform.choose`): a tapped strike wins; else the delta
 override picks the strike whose |delta| is nearest; else nearest to spot
@@ -1342,8 +1340,9 @@ unbounded `service.chain`. Answers while LOCKED (the market credential).
 
 **The limit** is the ask rounded up on the service's tick grid
 (`stops.tick_for`: 0.05 under $3, 0.10 at and above), so the `tick` rule
-cannot refuse it. **The resting stop** shown is `protective_stop_price` at
-that limit; its net includes both commissions.
+cannot refuse it. **The stop** starts at a flat $20 loss under that limit
+(`DEFAULT_STOP_LOSS_USD`, st-bafu below); the ticket shows the loss before
+commissions.
 
 **The intent** is `page-<stamp>`, source `page`, with `stop_spx` and
 `delta` from the ticket — the same wire form the desk sends. The journal
@@ -1354,7 +1353,7 @@ and dies in 60 s, and the service's price-band and quote-age rules refuse a
 stale ticket regardless. Agents cannot reach the page port (gate 7).
 
 **The script** (inline, no external assets): re-fetches `/order/price` when
-delta, budget, attempts or lots change; polls `/order/state` every 3 s for
+the delta or the stop box changes; polls `/order/state` every 3 s for
 the quote, the position and the state; pauses while the tab is hidden. The
 page works with the script off — every control is a link or a form.
 
@@ -1427,6 +1426,63 @@ the same tap, and reprice answers are numbered so a stale one never paints
 (on the slow link his taps landed as pairs a second apart, each pair
 sending the same state twice). The δ and stop boxes are drawn with a
 visible border, and the stop box is labelled *stop: strike or price*.
+
+**Stripped to the decision** (st-bafu, built 2026-09-18; Steve, 2026-09-17
+evening, six requests, verbatim on the bead). This paragraph is the page as
+it stands; where the paragraphs above speak of the cut line, the derivation,
+the budget, *more* or a second money figure, they are history.
+
+1. *"there is still no reason to display trading grant on the order form."*
+   The red refresh-wall line left the trading page. It is on the account
+   page, above *re-authorise (weekly)*, which is what it asks for
+   (`page.wall_alert_html`, the same two-day rule).
+2. *"option buying power and available is redundant."* One money figure
+   under the strip: **option buying power**. The ticket speaks of the
+   account only when it cannot pay (*this needs $X and the account has $Y
+   available — Schwab will refuse it*, red); when it can, it says nothing.
+3. *"keep amount of loss unless i override with a strike."* One stop line:
+   **stop loss $20.00** — the dollars the resting stop loses if it fills at
+   its price, before commissions — or, when he typed an SPX level into the
+   stop box, **stop if SPX falls to 6376** (*rises to* for a put). A price
+   he typed still shows as the dollars it loses. The cut line, *stop rests
+   at*, and the *your price / your level* markers are gone.
+4. *"stop loss amount should initially be set to flat $20."* The stop
+   starts at `DEFAULT_STOP_LOSS_USD` = $20 for the whole ticket: the limit
+   less 0.20 for one lot, on the tick grid — rounded **up** to the grid
+   when the per-contract loss is not a whole tick, so it never risks more
+   than $20 — held one tick under the limit and one tick above nothing (a
+   0.15 limit rests at 0.05 and loses $10; a 0.05 limit has no room, says
+   so in red, and is not sent). The stop box is pre-filled with that price
+   and the rule in the box is unchanged: a '.' is a price, none is an SPX
+   level. The intent still carries an SPX level: the walk back from spot
+   through the delta **the intent carries** (four places), rounded to the
+   cent **away from spot** — the service rounds its own walk up to the
+   tick, so a level a hair nearer spot would rest the stop one tick above
+   the ticket's number (`orderform._level_for`; a test walks every strike
+   of both rights through the service's arithmetic and compares).
+5. *"Let's just completely remove that complete calculation. I don't need
+   that level of hand holding."* Measured on the bead: the service's bounds
+   were $500 / 10 attempts; the $100 / 2 he saw were the form's own
+   `DEFAULT_BUDGET_USD` / `DEFAULT_ATTEMPTS`, a second budget beside the
+   real one. Both constants, the `budget` / `attempts` inputs and query
+   keys, `Selection.budget_usd` / `.attempts`, the call to `compose()` and
+   the `Ticket` / `Derivation` on `Priced`, the noise-floor and *YOUR STOP
+   RISKS* warnings and the old `fd0_html` table are removed. `Priced` now
+   carries `stop_spx`, `stop_price`, `stop_loss_usd` and `warnings`
+   directly. The form does not judge the size of a stop; the service's
+   ceiling (§3) still refuses an entry that does not fit the day, in its
+   own words. A `budget` or `attempts` key on an old link or an old working
+   entry's `page_query` is ignored.
+6. *"completely remove the text wall under more."* The *more* fold and its
+   rows are gone.
+
+What the SEND screen carries: the contract × lots at the price with the
+padlock and *priced HH:MM:SS*, the cost, the stop line, the take-profit
+line, SEND, the tuning row (today / next, δ, the stop box, RE-PRICE), the
+strikes, the day line and the journal fold. `tests/execd/test_orderform.py`
+— `test_the_ticket_is_stripped_to_the_decision`, the three
+`test_the_flat_stop…` / `test_a_cheap_contract…` tests, and
+`test_a_near_or_past_wall_is_one_red_line_on_the_account_page`.
 
 ### 5.20 The bracket — take-profit, one-cancels-the-other, the live editor (st-fn5y)
 

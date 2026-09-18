@@ -29,32 +29,36 @@
     </div>
   </div>
 
+  <!-- the one money figure, under the strip (st-2hei; one figure since st-bafu) -->
+  <div style="font-size: 1.05em;">option buying power <b style="font-size: 1.2em;">$4,812.40</b></div>
+
   <!-- side -->
   <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
     <a href="#" style="display: flex; align-items: center; justify-content: center; height: 60px; background: #059669; color: #ffffff; font-size: 1.3em; font-weight: 700; border-radius: 10px; outline: 3px solid #e5e7eb;">BULLISH</a>
     <a href="#" style="display: flex; align-items: center; justify-content: center; height: 60px; background: #7f1d1d; color: #fca5a5; font-size: 1.3em; font-weight: 700; border-radius: 10px;">BEARISH</a>
   </div>
 
-  <!-- the ticket: what will be sent, and what it risks — one card, three lines -->
+  <!-- the ticket, stripped to the decision (st-bafu, 2026-09-18): what will be sent and its cost,
+       the stop as the dollars it loses (a flat $20 until he types a stop; a typed SPX level shows
+       as "stop if SPX falls to 6376"), the take-profit. No cut line, no budget, no "more". -->
   <div style="background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
     <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
       <div style="font-size: 1.5em; font-weight: 700;">C6350 × 1 at 32.40 <span style="display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 44px; border: 1px solid #374151; border-radius: 8px; font-size: .75em; color: #9ca3af; vertical-align: middle;" title="following the ask — tap to lock">🔓</span></div>
       <div style="font-size: 1.5em; font-weight: 700;">$3,240</div>
     </div>
     <div style="display: flex; justify-content: space-between; gap: 12px; color: #e5e7eb;">
-      <span>cut if SPX ≤ <b>6375.75</b> <span style="color: #9ca3af;">(4.50 below)</span></span>
-      <span>stop rests at <b>28.90</b> → <span style="color: #f87171; font-weight: 700;">−$351.30</span></span>
+      <span>stop loss <b style="color: #f87171;">$20.00</b></span>
     </div>
     <div style="display: flex; justify-content: space-between; gap: 12px; color: #9ca3af; font-size: .95em;">
-      <span>target rests at 324.00 (10× the fill) → <span style="color: #34d399; font-weight: 700;">+$29,158.70</span></span>
-      <a href="#" style="color: #60a5fa;">more</a>
+      <span>take-profit rests at 324.00 (10× the fill) → <span style="color: #34d399; font-weight: 700;">+$29,158.70</span> if it fills there</span>
     </div>
   </div>
 
   <!-- the one action on this stage -->
   <a href="#" style="display: flex; align-items: center; justify-content: center; height: 60px; background: #dc2626; color: #ffffff; font-size: 1.3em; font-weight: 700; border-radius: 10px;">SEND</a>
 
-  <!-- expiry + delta + re-price: one row -->
+  <!-- expiry + delta + the stop box + re-price: one row. The stop box starts at the price a
+       flat $20 loss rests at (32.40 − 0.20); a '.' is a price, none is an SPX level (st-m3bl) -->
   <div style="display: flex; align-items: center; gap: 10px;">
     <a href="#" style="display: flex; align-items: center; height: 44px; padding: 0 14px; background: #1f2937; color: #ffffff; font-weight: 700; border-radius: 8px;">today 09-15</a>
     <a href="#" style="display: flex; align-items: center; height: 44px; padding: 0 14px; background: transparent; color: #9ca3af; border: 1px solid #374151; border-radius: 8px;">next 09-16</a>
@@ -62,6 +66,10 @@
     <div style="display: flex; align-items: center; gap: 6px;">
       <span style="color: #9ca3af; font-size: 1.1em;">δ</span>
       <input value="0.80" inputmode="decimal" style="width: 76px; height: 44px; box-sizing: border-box; font-size: 1.15em; text-align: center; padding: 0 8px; border-radius: 8px; border: 1px solid #374151; background: #0b1020; color: #e5e7eb;">
+    </div>
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <span style="color: #9ca3af; font-size: .9em;">stop: strike or price</span>
+      <input value="32.20" inputmode="decimal" style="width: 92px; height: 44px; box-sizing: border-box; font-size: 1.15em; text-align: center; padding: 0 8px; border-radius: 8px; border: 2px solid #9ca3af; background: #111827; color: #e5e7eb;">
     </div>
     <a href="#" style="display: flex; align-items: center; height: 44px; padding: 0 14px; background: #374151; color: #e5e7eb; font-weight: 700; border-radius: 8px;">RE-PRICE</a>
   </div>

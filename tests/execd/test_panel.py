@@ -293,22 +293,23 @@ class TestNewOrderClearsTheCard:
 
 
 class TestTheAccountsMoney:
-    """Steve, 2026-09-15: "display account's option buying power". In
-    Schwab's words on the foot of the trading page, and against the ticket
-    before PREVIEW asks Schwab — the 09:54 refusal was this arithmetic."""
+    """Steve, 2026-09-15: "display account's option buying power". One
+    figure, in Schwab's words (2026-09-17: "option buying power and
+    available is redundant", st-bafu); the ticket speaks of the account only
+    when it cannot pay — the 09:54 refusal was this arithmetic."""
 
-    def test_the_foot_carries_the_money_and_the_ticket_warns_when_it_is_short(
+    def test_one_money_figure_and_the_ticket_warns_only_when_it_is_short(
             self, page, service, broker):
         broker.set_balances(available_funds=150.0, option_buying_power=150.0, buying_power=300.0)
         service.unlock({"t": 1})
         service._balances_cache = None            # the unlock's status read came before the money
         body = text(page.get("/exec/order?side=call&delta=0.3"))
-        assert "option buying power <b>$150.00</b>" in body and "available $150.00" in body
+        assert "option buying power <b>$150.00</b>" in body and "available $150.00" not in body
         assert "this needs $210.00 and the account has $150.00 available" in body
         broker.set_balances(available_funds=1607.24, option_buying_power=1607.24)
         service._balances_cache = None
         body = text(page.get("/exec/order?side=call&delta=0.3"))
-        assert "available funds $1,607.24 — $1,397.24 after this" in body
+        assert "available" not in body and "after this" not in body
         j = page.get("/exec/order/state").get_json()
         assert "option buying power <b>$1,607.24</b>" in j["balances_html"]
 

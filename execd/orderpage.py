@@ -3,7 +3,7 @@
 Every element on ``/exec/order`` is here; the numbers come from
 ``execd.orderform`` and the money card from the same status body the
 operations page reads. Works with no script at all (every control is a link
-or a form); the script only keeps the quote, the FD0 block and the position
+or a form); the script only keeps the quote, the ticket and the position
 fresh without reloading a page that may have a number half-typed on it, and
 works the padlock beside the price (st-2s4u): unlocked, the ticket's price
 follows the live ask; locked, it is frozen at his number and SEND sends
@@ -20,9 +20,7 @@ import json
 from datetime import datetime
 from typing import Any, Mapping
 
-from .orderform import (
-    DEFAULT_ATTEMPTS, DEFAULT_BUDGET_USD, POLL_S, Priced, Selection, next_weekday,
-)
+from .orderform import POLL_S, Priced, Selection, next_weekday
 from .panel import COLORS, PANEL_SCRIPT, PANEL_STYLE, WORDS, contract_name, panel_html, stage_of as panel_stage_of
 from .service import CONTRACT_MULTIPLIER, CT, ExecService
 from .stops import take_profit_price
@@ -36,10 +34,7 @@ _ORDER_STYLE = """
  table.strikes{width:100%;border-collapse:collapse}table.strikes td{padding:.55em .4em;border-bottom:1px solid #1f2937;color:#e5e7eb}
  table.strikes tr.chosen td{background:#1f2937;font-weight:700}
  table.strikes a{color:#e5e7eb;text-decoration:none;display:block}
- .inputs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6em;margin:.6em 0}
- .inputs label{display:block;color:#9ca3af;font-size:.9em}
  .warn{color:#fbbf24}.cost{font-size:1.15em;font-weight:700}
- .fd0 td:first-child{color:#9ca3af;width:55%}
  button.send{background:#dc2626}button.send:disabled{opacity:.6}
  .embed body{padding:.5em}
  .strip{display:flex;align-items:center;justify-content:space-between;gap:.75em;margin:.2em 0 .6em}
@@ -65,9 +60,6 @@ _ORDER_STYLE = """
        cursor:pointer;vertical-align:middle;color:#9ca3af;padding:0 .4em;font-family:inherit}
  button.lock.on{background:#1f2937;border-color:#fbbf24;color:#fbbf24}
  .tbig #live{font-size:.6em;font-weight:400;vertical-align:middle}
- details.more summary{color:#60a5fa;cursor:pointer;list-style:none}details.more summary::-webkit-details-marker{display:none}
- .detail{display:none;margin-top:.5em}.card:has(details.more[open]) .detail{display:block}
- details.inputs2{margin-top:.5em}details.inputs2 summary{color:#9ca3af;cursor:pointer;font-size:.9em}
  .foot{display:flex;justify-content:space-between;gap:.75em;color:#9ca3af;font-size:.9em;margin-top:.4em}
  .money{display:flex;justify-content:space-between;align-items:baseline;gap:.75em;margin:0 0 .6em;font-size:1.05em}
  .money b{font-size:1.2em}
@@ -100,10 +92,10 @@ _SCRIPT = """
     }).catch(function(){}); }
   // a new delta is a new contract: the lock goes with the old one
   function unlockThenReprice(){ var lf = lockField(); if (lf) lf.value = ''; reprice(); }
-  if (form) { ['delta','budget','attempts','lots'].forEach(function(n){ var el = form.elements[n];
+  if (form) { ['delta'].forEach(function(n){ var el = form.elements[n];
     var fn = (n === 'delta') ? unlockThenReprice : reprice;
     if (el) { el.addEventListener('change', fn); el.addEventListener('input', function(){ clearTimeout(window.__t); window.__t = setTimeout(fn, 600); }); } }); }
-  // the stop box (st-m3bl): the visible box follows FD0's derived stop
+  // the stop box (st-m3bl): the visible box follows the flat-loss stop
   // until he types in it; from then on the hidden `stop` on this form
   // carries his text — dollars with a '.', an SPX level without — and the
   // ticket is repriced from it. Cleared, it goes back to following.
@@ -233,30 +225,6 @@ def last_refusal(service: ExecService, now: datetime | None = None) -> str | Non
     return f"{word}Refused ({r.get('bound')}): {r.get('reason')}. Nothing sent."
 
 
-#: The trading grant's wall is worth a line on the trading page from this
-#: many days out — the seven-day token lifecycle is the live feed's failure
-#: point, and the grants card that used to show it is gone (st-2hei).
-WALL_ALERT_DAYS = 2.0
-
-
-def wall_alert_html(st: dict[str, Any], now: datetime) -> str:
-    """One red line when the trading grant's refresh wall is inside
-    ``WALL_ALERT_DAYS`` or past — read from the armed credential, or from
-    the wall the journal last saw while LOCKED. Nothing otherwise."""
-    from .page import _fmt_wall
-    cred = st.get("credential") or {}
-    wall = cred.get("refresh_wall") if cred.get("armed") else cred.get("last_known_trading_wall")
-    if not wall:
-        return ""
-    try:
-        left = (datetime.fromisoformat(str(wall)) - now).total_seconds() / 86400
-    except ValueError:
-        return ""
-    if left > WALL_ALERT_DAYS:
-        return ""
-    return f"<div class=bad>trading grant: {_fmt_wall(str(wall), now)}</div>"
-
-
 def usd(v: Any) -> str:
     """An unsigned dollar figure — a balance, a cost — never the signed P&L
     form ``money`` gives."""
@@ -264,15 +232,14 @@ def usd(v: Any) -> str:
 
 
 def balances_html(b: dict[str, Any] | None) -> str:
-    """The account's money in Schwab's own words: available funds (what its
-    preview checks an option buy against) and option buying power (the
-    non-marginable figure). One line; an unreadable account says so."""
+    """The account's money as one figure: option buying power, in Schwab's
+    own words (Steve, 2026-09-17: "option buying power and available is
+    redundant", st-bafu). An unreadable account says so."""
     if not b:
         return "<span class=k>account not read</span>"
     if b.get("error"):
         return f"<span class=k>account: {esc(b['error'])}</span>"
-    return (f"<span>option buying power <b>{usd(b.get('option_buying_power'))}</b></span>"
-            f"<span class=k>available {usd(b.get('available_funds'))}</span>")
+    return f"<span>option buying power <b>{usd(b.get('option_buying_power'))}</b></span>"
 
 
 def journal_html(service: ExecService, n: int = 20) -> str:
@@ -293,17 +260,18 @@ def journal_html(service: ExecService, n: int = 20) -> str:
 
 
 def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = None) -> str:
-    """The ticket in three lines — what will be sent, the cut, the two legs
-    and what each nets — with the derivation behind *more*. Replaces the
-    FD0 table as the thing Steve reads before SEND (st-shhi)."""
+    """The ticket, stripped to the decision (st-bafu; Steve, 2026-09-17):
+    what will be sent and its cost, the stop as the dollars it loses — or
+    his level, when he typed one — and the take-profit. No derivation, no
+    budget, no *more*."""
     if priced.error and priced.contract is None:
         return f"<div class=bad>{esc(priced.error)}</div>"
     c = priced.contract
     name = contract_name(c.symbol)
-    # The price and its padlock (st-2s4u). Unlocked, the poll writes the live
-    # limit into #px and #cost; locked, the number is his and the poll writes
-    # the ask beside it into #live so the drift is visible. The chip's
-    # data-limit is what a tap locks: the number on the screen at that moment.
+    # The price and its padlock (st-2s4u). Unlocked, a moved ask reprices the
+    # whole ticket; locked, the number is his and the poll writes the ask
+    # beside it into #live so the drift is visible. The chip's data-limit is
+    # what a tap locks: the number on the screen at that moment.
     locked = priced.selection.locked
     lock = (f"<button type=button id=lock class='lock{' on' if locked else ''}' "
             f"data-limit='{priced.limit:.2f}' aria-label='{'unlock' if locked else 'lock'} the price' "
@@ -320,30 +288,19 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
             f"<div class=tbig id=cost>{money(-(priced.cost_usd or 0)).lstrip('-')}</div></div>")
     if priced.error:
         return f"<div class=card>{head}<div class=bad>{esc(priced.error)}</div></div>"
-    t = priced.ticket
-    d = t.derivation
-    # Every line in words Steve reads without a glossary (st-hzr6, 2026-09-17:
-    # "lots about this text wall that doesn't make sense"). A long call is cut
-    # when SPX falls to the level, a long put when it rises to it.
-    side = "below" if t.right == "CALL" else "above"
-    verb = "falls to" if t.right == "CALL" else "rises to"
-    if priced.stop_price is not None:
-        stop_txt = (f"stop rests at <b>{priced.stop_price:.2f}</b> → "
-                    f"<span class=neg>{money(priced.net_at_stop_usd)}</span> "
-                    f"<span class=k>if it fills there</span>")
+    # One stop line (Steve, 2026-09-17: "keep amount of loss unless i
+    # override with a strike"): the dollars the resting stop loses, or the
+    # level he typed. A long call is cut when SPX falls to the level, a long
+    # put when it rises to it.
+    if priced.stop_set_by == "spx":
+        verb = "falls to" if c.right == "CALL" else "rises to"
+        stop_line = f"<span id=stopline>stop if SPX {verb} <b>{priced.stop_spx:g}</b></span>"
     else:
-        stop_txt = f"<span class=neg>no resting stop — {esc(priced.stop_note or 'none')}</span>"
-    # a stop of his own is marked as his, and by which form (st-m3bl)
-    own = ""
-    if priced.stop_set_by == "price":
-        own = " <span class=k id=ownstop>· your price</span>"
-    elif priced.stop_set_by == "spx":
-        own = " <span class=k id=ownstop>· your level</span>"
-    line2 = (f"<div class=trow><span>cut if SPX {verb} <b>{t.stop_trigger_spx:.2f}</b> "
-             f"<span class=k>({d.stop_distance_spx:.2f} {side} spot)</span>{own}</span><span>{stop_txt}</span></div>")
-    for w in t.warnings:
-        if w.startswith("YOUR STOP RISKS"):
-            line2 += f"<div class=warn>{esc(w)}</div>"
+        stop_line = (f"<span id=stopline>stop loss "
+                     f"<b class=neg>{usd(priced.stop_loss_usd)}</b></span>")
+    line2 = f"<div class=trow>{stop_line}</div>"
+    for w in priced.warnings:
+        line2 += f"<div class=warn>{esc(w)}</div>"
     target_txt = ""
     try:
         multiple = float(getattr(bounds, "take_profit_multiple", 0) or 0)
@@ -356,50 +313,17 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
                           f"<span class=pos>{money(net)}</span> <span class=k>if it fills there</span>")
     except (ValueError, TypeError):
         target_txt = ""
-    line3 = (f"<div class='trow k'><span>{target_txt}</span>"
-             "<details class=more><summary>more</summary></details></div>")
-    # The account's money against this ticket, before SEND asks Schwab —
-    # the refusal of 2026-09-15 09:54 CT was exactly this arithmetic.
-    money_line = ""
+    line3 = f"<div class='trow k'><span>{target_txt}</span></div>" if target_txt else ""
+    # Said only when the account cannot pay for it — the refusal of
+    # 2026-09-15 09:54 CT was exactly this arithmetic. When it can, the
+    # ticket says nothing about the account: the one money figure is under
+    # the strip (st-bafu).
+    short = ""
     avail = (balances or {}).get("available_funds")
-    if isinstance(avail, (int, float)) and priced.cost_usd is not None:
-        if priced.cost_usd > avail:
-            money_line = (f"<div class=bad>this needs {usd(priced.cost_usd)} and the "
-                          f"account has {usd(avail)} available — Schwab will refuse it</div>")
-        else:
-            money_line = (f"<div class=k>available funds {usd(avail)} — "
-                          f"{usd(avail - priced.cost_usd)} after this</div>")
-    # The derivation, top to bottom, the way the money actually flows: what
-    # the contract costs; what this attempt is allowed to lose; what of that
-    # the market takes before the trade moves; the rest, turned into SPX
-    # points through delta — which is where the cut goes.
-    rows = [
-        ("to buy it", f"${priced.cost_usd or 0:.2f} at {priced.limit:.2f}, plus "
-                      f"${priced.commissions_usd:.2f} commissions in and out"),
-        ("the most this attempt may lose",
-         f"${t.max_loss_usd:.2f} — the budget of ${d.budget_remaining_usd:.2f} "
-         f"over {d.attempts_left} attempt(s) left"),
-        ("of that", f"${d.spread_usd:.2f} is the bid-ask gap and ${d.fees_rt_usd:.2f} fees; "
-                    f"${d.attempt_risk_usd:.2f} is left for the move against you"),
-        ("the move", f"${d.attempt_risk_usd:.2f} is {d.stop_premium_pts:.2f} of premium; "
-                     f"at delta {d.delta_live:.2f} that is {d.stop_distance_spx:.2f} SPX points "
-                     f"— where the cut goes"),
-        ("wobble allowance", f"about {d.noise_floor_spx:.2f} SPX points — the cut should sit "
-                             f"outside it (worked out from the bid-ask gap alone)"),
-        ("bid / ask", f"{c.bid_pts:.2f} / {c.ask_pts:.2f}, delta {c.abs_delta:.2f}"),
-    ]
-    detail = "<table class=fd0>" + "".join(
-        f"<tr><td>{esc(k)}</td><td>{v}</td></tr>" for k, v in rows) + "</table>"
-    for w in t.warnings:
-        if w.startswith("Noise floor used the spread only"):
-            continue                    # said in the wobble row; nothing to act on
-        if w.startswith("STOP INSIDE THE NOISE FLOOR"):
-            w = (f"the cut sits inside the wobble allowance — {d.stop_distance_spx:.2f} SPX "
-                 f"points of room against about {d.noise_floor_spx:.2f}; ordinary wobble can "
-                 f"take it out without the trade being wrong")
-        detail += f"<div class=warn>{esc(w)}</div>"
-    return (f"<div class=card>{head}{line2}{line3}{money_line}"
-            f"<div class='full detail'>{detail}</div></div>")
+    if isinstance(avail, (int, float)) and priced.cost_usd is not None and priced.cost_usd > avail:
+        short = (f"<div class=bad>this needs {usd(priced.cost_usd)} and the "
+                 f"account has {usd(avail)} available — Schwab will refuse it</div>")
+    return f"<div class=card>{head}{line2}{line3}{short}</div>"
 
 
 def strikes_html(priced: Priced, order_path: str) -> str:
@@ -418,40 +342,6 @@ def strikes_html(priced: Priced, order_path: str) -> str:
             f"<td><a href='{href}'>δ {abs(c.delta):.2f}</a></td></tr>")
     return (f"<div class=k>SPX {priced.spx:.2f} · tap a strike</div>"
             "<table class=strikes>" + "".join(rows) + "</table>")
-
-
-def fd0_html(priced: Priced) -> str:
-    if priced.error and priced.contract is None:
-        return f"<div class=bad>{esc(priced.error)}</div>"
-    c = priced.contract
-    parts = [f"<div class=cost>{esc(c.symbol.strip())} × {priced.lots} — "
-             f"limit {priced.limit:.2f} = {money(-(priced.cost_usd or 0)).lstrip('-')} "
-             f"({c.bid_pts:.2f} / {c.ask_pts:.2f}, δ {c.abs_delta:.2f})</div>"]
-    if priced.error:
-        parts.append(f"<div class=bad>{esc(priced.error)}</div>")
-        return "".join(parts)
-    t = priced.ticket
-    d = t.derivation
-    side = "below" if t.right == "CALL" else "above"
-    rows = [
-        ("cut if SPX reaches", f"{t.stop_trigger_spx:.2f} — {d.stop_distance_spx:.2f} pts {side} {t.spx_at_compose:.2f}"),
-        ("most this costs", money(-t.max_loss_usd)),
-        ("budget", f"${d.budget_remaining_usd:.2f} / {d.attempts_left} attempt(s) → ${d.budget_remaining_usd / d.attempts_left:.2f} for this one"),
-        ("less friction", f"${d.spread_usd:.2f} spread + ${d.fees_rt_usd:.2f} fees = ${d.attempt_risk_usd:.2f} to risk"),
-        ("in premium", f"{d.stop_premium_pts:.2f} at δ {d.delta_live:.2f} = {d.stop_distance_spx:.2f} SPX pts"),
-        ("tape noise", f"about {d.noise_floor_spx:.2f} pts"),
-    ]
-    if priced.stop_price is not None:
-        rows.append(("resting stop the service places",
-                     f"{priced.stop_price:.2f} → net {money(priced.net_at_stop_usd)} "
-                     f"(commissions ${priced.commissions_usd:.2f} in and out)"))
-    else:
-        rows.append(("resting stop", esc(priced.stop_note or "none")))
-    html = "<table class=fd0>" + "".join(
-        f"<tr><td>{esc(k)}</td><td>{v}</td></tr>" for k, v in rows) + "</table>"
-    for w in t.warnings:
-        html += f"<div class=warn>{esc(w)}</div>"
-    return "".join(parts) + html
 
 
 def quote_html(q: dict[str, Any] | None, spx: float | None, error: str | None) -> str:
@@ -548,9 +438,11 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     # passphrase box when the service is LOCKED (Steve, 2026-09-15: "if panel
     # is locked the Passphrase should be displayed") or the account's money
     # when it can be read — the number he looks for first, at the top, not
-    # in the foot (st-2hei)
-    top = [state_html(st, actions, now=service.clock()),
-           wall_alert_html(st, service.clock())]
+    # in the foot (st-2hei). The trading grant's wall is not on this page
+    # (Steve, 2026-09-17: "there is still no reason to display trading grant
+    # on the order form", st-bafu); it is on the account page, beside the
+    # re-authorisation it asks for.
+    top = [state_html(st, actions, now=service.clock())]
     if st["arming"]["state"] == "LOCKED":
         from .page import unlock_form
         top.append(unlock_form(actions["unlock"], back="order"))
@@ -578,13 +470,13 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     if priced is not None and sel.side:
         # the decision first (Steve, 2026-09-15: the action in the upper
         # portion): the ticket and SEND, then the tuning — expiry, δ, RE-PRICE
-        # — and the strikes. The ticket — three lines, the derivation behind more
+        # — and the strikes. The ticket — what is sent, the stop, the take-profit
         parts.append(f"<div id=fd0>{ticket_html(priced, service.bounds, st.get('balances'))}</div>")
         # the one action on this stage: SEND, one tap from the decision
         # (st-igw0 — the PREVIEW step is gone; the service runs the broker's
         # own preview inside every place). The script sends it by fetch and
         # paints the answer; the plain form redirects.
-        if priced.contract is not None and priced.ticket is not None and send_nonce:
+        if priced.ready and send_nonce:
             parts.append(
                 f"<form method=post action='{actions['order_send']}' class=sendform>"
                 f"<span id=sendfields>{send_fields_html(sel)}</span>"
@@ -600,9 +492,11 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
         delta_val = f"{sel.delta:g}" if sel.delta is not None else ""
         strike_field = (f"<input type=hidden name=strike value='{sel.strike:g}'>"
                         if sel.strike is not None else "")
+        # more than one lot rides the form so a reprice keeps it
+        lots_field = f"<input type=hidden name=lots value='{sel.lots}'>" if sel.lots != 1 else ""
         limit_val = f"{sel.limit:.2f}" if sel.limit is not None else ""
-        # the stop box (st-m3bl): pre-filled with FD0's derived dollar stop
-        # and following it until touched; touched, the hidden `stop` carries
+        # the stop box (st-m3bl): pre-filled with the flat-loss stop's price
+        # (st-bafu) and following it until touched; touched, the hidden `stop` carries
         # the text as typed and the rule is applied when the ticket is priced
         # — a '.' is dollars, none is an SPX level. The visible box has no
         # name of its own, so an untouched box never overrides anything.
@@ -612,7 +506,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             f"<form id=sel method=get action='{order}'>"
             f"<input type=hidden name=side value='{sel.side}'>"
             f"<input type=hidden name=expiry value='{exp.isoformat()}'>"
-            f"{strike_field}"
+            f"{strike_field}{lots_field}"
             f"<input type=hidden name=limit value='{limit_val}'>"
             f"<input type=hidden name=stop value='{esc(sel.stop or '')}'>"
             "<div class='row exp2'>"
@@ -624,11 +518,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             f"<span class=k>stop: strike or price</span><input id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off "
             f"value='{esc(stop_val)}' data-derived='{derived}'></label>"
             "<button class='chip quiet' name=reprice value=1>RE-PRICE</button></div>"
-            "<details class=inputs2><summary>budget and attempts</summary><div class=inputs>"
-            f"<label>FD0 budget $<input name=budget inputmode=decimal value='{sel.budget_usd:g}'></label>"
-            f"<label>attempts<input name=attempts inputmode=numeric value='{sel.attempts}'></label>"
-            f"<label>lots<input name=lots inputmode=numeric value='{sel.lots}' disabled></label>"
-            "</div></details></form>")
+            "</form>")
         # strikes around spot
         parts.append(f"<div class=card><div id=strikes>{strikes_html(priced, order)}</div></div>")
     elif not sel.side:

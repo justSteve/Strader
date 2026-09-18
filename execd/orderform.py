@@ -7,7 +7,7 @@ elements of the order form … eventually this needs to run on an iPad."
 
 Until this module the ticket was priced by COO typing ``single / price / go
 / send`` into the dictation desk. Here the page does the same work with the
-same engine (``execd.compose``, the FD0 derivation the desk uses) and the
+same chain reader (``execd.compose.parse_chain``) and the
 same service (``ExecService.preview`` / ``.place``, the same rules, journal,
 paper/live mode, STOP and FLATTEN). No model, no agent, no terminal between
 his intent and the service.
@@ -21,17 +21,21 @@ The flow, top to bottom on ``/exec/order``:
    shown as the strikes around spot with bid, ask and delta. The default row
    is nearest to spot (his ruling); a delta override picks the row whose
    |delta| is nearest; a row can be tapped directly.
-3. FD0: the budget (total, attempts — defaults $100 / 2, his to change on
-   the form), every line of the derivation, the SPX cut level, the limit on
-   the service's own tick grid, and the resting stop the service will place
-   (``execd.stops.protective_stop_price`` at that limit) with the net there.
+3. The ticket: the limit on the service's own tick grid and the stop — a
+   flat ``DEFAULT_STOP_LOSS_USD`` loss under the limit until he types a
+   stop of his own (Steve, 2026-09-17: "stop loss amount should initially
+   be set to flat $20"; st-bafu). There is no budget, no attempts and no
+   derivation on the form: the FD0 budget the form once carried was a
+   second budget beside the service's own bounds, and he had it removed
+   ("Let's just completely remove that complete calculation"). The
+   service's ceiling still refuses an entry that does not fit the day.
    The ticket's price follows the live ask through the poll until the
    padlock beside it is tapped (st-2s4u; Steve, 2026-09-15: "a padlock icon
    toggled between locked and unlocked … this is how TOS platform works").
-   Locked, the price is frozen where it was, the derivation is re-run at
-   that price, the live ask shows beside it, and SEND sends it as the
-   limit; the service's price band still judges it. RE-PRICE keeps the
-   strike and reprices at the market, dropping the lock.
+   Locked, the price is frozen where it was, the stop is struck from that
+   price, the live ask shows beside it, and SEND sends it as the limit; the
+   service's price band still judges it. RE-PRICE keeps the strike and
+   reprices at the market, dropping the lock.
 4. SEND → ``service.place`` of the ticket as priced at that moment (the
    locked price or the ask), under the id ``page-<stamp>-<token>``, source
    ``page``. The service runs the broker's own preview inside every place,
@@ -44,7 +48,7 @@ The flow, top to bottom on ``/exec/order``:
    operations page reads.
 
 Everything is server-rendered and works without a script; the small inline
-script on the page only re-fetches the FD0 block when an input changes and
+script on the page only re-fetches the ticket when an input changes and
 polls the quote and the position every few seconds, filling in place, and
 pauses while the tab is hidden. All arithmetic is Python.
 
@@ -55,18 +59,18 @@ Nothing here imports a transport or names a credential; the wall tests
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any, Mapping
 
 from .bounds import CT
 from .broker import COMMISSION_PER_CONTRACT_USD, CONTRACT_MULTIPLIER, BrokerError
-import dataclasses as _dc
-
-from .compose import Budget, CannotFund, Contract, Ticket, compose, parse_chain, template_fields
+from .compose import Contract, parse_chain
 from .intent import OrderIntent
 from .service import ExecService
-from .stops import _round_up_to_tick, on_tick, protective_stop_price, stop_is_consistent, tick_for
+from .stops import (_floor_to, _round_up_to_tick, on_tick, protective_stop_price, risk_usd,
+                    stop_is_consistent, tick_for)
 
 log = logging.getLogger("execd.orderform")
 
@@ -77,10 +81,11 @@ CHAIN_STRIKES = 40
 STRIKES_EACH_SIDE = 8
 #: The source word the service journals for a page intent.
 SOURCE = "page"
-#: FD0's standing budget for sizing the stop — the form's defaults, his to
-#: change per ticket.
-DEFAULT_BUDGET_USD = 100.0
-DEFAULT_ATTEMPTS = 2
+#: The loss the stop starts at, for the whole ticket, before commissions
+#: (Steve, 2026-09-17: "stop loss amount should initially be set to flat
+#: $20", st-bafu). The resting stop is the limit less this, on the tick
+#: grid; a stop of his own in the box replaces it.
+DEFAULT_STOP_LOSS_USD = 20.0
 #: The δ target the form starts at when no delta and no strike is given.
 #: Steve, 2026-09-15 (st-shhi), from his 2026-08-19 words that 0.8 is the
 #: consensus point to buy a single; it replaces "nearest to spot" as the
@@ -107,8 +112,6 @@ class Selection:
     strike: float | None = None
     delta: float | None = None
     lots: int = 1
-    budget_usd: float = DEFAULT_BUDGET_USD
-    attempts: int = DEFAULT_ATTEMPTS
     #: The padlock (st-2s4u). ``None`` is unlocked: the ticket is priced at
     #: the ask each time it is priced and the head follows the live quote.
     #: A number is the price he locked, sent as the limit whatever the ask
@@ -120,7 +123,7 @@ class Selection:
     #: amount … absent a decimal point means a strike price"). The raw text
     #: of the box, kept as typed so the rule is applied once, in ``price``:
     #: a '.' makes it a dollar option price, none makes it an SPX level.
-    #: ``None`` is the box untouched — FD0's derived stop stands.
+    #: ``None`` is the box untouched — the flat-loss stop stands.
     stop: str | None = None
 
     @property
@@ -141,8 +144,6 @@ class Selection:
             delta = DEFAULT_DELTA       # a blank box ('delta' present, empty) means nearest to spot
         lots = _as_int(args.get("lots"), 1)
         lots = max(1, min(lots, max(1, lots_cap)))
-        budget = _as_float(args.get("budget"))
-        attempts = _as_int(args.get("attempts"), DEFAULT_ATTEMPTS)
         # ``reprice`` is the RE-PRICE button's own field: it means "at the
         # market", so a lock riding on the same form is dropped.
         limit = None if args.get("reprice") else _as_float(args.get("limit"))
@@ -150,8 +151,6 @@ class Selection:
         return cls(side=side, expiry=expiry,
                    strike=strike if strike and strike > 0 else None,
                    delta=abs(delta) if delta is not None else None, lots=lots,
-                   budget_usd=budget if budget and budget > 0 else DEFAULT_BUDGET_USD,
-                   attempts=max(1, attempts),
                    limit=round(limit, 2) if limit and limit > 0 else None,
                    stop=stop)
 
@@ -163,8 +162,6 @@ class Selection:
             "strike": f"{self.strike:g}" if self.strike is not None else None,
             "delta": f"{self.delta:g}" if self.delta is not None else None,
             "lots": str(self.lots) if self.lots != 1 else None,
-            "budget": f"{self.budget_usd:g}" if self.budget_usd != DEFAULT_BUDGET_USD else None,
-            "attempts": str(self.attempts) if self.attempts != DEFAULT_ATTEMPTS else None,
             "limit": f"{self.limit:.2f}" if self.limit is not None else None,
             "stop": self.stop,
         }
@@ -288,17 +285,26 @@ class Priced:
     spx: float = 0.0
     contracts: list[Contract] = field(default_factory=list)   # the window shown
     contract: Contract | None = None
-    ticket: Ticket | None = None
     limit: float | None = None
+    #: the SPX level the intent carries — the service walks it into the
+    #: resting stop at the fill
+    stop_spx: float | None = None
     stop_price: float | None = None
-    stop_note: str | None = None
-    #: how the stop was set: ``None`` for FD0's derived stop, ``"price"`` or
-    #: ``"spx"`` for a stop of his own (st-m3bl)
+    #: how the stop was set: ``None`` for the flat-loss default, ``"price"``
+    #: or ``"spx"`` for a stop of his own (st-m3bl)
     stop_set_by: str | None = None
+    warnings: list[str] = field(default_factory=list)
     error: str | None = None
     #: when the ask this ticket is priced from was read — the service's clock
     #: at pricing, shown beside SEND (st-sk9r, audit note 37)
     priced_at: datetime | None = None
+
+    @property
+    def ready(self) -> bool:
+        """A contract at a limit — the ticket shows and SEND is offered. A
+        fault on it (a stop that cannot be one) is on the ticket in red and
+        ``intent_for`` refuses the send in the same words."""
+        return self.contract is not None and self.limit is not None
 
     # ── money ──
     @property
@@ -314,30 +320,32 @@ class Priced:
         return round(COMMISSION_PER_CONTRACT_USD * self.lots * 2, 2)
 
     @property
-    def net_at_stop_usd(self) -> float | None:
+    def stop_loss_usd(self) -> float | None:
+        """What the resting stop loses if it fills at its price, before
+        commissions — the one number the ticket's stop line shows."""
         if self.stop_price is None or self.limit is None:
             return None
-        return round((self.stop_price - self.limit) * CONTRACT_MULTIPLIER * self.lots
-                     - self.commissions_usd, 2)
+        return risk_usd(self.limit, self.stop_price, self.lots)
+
+    @property
+    def net_at_stop_usd(self) -> float | None:
+        loss = self.stop_loss_usd
+        return None if loss is None else round(-loss - self.commissions_usd, 2)
 
     def to_dict(self) -> dict[str, Any]:
-        t = self.ticket
         return {
             "side": self.selection.side, "right": self.selection.right,
             "expiry": self.selection.expiry.isoformat() if self.selection.expiry else None,
             "spx": self.spx, "lots": self.lots,
-            "budget_usd": self.selection.budget_usd, "attempts": self.selection.attempts,
             "strikes": [_contract_row(c, self.contract) for c in self.contracts],
             "contract": _contract_row(self.contract, self.contract) if self.contract else None,
             "limit": self.limit, "cost_usd": self.cost_usd,
             "commissions_usd": self.commissions_usd,
-            "stop_spx": t.stop_trigger_spx if t else None,
-            "stop_price": self.stop_price, "stop_note": self.stop_note,
+            "stop_spx": self.stop_spx, "stop_price": self.stop_price,
             "stop_set_by": self.stop_set_by, "stop_text": self.selection.stop,
+            "stop_loss_usd": self.stop_loss_usd,
             "net_at_stop_usd": self.net_at_stop_usd,
-            "max_loss_usd": round(t.max_loss_usd, 2) if t else None,
-            "derivation": t.derivation.as_record() if t else None,
-            "warnings": list(t.warnings) if t else [],
+            "warnings": list(self.warnings),
             "error": self.error,
         }
 
@@ -350,9 +358,8 @@ def _contract_row(c: Contract | None, chosen: Contract | None) -> dict[str, Any]
 
 
 def price(service: ExecService, sel: Selection) -> Priced:
-    """Everything the form shows, from the live chain and the engine. Never
-    raises: a fault is on ``.error`` in plain words, with whatever was
-    priced before it."""
+    """Everything the form shows, from the live chain. Never raises: a fault
+    is on ``.error`` in plain words, with whatever was priced before it."""
     out = Priced(selection=sel, priced_at=service.clock())
     if sel.side is None or sel.expiry is None:
         out.error = "pick BULLISH or BEARISH"
@@ -374,29 +381,61 @@ def price(service: ExecService, sel: Selection) -> Priced:
         return out
     out.contract = c
     # The limit on the service's own tick grid (0.05 under $3, 0.10 at and
-    # above), rounded up — the desk sent round(ask, 2) and the engine shows
-    # ceil to 0.05; the service refuses either when it is off the grid. A
-    # locked price (the padlock, st-2s4u) is the limit instead, whatever the
-    # ask is now; the service's price band judges it when it is previewed.
+    # above), rounded up — the service refuses a price off the grid. A locked
+    # price (the padlock, st-2s4u) is the limit instead, whatever the ask is
+    # now; the service's price band judges it at the send.
     out.limit = sel.limit if sel.limit is not None else limit_at(c.ask_pts)
-    budget = Budget(total_usd=sel.budget_usd, attempts=sel.attempts)
-    try:
-        out.ticket = compose([c], spx, budget, contract=c, lots=sel.lots,
-                             expiration=sel.expiry.isoformat())
-    except CannotFund as exc:
-        out.error = f"FD0 could not fund a stop: {exc}"
+    if not (0 < c.abs_delta <= 1):
+        out.error = f"the chain gives no usable delta for {c.strike:g} — no stop can be struck"
         return out
-    except ValueError as exc:
-        out.error = f"FD0 could not derive a stop: {exc}"
-        return out
-    try:
-        out.stop_price = protective_stop_price(out.limit, c.abs_delta, spx,
-                                               out.ticket.stop_trigger_spx)
-    except ValueError as exc:
-        out.stop_note = f"no resting stop can be derived at this limit: {exc}"
     if sel.stop:
         _apply_stop_of_his_own(out, c, spx)
+    else:
+        _apply_flat_loss_stop(out, c, spx)
     return out
+
+
+def _wire_delta(c: Contract) -> float:
+    """The delta as the intent carries it. The stop's level is struck with
+    this number because the service walks the level back into a price with
+    the intent's delta, not the chain's."""
+    return round(c.abs_delta, 4)
+
+
+def _level_for(right: str, spx: float, limit: float, stop_price: float, delta: float) -> float:
+    """The SPX level that walks to ``stop_price`` — the inverse of
+    ``protective_stop_price`` — rounded to the cent **away from spot**. The
+    service rounds the walked price *up* to the tick, so a level a hair
+    nearer spot than exact would rest the stop one tick higher than the
+    number on the ticket; a hair farther lands on it."""
+    distance = (limit - stop_price) / delta
+    if right == "CALL":
+        return math.floor(round((spx - distance) * 100, 6)) / 100
+    return math.ceil(round((spx + distance) * 100, 6)) / 100
+
+
+def _apply_flat_loss_stop(out: Priced, c: Contract, spx: float) -> None:
+    """The stop the ticket starts with: ``DEFAULT_STOP_LOSS_USD`` under the
+    limit for the whole ticket, on the tick grid. [st-bafu]
+
+    Rounded *up* to the grid when the loss per contract is not a whole tick
+    (more than one lot), so the ticket never risks more than the flat
+    figure; held one tick under the limit and one tick above nothing, the
+    same two clamps the service's own stop gets. A limit with no tick of
+    room under it cannot carry a stop, and the ticket says so and offers no
+    SEND — an entry with no stop is the state the service must not reach."""
+    limit = out.limit
+    per_contract = DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * out.lots)
+    floor_tick = tick_for(0.0)
+    stop = _round_up_to_tick(max(limit - per_contract, floor_tick), floor_tick)
+    cap = round(limit - tick_for(limit), 2)
+    cap = _floor_to(cap, tick_for(cap)) if cap > 0 else cap
+    stop = min(stop, cap)
+    if stop < floor_tick:
+        out.error = f"a {limit:.2f} limit leaves no room for a stop under it"
+        return
+    out.stop_price = round(stop, 2)
+    out.stop_spx = _level_for(c.right, spx, limit, out.stop_price, _wire_delta(c))
 
 
 def _apply_stop_of_his_own(out: Priced, c: Contract, spx: float) -> None:
@@ -408,30 +447,25 @@ def _apply_stop_of_his_own(out: Priced, c: Contract, spx: float) -> None:
     follows the same rule as updating - absent a decimal point means a
     strike price."*
 
-    FD0 derives the stop as an SPX level from the budget; the intent carries
-    that level and the service walks it into the resting price at the fill.
-    A stop of his own keeps that shape. **Dollars** (a '.'): the price he
-    typed becomes the resting stop, and its SPX level is the walk back from
-    spot through the contract's delta at the limit — the inverse of
-    ``protective_stop_price`` — so the intent still carries a level and the
-    service rests his number when it fills at the limit with the mark where
-    it was (a better fill or a moved mark re-walks from the level, which is
-    the instrument). **A level** (no '.'): the level is the trigger as
-    typed, and the resting price is the walk forward. Either way the
-    ticket's cut, resting stop, net and *most this costs* follow it, and
-    the derivation's distance, premium and risk are re-struck so the
-    ceiling check at the service sees the stop he set.
+    The intent carries the stop as an SPX level and the service walks it
+    into the resting price at the fill. A stop of his own keeps that shape.
+    **Dollars** (a '.'): the price he typed becomes the resting stop, and
+    its SPX level is the walk back from spot through the contract's delta
+    at the limit — the inverse of ``protective_stop_price`` — so the intent
+    still carries a level and the service rests his number when it fills at
+    the limit with the mark where it was (a better fill or a moved mark
+    re-walks from the level, which is the instrument). **A level** (no
+    '.'): the level is the trigger as typed, and the resting price is the
+    walk forward.
 
     Refused in words on the ticket — SEND is then refused with the same
     words: a price off the tick grid, at or above the limit, or not
     positive; a level on the wrong side of spot for the right, or one that
-    walks to a price nothing can rest at. Warned, not refused: a stop
-    inside the noise floor (as FD0 warns for its own), and a stop that
-    risks more than the attempt was funded for — the budget was his rule
-    too, and this box is him overriding it knowingly."""
+    walks to a price nothing can rest at. The form does not judge the size
+    of his stop (st-bafu: the budget, the noise floor and their warnings
+    left with the derivation); the service's ceiling does."""
     sel = out.selection
-    t = out.ticket
-    if t is None or out.limit is None or not sel.stop:
+    if out.limit is None or not sel.stop:
         return
     try:
         kind, value = parse_leg_text(sel.stop, "stop")
@@ -440,8 +474,7 @@ def _apply_stop_of_his_own(out: Priced, c: Contract, spx: float) -> None:
         return
     right = c.right
     word = "call" if right == "CALL" else "put"
-    delta = c.abs_delta
-    d = t.derivation
+    delta = _wire_delta(c)
     if kind == "price":
         if value <= 0:
             out.error = f"your stop: a stop price must be positive, not {value:g}"
@@ -456,8 +489,7 @@ def _apply_stop_of_his_own(out: Priced, c: Contract, spx: float) -> None:
                          f"it would fill at once")
             return
         stop_price = round(value, 2)
-        distance = (out.limit - stop_price) / delta
-        level = spx - distance if right == "CALL" else spx + distance
+        level = _level_for(right, spx, out.limit, stop_price, delta)
     else:
         level = value
         if not stop_is_consistent(right, spx, level):
@@ -470,48 +502,33 @@ def _apply_stop_of_his_own(out: Priced, c: Contract, spx: float) -> None:
         except ValueError as exc:
             out.error = f"your stop: SPX {level:g} walks to no price a stop can rest at: {exc}"
             return
-        distance = abs(spx - level)
-    premium = round(out.limit - stop_price, 2)
-    risk = round(premium * CONTRACT_MULTIPLIER * sel.lots, 2)
-    new_d = _dc.replace(d, stop_distance_spx=round(distance, 4), stop_premium_pts=premium,
-                        attempt_risk_usd=risk)
-    warnings = [w for w in t.warnings if not w.startswith("STOP INSIDE THE NOISE FLOOR")]
-    if kind == "spx" and out.limit - distance * delta <= 0:
-        # the same clamp FD0's own stop gets (stops.protective_stop_price):
-        # a level that walks the option below nothing rests one tick above
-        # it, and the SPX loop at his level is the stop that fires
-        warnings.insert(0, f"SPX {level:g} WALKS THE OPTION BELOW ZERO — the resting stop is one "
-                           f"tick, {stop_price:.2f}; the SPX loop at {level:g} is the stop")
-    if new_d.inside_noise_floor:
-        warnings.insert(0, f"STOP INSIDE THE NOISE FLOOR — {distance:.2f} SPX pts of room "
-                           f"against a {d.noise_floor_spx:.2f} pt floor. The tape can take "
-                           f"this out without the trade being wrong.")
-    if risk > d.attempt_risk_usd + 0.005:
-        warnings.insert(0, f"YOUR STOP RISKS ${risk:.2f} — this attempt was funded for "
-                           f"${d.attempt_risk_usd:.2f}; the budget rule is overridden")
-    level = round(level, 2)
-    out.ticket = _dc.replace(
-        t, stop_trigger_spx=level, derivation=new_d, warnings=tuple(warnings),
-        template_fields=template_fields(c, t.limit_pts, level, t.lots))
+        if out.limit - abs(spx - level) * delta <= 0:
+            # the same clamp the service's own stop gets
+            # (stops.protective_stop_price): a level that walks the option
+            # below nothing rests one tick above it, and the SPX loop at his
+            # level is the stop that fires
+            out.warnings.append(f"SPX {level:g} WALKS THE OPTION BELOW ZERO — the resting stop is "
+                                f"one tick, {stop_price:.2f}; the SPX loop at {level:g} is the stop")
+    out.stop_spx = round(level, 2)
     out.stop_price = stop_price
-    out.stop_note = None
     out.stop_set_by = kind
 
 
 def intent_for(priced: Priced, *, intent_id: str, engine_sha: str) -> dict[str, Any]:
     """The service's ``OrderIntent`` wire form for the priced ticket, checked
     against the service's own rules before it leaves the form."""
-    if priced.contract is None or priced.ticket is None or priced.limit is None:
-        raise ValueError(priced.error or "nothing is priced")
     if priced.error:
         # a ticket priced with a fault on it — a stop of his own that cannot
-        # be one (st-m3bl) — is shown, never sent
+        # be one (st-m3bl), a limit with no room for a stop — is shown, never
+        # sent
         raise ValueError(priced.error)
+    if not priced.ready or priced.stop_spx is None:
+        raise ValueError("nothing is priced")
     d = {
         "intent_id": intent_id, "symbol": priced.contract.symbol, "side": "BUY_TO_OPEN",
         "qty": priced.lots, "order_type": "LIMIT", "limit": priced.limit,
-        "stop_spx": float(priced.ticket.stop_trigger_spx),
-        "delta": round(priced.contract.abs_delta, 4),
+        "stop_spx": float(priced.stop_spx),
+        "delta": _wire_delta(priced.contract),
         "source": SOURCE, "engine_sha": engine_sha,
     }
     OrderIntent.from_dict(d).validated()
