@@ -56,7 +56,7 @@ from __future__ import annotations
 import math
 import threading
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -181,6 +181,12 @@ POSITION_SETTLE_S = 90.0
 #: genuine gap is accepted once the window has passed.
 MARK_BAND_PCT = 1.0
 MARK_BAND_WINDOW_S = 300.0
+
+#: How long ``flat_by_close`` waits before trying again when a sweep left
+#: something open or working — a broker that could not be reached at 14:55
+#: must not mean a position carried overnight in silence, and must not mean
+#: a market order every five seconds either. [st-9j8e]
+FLAT_BY_CLOSE_RETRY_S = 30.0
 
 #: How long a resting leg may be missing from the broker's listing before it
 #: is journaled as unaccounted for (the listing lags a fresh rest the same
@@ -446,6 +452,11 @@ class ExecService:
         #: Rebuilt from the day's ``closed`` lines at recovery.
         self._booked_exits: set[str] = set()
         self._last_fill_poll = clock()
+        #: the day flat-by-close finished on, and when it last tried — so the
+        #: 14:55 sweep runs once a day and a failed sweep is retried rather
+        #: than abandoned or hammered (st-9j8e; ``flat_by_close``)
+        self._flat_by_close_day: date | None = None
+        self._flat_by_close_try: datetime | None = None
         self._recover()
 
     # ── arming (page-only; none of these has an API route) ───────────────
@@ -460,7 +471,15 @@ class ExecService:
         trading-hours rule for SPX so after-hours sends can exercise the pipe,
         and an unlock after the close now arms until the end of the day,
         Central. An explicit ``until`` is capped the same way. Exits and
-        flatten need no arming window — only entries do."""
+        flatten need no arming window — only entries do.
+
+        **RULED, not inferred** (st-hlah). The 2026-09-15 audit, finding 63,
+        held that the 23:59 arming was read into his hours revocation rather
+        than stated by him, and asked whether to refuse the after-hours
+        unlock in live. Steve, 2026-09-18: *"accept after hours unlock and
+        submissions"* — the arming stands in both modes, and so does sending
+        after hours. Nothing here is to be narrowed back without a new word
+        from him."""
         with self._lock:
             now = self.clock()
             close = session_close(now, self.bounds)
@@ -564,6 +583,9 @@ class ExecService:
             "foreign_orders": list(self._foreign_orders.values()),
             "foreign_positions": [p.to_dict() for p in self._foreign_positions.values()],
             "shorts": [{"symbol": s, "qty": q} for s, q in self._shorts.items()],
+            # the day's close-out: when it is due, whether it has run, and
+            # anything still held past it (st-9j8e)
+            "flat_by_close": self.flat_by_close_status(),
             "excluded_positions": dict(getattr(self.broker, "excluded_positions", {}) or {}),
             "pnl": self._day_pnl([v for _p, v in valuations]),
             "bounds": self.bounds.to_dict(),
@@ -875,6 +897,108 @@ class ExecService:
             self.journal.record("flattened", closed=len(closed), errors=len(errors),
                                 reason=reason)
             return {"refused": None, "closed": closed, "errors": errors}
+
+    def flat_by_close(self) -> dict[str, Any]:
+        """Close the day out by this service's own hand. [st-9j8e]
+
+        Steve's ruling, 2026-09-18, on the question audit finding 38 left
+        open — "9j8e is flat". The bracket's legs are DAY orders and a
+        position is not, so a contract carried past the bell loses both exits
+        at the exchange; the alternatives were to rest the legs
+        GOOD_TILL_CANCEL and allow an overnight hold, or to hold nothing
+        overnight at all. He chose the second, which is what he trades: 0DTE.
+
+        At ``bounds.flat_by_close_ct`` — 14:55 CT, five minutes before the
+        close — every working entry is cancelled and everything held is sold
+        at market, through :meth:`flatten`, which is legal while STOPped,
+        while stood down and outside the session window. The entries go first:
+        an entry still working at 14:55 could fill at 14:59 and hand back the
+        overnight position this exists to prevent.
+
+        **Once a day, and retried until it is done.** The day is marked
+        finished only when nothing is left open *and* nothing is left
+        working; short of that the next pass tries again, no sooner than
+        ``FLAT_BY_CLOSE_RETRY_S``, so a broker that was unreachable at 14:55
+        does not mean a position carried overnight in silence. There is no
+        upper bound on the hour: a service that comes back at 16:30 still
+        holding something will try to be flat, and the broker's refusal of an
+        after-hours market order is journaled where he can see it — better a
+        loud refusal than a quiet hold.
+
+        **LOCKED does nothing here**, because it can do nothing: with no
+        credential in memory there is nothing to transmit with. That is the
+        one state this cannot rescue, and the page already says so under a
+        live position. The caller is the watcher (``execd.watch``); this
+        method is safe to call on any pass and answers what it did."""
+        with self._lock:
+            now = self.clock()
+            local = now.astimezone(CT)
+            today = local.date()
+            if self._flat_by_close_day == today:
+                return {"due": False, "why": "already flat for the day", "acted": False}
+            if self.bounds.weekdays_only and local.weekday() >= 5:
+                return {"due": False, "why": f"{local:%A} is not a trading day",
+                        "acted": False}
+            if local.time() < self.bounds.flat_by_close:
+                return {"due": False, "why": f"before {self.bounds.flat_by_close_ct} CT",
+                        "acted": False}
+            if not (self._open or self._working):
+                # Nothing to close: the day is done the moment it is due and
+                # the book is empty, so the sweep does not run again tonight.
+                self._flat_by_close_day = today
+                return {"due": True, "why": "nothing held", "acted": False}
+            last = self._flat_by_close_try
+            if last is not None and (now - last).total_seconds() < FLAT_BY_CLOSE_RETRY_S:
+                return {"due": True, "why": "waiting to retry", "acted": False}
+            self._flat_by_close_try = now
+            self.journal.record("flat_by_close", at_ct=self.bounds.flat_by_close_ct,
+                                positions=[p.symbol for p in self._open.values()],
+                                working=[w.order_id for w in self._working.values()])
+            cancelled: list[str] = []
+            errors: list[dict[str, Any]] = []
+            # The entries first — one that fills after the flatten is an
+            # overnight position this method just finished preventing.
+            for order_id in list(self._working):
+                try:
+                    self.cancel(order_id)
+                    cancelled.append(order_id)
+                except (BrokerError, Refused) as exc:
+                    self.journal.record("error", kind="flat_by_close", order_id=order_id,
+                                        detail=str(exc))
+                    errors.append({"order_id": order_id, "detail": str(exc)})
+            out: dict[str, Any] = {"closed": [], "errors": []}
+            if self._open:
+                try:
+                    out = self.flatten(reason="flat-by-close")
+                except Refused as exc:
+                    # LOCKED. Nothing can be sent; say so and try again later.
+                    self.journal.record("error", kind="flat_by_close", detail=str(exc))
+                    return {"due": True, "why": str(exc), "acted": False,
+                            "cancelled": cancelled, "errors": errors}
+            errors += list(out.get("errors") or [])
+            done = not (self._open or self._working)
+            if done:
+                self._flat_by_close_day = today
+            self.journal.record("flat_by_close_done", flat=done,
+                                cancelled=len(cancelled),
+                                closed=len(out.get("closed") or []),
+                                errors=len(errors))
+            return {"due": True, "acted": True, "flat": done, "cancelled": cancelled,
+                    "closed": out.get("closed") or [], "errors": errors}
+
+    def flat_by_close_status(self) -> dict[str, Any]:
+        """What the page says about the day's close-out: when it is due,
+        whether it has run, and what is still held past it. A position still
+        open after the hour is the one line that must never be silent."""
+        local = self.clock().astimezone(CT)
+        due = (local.time() >= self.bounds.flat_by_close
+               and not (self.bounds.weekdays_only and local.weekday() >= 5))
+        done = self._flat_by_close_day == local.date()
+        held = [p.symbol for p in self._open.values()] if due and not done else []
+        return {"at_ct": self.bounds.flat_by_close_ct, "due": due, "done": done,
+                "still_held": held,
+                "still_working": [w.order_id for w in self._working.values()]
+                if due and not done else []}
 
     # ── the live exit loop ───────────────────────────────────────────────
     def observe(self, spx: float) -> dict[str, Any]:

@@ -17,6 +17,11 @@ Every few seconds while exposed; a slow idle check otherwise; nothing at all
 while LOCKED, because with no credential in memory there is nothing to ask
 the broker with and no exit can be sent anyway.
 
+It is also the hand that closes the day. Since Steve's ruling of 2026-09-18
+("9j8e is flat") every pass asks :meth:`ExecService.flat_by_close` first:
+past 14:55 CT it cancels the working entries and sells what is held, so the
+DAY bracket never has to survive a bell. See that method. [st-9j8e]
+
 What it does not do: it never opens anything. ``observe`` and ``reconcile``
 are exit-class — they can only close, and only what the journal and the broker
 agree is held. A broker outage is journaled once per outage and retried; an
@@ -65,6 +70,20 @@ class Watcher:
         if not svc.has_exposure():
             return {"skipped": "flat"}
         out: dict[str, Any] = {}
+        # The day's close-out, before the mark is read (st-9j8e; Steve,
+        # 2026-09-18: "9j8e is flat"). It answers "not due" on almost every
+        # pass and costs nothing; past 14:55 CT it cancels the working
+        # entries and sells what is held, because the bracket's legs are DAY
+        # orders and a position carried past the bell loses both of them.
+        # Its own troubles are journaled inside it, and a failure here must
+        # not stop the pass that watches the position it failed to close.
+        try:
+            fbc = svc.flat_by_close()
+            if fbc.get("acted"):
+                out["flat_by_close"] = fbc
+        except Exception as exc:  # noqa: BLE001 — never lose the watch pass
+            log.exception("watch: flat-by-close failed; continuing")
+            out["flat_by_close_error"] = str(exc)
         try:
             rec = svc.reconcile()
             out["reconcile"] = rec

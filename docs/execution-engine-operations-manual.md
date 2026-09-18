@@ -599,7 +599,7 @@ names the most fundamental thing wrong:
 | 4 | `qty` | `qty > qty_cap` |
 | 5 | `stop` | the STOP file exists |
 | 6 | `protective_stop` | `require_protective_stop` and either `stop_spx` or `delta` is missing |
-| 7 | `window` | weekend; or before `open_ct`; or at/after `no_open_after_ct` — **not applied to SPX/SPXW roots** (`WINDOW_EXEMPT_ROOTS`; Steve 2026-09-14: "revoke the trading-hours rule when SPX is the target instrument. It can not fill after hours and placing live trades can help during testing"). Since those are the only instruments, the window gates no entry today; an unlock after the close arms until 23:59 CT instead of being refused |
+| 7 | `window` | weekend; or before `open_ct`; or at/after `no_open_after_ct` — **not applied to SPX/SPXW roots** (`WINDOW_EXEMPT_ROOTS`; Steve 2026-09-14: "revoke the trading-hours rule when SPX is the target instrument. It can not fill after hours and placing live trades can help during testing"). Since those are the only instruments, the window gates no entry today; an unlock after the close arms until 23:59 CT instead of being refused. **RULED** (st-hlah): the 2026-09-15 audit called the 23:59 arming inferred rather than stated and asked whether to refuse it in live; Steve, 2026-09-18, "accept after hours unlock and submissions" — both stand, in both modes |
 | 8 | `positions` | `open_positions >= max_open_positions` |
 | 9 | `ceiling` | `attempts_used >= max_attempts` — an attempt is a filled position, held while open and kept only if it closes at a loss; a close at break-even or better gives it back (Steve, 2026-09-14, st-fn5y, §5.20); a working entry holds a slot (row 8) but no attempt |
 | 10 | `ceiling` | `realized_loss_usd >= daily_loss_ceiling_usd` |
@@ -763,6 +763,7 @@ restarted to pick up a change.
 | `open_ct` | `"08:30"` |
 | `close_ct` | `"15:00"` |
 | `no_open_after_ct` | `"14:50"` |
+| `flat_by_close_ct` | `"14:55"` — when the watcher cancels the working entries and sells everything held (Steve, 2026-09-18, ruling on st-9j8e: "9j8e is flat"); §5.16 |
 | `weekdays_only` | `true` |
 | `price_band_pct` | `0.10` |
 | `max_quote_age_s` | `30.0` |
@@ -776,7 +777,8 @@ leave the service running under limits Steve did not choose. Validation also
 rejects an empty `instruments`, `qty_cap < 1`, `max_open_positions < 1`, a
 non-positive ceiling, `max_attempts < 1`, `price_band_pct` outside `(0,1)`, a
 non-positive `max_quote_age_s`, `open_ct >= close_ct`, a `no_open_after_ct`
-outside the window, a `take_profit_basis` other than `premium` or `risk`, a
+outside the window, a `flat_by_close_ct` outside `no_open_after_ct`..`close_ct`,
+a `take_profit_basis` other than `premium` or `risk`, a
 non-positive `take_profit_multiple`, and a premium-basis multiple at or under
 1 (fill × 1 is the fill — a sale, not a target). A file that exists but is
 wrong **raises**; a file that is absent falls back to the start values.
@@ -1133,7 +1135,8 @@ next `place` or `flatten` happened to reconcile.
 `Watcher` is a daemon thread started by `__main__` (`--watch-interval`,
 default 5 s; `0` turns it off, trials only). Each pass: LOCKED → nothing (no
 credential, no exit possible); no position and no working entry → nothing;
-otherwise `reconcile()` (the broker's truth on fills and what closed), then
+otherwise `flat_by_close()` (the day's close-out, below), then `reconcile()`
+(the broker's truth on fills and what closed), then
 the index mark into `observe()`, which fires FD0's SPX-level exit. Every
 5 s while exposed, every 30 s idle. A broker outage is one `error kind=watch`
 journal line per outage and a `watch: broker back` line when it clears; an
@@ -1163,6 +1166,45 @@ tick under the fill — because the only check ran on a mark read before the
 preview. That entry is now refused (`protective_stop`, "SPX moved through
 the cut while this entry was being priced"), and so is a send whose mark
 cannot be read at all.
+
+**Flat by close** (st-9j8e; Steve's ruling, 2026-09-18: *"9j8e is flat"*).
+Audit finding 38 found the hole: the bracket's two legs are DAY orders and a
+position is not, so a contract carried past 15:00 CT loses both exits at the
+exchange. The leg reconcile (st-vqmr) re-rests an expired leg and recovery
+now reads back over a week for an unclosed position, but the question those
+left open was whether to hold overnight at all. The choice was flat-by-close
+or resting the legs `GOOD_TILL_CANCEL`; he chose flat, which is what he
+trades — 0DTE.
+
+So at `bounds.flat_by_close_ct`, **14:55 CT**, five minutes before the bell,
+`ExecService.flat_by_close()` cancels every working entry and then flattens
+every position at market. The entries go first: one still working at 14:55
+could fill at 14:59 and hand back the overnight position this exists to
+prevent. It runs through `flatten`, so **no bound holds it** — legal while
+STOPped, while stood down, and outside the session window, because nothing
+that exists to keep him out of risk may keep him in it.
+
+It runs **once a day and is retried until it is done**. The day is marked
+finished only when nothing is left open *and* nothing is left working; short
+of that the next pass tries again, no sooner than `FLAT_BY_CLOSE_RETRY_S`
+(30 s), so a broker unreachable at 14:55 does not become a position carried
+overnight in silence, and does not become a market order every five seconds
+either. There is no upper bound on the hour: a service that comes back at
+16:30 still holding something will try to be flat, and the broker's refusal
+of an after-hours market order is journaled where he can see it. **LOCKED can
+do nothing here** — with no credential in memory there is nothing to transmit
+with — and it does not mark the day done.
+
+Journal: `flat_by_close` when a sweep starts (with what was held and
+working), `flat_by_close_done` with what it managed, `error kind=flat_by_close`
+for each failure, plus `flatten`'s own `request` / `flattened` lines with
+`reason="flat-by-close"`. `GET /status` carries `flat_by_close`
+(`at_ct`, `due`, `done`, `still_held`, `still_working`), and **past due with
+something still there the page says so in red** — on the status card and on
+the operations page — because a position held past the close-out with nothing
+said is the failure the whole ruling exists to prevent. `flat_by_close_ct`
+must sit between `no_open_after_ct` and `close_ct`, or the bounds file will
+not load.
 
 Reaches the running service at the next install (`installExecd`).
 

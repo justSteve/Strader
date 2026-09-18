@@ -338,6 +338,7 @@ class TestConfiguration:
         assert (b.qty_cap, b.max_open_positions) == (1, 1)
         assert (b.daily_loss_ceiling_usd, b.max_attempts) == (500.0, 2)
         assert (b.open_ct, b.close_ct, b.no_open_after_ct) == ("08:30", "15:00", "14:50")
+        assert b.flat_by_close_ct == "14:55"        # Steve's ruling on st-9j8e
 
     def test_steves_file_overrides_the_start_values(self, tmp_path):
         p = tmp_path / "bounds.yaml"
@@ -362,6 +363,16 @@ class TestConfiguration:
         with pytest.raises(ValueError, match="inside the window"):
             Bounds(no_open_after_ct="16:00").validated()
 
+    def test_flat_by_close_must_sit_between_the_cutoff_and_the_bell(self):
+        """Before the no-open cutoff it would sell a position the service is
+        still free to re-open; after the close it is a market order with no
+        market to fill it. [st-9j8e]"""
+        for bad in ("14:45", "15:05"):
+            with pytest.raises(ValueError, match="flat_by_close_ct"):
+                Bounds(flat_by_close_ct=bad).validated()
+        for good in ("14:50", "14:55", "15:00"):
+            assert Bounds(flat_by_close_ct=good).validated().flat_by_close_ct == good
+
     @pytest.mark.parametrize("kw", [
         {"qty_cap": 0}, {"max_open_positions": 0}, {"daily_loss_ceiling_usd": 0},
         {"max_attempts": 0}, {"price_band_pct": 1.5}, {"max_quote_age_s": 0},
@@ -383,7 +394,8 @@ class TestConfiguration:
     def test_to_dict_names_every_bound_the_service_enforces(self):
         assert set(Bounds().to_dict()) == {
             "instruments", "qty_cap", "max_open_positions", "daily_loss_ceiling_usd",
-            "max_attempts", "open_ct", "close_ct", "no_open_after_ct", "weekdays_only",
+            "max_attempts", "open_ct", "close_ct", "no_open_after_ct",
+            "flat_by_close_ct", "weekdays_only",
             "price_band_pct", "max_quote_age_s", "preview_cost_tolerance_usd",
             "require_protective_stop",
             "take_profit_multiple", "take_profit_basis",

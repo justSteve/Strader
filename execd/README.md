@@ -117,7 +117,7 @@ be reached.
 | `POST /cancel` · `POST /flatten` | getting out |
 | `POST /adjust` | move the resting stop, the resting take-profit, or both, under a live position — `{symbol, stop_price?, target_price?}` (st-fn5y) |
 | `POST /stand-down` · `POST /stop` | done for the day; the kill switch on |
-| `POST /observe` · `POST /poll-fills` | feed it the SPX mark; pick up a stop that fired — driven in-process by `execd/watch.py` since stage 4 (every 5 s while a position or working entry exists) |
+| `POST /observe` · `POST /poll-fills` | feed it the SPX mark; pick up a stop that fired — driven in-process by `execd/watch.py` since stage 4 (every 5 s while a position or working entry exists). The same loop closes the day out at `flat_by_close_ct` (14:55 CT): every working entry cancelled, everything held sold at market, because the bracket's legs are DAY orders and a position carried past the bell loses both — Steve's ruling on st-9j8e, 2026-09-18, "9j8e is flat". Once a day, retried every 30 s until nothing is left, and said in red on the page when it has not taken. Manual §5.16 |
 
 | `GET /marketdata/<kind>` | the raw Schwab body for `quotes`, `chains` or `pricehistory`, query allow-listed to that resource's own parameters — the readers' door (stage 3) |
 

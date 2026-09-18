@@ -995,6 +995,10 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     for p in st["positions"]:
         parts.append(_render_position(p))
     parts.append(_render_not_this_services(st))
+    # the day's close-out, when it is past due and has not taken (st-9j8e)
+    from .panel import flat_by_close_alert
+    if (alert := flat_by_close_alert(st)):
+        parts.append(f"<div class=card>{alert}</div>")
 
     # ── the day ──
     pnl = st.get("pnl") or {}

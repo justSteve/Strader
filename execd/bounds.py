@@ -101,6 +101,17 @@ class Bounds:
     open_ct: str = "08:30"
     close_ct: str = "15:00"
     no_open_after_ct: str = "14:50"
+    #: When the service closes whatever it still holds, by its own hand.
+    #: Steve's ruling, 2026-09-18, on st-9j8e: "9j8e is flat" — the choice was
+    #: flat-by-close or resting the bracket GOOD_TILL_CANCEL so a position
+    #: could be held overnight under its stop. He trades 0DTE and nothing in
+    #: the design wants overnight exposure, so the legs stay DAY orders and
+    #: this is the hand that makes that safe: five minutes before ``close_ct``
+    #: the working entries are pulled and every position is sold at market,
+    #: through FLATTEN's own force. Like every bound it is his to change; it
+    #: is not his to remove, because a DAY bracket with nothing to flatten
+    #: the position it protects is the hole audit finding 38 opened.
+    flat_by_close_ct: str = "14:55"
     weekdays_only: bool = True
     price_band_pct: float = 0.10      # a BUY limit may sit this far above the ask
     max_quote_age_s: float = 30.0     # older than this is not a live quote
@@ -127,6 +138,10 @@ class Bounds:
     @property
     def no_open_after(self) -> time:
         return _parse_hhmm(self.no_open_after_ct, "no_open_after_ct")
+
+    @property
+    def flat_by_close(self) -> time:
+        return _parse_hhmm(self.flat_by_close_ct, "flat_by_close_ct")
 
     def problems(self) -> list[str]:
         out: list[str] = []
@@ -167,7 +182,8 @@ class Bounds:
             out.append(f"take_profit_multiple on the premium basis must be above 1, "
                        f"not {self.take_profit_multiple}")
         try:
-            o, c, n = self.open_time, self.close_time, self.no_open_after
+            o, c, n, f = (self.open_time, self.close_time, self.no_open_after,
+                          self.flat_by_close)
         except ValueError as exc:
             out.append(str(exc))
             return out
@@ -175,6 +191,14 @@ class Bounds:
             out.append(f"open_ct {self.open_ct} must precede close_ct {self.close_ct}")
         if not o <= n <= c:
             out.append(f"no_open_after_ct {self.no_open_after_ct} must sit inside the window")
+        # After the door shuts on new entries and at or before the bell: a
+        # flatten before the no-open cutoff would sell a position the service
+        # would then be free to re-open, and one after the close is a market
+        # order with no market to fill it.
+        if not n <= f <= c:
+            out.append(
+                f"flat_by_close_ct {self.flat_by_close_ct} must sit between "
+                f"no_open_after_ct {self.no_open_after_ct} and close_ct {self.close_ct}")
         return out
 
     def validated(self) -> "Bounds":
@@ -218,6 +242,7 @@ class Bounds:
             "open_ct": self.open_ct,
             "close_ct": self.close_ct,
             "no_open_after_ct": self.no_open_after_ct,
+            "flat_by_close_ct": self.flat_by_close_ct,
             "weekdays_only": self.weekdays_only,
             "price_band_pct": self.price_band_pct,
             "max_quote_age_s": self.max_quote_age_s,
@@ -247,6 +272,13 @@ def check_instrument(intent: OrderIntent, bounds: Bounds) -> Refusal | None:
 #: Roots the session window does not gate on entry (Steve, 2026-09-14). The
 #: arming expiry still ends at the close on a normal unlock; an unlock after
 #: the close arms until the end of the day, for testing.
+#:
+#: Both halves are RULED, not inferred (st-hlah). The 2026-09-15 audit's
+#: finding 63 said the after-hours arming had been read into his hours
+#: revocation rather than stated, and asked whether to refuse it in live.
+#: Steve, 2026-09-18: "accept after hours unlock and submissions". An
+#: after-hours send is his to make; Schwab's own refusal is the answer he
+#: wants to see, and in paper it exercises the whole pipe.
 WINDOW_EXEMPT_ROOTS = frozenset({"SPX", "SPXW"})
 
 

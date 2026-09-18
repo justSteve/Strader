@@ -54,6 +54,16 @@ max_attempts: 10
 open_ct: "08:30"
 close_ct: "15:00"
 no_open_after_ct: "14:50"
+
+# When the service closes the day out by its own hand. Steve's ruling,
+# 2026-09-18 ("9j8e is flat"): the bracket's legs are DAY orders and a
+# position is not, so nothing is carried past the bell. At this hour the
+# watcher cancels every working entry and sells everything held at market,
+# through FLATTEN, which no bound refuses. Must sit between no_open_after_ct
+# and close_ct. Changing it is his; removing it is not — a DAY bracket with
+# no hand to flatten the position it protects is the hole audit finding 38
+# opened.
+flat_by_close_ct: "14:55"
 weekdays_only: true
 
 # Price sanity. A limit must sit within this fraction of the live touch, and a
