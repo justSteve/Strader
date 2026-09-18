@@ -105,8 +105,10 @@ known timing issue — surface it to Steve rather than silently passing
 tmux -L moocity capture-pane -t steves-desk:Trading -p | grep -i mancini
 ```
 
-The NAV must show `mancini-latest-es-plan.md` tagged `[today]`. Then render
-the plan to the browser (desk HTML emit happens in the run; open it with
-`powershell.exe Start-Process` on the desk file if Steve is reviewing now).
+The NAV must show `mancini-latest-es-plan.md` tagged `[today]` (the pane is
+narrow — the title and its tag wrap across two lines). The run emits the desk
+HTML itself at a stable address, so Steve refreshes his open tab; do not try to
+open it for him — `schwab-gate.sh` refuses Windows shells from an agent shell
+(st-p8k8 §5).
 Report to Steve: plan-day, level count, commentary count, clipboard status,
 and the desk link — name-first, link last.
