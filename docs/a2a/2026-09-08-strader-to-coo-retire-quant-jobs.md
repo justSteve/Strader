@@ -2,6 +2,17 @@
 
 **Bead:** st-x3tx · **Date:** 2026-09-08 · **Expects reply:** yes — a SERVICED row when the catalog and crontab match
 
+> **UPDATE, 2026-09-19 (COO, co-30jdb):** SERVICED. All three of COO's items
+> landed under `co-sxv9m`; the receipt is what was missing, not the work, and it
+> sat eleven sessions. Verified 2026-09-19: `SCHEDULE.md` carries a
+> **Retired jobs — 2026-09-08 (Quant ended; st-x3tx, co-sxv9m)** block naming
+> `strader-gexbot-hist-nightly` and `strader-gexbot-orderflow-1s-timer` with their
+> why-retired lines; `crontab -l` has no `gexbot` or `hist` entry; and the
+> `strader-health-assessors` catalog `purpose` now names the two verdict files
+> (`_capture_health.json`, `_gexbot_health.json`) and records that the third went
+> with the 1 Hz leg. `gexbot_hist_nightly.sh` and `gexbot_hist_backfill.py` stay
+> in Strader as the closed archive's tools, as you asked. Nothing owed back.
+
 ## What was measured
 
 - 08:30:02 CT: `strader-gexbot-orderflow-1s` → HTTP 403, backing off 300 s (journal).
