@@ -57,13 +57,22 @@ from strader.blotter.state import DEFAULT_CORPUS, DEFAULT_PARSED, day_inputs, st
 from strader.marks.estimated import Calibration, minute_index
 
 __all__ = ["CT", "FIRE_GRACE_S", "CLOSE_GRACE_S", "SNAPSHOT_WAIT_S", "ShadowReport",
-           "run_shadow", "compare", "read_journal", "shadow_rows_path", "shadow_log_path", "COMPARE_KEYS"]
+           "run_shadow", "compare", "read_journal", "shadow_rows_path", "shadow_log_path", "COMPARE_KEYS",
+           "ACCEPTANCE_DAYS", "REALTIME_SLACK_S", "DEFAULT_VERDICT_DIR", "verdict_path", "fire_lags_s",
+           "write_verdict", "acceptance_streak"]
 
 CT = ZoneInfo("America/Chicago")
 FIRE_GRACE_S = 5          # seconds after a fire minute closes before the state is built
 CLOSE_GRACE_S = 20        # seconds after the close before the rows are priced
 SNAPSHOT_WAIT_S = 120     # how long to wait for the close-watch snapshot after a fire
 SNAPSHOT_POLL_S = 5
+
+#: Clean compares in a row before the lane earns its systemd unit (st-uaxf).
+ACCEPTANCE_DAYS = 7
+#: How late a fire may be seen and still count as having been seen at real time.
+REALTIME_SLACK_S = 120
+#: Where the wrapper records one verdict per day for the acceptance clock.
+DEFAULT_VERDICT_DIR = Path("/var/moo/state/blotter-shadow")
 
 #: What a replay must reproduce for a shadow row to count as clean.
 COMPARE_KEYS = ("rule_id", "fire_ct", "call", "entry_minute", "occ_symbol")
@@ -230,6 +239,13 @@ def _view(r: dict) -> dict:
             "entry_minute": r["entry_ts"][:5], "occ_symbol": r["occ_symbol"]}
 
 
+def _journal_records(out_dir: Path, day: str) -> list[dict]:
+    log = shadow_log_path(out_dir, day)
+    if not log.is_file():
+        return []
+    return [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines() if l.strip()]
+
+
 def read_journal(out_dir: Path, day: str) -> tuple[list[dict], list[dict]] | None:
     """The shadow's side of ``day`` from its files: ``(rows, fires)``.
 
@@ -238,11 +254,8 @@ def read_journal(out_dir: Path, day: str) -> tuple[list[dict], list[dict]] | Non
     Returns None when the journal is missing or has no ``close`` record — the
     day has not been shadowed to its close, so there is nothing to compare.
     """
-    log = shadow_log_path(out_dir, day)
-    if not log.is_file():
-        return None
-    journal = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines() if l.strip()]
-    if not any(j.get("phase") == "close" for j in journal):
+    journal = _journal_records(out_dir, day)
+    if not journal or not any(j.get("phase") == "close" for j in journal):
         return None
     fires = [{"rule_id": a["rule_id"], "fire_ct": j["fire_ct"], "call": a["call"]}
              for j in journal if j.get("phase") == "fire" for a in j.get("answers", [])]
@@ -294,3 +307,126 @@ def compare(day: str, shadow_rows: Sequence[dict], rules: Sequence[Rule], *, cor
     }
     out["clean"] = not (fire_mismatches or out["shadow_only"] or out["replay_only"] or mismatches)
     return out
+
+
+# ------------------------------------------------------------- acceptance ---
+#
+# The acceptance clock. The bead asks for a week of clean compares before the
+# lane earns a systemd unit, and until 2026-09-19 that week was counted by
+# hand: the run was started by hand and the compare remembered by hand, which
+# is why four of the five session days after day 2 were never shadowed at all.
+# The count is now an artifact — one verdict file per day — and it is strict
+# about what may advance it:
+#
+#   - a day the REPLAY could not score (``replay_skip``: a holiday, a tape too
+#     thin to lens) is not evidence, and neither is a day on which the shadow
+#     journaled no answer at all;
+#   - a day whose fires were seen LATE is not evidence either. Started after
+#     the fire minute, the shadow reads the same finished files the replay
+#     reads and agrees with it trivially — a clean compare that proves nothing
+#     about the wall clock. ``fire_lags_s`` measures that from the journal's
+#     own ``seen_at`` stamps, so the verdict carries its own proof rather than
+#     trusting whoever launched the run.
+#
+# An uncounted day neither advances the clock nor breaks it.
+
+
+def verdict_path(verdict_dir: Path, day: str) -> Path:
+    return Path(verdict_dir) / f"{day}.json"
+
+
+def fire_lags_s(out_dir: Path, day: str) -> list[float]:
+    """Seconds between each fire minute's scheduled read and when it was seen.
+
+    One entry per ``fire`` record the journal holds, in journal order. The
+    scheduled read is the fire minute plus 60 (the minute must close) plus
+    :data:`FIRE_GRACE_S`. A negative lag is impossible in a real run and is
+    reported as it is measured rather than clamped.
+    """
+    lags = []
+    for j in _journal_records(out_dir, day):
+        if j.get("phase") != "fire" or not j.get("seen_at") or not j.get("fire_ct"):
+            continue
+        try:
+            seen = datetime.fromisoformat(j["seen_at"])
+            due = _at(day, j["fire_ct"], 60 + FIRE_GRACE_S)
+        except ValueError:
+            continue
+        lags.append((seen - due).total_seconds())
+    return lags
+
+
+def write_verdict(verdict_dir: Path, day: str, out: dict, *, out_dir: Path,
+                  slack_s: float = REALTIME_SLACK_S,
+                  now_fn: Callable[[], datetime] = lambda: datetime.now(CT)) -> dict:
+    """Record one day's compare as an acceptance verdict and return it.
+
+    ``counted`` says whether this day may advance the acceptance clock;
+    ``why`` names the reason when it may not. The write is tmp+rename so a
+    reader never sees half a file.
+    """
+    lags = fire_lags_s(out_dir, day)
+    late = [round(x, 1) for x in lags if x > slack_s]
+    if out.get("replay_skip"):
+        counted, why = False, f"the day could not be scored ({out['replay_skip']})"
+    elif not lags:
+        counted, why = False, "the journal holds no fire the acceptance can read"
+    elif not out.get("n_fires"):
+        counted, why = False, "no rule answered at the fire minute"
+    elif late:
+        counted, why = False, (f"seen {max(late):.0f}s after the fire minute, past the {slack_s:.0f}s "
+                               "slack — a late read agrees with the replay trivially")
+    else:
+        counted, why = True, None
+    verdict = {
+        "day": day,
+        "ts": now_fn().isoformat(timespec="seconds"),
+        "clean": bool(out.get("clean")),
+        "counted": counted,
+        "why_not_counted": why,
+        "fire_lag_s": round(max(lags), 1) if lags else None,
+        "n_fires": out.get("n_fires"),
+        "n_shadow": out.get("n_shadow"),
+        "n_replay": out.get("n_replay"),
+        "replay_skip": out.get("replay_skip"),
+        "fire_mismatches": out.get("fire_mismatches") or [],
+        "mismatches": out.get("mismatches") or [],
+        "shadow_only": out.get("shadow_only") or [],
+        "replay_only": out.get("replay_only") or [],
+    }
+    d = Path(verdict_dir)
+    d.mkdir(parents=True, exist_ok=True)
+    path = verdict_path(d, day)
+    tmp = d / f".{path.name}.tmp"
+    tmp.write_text(json.dumps(verdict, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(path)
+    return verdict
+
+
+def acceptance_streak(verdict_dir: Path, *, needed: int = ACCEPTANCE_DAYS) -> dict:
+    """How many counted days in a row have compared clean, newest backwards.
+
+    Walks the verdict files from the most recent day, counting clean counted
+    days and stopping at the first counted day that was not clean. Uncounted
+    days are passed over. Returns ``{"streak", "needed", "earned", "last_day",
+    "broke_on", "n_verdicts"}``; a missing or empty directory is a streak of
+    zero, not an error.
+    """
+    d = Path(verdict_dir)
+    files = sorted(d.glob("*.json"), reverse=True) if d.is_dir() else []
+    streak, last_day, broke_on, n = 0, None, None, 0
+    for f in files:
+        try:
+            v = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        n += 1
+        if not v.get("counted"):
+            continue
+        if not v.get("clean"):
+            broke_on = v.get("day")
+            break
+        streak += 1
+        last_day = last_day or v.get("day")
+    return {"streak": streak, "needed": needed, "earned": streak >= needed,
+            "last_day": last_day, "broke_on": broke_on, "n_verdicts": n}

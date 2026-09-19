@@ -14,15 +14,30 @@ WHAT
 
     ``--compare`` replays the day afterwards and holds it against the shadow
     rows: rule id, fire minute, call, entry minute and contract must match.
-    Exit 0 when clean, 1 when not, naming the row and the key.
+
+    ``--record DIR`` writes that compare as a verdict file under DIR and
+    prints where the acceptance clock now stands — the week of clean compares
+    the systemd unit is gated on (st-uaxf). A day the replay could not score,
+    or one whose fires were read late, is recorded and NOT counted: see the
+    acceptance section of strader/blotter/shadow.py for why.
+
+EXIT
+    0  clean (and, with --record, a day the clock counts)
+    1  mismatch — the diff names the row or the answer and the key
+    2  the day was never shadowed to its close, so there is nothing to compare
+    3  clean, but not a day the acceptance clock may count (--record only)
 
 RUN
     .venv/bin/python3 scripts/blotter_shadow.py                 # today, wait for 14:45, close at 15:00
     .venv/bin/python3 scripts/blotter_shadow.py --day 2026-09-11 --compare
+    .venv/bin/python3 scripts/blotter_shadow.py --day 2026-09-11 --compare --record /var/moo/state/blotter-shadow
     nohup .venv/bin/python3 scripts/blotter_shadow.py >> /var/moo/logs/blotter-shadow-$(date +%F).log 2>&1 &
 
     Started after the close, it prices at once from the finished files — a
     dry run of the close phase. Started before the fire minute, it waits.
+
+    Scheduled: scripts/cron/blotter-shadow-wrapper.sh runs both halves at
+    14:46 CT on session days (SCHEDULE.md, strader-blotter-shadow).
 """
 from __future__ import annotations
 
@@ -54,7 +69,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     ap.add_argument("--no-events", action="store_true")
     ap.add_argument("--compare", action="store_true", help="replay the day and compare with the shadow rows")
+    ap.add_argument("--record", type=Path, nargs="?", const=S.DEFAULT_VERDICT_DIR, default=None,
+                    help=f"with --compare: write the verdict under this directory (default {S.DEFAULT_VERDICT_DIR}) "
+                         "and report the acceptance clock")
     args = ap.parse_args(argv)
+
+    if args.record is not None and not args.compare:
+        ap.error("--record records a compare; pass --compare too")
 
     day = args.day or datetime.now(S.CT).strftime("%Y-%m-%d")
     rules = load_rules()
@@ -75,7 +96,20 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(out, indent=1, sort_keys=True))
         print(f"{day}: {'CLEAN' if out['clean'] else 'MISMATCH'} — {out['n_fires']} answers held, "
               f"{out['n_shadow']} shadow rows, {out['n_replay']} replay rows")
-        return 0 if out["clean"] else 1
+        if args.record is None:
+            return 0 if out["clean"] else 1
+        verdict = S.write_verdict(args.record, day, out, out_dir=args.out_dir)
+        clock = S.acceptance_streak(args.record)
+        print(f"{day}: recorded at {S.verdict_path(args.record, day)}")
+        if not verdict["counted"]:
+            print(f"{day}: NOT COUNTED — {verdict['why_not_counted']}")
+        print(f"acceptance: {clock['streak']} of {clock['needed']} clean in a row"
+              + (f", last {clock['last_day']}" if clock["last_day"] else "")
+              + (f"; broken on {clock['broke_on']}" if clock["broke_on"] else "")
+              + ("; the unit is earned" if clock["earned"] else ""))
+        if not out["clean"]:
+            return 1
+        return 0 if verdict["counted"] else 3
 
     print(f"shadowing {day} with {[r.id for r in rules]}; fire minutes {sorted({t for r in rules for t in r.fire_at})} CT", flush=True)
     rep = S.run_shadow(day, rules, corpus=args.corpus, parsed=args.parsed, cal=cal, out_dir=args.out_dir,
