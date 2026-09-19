@@ -434,6 +434,17 @@ def format_price(pts: float) -> str:
     return str(Decimal(str(pts)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
+#: The quote that counts as touching a protective stop, sent explicitly so
+#: live and paper trigger off the same number. Sending ``stopPrice`` alone
+#: left it on the account default while the paper book triggered on the bid,
+#: and the two disagreed by the width of the spread (st-qb7w). Steve,
+#: 2026-09-19: "convention is to use 'mid'. split the diff between bid and
+#: offer." ``MARK`` is Schwab's midpoint on an option; ``StopType`` also
+#: allows STANDARD, BID, ASK and LAST. ``execd/paper.py`` triggers on the
+#: same midpoint.
+STOP_TRIGGER = "MARK"
+
+
 def build_order(intent: OrderIntent) -> dict[str, Any]:
     """One single-leg option order, in the Trader API's request shape.
 
@@ -459,6 +470,7 @@ def build_order(intent: OrderIntent) -> dict[str, Any]:
         if intent.stop_price is None:
             raise ValueError("a STOP intent needs a stop_price")
         body["stopPrice"] = format_price(intent.stop_price)
+        body["stopType"] = STOP_TRIGGER
     return body
 
 

@@ -23,9 +23,13 @@ never reach it:
     flatten what it did not open.
 
 Resting orders are swept against live quotes on every read: a resting buy
-fills when the offer comes down to it; a resting stop fills at the bid once
-the bid is at or under the stop price. That is what lets the service's own
-loop — the watcher, reconcile, the fill sweep — run unchanged over paper.
+fills when the offer comes down to it; a resting stop triggers once the
+**mid** is at or under the stop price and then fills at the bid, which is
+where a market sell lands. The mid, not the bid, because that is the basis
+the live order names — ``stopType: MARK`` — and a stop the two surfaces
+trigger differently is not a simulation of it (st-qb7w). That is what lets
+the service's own loop — the watcher, reconcile, the fill sweep — run
+unchanged over paper.
 
 The book persists as JSON so a restart recovers it the way the journal
 recovers the day: the service asks the broker what is held, and the answer
@@ -67,6 +71,25 @@ def _iso(dt: datetime) -> str:
 
 def _from_iso(s: str) -> datetime:
     return datetime.fromisoformat(s)
+
+
+def _mid(q: Quote) -> float:
+    """The midpoint of bid and offer — what triggers a protective stop here.
+
+    Until 2026-09-19 the book triggered a stop on the bid while the live
+    order named no basis at all and ran on the account default, so the two
+    surfaces disagreed by the width of the spread: the bid is the lowest of
+    the three, so a bid-triggered sell stop fires first (st-qb7w). Steve:
+    "convention is to use 'mid'. split the diff between bid and offer."
+    Live sends that basis as ``stopType: MARK``
+    (:data:`execd.schwab.STOP_TRIGGER`).
+
+    One-sided quotes fall back to whichever side is there; a stop is never
+    triggered off a side that is not quoted.
+    """
+    if q.bid > 0 and q.ask > 0:
+        return (q.bid + q.ask) / 2.0
+    return q.ask if q.ask > 0 else q.bid
 
 
 class PaperBroker:
@@ -178,7 +201,8 @@ class PaperBroker:
             if q is None:
                 continue
             if order.order_type is OrderType.STOP:
-                if order.price is not None and q.bid <= order.price and q.bid > 0:
+                trigger = _mid(q)   # not the bid — live triggers on MARK [st-qb7w]
+                if order.price is not None and 0 < trigger <= order.price and q.bid > 0:
                     self._fill(order, q.bid)
             elif order.order_type is OrderType.LIMIT and order.price is not None:
                 if order.side is Side.BUY_TO_OPEN and 0 < q.ask <= order.price:

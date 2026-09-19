@@ -451,10 +451,20 @@ class TestOrderBody:
         assert body["orderType"] == "MARKET" and "price" not in body and "stopPrice" not in body
         assert body["orderLegCollection"][0]["instruction"] == "SELL_TO_CLOSE"
 
-    def test_stop_carries_stop_price_only(self):
+    def test_stop_carries_the_stop_price_and_names_the_mid_as_its_trigger(self):
+        # stopPrice alone left the trigger basis on the account default while
+        # the paper book triggered on the bid, so the two surfaces disagreed
+        # by the width of the spread. Steve, 2026-09-19: "convention is to
+        # use 'mid'." MARK is Schwab's midpoint on an option. [st-qb7w]
         body = build_order(intent(side=Side.SELL_TO_CLOSE, order_type=OrderType.STOP,
                                   limit=None, stop_price=1.45))
         assert body["orderType"] == "STOP" and body["stopPrice"] == "1.45" and "price" not in body
+        assert body["stopType"] == "MARK"
+
+    def test_only_a_stop_names_a_trigger_basis(self):
+        assert "stopType" not in build_order(intent())
+        assert "stopType" not in build_order(
+            intent(side=Side.SELL_TO_CLOSE, order_type=OrderType.MARKET, limit=None))
 
     def test_the_only_session_and_duration_are_normal_and_day(self):
         body = build_order(intent())

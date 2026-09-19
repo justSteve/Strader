@@ -1240,7 +1240,7 @@ preview** go to Schwab exactly as in live mode. `place`, `cancel`, `orders`,
 |---|---|
 | limit buy | fills at once at the live offer when the offer is at or under the limit; else rests and fills when the offer comes down to it |
 | market sell | fills at once at the live bid |
-| stop sell | rests; fills at the bid once the bid is at or under the stop price |
+| stop sell | rests; triggers once the **mid** (bid+offer)/2 is at or under the stop price, then fills at the bid. The mid because that is the basis the live order names — `stopType: MARK` — so both surfaces trigger off the same number (st-qb7w) |
 | cancel | resting → CANCELED; already filled → reported filled (the race) |
 | any order with no live quote | refused — nothing is simulated without a market |
 | the day after a contract's expiry | a resting order in it → CANCELED `expired`; a position in it → a SELL_TO_CLOSE fill at 0.00 (`paper-expiry-NNNN`), which the service books as an `external` close with its loss (st-ee8f) |

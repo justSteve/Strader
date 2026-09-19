@@ -86,7 +86,13 @@ class TestTheBook:
         assert o.status is OrderStatus.FILLED and o.fill_price == 2.00
         assert paper.positions() == []
 
-    def test_a_stop_rests_and_fills_at_the_bid_when_the_bid_reaches_it(self, paper, live, clock):
+    def test_a_stop_triggers_on_the_mid_not_the_bid_and_fills_at_the_bid(self, paper, live, clock):
+        # The bid is the lowest of the three, so a bid-triggered stop fired
+        # here before the live one did — live names no basis and runs on the
+        # account default. Steve, 2026-09-19: "convention is to use 'mid'.
+        # split the diff between bid and offer." Live now sends MARK and this
+        # book triggers on the same midpoint; the FILL is still the bid,
+        # because that is where a triggered market sell lands. [st-qb7w]
         paper.place(entry("p-6"))
         from execd.intent import OrderIntent, OrderType, Side
         stop = paper.place(OrderIntent("p-6-s", CALL, Side.SELL_TO_CLOSE, 1,
@@ -95,7 +101,10 @@ class TestTheBook:
         since = clock()
         clock.advance(seconds=5)
         assert paper.fills_since(since) == []
-        live.set_quote(CALL, bid=1.55, ask=1.65)
+        live.set_quote(CALL, bid=1.50, ask=1.80)     # bid is through it, mid 1.65 is not
+        assert paper.fills_since(since) == []
+        assert paper.positions() != []
+        live.set_quote(CALL, bid=1.55, ask=1.65)     # mid 1.60 touches the stop
         fills = paper.fills_since(since)
         assert len(fills) == 1 and fills[0].order_id == stop.order_id and fills[0].price == 1.55
         assert paper.positions() == []
