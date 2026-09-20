@@ -12,10 +12,19 @@
 #
 # Everything else — backup of the old token, shape check of the new grant, a
 # live market-data call — is scripts/refresh_schwab_token.py, unchanged.
-# Since execd stage 3 (st-p8k8): once /opt/execd/INSTALLED exists the service
-# holds both grants and re-authorisation happens on its page —
-# https://mydesk-1.tail89f676.ts.net/exec/ — so the script below answers with
-# that address and exit 3 instead of minting a file nothing reads.
+#
+# WHERE THE GRANT GOES. Once the execution service is installed it is the one
+# credential holder on this box, so the flow is handed to scripts/execd_reauth.py
+# and the new grant is written into the service's own store, not into a token
+# file under tokens/ that nothing reads any more. Between stage 3 (st-p8k8) and
+# 2026-09-20 this handle did nothing but print the page's address and exit 3;
+# st-bd2g gave it back its work. With no service installed the old file flow
+# runs unchanged, and SCHWAB_REAUTH_FORCE_FILE=1 forces it either way.
+#
+# Exit codes: 0 the grant was stored, notes on the screen or not; 1 refused
+# before anything was sent; 2 the exchange or the live check failed and nothing
+# was stored, so the old grant is still there to retry. Anything left to do
+# about the running service is said in words in the last lines of the run.
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")/.."
 exec .venv/bin/python3 scripts/refresh_schwab_token.py "$@"

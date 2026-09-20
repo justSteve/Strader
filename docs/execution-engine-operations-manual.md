@@ -55,8 +55,9 @@ in the repo outside `.venv` and `lib`.
 | `https://mydesk-1.tail89f676.ts.net/exec/` | the page | Steve's surface on the tailnet: unlock, STOP, clear STOP, flatten, stand down, lock, weekly re-auth of both apps. Loopback `127.0.0.1:8779` behind `tailscale serve`. §5.15. |
 | `python -m strader.execution.feed --preflight --token PATH` | one-shot check | Go/no-go preflight. §6. |
 | `python scripts/fire_server.py [--port N]` | long-running server | Fire server. §7. |
-| `reauthData` / `reauthAccount` | interactive chore | The shell handles for the weekly re-auth — app 1 (market data) and app 2 (trading). Each prints both walls before and after and names the other. `reauth` alone no longer runs anything; it says which two exist. §5.12a. |
-| `python scripts/refresh_schwab_token.py [--trading]` | interactive chore | What those handles call. Without the flag it mints app 1 (market data); with it, app 2 (trading). Do both in one sitting. §5.12a, §6. |
+| `reauthData` / `reauthAccount` | interactive chore | The shell handles for the weekly re-auth — app 1 (market data) and app 2 (trading). Each prints both walls before and after and names the other. `reauth` alone no longer runs anything; it says which two exist. §5.12a, §6.3. |
+| `python scripts/refresh_schwab_token.py [--trading]` | interactive chore | What those handles call. With the service installed it hands the flow to `scripts/execd_reauth.py` and the grant goes into the service's own store; without it, the old token file. §5.12a, §6.3. |
+| `python scripts/execd_reauth.py [--trading]` | interactive chore | The re-auth the handles actually run once the service is installed. §6.3. |
 | `python scripts/schwab_token_health.py --no-bead --no-push` | one-shot check | Token staleness. Exit 0 healthy, 1 action needed. §6. |
 
 All of these are run through the repo venv: `/root/projects/Strader/.venv/bin/python`.
@@ -1119,8 +1120,8 @@ the readers make — `get_quotes`, `get_option_chain`,
 `get_price_history_every_minute`, `…_every_five_minutes` — over
 `GET /marketdata/<kind>`. No consumer changed. The token-age heartbeat
 (`scripts/schwab_token_health.py`) reads the service's walls first and the
-files only as fallback. `reauthData` / `reauthTrade` answer with the page's
-address once `/opt/execd/INSTALLED` exists.
+files only as fallback. `reauthData` / `reauthAccount` re-authorise the
+service's own store once `/opt/execd/INSTALLED` exists — §6.3.
 
 ---
 
@@ -2001,18 +2002,55 @@ market-data call — both must pass before it reports done. It keeps the last te
 backups beside the token. An agent can run everything up to the login link; the
 login itself is Steve's, because it needs a browser session.
 
-**On the page** (stage 3, §5.15, the path of record once the service is
-installed): `execd.schwab.authorize_url` builds the login link,
+**Once the service is installed there are two doors, and they run the same
+flow** — `execd/reauth.py`. `authorize_url` builds the login link,
 `code_from_received_url` takes the pasted redirect (and refuses a state that
 does not match the link shown), `exchange` trades the code for a wrapped
 token with `creation_timestamp` = now — the start of the seven-day clock —
-`verify_grant` proves it against the family the app is for, and the page
-stores it: the trading grant in the vault with the passphrase Steve just
-typed, the market grant in its file. `refresh` renews the access token and
-preserves the timestamp. Both apps, one sitting, so the two walls stay on the
-same day. The script above keeps working only until the service is installed;
-after that it answers with the page's address (`SCHWAB_REAUTH_FORCE_FILE=1`
-overrides, for a fallback nobody should need).
+`verify_grant` proves it against the family the app is for, and the grant is
+stored where that app's credential lives: the trading one in the vault under
+the passphrase just typed, the market one in its file. `refresh` renews the
+access token and preserves the timestamp. Both apps, one sitting, so the two
+walls stay on the same day.
+
+*The page* (stage 3, §5.15) runs it inside the service, so a new grant reaches
+the running transport in the same step it reaches disk.
+
+*The terminal handles* — `reauthData` (app 1) and `reauthAccount` (app 2, also
+reachable as `reauthTrade`) — run it in Steve's own process, as root, through
+`scripts/execd_reauth.py`. Between stage 3 and 2026-09-20 they did nothing but
+print the page's address and exit 3, because the grant they used to mint went
+into a token file nothing reads; st-bd2g pointed them at the store the service
+actually reads. Two things follow from the writer not being the reader, and
+both are handled rather than hoped away:
+
+- **Each file keeps its owner.** `os.replace` leaves the new inode owned by
+  whoever wrote it, and a root-owned vault is a service that cannot read its
+  own credential after the next restart — the same for the journal it appends
+  to every day. Every write is bracketed by `execd.reauth.preserve_owner`,
+  which puts the owner back and names the `chown` to run if it could not, and
+  a journal file the run created is set back to owner-only.
+- **The running process holds its own copy.** The market credential re-reads
+  itself when the file moves (`execd.reauth.CredentialFile.current`), so a
+  market re-auth lands without a restart — but only on a build carrying that
+  change, so the run asks the service for one live quote afterwards and says
+  `systemctl restart strader-execd` if it did not get one. The trading
+  credential cannot re-read itself: the service does not keep the passphrase.
+  While it is LOCKED — the ordinary case, before the first unlock of the day —
+  the next unlock reads the new grant. While it is armed, the run ends by
+  saying to LOCK and then UNLOCK on the page.
+
+Each run journals `reauth` with the app and the new wall, which is what
+`ExecService._last_known_trading_wall` reads to answer `/status` while LOCKED,
+and what the 06:30 token-age heartbeat reads in turn. Exit codes: `0` the grant
+was stored, notes on the screen or not; `1` refused before anything was sent;
+`2` the exchange or the live check failed and nothing was stored, so the old
+grant is still there to retry. **Zero means stored** because the shell wrapper
+reads any non-zero code as "token regeneration failed — the old token is
+untouched"; a stored grant reported that way would be the opposite of the
+truth, so what is left to do is said in words instead.
+`SCHWAB_REAUTH_FORCE_FILE=1` forces the old token-file flow, for a box where
+the service is not what is being fixed.
 
 ---
 
