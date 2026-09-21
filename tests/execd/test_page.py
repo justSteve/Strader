@@ -530,6 +530,43 @@ class TestCredentialFile:
         with pytest.raises(BrokerError):
             CredentialFile(tmp_path / "m.json").current()
 
+    def test_current_picks_up_a_write_from_outside_this_process(self, tmp_path):
+        """2026-09-21: ``reauthData`` wrote a fresh grant and reported success
+        while the service went on serving the copy it read at start-up, seven
+        days dead. Only a restart cleared it. Now it notices."""
+        path = tmp_path / "m.json"
+        path.write_text(json.dumps(market_payload("old")))
+        f = CredentialFile(path)
+        f.load()
+        assert f.current()["token"]["token"]["refresh_token"] == "old"
+
+        CredentialFile(path).save(market_payload("written-elsewhere"))
+        assert f.current()["token"]["token"]["refresh_token"] == "written-elsewhere"
+
+    def test_an_unchanged_file_is_not_parsed_again(self, tmp_path, monkeypatch):
+        """One stat per market read, not one parse."""
+        path = tmp_path / "m.json"
+        path.write_text(json.dumps(market_payload()))
+        f = CredentialFile(path)
+        f.load()
+        reads: list = []
+        real = Path.read_text
+        monkeypatch.setattr(Path, "read_text",
+                            lambda self, **kw: (reads.append(self), real(self, **kw))[1])
+        for _ in range(5):
+            f.current()
+        assert reads == []
+
+    def test_a_file_caught_mid_replace_leaves_the_working_copy_alone(self, tmp_path):
+        path = tmp_path / "m.json"
+        path.write_text(json.dumps(market_payload("good")))
+        f = CredentialFile(path)
+        f.load()
+        path.write_text("{ this is not json")
+        assert f.current()["token"]["token"]["refresh_token"] == "good"
+        CredentialFile(path).save(market_payload("repaired"))
+        assert f.current()["token"]["token"]["refresh_token"] == "repaired"
+
 
 def test_page_refused_is_plain():
     assert issubclass(PageRefused, RuntimeError)

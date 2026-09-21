@@ -116,17 +116,45 @@ class CredentialFile:
         self.path = Path(path)
         self._lock = threading.Lock()
         self._payload: dict[str, Any] | None = None
+        self._stamp: tuple[int, int, int] | None = None
+
+    def _stamp_now(self) -> tuple[int, int, int] | None:
+        try:
+            st = self.path.stat()
+        except OSError:
+            return None
+        return (st.st_mtime_ns, st.st_size, st.st_ino)
 
     def load(self) -> dict[str, Any]:
+        stamp = self._stamp_now()
         raw = json.loads(self.path.read_text(encoding="utf-8"))
         Credential.from_payload(raw)      # shape-checked here, not on the first quote
         with self._lock:
             self._payload = raw
+            self._stamp = stamp
         return raw
 
     def current(self) -> dict[str, Any]:
-        """What the transport calls on every market read."""
+        """What the transport calls on every market read.
+
+        Re-read when the file has moved underneath us. Holding the credential
+        in memory is the point — the transport asks on every call and must not
+        touch disk for the value — but a process that could not notice the file
+        had changed went on presenting a grant that was seven days dead while
+        ``reauthData`` reported success, and only a restart cleared it
+        (2026-09-21). One ``stat`` per market call; the file is parsed again
+        only when the stamp moves, and a file caught mid-replace leaves the
+        working copy in place rather than taking the service down. [st-bd2g]"""
         with self._lock:
+            stamp = self._stamp_now()
+            if stamp is not None and stamp != self._stamp:
+                try:
+                    raw = json.loads(self.path.read_text(encoding="utf-8"))
+                    Credential.from_payload(raw)
+                except (OSError, ValueError):
+                    pass              # keep what works; the stamp stays unclaimed
+                else:
+                    self._payload, self._stamp = raw, stamp
             if self._payload is None:
                 raise BrokerError("no market credential is loaded")
             return self._payload
