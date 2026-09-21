@@ -138,10 +138,6 @@ def mbp1_raw_segments(day: _date | Path) -> list[Path]:
     return [p for _, p in sorted(found)]
 
 
-def _px(raw: int, undef: int) -> float | None:
-    return None if raw == undef else raw / 1e9
-
-
 def read_mbp1_raw_segment(path: Path) -> Iterator[BookEvent]:
     """Stream one raw DBN segment as ``BookEvent`` rows in stream order.
 
@@ -155,7 +151,8 @@ def read_mbp1_raw_segment(path: Path) -> Iterator[BookEvent]:
     contract as ``read_mbp1_day``.
     """
     import databento as db
-    from databento_dbn import UNDEF_PRICE
+
+    from market.ingest.databento import book_event_from_databento
 
     if not path.exists():
         raise FileNotFoundError(f"no raw MBP-1 segment at {path}")
@@ -181,26 +178,4 @@ def read_mbp1_raw_segment(path: Path) -> Iterator[BookEvent]:
                 f"raw segment is not in event order"
             )
         prev_ns = ns
-        action = getattr(rec.action, "value", rec.action)
-        if action not in _ACTIONS:
-            action = "N"
-        side = getattr(rec.side, "value", rec.side)
-        if side not in _SIDES:
-            side = "N"
-        lvl = rec.levels[0]
-        yield BookEvent(
-            ts=datetime.fromtimestamp(ns // 1_000 / 1e6, tz=CENTRAL),
-            symbol=symbols.get(rec.instrument_id, ""),
-            instrument_id=rec.instrument_id,
-            action=action,  # type: ignore[arg-type]
-            side=side,      # type: ignore[arg-type]
-            price=_px(rec.price, UNDEF_PRICE),
-            size=rec.size,
-            bid_px=_px(lvl.bid_px, UNDEF_PRICE),
-            ask_px=_px(lvl.ask_px, UNDEF_PRICE),
-            bid_sz=lvl.bid_sz,
-            ask_sz=lvl.ask_sz,
-            bid_ct=lvl.bid_ct,
-            ask_ct=lvl.ask_ct,
-            sequence=rec.sequence,
-        )
+        yield book_event_from_databento(rec, symbols)

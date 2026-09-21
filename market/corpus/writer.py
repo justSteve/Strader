@@ -38,6 +38,24 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def iso_utc_from_ns(ns: int) -> str:
+    """UTC ISO-8601 for integer nanoseconds, in the exact form pandas gives. [co-qp8cn]
+
+    Every corpus ``ts_event`` string was written by ``pd.Timestamp.isoformat()``
+    — nine fractional digits, or six when the nanoseconds are zero, or none
+    when the whole fraction is — and the duplicate tools compare those strings.
+    Same bytes without pandas, whose timestamp object cost the live book
+    collector 42 microseconds a row against 2 here (measured 2026-09-21).
+    """
+    secs, frac = divmod(ns, 1_000_000_000)
+    base = datetime.fromtimestamp(secs, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    if frac == 0:
+        return f"{base}+00:00"
+    if frac % 1_000 == 0:
+        return f"{base}.{frac // 1_000:06d}+00:00"
+    return f"{base}.{frac:09d}+00:00"
+
+
 def append_jsonl(path: Path, record: dict[str, Any]) -> None:
     """Atomic-ish JSONL append. Parent dir is created if missing."""
     path.parent.mkdir(parents=True, exist_ok=True)

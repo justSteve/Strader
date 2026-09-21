@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 
@@ -35,3 +35,8 @@ class BookEvent:
     bid_ct: int | None = None     # resting order count at best bid
     ask_ct: int | None = None
     sequence: int | None = None
+    # Event time as integer nanoseconds since the epoch, when the source had it.
+    # `ts` is a microsecond datetime; the corpus ts_event string is nine digits,
+    # and the live collector writes it from here. Not part of equality: a row
+    # read back from JSONL is the same event. [co-qp8cn]
+    ts_ns: int | None = field(default=None, compare=False)

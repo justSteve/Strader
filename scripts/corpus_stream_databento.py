@@ -109,7 +109,7 @@ from market.corpus.paths import (  # noqa: E402
     databento_path,
     day_dir,
 )
-from market.corpus.writer import update_manifest, utc_now_iso  # noqa: E402
+from market.corpus.writer import iso_utc_from_ns, update_manifest, utc_now_iso  # noqa: E402
 
 CENTRAL = ZoneInfo("America/Chicago")
 UTC = ZoneInfo("UTC")
@@ -165,7 +165,7 @@ class StreamSpec:
 
 
 #: Schemas whose records are top-of-book snapshots rather than prints. These
-#: are consumed through ``quotes()`` and serialised with the book row shape.
+#: are consumed through ``book_events()`` and serialised with the book row shape.
 BOOK_SCHEMAS = ("mbp-1", "tbbo")
 
 
@@ -474,10 +474,12 @@ class StreamWorker(threading.Thread):
     def _consume(self, client) -> None:
         last_flush = time.monotonic()
         last_commit = time.monotonic()
-        # A book stream yields top-of-book snapshots, not prints: different
-        # iterator, different row shape, same bookkeeping. [st-jy3i]
+        # A book stream yields book events, not prints: different iterator,
+        # different row shape, same bookkeeping. [st-jy3i] It is book_events(),
+        # not quotes(): a Quote drops the triggering event, and with it every
+        # trade the absorption tracker attributes aggression from. [co-qp8cn]
         is_book = self.spec.schema in BOOK_SCHEMAS
-        records = client.quotes() if is_book else client.trades()
+        records = client.book_events() if is_book else client.trades()
         for rec in records:
             if self.stop_event.is_set() or self._done.is_set():
                 break
@@ -488,9 +490,13 @@ class StreamWorker(threading.Thread):
 
             self.status.ticks += 1
             self.status.last_symbol = rec.symbol or "?"
-            # A quote has no single price; mid is the honest one-number summary
-            # and is only ever used for the status line.
-            self.status.last_price = rec.mid if is_book else rec.price
+            # A book event has no single price; mid is the honest one-number
+            # summary and is only ever used for the status line. One side of
+            # the book can be empty, and then the last mid stands.
+            if not is_book:
+                self.status.last_price = rec.price
+            elif rec.bid_px is not None and rec.ask_px is not None:
+                self.status.last_price = (rec.bid_px + rec.ask_px) / 2.0
             self.status.last_ts = rec.ts.isoformat()
             if not rec.symbol:
                 self.status.unmapped += 1
@@ -539,15 +545,16 @@ class StreamWorker(threading.Thread):
         }
         return json.dumps(rec, default=str) + "\n"
 
-    def _book_row(self, q) -> str:
-        """Serialise a top-of-book snapshot. [st-jy3i]
+    def _book_row(self, e) -> str:
+        """Serialise one book event: the triggering event plus the top of book
+        after it. [st-jy3i, co-qp8cn]
 
         Key names match `corpus_pull_databento_es_mbp1.py` exactly so live and
-        T+1 rows land in one homogeneous file. The fields the live Quote entity
-        does not carry — order counts, sequence, flags, and the trade-side
-        columns MBP-1 populates only on a trade event — are written null and
-        recovered from the raw DBN archive if microstructure work ever needs
-        them, the same contract the trade rows already use.
+        T+1 rows land in one homogeneous file. Until 2026-09-21 the trade-side
+        columns, order counts and sequence were written null here, which left
+        every live day unable to drive AbsorptionTracker (st-d5f); they are now
+        the record's own values. Only `flags` is still null, recoverable from
+        the raw DBN archive, the same contract the trade rows use.
         """
         rec = {
             "ts_pull_utc": utc_now_iso(),
@@ -557,23 +564,25 @@ class StreamWorker(threading.Thread):
                 "schema": self.spec.schema,
                 self.spec.symbol_key: self.spec.symbols[0],
                 "stype_in": self.spec.stype_in,
-                "ts_event": q.ts.astimezone(UTC).isoformat(),
+                # nine digits, as the raw record has it; `ts` is microsecond
+                "ts_event": (iso_utc_from_ns(e.ts_ns) if e.ts_ns is not None
+                             else e.ts.astimezone(UTC).isoformat()),
                 "source": "live",
             },
             "data": {
-                "symbol": q.symbol or None,
-                "instrument_id": q.instrument_id,
-                "action": None,
-                "side": None,
-                "price": None,
-                "size": None,
-                "bid_px": q.bid_price,
-                "ask_px": q.ask_price,
-                "bid_sz": q.bid_size,
-                "ask_sz": q.ask_size,
-                "bid_ct": None,
-                "ask_ct": None,
-                "sequence": None,
+                "symbol": e.symbol or None,
+                "instrument_id": e.instrument_id,
+                "action": e.action,
+                "side": e.side,
+                "price": e.price,
+                "size": e.size,
+                "bid_px": e.bid_px,
+                "ask_px": e.ask_px,
+                "bid_sz": e.bid_sz,
+                "ask_sz": e.ask_sz,
+                "bid_ct": e.bid_ct,
+                "ask_ct": e.ask_ct,
+                "sequence": e.sequence,
                 "flags": None,
             },
         }

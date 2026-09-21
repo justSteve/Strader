@@ -18,6 +18,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from market.entities.book import BookEvent
+
 import market.corpus.paths as paths
 
 CENTRAL = ZoneInfo("America/Chicago")
@@ -51,28 +53,21 @@ class FakeTrade:
         self.sequence = sequence
 
 
-class FakeQuote:
-    """Stand-in for the typed Quote entity a book stream yields. [st-jy3i]"""
-    def __init__(self, symbol, instrument_id, bid_price, bid_size,
-                 ask_price, ask_size, minute=0):
-        self.ts = datetime(2026, 6, 8, 13, minute, 0, tzinfo=CENTRAL)
-        self.symbol = symbol
-        self.instrument_id = instrument_id
-        self.bid_price = bid_price
-        self.bid_size = bid_size
-        self.ask_price = ask_price
-        self.ask_size = ask_size
-
-    @property
-    def mid(self):
-        return (self.bid_price + self.ask_price) / 2.0
+def book_event(symbol, instrument_id, bid, ask, minute=0, action="M", side="N",
+               price=None, size=0, sequence=1):
+    """A real BookEvent, as ``LiveClient.book_events()`` yields. [st-jy3i, co-qp8cn]"""
+    return BookEvent(
+        ts=datetime(2026, 6, 8, 13, minute, 0, tzinfo=CENTRAL), symbol=symbol,
+        instrument_id=instrument_id, action=action, side=side, price=price, size=size,
+        bid_px=bid[0], bid_sz=bid[1], ask_px=ask[0], ask_sz=ask[1],
+        bid_ct=4, ask_ct=3, sequence=sequence)
 
 
 class FakeLiveClient:
     """Yields a fixed list of records, optionally raising after some of them.
 
-    Serves both iterators: ``trades()`` for print streams and ``quotes()`` for
-    book streams. A worker only ever calls the one its schema selects. The
+    Serves both iterators: ``trades()`` for print streams and ``book_events()``
+    for book streams. A worker only ever calls the one its schema selects. The
     simulated drop is a ConnectionError — a transport failure, the class the
     worker reconnects on (see ``is_transport_error``).
     """
@@ -98,7 +93,7 @@ class FakeLiveClient:
     def trades(self):
         yield from self._iter()
 
-    def quotes(self):
+    def book_events(self):
         yield from self._iter()
 
     def close(self):
@@ -538,7 +533,7 @@ def test_probe_mode_skips_raw(corpus_tmp):
 # --- Phase B: the ES book stream [st-jy3i] ----------------------------------
 # Absorption's refill_events needs MBP-1, and MBP-1 is never backfilled — it is
 # captured forward from this stream or not at all. Two things must hold: the
-# book stream reaches quotes() rather than trades(), and its rows land in the
+# book stream reaches book_events() rather than trades(), and its rows land in the
 # same shape the T+1 batch puller writes, so one file holds both sources.
 
 def test_es_mbp1_spec_defaults_to_the_book_schema():
@@ -560,11 +555,13 @@ def test_global_schema_override_still_applies_to_every_stream():
 
 def test_book_stream_writes_rows_matching_the_batch_mbp1_schema(corpus_tmp):
     spec = streamer.default_specs()["es-mbp1"]
-    quotes = [
-        FakeQuote("ESU6", 501, 7562.75, 12, 7563.00, 8, minute=1),
-        FakeQuote("ESU6", 501, 7563.00, 3, 7563.25, 21, minute=2),
+    events = [
+        book_event("ESU6", 501, (7562.75, 12), (7563.00, 8), minute=1,
+                   price=7562.75, size=2, sequence=41),
+        book_event("ESU6", 501, (7562.75, 3), (7563.00, 8), minute=2, action="T",
+                   side="A", price=7562.75, size=9, sequence=42),
     ]
-    worker = _make_worker(spec, lambda: FakeLiveClient(quotes), max_ticks=2)
+    worker = _make_worker(spec, lambda: FakeLiveClient(events), max_ticks=2)
     worker.run()
 
     rows = _read_rows(paths.databento_glbx_es_mbp1_path(D))
@@ -582,19 +579,77 @@ def test_book_stream_writes_rows_matching_the_batch_mbp1_schema(corpus_tmp):
     assert d["bid_px"] == 7562.75 and d["bid_sz"] == 12
     assert d["ask_px"] == 7563.00 and d["ask_sz"] == 8
     assert d["instrument_id"] == 501
-    # Key names must match corpus_pull_databento_es_mbp1.py exactly, including
-    # the columns the live Quote entity cannot fill.
+    # Key names must match corpus_pull_databento_es_mbp1.py exactly.
     assert set(d) == {
         "symbol", "instrument_id", "action", "side", "price", "size",
         "bid_px", "ask_px", "bid_sz", "ask_sz", "bid_ct", "ask_ct",
         "sequence", "flags",
     }
-    for absent in ("action", "side", "price", "size", "bid_ct", "ask_ct",
-                   "sequence", "flags"):
-        assert d[absent] is None
+    assert d["flags"] is None
 
     manifest = json.loads(paths.manifest_path(D).read_text())
     assert manifest["streams"]["databento_glbx_es_mbp1"]["cycles"] == 2
+
+
+def test_live_book_rows_carry_the_trade_the_absorption_tracker_needs(corpus_tmp):
+    # st-d5f: every live book row used to be written with action/side/price/
+    # size null, so AbsorptionTracker saw zero aggression on every live day
+    # (3,838,605 of 3,838,605 rows on 2026-09-18). The row written here must
+    # come back through the corpus reader as the trade that went in. [co-qp8cn]
+    from market.orderflow.quotes import read_mbp1_day
+
+    spec = streamer.default_specs()["es-mbp1"]
+    trade = book_event("ESU6", 501, (7562.75, 3), (7563.00, 8), minute=2, action="T",
+                       side="A", price=7562.75, size=9, sequence=42)
+    worker = _make_worker(spec, lambda: FakeLiveClient([trade]), max_ticks=1)
+    worker.run()
+
+    (d,) = [r["data"] for r in _read_rows(paths.databento_glbx_es_mbp1_path(D))]
+    assert (d["action"], d["side"], d["price"], d["size"]) == ("T", "A", 7562.75, 9)
+    assert (d["bid_ct"], d["ask_ct"], d["sequence"]) == (4, 3, 42)
+
+    (back,) = list(read_mbp1_day(paths.databento_glbx_es_mbp1_path(D)))
+    assert (back.action, back.side, back.price, back.size) == ("T", "A", 7562.75, 9)
+    assert (back.bid_px, back.bid_sz, back.ts) == (7562.75, 3, trade.ts)
+
+
+def test_book_row_event_time_matches_pandas_byte_for_byte(corpus_tmp):
+    # The duplicate tools compare ts_event strings, and every older row was
+    # written by pd.Timestamp.isoformat(): nine digits, six, or none.
+    import dataclasses
+
+    import pandas as pd
+
+    from market.corpus.writer import iso_utc_from_ns
+
+    base = 1_789_739_789_000_000_000
+    cases = [base + 123_456_789, base + 123_456_000, base]
+    for ns in cases:
+        assert iso_utc_from_ns(ns) == pd.Timestamp(ns, unit="ns", tz="UTC").isoformat()
+
+    spec = streamer.default_specs()["es-mbp1"]
+    events = [dataclasses.replace(book_event("ESU6", 501, (7562.75, 12), (7563.0, 8),
+                                             minute=i), ts_ns=ns)
+              for i, ns in enumerate(cases)]
+    worker = _make_worker(spec, lambda: FakeLiveClient(events), max_ticks=3)
+    worker.run()
+    written = [r["provenance"]["ts_event"]
+               for r in _read_rows(paths.databento_glbx_es_mbp1_path(D))]
+    assert written == ["2026-09-18T13:56:29.123456789+00:00",
+                       "2026-09-18T13:56:29.123456+00:00",
+                       "2026-09-18T13:56:29+00:00"]
+
+
+def test_book_status_price_survives_an_empty_side(corpus_tmp):
+    spec = streamer.default_specs()["es-mbp1"]
+    events = [
+        book_event("ESU6", 501, (7562.75, 12), (7563.25, 8), minute=1),
+        book_event("ESU6", 501, (None, 0), (7563.25, 8), minute=2),
+    ]
+    worker = _make_worker(spec, lambda: FakeLiveClient(events), max_ticks=2)
+    worker.run()
+    assert worker.status.last_price == 7563.00
+    assert len(_read_rows(paths.databento_glbx_es_mbp1_path(D))) == 2
 
 
 def test_trade_stream_untouched_by_the_book_path(corpus_tmp):

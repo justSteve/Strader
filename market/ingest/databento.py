@@ -18,12 +18,14 @@ Callers are responsible for narrow subscriptions and prompt disconnect.
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from typing import Iterator
 from zoneinfo import ZoneInfo
 
 from databento import Live
-from databento_dbn import MBP1Msg, SymbolMappingMsg, TradeMsg
+from databento_dbn import UNDEF_PRICE, MBP1Msg, SymbolMappingMsg, TradeMsg
 
+from market.entities.book import BookEvent
 from market.entities.quote import Quote
 from market.entities.trade import Trade
 
@@ -66,6 +68,60 @@ def quote_from_databento(record: "MBP1Msg", symbol_map: dict[int, str]) -> Quote
         bid_size=int(record.bid_sz_00),
         ask_price=float(record.pretty_ask_px_00),
         ask_size=int(record.ask_sz_00),
+    )
+
+
+_BOOK_ACTIONS = {"A", "C", "M", "T", "F", "R", "N"}
+_BOOK_SIDES = {"B", "A", "N"}
+
+
+def _book_px(raw: int) -> float | None:
+    return None if raw == UNDEF_PRICE else raw / 1e9
+
+
+def book_event_from_databento(record: "MBP1Msg", symbol_map: dict[int, str]) -> BookEvent:
+    """Convert a Databento MBP1Msg into a full BookEvent. [co-qp8cn]
+
+    Unlike ``quote_from_databento`` this keeps the triggering event — action,
+    side, price, size, sequence — beside the post-event top of book. Those are
+    the columns AbsorptionTracker attributes aggression from; a Quote drops
+    them, which is why every live-collected book row was written with
+    action=null until 2026-09-21 (st-d5f).
+
+    THE shared conversion: the live collector and the raw-archive reader
+    (``market.orderflow.quotes.read_mbp1_raw_segment``) both come through here,
+    so a live row cannot diverge from the raw record it was teed beside.
+
+    The timestamp is built from the integer ``ts_event``, not the vendor's
+    ``pretty_ts_event``: that pandas object cost 42 of this function's 56
+    microseconds (measured 2026-09-21), and the busiest recorded second holds
+    9,104 book rows. ``ts`` is therefore microsecond; ``ts_ns`` keeps the full
+    nanosecond value for the corpus row.
+    """
+    action = getattr(record.action, "value", record.action)
+    if action not in _BOOK_ACTIONS:
+        action = "N"
+    side = getattr(record.side, "value", record.side)
+    if side not in _BOOK_SIDES:
+        side = "N"
+    lvl = record.levels[0]
+    ns = int(record.ts_event)
+    return BookEvent(
+        ts=datetime.fromtimestamp(ns // 1_000 / 1e6, tz=CENTRAL),
+        symbol=symbol_map.get(record.instrument_id, ""),
+        instrument_id=int(record.instrument_id),
+        action=action,  # type: ignore[arg-type]
+        side=side,      # type: ignore[arg-type]
+        price=_book_px(record.price),
+        size=int(record.size),
+        bid_px=_book_px(lvl.bid_px),
+        ask_px=_book_px(lvl.ask_px),
+        bid_sz=int(lvl.bid_sz),
+        ask_sz=int(lvl.ask_sz),
+        bid_ct=int(lvl.bid_ct),
+        ask_ct=int(lvl.ask_ct),
+        sequence=int(record.sequence),
+        ts_ns=ns,
     )
 
 
@@ -171,6 +227,17 @@ class LiveClient:
                 continue
             if isinstance(record, MBP1Msg):
                 yield quote_from_databento(record, self._symbol_map)
+
+    def book_events(self) -> Iterator[BookEvent]:
+        """Yield full BookEvents from MBP-1/TBBO: the triggering event (trades
+        included) plus the post-event top of book. Subscribe with schema
+        'mbp-1' or 'tbbo' before iterating. [co-qp8cn]"""
+        for record in self._client:
+            if isinstance(record, SymbolMappingMsg):
+                self._symbol_map[int(record.instrument_id)] = record.stype_out_symbol
+                continue
+            if isinstance(record, MBP1Msg):
+                yield book_event_from_databento(record, self._symbol_map)
 
     def close(self) -> None:
         """Disconnect from the gateway. Safe to call multiple times."""

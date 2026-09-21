@@ -211,3 +211,94 @@ def test_live_client_symbol_map_uses_stype_out(monkeypatch):
     trades = list(client.trades())
     assert len(trades) == 1
     assert trades[0].symbol == "SPXW  260608C05500000"  # not "SPXW.OPT"
+
+
+# ── BookEvent conversion (co-qp8cn) — real vendor records, no fakes ──────────
+# quote_from_databento drops the triggering event; book_event_from_databento
+# keeps it. These build genuine MBP1Msg records so an attribute rename in the
+# vendor library fails here and not in the live collector.
+
+_T_NS = 1_789_739_789_123_456_789   # 2026-09-18 13:56:29.123456789 UTC
+_PX = 1_000_000_000
+
+
+def _real_mbp1(action, side, price, size, bid, ask, iid=10252, seq=7):
+    import databento_dbn as dbn
+    level = dbn.BidAskPair(bid_px=bid[0], ask_px=ask[0], bid_sz=bid[1], ask_sz=ask[1],
+                           bid_ct=5, ask_ct=6)
+    return dbn.MBP1Msg(publisher_id=1, instrument_id=iid, ts_event=_T_NS, price=price,
+                       size=size, action=action, side=side, depth=0, ts_recv=_T_NS + 10,
+                       flags=0, ts_in_delta=0, sequence=seq, levels=level)
+
+
+def test_book_event_keeps_the_trade_a_quote_drops():
+    import databento_dbn as dbn
+    from market.ingest.databento import book_event_from_databento
+
+    rec = _real_mbp1(dbn.Action.TRADE, dbn.Side.ASK, 7695 * _PX + _PX // 2, 12,
+                     bid=(7695 * _PX + _PX // 2, 40), ask=(7695 * _PX + 3 * _PX // 4, 18))
+    e = book_event_from_databento(rec, {10252: "ESZ6"})
+    assert (e.symbol, e.instrument_id, e.sequence) == ("ESZ6", 10252, 7)
+    assert (e.action, e.side, e.price, e.size) == ("T", "A", 7695.5, 12)
+    assert (e.bid_px, e.bid_sz, e.bid_ct) == (7695.5, 40, 5)
+    assert (e.ask_px, e.ask_sz, e.ask_ct) == (7695.75, 18, 6)
+
+
+def test_book_event_timestamp_is_central_and_keeps_the_nanoseconds_beside_it():
+    import databento_dbn as dbn
+    from market.ingest.databento import book_event_from_databento
+
+    rec = _real_mbp1(dbn.Action.MODIFY, dbn.Side.NONE, 7695 * _PX, 1,
+                     bid=(7695 * _PX, 5), ask=(7695 * _PX + _PX // 4, 5))
+    e = book_event_from_databento(rec, {})
+    assert e.ts == datetime(2026, 9, 18, 8, 56, 29, 123456, tzinfo=CENTRAL)
+    assert e.ts.utcoffset().total_seconds() == -5 * 3600
+    assert e.ts_ns == _T_NS
+    assert e.symbol == ""
+
+
+def test_book_event_ts_ns_is_not_part_of_equality():
+    # a row read back from JSONL has no ts_ns and is still the same event
+    import dataclasses
+    import databento_dbn as dbn
+    from market.ingest.databento import book_event_from_databento
+
+    rec = _real_mbp1(dbn.Action.MODIFY, dbn.Side.NONE, 7695 * _PX, 1,
+                     bid=(7695 * _PX, 5), ask=(7695 * _PX + _PX // 4, 5))
+    e = book_event_from_databento(rec, {})
+    assert dataclasses.replace(e, ts_ns=None) == e
+
+
+def test_book_event_undefined_prices_become_none():
+    import databento_dbn as dbn
+    from market.ingest.databento import book_event_from_databento
+
+    rec = _real_mbp1(dbn.Action.CLEAR, dbn.Side.NONE, dbn.UNDEF_PRICE, 0,
+                     bid=(dbn.UNDEF_PRICE, 0), ask=(7695 * _PX, 5))
+    e = book_event_from_databento(rec, {})
+    assert e.action == "R"
+    assert e.price is None and e.bid_px is None and e.ask_px == 7695.0
+
+
+def test_live_client_book_events_maps_symbols_and_skips_other_records(monkeypatch):
+    import databento_dbn as dbn
+    import market.ingest.databento as ing
+
+    mapping = dbn.SymbolMappingMsg(
+        publisher_id=1, instrument_id=10252, ts_event=_T_NS,
+        stype_in=dbn.SType.CONTINUOUS, stype_in_symbol="ES.c.0",
+        stype_out=dbn.SType.RAW_SYMBOL, stype_out_symbol="ESZ6",
+        start_ts=_T_NS, end_ts=_T_NS)
+    trade = _real_mbp1(dbn.Action.TRADE, dbn.Side.BID, 7695 * _PX, 3,
+                       bid=(7694 * _PX, 9), ask=(7695 * _PX, 2))
+
+    class FakeLive:
+        def __iter__(self):
+            return iter([mapping, object(), trade])
+
+        def stop(self):
+            pass
+
+    monkeypatch.setattr(ing, "Live", lambda key=None: FakeLive())
+    (e,) = list(ing.LiveClient(key="dummy").book_events())
+    assert (e.symbol, e.action, e.side, e.size) == ("ESZ6", "T", "B", 3)
