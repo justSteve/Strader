@@ -42,6 +42,7 @@ passphrase in a message, a log line or a journal entry.
 from __future__ import annotations
 
 import json
+import os
 import secrets
 import threading
 import time
@@ -56,9 +57,8 @@ from markupsafe import escape as _escape
 from .arming import ArmState, Locked
 from .bounds import CT
 from .broker import BrokerError
-from .reauth import (REAUTH_TTL_S, CredentialFile, ReauthRefused, Source, app_credential,
-                     callback_for, exchange_and_verify, login_link, store_grant)
-from .schwab import App, Credential, new_client, trading_payload
+from .schwab import (VAULT_VERSION, App, Credential, authorize_url, code_from_received_url,
+                     exchange, new_client, trading_payload, verify_grant)
 from .intent import OrderIntent
 from .orderform import (SEND_NONCE_TTL_S, Selection, intent_for, limit_at, parse_leg_text, price,
                         stamp)
@@ -81,8 +81,8 @@ PAGE_URL = "https://mydesk-1.tail89f676.ts.net/exec/"
 DEFAULT_CALLBACK_URL = "https://127.0.0.1:8182"
 
 #: A FLATTEN confirm and a re-auth link each live this long, single use.
-#: ``REAUTH_TTL_S`` comes from :mod:`execd.reauth`, where the flow lives.
 CONFIRM_TTL_S = 60.0
+REAUTH_TTL_S = 10 * 60.0
 
 #: A wrong passphrase costs this long before the answer, on top of scrypt.
 WRONG_PASSPHRASE_DELAY_S = 1.0
@@ -100,11 +100,58 @@ def esc(value: Any) -> str:
 
 
 # ── the market credential file ────────────────────────────────────────────
-#
-# :class:`CredentialFile` moved to ``execd/reauth.py`` with the rest of the
-# re-authorisation flow (st-bd2g), so Steve's terminal handles can write the
-# same file the same way. It is re-exported here because ``execd/__main__.py``
-# and the tests have imported it from this module since stage 3.
+
+
+class CredentialFile:
+    """The market-data app's credential on disk, and its in-memory copy.
+
+    Loaded once at start (``python -m execd --market-credential FILE``) and
+    handed to the transport as a callable, so a re-authorisation on the page
+    can replace both the file and what the transport sees, atomically, without
+    a restart. Plain JSON, mode 0600, owned by the service user — outside the
+    vault by design (st-p9mx: this app cannot trade, so a credential that must
+    load before Steve types anything costs nothing to hold that way)."""
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self._lock = threading.Lock()
+        self._payload: dict[str, Any] | None = None
+
+    def load(self) -> dict[str, Any]:
+        raw = json.loads(self.path.read_text(encoding="utf-8"))
+        Credential.from_payload(raw)      # shape-checked here, not on the first quote
+        with self._lock:
+            self._payload = raw
+        return raw
+
+    def current(self) -> dict[str, Any]:
+        """What the transport calls on every market read."""
+        with self._lock:
+            if self._payload is None:
+                raise BrokerError("no market credential is loaded")
+            return self._payload
+
+    def save(self, payload: Mapping[str, Any]) -> None:
+        """Write, fsync, rename, 0600 — the vault's discipline, for the same
+        reason: a half-written credential is one the service will not start
+        with, and this box has been OOM-killed mid-run before."""
+        Credential.from_payload(payload)
+        blob = json.dumps(dict(payload), separators=(",", ":")).encode("utf-8")
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(blob)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, self.path)
+            os.chmod(self.path, 0o600)
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
+        with self._lock:
+            self._payload = dict(payload)
 
 
 # ── single-use tokens ─────────────────────────────────────────────────────
@@ -351,13 +398,13 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         pw = passphrase()
         try:
             source = _app_credential(target, open_vault(pw), market)
-        except ReauthRefused as exc:
+        except PageRefused as exc:
             return home(str(exc), bad=True)
         finally:
             del pw
         state = nonces.issue("reauth", REAUTH_TTL_S, app=target)
-        return _render_reauth(target, login_link(source, callback_url, state),
-                              state, _actions())
+        link = authorize_url(source.app_key, _callback(source, callback_url), state)
+        return _render_reauth(target, link, state, _actions())
 
     @bp.post("/reauth/store")
     def reauth_store():
@@ -373,11 +420,13 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                                   f"minutes or was used already. Ask for a new one.")
             target = pending.app
             source = _app_credential(target, payload, market)
+            code = code_from_received_url(request.form.get("received_url", ""), state)
             with client() as c:
-                wrapped = exchange_and_verify(c, target, source, callback_url, state,
-                                              request.form.get("received_url", ""))
+                wrapped = exchange(c, source.app_key, source.secret,
+                                   _callback(source, callback_url), code)
+                verify_grant(c, target, wrapped)
             wall = _store_grant(service, vault, market, target, payload, wrapped, pw)
-        except ReauthRefused as exc:
+        except PageRefused as exc:
             return home(str(exc), bad=True)
         except ValueError as exc:
             return home(f"The pasted address was not usable: {exc}. Nothing stored.", bad=True)
@@ -711,31 +760,44 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
     return app
 
 
-class PageRefused(ReauthRefused):
-    """A refusal the page shows Steve in plain words. Never carries a value.
+class PageRefused(RuntimeError):
+    """A refusal the page shows Steve in plain words. Never carries a value."""
 
-    It subclasses :class:`execd.reauth.ReauthRefused` so that one ``except``
-    in the re-auth routes catches both the page's own refusals and the shared
-    flow's, and every other ``except PageRefused`` in this module keeps its
-    exact meaning."""
+
+@dataclass(frozen=True)
+class _Source:
+    app_key: str
+    secret: str
+    callback_url: str | None
 
 
 def _app_credential(target: App, vault_payload: Mapping[str, Any],
-                    market: CredentialFile | None) -> Source:
-    """:func:`execd.reauth.app_credential`, with the one refusal only the page
-    can phrase: a service started without a market credential file."""
-    if target is App.MARKET and market is None:
+                    market: CredentialFile | None) -> _Source:
+    """The app key and secret the OAuth calls need, from where each lives:
+    the trading app's in the vault (already open, or we would not be here);
+    the market app's in its file. The passphrase gates both — a market
+    re-auth cannot leak trading capability, but the page treats every
+    credential write as Steve's act, and the vault opening is how it knows."""
+    if target is App.TRADING:
+        trading = trading_payload(vault_payload)
+        try:
+            cred = Credential.from_payload(trading)
+        except ValueError as exc:
+            raise PageRefused(f"The vault holds no usable trading credential: {exc}")
+        return _Source(cred.app_key, cred.secret, trading.get("callback_url"))
+    if market is None:
         raise PageRefused("This service was started without a market credential file; "
                           "there is nothing to re-authorise for the market app.")
     try:
-        raw = market.current() if target is App.MARKET and market is not None else None
-    except BrokerError as exc:
+        raw = market.current()
+        cred = Credential.from_payload(raw)
+    except (BrokerError, ValueError) as exc:
         raise PageRefused(f"The market credential is not usable: {exc}")
-    return app_credential(target, vault_payload, raw)
+    return _Source(cred.app_key, cred.secret, raw.get("callback_url"))
 
 
-def _callback(source: Source, default: str) -> str:
-    return callback_for(source, default)
+def _callback(source: _Source, default: str) -> str:
+    return source.callback_url or default
 
 
 def _store_grant(service: ExecService, vault: Vault, market: CredentialFile | None,
@@ -743,29 +805,30 @@ def _store_grant(service: ExecService, vault: Vault, market: CredentialFile | No
                  pw: str) -> datetime:
     """Store a verified grant where its app's credential lives, and if the
     service is armed, put the new trading credential into memory too. Journals
-    the event with the app and its new wall — never a value.
-
-    The writing itself is :func:`execd.reauth.store_grant`, shared with the
-    terminal handles; what stays here is what only a running service has — the
-    in-memory swap and the journal line."""
+    the event with the app and its new wall — never a value."""
     if target is App.TRADING:
-        stored = store_grant(target, wrapped, vault=vault, vault_payload=vault_payload,
-                             passphrase=pw)
-        assert stored.trading is not None
+        trading = dict(trading_payload(vault_payload))
+        trading["token"] = dict(wrapped)
+        envelope: dict[str, Any] = dict(vault_payload) if "trading" in vault_payload else {}
+        envelope["version"] = VAULT_VERSION
+        envelope["trading"] = trading
+        vault.store(envelope, pw)
+        wall = Credential.from_payload(trading).refresh_wall
         if service.arming.state is not ArmState.LOCKED:
             try:
-                service.arming.replace_credential(stored.trading)
+                service.arming.replace_credential(trading)
             except Locked:
                 pass
-        service.journal.record("reauth", app=target.value, refresh_wall=stored.wall,
+        service.journal.record("reauth", app=target.value, refresh_wall=wall,
                                in_memory=service.arming.state is not ArmState.LOCKED)
-        return stored.wall
+        return wall
     assert market is not None
-    stored = store_grant(target, wrapped, market_payload=market.current(),
-                         market_save=market.save)
-    service.journal.record("reauth", app=target.value, refresh_wall=stored.wall,
-                           in_memory=True)
-    return stored.wall
+    payload = dict(market.current())
+    payload["token"] = dict(wrapped)
+    market.save(payload)
+    wall = Credential.from_payload(payload).refresh_wall
+    service.journal.record("reauth", app=target.value, refresh_wall=wall, in_memory=True)
+    return wall
 
 
 # ── rendering ─────────────────────────────────────────────────────────────

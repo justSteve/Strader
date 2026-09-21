@@ -20,13 +20,6 @@ USAGE:
     .venv/bin/python scripts/refresh_schwab_token.py              # app 1, market data
     .venv/bin/python scripts/refresh_schwab_token.py --trading    # app 2, trading
 
-WHERE THE GRANT GOES (st-bd2g). Once the execution service is installed it is
-the one credential holder on this box, and this script hands the flow to
-scripts/execd_reauth.py so the grant lands in the store the service actually
-reads — not in a token file under tokens/ that nothing reads any more. What is
-below runs unchanged on a box with no service, and under
-SCHWAB_REAUTH_FORCE_FILE=1 either way.
-
 REQUIREMENTS:
     1. `touch ~/.schwab_gate_key` to authorize agent-driven auth flows
     2. .env pointing at the credential vault file, which holds
@@ -326,23 +319,25 @@ def _verify_client(client) -> None:
 
 
 #: Written by ``deploy/install.sh --execd`` beside the installed service. Once
-#: it exists, the service is the one credential holder on this box: it keeps
-#: its own grants under ``/var/lib/execd`` and nothing reads the token files
-#: this script mints. [st-p8k8]
-#:
-#: Between stage 3 and 2026-09-20 that meant the handles did nothing but print
-#: the page's address. Steve asked for them back (st-bd2g), so the flow is
-#: handed to ``scripts/execd_reauth.py``, which re-authorises the store the
-#: service actually reads. ``SCHWAB_REAUTH_FORCE_FILE=1`` still mints the file,
-#: for a box where the service is not what is being fixed.
+#: it exists, the service is the one credential holder on this box and the
+#: weekly re-authorisation happens on its page — a grant minted here would go
+#: into a file nothing reads any more, and a second grant for the same app is
+#: a second seven-day wall to keep track of. [st-p8k8]
 EXECD_INSTALLED = Path("/opt/execd/INSTALLED")
+EXECD_PAGE = "https://mydesk-1.tail89f676.ts.net/exec/"
 
 
-def _the_service_holds_the_grants() -> bool:
+def _retired_by_the_service() -> bool:
     return EXECD_INSTALLED.exists() and os.environ.get("SCHWAB_REAUTH_FORCE_FILE") != "1"
 
 
 def main(argv: list[str] | None = None) -> int:
+    if _retired_by_the_service():
+        print(f"Since the execution service was installed, re-authorisation happens on its "
+              f"page: {EXECD_PAGE} (open 're-authorise an app', both apps, one sitting). "
+              f"This script now writes a token file nothing reads. To mint one anyway, set "
+              f"SCHWAB_REAUTH_FORCE_FILE=1.", file=sys.stderr)
+        return 3
     args = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     args.add_argument("--trading", action="store_true",
                       help="mint the TRADING app's grant (app 2, Accounts and "
@@ -355,18 +350,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"       Authorize this run with:  touch {GATE_KEY}",
               file=sys.stderr)
         return 1
-
-    # The service holds the grants, so the flow goes to the store it reads.
-    # The gate is checked first and not skipped: it is the one control that
-    # says an OAuth flow on this box was asked for. [st-bd2g]
-    if _the_service_holds_the_grants():
-        # Imported through the package path, not as a bare top-level module:
-        # ``import execd_reauth`` would be a SECOND module object beside the
-        # ``scripts.execd_reauth`` a test or another caller already holds, and
-        # a stub put on one of them leaves the other running for real.
-        from scripts import execd_reauth
-        from execd.schwab import App
-        return execd_reauth.reauthorise(App.TRADING if trading else App.MARKET)
 
     try:
         cfg = load_schwab_trading_auth() if trading else load_schwab_auth()

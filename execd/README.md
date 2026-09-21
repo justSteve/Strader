@@ -64,23 +64,8 @@ carries a passphrase or a token.
 read calls, over `GET /marketdata/{quotes,chains,pricehistory}` — and the
 old token-file client when it does not. No consumer changed. The token-age
 heartbeat reads the service's walls first. Once a morning run has been seen
-going through the service, the token files under `tokens/` retire.
-
-**The two doors to the weekly re-authorisation** run the same flow, from
-`execd/reauth.py`: a login link, an exchange proved against the app's own
-endpoint family before anything is stored, and a store into whichever home
-that app's credential lives in. The page runs it inside the service. Steve's
-terminal handles — `reauthData` (app 1) and `reauthAccount` (app 2, also
-reachable as `reauthTrade`) — run it in a process of his own through
-`scripts/execd_reauth.py`, as root, and write the same stores. Two things only
-the terminal door has to answer for, and it does: each file it writes keeps the
-owner the service reads it as, and the running process is holding its own copy — the
-market credential re-reads itself when the file moves, the trading one cannot
-(the service does not keep the passphrase), so a re-auth while it is armed is
-reported rather than left half done. Between stage 3 and 2026-09-20 these
-handles printed the page's address and exited 3; st-bd2g gave them back their
-work at Steve's word. `SCHWAB_REAUTH_FORCE_FILE=1` still mints the old token
-file, for a box where the service is not what is being fixed.
+going through the service, the token files under `tokens/` retire and
+`reauthData` / `reauthTrade` already answer with the page's address.
 
 **Presented, not landed:** `docs/patches/2026-09-13-gate-execd-runtime.diff`
 (and its COO twin) deny agent shells the six ways round the process boundary
