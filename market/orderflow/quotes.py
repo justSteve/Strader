@@ -18,6 +18,7 @@ from __future__ import annotations
 import gzip
 import json
 import logging
+import re
 from datetime import date as _date, datetime
 from pathlib import Path
 from typing import Iterator
@@ -107,3 +108,99 @@ def read_mbp1_day(day: _date | Path) -> Iterator[BookEvent]:
     if bad:
         logger.info("read_mbp1_day %s: %d events (%d bad rows skipped)",
                     path.name, n, bad)
+
+
+# ── raw DBN archive reader (co-qp8cn) ────────────────────────────────────────
+# The live collector's JSONL writes action/side/price/size as null on every
+# book row (scripts/corpus_stream_databento.py `_book_row`), so a forward-
+# collected day cannot drive AbsorptionTracker from the JSONL — measured
+# 2026-09-21: 3,838,605 of 3,838,605 rows on 09-18 carry action=null. The raw
+# `.dbn.zst` segments teed beside it keep the full MBP-1 record, trades
+# included, and are row-for-row the same stream.
+
+_RAW_SEGMENT_RE = re.compile(r"^databento_glbx_es_mbp1\.(\d+)\.dbn(\.zst)?$")
+
+
+def mbp1_raw_segments(day: _date | Path) -> list[Path]:
+    """The day's raw MBP-1 segments in capture order.
+
+    The collector opens a new numbered segment on every (re)connect, so the
+    order is numeric — a lexical sort puts segment 10 before segment 2. Accepts
+    a date (resolved under ``data/corpus/``) or an explicit directory.
+    """
+    root = day if isinstance(day, Path) else _CORPUS_ROOT / day.isoformat()
+    found: list[tuple[int, Path]] = []
+    if root.is_dir():
+        for p in root.iterdir():
+            m = _RAW_SEGMENT_RE.match(p.name)
+            if m:
+                found.append((int(m.group(1)), p))
+    return [p for _, p in sorted(found)]
+
+
+def _px(raw: int, undef: int) -> float | None:
+    return None if raw == undef else raw / 1e9
+
+
+def read_mbp1_raw_segment(path: Path) -> Iterator[BookEvent]:
+    """Stream one raw DBN segment as ``BookEvent`` rows in stream order.
+
+    One segment is one unbroken connection: a reconnect, and with it any
+    contract roll of the continuous symbol, starts a new segment. Callers that
+    keep book-dependent state (AbsorptionTracker) should reset it per segment
+    rather than carry a defended price across a gap or a roll.
+
+    Symbols come from the in-stream ``SymbolMappingMsg`` records. Raises
+    ``ValueError`` on a ``ts_event`` regression inside the segment, the same
+    contract as ``read_mbp1_day``.
+    """
+    import databento as db
+    from databento_dbn import UNDEF_PRICE
+
+    if not path.exists():
+        raise FileNotFoundError(f"no raw MBP-1 segment at {path}")
+    if path.stat().st_size == 0:
+        # a connection that dropped before its first byte; the vendor library
+        # refuses an empty file, and there is nothing in it to refuse
+        logger.info("%s is empty — no events", path.name)
+        return
+
+    symbols: dict[int, str] = {}
+    prev_ns: int | None = None
+    for rec in db.DBNStore.from_file(path):
+        kind = type(rec).__name__
+        if kind == "SymbolMappingMsg":
+            symbols[rec.instrument_id] = rec.stype_out_symbol
+            continue
+        if kind != "MBP1Msg":
+            continue
+        ns = rec.ts_event
+        if prev_ns is not None and ns < prev_ns:
+            raise ValueError(
+                f"{path.name}: ts_event regression {ns} < {prev_ns} — "
+                f"raw segment is not in event order"
+            )
+        prev_ns = ns
+        action = getattr(rec.action, "value", rec.action)
+        if action not in _ACTIONS:
+            action = "N"
+        side = getattr(rec.side, "value", rec.side)
+        if side not in _SIDES:
+            side = "N"
+        lvl = rec.levels[0]
+        yield BookEvent(
+            ts=datetime.fromtimestamp(ns // 1_000 / 1e6, tz=CENTRAL),
+            symbol=symbols.get(rec.instrument_id, ""),
+            instrument_id=rec.instrument_id,
+            action=action,  # type: ignore[arg-type]
+            side=side,      # type: ignore[arg-type]
+            price=_px(rec.price, UNDEF_PRICE),
+            size=rec.size,
+            bid_px=_px(lvl.bid_px, UNDEF_PRICE),
+            ask_px=_px(lvl.ask_px, UNDEF_PRICE),
+            bid_sz=lvl.bid_sz,
+            ask_sz=lvl.ask_sz,
+            bid_ct=lvl.bid_ct,
+            ask_ct=lvl.ask_ct,
+            sequence=rec.sequence,
+        )
