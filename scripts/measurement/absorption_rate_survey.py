@@ -46,7 +46,9 @@ sys.path.insert(0, str(REPO))
 
 import market.orderflow.absorption as _abs  # noqa: E402
 from market.orderflow.absorption import AbsorptionTracker  # noqa: E402
-from market.orderflow.quotes import mbp1_raw_segments, read_mbp1_raw_segment  # noqa: E402
+from market.orderflow.quotes import (  # noqa: E402
+    mbp1_day_path, mbp1_raw_segments, read_mbp1_day, read_mbp1_raw_segment,
+)
 from market.signals import orderflow_config as _cfg  # noqa: E402
 
 logger = logging.getLogger("absorption_rate_survey")
@@ -207,22 +209,43 @@ def summarize(day: _date, segments: list[Path], episodes: list[tuple], facts: di
     }
 
 
+def day_file(day: _date) -> Path | None:
+    """The day's MBP-1 JSONL, gzipped or not, if it exists."""
+    plain = mbp1_day_path(day)
+    for p in (plain.with_name(plain.name + ".gz"), plain):
+        if p.exists():
+            return p
+    return None
+
+
 def survey_day(day_iso: str) -> dict:
+    """Survey one day from its raw segments, or — for a day the T+1 batch pull
+    filled, which has no raw segments but does carry trade rows (09-03) — from
+    its JSONL. A JSONL with no trade rows is reported, never counted as zero."""
     day = _date.fromisoformat(day_iso)
     segments = mbp1_raw_segments(day)
-    if not segments:
-        return {"date": day_iso, "error": "no raw MBP-1 segments"}
+    source = "raw"
     try:
-        episodes, facts = collect_episodes(
-            (seg.name, read_mbp1_raw_segment(seg)) for seg in segments)
+        if segments:
+            streams = ((seg.name, read_mbp1_raw_segment(seg)) for seg in segments)
+        else:
+            jsonl = day_file(day)
+            if jsonl is None:
+                return {"date": day_iso, "error": "no raw MBP-1 segments and no day file"}
+            source, segments = "jsonl", [jsonl]
+            streams = [(jsonl.name, read_mbp1_day(jsonl))]
+        episodes, facts = collect_episodes(streams)
     except Exception as e:  # one bad day must not sink the survey
         logger.exception("%s failed", day_iso)
         return {"date": day_iso, "error": f"{type(e).__name__}: {e}"}
-    return summarize(day, segments, episodes, facts)
+    if source == "jsonl" and facts["book_events"] and not facts["trade_events"]:
+        return {"date": day_iso,
+                "error": "no raw segments, and the day file carries no trade rows"}
+    return {"source": source, **summarize(day, segments, episodes, facts)}
 
 
 def days_with_raw(start: _date | None, end: _date | None) -> list[str]:
-    """Corpus days holding raw segments. Today is left out unless asked for by
+    """Corpus days holding raw segments or a day file. Today is left out unless asked for by
     ``--date``: its capture is still running, so its row would be a part-day."""
     out = []
     today = _date.today()
@@ -233,7 +256,7 @@ def days_with_raw(start: _date | None, end: _date | None) -> list[str]:
             continue
         if (start and d < start) or (end and d > end) or d >= today:
             continue
-        if mbp1_raw_segments(d):
+        if mbp1_raw_segments(d) or day_file(d) is not None:
             out.append(p.name)
     return out
 

@@ -142,10 +142,32 @@ def test_summary_counts_rth_hours_and_the_last_ten_minutes():
     assert row["trade_volume"] == facts["trade_volume"] > 0
 
 
-def test_a_day_without_raw_segments_reports_an_error_row(monkeypatch, tmp_path):
+def test_a_day_with_nothing_recorded_reports_an_error_row(monkeypatch):
     monkeypatch.setattr(survey, "mbp1_raw_segments", lambda day: [])
-    assert survey.survey_day("2026-09-19") == {"date": "2026-09-19",
-                                               "error": "no raw MBP-1 segments"}
+    monkeypatch.setattr(survey, "day_file", lambda day: None)
+    assert survey.survey_day("2026-09-19") == {
+        "date": "2026-09-19", "error": "no raw MBP-1 segments and no day file"}
+
+
+def test_a_batch_filled_day_is_surveyed_from_its_day_file(monkeypatch):
+    monkeypatch.setattr(survey, "mbp1_raw_segments", lambda day: [])
+    monkeypatch.setattr(survey, "day_file", lambda day: MBP1_FIXTURE)
+    row = survey.survey_day("2026-07-02")
+    assert row["source"] == "jsonl" and row["trade_events"] > 0 and "error" not in row
+
+
+def test_a_day_file_without_trade_rows_is_an_error_not_a_zero(monkeypatch, tmp_path):
+    quotes_only = tmp_path / "databento_glbx_es_mbp1.jsonl"
+    quotes_only.write_text(json.dumps({
+        "provenance": {"ts_event": "2026-09-18T14:00:00+00:00"},
+        "data": {"symbol": "ESZ6", "instrument_id": 1, "action": None, "side": None,
+                 "price": None, "size": None, "bid_px": 7700.0, "ask_px": 7700.25,
+                 "bid_sz": 5, "ask_sz": 5}}) + "\n")
+    monkeypatch.setattr(survey, "mbp1_raw_segments", lambda day: [])
+    monkeypatch.setattr(survey, "day_file", lambda day: quotes_only)
+    assert survey.survey_day("2026-09-18") == {
+        "date": "2026-09-18",
+        "error": "no raw segments, and the day file carries no trade rows"}
 
 
 def test_rows_merge_by_date_and_a_rerun_replaces_the_day(tmp_path):
