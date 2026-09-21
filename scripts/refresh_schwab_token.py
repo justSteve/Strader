@@ -319,25 +319,85 @@ def _verify_client(client) -> None:
 
 
 #: Written by ``deploy/install.sh --execd`` beside the installed service. Once
-#: it exists, the service is the one credential holder on this box and the
-#: weekly re-authorisation happens on its page — a grant minted here would go
-#: into a file nothing reads any more, and a second grant for the same app is
-#: a second seven-day wall to keep track of. [st-p8k8]
+#: it exists the service is what the readers and the order page use, and it
+#: keeps its own copy of each grant under ``/var/lib/execd`` — so the token
+#: file this script writes is no longer the one that matters, and the grant is
+#: copied on into the service's store at the end of a successful run. Between
+#: st-p8k8 and 2026-09-21 the script refused to run at all for that reason;
+#: the paths were the thing that needed changing, not the script. [st-bd2g]
 EXECD_INSTALLED = Path("/opt/execd/INSTALLED")
-EXECD_PAGE = "https://mydesk-1.tail89f676.ts.net/exec/"
+EXECD_MARKET = Path("/var/lib/execd/market.json")
+EXECD_VAULT = Path("/var/lib/execd/vault.json")
 
 
-def _retired_by_the_service() -> bool:
+def _execd_holds_the_grants() -> bool:
     return EXECD_INSTALLED.exists() and os.environ.get("SCHWAB_REAUTH_FORCE_FILE") != "1"
 
 
+def _write_keeping_owner(path: Path, blob: bytes) -> None:
+    """Write, fsync, rename, 0600, and give the file back the owner it had.
+
+    This script runs as root and the service runs as its own user, so an inode
+    left owned by root is a service that cannot read its own credential after
+    the next restart."""
+    before = path.stat() if path.exists() else path.parent.stat()
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(blob)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+        os.chmod(path, 0o600)
+        os.chown(path, before.st_uid, before.st_gid)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def _copy_grant_into_execd(trading: bool, api_key: str, app_secret: str,
+                           callback_url: str, token_path: Path) -> None:
+    """Put the grant just minted where the execution service reads it.
+
+    The market app's credential is a plain 0600 file, so this is a write. The
+    trading app's lives in the vault, encrypted under Steve's passphrase —
+    only he can open it, so that one asks."""
+    grant = json.loads(token_path.read_text(encoding="utf-8"))
+    if not trading:
+        payload = {}
+        if EXECD_MARKET.exists():
+            payload = json.loads(EXECD_MARKET.read_text(encoding="utf-8"))
+        payload["app"] = {"key": api_key, "secret": app_secret}
+        payload.setdefault("callback_url", callback_url)
+        payload["token"] = grant
+        _write_keeping_owner(EXECD_MARKET,
+                             json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+        print(f"✓ execd market credential updated ({EXECD_MARKET})")
+        return
+
+    import getpass
+
+    from execd.vault import Vault
+
+    vault = Vault(EXECD_VAULT)
+    pw = getpass.getpass("execd vault passphrase: ")
+    try:
+        envelope = vault.load(pw)
+        inner = envelope.get("trading") if "trading" in envelope else envelope
+        inner["app"] = {"key": api_key, "secret": app_secret}
+        inner.setdefault("callback_url", callback_url)
+        inner["token"] = grant
+        envelope = {"version": 2, "trading": inner}
+        before = EXECD_VAULT.stat() if EXECD_VAULT.exists() else EXECD_VAULT.parent.stat()
+        vault.store(envelope, pw)
+        os.chown(EXECD_VAULT, before.st_uid, before.st_gid)
+    finally:
+        del pw
+    print(f"✓ execd trading credential updated ({EXECD_VAULT})")
+
+
 def main(argv: list[str] | None = None) -> int:
-    if _retired_by_the_service():
-        print(f"Since the execution service was installed, re-authorisation happens on its "
-              f"page: {EXECD_PAGE} (open 're-authorise an app', both apps, one sitting). "
-              f"This script now writes a token file nothing reads. To mint one anyway, set "
-              f"SCHWAB_REAUTH_FORCE_FILE=1.", file=sys.stderr)
-        return 3
     args = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     args.add_argument("--trading", action="store_true",
                       help="mint the TRADING app's grant (app 2, Accounts and "
@@ -500,6 +560,16 @@ def main(argv: list[str] | None = None) -> int:
     swept = _sweep_rescues(token_path)
 
     print(f"✓ New token written to {token_path}")
+    if _execd_holds_the_grants():
+        try:
+            _copy_grant_into_execd(trading, api_key, app_secret, callback_url, token_path)
+        except Exception as e:
+            # The grant itself is good and on disk; only the copy failed. Say
+            # so and keep going rather than reporting a failed re-auth.
+            print(f"[WARN] the grant is good but the execd store was not updated: {e}",
+                  file=sys.stderr)
+            print(f"[WARN] the service is still on its old grant. Retry, or do this "
+                  f"app on the page.", file=sys.stderr)
     print(f"✓ Grant is complete — refresh token present, "
           f"{health.days_left:.1f}d to the wall")
     print("✓ Live API call to trader/v1 accountNumbers returned 200" if trading
