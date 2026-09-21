@@ -45,7 +45,8 @@ from execd.arming import Locked
 from execd.broker import BrokerError, OrderStatus
 from execd.intent import OrderIntent, OrderType, Side
 from execd import schwab as S
-from execd.schwab import Credential, SchwabBroker, build_order, format_price
+from execd.schwab import (Credential, SchwabBroker, build_order, format_price,
+                          trading_payload)
 
 REPO = Path(__file__).resolve().parents[2]
 FIXTURES = REPO / "tests" / "fixtures" / "schwab"
@@ -1257,3 +1258,55 @@ class TestTwoWalls:
         b.positions()
         assert b._access[S.App.MARKET][1] == MARKET_ACCESS
         assert b._access[S.App.TRADING][1] == "ACCESS-STORED"
+
+
+class TestRefreshedTradingGrant:
+    """The weekly re-auth leaves the new trading token beside the vault
+    instead of asking for the passphrase (Steve, 2026-09-21, st-bd2g). The
+    vault still holds the app key and secret and still gates arming."""
+
+    def _vault(self, created: int) -> dict:
+        return {"version": 2, "trading": {"app": {"key": "TKEY", "secret": "TSECRET"},
+                                          "token": {"creation_timestamp": created,
+                                                    "token": {"refresh_token": "old"}}}}
+
+    def _beside(self, tmp_path, created: int, refresh: str = "new") -> None:
+        (tmp_path / "trading.json").write_text(json.dumps(
+            {"app": {"key": "TKEY", "secret": "TSECRET"},
+             "token": {"creation_timestamp": created, "token": {"refresh_token": refresh}}}))
+
+    def test_without_a_state_dir_the_vault_answers_as_it_always_did(self, tmp_path):
+        out = trading_payload(self._vault(100))
+        assert out["token"]["token"]["refresh_token"] == "old"
+
+    def test_a_newer_grant_beside_the_vault_is_taken(self, tmp_path):
+        self._beside(tmp_path, 200)
+        out = trading_payload(self._vault(100), tmp_path)
+        assert out["token"]["token"]["refresh_token"] == "new"
+        assert out["app"] == {"key": "TKEY", "secret": "TSECRET"}
+
+    def test_a_stale_grant_beside_the_vault_is_ignored(self, tmp_path):
+        """Newer rather than merely present: a file left over from an older
+        re-auth must never pull the service back to a dead grant."""
+        self._beside(tmp_path, 50)
+        assert trading_payload(self._vault(100), tmp_path)["token"]["token"][
+            "refresh_token"] == "old"
+
+    def test_the_same_grant_twice_changes_nothing(self, tmp_path):
+        self._beside(tmp_path, 100)
+        assert trading_payload(self._vault(100), tmp_path)["token"]["token"][
+            "refresh_token"] == "old"
+
+    def test_no_file_beside_the_vault_is_normal(self, tmp_path):
+        assert trading_payload(self._vault(100), tmp_path)["token"]["token"][
+            "refresh_token"] == "old"
+
+    def test_an_unreadable_file_leaves_the_vault_in_charge(self, tmp_path):
+        (tmp_path / "trading.json").write_text("{ not json")
+        assert trading_payload(self._vault(100), tmp_path)["token"]["token"][
+            "refresh_token"] == "old"
+
+    def test_a_file_with_no_timestamp_leaves_the_vault_in_charge(self, tmp_path):
+        (tmp_path / "trading.json").write_text(json.dumps({"token": {"token": {}}}))
+        assert trading_payload(self._vault(100), tmp_path)["token"]["token"][
+            "refresh_token"] == "old"

@@ -269,7 +269,8 @@ def main(argv: list[str] | None = None) -> int:
                   file=sys.stderr)
             return 2
         try:
-            payload = trading_payload(Vault(args.vault).load(_read_passphrase()))
+            payload = trading_payload(Vault(args.vault).load(_read_passphrase()),
+                                      args.state_dir)
             Credential.from_payload(payload)
         except BadPassphrase:
             print("execd: the vault did not open.", file=sys.stderr)
@@ -303,7 +304,8 @@ def main(argv: list[str] | None = None) -> int:
         print("execd watch: OFF — no SPX-mark exit loop, no fill sweep", file=sys.stderr)
     if not args.no_page:
         page = create_page(service, vault=args.vault, market=market,
-                           callback_url=args.callback_url)
+                           callback_url=args.callback_url,
+                           state_dir=args.state_dir)
         threading.Thread(
             target=lambda: page.run(host=PAGE_HOST, port=args.page_port, threaded=True),
             name="execd-page", daemon=True).start()

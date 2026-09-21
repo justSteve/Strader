@@ -327,7 +327,7 @@ def _verify_client(client) -> None:
 #: the paths were the thing that needed changing, not the script. [st-bd2g]
 EXECD_INSTALLED = Path("/opt/execd/INSTALLED")
 EXECD_MARKET = Path("/var/lib/execd/market.json")
-EXECD_VAULT = Path("/var/lib/execd/vault.json")
+EXECD_TRADING = Path("/var/lib/execd/trading.json")
 
 
 def _execd_holds_the_grants() -> bool:
@@ -360,41 +360,20 @@ def _copy_grant_into_execd(trading: bool, api_key: str, app_secret: str,
                            callback_url: str, token_path: Path) -> None:
     """Put the grant just minted where the execution service reads it.
 
-    The market app's credential is a plain 0600 file, so this is a write. The
-    trading app's lives in the vault, encrypted under Steve's passphrase —
-    only he can open it, so that one asks."""
+    Both apps the same way: a plain 0600 file in the service's state
+    directory, owned by the service. No passphrase — Steve's call, 2026-09-21.
+    The vault still holds the trading app's key and secret and still gates
+    arming; what the weekly ritual replaces is the token, and that lands
+    beside the vault, where the service takes it over its own at the next
+    unlock (``execd.schwab.trading_payload``)."""
     grant = json.loads(token_path.read_text(encoding="utf-8"))
-    if not trading:
-        payload = {}
-        if EXECD_MARKET.exists():
-            payload = json.loads(EXECD_MARKET.read_text(encoding="utf-8"))
-        payload["app"] = {"key": api_key, "secret": app_secret}
-        payload.setdefault("callback_url", callback_url)
-        payload["token"] = grant
-        _write_keeping_owner(EXECD_MARKET,
-                             json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-        print(f"✓ execd market credential updated ({EXECD_MARKET})")
-        return
-
-    import getpass
-
-    from execd.vault import Vault
-
-    vault = Vault(EXECD_VAULT)
-    pw = getpass.getpass("execd vault passphrase: ")
-    try:
-        envelope = vault.load(pw)
-        inner = envelope.get("trading") if "trading" in envelope else envelope
-        inner["app"] = {"key": api_key, "secret": app_secret}
-        inner.setdefault("callback_url", callback_url)
-        inner["token"] = grant
-        envelope = {"version": 2, "trading": inner}
-        before = EXECD_VAULT.stat() if EXECD_VAULT.exists() else EXECD_VAULT.parent.stat()
-        vault.store(envelope, pw)
-        os.chown(EXECD_VAULT, before.st_uid, before.st_gid)
-    finally:
-        del pw
-    print(f"✓ execd trading credential updated ({EXECD_VAULT})")
+    where = EXECD_TRADING if trading else EXECD_MARKET
+    payload = json.loads(where.read_text(encoding="utf-8")) if where.exists() else {}
+    payload["app"] = {"key": api_key, "secret": app_secret}
+    payload.setdefault("callback_url", callback_url)
+    payload["token"] = grant
+    _write_keeping_owner(where, json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    print(f"✓ execd {'trading' if trading else 'market'} credential updated ({where})")
 
 
 def main(argv: list[str] | None = None) -> int:

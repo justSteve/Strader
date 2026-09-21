@@ -202,6 +202,7 @@ class _Nonces:
 def create_page(service: ExecService, *, vault: Vault | str | Path,
                 market: CredentialFile | None = None,
                 callback_url: str = DEFAULT_CALLBACK_URL,
+                state_dir: str | Path | None = None,
                 http_client: Any | None = None,
                 clock: Callable[[], datetime] = _utcnow,
                 monotonic: Callable[[], float] = time.monotonic) -> Flask:
@@ -296,7 +297,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
     def unlock():
         pw = passphrase()
         try:
-            payload = trading_payload(open_vault(pw))
+            payload = trading_payload(open_vault(pw), state_dir)
             Credential.from_payload(payload)
             status = service.unlock(payload)
         except PageRefused as exc:

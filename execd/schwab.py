@@ -73,12 +73,14 @@ hash is replaced with ``<account>`` in every message that carries a path.
 from __future__ import annotations
 
 import base64
+import json
 import threading
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
+from pathlib import Path
 from typing import Any, Callable, Mapping
 
 import httpx
@@ -139,17 +141,43 @@ APP_BY_PREFIX: tuple[tuple[str, App], ...] = (
 VAULT_VERSION = 2
 
 
-def trading_payload(vault_payload: Any) -> Any:
+#: Where ``reauthAccount`` leaves a freshly minted trading grant. Steve's
+#: call, 2026-09-21: the weekly re-auth does not ask for the vault passphrase.
+#: The vault still holds the app key and secret and the passphrase is still
+#: what arms the service — only the token, which is what the weekly ritual
+#: replaces, arrives beside it, 0600, the same way the market app's does.
+#: [st-bd2g]
+REFRESHED_TRADING = "trading.json"
+
+
+def trading_payload(vault_payload: Any, state_dir: Any = None) -> Any:
     """The trading credential out of a vault payload, v1 or v2.
 
     A vault Steve wrote before the split keeps opening: v1 had exactly one
     credential and it was the trading one, so an envelope with no ``trading``
     key *is* the trading credential. The market credential is deliberately not
     in here — a credential that must load without the passphrase cannot live
-    behind it."""
-    if isinstance(vault_payload, Mapping) and "trading" in vault_payload:
-        return vault_payload["trading"]
-    return vault_payload
+    behind it.
+
+    With ``state_dir``, a grant left by the weekly re-auth is taken over the
+    vault's own when it is the newer of the two. Newer rather than merely
+    present, so a stale file can never pull the service back to a dead grant."""
+    payload = (vault_payload["trading"]
+               if isinstance(vault_payload, Mapping) and "trading" in vault_payload
+               else vault_payload)
+    if state_dir is None:
+        return payload
+    try:
+        refreshed = json.loads(
+            (Path(state_dir) / REFRESHED_TRADING).read_text(encoding="utf-8"))
+        token = refreshed["token"] if "token" in refreshed else refreshed
+        if int(token["creation_timestamp"]) <= int(payload["token"]["creation_timestamp"]):
+            return payload
+    except (OSError, ValueError, KeyError, TypeError):
+        return payload
+    merged = dict(payload)
+    merged["token"] = token
+    return merged
 
 
 def app_for(path: str) -> App:
