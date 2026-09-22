@@ -149,3 +149,44 @@ def test_deterministic_and_flush_is_not_a_hold():
     assert a == b
     (r,) = bid_reads(a)
     assert r.held is False and "end of stream" in r.reason
+
+
+def test_print_norm_is_the_trailing_mean_and_holds_the_seed_until_warm():
+    from market.orderflow.absorption_impact import PrintNormEstimator
+    est = PrintNormEstimator(bin_s=10, window_s=900, min_bins=30, seed=4.0)
+    tape, _ = warm_tape(T0, bins=40, ticks_per_contract=0.04, contracts_per_bin=50)
+    norms = []
+    for e in tape:
+        est.observe(e)
+        norms.append(est.norm)
+    assert norms[0] == 4.0                        # seed in force before any bin closed
+    assert est.norm == 50.0                       # one 50-lot print per closed bin
+    assert est.closed_bins == 39
+
+
+def test_read_carries_print_evidence_and_start_time():
+    # warm tape prints are 50-lots, so the norm is 50; at mult 4 a 200-lot is
+    # big and a 20-lot is not
+    fast, px = warm_tape(T0, bins=35, ticks_per_contract=0.06)
+    ep_t = T0 + timedelta(seconds=35 * 10 + 5)
+    px = round(px + 1.0, 2)
+    small = fast + defended_bid(ep_t, px, vol_each=20)
+    (r,) = bid_reads(ImpactAbsorptionTracker(expected_ticks_min=3.0, big_print_mult=4.0).run(small))
+    assert r.prints == 3 and r.max_print == 20 and r.big_prints == 0
+    assert r.print_norm == 50.0
+    assert r.start_ts == ep_t and r.start_ts <= r.timestamp
+    assert "largest 20" in r.reason
+    big = fast + defended_bid(ep_t, px, vol_each=200)
+    (rb,) = bid_reads(ImpactAbsorptionTracker(expected_ticks_min=3.0, big_print_mult=4.0).run(big))
+    assert rb.prints == 3 and rb.max_print == 200 and rb.big_prints == 3
+
+
+def test_big_prints_gate_is_off_by_default_and_works_when_set():
+    fast, px = warm_tape(T0, bins=35, ticks_per_contract=0.06)
+    ep_t = T0 + timedelta(seconds=35 * 10 + 5)
+    px = round(px + 1.0, 2)
+    small = fast + defended_bid(ep_t, px, vol_each=20)
+    assert len(bid_reads(ImpactAbsorptionTracker(expected_ticks_min=3.0).run(small))) == 1
+    assert bid_reads(ImpactAbsorptionTracker(expected_ticks_min=3.0, big_prints_min=1).run(small)) == []
+    big = fast + defended_bid(ep_t, px, vol_each=200)
+    assert len(bid_reads(ImpactAbsorptionTracker(expected_ticks_min=3.0, big_prints_min=1).run(big))) == 1

@@ -153,6 +153,19 @@ IMPACT_FLOOR_TICKS_PER_CONTRACT = 0.002 # a flat, dead window cannot make any vo
 ABSORPTION_EXPECTED_TICKS_MIN = 3.0     # the aggression should have moved price this far
 ABSORPTION_HOLD_MIN_S = 0.0             # the defended price must stand at least this long
 ABSORPTION_IMPACT_REFILL_MIN = 0        # refills stay evidence, not a gate
+# Print-size evidence (Steve, 2026-09-22): the activity he trades happens at a
+# level of interest, in under a minute, as larger-than-average prints. The
+# tracker carries the trailing mean print size (same bins and window as the
+# impact fit) and counts the episode's prints at or above BIG_PRINT_MULT
+# times that norm. Evidence on the read, not a gate. [measured 2026-09-18
+# RTH: 209,724 prints, mean 4.0, p50 1, p90 10, p99 36.] [measured 2026-09-22,
+# scripts/measurement/absorption_scalp_survey.py, 50 sessions: 99% of held
+# reads already carry a print at 4× the norm (largest print / norm p50 11×),
+# and requiring 20× or 40× makes the held level break MORE often within five
+# minutes, not less — so the multiple stays evidence and is not a gate.]
+ABSORPTION_BIG_PRINT_MULT = 4.0         # a print this many times the trailing mean is "big"
+ABSORPTION_BIG_PRINTS_MIN = 0           # big prints stay evidence, not a gate
+PRINT_NORM_SEED = 4.0                   # cross-day RTH mean print size, used until warm
 
 # ── consumer wiring (spec §6) ───────────────────────────────────────────────
 CONFLUENCE_TOLERANCE_PTS = 2.0  # Mancini level ∩ anchor proximity

@@ -26,6 +26,15 @@ What this one does differently, and nothing else:
      Nothing is filtered on it here; the survey and the page decide.
   3. Refills are evidence on the read, not a gate (ABSORPTION_IMPACT_REFILL_MIN
      defaults to 0).
+  4. Print sizes are evidence on the read (Steve, 2026-09-22: the activity he
+     trades shows as larger-than-average prints at a level, in under a
+     minute). ``PrintNormEstimator`` keeps the trailing mean print size over
+     the same bins and window as the impact fit; each aggressor print
+     credited to an episode is counted, the largest kept, and prints at or
+     above ABSORPTION_BIG_PRINT_MULT × the norm in force when they printed
+     counted as big. ABSORPTION_BIG_PRINTS_MIN gates emission (default 0).
+     The read also carries ``start_ts``, when the defended price first took
+     top-of-book, so a consumer can attribute it to the bar the defense began.
 
 Episode mechanics are inherited unchanged from AbsorptionTracker: a defended
 price at top-of-book, alive within the band, aggression credited per trade,
@@ -39,6 +48,8 @@ from market.entities.book import BookEvent
 from market.orderflow.absorption import AbsorptionTracker, _Episode
 from market.signals.orderflow import ImpactAbsorptionRead
 from market.signals.orderflow_config import (
+    ABSORPTION_BIG_PRINT_MULT,
+    ABSORPTION_BIG_PRINTS_MIN,
     ABSORPTION_EXPECTED_TICKS_MIN,
     ABSORPTION_HOLD_MIN_S,
     ABSORPTION_IMPACT_REFILL_MIN,
@@ -47,6 +58,7 @@ from market.signals.orderflow_config import (
     IMPACT_MIN_BINS,
     IMPACT_SEED_TICKS_PER_CONTRACT,
     IMPACT_WINDOW_S,
+    PRINT_NORM_SEED,
     TICK,
 )
 from market.signals.types import Signal
@@ -116,30 +128,101 @@ class ImpactEstimator:
         return self.rate * contracts
 
 
+class PrintNormEstimator:
+    """Trailing mean aggressor print size over the last IMPACT_WINDOW_S of
+    IMPACT_BIN_S bins, closed on the same rule as ``ImpactEstimator``: a bin
+    closes when an event arrives with a later key, so ``norm`` is the mean of
+    prints that closed before the current event. The seed stands in until
+    IMPACT_MIN_BINS have closed, and a window with no prints keeps the last
+    value rather than reporting zero.
+    """
+
+    def __init__(self, bin_s: int = IMPACT_BIN_S, window_s: int = IMPACT_WINDOW_S,
+                 min_bins: int = IMPACT_MIN_BINS, seed: float = PRINT_NORM_SEED):
+        self.bin_s = bin_s
+        self.max_bins = max(1, window_s // bin_s)
+        self.min_bins = min_bins
+        self._bins: deque[tuple[int, int]] = deque()   # (contracts, prints)
+        self._sum = 0
+        self._n = 0
+        self._key: int | None = None
+        self._bin_sum = 0
+        self._bin_n = 0
+        self.norm = seed
+        self.closed_bins = 0
+
+    def _close_bin(self) -> None:
+        self._bins.append((self._bin_sum, self._bin_n))
+        self._sum += self._bin_sum
+        self._n += self._bin_n
+        if len(self._bins) > self.max_bins:
+            s, n = self._bins.popleft()
+            self._sum -= s
+            self._n -= n
+        self.closed_bins += 1
+        if self.closed_bins >= self.min_bins and self._n > 0:
+            self.norm = self._sum / self._n
+        self._bin_sum = 0
+        self._bin_n = 0
+
+    def observe(self, e: BookEvent) -> None:
+        key = int(e.ts.timestamp()) // self.bin_s
+        if self._key is not None and key != self._key:
+            self._close_bin()
+        self._key = key
+        if e.action == "T" and e.size and e.side in ("B", "A"):
+            self._bin_sum += e.size
+            self._bin_n += 1
+
+
 class ImpactAbsorptionTracker(AbsorptionTracker):
     """AbsorptionTracker with the impact-scaled floor and the outcome on the read."""
 
     def __init__(self, *, expected_ticks_min: float = ABSORPTION_EXPECTED_TICKS_MIN,
                  hold_min_s: float = ABSORPTION_HOLD_MIN_S,
                  refill_min: int = ABSORPTION_IMPACT_REFILL_MIN,
-                 estimator: ImpactEstimator | None = None):
+                 big_print_mult: float = ABSORPTION_BIG_PRINT_MULT,
+                 big_prints_min: int = ABSORPTION_BIG_PRINTS_MIN,
+                 estimator: ImpactEstimator | None = None,
+                 print_norm: PrintNormEstimator | None = None):
         super().__init__()
         self.expected_ticks_min = expected_ticks_min
         self.hold_min_s = hold_min_s
         self.refill_min = refill_min
+        self.big_print_mult = big_print_mult
+        self.big_prints_min = big_prints_min
         self.impact = estimator if estimator is not None else ImpactEstimator()
+        self.prints = print_norm if print_norm is not None else PrintNormEstimator()
 
     def process(self, e: BookEvent) -> list[Signal]:
-        # the rate in force for this event is fit on bins that closed before it
+        # the rate and the norm in force for this event are fit on bins that
+        # closed before it
         self.impact.observe(e)
+        self.prints.observe(e)
         return super().process(e)
+
+    def _attribute_trade(self, e: BookEvent) -> None:
+        if e.action != "T" or e.price is None or not e.size:
+            return
+        side = "bid" if e.side == "A" else "ask" if e.side == "B" else None
+        if side is None:
+            return
+        ep = self._episodes[side]
+        if ep is None or e.price != ep.price:
+            return
+        super()._attribute_trade(e)
+        ep.prints += 1
+        if e.size > ep.max_print:
+            ep.max_print = e.size
+        if e.size >= self.big_print_mult * self.prints.norm:
+            ep.big_prints += 1
 
     def _close(self, ep: _Episode, next_px: float | None) -> list[Signal]:
         rate = self.impact.rate
         expected = self.impact.expected_ticks(ep.aggr_vol)
         hold_s = (ep.last_ts - ep.start_ts).total_seconds()
         if expected < self.expected_ticks_min or ep.refill_events < self.refill_min \
-                or hold_s < self.hold_min_s:
+                or hold_s < self.hold_min_s or ep.big_prints < self.big_prints_min:
             return []
         if next_px is None:
             disp = 0
@@ -156,14 +239,18 @@ class ImpactAbsorptionTracker(AbsorptionTracker):
             timestamp=ep.last_ts, source="orderflow.absorption_impact",
             confidence=confidence,
             reason=(f"{attacker} threw {ep.aggr_vol} contracts at {ep.price:.2f} {ep.side} "
-                    f"over {hold_s:.1f}s; at {rate:.4f} ticks/contract that should have moved "
+                    f"over {hold_s:.1f}s in {ep.prints} prints (largest {ep.max_print}, "
+                    f"{ep.big_prints} big against a norm of {self.prints.norm:.1f}); "
+                    f"at {rate:.4f} ticks/contract that should have moved "
                     f"price {expected:.1f} ticks, it moved {actual}; refilled {ep.refill_events}x "
                     f"— level {outcome}"),
             side=ep.side, price=ep.price, aggressive_vol=ep.aggr_vol,
             displacement_ticks=disp, refill_events=ep.refill_events,
             expected_ticks=round(expected, 3), impact_ticks_per_contract=round(rate, 6),
-            held=held, hold_s=round(hold_s, 3),
+            held=held, hold_s=round(hold_s, 3), start_ts=ep.start_ts,
+            prints=ep.prints, max_print=ep.max_print, big_prints=ep.big_prints,
+            print_norm=round(self.prints.norm, 3),
         )]
 
 
-__all__ = ["ImpactEstimator", "ImpactAbsorptionTracker"]
+__all__ = ["ImpactEstimator", "PrintNormEstimator", "ImpactAbsorptionTracker"]

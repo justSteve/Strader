@@ -9,6 +9,7 @@ ImbalanceStack (st-su4); SetupRecognition (st-2kf); AbsorptionRead (st-9vl).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 
 from market.signals.types import Signal
@@ -90,12 +91,24 @@ class ImpactAbsorptionRead(AbsorptionRead):
     price; ``impact_ticks_per_contract`` is that rate at the time the episode
     ended; ``held`` is whether the defended price was still standing when it
     ended (the effect half of force-without-effect); ``hold_s`` is how long it
-    stood. ``confidence`` is the shortfall: 1 − actual/expected, floored at 0."""
+    stood. ``confidence`` is the shortfall: 1 − actual/expected, floored at 0.
+
+    ``start_ts`` is when the defended price first took top-of-book (the bar
+    the defense began in, for attribution). ``prints`` / ``max_print`` are the
+    aggressor prints credited to the episode and the largest of them;
+    ``print_norm`` is the trailing mean print size in force when it ended and
+    ``big_prints`` how many of its prints were at least
+    ABSORPTION_BIG_PRINT_MULT times the norm in force when each printed."""
 
     expected_ticks: float = 0.0
     impact_ticks_per_contract: float = 0.0
     held: bool = False
     hold_s: float = 0.0
+    start_ts: datetime | None = None
+    prints: int = 0
+    max_print: int = 0
+    big_prints: int = 0
+    print_norm: float = 0.0
 
 
 @dataclass(frozen=True)

@@ -78,6 +78,10 @@ class _Episode:
     peak_sz: int = 0     # max resting size since episode start / last refill
     trough_sz: int = 0   # min resting size since peak_sz was set
     events: int = 0
+    # print-size evidence, filled by ImpactAbsorptionTracker only [co-qp8cn]
+    prints: int = 0
+    max_print: int = 0
+    big_prints: int = 0
 
     def observe_size(self, sz: int) -> None:
         """Advance the deplete→recover cycle with the current resting size."""
