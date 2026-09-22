@@ -81,6 +81,24 @@ class AbsorptionRead(Signal):
 
 
 @dataclass(frozen=True)
+class ImpactAbsorptionRead(AbsorptionRead):
+    """An AbsorptionRead whose volume floor was set by the tape's own price
+    impact rather than a fixed contract count. [co-qp8cn]
+
+    ``expected_ticks`` is how far the trailing impact rate says
+    ``aggressive_vol`` contracts of one-sided aggression should have moved
+    price; ``impact_ticks_per_contract`` is that rate at the time the episode
+    ended; ``held`` is whether the defended price was still standing when it
+    ended (the effect half of force-without-effect); ``hold_s`` is how long it
+    stood. ``confidence`` is the shortfall: 1 − actual/expected, floored at 0."""
+
+    expected_ticks: float = 0.0
+    impact_ticks_per_contract: float = 0.0
+    held: bool = False
+    hold_s: float = 0.0
+
+
+@dataclass(frozen=True)
 class SetupRecognition(Signal):
     """A Carmine setup forming / confirmed / invalidated at a level (spec §3,
     §6). Score-don't-gate: partial recognitions surface as ``forming`` with

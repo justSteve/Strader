@@ -134,6 +134,26 @@ REFILL_RECOVERY_MIN = 25        # contracts replenished to count one refill
 ABSORPTION_VOL_SCALE = 500      # volume at which the vol component saturates
 ABSORPTION_REFILL_SCALE = 4     # refills at which the refill component saturates
 
+# ── absorption, impact-scaled floor (co-qp8cn, 2026-09-22) ──────────────────
+# The fixed ABSORPTION_VOL_MIN above is worth two ticks of expected move at
+# noon and one tick in the last fifteen minutes, which is why the reads pile
+# into the end of the day. [measured] scripts/measurement/impact_by_interval.py
+# over 50 recorded days: the trades-only impact slope (mid change per signed
+# contract, 10-s bins, OLS through the origin) runs ~0.022 ticks/contract at
+# 08:30, ~0.020 midday, 0.0094 in 14:45-15:00; the book-side law β·depth = 0.29
+# holds in every interval (0.284-0.297, R² 0.91-0.94) except the last (0.228).
+# The impact tracker therefore sets its floor as "enough contracts that the
+# trailing rate says price should have moved EXPECTED_TICKS_MIN ticks", and
+# emits with the held/broke outcome as part of the read.
+IMPACT_BIN_S = 10                       # bin for the trailing regression
+IMPACT_WINDOW_S = 900                   # trailing window the slope is fit over
+IMPACT_MIN_BINS = 30                    # bins before the fit replaces the seed
+IMPACT_SEED_TICKS_PER_CONTRACT = 0.02   # the cross-day midday median, used until warm
+IMPACT_FLOOR_TICKS_PER_CONTRACT = 0.002 # a flat, dead window cannot make any volume "enough"
+ABSORPTION_EXPECTED_TICKS_MIN = 3.0     # the aggression should have moved price this far
+ABSORPTION_HOLD_MIN_S = 0.0             # the defended price must stand at least this long
+ABSORPTION_IMPACT_REFILL_MIN = 0        # refills stay evidence, not a gate
+
 # ── consumer wiring (spec §6) ───────────────────────────────────────────────
 CONFLUENCE_TOLERANCE_PTS = 2.0  # Mancini level ∩ anchor proximity
 
