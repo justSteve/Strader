@@ -124,6 +124,10 @@ class ServiceConfig:
     #: ``live`` or ``paper`` (``execd.paper``). Stamped on the journal, the
     #: status body and every preview/place answer.
     mode: str = "live"
+    #: ``schwab``, ``alpaca`` or ``mock`` — which broker this instance sends
+    #: to. On every journal line, in ``/status``, and the badge on its page;
+    #: two instances run side by side, one per broker (co-8mb1z).
+    broker: str = ""
 
     def __post_init__(self) -> None:
         self.state_dir = Path(self.state_dir)
@@ -407,7 +411,7 @@ class ExecService:
         state = Path(config.state_dir)
         state.mkdir(parents=True, exist_ok=True)
         self.journal = Journal(state / "journal", sha=config.sha, clock=clock,
-                               mode=config.mode)
+                               mode=config.mode, broker=config.broker)
         self.arming = Arming(state / "STOP", clock=clock)
         self._lock = threading.RLock()
         self._open: dict[str, OpenPosition] = {}
@@ -570,6 +574,7 @@ class ExecService:
             "now_ct": now.astimezone(CT).strftime("%Y-%m-%d %H:%M:%S CT"),
             "sha": self.config.sha,
             "mode": self.config.mode,
+            "broker": self.config.broker,
             "arming": self.arming.status(),
             "day": {
                 "open_positions": day.open_positions,

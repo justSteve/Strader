@@ -56,6 +56,16 @@ EXECD_PAGE_PORT=8779
 EXECD_API_PORT=8778
 EXECD_TAILNET_PATH="/exec"
 
+# The Alpaca instance (co-8mb1z, Steve 2026-09-24: "I need sep forms for Alpaca
+# and Schwab"). Same code, same user, its own state, config, ports and page.
+# It reads the vault and the market grant in $EXECD_STATE and writes neither.
+ALPACA_ETC="/etc/execd-alpaca"
+ALPACA_STATE="/var/lib/execd-alpaca"
+ALPACA_UNIT="strader-execd-alpaca.service"
+ALPACA_PAGE_PORT=8781
+ALPACA_API_PORT=8780
+ALPACA_TAILNET_PATH="/exec-alpaca"
+
 say() { echo "execd: $*"; }
 run() {
     # Every state-changing command in the execd section goes through here so
@@ -136,17 +146,27 @@ install_execd() {
         say "mode seeded at $EXECD_MODE: paper (write 'live' there and re-run the install to go live)"
     fi
 
-    # 5c. the broker file — 'schwab' or 'alpaca' (co-8mb1z). Seeded as schwab
-    #     once, then Steve's. The unit reads it with --broker-file; an absent
-    #     file or any other word and the service refuses to start.
-    EXECD_BROKER="$EXECD_ETC/broker"
-    if [[ -e "$EXECD_BROKER" ]]; then
-        say "broker file exists at $EXECD_BROKER: $(tr -d '[:space:]' < "$EXECD_BROKER") (yours; not touched)"
+    # 5c. the Alpaca instance's own directories, bounds and mode file — seeded
+    #     once each, then Steve's, exactly as the Schwab ones above. Its limits
+    #     are its own: a loss on one broker does not count against the other.
+    run install -d -o root -g "$EXECD_USER" -m 0750 "$ALPACA_ETC"
+    run install -d -o "$EXECD_USER" -g "$EXECD_USER" -m 0700 "$ALPACA_STATE" "$ALPACA_STATE/journal"
+    if [[ -e "$ALPACA_ETC/bounds.yaml" ]]; then
+        say "alpaca bounds exist at $ALPACA_ETC/bounds.yaml (yours; not touched)"
     else
-        run bash -c "printf 'schwab\n' > '$EXECD_BROKER'"
-        run chown root:"$EXECD_USER" "$EXECD_BROKER"
-        run chmod 0640 "$EXECD_BROKER"
-        say "broker seeded at $EXECD_BROKER: schwab (write 'alpaca' there and re-run the install to switch)"
+        run install -o root -g "$EXECD_USER" -m 0640 "$REPO/execd/bounds.example.yaml" "$ALPACA_ETC/bounds.yaml"
+        say "alpaca bounds seeded at $ALPACA_ETC/bounds.yaml from execd/bounds.example.yaml"
+    fi
+    if [[ -e "$ALPACA_ETC/mode" ]]; then
+        say "alpaca mode file exists at $ALPACA_ETC/mode: $(tr -d '[:space:]' < "$ALPACA_ETC/mode") (yours; not touched)"
+    else
+        run bash -c "printf 'paper\n' > '$ALPACA_ETC/mode'"
+        run chown root:"$EXECD_USER" "$ALPACA_ETC/mode"
+        run chmod 0640 "$ALPACA_ETC/mode"
+        say "alpaca mode seeded at $ALPACA_ETC/mode: paper (Alpaca's paper account)"
+    fi
+    if [[ -e "$EXECD_ETC/broker" ]]; then
+        say "$EXECD_ETC/broker is no longer read — each broker has its own instance now"
     fi
 
     # 6. the market credential (app 1, cannot trade): assembled from the repo's
@@ -185,48 +205,61 @@ install_execd() {
         echo "  + systemctl daemon-reload; systemctl enable --now $EXECD_UNIT"
     else
         install -m 0644 "$SRC/$EXECD_UNIT" "$DST/$EXECD_UNIT"
+        install -m 0644 "$SRC/$ALPACA_UNIT" "$DST/$ALPACA_UNIT"
         systemctl daemon-reload
-        systemctl enable "$EXECD_UNIT" >/dev/null 2>&1 || true
+        systemctl enable "$EXECD_UNIT" "$ALPACA_UNIT" >/dev/null 2>&1 || true
         systemctl restart "$EXECD_UNIT"
         say "$EXECD_UNIT (re)started"
+        systemctl restart "$ALPACA_UNIT"
+        say "$ALPACA_UNIT (re)started"
     fi
 
     # 9. the tailnet path for the page. tailscale serve keeps this across
     #    reboots; --bg makes it persistent. Tailnet only — never funnel.
     if command -v tailscale >/dev/null 2>&1; then
         run tailscale serve --bg --set-path "$EXECD_TAILNET_PATH" "http://127.0.0.1:$EXECD_PAGE_PORT$EXECD_TAILNET_PATH"
+        run tailscale serve --bg --set-path "$ALPACA_TAILNET_PATH" "http://127.0.0.1:$ALPACA_PAGE_PORT$ALPACA_TAILNET_PATH"
         say "page published at https://$(tailscale status --json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))' 2>/dev/null || echo '<tailnet host>')$EXECD_TAILNET_PATH/"
     else
         say "tailscale not on PATH — publish the page by hand:"
         say "  tailscale serve --bg --set-path $EXECD_TAILNET_PATH http://127.0.0.1:$EXECD_PAGE_PORT$EXECD_TAILNET_PATH"
+        say "  tailscale serve --bg --set-path $ALPACA_TAILNET_PATH http://127.0.0.1:$ALPACA_PAGE_PORT$ALPACA_TAILNET_PATH"
     fi
 
     # 10. prove it answers. LOCKED is the right first answer.
     if (( DRY )); then
         echo "  + curl -s http://127.0.0.1:$EXECD_API_PORT/status"
+        echo "  + curl -s http://127.0.0.1:$ALPACA_API_PORT/status"
         return
     fi
-    local status
-    for _ in 1 2 3 4 5 6 7 8 9 10; do
-        status="$(curl -s -m 2 "http://127.0.0.1:$EXECD_API_PORT/status" 2>/dev/null || true)"
-        [[ -n "$status" ]] && break
-        sleep 1
-    done
-    if [[ -z "$status" ]]; then
-        say "the service did not answer on $EXECD_API_PORT within 10 s — read: journalctl -u $EXECD_UNIT -n 50"
-        exit 1
-    fi
-    python3 - "$status" <<'PY'
+    local port unit status failed=0
+    for pair in "$EXECD_API_PORT:$EXECD_UNIT" "$ALPACA_API_PORT:$ALPACA_UNIT"; do
+        port="${pair%%:*}"; unit="${pair#*:}"; status=""
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+            status="$(curl -s -m 2 "http://127.0.0.1:$port/status" 2>/dev/null || true)"
+            [[ -n "$status" ]] && break
+            sleep 1
+        done
+        if [[ -z "$status" ]]; then
+            say "$unit did not answer on $port within 10 s — read: journalctl -u $unit -n 50"
+            failed=1
+            continue
+        fi
+        python3 - "$status" <<'PY'
 import json, sys
 st = json.loads(sys.argv[1])
 arm = st.get("arming", {})
 cred = st.get("credential") or {}
 mk = cred.get("market") or {}
-print(f"execd: answering — service {st.get('sha')}, arming {arm.get('state')}, STOP {'on' if arm.get('killed') else 'off'}")
-print(f"execd: market-data grant wall {mk.get('refresh_wall', 'unknown')}" if mk.get("armed")
-      else f"execd: market-data grant: {mk.get('detail', 'not loaded')}")
-print("execd: next — open the page, enter the passphrase, watch the state turn ARMED")
+who = str(st.get("broker") or "execd").upper()
+print(f"execd {who}: answering — service {st.get('sha')}, mode {st.get('mode')}, "
+      f"arming {arm.get('state')}, STOP {'on' if arm.get('killed') else 'off'}")
+print(f"execd {who}: market-data grant wall {mk.get('refresh_wall', 'unknown')}" if mk.get("armed")
+      else f"execd {who}: market-data grant: {mk.get('detail', 'not loaded')}")
 PY
+    done
+    (( failed )) && exit 1
+    say "next — open each page (/exec and /exec-alpaca), enter the passphrase on each, watch it turn ARMED"
 }
 
 if (( EXECD )); then

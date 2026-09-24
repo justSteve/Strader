@@ -9,16 +9,25 @@ start.
     .venv/bin/python -m execd --schwab --vault /var/lib/execd/vault.json \
         --market-credential /var/lib/execd/market.json --state-dir /var/lib/execd
     .venv/bin/python -m execd --alpaca --vault /var/lib/execd/vault.json \
-        --market-credential /var/lib/execd/market.json --state-dir /var/lib/execd
-    .venv/bin/python -m execd --broker-file /etc/execd/broker ...   # the unit's form
+        --market-credential /var/lib/execd/market.json --state-dir /var/lib/execd-alpaca \
+        --port 8780 --page-port 8781 --page-prefix /exec-alpaca
 
 ``--alpaca`` (co-8mb1z) sends orders to Alpaca: its paper venue when Steve's
 mode file says ``paper`` (Alpaca's own simulated account — not execd's paper
 book), its live venue when it says ``live``. Quotes, chains and the readers'
 market door still come from the Schwab market credential, because Alpaca
-publishes no index data. ``--broker-file`` reads ``schwab`` or ``alpaca`` from
-Steve's file; the installed unit uses it so switching brokers is a one-word
-edit and a re-install, never a code change.
+publishes no index data.
+
+**One instance per broker** (Steve, 2026-09-24: "I need sep forms for Alpaca
+and Schwab. I'll be wanting to create and manage positions in both throughout
+the day"). ``strader-execd`` runs ``--schwab`` on 8778/8779 at ``/exec`` with
+state in ``/var/lib/execd``; ``strader-execd-alpaca`` runs ``--alpaca`` on
+8780/8781 at ``/exec-alpaca`` with state in ``/var/lib/execd-alpaca``. Each
+has its own journal, arming, STOP, mode file, bounds and daily limits. A
+state directory is claimed with a lock at start, so two instances can never
+share one. The Alpaca instance reads the one vault and the one market grant
+file and writes neither: its page refuses re-authorisation, and its unit
+mounts both read-only.
 
 ``--schwab`` (stage 2, st-w2nw) starts the service LOCKED against the real
 Trader API. Nothing arms it but Steve's passphrase: on its tailnet page
@@ -43,8 +52,11 @@ carries that sha.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import getpass
 import json
+import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -66,18 +78,36 @@ from .watch import INTERVAL_S as WATCH_INTERVAL_S, Watcher
 #: Steve's mode file: ``paper`` or ``live``. Absent means paper.
 DEFAULT_MODE_FILE = "/etc/execd/mode"
 
-#: The brokers ``--broker-file`` may name. No default: an absent or unknown
-#: word is a refusal to start.
-BROKER_WORDS = ("schwab", "alpaca")
+#: A page prefix: one path segment, lower case. ``/exec`` is Schwab's.
+PREFIX_RE = re.compile(r"^/[a-z0-9][a-z0-9-]{0,30}$")
+
+#: The file in a state directory that says an instance holds it.
+INSTANCE_LOCK = ".instance.lock"
 
 
-def read_broker(path: str | Path) -> str:
-    """``schwab`` or ``alpaca`` from Steve's broker file. Absent or anything
-    else raises — unlike the mode file there is no safe default broker."""
-    word = Path(path).read_text(encoding="utf-8").strip().lower()
-    if word not in BROKER_WORDS:
-        raise ValueError(f"{path}: expected one of {', '.join(BROKER_WORDS)}, found {word!r}")
-    return word
+class StateDirTaken(RuntimeError):
+    """Another running instance already holds this state directory."""
+
+
+def claim_state_dir(state_dir: str | Path) -> int:
+    """Take the state directory for this process, or raise.
+
+    Two instances on one directory would share a journal, a STOP file and a
+    day's limits — the separation of the two brokers would be a label. An
+    exclusive ``flock`` on a file inside it, held for the life of the process
+    (the kernel drops it when the process dies, so a crash leaves nothing to
+    clean up). Returns the descriptor, which the caller keeps open."""
+    path = Path(state_dir)
+    path.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path / INSTANCE_LOCK, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        raise StateDirTaken(f"{path} is held by another running execd instance") from None
+    os.ftruncate(fd, 0)
+    os.write(fd, f"{os.getpid()}\n".encode())
+    return fd
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_VAULT = "/var/lib/execd/vault.json"
@@ -172,9 +202,6 @@ def build_parser() -> argparse.ArgumentParser:
     which.add_argument("--alpaca", action="store_true",
                        help="run against Alpaca's Trading API — its paper venue in paper "
                             "mode, live in live mode; starts locked (co-8mb1z)")
-    which.add_argument("--broker-file", default=None,
-                       help="read the broker ('schwab' or 'alpaca') from this file — "
-                            "Steve's, like the mode file; absent is a refusal")
     p.add_argument("--vault", default=DEFAULT_VAULT,
                    help="the encrypted trading credential, for --schwab and --alpaca "
                         "(default: %(default)s)")
@@ -197,6 +224,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--page-port", type=int, default=PAGE_PORT,
                    help="loopback port for Steve's page — unlock, STOP, flatten, re-auth "
                         "(default: %(default)s); published by tailscale serve, never funnel")
+    p.add_argument("--page-prefix", default="/exec",
+                   help="the path the page lives under (default: %(default)s; the Alpaca "
+                        "instance uses /exec-alpaca). Every link and form stays inside it")
     p.add_argument("--no-page", action="store_true",
                    help="do not serve the page (console trials; --unlock-stdin still works)")
     p.add_argument("--callback-url", default=DEFAULT_CALLBACK_URL,
@@ -226,15 +256,6 @@ def main(argv: list[str] | None = None) -> int:
     except SystemExit as exc:      # argparse's own refusal (e.g. --mock with --schwab)
         return 2 if exc.code else 0
 
-    if args.broker_file:
-        try:
-            word = read_broker(args.broker_file)
-        except (OSError, ValueError) as exc:
-            print(f"execd: broker file unusable — {exc}. Write 'schwab' or 'alpaca' there.",
-                  file=sys.stderr)
-            return 2
-        args.schwab, args.alpaca = word == "schwab", word == "alpaca"
-
     if not args.mock and not args.schwab and not args.alpaca:
         print("execd: choose a broker — --mock (deterministic, no network), --schwab "
               "or --alpaca (both start locked). None is a default.", file=sys.stderr)
@@ -245,6 +266,11 @@ def main(argv: list[str] | None = None) -> int:
         # carries the same rule for the same reason (scripts/fire_server.py).
         print(f"execd: refusing to bind {args.host} — this API is loopback-only.",
               file=sys.stderr)
+        return 2
+
+    if not PREFIX_RE.match(args.page_prefix):
+        print(f"execd: --page-prefix {args.page_prefix!r} must be one lower-case path "
+              f"segment such as /exec or /exec-alpaca.", file=sys.stderr)
         return 2
 
     if (args.schwab or args.alpaca) and not Path(args.vault).is_file():
@@ -267,7 +293,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"execd: mode file unreadable — {exc}", file=sys.stderr)
         return 2
     config = ServiceConfig(state_dir=Path(args.state_dir), bounds=bounds,
-                           sha=installed_sha(), mode=mode)
+                           sha=installed_sha(), mode=mode,
+                           broker="mock" if args.mock else "alpaca" if args.alpaca else "schwab")
     market: CredentialFile | None = None
     if args.alpaca:
         return _run_alpaca(args, config, bounds, mode)
@@ -338,13 +365,17 @@ def main(argv: list[str] | None = None) -> int:
               "orders fill in a simulated book against live quotes and never reach "
               f"Schwab. To go live: write 'live' to {args.mode_file} and restart.",
               file=sys.stderr)
-    _serve(args, service, market)
-    return 0
+    return _serve(args, service, market)
 
 
 def _serve(args: argparse.Namespace, service: ExecService, market: CredentialFile | None,
-           unlock_payload: Any = None) -> None:
+           unlock_payload: Any = None, grants: bool = True) -> int:
     """The watcher, the page and the API — the same for every broker."""
+    try:
+        claim = claim_state_dir(args.state_dir)
+    except StateDirTaken as exc:
+        print(f"execd: {exc} — each instance needs its own --state-dir.", file=sys.stderr)
+        return 2
     if args.watch_interval > 0:
         # The loop that watches a live position: fills picked up, the SPX-mark
         # exit fired. Without it a fill rests its broker stop and then sits
@@ -356,14 +387,19 @@ def _serve(args: argparse.Namespace, service: ExecService, market: CredentialFil
     if not args.no_page:
         page = create_page(service, vault=args.vault, market=market,
                            callback_url=args.callback_url,
-                           state_dir=args.state_dir, unlock_payload=unlock_payload)
+                           state_dir=args.state_dir, unlock_payload=unlock_payload,
+                           prefix=args.page_prefix, grants=grants)
         threading.Thread(
             target=lambda: page.run(host=PAGE_HOST, port=args.page_port, threaded=True),
             name="execd-page", daemon=True).start()
-        print(f"execd page on {PAGE_HOST}:{args.page_port} — publish it with: tailscale serve "
-              f"--bg --set-path /exec http://{PAGE_HOST}:{args.page_port}/exec",
-              file=sys.stderr)
-    create_app(service).run(host=BIND_HOST, port=args.port, threaded=True)
+        print(f"execd page on {PAGE_HOST}:{args.page_port}{args.page_prefix} — publish it "
+              f"with: tailscale serve --bg --set-path {args.page_prefix} "
+              f"http://{PAGE_HOST}:{args.page_port}{args.page_prefix}", file=sys.stderr)
+    try:
+        create_app(service).run(host=BIND_HOST, port=args.port, threaded=True)
+    finally:
+        os.close(claim)
+    return 0
 
 
 def _run_alpaca(args: argparse.Namespace, config: ServiceConfig, bounds: Any,
@@ -432,8 +468,9 @@ def _run_alpaca(args: argparse.Namespace, config: ServiceConfig, bounds: Any,
     else:
         print("execd ALPACA LIVE: orders go to Alpaca's live account once Steve unlocks.",
               file=sys.stderr)
-    _serve(args, service, market, unlock_payload=unlock_payload)
-    return 0
+    # grants=False: this instance reads the Schwab grants and never writes
+    # them — the Schwab instance is the one writer (co-8mb1z).
+    return _serve(args, service, market, unlock_payload=unlock_payload, grants=False)
 
 
 if __name__ == "__main__":

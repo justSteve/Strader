@@ -486,26 +486,6 @@ class TestMain:
         from execd.__main__ import may_mock_unlock
         assert may_mock_unlock(AlpacaBroker("paper")) is False
 
-    @pytest.mark.parametrize("content", [None, "", "ibkr", "mock"])
-    def test_a_broker_file_absent_or_unknown_is_a_refusal(self, tmp_path, content):
-        from execd.__main__ import main
-        path = tmp_path / "broker"
-        if content is not None:
-            path.write_text(content)
-        assert main(["--broker-file", str(path), "--state-dir", str(tmp_path)]) == 2
-
-    def test_a_broker_file_is_exclusive_with_a_flag(self, tmp_path):
-        from execd.__main__ import main
-        path = tmp_path / "broker"
-        path.write_text("schwab\n")
-        assert main(["--schwab", "--broker-file", str(path), "--state-dir", str(tmp_path)]) == 2
-
-    def test_read_broker(self, tmp_path):
-        from execd.__main__ import read_broker
-        path = tmp_path / "broker"
-        path.write_text(" Alpaca\n")
-        assert read_broker(path) == "alpaca"
-
 
 # ── the page ─────────────────────────────────────────────────────────────
 

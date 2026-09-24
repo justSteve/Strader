@@ -80,8 +80,8 @@ memory readers, the page port, stopping the unit. Hooks are Steve's to land.
 ```bash
 .venv/bin/python -m execd --mock --state-dir /var/lib/execd --mock-unlock
 .venv/bin/python -m execd --schwab --vault /etc/execd/vault.json --state-dir /var/lib/execd --unlock-stdin
-.venv/bin/python -m execd --alpaca --vault /var/lib/execd/vault.json --market-credential /var/lib/execd/market.json --state-dir /var/lib/execd
-.venv/bin/python -m execd --broker-file /etc/execd/broker ...   # what the installed unit runs
+.venv/bin/python -m execd --alpaca --vault /var/lib/execd/vault.json --market-credential /var/lib/execd/market.json \
+    --state-dir /var/lib/execd-alpaca --port 8780 --page-port 8781 --page-prefix /exec-alpaca
 ```
 
 A broker flag is required, and its absence is a refusal rather than a default:
@@ -378,12 +378,42 @@ trading against either Alpaca or Schwab."* `AlpacaBroker` is the third
 `Broker`; the service, the bounds, the bracket and the journal are the same
 code over it. The Schwab path is unchanged.
 
-**Choosing the broker.** `/etc/execd/broker` says `schwab` (seeded by the
-install) or `alpaca`; the unit runs `--broker-file /etc/execd/broker`, and an
-absent file or any other word is a refusal to start. Switching is a one-word
-edit and `installExecd`.
+**Two instances, one per broker** (Steve, 2026-09-24: *"I need sep forms for
+Alpaca and Schwab. I'll be wanting to create and manage positions in both
+throughout the day."*). The same installed code runs twice:
 
-**The venue is the mode.** With `alpaca`, `/etc/execd/mode` = `paper` sends to
+| | Schwab | Alpaca |
+|---|---|---|
+| unit | `strader-execd` | `strader-execd-alpaca` |
+| API / page ports | 8778 / 8779 | 8780 / 8781 |
+| page | `/exec` | `/exec-alpaca` |
+| state (journal, STOP, arming) | `/var/lib/execd` | `/var/lib/execd-alpaca` |
+| bounds, mode | `/etc/execd/` | `/etc/execd-alpaca/` |
+
+**Each instance has its own limits.** The loss ceiling, attempts, one-open-
+position and the window are counted per instance from its own journal: a
+loss on Alpaca does not count against Schwab's ceiling, and the reverse.
+Flat-by-close (14:55 CT) and SPX/SPXW-only apply to both, from each one's
+bounds file (both seeded from `bounds.example.yaml`). Each page is unlocked
+separately with the one passphrase; STOP on one page stops only that broker.
+Every page carries a large SCHWAB or ALPACA badge beside PAPER/LIVE, every
+journal line carries `broker`, and `/status` says which. A state directory is
+held with a lock at start, so two instances cannot share one.
+
+**One vault, one writer.** Both instances read `/var/lib/execd/vault.json`;
+the Alpaca instance reads its `alpaca` section. One file keeps one
+passphrase and one place `--add-alpaca` and the weekly re-auth write to; a
+copy would carry a second copy of the Schwab trading grant and drift from it
+at the first re-auth. The market grant (`/var/lib/execd/market.json`) is
+likewise one file. The access tokens each process derives from it live in
+its memory only (`execd/schwab.py`, `_bearer`); what writes the file is the
+page's weekly re-auth and `scripts/refresh_schwab_token.py`. Only the Schwab
+instance writes: the Alpaca page refuses re-authorisation, and its unit's
+`ReadWritePaths` names only its own state, so under `ProtectSystem=strict`
+both files are read-only to it. It picks up a new market grant on its next
+read without a restart (`CredentialFile.current`).
+
+**The venue is the mode.** On the Alpaca instance, `/etc/execd-alpaca/mode` = `paper` sends to
 Alpaca's paper venue (`paper-api.alpaca.markets` — Alpaca's own simulated
 account, so execd's paper book is *not* wrapped over it) and `live` sends to
 `api.alpaca.markets`. The credential in memory carries its venue; a paper key

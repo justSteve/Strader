@@ -144,15 +144,15 @@ def schwab_chain_maps(expiry: str = "2026-08-26") -> dict:
     return {"calls": {key: calls}, "puts": {key: puts}}
 
 
-def page_send(client, data: dict):
+def page_send(client, data: dict, prefix: str = "/exec"):
     """SEND from the trading page the way the form does (st-igw0): render
     the ticket for the selection, take the single-use token it carries, and
     post the selection with that token. Returns the send's response."""
     from urllib.parse import urlencode
-    body = client.get("/exec/order?" + urlencode(data)).get_data(as_text=True)
+    body = client.get(prefix + "/order?" + urlencode(data)).get_data(as_text=True)
     assert "name=nonce value='" in body, "the page carried no SEND token"
     nonce = body.split("name=nonce value='")[1].split("'")[0]
-    return client.post("/exec/order/send", data={**data, "nonce": nonce})
+    return client.post(prefix + "/order/send", data={**data, "nonce": nonce})
 
 
 def same_origin(client):

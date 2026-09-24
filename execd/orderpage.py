@@ -178,6 +178,17 @@ def esc(v: Any) -> str:
 
 # ── fragments (each also served as JSON for the script) ──────────────────
 
+def broker_badge(st: Mapping[str, Any]) -> str:
+    """The broker this page sends to, as a large badge beside PAPER/LIVE.
+    Steve runs one page per broker side by side (co-8mb1z, 2026-09-24: "I
+    need sep forms for Alpaca and Schwab"), so the page must say which one
+    it is before anything else. Nothing for a service that does not say."""
+    broker = str(st.get("broker") or "").lower()
+    if not broker:
+        return ""
+    return f"<span class='badge broker {esc(broker)}'>{esc(broker.upper())}</span>"
+
+
 def state_html(st: dict[str, Any], actions: Mapping[str, str] | None = None,
                now: datetime | None = None) -> str:
     """The strip: the mode badge, the arming word, and STOP — the same on
@@ -205,7 +216,7 @@ def state_html(st: dict[str, Any], actions: Mapping[str, str] | None = None,
                      "<input type=hidden name=back value='order'>"
                      "<button class='chip stopbtn'>STOP</button></form>")
         right += f"<a class='chip quiet' href='{actions['account']}'>account</a>"
-    return (f"<div class=strip><div class=l>{badge}{word}</div>"
+    return (f"<div class=strip><div class=l>{broker_badge(st)}{badge}{word}</div>"
             f"<div class=r>{right}</div></div>")
 
 

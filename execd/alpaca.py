@@ -31,8 +31,9 @@ possibility this module is honest about.
 ``paper`` is ``paper-api.alpaca.markets`` — Alpaca's own simulated venue, so
 unlike Schwab the service does not wrap this broker in its paper book; the
 orders go to Alpaca's paper account. ``live`` is ``api.alpaca.markets``. The
-venue is fixed at construction from ``/etc/execd/mode``, and the credential
-the passphrase puts in memory carries its own venue; a paper key offered to
+venue is fixed at construction from the instance's mode file
+(``/etc/execd-alpaca/mode``), and the credential the passphrase puts in
+memory carries its own venue; a paper key offered to
 the live venue, or a live key to paper, is refused before any call. So live
 Alpaca sits behind the same three gates as live Schwab: the mode file Steve
 writes, his passphrase, and the bounds.

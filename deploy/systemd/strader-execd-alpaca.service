@@ -1,0 +1,72 @@
+[Unit]
+# execd, the ALPACA instance — the twin of strader-execd.service (the Schwab
+# instance). [co-8mb1z; Steve 2026-09-24: "I need sep forms for Alpaca and
+# Schwab. I'll be wanting to create and manage positions in both throughout
+# the day."]
+#
+# Same installed code (/opt/execd, put there only by `bash deploy/install.sh
+# --execd`, which Steve runs), same service user, and nothing else shared that
+# either instance writes:
+#
+#   state   /var/lib/execd-alpaca   its own journal, STOP file, arming
+#   config  /etc/execd-alpaca       its own bounds.yaml and mode (paper|live)
+#   ports   127.0.0.1:8780 the narrow door, 127.0.0.1:8781 the page
+#   page    /exec-alpaca, published tailnet-only by
+#           tailscale serve --bg --set-path /exec-alpaca http://127.0.0.1:8781/exec-alpaca
+#
+# It READS the one vault (/var/lib/execd/vault.json, its alpaca section) and
+# the Schwab market grant (/var/lib/execd/market.json — Alpaca publishes no
+# index data) and writes neither: ReadWritePaths names only its own state, so
+# under ProtectSystem=strict both files are read-only to this process, and its
+# page refuses re-authorisation. The Schwab instance is the one writer.
+#
+# Its daily limits are its own: a loss here does not count against the
+# Schwab instance's ceiling, nor the reverse. Flat-by-close (14:55 CT) and
+# SPX/SPXW-only come from its own bounds file, seeded from the same example.
+Description=Strader execd ALPACA — live execution service (loopback 8780; page 8781)
+Documentation=https://github.com/justSteve/Strader
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/opt/execd/INSTALLED
+ConditionPathIsDirectory=/var/lib/execd-alpaca
+
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=exec
+User=execd
+Group=execd
+WorkingDirectory=/opt/execd
+UMask=0077
+ExecStart=/opt/execd/venv/bin/python -m execd --alpaca \
+    --vault /var/lib/execd/vault.json \
+    --market-credential /var/lib/execd/market.json \
+    --state-dir /var/lib/execd-alpaca \
+    --bounds /etc/execd-alpaca/bounds.yaml \
+    --mode-file /etc/execd-alpaca/mode \
+    --port 8780 \
+    --page-port 8781 \
+    --page-prefix /exec-alpaca \
+    --callback-url https://127.0.0.1:8182
+Restart=always
+RestartSec=3s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strader-execd-alpaca
+KillSignal=SIGINT
+TimeoutStopSec=15
+
+# Hardening: the Schwab unit's, with its own state as the only writable path.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/execd-alpaca
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

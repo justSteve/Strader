@@ -63,7 +63,8 @@ from .intent import OrderIntent
 from .orderform import (SEND_NONCE_TTL_S, Selection, intent_for, limit_at, parse_leg_text, price,
                         stamp)
 from .orderpage import (balances_html, journal_html, position_html, send_fields_html,
-                        quote_html, render_order, state_html, strikes_html, ticket_html)
+                        quote_html, render_order, state_html, strikes_html, ticket_html,
+                        broker_badge)
 from .service import CONTRACT_MULTIPLIER, ExecService, Refused
 from .vault import BadPassphrase, Vault, VaultError, VaultMissing
 
@@ -234,7 +235,8 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 http_client: Any | None = None,
                 clock: Callable[[], datetime] = _utcnow,
                 monotonic: Callable[[], float] = time.monotonic,
-                unlock_payload: Callable[[Mapping[str, Any]], Any] | None = None) -> Flask:
+                unlock_payload: Callable[[Mapping[str, Any]], Any] | None = None,
+                prefix: str = "/exec", grants: bool = True) -> Flask:
     """Build the page app. ``vault`` is the path (or a :class:`Vault`) the
     trading credential lives in; ``market`` the market credential file, if
     the service holds one; ``http_client`` is for tests (an ``httpx.Client``
@@ -245,11 +247,23 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
     opened vault; absent, it is the Schwab trading credential, as it always
     was. The Alpaca broker passes its own (co-8mb1z), and then a Schwab
     trading re-authorisation is stored in the vault but never swapped into
-    memory, where it would replace the Alpaca keys the service is armed with."""
+    memory, where it would replace the Alpaca keys the service is armed with.
+
+    ``prefix`` is where the page lives: ``/exec`` for the Schwab instance,
+    ``/exec-alpaca`` for the Alpaca one (co-8mb1z, two instances side by
+    side). Every link, form and poll is built by ``url_for`` under it, so a
+    page never posts into the other instance's.
+
+    ``grants`` says whether this page may write the Schwab grants — the
+    trading token into the vault and the market token into its file. Only
+    one instance may, or two would race on one file: the Schwab instance
+    does, the Alpaca instance does not (its unit also has both files
+    read-only). With ``grants`` off, re-authorisation is refused in words and
+    its form is not shown."""
     vault = vault if isinstance(vault, Vault) else Vault(vault)
     nonces = _Nonces(monotonic)
     app = Flask("execd-page")
-    bp = Blueprint("exec", __name__, url_prefix="/exec")
+    bp = Blueprint("exec", __name__, url_prefix=prefix)
 
     def client():
         return http_client if http_client is not None else new_client()
@@ -326,7 +340,8 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         """Arming, STOP/clear, stand down, lock, the weekly re-authorisation,
         the grants, the journal tail — everything that is not placing an order."""
         return _render_index(service, vault, market, clock, _actions(),
-                             msg=request.args.get("msg"), bad=request.args.get("bad"))
+                             msg=request.args.get("msg"), bad=request.args.get("bad"),
+                             grants=grants)
 
     @bp.post("/unlock")
     def unlock():
@@ -427,6 +442,14 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                     f"read the journal below.")
 
     # ── re-authorisation ──────────────────────────────────────────────
+    @bp.before_request
+    def grants_only_where_they_are_written():
+        """The one-writer rule for the Schwab grants (see ``grants`` above)."""
+        if grants or not (request.endpoint or "").startswith("exec.reauth_"):
+            return None
+        return home("Schwab grants are re-authorised on the Schwab page (/exec/account); "
+                    "this instance only reads them. Nothing changed.", bad=True)
+
     @bp.post("/reauth/link")
     def reauth_link():
         which = request.form.get("app", "")
@@ -889,6 +912,9 @@ _STYLE = """
  .staterow{display:flex;align-items:center;gap:.6em}
  .badge{font-weight:700;font-size:.8em;padding:4px 8px;border-radius:6px;letter-spacing:.04em}
  .badge.paper{background:#fbbf24;color:#111}.badge.live{background:#dc2626;color:#fff}
+ .badge.broker{font-size:1.25em;padding:6px 14px;margin-right:8px;letter-spacing:.08em;border:2px solid #fff}
+ .badge.schwab{background:#1d4ed8;color:#fff}.badge.alpaca{background:#15803d;color:#fff}
+ .badge.mock{background:#4b5563;color:#fff}
  .stop-on{color:#f87171;font-weight:700}
  .k{color:#9ca3af;font-size:.9em}
  .big{display:block;width:100%;padding:.9em;font-size:1.25em;border-radius:12px;border:0;
@@ -1028,7 +1054,7 @@ def unlock_form(action: str, back: str | None = None) -> str:
 
 def _render_index(service: ExecService, vault: Vault, market: CredentialFile | None,
                   clock: Callable[[], datetime], a: dict[str, str], *,
-                  msg: str | None, bad: str | None) -> str:
+                  msg: str | None, bad: str | None, grants: bool = True) -> str:
     st = service.status()
     arming = st["arming"]
     state = arming["state"]
@@ -1052,7 +1078,7 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     mode = str(st.get("mode", "live"))
     mode_badge = ("<span class='badge paper'>PAPER</span>" if mode == "paper"
                   else "<span class='badge live'>LIVE</span>")
-    parts.append(f"<div class=card><div class=staterow>{mode_badge}"
+    parts.append(f"<div class=card><div class=staterow>{broker_badge(st)}{mode_badge}"
                  f"<span class='state {state}'>{state.replace('_', ' ')}</span>"
                  f"<span class=k>{esc(sub)}</span></div>{stop_line}"
                  f"<div class=k>service {esc(st['sha'])}</div></div>")
@@ -1110,14 +1136,15 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     # "Still don't need 'GRANTS' section"; the walls are the service's to
     # alert on, [ALERT] one line, not a table for him to read)
     parts.append(wall_alert_html(st, service.clock()))
-    parts.append(
-        "<details><summary>re-authorise (weekly)</summary>"
-        f"<div class=card><form method=post action='{a['reauth_link']}'>"
-        "<label><input type=radio name=app value=trading checked> trading</label> &nbsp; "
-        "<label><input type=radio name=app value=market> market data</label>"
-        "<input type=password name=passphrase placeholder='passphrase' "
-        "autocomplete=current-password required style='margin-top:.5em'>"
-        "<button class='big quiet'>login link</button></form></div></details>")
+    if grants:
+        parts.append(
+            "<details><summary>re-authorise (weekly)</summary>"
+            f"<div class=card><form method=post action='{a['reauth_link']}'>"
+            "<label><input type=radio name=app value=trading checked> trading</label> &nbsp; "
+            "<label><input type=radio name=app value=market> market data</label>"
+            "<input type=password name=passphrase placeholder='passphrase' "
+            "autocomplete=current-password required style='margin-top:.5em'>"
+            "<button class='big quiet'>login link</button></form></div></details>")
 
     # ── journal ──
     tail = service.journal.tail(12)

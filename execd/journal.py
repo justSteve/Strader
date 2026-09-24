@@ -51,13 +51,18 @@ class Journal:
     """One directory of ``YYYY-MM-DD.jsonl`` files, named by Central date."""
 
     def __init__(self, directory: str | Path, sha: str = "unknown",
-                 clock: Callable[[], datetime] = _utcnow, mode: str = "live") -> None:
+                 clock: Callable[[], datetime] = _utcnow, mode: str = "live",
+                 broker: str = "") -> None:
         self.dir = Path(directory)
         self.dir.mkdir(parents=True, exist_ok=True)
         self.sha = sha or "unknown"
         #: ``paper`` or ``live`` — on every line, so a simulated fill can
         #: never be read back as a real one (st-k6gl).
         self.mode = mode
+        #: ``schwab`` or ``alpaca`` when the service knows — on every line, so
+        #: a journal read back names the broker that acted (co-8mb1z: two
+        #: instances run side by side, one per broker).
+        self.broker = broker
         self.clock = clock
         self._lock = threading.Lock()
 
@@ -79,6 +84,8 @@ class Journal:
             "sha": self.sha,
             "mode": self.mode,
         }
+        if self.broker:
+            line["broker"] = self.broker
         line.update({k: _plain(v) for k, v in fields.items()})
         payload = json.dumps(line, separators=(",", ":"), sort_keys=False)
         path = self.path_for(now.astimezone(CT).date())
