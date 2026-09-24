@@ -1001,12 +1001,29 @@ def unlock_form(action: str, back: str | None = None) -> str:
     """The passphrase box and UNLOCK — on the account page, and on the
     trading page whenever the service is LOCKED (Steve, 2026-09-15: "if panel
     is locked the Passphrase should be displayed"). ``back=order`` brings the
-    answer to the trading page."""
+    answer to the trading page.
+
+    Enter submits it (a lone form with a submit button), but the answer can
+    take seconds — unlock reconciles with the broker before it returns — and
+    on 2026-09-24 a page that showed nothing while it waited read as Enter
+    doing nothing, and UNLOCK was clicked twice more (three unlocks in the
+    journal in 13 s). So the moment it is sent the button says UNLOCKING…
+    and goes dead, and a second submit is swallowed. The box is made
+    read-only, not disabled: a disabled input is not sent."""
     back_field = f"<input type=hidden name=back value='{esc(back)}'>" if back else ""
-    return (f"<form method=post action='{action}'>{back_field}"
+    return (f"<form method=post action='{action}' class=unlockform>{back_field}"
             "<input type=password name=passphrase placeholder='passphrase' "
-            "autocomplete=current-password required>"
-            "<button class='big arm'>UNLOCK</button></form>")
+            "autocomplete=current-password enterkeyhint=go required>"
+            "<button class='big arm'>UNLOCK</button></form>"
+            "<script>(function(){var f=document.currentScript.previousElementSibling;"
+            "f.addEventListener('submit',function(e){if(f.__sent){e.preventDefault();return;}"
+            "f.__sent=true;var b=f.querySelector('button'),p=f.elements['passphrase'];"
+            "if(p)p.readOnly=true;if(b){b.disabled=true;b.textContent='UNLOCKING…';}});"
+            # a page brought back by the browser's Back button keeps its
+            # script state: give it a live button again
+            "window.addEventListener('pageshow',function(e){if(!e.persisted)return;f.__sent=false;"
+            "var b=f.querySelector('button'),p=f.elements['passphrase'];"
+            "if(p)p.readOnly=false;if(b){b.disabled=false;b.textContent='UNLOCK';}});})();</script>")
 
 
 def _render_index(service: ExecService, vault: Vault, market: CredentialFile | None,

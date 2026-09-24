@@ -605,6 +605,9 @@ class TestLockedInPlaceAndFewerWords:
         after = body[strip_end:strip_end + 400]
         assert "action='/exec/unlock'" in after and "name=back value='order'" in after
         assert "name=passphrase" in after and ">UNLOCK<" in after
+        # Enter submits, and the page shows it is working at once, so a slow
+        # answer is not read as Enter doing nothing (2026-09-24)
+        assert "enterkeyhint=go" in after and "class=unlockform" in body and "UNLOCKING…" in body
         assert "account page" not in body and "account:" not in body and "unlock on" not in body
         r = c.post("/exec/unlock", data={"passphrase": PASS, "back": "order"})
         assert r.status_code == 303 and r.headers["Location"].startswith("/exec/order")
