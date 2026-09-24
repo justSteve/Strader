@@ -34,6 +34,14 @@ must not try. The floor is 8 characters and spaces inside are allowed
 refresh-token wall and nothing else — the way to confirm a vault before the
 plaintext token is retired.
 
+``--add-alpaca`` (co-8mb1z) opens an existing vault with the passphrase and
+adds or replaces its ``alpaca`` section from the ``ALPACA_PAPER_*`` and
+``ALPACA_LIVE_*`` pairs in the vault file ``.env`` points at (put there by
+``vault-set.py Strader <NAME>``). The Schwab section is left exactly as it
+was. It says which venues it found — never a value.
+
+    .venv/bin/python scripts/execd_vault_init.py --vault /var/lib/execd/vault.json --add-alpaca
+
 This script imports ``execd.vault`` and ``execd.schwab`` for the payload shape.
 It imports neither ``schwab`` nor ``broker_schwab``; the gate hook does not
 apply to it, and it makes no network call.
@@ -53,7 +61,13 @@ sys.path.insert(0, str(REPO))
 
 from execd.schwab import VAULT_VERSION, Credential, trading_payload  # noqa: E402
 from execd.vault import BadPassphrase, Vault, VaultError  # noqa: E402
-from strader.settings import load_schwab_trading  # noqa: E402
+from strader.settings import load_alpaca, load_schwab_trading  # noqa: E402
+
+#: vault-file names → the venue they belong to, in the vault's alpaca section.
+ALPACA_NAMES = {
+    "paper": ("ALPACA_PAPER_API_KEY_ID", "ALPACA_PAPER_API_SECRET_KEY"),
+    "live": ("ALPACA_LIVE_API_KEY_ID", "ALPACA_LIVE_API_SECRET_KEY"),
+}
 
 
 def _token_path(cfg: dict[str, str]) -> Path:
@@ -137,11 +151,81 @@ def check(vault_path: Path) -> int:
     return 0
 
 
+def alpaca_section(cfg: dict[str, str]) -> dict[str, dict[str, str]]:
+    """The venues whose key pair is complete in ``cfg``. A half pair is an
+    error, not a venue: it would arm a service that cannot authenticate."""
+    out: dict[str, dict[str, str]] = {}
+    for venue, (kid, secret) in ALPACA_NAMES.items():
+        have = [n for n in (kid, secret) if cfg.get(n)]
+        if len(have) == 1:
+            raise ValueError(f"only {have[0]} is in the vault file; {venue} needs both "
+                             f"{kid} and {secret}")
+        if have:
+            out[venue] = {"key_id": cfg[kid], "secret_key": cfg[secret]}
+    return out
+
+
+def add_alpaca(vault_path: Path) -> int:
+    vault = Vault(vault_path)
+    if not vault.exists:
+        print(f"no vault at {vault_path}; write it first (this script without --add-alpaca)",
+              file=sys.stderr)
+        return 1
+    try:
+        section = alpaca_section(load_alpaca())
+    except ValueError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 1
+    if not section:
+        print("no Alpaca keys in the vault file — run vault-set.py Strader "
+              "ALPACA_PAPER_API_KEY_ID (and its secret) first", file=sys.stderr)
+        return 1
+    # The installed vault belongs to the service user; this runs as root, and
+    # the atomic rename would otherwise hand the file to root and lock the
+    # service out of its own credential.
+    before = vault_path.stat()
+    pw = _ask("passphrase: ")
+    try:
+        payload = vault.load(pw)
+        envelope = dict(payload)
+        if "trading" not in envelope:
+            # a v1 vault: the whole payload is the Schwab credential
+            envelope = {"version": VAULT_VERSION, "trading": payload}
+        envelope["alpaca"] = section
+        info = vault.store(envelope, pw)
+    except BadPassphrase:
+        print("the vault did not open; nothing changed", file=sys.stderr)
+        return 3
+    except VaultError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        del pw
+    os.chmod(vault_path, 0o600)
+    try:
+        os.chown(vault_path, before.st_uid, before.st_gid)
+    except PermissionError:
+        print(f"could not restore the vault's owner ({before.st_uid}:{before.st_gid}); "
+              f"chown it back before the service restarts", file=sys.stderr)
+    print(f"alpaca section written: {', '.join(sorted(section))}; vault {info.size_bytes} bytes")
+    missing = sorted(set(ALPACA_NAMES) - set(section))
+    if missing:
+        print(f"not in the vault file, so not added: {', '.join(missing)}")
+    print("next: installExecd, then UNLOCK on the page")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--vault", required=True, type=Path)
-    p.add_argument("--check", action="store_true", help="open an existing vault and report its wall")
+    which = p.add_mutually_exclusive_group()
+    which.add_argument("--check", action="store_true",
+                       help="open an existing vault and report its wall")
+    which.add_argument("--add-alpaca", action="store_true",
+                       help="add Alpaca's paper/live keys from the vault file to this vault")
     args = p.parse_args(argv)
+    if args.add_alpaca:
+        return add_alpaca(args.vault)
     return check(args.vault) if args.check else init(args.vault)
 
 

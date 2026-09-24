@@ -1,6 +1,6 @@
 """``python -m execd`` — run the service. [st-eznu, st-w2nw, st-p8k8]
 
-Two brokers, and the choice is explicit or the process refuses to start: a
+Three brokers, and the choice is explicit or the process refuses to start: a
 process called ``execd`` that started quietly and turned out to be talking to
 nothing — or to the wrong thing — would be worse than one that would not
 start.
@@ -8,6 +8,17 @@ start.
     .venv/bin/python -m execd --mock --state-dir /tmp/execd --mock-unlock
     .venv/bin/python -m execd --schwab --vault /var/lib/execd/vault.json \
         --market-credential /var/lib/execd/market.json --state-dir /var/lib/execd
+    .venv/bin/python -m execd --alpaca --vault /var/lib/execd/vault.json \
+        --market-credential /var/lib/execd/market.json --state-dir /var/lib/execd
+    .venv/bin/python -m execd --broker-file /etc/execd/broker ...   # the unit's form
+
+``--alpaca`` (co-8mb1z) sends orders to Alpaca: its paper venue when Steve's
+mode file says ``paper`` (Alpaca's own simulated account — not execd's paper
+book), its live venue when it says ``live``. Quotes, chains and the readers'
+market door still come from the Schwab market credential, because Alpaca
+publishes no index data. ``--broker-file`` reads ``schwab`` or ``alpaca`` from
+Steve's file; the installed unit uses it so switching brokers is a one-word
+edit and a re-install, never a code change.
 
 ``--schwab`` (stage 2, st-w2nw) starts the service LOCKED against the real
 Trader API. Nothing arms it but Steve's passphrase: on its tailnet page
@@ -37,6 +48,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import threading
 
@@ -45,6 +57,7 @@ from .bounds import load_bounds
 from .broker import MockBroker
 from .page import DEFAULT_CALLBACK_URL, PAGE_HOST, PAGE_PORT, CredentialFile, create_page
 from .schwab import Credential, SchwabBroker, trading_payload
+from .alpaca import AlpacaBroker, AlpacaCredential, alpaca_payload
 from .service import ExecService, ServiceConfig
 from .paper import PaperBroker, read_mode
 from .vault import BadPassphrase, Vault, VaultError
@@ -52,6 +65,19 @@ from .watch import INTERVAL_S as WATCH_INTERVAL_S, Watcher
 
 #: Steve's mode file: ``paper`` or ``live``. Absent means paper.
 DEFAULT_MODE_FILE = "/etc/execd/mode"
+
+#: The brokers ``--broker-file`` may name. No default: an absent or unknown
+#: word is a refusal to start.
+BROKER_WORDS = ("schwab", "alpaca")
+
+
+def read_broker(path: str | Path) -> str:
+    """``schwab`` or ``alpaca`` from Steve's broker file. Absent or anything
+    else raises — unlike the mode file there is no safe default broker."""
+    word = Path(path).read_text(encoding="utf-8").strip().lower()
+    if word not in BROKER_WORDS:
+        raise ValueError(f"{path}: expected one of {', '.join(BROKER_WORDS)}, found {word!r}")
+    return word
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_VAULT = "/var/lib/execd/vault.json"
@@ -143,8 +169,15 @@ def build_parser() -> argparse.ArgumentParser:
                        help="run against the deterministic MockBroker")
     which.add_argument("--schwab", action="store_true",
                        help="run against the Schwab Trader API; starts locked (stage 2)")
+    which.add_argument("--alpaca", action="store_true",
+                       help="run against Alpaca's Trading API — its paper venue in paper "
+                            "mode, live in live mode; starts locked (co-8mb1z)")
+    which.add_argument("--broker-file", default=None,
+                       help="read the broker ('schwab' or 'alpaca') from this file — "
+                            "Steve's, like the mode file; absent is a refusal")
     p.add_argument("--vault", default=DEFAULT_VAULT,
-                   help="the encrypted trading credential, for --schwab (default: %(default)s)")
+                   help="the encrypted trading credential, for --schwab and --alpaca "
+                        "(default: %(default)s)")
     p.add_argument("--market-credential", default=None,
                    help="the market-data app's credential file (0600, owned by the "
                         "service user). Held outside the arming lock so quotes and "
@@ -193,9 +226,18 @@ def main(argv: list[str] | None = None) -> int:
     except SystemExit as exc:      # argparse's own refusal (e.g. --mock with --schwab)
         return 2 if exc.code else 0
 
-    if not args.mock and not args.schwab:
-        print("execd: choose a broker — --mock (deterministic, no network) or --schwab "
-              "(the Trader API, starts locked). Neither is a default.", file=sys.stderr)
+    if args.broker_file:
+        try:
+            word = read_broker(args.broker_file)
+        except (OSError, ValueError) as exc:
+            print(f"execd: broker file unusable — {exc}. Write 'schwab' or 'alpaca' there.",
+                  file=sys.stderr)
+            return 2
+        args.schwab, args.alpaca = word == "schwab", word == "alpaca"
+
+    if not args.mock and not args.schwab and not args.alpaca:
+        print("execd: choose a broker — --mock (deterministic, no network), --schwab "
+              "or --alpaca (both start locked). None is a default.", file=sys.stderr)
         return 2
 
     if args.host != BIND_HOST:
@@ -205,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 2
 
-    if args.schwab and not Path(args.vault).is_file():
+    if (args.schwab or args.alpaca) and not Path(args.vault).is_file():
         if not args.market_credential:
             print(f"execd: --schwab needs the vault at {args.vault} and there is none. "
                   f"scripts/execd_vault_init.py writes one (Steve's passphrase).",
@@ -226,6 +268,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     config = ServiceConfig(state_dir=Path(args.state_dir), bounds=bounds,
                            sha=installed_sha(), mode=mode)
+    market: CredentialFile | None = None
+    if args.alpaca:
+        return _run_alpaca(args, config, bounds, mode)
     broker = MockBroker() if args.mock else SchwabBroker(underlying=config.index_symbol,
                                                           roots=bounds.instruments)
     # `broker` stays the transport — bound, checked, printed below as before.
@@ -234,7 +279,6 @@ def main(argv: list[str] | None = None) -> int:
     service_broker = (PaperBroker(broker, book_path=Path(args.state_dir) / "paper-book.json")
                       if mode == "paper" else broker)
     service = ExecService(service_broker, config)
-    market: CredentialFile | None = None
     if isinstance(broker, SchwabBroker):
         broker.bind(service.arming)
         if args.market_credential:
@@ -294,6 +338,13 @@ def main(argv: list[str] | None = None) -> int:
               "orders fill in a simulated book against live quotes and never reach "
               f"Schwab. To go live: write 'live' to {args.mode_file} and restart.",
               file=sys.stderr)
+    _serve(args, service, market)
+    return 0
+
+
+def _serve(args: argparse.Namespace, service: ExecService, market: CredentialFile | None,
+           unlock_payload: Any = None) -> None:
+    """The watcher, the page and the API — the same for every broker."""
     if args.watch_interval > 0:
         # The loop that watches a live position: fills picked up, the SPX-mark
         # exit fired. Without it a fill rests its broker stop and then sits
@@ -305,7 +356,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_page:
         page = create_page(service, vault=args.vault, market=market,
                            callback_url=args.callback_url,
-                           state_dir=args.state_dir)
+                           state_dir=args.state_dir, unlock_payload=unlock_payload)
         threading.Thread(
             target=lambda: page.run(host=PAGE_HOST, port=args.page_port, threaded=True),
             name="execd-page", daemon=True).start()
@@ -313,6 +364,75 @@ def main(argv: list[str] | None = None) -> int:
               f"--bg --set-path /exec http://{PAGE_HOST}:{args.page_port}/exec",
               file=sys.stderr)
     create_app(service).run(host=BIND_HOST, port=args.port, threaded=True)
+
+
+def _run_alpaca(args: argparse.Namespace, config: ServiceConfig, bounds: Any,
+                mode: str) -> int:
+    """``--alpaca``: orders to Alpaca, market data from Schwab's market app.
+
+    The venue IS the mode: ``paper`` → Alpaca's paper venue, ``live`` → live.
+    There is no execd paper book over Alpaca, because Alpaca's paper venue is
+    already a simulated account and wrapping it would mean nothing reached
+    Alpaca at all. The live venue therefore sits behind exactly the gates the
+    live Schwab path does: Steve's mode file, his passphrase, the bounds."""
+    venue = mode
+    if args.mock_unlock:
+        print("execd: --mock-unlock arms only the mock broker. A real broker "
+              "is armed by Steve's passphrase, never by a flag.", file=sys.stderr)
+        return 2
+    market: CredentialFile | None = None
+    data: SchwabBroker | None = None
+    if args.market_credential:
+        try:
+            market = load_market_credential(args.market_credential)
+        except (OSError, ValueError) as exc:
+            print(f"execd: the market credential at {args.market_credential} "
+                  f"is unusable: {exc}", file=sys.stderr)
+            return 2
+        # Market data only: bound to the market credential and NEVER to the
+        # arming state, whose credential is Alpaca's. Nothing here can reach
+        # /trader/v1 — the market credential cannot trade.
+        data = SchwabBroker(underlying=config.index_symbol, roots=bounds.instruments)
+        data.bind_market(market.current)
+    else:
+        print("execd: no --market-credential; there is no $SPX mark and no SPX chain "
+              "(Alpaca publishes no index data), so the exit loop and the order page "
+              "cannot price. Quotes for equities and crypto come from Alpaca.",
+              file=sys.stderr)
+    broker = AlpacaBroker(venue, market=data, roots=bounds.instruments)
+    service = ExecService(broker, config)
+    broker.bind(service.arming)
+
+    def unlock_payload(vault_payload: Any) -> dict[str, Any]:
+        return alpaca_payload(vault_payload, venue)
+
+    if args.unlock_stdin:
+        try:
+            payload = unlock_payload(Vault(args.vault).load(_read_passphrase()))
+            AlpacaCredential.from_payload(payload)
+        except BadPassphrase:
+            print("execd: the vault did not open.", file=sys.stderr)
+            return 3
+        except (VaultError, ValueError) as exc:
+            print(f"execd: the vault opened but cannot be used: {exc}", file=sys.stderr)
+            return 3
+        try:
+            service.unlock(payload)
+        except Exception as exc:  # a Refused (after the close) is reported, not hidden
+            print(f"execd: unlock refused — {exc}", file=sys.stderr)
+            return 3
+        print(f"execd: armed until {service.arming.expires_at}", file=sys.stderr)
+
+    print(f"execd {config.sha} on {BIND_HOST}:{args.port} — broker=alpaca, venue={venue}, "
+          f"mode={mode}, state={config.state_dir}, arming={service.arming.state.value}",
+          file=sys.stderr)
+    if venue == "paper":
+        print("execd ALPACA PAPER: orders go to Alpaca's paper account, not to money. "
+              f"To go live: write 'live' to {args.mode_file} and re-install.", file=sys.stderr)
+    else:
+        print("execd ALPACA LIVE: orders go to Alpaca's live account once Steve unlocks.",
+              file=sys.stderr)
+    _serve(args, service, market, unlock_payload=unlock_payload)
     return 0
 
 

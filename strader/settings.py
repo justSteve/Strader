@@ -107,6 +107,27 @@ def load_schwab_trading_auth(
     return cfg
 
 
+# Alpaca's key pairs, one per venue (co-8mb1z). Only execd uses these, and only
+# through its own passphrase vault: scripts/execd_vault_init.py --add-alpaca
+# copies them in. Optional here because either venue may be absent — the
+# script says which it found and which it did not.
+ALPACA_FIELDS: tuple[Field, ...] = (
+    Field("ALPACA_PAPER_API_KEY_ID", required=False, secret=True,
+          validators=(no_comment_residue, no_whitespace)),
+    Field("ALPACA_PAPER_API_SECRET_KEY", required=False, secret=True,
+          validators=(no_comment_residue, no_whitespace)),
+    Field("ALPACA_LIVE_API_KEY_ID", required=False, secret=True,
+          validators=(no_comment_residue, no_whitespace)),
+    Field("ALPACA_LIVE_API_SECRET_KEY", required=False, secret=True,
+          validators=(no_comment_residue, no_whitespace)),
+)
+
+
+def load_alpaca(env_path: str | os.PathLike[str] = DEFAULT_ENV_PATH) -> dict[str, str]:
+    """Alpaca's paper and live key pairs, whichever the vault file holds."""
+    return load(ALPACA_FIELDS, env_path=env_path, apply_to_environ=False)
+
+
 # Databento market-data API key (single token, comment-immune).
 DATABENTO_FIELDS: tuple[Field, ...] = (
     Field("DATABENTO_API_KEY", secret=True, validators=(non_empty, no_comment_residue, no_whitespace)),

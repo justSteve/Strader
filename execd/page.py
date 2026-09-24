@@ -233,12 +233,19 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 state_dir: str | Path | None = None,
                 http_client: Any | None = None,
                 clock: Callable[[], datetime] = _utcnow,
-                monotonic: Callable[[], float] = time.monotonic) -> Flask:
+                monotonic: Callable[[], float] = time.monotonic,
+                unlock_payload: Callable[[Mapping[str, Any]], Any] | None = None) -> Flask:
     """Build the page app. ``vault`` is the path (or a :class:`Vault`) the
     trading credential lives in; ``market`` the market credential file, if
     the service holds one; ``http_client`` is for tests (an ``httpx.Client``
     over a mock transport) — production builds its own from the transport
-    module."""
+    module.
+
+    ``unlock_payload`` picks the credential UNLOCK puts in memory out of the
+    opened vault; absent, it is the Schwab trading credential, as it always
+    was. The Alpaca broker passes its own (co-8mb1z), and then a Schwab
+    trading re-authorisation is stored in the vault but never swapped into
+    memory, where it would replace the Alpaca keys the service is armed with."""
     vault = vault if isinstance(vault, Vault) else Vault(vault)
     nonces = _Nonces(monotonic)
     app = Flask("execd-page")
@@ -325,8 +332,11 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
     def unlock():
         pw = passphrase()
         try:
-            payload = trading_payload(open_vault(pw), state_dir)
-            Credential.from_payload(payload)
+            if unlock_payload is None:
+                payload = trading_payload(open_vault(pw), state_dir)
+                Credential.from_payload(payload)
+            else:
+                payload = unlock_payload(open_vault(pw))
             status = service.unlock(payload)
         except PageRefused as exc:
             return home(str(exc), bad=True)
@@ -454,7 +464,8 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 wrapped = exchange(c, source.app_key, source.secret,
                                    _callback(source, callback_url), code)
                 verify_grant(c, target, wrapped)
-            wall = _store_grant(service, vault, market, target, payload, wrapped, pw)
+            wall = _store_grant(service, vault, market, target, payload, wrapped, pw,
+                                in_memory=unlock_payload is None)
         except PageRefused as exc:
             return home(str(exc), bad=True)
         except ValueError as exc:
@@ -831,7 +842,7 @@ def _callback(source: _Source, default: str) -> str:
 
 def _store_grant(service: ExecService, vault: Vault, market: CredentialFile | None,
                  target: App, vault_payload: Mapping[str, Any], wrapped: Mapping[str, Any],
-                 pw: str) -> datetime:
+                 pw: str, *, in_memory: bool = True) -> datetime:
     """Store a verified grant where its app's credential lives, and if the
     service is armed, put the new trading credential into memory too. Journals
     the event with the app and its new wall — never a value."""
@@ -843,13 +854,14 @@ def _store_grant(service: ExecService, vault: Vault, market: CredentialFile | No
         envelope["trading"] = trading
         vault.store(envelope, pw)
         wall = Credential.from_payload(trading).refresh_wall
-        if service.arming.state is not ArmState.LOCKED:
+        swapped = in_memory and service.arming.state is not ArmState.LOCKED
+        if swapped:
             try:
                 service.arming.replace_credential(trading)
             except Locked:
-                pass
+                swapped = False
         service.journal.record("reauth", app=target.value, refresh_wall=wall,
-                               in_memory=service.arming.state is not ArmState.LOCKED)
+                               in_memory=swapped)
         return wall
     assert market is not None
     payload = dict(market.current())

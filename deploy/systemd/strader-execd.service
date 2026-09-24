@@ -9,6 +9,9 @@
 # the encrypted vault, the market credential, the journal, the STOP file. The
 # bounds are Steve's file at /etc/execd/bounds.yaml.
 #
+# The broker is Steve's file too: /etc/execd/broker says 'schwab' (seeded) or
+# 'alpaca' (co-8mb1z). Alpaca's venue follows /etc/execd/mode: paper or live.
+#
 # Two loopback ports, nothing else bound:
 #   127.0.0.1:8778  the narrow door — no unlock, no resume, no re-auth
 #   127.0.0.1:8779  Steve's page, published tailnet-only by
@@ -36,7 +39,7 @@ User=execd
 Group=execd
 WorkingDirectory=/opt/execd
 UMask=0077
-ExecStart=/opt/execd/venv/bin/python -m execd --schwab \
+ExecStart=/opt/execd/venv/bin/python -m execd --broker-file /etc/execd/broker \
     --vault /var/lib/execd/vault.json \
     --market-credential /var/lib/execd/market.json \
     --state-dir /var/lib/execd \

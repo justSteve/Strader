@@ -10,9 +10,10 @@ narrow, or the sentence stops being worth saying. So:
 
 - The service speaks to the broker over plain HTTPS in stage 2 and never
   imports the hobbled library. The hook keeps its meaning unchanged.
-- **Exactly one module carries a transport**: ``execd/schwab.py`` imports
-  ``httpx`` and nothing else in the package imports any transport at all
-  (stage 2, st-w2nw). The exemption is by file name and by library name, and
+- **Exactly two modules carry a transport**: ``execd/schwab.py`` (stage 2,
+  st-w2nw) and ``execd/alpaca.py`` (co-8mb1z, Steve 2026-09-23: "allow trading
+  against either Alpaca or Schwab") import ``httpx``, and nothing else in the
+  package imports any transport at all. The exemption is by file name and by library name, and
   a test asserts the exempted module really does import it, so the exemption
   cannot become a blanket by drift. ``urllib`` stays banned as a whole root
   even there — ``urllib.parse`` would be harmless, and ``urllib.request``
@@ -52,9 +53,10 @@ FORBIDDEN_TRANSPORTS = {"httpx", "requests", "urllib3", "socket", "aiohttp",
                         "urllib", "http", "http.client", "ftplib", "telnetlib",
                         "xmlrpc"}
 
-#: The one module allowed one transport. Stage 2 (st-w2nw): the Trader API
-#: client and nothing else. Widening this is a design change, not a fix.
-TRANSPORT_MODULE = "schwab.py"
+#: The modules allowed one transport. Stage 2 (st-w2nw): the Trader API
+#: client; co-8mb1z (2026-09-23): the Alpaca client, the design change Steve
+#: asked for. Widening this again is a design change, not a fix.
+TRANSPORT_MODULES = ("schwab.py", "alpaca.py")
 TRANSPORT_ALLOWED = {"httpx"}
 
 
@@ -101,20 +103,21 @@ def test_no_module_imports_the_hobbled_broker_library(path: Path):
 @pytest.mark.parametrize("path", modules(), ids=lambda p: p.name)
 def test_only_the_transport_module_has_a_transport(path: Path):
     found = imported_roots(path) & FORBIDDEN_TRANSPORTS
-    if path.name == TRANSPORT_MODULE:
+    if path.name in TRANSPORT_MODULES:
         found -= TRANSPORT_ALLOWED
     assert not found, (
         f"{path.name} imports {sorted(found)}. The only transport in this "
-        f"package is {sorted(TRANSPORT_ALLOWED)} in {TRANSPORT_MODULE} (st-w2nw); "
-        f"a second one is a design change, not a fix."
+        f"package is {sorted(TRANSPORT_ALLOWED)} in {', '.join(TRANSPORT_MODULES)}; "
+        f"another is a design change, not a fix."
     )
 
 
-def test_the_exemption_is_not_vacuous():
-    """The exempted module must actually import what it is exempted for —
+@pytest.mark.parametrize("name", TRANSPORT_MODULES)
+def test_the_exemption_is_not_vacuous(name: str):
+    """Each exempted module must actually import what it is exempted for —
     otherwise a rename leaves a hole that names a file no longer there."""
-    path = PACKAGE / TRANSPORT_MODULE
-    assert path.is_file(), f"{TRANSPORT_MODULE} is exempted but does not exist"
+    path = PACKAGE / name
+    assert path.is_file(), f"{name} is exempted but does not exist"
     assert imported_roots(path) & TRANSPORT_ALLOWED == TRANSPORT_ALLOWED
 
 
@@ -158,9 +161,9 @@ def test_importing_the_whole_package_loads_no_broker_library():
     )
 
 
-def test_there_are_exactly_two_brokers_and_each_lives_where_it_says():
-    """The mock in ``broker.py``, the Trader API client in ``schwab.py``, and
-    no third — a broker class appearing anywhere else is a transport that
+def test_there_are_exactly_three_brokers_and_each_lives_where_it_says():
+    """The mock in ``broker.py``, the Trader API client in ``schwab.py``, the
+    Alpaca client in ``alpaca.py`` (co-8mb1z), and no fourth — a broker class appearing anywhere else is a transport that
     escaped the exemption above."""
     import importlib
 
@@ -174,7 +177,7 @@ def test_there_are_exactly_two_brokers_and_each_lives_where_it_says():
                     and obj.__module__ == mod.__name__:
                 found[name] = path.name
     assert found == {"MockBroker": "broker.py", "SchwabBroker": "schwab.py",
-                     "PaperBroker": "paper.py"}
+                     "AlpacaBroker": "alpaca.py", "PaperBroker": "paper.py"}
     # The third is a wrapper, not a transport: it can reach Schwab only
     # through the one it wraps, and it carries no client of its own.
     import inspect

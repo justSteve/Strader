@@ -136,6 +136,19 @@ install_execd() {
         say "mode seeded at $EXECD_MODE: paper (write 'live' there and re-run the install to go live)"
     fi
 
+    # 5c. the broker file — 'schwab' or 'alpaca' (co-8mb1z). Seeded as schwab
+    #     once, then Steve's. The unit reads it with --broker-file; an absent
+    #     file or any other word and the service refuses to start.
+    EXECD_BROKER="$EXECD_ETC/broker"
+    if [[ -e "$EXECD_BROKER" ]]; then
+        say "broker file exists at $EXECD_BROKER: $(tr -d '[:space:]' < "$EXECD_BROKER") (yours; not touched)"
+    else
+        run bash -c "printf 'schwab\n' > '$EXECD_BROKER'"
+        run chown root:"$EXECD_USER" "$EXECD_BROKER"
+        run chmod 0640 "$EXECD_BROKER"
+        say "broker seeded at $EXECD_BROKER: schwab (write 'alpaca' there and re-run the install to switch)"
+    fi
+
     # 6. the market credential (app 1, cannot trade): assembled from the repo's
     #    .env and the current market token, plain JSON 0600, execd-owned. Only
     #    when absent — after this the page's re-authorisation rewrites it.

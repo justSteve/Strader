@@ -6,7 +6,8 @@ the token is hidden from agents, pasting is not the long-term transport.*
 This is that service. Epic **st-5qjq**; design of record
 `docs/a2a/2026-08-30-coo-to-strader-live-execution-service-plan.md`.
 
-**Stages 1, 2 and 3 are what is here.** Two brokers: `MockBroker` (stage 1,
+**Stages 1, 2 and 3 are what is here**, plus a third broker, Alpaca
+(co-8mb1z, below). The first two: `MockBroker` (stage 1,
 st-eznu) and `SchwabBroker` (stage 2, st-w2nw) — the Trader API over plain
 HTTPS in `execd/schwab.py`, the one module in the package that imports a
 transport. There is no plaintext credential on disk here (the vault holds
@@ -79,6 +80,8 @@ memory readers, the page port, stopping the unit. Hooks are Steve's to land.
 ```bash
 .venv/bin/python -m execd --mock --state-dir /var/lib/execd --mock-unlock
 .venv/bin/python -m execd --schwab --vault /etc/execd/vault.json --state-dir /var/lib/execd --unlock-stdin
+.venv/bin/python -m execd --alpaca --vault /var/lib/execd/vault.json --market-credential /var/lib/execd/market.json --state-dir /var/lib/execd
+.venv/bin/python -m execd --broker-file /etc/execd/broker ...   # what the installed unit runs
 ```
 
 A broker flag is required, and its absence is a refusal rather than a default:
@@ -367,6 +370,62 @@ filled reports the fill — the race the exit path is written to survive.
 `scripts/record_schwab_shapes.py` is the recorder: read-only, plain HTTPS,
 scrubs account identifiers at capture, writes `tests/fixtures/schwab/` with a
 `_capture.json` that says when and in what market state.
+
+## The Alpaca transport (co-8mb1z)
+
+`execd/alpaca.py`. Steve, 2026-09-23: *"Update Strader's codebase to allow
+trading against either Alpaca or Schwab."* `AlpacaBroker` is the third
+`Broker`; the service, the bounds, the bracket and the journal are the same
+code over it. The Schwab path is unchanged.
+
+**Choosing the broker.** `/etc/execd/broker` says `schwab` (seeded by the
+install) or `alpaca`; the unit runs `--broker-file /etc/execd/broker`, and an
+absent file or any other word is a refusal to start. Switching is a one-word
+edit and `installExecd`.
+
+**The venue is the mode.** With `alpaca`, `/etc/execd/mode` = `paper` sends to
+Alpaca's paper venue (`paper-api.alpaca.markets` — Alpaca's own simulated
+account, so execd's paper book is *not* wrapped over it) and `live` sends to
+`api.alpaca.markets`. The credential in memory carries its venue; a paper key
+offered to the live venue, or the reverse, is refused before any request. Live
+Alpaca therefore sits behind the same gates as live Schwab: the mode file, the
+passphrase, the bounds, STOP.
+
+**The keys.** Values live in `/home/vault/Strader/env` as
+`ALPACA_PAPER_API_KEY_ID` / `ALPACA_PAPER_API_SECRET_KEY` (and `ALPACA_LIVE_*`),
+put there by `vault-set.py Strader <NAME>`. `scripts/execd_vault_init.py
+--vault /var/lib/execd/vault.json --add-alpaca` copies them into the execd vault
+under the passphrase, beside the Schwab section, keeping the file's owner. The
+page's UNLOCK then arms the venue's pair. A Schwab trading re-authorisation
+while on Alpaca is stored in the vault but never swapped into memory.
+
+**Market data stays on Schwab.** Alpaca "does not currently provide index data
+through its Market Data offering" (Alpaca, 2026-09-02), so the `$SPX` mark, the
+chain and the readers' door come from the Schwab market credential
+(`--market-credential`), which cannot trade and is never bound to the arming
+state. Without it, equity and crypto quotes come from Alpaca's data API and an
+index quote is refused by name.
+
+**What Alpaca trades (read from Alpaca's pages 2026-09-23, not recorded).**
+Index options SPX, SPXW, VIX, VIXW, DJX, XSP are live on the Trading API since
+2026-09-02, $0.50/contract plus pass-through fees. Order types market, limit,
+stop, stop_limit; `day` or `gtc`. There is no preview endpoint: `preview` is
+computed here (price × multiplier + the $0.50 index fee, checked against
+`options_buying_power`) and says so in its messages. `client_order_id` is the
+intent id plus a short suffix, because Alpaca refuses a repeat and the service
+legitimately re-rests a stop under one intent id.
+
+**What the service will not send on Alpaca, and why.** Intents are OCC option
+symbols and the bounds allow SPX/SPXW only (`intent.py`: widening that is a
+wall-crossing decision). The transport itself builds equity and crypto orders
+(tested), but nothing reaches it through `/place` that is not an SPX option.
+
+**Not recorded.** Every Alpaca shape here is from the API reference; the first
+paper order is the first recording.
+
+```bash
+.venv/bin/python -m pytest tests/execd/test_alpaca.py -q   # no network
+```
 
 ## What comes next
 
