@@ -55,14 +55,12 @@ First full Monday-morning fire: **2026-08-03**.
 
 ## Risk Posture
 
-`config/risk.yaml` snapshots into `data/risk/<day>.json` at the 08:25 reset;
-the day trades against the snapshot, so edits take effect tomorrow. State flips
-to **HALTED** on a daily-loss breach.
-
-- Daily stop −$300 · max 2 open positions · escalation above $5,000 notional
-- Per-strategy: flies 3×$150 · ORB 1×$100 · scalps 3×$100
-- **`account_balance_usd` is `null`** — the 2%-per-trade cap is **unarmed**.
-  Every number above is Strader's graduated-sizing default, not Steve's ruling.
+No daily loss halt, no position cap, no per-strategy trade counts, no daily
+attempts and no time-of-day rule, anywhere that gates his trading — removed
+2026-09-24/25 on Steve's word (co-8mb1z): "make sure they are removed now and
+not restored in the future." `config/risk.yaml`, `runbook/risk_state.py` and
+its 08:25 reset are gone; the 08:25 pre-open heartbeat still runs without a
+risk check. `tests/execd/test_no_hand_holding.py` guards against their return.
 
 ## Execution Gate
 

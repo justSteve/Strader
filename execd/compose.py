@@ -1,9 +1,9 @@
-"""FD0 composition — pick the strike, price it, derive the stop from budget.
+"""FD0 composition — pick the strike, price it, derive the stop from a dollar loss.
 
 Design: ``docs/superpowers/specs/2026-08-02-fd0-flushdown-design.md``.
 Bead: Cut And Await (st-apzt), child of Coded Counter Wisdom (st-ug5).
 
-This module is pure. It takes a chain snapshot and a budget and returns a
+This module is pure. It takes a chain snapshot and a stop loss and returns a
 :class:`Ticket`; it opens no sockets, reads no credentials, and transmits no
 orders. The order-transmission wall is st-5ey's job and is not breached here —
 FD0 renders a string for Steve to paste, and nothing more.
@@ -19,11 +19,17 @@ FD0 renders a string for Steve to paste, and nothing more.
                      contract only so a mis-parsed chain is visible.
 ===================  ==========================================================
 
-The budget engine is the heart, and it runs backwards from the money rather
-than forwards from a chart: the stop distance is whatever the remaining risk
-budget can fund at the live delta. It is never a fixed number of points. Steve
-set that explicitly on 08-02 — his 0.60δ two-point sketch priced out at roughly
-3.6× the $100 ceiling, which is how the derivation ended up inverted.
+The stop runs backwards from the money rather than forwards from a chart:
+the stop distance is whatever the ticket's stop loss buys at the live delta.
+It is never a fixed number of points (Steve, 08-02).
+
+**No daily budget and no attempts** (co-8mb1z). Until 2026-09-25 the loss
+came from a $100 day split over two attempts — ``remaining / attempts_left``
+— and a third attempt was refused. Steve, 2026-09-17: "Let's just completely
+remove that complete calculation. I don't need that level of hand holding";
+2026-09-24: "make sure they are removed now and not restored in the future."
+The loss is now one number per ticket, :class:`StopLoss`, starting at his
+flat $20 (``DEFAULT_STOP_LOSS_USD``, the order form's own default, st-bafu).
 
 2026-08-23, the join with the intent dialect (st-79z.3): the engine now takes
 the contract the dialect chose (``compose(..., contract=)``) instead of always
@@ -43,15 +49,20 @@ from typing import Iterable, Literal, Sequence
 log = logging.getLogger(__name__)
 
 __all__ = [
-    "Contract", "Budget", "Derivation", "Ticket",
+    "Contract", "StopLoss", "Derivation", "Ticket", "DEFAULT_STOP_LOSS_USD",
     "parse_chain", "pick_strike", "derive", "noise_floor_spx", "compose",
     "order_string", "exit_fields", "template_fields", "stop_trigger",
-    "NoStrikeInBand", "CannotFund",
+    "NoStrikeInBand",
     "CONTRACT_MULTIPLIER", "DELTA_TARGET", "DELTA_BAND", "FEES_RT_USD",
 ]
 
 # One SPX option contract controls 100× the premium in dollars.
 CONTRACT_MULTIPLIER = 100
+
+#: What a ticket's stop loses, in dollars, before friction — Steve's flat $20
+#: (2026-09-17, st-bafu: "stop loss amount should initially be set to flat
+#: $20"). The order form reads the same constant.
+DEFAULT_STOP_LOSS_USD = 20.0
 
 DELTA_TARGET = 0.30
 DELTA_BAND = (0.25, 0.35)
@@ -78,12 +89,7 @@ def _usd(x: float) -> str:
 class NoStrikeInBand(Exception):
     """No contract sits inside the delta band. Compose refuses rather than
     reaching for the nearest strike outside it — a 0.5δ put doubles the dollar
-    risk per SPX point and silently breaks the budget derivation."""
-
-
-class CannotFund(Exception):
-    """The remaining budget cannot fund another attempt once friction is paid.
-    Carries the arithmetic so the refusal is auditable, per the design."""
+    risk per SPX point and silently breaks the stop derivation."""
 
 
 # ---------------------------------------------------------------- inputs ---
@@ -129,51 +135,26 @@ class Contract:
 
 
 @dataclass(frozen=True)
-class Budget:
-    """The hard ceiling. ``total_usd`` is realized loss, not notional."""
+class StopLoss:
+    """What this one ticket's stop may lose, in dollars, before friction.
+    One number per ticket; nothing carries over from one ticket to the next."""
 
-    total_usd: float = 100.0
-    attempts: int = 2
-    spent_usd: float = 0.0
-    attempts_used: int = 0
-
-    @property
-    def remaining_usd(self) -> float:
-        return self.total_usd - self.spent_usd
-
-    @property
-    def attempts_left(self) -> int:
-        return self.attempts - self.attempts_used
-
-    def debit(self, realized_loss_usd: float) -> "Budget":
-        """Book a closed attempt. Returns a new Budget — the ledger is a value,
-        so a mis-sequenced update cannot corrupt the running one in place."""
-        if realized_loss_usd < 0:
-            log.info("attempt closed for a gain of $%.2f — budget not debited",
-                     -realized_loss_usd)
-            realized_loss_usd = 0.0
-        return Budget(
-            total_usd=self.total_usd,
-            attempts=self.attempts,
-            spent_usd=self.spent_usd + realized_loss_usd,
-            attempts_used=self.attempts_used + 1,
-        )
+    usd: float = DEFAULT_STOP_LOSS_USD
 
 
 # ---------------------------------------------------------------- output ---
 
 @dataclass(frozen=True)
 class Derivation:
-    """Every number between the budget and the stop, in order, so the ticket
-    can be audited at a glance and the journal can replay the reasoning.
-    Spread, fees and premium are for all ``lots`` together."""
+    """Every number between the stop loss and the stop, in order, so the
+    ticket can be audited at a glance and the journal can replay the
+    reasoning. Spread, fees and premium are for all ``lots`` together."""
 
-    budget_remaining_usd: float
-    attempts_left: int
+    stop_loss_usd: float
     spread_usd: float
     fees_rt_usd: float
     friction_usd: float
-    attempt_risk_usd: float
+    risk_usd: float
     stop_premium_pts: float
     delta_live: float
     stop_distance_spx: float
@@ -191,6 +172,12 @@ class Derivation:
 
     @classmethod
     def from_dict(cls, d: dict) -> "Derivation":
+        d = dict(d)
+        # a ticket saved before 2026-09-25 carries the budget-era names
+        old = "attempt_" + "risk_usd"
+        if "risk_usd" not in d and old in d:
+            d["risk_usd"] = d[old]
+        d.setdefault("stop_loss_usd", d.get("risk_usd", DEFAULT_STOP_LOSS_USD))
         names = set(cls.__dataclass_fields__)
         return cls(**{k: v for k, v in d.items() if k in names})
 
@@ -216,9 +203,9 @@ class Ticket:
 
     @property
     def max_loss_usd(self) -> float:
-        """What this attempt costs if the stop fills at the trigger, including
-        the friction already assumed. This is the number the ceiling governs."""
-        return self.derivation.attempt_risk_usd + self.derivation.friction_usd
+        """What this ticket costs if the stop fills at the trigger, including
+        the friction."""
+        return self.derivation.risk_usd + self.derivation.friction_usd
 
     @property
     def exit_fields(self) -> dict:
@@ -343,7 +330,7 @@ def pick_strike(
     """The contract whose |delta| is nearest ``target`` **within** ``band``.
 
     Ties break to the tighter spread — at equal delta, the cheaper crossing is
-    strictly better, and it is the spread that eats the attempt budget.
+    strictly better, and it is the spread that eats into the stop.
     """
     lo, hi = band
     eligible = [c for c in contracts if lo <= c.abs_delta <= hi]
@@ -385,59 +372,44 @@ def noise_floor_spx(
 
 
 def derive(
-    budget: Budget,
+    stop_loss: StopLoss,
     contract: Contract,
     *,
     recent_minute_ranges_spx: Sequence[float] = (),
     fees_rt_usd: float = FEES_RT_USD,
     lots: int = 1,
 ) -> Derivation:
-    """Run the budget backwards into a stop distance.
+    """Run the stop loss backwards into a stop distance.
 
-        friction   = (spread + fees) × lots
-        attempt    = remaining / attempts_left − friction
-        premium    = attempt / (100 × lots)
+        premium    = stop loss / (100 × lots)
         distance   = premium / delta
 
-    Raises :class:`CannotFund` when friction alone exhausts the slice. That is
-    a refusal with arithmetic attached, not a crash — the design requires the
-    numbers be printed so the refusal can be argued with.
+    Friction (spread + fees, × lots) is reported beside it and is part of
+    ``Ticket.max_loss_usd``; it does not shrink the stop.
     """
     if lots < 1:
         raise ValueError(f"lots must be at least 1, not {lots}")
     if contract.abs_delta <= 0:
         raise ValueError(f"{contract.strike:g} {contract.right} has no delta in the "
                          f"snapshot — cannot turn premium into SPX points")
-    if budget.attempts_left <= 0:
-        raise CannotFund(
-            f"no attempts left: {budget.attempts_used} of {budget.attempts} used"
-        )
+    if stop_loss.usd <= 0:
+        raise ValueError(f"the stop loss must be a positive number of dollars, "
+                         f"not {stop_loss.usd!r}")
 
     spread_usd = contract.spread_usd * lots
     fees_usd = fees_rt_usd * lots
     friction_usd = spread_usd + fees_usd
-    slice_usd = budget.remaining_usd / budget.attempts_left
-    attempt_risk_usd = slice_usd - friction_usd
+    risk_usd = float(stop_loss.usd)
 
-    if attempt_risk_usd <= 0:
-        raise CannotFund(
-            f"{_usd(budget.remaining_usd)} remaining / {budget.attempts_left} "
-            f"attempt(s) = {_usd(slice_usd)} per attempt, but friction is "
-            f"{_usd(friction_usd)} ({_usd(spread_usd)} spread + "
-            f"{_usd(fees_usd)} fees{f' for {lots} lots' if lots > 1 else ''}). "
-            f"Nothing left to risk."
-        )
-
-    stop_premium_pts = attempt_risk_usd / (CONTRACT_MULTIPLIER * lots)
+    stop_premium_pts = risk_usd / (CONTRACT_MULTIPLIER * lots)
     stop_distance_spx = stop_premium_pts / contract.abs_delta
 
     return Derivation(
-        budget_remaining_usd=budget.remaining_usd,
-        attempts_left=budget.attempts_left,
+        stop_loss_usd=float(stop_loss.usd),
         spread_usd=spread_usd,
         fees_rt_usd=fees_usd,
         friction_usd=friction_usd,
-        attempt_risk_usd=attempt_risk_usd,
+        risk_usd=risk_usd,
         stop_premium_pts=stop_premium_pts,
         delta_live=contract.abs_delta,
         stop_distance_spx=stop_distance_spx,
@@ -503,7 +475,7 @@ CONDITION_SYMBOL = "SPX"
 def stop_trigger(spx_now: float, stop_distance_spx: float, right: str = "PUT") -> float:
     """Where the cut sits. A long put loses as SPX rallies, so the trigger is
     above spot; a long call loses as SPX falls, so it is below. Same distance
-    either way — the budget engine is direction-blind; the sign is not."""
+    either way — the stop derivation is direction-blind; the sign is not."""
     r = right.upper()
     if r == "PUT":
         return spx_now + stop_distance_spx
@@ -566,7 +538,7 @@ def template_fields(contract: Contract, limit_pts: float, stop_trigger_spx: floa
 def compose(
     chain: dict | Sequence[Contract],
     spx_now: float,
-    budget: Budget,
+    stop_loss: StopLoss | None = None,
     *,
     expiration: str | None = None,
     recent_minute_ranges_spx: Sequence[float] = (),
@@ -576,10 +548,10 @@ def compose(
     contract: Contract | None = None,
     lots: int = 1,
 ) -> Ticket:
-    """Build one ticket. Raises :class:`NoStrikeInBand` or :class:`CannotFund`.
+    """Build one ticket. Raises :class:`NoStrikeInBand`.
 
     ``limit_mode`` defaults to ``ask`` — a marketable limit. This is consistent
-    with the budget engine, which already charges the *full* spread as friction
+    with the derivation, which already charges the *full* spread as friction
     (half on the way in, half on the way out). Bidding mid would understate the
     risk the engine just priced, and a miss on a flush costs more than a nickel.
 
@@ -595,7 +567,7 @@ def compose(
         contract = pick_strike(contracts)
 
     derivation = derive(
-        budget, contract,
+        stop_loss or StopLoss(), contract,
         recent_minute_ranges_spx=recent_minute_ranges_spx,
         fees_rt_usd=fees_rt_usd,
         lots=lots,

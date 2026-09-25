@@ -13,22 +13,12 @@ returns. A service that acknowledged an order it had not yet recorded would,
 after a crash, come back not knowing what it had sent — and this is a machine
 that has already lost a run to an OOM kill this month.
 
-**The day's state is derived from it, not held beside it.** ``day_state()``
-rebuilds open positions, realized loss and attempts used by reading the file.
-There is no counter in memory to drift, and a restart mid-session recovers the
-ceiling rather than resetting it — which is the whole point of a ceiling that
-holds when Steve is not watching.
-
-Losses only debit the ceiling. A winning trade does not raise it; the budget
-is a bound on how much of the day can go wrong, not a running P&L. That is
-FD0's ``Budget`` semantics (``execd/compose.py``), carried here unchanged.
-
-Attempts are counted differently since 2026-09-14 (Steve, st-fn5y): *"An
-'attempt' is a 'filled position'. Any attempt that breaks even or better
-doesn't decrement the counter."* So an attempt is held by a filled position
-while it is open and kept only by one that closed at a loss; a close at zero
-or better gives its attempt back. A working entry holds a position slot but
-no attempt.
+**The day's facts are derived from it, not held beside it.** ``day_state()``
+rebuilds open positions and realized loss by reading the file, so a restart
+recovers them. They are facts for ``/status``; nothing refuses because of
+them — the daily loss ceiling and the attempts count that used to read them
+were removed on 2026-09-24 (co-8mb1z). ``attempts_used`` is still computed
+here for the record and gates nothing.
 """
 
 from __future__ import annotations

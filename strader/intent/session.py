@@ -24,7 +24,7 @@ from zoneinfo import ZoneInfo
 from market.entities.chain import Chain
 from market.entities.spread import ButterflyTemplate
 from market.resolve import ResolutionError, resolve_butterfly
-from strader.execution.compose import CannotFund, Ticket
+from strader.execution.compose import Ticket
 from strader.execution.fd0 import Fd0
 from strader.intent import grammar
 from strader.intent.bracket import NotBracketable, bracket
@@ -302,7 +302,7 @@ class Session:
         return f"{head}{tail}\nSay go to stage it, or stand down."
 
     def _bracket_for(self, order: Order, chain: Chain) -> dict | None:
-        """FD0's budget-derived stop and SPX-conditional exit for a directional
+        """FD0's stop (from a per-ticket stop loss) and SPX-conditional exit for a directional
         single. None (and a logged reason) for anything defined-risk — a
         butterfly's loss is the debit, so there is no stop to add."""
         try:
@@ -310,9 +310,9 @@ class Session:
         except NotBracketable as e:
             self._log(f"no bracket: {e}")
             return None
-        except CannotFund as e:
+        except ValueError as e:
             self._log(f"bracket refused: {e}")
-            self._last_bracket_note = f"FD0 could not fund a stop: {e}"
+            self._last_bracket_note = f"FD0 could not derive a stop: {e}"
             return None
         self._last_bracket_note = ""
         return ticket.to_dict()
@@ -324,7 +324,7 @@ class Session:
             return ""
         t = Ticket.from_dict(self.plan.bracket)
         lines = Fd0.render_stop(t) + [""] + Fd0.render_exit(t)
-        return "\nFD0 stop (budget-derived, $100 / 2 attempts):\n" + "\n".join(lines)
+        return "\nFD0 stop:\n" + "\n".join(lines)
 
     def _resolve(self, s: StructureTemplate, chain: Chain) -> Order:
         right = s.right or "CALL"

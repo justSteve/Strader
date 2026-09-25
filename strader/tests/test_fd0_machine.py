@@ -4,7 +4,7 @@ Bead: Cut And Await (st-apzt). Pure-logic: no feed, no broker, no clock
 dependence beyond injected timestamps.
 
 The properties worth defending here are the *refusals* — that no path opens a
-position, that a presumed cut cannot double-debit the budget, and that an
+position, that a presumed cut cannot double-count a loss, and that an
 unknown key is rejected rather than swallowed.
 """
 from __future__ import annotations
@@ -15,7 +15,6 @@ from pathlib import Path
 
 import pytest
 
-from strader.execution.compose import Budget, CannotFund
 from strader.execution.fd0 import (
     Fd0, State, IllegalTransition, checklist, journal_path_for,
 )
@@ -57,7 +56,6 @@ def test_full_cycle_compose_fill_cut_confirm_reload():
 
     h.confirm_exit(1.28)
     assert h.state is State.WAITING
-    assert h.budget.attempts_left == 1
 
     _quiet(h)                                                  # reload is manual
     assert h.state is State.COMPOSED
@@ -68,8 +66,7 @@ def test_discarding_a_ticket_returns_to_idle_and_spends_nothing():
     _quiet(h)
     h.discard()
     assert h.state is State.IDLE
-    assert h.budget.remaining_usd == 100.0
-    assert h.budget.attempts_left == 2
+    assert h.attempts == []
 
 
 def test_end_is_legal_from_any_state():
@@ -84,91 +81,45 @@ def test_end_is_legal_from_any_state():
 
 # --------------------------------------------------------------- ledger ---
 
-def test_confirmed_exit_corrects_the_tape_estimate_without_double_debiting():
+def test_confirmed_exit_corrects_the_tape_estimate_without_double_counting():
     h = _harness()
     t = _quiet(h)
     h.confirm_fill(1.60)
     h.observe(t.stop_trigger_spx)
-
-    estimated = h.budget.spent_usd
-    assert estimated == pytest.approx(t.derivation.attempt_risk_usd)
-    assert len(h.attempts) == 1
-
+    assert h.attempts[0].realized_usd == pytest.approx(t.derivation.risk_usd)
     h.confirm_exit(1.28)                       # actual loss = (1.60-1.28)*100 = $32
     assert len(h.attempts) == 1                # corrected, not appended
-    assert h.budget.spent_usd == pytest.approx(32.0)
+    assert h.attempts[0].realized_usd == pytest.approx(32.0)
     assert h.attempts[0].estimated is False
 
 
-def test_a_better_than_estimated_exit_gives_the_budget_back():
+def test_losses_never_refuse_the_next_ticket():
+    """No $100 day and no attempts count (co-8mb1z; Steve, 2026-09-24: "make
+    sure they are removed now and not restored in the future")."""
     h = _harness()
+    for _ in range(10):
+        t = _quiet(h)
+        h.confirm_fill(1.60)
+        h.observe(t.stop_trigger_spx)
+        h.confirm_exit(0.60)                   # $100 lost each time
     t = _quiet(h)
-    h.confirm_fill(1.60)
-    h.observe(t.stop_trigger_spx)
-    h.confirm_exit(1.45)                       # only $15 lost
-    assert h.budget.spent_usd == pytest.approx(15.0)
-    assert h.budget.remaining_usd == pytest.approx(85.0)
+    assert h.state is State.COMPOSED
+    assert t.derivation.stop_loss_usd == 20.0  # sized like the first
 
 
-def test_an_attempt_closed_for_a_gain_costs_an_attempt_but_no_budget():
-    h = _harness()
-    t = _quiet(h)
-    h.confirm_fill(1.60)
-    h.observe(t.stop_trigger_spx)
-    h.confirm_exit(2.10)                       # exited higher — a gain
-    assert h.budget.spent_usd == 0.0
-    assert h.budget.attempts_left == 1
-
-
-def test_the_second_attempt_re_derives_a_wider_stop_from_what_is_left():
+def test_every_ticket_is_sized_the_same():
     h = _harness()
     t1 = _quiet(h)
     h.confirm_fill(1.60)
     h.observe(t1.stop_trigger_spx)
-    h.confirm_exit(1.28)                       # $32 gone, 1 attempt left
-
+    h.confirm_exit(1.28)
     t2 = _quiet(h)
-    # $68 on one attempt buys more room than $50 did.
-    assert t2.derivation.stop_distance_spx > t1.derivation.stop_distance_spx
+    assert t2.derivation.stop_distance_spx == pytest.approx(t1.derivation.stop_distance_spx)
 
 
-def test_a_stop_can_fill_worse_than_estimated_and_the_ledger_takes_it():
-    # The stop is TOS-resident and market-on-trigger. A fast rally fills where
-    # it fills, which can be well past the derived risk. The ledger must book
-    # what actually happened, not what was budgeted.
-    h = _harness()
-    t = _quiet(h)
-    h.confirm_fill(1.60)
-    h.observe(t.stop_trigger_spx)
-    assert h.budget.spent_usd == pytest.approx(t.derivation.attempt_risk_usd)  # $32 est
-    h.confirm_exit(1.05)                       # actually lost $55
-    assert h.budget.spent_usd == pytest.approx(55.0)
-    assert h.budget.remaining_usd == pytest.approx(45.0)
-
-
-def test_budget_exhaustion_refuses_the_next_compose_with_arithmetic():
-    h = _harness(budget_total_usd=40.0)
-    t = _quiet(h)
-    h.confirm_fill(1.60)
-    h.observe(t.stop_trigger_spx)
-    h.confirm_exit(1.20)                       # $40 gone — the whole ceiling
-
-    with pytest.raises(CannotFund) as exc:
-        _quiet(h)
-    assert "$0.00 remaining" in str(exc.value)  # the division is printed
-
-
-def test_an_overrun_past_the_ceiling_is_shown_not_clamped():
-    # Losing more than the ceiling is a fact about the session, and hiding it
-    # behind a floor of zero would make the ledger lie about what happened.
-    h = _harness(budget_total_usd=40.0)
-    t = _quiet(h)
-    h.confirm_fill(1.60)
-    h.observe(t.stop_trigger_spx)
-    h.confirm_exit(1.00)                       # $60 lost against a $40 ceiling
-    assert h.budget.remaining_usd == pytest.approx(-20.0)
-    with pytest.raises(CannotFund):
-        _quiet(h)
+def test_the_stop_loss_is_his_to_set():
+    h = _harness(stop_loss_usd=50.0)
+    assert _quiet(h).derivation.stop_loss_usd == 50.0
 
 
 # ------------------------------------------------------------- refusals ---
@@ -202,7 +153,7 @@ def test_manual_cut_from_open_books_the_attempt_on_his_word(tmp_path):
     assert h.state is State.WAITING
     assert a.closed and a.estimated is False and a.exit_premium_pts == 1.20
     assert a.realized_usd == pytest.approx(40.0)
-    assert len(h.attempts) == 1 and h.budget.attempts_left == 1
+    assert len(h.attempts) == 1
     events = [json.loads(l) for l in (tmp_path / "fd0.jsonl").read_text().splitlines()]
     exit_ev = [e for e in events if e["event"] == "confirm_exit"][0]
     assert exit_ev["manual_cut"] is True
@@ -256,15 +207,6 @@ def test_journal_records_the_whole_cycle_with_the_derivation(tmp_path):
     assert events[3]["realized_usd"] == pytest.approx(32.0)
 
 
-def test_a_refusal_is_journalled(tmp_path):
-    h = _harness(tmp_path, budget_total_usd=1.0)
-    with pytest.raises(CannotFund):
-        _quiet(h)
-    events = [json.loads(l) for l in (tmp_path / "fd0.jsonl").read_text().splitlines()]
-    assert events[0]["event"] == "refuse"
-    assert events[0]["reason"] == "CannotFund"
-
-
 def test_a_noise_floor_warning_is_journalled(tmp_path):
     h = _harness(tmp_path)
     h.compose(_chain(), SPX, recent_minute_ranges_spx=[3.0] * 15)
@@ -296,7 +238,7 @@ def _ticks(n=3, moving=True):
 def _lines(**kw):
     base = dict(token_status="ok", spx_ticks=_ticks(), chain_ok=True,
                 chain_detail="0.30d put at 7415, $15 spread", tos_validated=True,
-                budget=Budget(), journal_path=Path("data/exec/fd0-test.jsonl"),
+                journal_path=Path("data/exec/fd0-test.jsonl"),
                 build_complete=True)
     return checklist(**{**base, **kw})
 
@@ -304,7 +246,8 @@ def _lines(**kw):
 def test_a_clean_checklist_passes_every_line(tmp_path):
     lines = _lines(journal_path=tmp_path / "fd0.jsonl")
     assert all(l.passed for l in lines)
-    assert len(lines) == 7
+    assert len(lines) == 6
+    assert not any("Budget" in l.name for l in lines)
 
 
 def test_a_stale_token_fails():
@@ -320,12 +263,6 @@ def test_a_frozen_quote_stream_fails_even_with_three_ticks():
 def test_too_few_ticks_fails():
     assert not [l for l in _lines(spx_ticks=_ticks(2))
                 if l.name == "SPX quote stream"][0].passed
-
-
-def test_an_unarmed_ledger_fails():
-    line = [l for l in _lines(budget=Budget(spent_usd=32.0, attempts_used=1))
-            if l.name == "Budget ledger armed"][0]
-    assert not line.passed
 
 
 def test_an_unanswered_tos_card_fails():

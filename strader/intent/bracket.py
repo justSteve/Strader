@@ -2,12 +2,12 @@
 
 Steve's ``go`` on a directional single (a long put or a long call — the
 futures-proxy play, ``knowledge/singles-as-futures-proxy.md``) hands the chosen
-contract to FD0. FD0 runs the budget backwards into a stop distance at the live
+contract to FD0. FD0 runs the ticket's stop loss backwards into a stop distance at the live
 delta, sets the SPX-conditional trigger on the correct side of spot, and returns
 the values that go into the TOS Order Rules gear. The dialect renders the entry
 paste line; FD0 renders the exit that cannot be pasted.
 
-Why only singles. FD0's whole mechanism is a budget-derived stop on a *directional*
+Why only singles. FD0's whole mechanism is a dollar-derived stop on a *directional*
 long option — its risk is open until it is cut. A butterfly is defined-risk: the
 most it loses is the debit paid, which the dialect already prints, so there is
 nothing for a stop to protect and ``go`` stages it unbracketed. A vertical or a
@@ -22,7 +22,7 @@ from __future__ import annotations
 import datetime as dt
 
 from market.entities.chain import Chain
-from strader.execution.compose import Budget, Contract as Fd0Contract, Ticket, compose
+from strader.execution.compose import Contract as Fd0Contract, StopLoss, Ticket, compose
 from strader.intent.entities import Order
 
 
@@ -63,21 +63,20 @@ def bracket(
     order: Order,
     chain: Chain,
     *,
-    budget: Budget | None = None,
+    stop_loss: StopLoss | None = None,
     spx_now: float | None = None,
     recent_minute_ranges_spx=(),
     day: dt.date | None = None,
 ) -> Ticket:
     """Build the FD0 bracket for a directional single.
 
-    ``budget`` defaults to FD0's standing ceiling ($100, two attempts) — the
-    first attempt's slice is what a fresh directional single risks. ``spx_now``
+    ``stop_loss`` defaults to Steve's flat $20 (``DEFAULT_STOP_LOSS_USD``);
+    there is no day's budget and no attempts count (co-8mb1z). ``spx_now``
     defaults to the chain's underlying price, which is the level the stop is
     measured from.
 
     Raises :class:`NotBracketable` when the order is not a long single, and
-    lets FD0's own :class:`CannotFund` through when the budget cannot fund the
-    stop (its message carries the arithmetic).
+    lets a ``ValueError`` through when no stop can be derived (no delta).
     """
     if order.spread_type.upper() != "SINGLE":
         raise NotBracketable(
@@ -91,7 +90,7 @@ def bracket(
     return compose(
         [contract],
         spx_now if spx_now is not None else chain.underlying_price,
-        budget or Budget(),
+        stop_loss or StopLoss(),
         contract=contract,
         lots=abs(order.quantity),
         recent_minute_ranges_spx=recent_minute_ranges_spx,

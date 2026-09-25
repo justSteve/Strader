@@ -16,7 +16,6 @@ from pathlib import Path
 
 import pytest
 
-from strader.execution.compose import Budget
 from strader.execution.feed import (
     FeedError, FixtureFeed, Quote, SPX_SYMBOL, preflight, spx_price_diagnostic,
 )
@@ -102,7 +101,7 @@ def test_a_missing_fixture_chain_raises_feed_error():
 
 def _run(feed, tmp_path, **kw):
     return preflight(feed, token_path=tmp_path / "no_token.json",
-                     budget=Budget(), journal_path=tmp_path / "fd0.jsonl", **kw)
+                     journal_path=tmp_path / "fd0.jsonl", **kw)
 
 
 def test_a_dead_feed_produces_fail_lines_not_an_exception(tmp_path):
@@ -127,7 +126,7 @@ def test_a_working_fixture_feed_passes_the_machine_checkable_lines(tmp_path):
     assert by["SPX quote stream"].passed
     assert by["Chain / delta band"].passed
     assert by["Journal writable"].passed
-    assert by["Budget ledger armed"].passed
+    assert "Budget ledger armed" not in by
     assert diag["pick"]["strike"] == 7415.0
 
 

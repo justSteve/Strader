@@ -24,7 +24,10 @@ can refuse a compose, but no code path in this file opens a position.
 
 The ledger is a list of attempts rather than a running total, so the tape
 estimate booked at presumption can be *corrected* by Steve's confirmed exit
-without any risk of double-debiting the budget.
+without any risk of double-counting. It is a record, not a budget: since
+2026-09-25 there is no $100 day and no count of attempts (co-8mb1z; Steve,
+2026-09-24: "make sure they are removed now and not restored in the
+future"). Each ticket's stop is sized from its own stop loss.
 
 2026-08-23, joined to the intent dialect (st-79z.3) as the engine's trigger
 desk: the machine now saves itself after every transition (``save``/``load``)
@@ -43,7 +46,7 @@ from pathlib import Path
 from typing import Sequence
 
 from strader.execution.compose import (
-    Budget, CannotFund, NoStrikeInBand, Ticket, compose, CONTRACT_MULTIPLIER,
+    DEFAULT_STOP_LOSS_USD, NoStrikeInBand, StopLoss, Ticket, compose, CONTRACT_MULTIPLIER,
 )
 
 log = logging.getLogger(__name__)
@@ -129,7 +132,6 @@ def checklist(
     chain_ok: bool,
     chain_detail: str,
     tos_validated: bool,
-    budget: Budget,
     journal_path: Path,
     build_complete: bool = True,
     build_detail: str = "",
@@ -162,12 +164,6 @@ def checklist(
         if tos_validated else
         "the 1st Triggers pair was confirmed 08-03; the SPX mark condition on the SELL "
         "leg, saved and reloaded, is not — the one item that is Steve's"))
-    lines.append(CheckLine(
-        "Budget ledger armed",
-        budget.spent_usd == 0 and budget.attempts_used == 0,
-        f"${budget.total_usd:.0f} / {budget.attempts} attempts / "
-        f"${budget.spent_usd:.0f} spent",
-    ))
 
     writable = False
     try:
@@ -193,8 +189,8 @@ def checklist(
 class Fd0:
     """The harness. One instance per session."""
 
-    budget_total_usd: float = 100.0
-    budget_attempts: int = 2
+    #: what each ticket's stop loses, in dollars, before friction
+    stop_loss_usd: float = DEFAULT_STOP_LOSS_USD
     journal_path: Path | None = None
     state_path: Path | None = None      # set, the machine saves itself after every transition
 
@@ -207,8 +203,7 @@ class Fd0:
 
     def to_dict(self) -> dict:
         d = {
-            "budget_total_usd": self.budget_total_usd,
-            "budget_attempts": self.budget_attempts,
+            "stop_loss_usd": self.stop_loss_usd,
             "state": self.state.value,
             "attempts": [a.to_dict() for a in self.attempts],
             "pending": self.pending.to_dict() if self.pending else None,
@@ -226,8 +221,7 @@ class Fd0:
     @classmethod
     def from_dict(cls, d: dict, *, journal_path: Path | None = None,
                   state_path: Path | None = None) -> "Fd0":
-        h = cls(budget_total_usd=float(d.get("budget_total_usd", 100.0)),
-                budget_attempts=int(d.get("budget_attempts", 2)),
+        h = cls(stop_loss_usd=float(d.get("stop_loss_usd", DEFAULT_STOP_LOSS_USD)),
                 journal_path=journal_path, state_path=state_path,
                 state=State(d.get("state", "IDLE")),
                 attempts=[Attempt.from_dict(a) for a in d.get("attempts", [])],
@@ -268,16 +262,8 @@ class Fd0:
     # ------------------------------------------------------------ ledger ---
 
     @property
-    def budget(self) -> Budget:
-        """Rebuilt from the attempt ledger every time, so a corrected exit
-        cannot double-debit and a mis-sequenced update cannot drift."""
-        closed = [a for a in self.attempts if a.closed]
-        return Budget(
-            total_usd=self.budget_total_usd,
-            attempts=self.budget_attempts,
-            spent_usd=sum(max(0.0, a.realized_usd) for a in closed),
-            attempts_used=len(closed),
-        )
+    def stop_loss(self) -> StopLoss:
+        return StopLoss(self.stop_loss_usd)
 
     # ----------------------------------------------------------- journal ---
 
@@ -304,8 +290,8 @@ class Fd0:
             raise IllegalTransition(f"cannot compose from {self.state.value}")
 
         try:
-            ticket = compose(chain, spx_now, self.budget, **kw)
-        except (CannotFund, NoStrikeInBand) as exc:
+            ticket = compose(chain, spx_now, self.stop_loss, **kw)
+        except (NoStrikeInBand, ValueError) as exc:
             self._journal("refuse", reason=type(exc).__name__, detail=str(exc))
             log.warning("compose refused: %s", exc)
             raise
@@ -347,7 +333,7 @@ class Fd0:
 
         Only ever *presumes*. The real stop is resident at the broker; this is
         bookkeeping so the harness knows what state Steve is in, and so the
-        next attempt's budget is already re-derived when he reaches for it.
+        next ticket is ready when he reaches for it.
         """
         if self.state is not State.OPEN or self.open_attempt is None:
             return False
@@ -358,7 +344,7 @@ class Fd0:
             return False
 
         # Book the tape's estimate now; Steve's confirmed exit corrects it.
-        estimate_usd = self.open_attempt.ticket.derivation.attempt_risk_usd
+        estimate_usd = self.open_attempt.ticket.derivation.risk_usd
         closed = replace(self.open_attempt, realized_usd=estimate_usd,
                          estimated=True, closed_at=now or datetime.now())
         self.attempts.append(closed)
@@ -400,9 +386,7 @@ class Fd0:
         self.state = State.WAITING
 
         self._journal("confirm_exit", exit_premium_pts=premium_pts,
-                      realized_usd=round(realized_usd, 2), manual_cut=manual,
-                      budget_remaining_usd=round(self.budget.remaining_usd, 2),
-                      attempts_left=self.budget.attempts_left)
+                      realized_usd=round(realized_usd, 2), manual_cut=manual)
         if realized_usd < 0:
             log.info("attempt closed for a gain of $%.2f", -realized_usd)
         self.save()
@@ -411,7 +395,8 @@ class Fd0:
     def end(self) -> None:
         """``x`` — end the session from any state."""
         self._journal("end", attempts=len(self.attempts),
-                      spent_usd=round(self.budget.spent_usd, 2))
+                      realized_usd=round(sum(a.realized_usd for a in self.attempts
+                                             if a.closed), 2))
         self.pending = None
         self.open_attempt = None
         self.state = State.DONE
@@ -434,12 +419,10 @@ class Fd0:
             f"  Most this costs you: ${ticket.max_loss_usd:.2f}",
             "",
             "  How that stop was worked out:",
-            f"    ${d.budget_remaining_usd:.2f} left, {d.attempts_left} attempt(s) "
-            f"-> ${d.budget_remaining_usd / d.attempts_left:.2f} for this one",
-            f"    less ${d.spread_usd:.2f} spread and ${d.fees_rt_usd:.2f} fees"
-            f"{f' ({ticket.lots} lots)' if ticket.lots > 1 else ''} "
-            f"= ${d.attempt_risk_usd:.2f} to risk",
-            f"    ${d.attempt_risk_usd:.2f} is {d.stop_premium_pts:.2f} of premium"
+            f"    a ${d.stop_loss_usd:.2f} stop loss"
+            f"{f' ({ticket.lots} lots)' if ticket.lots > 1 else ''}, plus "
+            f"${d.spread_usd:.2f} spread and ${d.fees_rt_usd:.2f} fees",
+            f"    ${d.risk_usd:.2f} is {d.stop_premium_pts:.2f} of premium"
             f"{' ' + per if per else ''}, which at {d.delta_live:.2f} delta is "
             f"{d.stop_distance_spx:.2f} SPX points",
             f"    the tape's own noise is about {d.noise_floor_spx:.2f} points",
@@ -480,8 +463,7 @@ class Fd0:
 
     def status_line(self) -> str:
         """One line for a read-back: where the machine is and what it holds."""
-        b = self.budget
-        money = f"${b.remaining_usd:.0f} left, {b.attempts_left} attempt(s)"
+        money = f"stop loss ${self.stop_loss_usd:.0f} a ticket"
         if self.state is State.IDLE:
             return f"FD0: idle. {money}."
         if self.state is State.COMPOSED and self.pending:

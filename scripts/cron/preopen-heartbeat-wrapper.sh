@@ -44,11 +44,9 @@ hb_init "$(hb_path strader-preopen-heartbeat)" "pre-open assertion"
 
     cd "$STRADER_REPO" || { log "FATAL: repo dir missing: $STRADER_REPO"; exit 2; }
 
-    # Day-start risk reset first [st-958] — idempotent, so a re-fire never
-    # clobbers a day that already carries recorded trades. Its failure does not
-    # stop the heartbeat below; the heartbeat's risk check is what reports it.
-    PYTHONPATH="$STRADER_REPO" "$PY" -m runbook.risk_state reset \
-        || log "WARN: risk-state reset failed (heartbeat will flag it)"
+    # The day-start risk reset that ran here [st-958] is gone with the risk
+    # state itself (co-8mb1z, 2026-09-25): no daily loss halt, position cap
+    # or trade counts. This job is the pre-open heartbeat alone.
 
     PYTHONPATH="$STRADER_REPO" "$PY" -m runbook.heartbeat
     rc=$?

@@ -131,7 +131,6 @@ def test_capture_is_in_the_default_check_set(monkeypatch, tmp_path):
     _capture_state(tmp_path, monkeypatch)
     monkeypatch.setattr(heartbeat, "check_corpus", lambda: dict(GOOD))
     monkeypatch.setattr(heartbeat, "check_mancini", lambda: dict(GOOD, name="mancini"))
-    monkeypatch.setattr(heartbeat, "check_risk", lambda: dict(GOOD, name="risk"))
     monkeypatch.setattr(heartbeat, "check_schwab", lambda: dict(SOFT_BAD))
     assert [c["name"] for c in heartbeat.run_checks()][-1] == "capture"
 

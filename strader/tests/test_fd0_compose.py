@@ -1,4 +1,4 @@
-"""Tests for strader/execution/compose.py — FD0 strike pick and budget engine.
+"""Tests for strader/execution/compose.py — FD0 strike pick and stop derivation.
 
 Bead: Cut And Await (st-apzt).
 
@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from strader.execution.compose import (
-    Budget, Contract, CannotFund, NoStrikeInBand,
+    DEFAULT_STOP_LOSS_USD, StopLoss, Contract, NoStrikeInBand,
     compose, derive, noise_floor_spx, order_string, parse_chain, pick_strike,
     CONTRACT_MULTIPLIER,
 )
@@ -36,29 +36,13 @@ def _contract(delta=-0.30, bid=1.45, ask=1.60, strike=7415.0) -> Contract:
                     ask_pts=ask, delta=delta, expiration="2026-08-03", dte=0)
 
 
-# ---------------------------------------------------------------- budget ---
+# ------------------------------------------------------------- stop loss ---
 
-def test_budget_starts_at_the_ceiling():
-    b = Budget()
-    assert (b.total_usd, b.attempts, b.remaining_usd, b.attempts_left) == (100.0, 2, 100.0, 2)
-
-
-def test_debit_books_a_loss_and_consumes_an_attempt():
-    b = Budget().debit(38.0)
-    assert b.remaining_usd == 62.0
-    assert b.attempts_left == 1
-
-
-def test_debit_is_a_value_not_a_mutation():
-    original = Budget()
-    original.debit(38.0)
-    assert original.remaining_usd == 100.0     # untouched
-
-
-def test_a_winning_attempt_consumes_an_attempt_but_not_budget():
-    b = Budget().debit(-25.0)
-    assert b.remaining_usd == 100.0
-    assert b.attempts_left == 1
+def test_the_stop_loss_starts_at_steves_flat_20():
+    """No day's budget and no attempts (co-8mb1z); one number per ticket,
+    the same $20 the order form starts at (st-bafu)."""
+    from execd.orderform import DEFAULT_STOP_LOSS_USD as FORM_DEFAULT
+    assert StopLoss().usd == DEFAULT_STOP_LOSS_USD == FORM_DEFAULT == 20.0
 
 
 # ----------------------------------------------------------------- chain ---
@@ -116,60 +100,58 @@ def test_pick_strike_breaks_ties_toward_the_tighter_spread():
     assert pick_strike([wide, tight]).strike == 7414.0
 
 
-# ---------------------------------------------------------- budget engine ---
+# ------------------------------------------------------------ derivation ---
 
-def test_derive_matches_the_designs_worked_illustration():
-    # Design §budget engine: ~0.30 delta, ~$15 spread, $3 fees
-    #   attempt 1 = $50 − $18 = $32 premium risk
-    #             = 0.32 pts of premium
-    #             ≈ 1.1 SPX pts of stop
-    c = _contract(delta=-0.30, bid=1.45, ask=1.60)      # 0.15 pts = $15
-    d = derive(Budget(), c, recent_minute_ranges_spx=[0.5] * 15)
-
+def test_derive_turns_the_stop_loss_into_spx_points():
+    # $20 of premium at 0.30 delta: 0.20 pts, 0.667 SPX pts of stop; the
+    # $15 spread and $3 fees are friction beside it, not taken out of it.
+    c = _contract(delta=-0.30, bid=1.45, ask=1.60)
+    d = derive(StopLoss(), c, recent_minute_ranges_spx=[0.5] * 15)
     assert d.friction_usd == pytest.approx(18.0)
-    assert d.attempt_risk_usd == pytest.approx(32.0)
-    assert d.stop_premium_pts == pytest.approx(0.32)
-    assert d.stop_distance_spx == pytest.approx(1.0667, abs=1e-3)
+    assert d.risk_usd == pytest.approx(20.0)
+    assert d.stop_premium_pts == pytest.approx(0.20)
+    assert d.stop_distance_spx == pytest.approx(0.6667, abs=1e-3)
 
 
-def test_the_second_attempt_re_derives_from_what_is_actually_left():
+def test_a_bigger_stop_loss_buys_a_wider_stop():
     c = _contract()
-    after_loss = Budget().debit(32.0)                    # $68 left, 1 attempt
-    d = derive(after_loss, c, recent_minute_ranges_spx=[0.5] * 15)
-    assert d.attempt_risk_usd == pytest.approx(68.0 - 18.0)
-    assert d.stop_distance_spx > 1.0667                  # more room, not less
-
-
-def test_a_wider_spread_buys_a_tighter_stop():
-    tight = derive(Budget(), _contract(bid=1.50, ask=1.60), recent_minute_ranges_spx=[0.5])
-    wide = derive(Budget(), _contract(bid=1.35, ask=1.75), recent_minute_ranges_spx=[0.5])
-    assert wide.stop_distance_spx < tight.stop_distance_spx
+    assert (derive(StopLoss(60.0), c).stop_distance_spx
+            > derive(StopLoss(20.0), c).stop_distance_spx)
 
 
 def test_a_lower_delta_buys_a_wider_stop_in_spx_points():
-    # Same dollars of premium risk travels further in SPX terms at low delta.
-    lo = derive(Budget(), _contract(delta=-0.25), recent_minute_ranges_spx=[0.5])
-    hi = derive(Budget(), _contract(delta=-0.35), recent_minute_ranges_spx=[0.5])
+    lo = derive(StopLoss(), _contract(delta=-0.25), recent_minute_ranges_spx=[0.5])
+    hi = derive(StopLoss(), _contract(delta=-0.35), recent_minute_ranges_spx=[0.5])
     assert lo.stop_distance_spx > hi.stop_distance_spx
 
 
-def test_refuses_to_fund_when_friction_eats_the_slice():
-    c = _contract(bid=1.00, ask=1.60)                    # $60 spread
-    with pytest.raises(CannotFund) as exc:
-        derive(Budget(spent_usd=20.0), c)                # $80 / 2 = $40 slice
-    msg = str(exc.value)
-    assert "$40.00 per attempt" in msg and "$63.00" in msg   # arithmetic printed
+def test_nothing_carries_over_between_tickets():
+    """The tenth ticket is sized exactly like the first: no remaining, no
+    attempts left, no refusal (co-8mb1z)."""
+    c = _contract()
+    first = derive(StopLoss(), c)
+    tenth = derive(StopLoss(), c)
+    assert first == tenth
 
 
-def test_refuses_when_the_attempts_are_used_up():
-    with pytest.raises(CannotFund) as exc:
-        derive(Budget(attempts_used=2), _contract())
-    assert "no attempts left" in str(exc.value)
+def test_a_stop_loss_that_is_not_positive_is_a_value_error():
+    with pytest.raises(ValueError):
+        derive(StopLoss(0.0), _contract())
 
 
 def test_premium_to_dollars_uses_the_contract_multiplier():
-    d = derive(Budget(), _contract(), recent_minute_ranges_spx=[0.5])
-    assert d.stop_premium_pts * CONTRACT_MULTIPLIER == pytest.approx(d.attempt_risk_usd)
+    d = derive(StopLoss(), _contract(), recent_minute_ranges_spx=[0.5])
+    assert d.stop_premium_pts * CONTRACT_MULTIPLIER == pytest.approx(d.risk_usd)
+
+
+def test_a_ticket_saved_before_the_change_still_loads():
+    from strader.execution.compose import Derivation
+    old = {"budget_remaining_usd": 100.0, "attempts_left": 2, "spread_usd": 15.0,
+           "fees_rt_usd": 3.0, "friction_usd": 18.0, "attempt_risk_usd": 32.0,
+           "stop_premium_pts": 0.32, "delta_live": 0.3, "stop_distance_spx": 1.0667,
+           "noise_floor_spx": 0.5}
+    d = Derivation.from_dict(old)
+    assert d.risk_usd == 32.0
 
 
 # ------------------------------------------------------------ noise floor ---
@@ -210,7 +192,7 @@ def test_order_string_carries_no_exit_leg():
 # --------------------------------------------------------------- compose ---
 
 def _composed(**kw):
-    return compose(_chain("schwab_chain_spx_0dte.json"), 7440.25, Budget(),
+    return compose(_chain("schwab_chain_spx_0dte.json"), 7440.25, StopLoss(),
                    recent_minute_ranges_spx=[0.4] * 15,
                    now=datetime(2026, 8, 3, 8, 47), **kw)
 
@@ -244,13 +226,14 @@ def test_the_stop_sits_above_spx_because_a_long_put_loses_on_a_rally():
     assert t.stop_trigger_spx > t.spx_at_compose
 
 
-def test_max_loss_stays_inside_the_ceiling():
+def test_max_loss_is_the_stop_loss_plus_friction():
     t = _composed()
-    assert t.max_loss_usd <= Budget().total_usd / Budget().attempts + 1e-9
+    d = t.derivation
+    assert t.max_loss_usd == pytest.approx(d.stop_loss_usd + d.friction_usd)
 
 
 def test_warns_loudly_when_the_stop_sits_inside_the_noise_floor():
-    t = compose(_chain("schwab_chain_spx_0dte.json"), 7440.25, Budget(),
+    t = compose(_chain("schwab_chain_spx_0dte.json"), 7440.25, StopLoss(),
                 recent_minute_ranges_spx=[3.0] * 15)     # rowdy tape
     assert any("NOISE FLOOR" in w for w in t.warnings)
     assert t.derivation.inside_noise_floor
@@ -262,20 +245,20 @@ def test_a_quiet_tape_produces_no_noise_warning():
 
 
 def test_missing_tape_context_is_surfaced_not_silently_accepted():
-    t = compose(_chain("schwab_chain_spx_0dte.json"), 7440.25, Budget())
+    t = compose(_chain("schwab_chain_spx_0dte.json"), 7440.25, StopLoss())
     assert any("spread only" in w for w in t.warnings)
 
 
 def test_template_fields_are_the_two_numbers_to_overwrite():
     f = _composed().template_fields
     assert f["strike"] == 7415.0
-    assert f["condition_spx"] == pytest.approx(7441.32, abs=0.01)
+    assert f["condition_spx"] == pytest.approx(7440.92, abs=0.01)
     assert f["expiry"] == "3 AUG 26"
 
 
 def test_the_record_carries_the_whole_derivation_chain():
     rec = _composed().as_record()
-    for key in ("budget_remaining_usd", "friction_usd", "attempt_risk_usd",
+    for key in ("stop_loss_usd", "friction_usd", "risk_usd",
                 "stop_premium_pts", "delta_live", "stop_distance_spx",
                 "noise_floor_spx", "inside_noise_floor"):
         assert key in rec["derivation"]

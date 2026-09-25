@@ -29,7 +29,7 @@ been launched; one is the credential lifecycle that all of them depend on.
 | Part | Package | State | Can it transmit an order? |
 |---|---|---|---|
 | **Intent desk** — speak the day, get a paste line | `strader/intent/` | works; since 2026-09-14 `go` also hands a priced single to execd for a **preview** (§3.11) | No. The desk's client has no place; the paste line stands. |
-| **FD0** — budget-derived stop, exit block, attempt ledger | `strader/execution/` | works, as a library | No. Renders text. |
+| **FD0** — stop derived from a per-ticket stop loss ($20 default; no day budget, no attempts since 2026-09-25, co-8mb1z), exit block, attempt record | `strader/execution/` | works, as a library | No. Renders text. |
 | **execd** — the live execution service | `execd/` | stages 1–3 of 5 built and installed (2026-09-14): mock broker, the Schwab transport, the systemd unit and the tailnet page; stage 4's preview rehearsal wired | **Yes, by design, and only it** — through `/place`, which nothing in the tree calls yet. Nothing sends before stage 4's one live ticket with Steve at the STOP button. |
 | **Fire server** — ARM → FIRE page on the tailnet | `scripts/fire_server.py` | built, never launched, dry run | No. Journals `transmitted: false`. |
 | **Schwab read feed + token** | `strader/execution/feed.py`, `broker_schwab/`, `scripts/refresh_schwab_token.py` | works, read-only | No. Order calls are removed from the library. |
@@ -202,7 +202,7 @@ stores `Ticket.to_dict()` on `plan.bracket`. Two non-fatal outcomes:
   operator as `FD0 could not fund a stop: <reason>`.
 
 When a bracket exists, the read-back appends
-`FD0 stop (budget-derived, $100 / 2 attempts):` followed by
+`FD0 stop:` (a per-ticket $20 stop loss since 2026-09-25; the $100 / 2-attempt budget is gone, co-8mb1z) followed by
 `Fd0.render_stop(t)`, a blank line, and `Fd0.render_exit(t)`.
 
 ### 3.8 The paste line

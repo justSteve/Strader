@@ -29,7 +29,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol, Sequence
 
-from strader.execution.compose import Budget, NoStrikeInBand, parse_chain, pick_strike
+from strader.execution.compose import NoStrikeInBand, parse_chain, pick_strike
 from strader.execution.fd0 import CheckLine, checklist
 
 log = logging.getLogger(__name__)
@@ -233,7 +233,6 @@ def preflight(
     feed: Feed,
     *,
     token_path: Path | str,
-    budget: Budget,
     journal_path: Path,
     build_complete: bool = False,
     build_detail: str = "",
@@ -295,7 +294,6 @@ def preflight(
         chain_ok=chain_ok,
         chain_detail=chain_detail,
         tos_validated=tos_validated,
-        budget=budget,
         journal_path=journal_path,
         build_complete=build_complete,
         build_detail=build_detail,
@@ -331,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.preflight:
         lines, diag = preflight(
-            feed, token_path=args.token, budget=Budget(),
+            feed, token_path=args.token,
             journal_path=Path("data/exec/fd0-preflight.jsonl"),
         )
         print()

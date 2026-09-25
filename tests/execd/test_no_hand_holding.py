@@ -43,6 +43,8 @@ SHAPED_LIKE = re.compile(r"loss|ceiling|headroom|attempt|open_positions|max_posi
 
 #: Names in code that would mean the rule is back.
 FORBIDDEN_NAMES = REMOVED | {"check_window", "check_risk_budget", "session_close",
+                             "Budget", "CannotFund", "remaining_usd",
+                             "budget_total_usd", "budget_attempts", "check_risk",
                              "flat_by_close", "flat_by_close_status", "WINDOW_EXEMPT_ROOTS",
                              "loss_headroom_usd", "attempts_left", "_open_risk_usd"}
 
@@ -76,28 +78,7 @@ def test_an_old_file_carrying_every_one_of_them_still_loads(tmp_path):
     assert load_bounds(p) == Bounds()
 
 
-#: ``compose.py`` holds FD0's budget-to-stop derivation (``Budget``,
-#: ``attempts_left``). No part of the service calls it — the order form stopped
-#: on 2026-09-18 (st-bafu) and imports only the chain reader — and the one
-#: caller, the intent desk (``strader/intent``), is outside execd. It is
-#: exempted here by name, and the next test proves the service never reaches it.
-FD0_MODULE = "compose.py"
-
-
-def test_the_service_never_reaches_the_fd0_budget():
-    for path in modules():
-        if path.name == FD0_MODULE:
-            continue
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module and node.module.endswith("compose"):
-                names = {a.name for a in node.names}
-                assert not names & {"Budget", "derive", "compose", "CannotFund"}, \
-                    (path.name, sorted(names))
-
-
-@pytest.mark.parametrize("path", [p for p in modules() if p.name != FD0_MODULE],
-                         ids=lambda p: p.name)
+@pytest.mark.parametrize("path", modules(), ids=lambda p: p.name)
 def test_no_code_names_a_removed_rule(path: Path):
     tree = ast.parse(path.read_text(encoding="utf-8"))
     found = set()
@@ -139,3 +120,40 @@ def test_nothing_in_the_service_reads_the_hour_or_the_weekday(path: Path):
 def test_no_state_of_the_day_refuses_an_entry(when):
     state = DayState(open_positions=99, realized_loss_usd=10_000_000.0, attempts_used=999)
     assert check_entry(entry(), Bounds(), state, GOOD_QUOTE, when) is None
+
+
+# ── outside execd: FD0 and the runbook (co-8mb1z, 2026-09-25) ────────────
+
+def test_fd0_has_no_day_budget_and_no_attempts():
+    """FD0's $100 day over two attempts is gone; each ticket's stop comes from
+    its own stop loss, and nothing carries over from one ticket to the next."""
+    import dataclasses
+    import execd.compose as compose
+    from strader.execution.fd0 import Fd0
+    assert not hasattr(compose, "Budget") and not hasattr(compose, "CannotFund")
+    assert [f.name for f in dataclasses.fields(compose.StopLoss)] == ["usd"]
+    fields = {f.name for f in dataclasses.fields(Fd0)}
+    assert not {"budget_total_usd", "budget_attempts"} & fields
+    assert not hasattr(Fd0, "budget")
+
+
+@pytest.mark.parametrize("path", [REPO / "strader" / "execution" / "fd0.py",
+                                  REPO / "strader" / "execution" / "feed.py",
+                                  REPO / "strader" / "intent" / "bracket.py",
+                                  REPO / "strader" / "intent" / "session.py",
+                                  REPO / "runbook" / "heartbeat.py"],
+                         ids=lambda p: p.name)
+def test_the_desk_and_the_runbook_name_no_removed_rule(path: Path):
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    found = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)} | \
+            {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    assert not found & FORBIDDEN_NAMES, sorted(found & FORBIDDEN_NAMES)
+
+
+def test_the_runbook_risk_state_is_gone():
+    """A daily loss halt, a position cap and per-strategy trade counts, reset
+    at 08:25 every morning. Removed with its config."""
+    assert not (REPO / "runbook" / "risk_state.py").exists()
+    assert not (REPO / "config" / "risk.yaml").exists()
+    wrapper = (REPO / "scripts" / "cron" / "preopen-heartbeat-wrapper.sh").read_text()
+    assert "risk_state" not in wrapper

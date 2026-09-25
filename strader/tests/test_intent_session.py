@@ -97,12 +97,12 @@ def test_single_first_itm(tmp_path):
 
 def test_single_call_gets_an_fd0_bracket_stop_below_spot(tmp_path):
     """The join (st-79z.3 × st-apzt): a directional single hands FD0 the
-    contract; FD0 derives the stop from budget and puts the SPX-conditional
+    contract; FD0 derives the stop from the ticket's stop loss and puts the SPX-conditional
     trigger on the loss side. A long call loses as SPX falls, so 'at or below'."""
     s = _session(tmp_path)
     s.single("one 6320 call, 0DTE")
     out = s.price(_chain())
-    assert "FD0 stop (budget-derived" in out
+    assert "FD0 stop:" in out and "attempt" not in out
     assert "at or below" in out                                     # call cut below spot
     assert s.plan.bracket is not None
     assert s.plan.bracket["stop_trigger_spx"] < _chain().underlying_price
@@ -111,7 +111,8 @@ def test_single_call_gets_an_fd0_bracket_stop_below_spot(tmp_path):
     rec = json.loads(next((tmp_path / "staged").glob("*-single.json")).read_text())
     assert rec["fd0"]["exit_fields"]["trigger_direction"] == "at or below"
     assert rec["fd0"]["exit_fields"]["action"] == "SELL -1, MARKET"
-    assert rec["fd0"]["max_loss_usd"] == 50.0                        # $100 / 2 attempts
+    # Steve's flat $20 stop loss plus the friction; no $100 day, no attempts (co-8mb1z)
+    assert 20.0 < rec["fd0"]["max_loss_usd"] < 50.0
 
 
 def test_single_put_stop_sits_above_spot(tmp_path):
