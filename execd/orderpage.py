@@ -59,6 +59,7 @@ _ORDER_STYLE = """
        cursor:pointer;vertical-align:middle;color:#9ca3af;padding:0 .4em;font-family:inherit}
  button.lock.on{background:#1f2937;border-color:#fbbf24;color:#fbbf24}
  .tbig #live{font-size:.6em;font-weight:400;vertical-align:middle}
+ input.pxbox{width:4.2em;font-size:1em;font-weight:700;padding:.1em .25em;border:2px solid #fbbf24;border-radius:6px;background:#111827;color:#f9fafb}
  .foot{display:flex;justify-content:space-between;gap:.75em;color:#9ca3af;font-size:.9em;margin-top:.4em}
  .money{display:flex;justify-content:space-between;align-items:baseline;gap:.75em;margin:0 0 .6em;font-size:1.05em}
  .money b{font-size:1.2em}
@@ -85,7 +86,13 @@ _SCRIPT = """
   // a head rewritten over a stale body is the st-hzr6 bug: the price said
   // 0.60 while the stop, the net and the cost under it still stood on 0.70.
   window.__paintTicket = function(j){ if (!j) return;
+    // the price box lives in the ticket: a repaint while he is in it keeps
+    // what he typed and where the caret was (co-8mb1z)
+    var px = document.getElementById('pxbox'), had = !!(px && document.activeElement === px);
+    var pv = had ? px.value : null, pc = had ? px.selectionStart : null;
     var f = document.getElementById('fd0'); if (f && j.fd0_html) f.innerHTML = j.fd0_html;
+    if (had) { var nx = document.getElementById('pxbox'); if (nx) { nx.value = pv; nx.focus();
+      try { nx.setSelectionRange(pc, pc); } catch (e) {} } }
     var s = document.getElementById('strikes'); if (s && j.strikes_html) s.innerHTML = j.strikes_html;
     var p = document.getElementById('sendfields'); if (p && j.send_fields_html) p.innerHTML = j.send_fields_html;
     if (j.contract) window.__sym = j.contract.symbol;
@@ -119,6 +126,15 @@ _SCRIPT = """
   if (stopBox) { stopBox.addEventListener('input', function(){ var sf = stopField(); if (!sf) return;
       sf.value = stopBox.value.trim(); clearTimeout(window.__t); window.__t = setTimeout(reprice, 600); });
     stopBox.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); clearTimeout(window.__t); reprice(); stopBox.blur(); } }); }
+  // the entry price box (co-8mb1z): typing is locking at that price — the
+  // hidden limit carries it, the server puts it on the grid and the stop
+  // follows it; an empty box goes back to following the ask
+  document.addEventListener('input', function(e){ if (!e.target || e.target.id !== 'pxbox') return;
+    var lf = lockField(); if (!lf) return; lf.value = e.target.value.trim();
+    var b = document.getElementById('lock'); if (b) { b.classList.toggle('on', !!lf.value); b.innerHTML = lf.value ? '&#128274;' : '&#128275;'; }
+    clearTimeout(window.__t); window.__t = setTimeout(reprice, 600); });
+  document.addEventListener('keydown', function(e){ if (!e.target || e.target.id !== 'pxbox' || e.key !== 'Enter') return;
+    e.preventDefault(); clearTimeout(window.__t); reprice(); e.target.blur(); });
   window.__followStop = function(j){ if (!stopBox || stopTouched() || !j || j.stop_price == null) return;
     if (document.activeElement === stopBox) return;
     var v = Number(j.stop_price).toFixed(2); stopBox.value = v; stopBox.setAttribute('data-derived', v); };
@@ -144,7 +160,7 @@ _SCRIPT = """
   // third when the ask moved far enough to trigger a reprice of its own.
   // Locked, the server renders the live ask beside the locked price, so the
   // padlock needs nothing here either.
-  function editing(){ var a = document.activeElement; return !!(a && a.tagName === 'INPUT' && form && form.contains(a)); }
+  function editing(){ var a = document.activeElement; return !!(a && a.tagName === 'INPUT' && ((form && form.contains(a)) || a.id === 'pxbox')); }
   window.__lots = form && form.elements['lots'] ? (form.elements['lots'].value || '1') : '1';
 })();
 </script>
@@ -309,7 +325,11 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
     when = (f"priced {priced.priced_at.astimezone(CT).strftime('%H:%M:%S')}"
             if priced.priced_at is not None else "")
     head = (f"<div class=trow><div class=tbig>{esc(name)} × {priced.lots} at "
-            f"<span id=px>{priced.limit:.2f}</span> {lock} {live} "
+            # the entry price is a box (co-8mb1z, Steve 2026-09-25: "i want to
+            # be able to set the price of my entry"): it shows the limit that
+            # will be sent, on the grid; typing in it is locking at that price
+            f"<input id=pxbox class=pxbox inputmode=decimal enterkeyhint=go autocomplete=off "
+            f"aria-label='entry price' value='{priced.limit:.2f}'> {lock} {live} "
             f"<span id=priced class=k>{when}</span></div>"
             f"<div class=tbig id=cost>{money(-(priced.cost_usd or 0)).lstrip('-')}</div></div>")
     if priced.error:

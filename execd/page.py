@@ -715,6 +715,25 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
             priced = price(service, sel)
             intent = intent_for(priced, intent_id=f"page-{stamp(clock())}-{token[:6]}",
                                 engine_sha=service.config.sha)
+            # SEND beside a working entry in the same contract re-prices it
+            # (co-8mb1z, Steve 2026-09-25: "the form needs to be updated that
+            # it's a working order with the form ready to take a new price"):
+            # the old order comes off first, by the same confirmed cancel
+            # CANCEL AND RE-PRICE uses, and only a cancel the broker confirmed
+            # lets the new price go out — otherwise one order becomes two.
+            symbol = priced.contract.symbol if priced.contract is not None else ""
+            for w in service.status()["working"]:
+                if w.get("symbol") != symbol:
+                    continue
+                oid = str(w.get("order_id", ""))
+                pulled = service.cancel(oid)
+                if pulled.get("filled"):
+                    raise ValueError(f"{oid} filled before the new price reached the broker — "
+                                     f"the position is open with its stop and target")
+                if not pulled.get("confirmed", True):
+                    raise ValueError(f"the broker still holds {oid} "
+                                     f"({(pulled.get('order') or {}).get('status', 'working')}) — "
+                                     f"it can still fill; send again when it is off")
             out = service.place(OrderIntent.from_dict(intent), page_query=sel.as_query())
             if out.get("refused"):
                 # A refusal the service answered (a bound, or the broker's own

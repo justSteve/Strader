@@ -531,7 +531,7 @@ class TestThePadlockAndRePrice:
         armed._balances_cache = (now, {"available_funds": 1234.5, "option_buying_power": 2345.0})
         body = text(order_page.get("/exec/order?side=call&strike=6400"))
         card = body.split("<div id=fd0>")[1].split("<form")[0]
-        assert "C6400 × 1 at <span id=px>2.10</span>" in card and "id=cost>$210.00" in card
+        assert "C6400 × 1 at <input id=pxbox" in card and "value='2.10'" in card and "id=cost>$210.00" in card
         assert "<span id=stopline>stop loss <b class=neg>$20.00</b></span>" in card
         assert "take-profit rests at 21.00" in card
         for gone in ("trading grant", "available", "cut if SPX", "stop rests at", "budget",
@@ -548,11 +548,11 @@ class TestThePadlockAndRePrice:
     def test_the_padlock_on_the_ticket(self, order_page):
         body = text(order_page.get("/exec/order?side=call&strike=6400"))
         assert "id=lock class='lock'" in body and "&#128275;" in body and "data-limit='2.10'" in body
-        assert "<span id=px>2.10</span>" in body and "id=cost>$210.00" in body
+        assert "aria-label='entry price' value='2.10'" in body and "id=cost>$210.00" in body
         assert "<span id=live class=k></span>" in body
         locked = text(order_page.get("/exec/order?side=call&strike=6400&limit=2.00"))
         assert "id=lock class='lock on'" in locked and "&#128274;" in locked
-        assert "<span id=px>2.00</span>" in locked and "id=cost>$200.00" in locked
+        assert "aria-label='entry price' value='2.00'" in locked and "id=cost>$200.00" in locked
         assert "ask 2.10 now" in locked
         # SEND carries the lock; the RE-PRICE form holds it for the script to flip
         assert "name='limit' value='2.00'" in locked.split("id=sendfields")[1].split("</span>")[0]

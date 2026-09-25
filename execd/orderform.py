@@ -36,6 +36,10 @@ The flow, top to bottom on ``/exec/order``:
    price, the live ask shows beside it, and SEND sends it as the limit; the
    service's price band still judges it. RE-PRICE keeps the strike and
    reprices at the market, dropping the lock.
+   **The price is a box** (co-8mb1z, Steve 2026-09-25: "i want to be able
+   to set the price of my entry"): it shows the limit, and what he types
+   is the limit sent, to the nearest tick (``nearest_tick``) — typing is
+   locking. The stop follows it at $20 under until he types his own.
 4. SEND → ``service.place`` of the ticket as priced at that moment (the
    locked price or the ask), under the id ``page-<stamp>-<token>``, source
    ``page``. The service runs the broker's own preview inside every place,
@@ -43,7 +47,10 @@ The flow, top to bottom on ``/exec/order``:
    remove the preview step as well. anything we can do to shorten the
    submission after the decision has been made", st-igw0). The SEND token
    is issued with the page, single use, and a replay of a spent token is
-   answered from its remembered outcome — never sent twice.
+   answered from its remembered outcome — never sent twice. **SEND beside a
+   working entry in the same contract re-prices it** (co-8mb1z): the old
+   order comes off by a confirmed cancel first and only then does the new
+   price go out; the form stays live for the next price.
 5. The open position with its money, from the same status body the
    operations page reads.
 
@@ -272,6 +279,14 @@ def choose(contracts: list[Contract], spx: float, *, strike: float | None,
 
 # ── the priced ticket ────────────────────────────────────────────────────
 
+def nearest_tick(pts: float) -> float:
+    """A typed entry price on the exchange's grid, to the nearest tick —
+    the price box shows this number, and it is the limit sent (co-8mb1z,
+    Steve 2026-09-25: "i want to be able to set the price of my entry")."""
+    t = tick_for(pts)
+    return round(max(t, round(pts / t) * t), 2)
+
+
 def limit_at(ask_pts: float) -> float:
     """The buy limit the form sends for an ask: the ask rounded up to the
     service's own tick grid. One place, so the page's live head, the priced
@@ -384,7 +399,7 @@ def price(service: ExecService, sel: Selection) -> Priced:
     # above), rounded up — the service refuses a price off the grid. A locked
     # price (the padlock, st-2s4u) is the limit instead, whatever the ask is
     # now; the service's price band judges it at the send.
-    out.limit = sel.limit if sel.limit is not None else limit_at(c.ask_pts)
+    out.limit = nearest_tick(sel.limit) if sel.limit is not None else limit_at(c.ask_pts)
     if not (0 < c.abs_delta <= 1):
         out.error = f"the chain gives no usable delta for {c.strike:g} — no stop can be struck"
         return out
