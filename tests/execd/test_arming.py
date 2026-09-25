@@ -24,10 +24,6 @@ def arming(tmp_path, clock: Clock) -> Arming:
     return Arming(kill_file=tmp_path / "STOP", clock=clock)
 
 
-def until(clock: Clock, minutes: int = 300) -> datetime:
-    return clock() + timedelta(minutes=minutes)
-
-
 class TestTheThreeStates:
     def test_a_fresh_service_is_locked(self, arming):
         assert arming.state is ArmState.LOCKED
@@ -35,66 +31,63 @@ class TestTheThreeStates:
         assert arming.permits_exit().bound == "armed"
 
     def test_unlock_arms_it(self, arming, clock):
-        assert arming.unlock(CRED, until(clock)) is ArmState.ARMED
+        assert arming.unlock(CRED) is ArmState.ARMED
         assert arming.permits_entry() is None and arming.permits_exit() is None
 
     def test_stand_down_stops_entries_and_leaves_exits_alone(self, arming, clock):
-        arming.unlock(CRED, until(clock))
+        arming.unlock(CRED)
         assert arming.stand_down() is ArmState.STOOD_DOWN
         assert arming.permits_entry().bound == "armed"
         assert "stood down" in arming.permits_entry().reason
         assert arming.permits_exit() is None
 
     def test_lock_forgets_the_credential(self, arming, clock):
-        arming.unlock(CRED, until(clock))
+        arming.unlock(CRED)
         assert arming.lock() is ArmState.LOCKED
         with pytest.raises(Locked):
             arming.credential()
 
     def test_unlock_after_stand_down_arms_it_again(self, arming, clock):
-        arming.unlock(CRED, until(clock))
+        arming.unlock(CRED)
         arming.stand_down()
-        assert arming.unlock(CRED, until(clock)) is ArmState.ARMED
+        assert arming.unlock(CRED) is ArmState.ARMED
 
 
-class TestExpiry:
-    def test_arming_expires_at_the_session_close(self, arming, clock):
-        arming.unlock(CRED, until(clock, minutes=60))
-        clock.advance(minutes=61)
-        assert arming.state is ArmState.STOOD_DOWN
-        assert "expired" in arming.permits_entry().reason
+class TestNoExpiry:
+    """Steve, 2026-09-24: "never ever place that kind of restriction on me".
+    The arming lasts until LOCK, STOP, stand-down or a restart. [co-8mb1z]"""
 
-    def test_expiry_stands_down_rather_than_locking(self, arming, clock):
-        """The credential stays available to close what is still open at the bell."""
-        arming.unlock(CRED, until(clock, minutes=60))
-        clock.advance(minutes=61)
-        assert arming.permits_exit() is None
-        assert arming.credential() == CRED
+    def test_arming_does_not_expire_with_the_clock(self, arming, clock):
+        arming.unlock(CRED)
+        for hours in (1, 6, 24, 24 * 3):
+            clock.advance(minutes=60 * hours)
+            assert arming.state is ArmState.ARMED, hours
+            assert arming.permits_entry() is None
 
-    def test_unlock_requires_an_aware_expiry(self, arming):
-        with pytest.raises(ValueError, match="timezone-aware"):
-            arming.unlock(CRED, datetime(2026, 8, 26, 15, 0))
+    def test_unlock_takes_no_expiry(self, arming, clock):
+        with pytest.raises(TypeError):
+            arming.unlock(CRED, clock())   # type: ignore[call-arg]
 
     def test_unlock_requires_a_credential(self, arming, clock):
         with pytest.raises(ValueError, match="credential"):
-            arming.unlock(None, until(clock))
+            arming.unlock(None)
 
 
 class TestTheKillFile:
     def test_stop_blocks_entries_while_armed(self, arming, clock):
-        arming.unlock(CRED, until(clock))
+        arming.unlock(CRED)
         arming.stop()
         assert arming.killed
         assert arming.permits_entry().bound == "stop"
 
     def test_stop_is_idempotent(self, arming, clock):
-        arming.unlock(CRED, until(clock))
+        arming.unlock(CRED)
         arming.stop()
         arming.stop()
         assert arming.killed
 
     def test_resume_clears_it_and_tolerates_an_absent_file(self, arming, clock):
-        arming.unlock(CRED, until(clock))
+        arming.unlock(CRED)
         arming.resume()          # nothing to clear yet
         arming.stop()
         arming.resume()
@@ -109,7 +102,7 @@ class TestTheKillFile:
     def test_a_kill_file_left_by_a_previous_process_is_still_in_force(self, tmp_path, clock):
         (tmp_path / "STOP").touch()
         fresh = Arming(kill_file=tmp_path / "STOP", clock=clock)
-        fresh.unlock(CRED, until(clock))
+        fresh.unlock(CRED)
         assert fresh.permits_entry().bound == "stop"
 
 
@@ -122,12 +115,12 @@ class TestExitsAreNeverRefusedForRisk:
         pytest.param(lambda a: (a.stop(), a.stand_down()), id="both"),
     ])
     def test_exits_pass(self, arming, clock, arrange):
-        arming.unlock(CRED, until(clock))
+        arming.unlock(CRED)
         arrange(arming)
         assert arming.permits_exit() is None
 
     def test_exits_pass_after_the_session_expired(self, arming, clock):
-        arming.unlock(CRED, until(clock, minutes=1))
+        arming.unlock(CRED)
         clock.advance(minutes=120)
         arming.stop()
         assert arming.permits_exit() is None
@@ -139,13 +132,13 @@ class TestExitsAreNeverRefusedForRisk:
 
 class TestStatus:
     def test_status_reports_what_the_page_needs(self, arming, clock):
-        arming.unlock(CRED, until(clock, minutes=300))
+        arming.unlock(CRED)
         s = arming.status()
         assert s["state"] == "ARMED"
         assert s["killed"] is False
         assert s["permits_entry"] is True and s["permits_exit"] is True
-        assert s["expires_at_ct"].endswith("CT")
+        assert "expires_at" not in s and "expires_at_ct" not in s
 
     def test_status_never_carries_the_credential(self, arming, clock):
-        arming.unlock({"token": "sekrit-refresh-token"}, until(clock))
+        arming.unlock({"token": "sekrit-refresh-token"})
         assert "sekrit" not in repr(arming.status())

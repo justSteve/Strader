@@ -362,8 +362,10 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
             return home(f"Unlock refused: {exc.refusal.reason}", bad=True)
         finally:
             del pw
-        until = status["arming"].get("expires_at_ct") or "the close"
-        return home(f"Armed until {until}.")
+        # Armed until he presses LOCK or STOP, or the service restarts — no
+        # clock ends it (Steve, 2026-09-24: "never ever place that kind of
+        # restriction on me").
+        return home("Armed.")
 
     @bp.post("/stop")
     def stop():
@@ -1072,9 +1074,7 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     # no need to define PAPER" — the badge is the word, the state is the
     # word, and the only sentence left is STOP when it is on)
     stop_line = ("<div class=stop-on>STOP IS ON</div>" if arming["killed"] else "")
-    until = arming.get("expires_at_ct")
-    sub = {"LOCKED": "", "ARMED": f"until {until}" if until else "",
-           "STOOD_DOWN": "exits only"}[state]
+    sub = {"LOCKED": "", "ARMED": "", "STOOD_DOWN": "exits only"}[state]
     mode = str(st.get("mode", "live"))
     mode_badge = ("<span class='badge paper'>PAPER</span>" if mode == "paper"
                   else "<span class='badge live'>LIVE</span>")
@@ -1106,10 +1106,6 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     for p in st["positions"]:
         parts.append(_render_position(p))
     parts.append(_render_not_this_services(st))
-    # the day's close-out, when it is past due and has not taken (st-9j8e)
-    from .panel import flat_by_close_alert
-    if (alert := flat_by_close_alert(st)):
-        parts.append(f"<div class=card>{alert}</div>")
 
     # ── the day ──
     pnl = st.get("pnl") or {}

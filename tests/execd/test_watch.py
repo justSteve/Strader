@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 
+import pytest
+
 from execd.broker import BrokerError
 from execd.intent import Side
 from execd.service import ExecService
@@ -129,156 +131,58 @@ def test_the_loop_survives_a_pass_that_raises(armed: ExecService, monkeypatch):
     assert len(calls) == 3 and naps == [5, 30, 30]                 # an error pass is not "idle"
 
 
-class TestFlatByClose:
-    """Steve's ruling, 2026-09-18, on st-9j8e: "9j8e is flat". The bracket's
-    legs are DAY orders and a position is not, so at 14:55 CT the watcher
-    cancels what is working and sells what is held. Nothing is carried past
-    the bell; nothing is held overnight."""
+class TestNoClockAction:
+    """Steve, 2026-09-24: "omg - never ever place that kind of restriction on
+    me ... As 0DTE trades, if i don't close them, they expire. flat. But I
+    will _never ask that you do it automatically." The 14:55 close-out is
+    gone; nothing the watcher or the service does is driven by the hour or
+    the day. [co-8mb1z]"""
 
-    def test_mid_session_it_is_not_due_and_does_nothing(self, armed: ExecService, broker):
-        armed.place(entry("f-1"))
+    @pytest.mark.parametrize("hour,minute,day", [
+        (14, 55, 26), (15, 0, 26), (15, 30, 26), (23, 0, 26), (10, 0, 29)])
+    def test_a_held_position_is_untouched_at_any_hour(self, armed: ExecService, broker,
+                                                      clock, hour, minute, day):
+        armed.place(entry("n-1"))
         sent = len(broker.calls_to("place"))
-        w = Watcher(armed)
-        r = w.once()
-        assert "flat_by_close" not in r
-        assert armed.flat_by_close() == {"due": False, "why": "before 14:55 CT",
-                                         "acted": False}
-        assert len(broker.calls_to("place")) == sent
-        assert len(armed.status()["positions"]) == 1
-
-    def test_at_the_hour_the_position_is_sold(self, armed: ExecService, broker, clock):
-        armed.place(entry("f-2"))
-        assert len(armed.status()["positions"]) == 1
-        clock.set_ct(14, 55)
-        r = Watcher(armed).once()
-        assert r["flat_by_close"]["acted"] and r["flat_by_close"]["flat"]
-        assert armed.status()["positions"] == []
-        events = [e["event"] for e in armed.journal.read()]
-        assert "flat_by_close" in events and "flattened" in events
-        assert any(e.get("reason") == "flat-by-close"
-                   for e in armed.journal.read() if e.get("event") == "flattened")
-
-    def test_a_working_entry_is_cancelled_so_it_cannot_fill_at_the_bell(
-            self, armed: ExecService, broker, clock):
-        """The entries go first. One still working at 14:55 could fill at
-        14:59 and hand back the overnight position this exists to prevent."""
-        broker.rest_limits = True
-        armed.place(entry("f-3"))
-        assert armed.status()["working"]
-        clock.set_ct(14, 56)
-        r = Watcher(armed).once()
-        assert r["flat_by_close"]["cancelled"] and r["flat_by_close"]["flat"]
-        assert armed.status()["working"] == []
-
-    def test_it_runs_once_a_day_and_not_again(self, armed: ExecService, broker, clock):
-        armed.place(entry("f-4"))
-        clock.set_ct(14, 55)
-        assert Watcher(armed).once()["flat_by_close"]["flat"]
-        clock.set_ct(14, 56)
-        assert armed.flat_by_close() == {"due": False, "why": "already flat for the day",
-                                         "acted": False}
-
-    def test_stop_and_stand_down_do_not_hold_it(self, armed: ExecService, broker, clock):
-        """Nothing that exists to keep him out of risk may keep him in it —
-        flatten is legal while STOPped and while stood down, and so is this."""
-        armed.place(entry("f-5"))
-        armed.stop()
-        armed.stand_down()
-        clock.set_ct(14, 55)
-        assert Watcher(armed).once()["flat_by_close"]["flat"]
-        assert armed.status()["positions"] == []
-
-    def test_a_broker_that_cannot_be_reached_is_retried_not_abandoned(
-            self, armed: ExecService, broker, clock, monkeypatch):
-        armed.place(entry("f-6"))
-        clock.set_ct(14, 55)
-        with no_exits(broker, monkeypatch):
-            r = armed.flat_by_close()
-            assert r["acted"] and not r["flat"] and r["errors"]
-            assert len(armed.status()["positions"]) == 1
-
-            # inside the retry window it holds off rather than hammering
-            clock.advance(seconds=5)
-            assert armed.flat_by_close() == {"due": True, "why": "waiting to retry",
-                                             "acted": False}
-        # past it, with the broker back, it tries again and gets out
-        clock.advance(seconds=40)
-        assert armed.flat_by_close()["flat"]
-        assert armed.status()["positions"] == []
-
-    def test_a_weekend_pass_is_never_due(self, armed: ExecService, clock):
-        armed.place(entry("f-7"))
-        clock.set_ct(14, 55, day=29)                       # Saturday 2026-08-29
-        r = armed.flat_by_close()
-        assert r["due"] is False and "not a trading day" in r["why"]
-        assert len(armed.status()["positions"]) == 1
-
-    def test_still_held_past_the_hour_is_never_silent(
-            self, armed: ExecService, broker, clock, monkeypatch):
-        """The status body carries it and the card says it in red, because a
-        position held past the close-out with nothing said is the failure
-        this whole ruling exists to prevent."""
-        from execd.panel import flat_by_close_alert
-
-        armed.place(entry("f-8"))
-        clock.set_ct(14, 55)
-        with no_exits(broker, monkeypatch):
-            armed.flat_by_close()
-        st = armed.status()
-        f = st["flat_by_close"]
-        assert f["due"] and not f["done"] and f["still_held"] == [CALL]
-        alert = flat_by_close_alert(st)
-        assert "past 14:55 CT and still here" in alert and "C6400" in alert
-        assert flat_by_close_alert({"flat_by_close": {"due": False}}) == ""
-
-    def test_an_entry_sent_after_the_sweep_is_his_and_is_left_alone(
-            self, armed: ExecService, broker, clock):
-        """The other half of the same day's ruling: Steve also accepted
-        after-hours sends (st-hlah), and in paper they fill. The sweep is ONE
-        event — reaching 14:55 marks the day whether or not there was
-        anything to close — so a position opened at 15:30 to exercise the
-        pipe is not sold the moment it fills."""
-        clock.set_ct(14, 55)
-        assert Watcher(armed).once()["skipped"] == "flat"     # nothing held
-        assert armed.flat_by_close_status()["done"] is True   # the day is marked
-
-        clock.set_ct(15, 30)
+        clock.set_ct(hour, minute, day=day)
         refresh_quotes(armed, broker)
-        # the morning's arming ended at the close; he arms again to test
-        armed.unlock({"token": "x"})
-        armed.place(entry("f-10"))
-        assert len(armed.status()["positions"]) == 1
         r = Watcher(armed).once()
         assert "flat_by_close" not in r
-        assert len(armed.status()["positions"]) == 1, "his after-hours entry was swept"
+        assert len(armed.status()["positions"]) == 1
+        # the bracket rested at the fill is all that was sent; nothing since
+        assert len(broker.calls_to("place")) == sent
+        assert not any(e.get("event") in ("flattened", "flat_by_close")
+                       for e in armed.journal.read())
 
-    def test_an_unlock_after_the_hour_marks_the_day_and_closes_what_survived(
-            self, service: ExecService, broker, clock):
-        """Unlocking is the first moment a LOCKED service can close anything,
-        so the close-out runs there too — and when there is nothing to close
-        it marks the day, so the entry he unlocked in order to send is
-        safe."""
-        clock.set_ct(15, 30)
+    def test_a_working_entry_is_not_cancelled_by_the_clock(self, armed: ExecService,
+                                                          broker, clock):
+        broker.rest_limits = True
+        armed.place(entry("n-2"))
+        clock.set_ct(14, 56)
+        refresh_quotes(armed, broker)
+        Watcher(armed).once()
+        assert armed.status()["working"]
+        assert broker.calls_to("cancel") == []
+
+    def test_the_service_has_no_close_out_to_call(self, armed: ExecService):
+        assert not hasattr(armed, "flat_by_close")
+        assert not hasattr(armed, "flat_by_close_status")
+        assert "flat_by_close" not in armed.status()
+
+    @pytest.mark.parametrize("hour,day", [(16, 26), (10, 29)])   # after the bell; Saturday
+    def test_an_entry_at_any_hour_is_not_refused_and_is_left_alone(
+            self, service: ExecService, broker, clock, hour, day):
+        clock.set_ct(hour, 0, day=day)
         refresh_quotes(service, broker)
         service.unlock({"token": "x"})
-        assert service.flat_by_close_status()["done"] is True
-        service.place(entry("f-11"))
+        out = service.place(entry("n-3"))
+        assert out.get("refused") is None, out
         assert len(service.status()["positions"]) == 1
-        assert service.flat_by_close()["acted"] is False
+        clock.advance(minutes=60 * 5)
+        refresh_quotes(service, broker)
+        Watcher(service).once()
         assert len(service.status()["positions"]) == 1
-
-    def test_locked_says_so_and_leaves_the_position_alone(
-            self, armed: ExecService, clock):
-        """With no credential in memory there is nothing to transmit with.
-        The watcher skips the pass entirely; asked directly, the service says
-        why and does not mark the day done."""
-        armed.place(entry("f-9"))
-        armed.arming.lock()
-        clock.set_ct(14, 55)
-        assert Watcher(armed).once() == {"skipped": "locked"}
-        r = armed.flat_by_close()
-        assert r["acted"] is False and "locked" in r["why"]
-        assert armed.flat_by_close_status()["done"] is False
+        assert service.arming.state.value == "ARMED"
 
 
 def test_start_returns_a_daemon_thread(armed: ExecService):

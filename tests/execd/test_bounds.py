@@ -19,8 +19,8 @@ import pytest
 
 from execd.bounds import (
     Bounds, DayState, QuoteView, check_entry, check_exit, check_instrument,
-    check_preview_cost, check_price_band, check_risk_budget, check_window,
-    load_bounds, session_close,
+    check_preview_cost, check_price_band, check_risk_budget,
+    load_bounds,
 )
 from execd.intent import OrderIntent, OrderType, Side
 
@@ -85,27 +85,17 @@ class TestEachBoundRefusesByName:
         r = refusal(entry(delta=None))
         assert r.bound == "protective_stop"
 
-    def test_the_window_does_not_gate_spx_entries(self):
-        """Steve, 2026-09-14: the trading-hours rule is revoked for SPX — it
-        cannot fill after hours, and after-hours sends exercise the pipe."""
-        from execd.bounds import WINDOW_EXEMPT_ROOTS
-        assert WINDOW_EXEMPT_ROOTS == {"SPX", "SPXW"}
-        for when in (datetime(2026, 8, 26, 8, 0, tzinfo=CT),       # before the open
-                     datetime(2026, 8, 26, 14, 55, tzinfo=CT),     # past no_open_after
-                     datetime(2026, 8, 30, 10, 0, tzinfo=CT)):     # a Sunday
-            assert refusal(entry(), now=when) is None, when
-
-    def test_check_window_itself_still_knows_the_hours(self):
-        """The rule is not gone, only not applied to SPX roots."""
-        from execd.bounds import check_window
-        b = Bounds()
-        r = check_window(datetime(2026, 8, 26, 8, 0, tzinfo=CT), b, opening=True)
-        assert r.bound == "window" and "before" in r.reason
-        r = check_window(datetime(2026, 8, 26, 14, 55, tzinfo=CT), b, opening=True)
-        assert r.bound == "window" and "no new positions" in r.reason
-        r = check_window(datetime(2026, 8, 30, 10, 0, tzinfo=CT), b, opening=True)
-        assert r.bound == "window" and "Sunday" in r.reason
-        assert check_window(datetime(2026, 8, 26, 10, 0, tzinfo=CT), b, opening=True) is None
+    @pytest.mark.parametrize("when", [
+        datetime(2026, 8, 26, 8, 0, tzinfo=CT),      # before the old open
+        datetime(2026, 8, 26, 14, 55, tzinfo=CT),    # past the old 14:50 cutoff
+        datetime(2026, 8, 26, 16, 0, tzinfo=CT),     # after the bell
+        datetime(2026, 8, 29, 10, 0, tzinfo=CT),     # a Saturday
+        datetime(2026, 8, 30, 3, 0, tzinfo=CT),      # a Sunday, small hours
+    ])
+    def test_no_bound_reads_the_clock(self, when):
+        """Steve, 2026-09-24: "never ever place that kind of restriction on
+        me". No hour and no day of the week refuses an entry. [co-8mb1z]"""
+        assert refusal(entry(), now=when) is None, when
 
     def test_positions_refuses_a_second_open_position(self):
         r = refusal(entry(), state=DayState(open_positions=1))
@@ -307,38 +297,15 @@ class TestExitsClearAlmostNothing:
         assert check_exit(exit_intent(qty=5), Bounds(), held_qty=None) is None
 
 
-class TestWindow:
-    @pytest.mark.parametrize("hour,minute,opening,expected", [
-        (8, 29, True, "window"), (8, 30, True, None), (14, 49, True, None),
-        (14, 50, True, "window"), (14, 55, False, None), (15, 0, False, "window"),
-    ])
-    def test_the_two_cutoffs(self, hour, minute, opening, expected):
-        now = datetime(2026, 8, 26, hour, minute, tzinfo=CT)
-        got = check_window(now, Bounds(), opening=opening)
-        assert (got.bound if got else None) == expected
-
-    def test_utc_input_is_converted_to_central(self):
-        # 15:00 UTC is 10:00 CDT — inside the session, not past the close.
-        assert check_window(datetime(2026, 8, 26, 15, 0, tzinfo=timezone.utc),
-                            Bounds(), opening=True) is None
-
-    def test_session_close_is_todays_close_in_central(self):
-        close = session_close(MIDSESSION, Bounds())
-        assert close.astimezone(CT).strftime("%Y-%m-%d %H:%M") == "2026-08-26 15:00"
-
-    def test_session_close_after_the_bell_rolls_to_the_next_day(self):
-        after = datetime(2026, 8, 26, 16, 0, tzinfo=CT)
-        assert session_close(after, Bounds()).astimezone(CT).day == 27
-
-
 class TestConfiguration:
     def test_the_start_values_are_the_ones_in_the_design(self):
         b = Bounds()
         assert b.instruments == ("SPX", "SPXW")
         assert (b.qty_cap, b.max_open_positions) == (1, 1)
         assert (b.daily_loss_ceiling_usd, b.max_attempts) == (500.0, 2)
-        assert (b.open_ct, b.close_ct, b.no_open_after_ct) == ("08:30", "15:00", "14:50")
-        assert b.flat_by_close_ct == "14:55"        # Steve's ruling on st-9j8e
+        for gone in ("open_ct", "close_ct", "no_open_after_ct", "flat_by_close_ct",
+                     "weekdays_only"):
+            assert not hasattr(b, gone), gone        # no clock rules (co-8mb1z)
 
     def test_steves_file_overrides_the_start_values(self, tmp_path):
         p = tmp_path / "bounds.yaml"
@@ -355,23 +322,20 @@ class TestConfiguration:
         with pytest.raises(ValueError, match="unknown bound"):
             load_bounds(p)
 
-    def test_an_incoherent_window_is_refused(self):
-        with pytest.raises(ValueError, match="must precede"):
-            Bounds(open_ct="15:00", close_ct="08:30").validated()
+    def test_an_old_file_with_the_retired_clock_keys_still_loads(self, tmp_path):
+        """/etc files written before 2026-09-24 carry these; they must not
+        stop the service from starting, and they must do nothing."""
+        p = tmp_path / "bounds.yaml"
+        p.write_text('open_ct: "08:30"\nclose_ct: "15:00"\nno_open_after_ct: "14:50"\n'
+                     'flat_by_close_ct: "14:55"\nweekdays_only: true\nqty_cap: 1\n')
+        assert load_bounds(p) == Bounds()
 
-    def test_a_cutoff_outside_the_window_is_refused(self):
-        with pytest.raises(ValueError, match="inside the window"):
-            Bounds(no_open_after_ct="16:00").validated()
-
-    def test_flat_by_close_must_sit_between_the_cutoff_and_the_bell(self):
-        """Before the no-open cutoff it would sell a position the service is
-        still free to re-open; after the close it is a market order with no
-        market to fill it. [st-9j8e]"""
-        for bad in ("14:45", "15:05"):
-            with pytest.raises(ValueError, match="flat_by_close_ct"):
-                Bounds(flat_by_close_ct=bad).validated()
-        for good in ("14:50", "14:55", "15:00"):
-            assert Bounds(flat_by_close_ct=good).validated().flat_by_close_ct == good
+    def test_the_shipped_example_carries_no_clock_keys(self):
+        from pathlib import Path
+        import yaml
+        from execd.bounds import RETIRED_KEYS
+        example = Path(__file__).resolve().parents[2] / "execd" / "bounds.example.yaml"
+        assert not set(yaml.safe_load(example.read_text())) & RETIRED_KEYS
 
     @pytest.mark.parametrize("kw", [
         {"qty_cap": 0}, {"max_open_positions": 0}, {"daily_loss_ceiling_usd": 0},
@@ -394,8 +358,7 @@ class TestConfiguration:
     def test_to_dict_names_every_bound_the_service_enforces(self):
         assert set(Bounds().to_dict()) == {
             "instruments", "qty_cap", "max_open_positions", "daily_loss_ceiling_usd",
-            "max_attempts", "open_ct", "close_ct", "no_open_after_ct",
-            "flat_by_close_ct", "weekdays_only",
+            "max_attempts",
             "price_band_pct", "max_quote_age_s", "preview_cost_tolerance_usd",
             "require_protective_stop",
             "take_profit_multiple", "take_profit_basis",
@@ -455,7 +418,8 @@ class TestTheBoundsAreAllCovered:
     def test_the_scan_finds_the_bounds_it_is_supposed_to(self):
         """A meta-test that silently matched nothing would pass forever."""
         declared = self._declared()
-        assert {"instrument", "qty", "ceiling", "window", "stop"} <= declared
+        assert {"instrument", "qty", "ceiling", "stop"} <= declared
+        assert "window" not in declared          # no clock bound (co-8mb1z)
         assert len(declared) >= 10
 
     def test_every_bound_the_service_can_emit_has_a_refusing_test(self):

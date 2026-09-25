@@ -120,7 +120,7 @@ be reached.
 | `POST /cancel` · `POST /flatten` | getting out |
 | `POST /adjust` | move the resting stop, the resting take-profit, or both, under a live position — `{symbol, stop_price?, target_price?}` (st-fn5y) |
 | `POST /stand-down` · `POST /stop` | done for the day; the kill switch on |
-| `POST /observe` · `POST /poll-fills` | feed it the SPX mark; pick up a stop that fired — driven in-process by `execd/watch.py` since stage 4 (every 5 s while a position or working entry exists). The same loop closes the day out at `flat_by_close_ct` (14:55 CT): every working entry cancelled, everything held sold at market, because the bracket's legs are DAY orders and a position carried past the bell loses both — Steve's ruling on st-9j8e, 2026-09-18, "9j8e is flat". Once a day, retried every 30 s until nothing is left, and said in red on the page when it has not taken. Manual §5.16 |
+| `POST /observe` · `POST /poll-fills` | feed it the SPX mark; pick up a stop that fired — driven in-process by `execd/watch.py` since stage 4 (every 5 s while a position or working entry exists). It never acts because of the time of day: the 14:55 CT close-out it ran from 2026-09-18 was removed on 2026-09-24 (co-8mb1z). The 09-18 reading of "9j8e is flat" as a request for an automatic close was wrong — Steve, 2026-09-24: *"omg - never ever place that kind of restriction on me ... As 0DTE trades, if i don't close them, they expire. flat. But I will _never ask that you do it automatically."* |
 
 | `GET /marketdata/<kind>` | the raw Schwab body for `quotes`, `chains` or `pricehistory`, query allow-listed to that resource's own parameters — the readers' door (stage 3) |
 
@@ -152,7 +152,6 @@ breaks the suite. Those three live on the page (stage 3), behind the passphrase.
 | `qty` | 1 contract |
 | `stop` | the STOP file blocks entries |
 | `protective_stop` | an entry must carry `stop_spx` and `delta`, and the sign must not be transposed |
-| `window` | 08:30–15:00 CT, weekdays; nothing opens after 14:50 |
 | `positions` | 1 open at a time |
 | `ceiling` | $500 realized loss, 10 attempts (2 at the design; 10 by Steve, 2026-09-14) — an attempt is a filled position, held while it is open and kept only if it closes at a loss; a close at break-even or better gives it back (Steve, 2026-09-14, st-fn5y). Rebuilt from the journal, so a restart does not reset it; and the entry's own worst case, limit down to its derived stop, must fit the headroom left — as must a stop moved wider by `adjust`; the headroom is what remains after the day's realized losses *and* the worst cases of the positions already held, so the sum of the day's worst cases fits the ceiling at any `max_open_positions`, not only at 1 — and a position held with no stop (adopted, or a stop that would not rest) has no worst case to sum, so it shuts the entry door until it has one or is flat (st-s2jj) |
 | `bracket` | an adjusted stop must sit below the live bid and an adjusted target above it, on the tick grid; a leg that filled before it could be moved is booked and the adjust refused (`filled`) |
@@ -169,8 +168,8 @@ and never re-sent.
 contract is one this service trades, that the side really closes, and that it
 is not larger than the position (selling more than you hold is an opening sale
 wearing an exit's label). Nothing that exists to keep Steve out of risk may
-keep him in it, so `flatten` works while STOPped, while stood down, after the
-bell and with the ceiling breached. An exit for a contract the service is not
+keep him in it, so `flatten` works while STOPped, while stood down, at any
+hour and with the ceiling breached. An exit for a contract the service is not
 tracking is sized against the broker's own position; only when the broker
 cannot be reached at all does the order go through unsized, journaled as
 `exit_unverified`, because refusing on ignorance is how an exit gate traps
@@ -390,11 +389,18 @@ throughout the day."*). The same installed code runs twice:
 | state (journal, STOP, arming) | `/var/lib/execd` | `/var/lib/execd-alpaca` |
 | bounds, mode | `/etc/execd/` | `/etc/execd-alpaca/` |
 
-**Each instance has its own limits.** The loss ceiling, attempts, one-open-
-position and the window are counted per instance from its own journal: a
-loss on Alpaca does not count against Schwab's ceiling, and the reverse.
-Flat-by-close (14:55 CT) and SPX/SPXW-only apply to both, from each one's
-bounds file (both seeded from `bounds.example.yaml`). Each page is unlocked
+**Each instance has its own limits.** The loss ceiling, attempts and
+one-open-position are counted per instance from its own journal: a loss on
+Alpaca does not count against Schwab's ceiling, and the reverse. SPX/SPXW-only
+applies to both, from each one's bounds file (both seeded from
+`bounds.example.yaml`).
+
+**No clock rules, on either instance** (co-8mb1z). Nothing refuses, closes or
+locks because of the hour or the day: no session window, no 14:50 cutoff, no
+weekdays-only, no flat-by-close, and an unlock lasts until LOCK, STOP,
+stand-down or a restart. Steve, 2026-09-24: *"omg - never ever place that kind of restriction on me ... As 0DTE trades, if i don't close them, they expire. flat. But I will _never ask that you do it automatically."* A bounds file that still carries
+`open_ct`, `close_ct`, `no_open_after_ct`, `flat_by_close_ct` or
+`weekdays_only` loads; the keys are ignored. Each page is unlocked
 separately with the one passphrase; STOP on one page stops only that broker.
 Every page carries a large SCHWAB or ALPACA badge beside PAPER/LIVE, every
 journal line carries `broker`, and `/status` says which. A state directory is

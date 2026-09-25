@@ -46,25 +46,14 @@ daily_loss_ceiling_usd: 500.0
 # LOSING attempts, per the rule above.
 max_attempts: 10
 
-# The session, in Central time. NOT APPLIED TO SPX/SPXW ENTRIES since
-# 2026-09-14 (Steve: "revoke the trading-hours rule when SPX is the target
-# instrument"); kept for any other root, and an unlock after close_ct arms
-# until the end of the day. Nothing opens after no_open_after_ct; exits are
-# not gated by any of these.
-open_ct: "08:30"
-close_ct: "15:00"
-no_open_after_ct: "14:50"
-
-# When the service closes the day out by its own hand. Steve's ruling,
-# 2026-09-18 ("9j8e is flat"): the bracket's legs are DAY orders and a
-# position is not, so nothing is carried past the bell. At this hour the
-# watcher cancels every working entry and sells everything held at market,
-# through FLATTEN, which no bound refuses. Must sit between no_open_after_ct
-# and close_ct. Changing it is his; removing it is not — a DAY bracket with
-# no hand to flatten the position it protects is the hole audit finding 38
-# opened.
-flat_by_close_ct: "14:55"
-weekdays_only: true
+# No clock rules. There is no session window, no no-new-entries cutoff, no
+# weekdays-only and no flat-by-close: nothing here refuses, closes or locks
+# because of the time of day (Steve, 2026-09-24: "never ever place that kind
+# of restriction on me ... As 0DTE trades, if i don't close them, they
+# expire. flat. But I will _never ask that you do it automatically.").
+# A file that still carries open_ct, close_ct, no_open_after_ct,
+# flat_by_close_ct or weekdays_only loads; those lines are ignored and can
+# be deleted.
 
 # Price sanity. A limit must sit within this fraction of the live touch, and a
 # quote older than max_quote_age_s is not a live quote.

@@ -612,7 +612,7 @@ class TestLockedInPlaceAndFewerWords:
         r = c.post("/exec/unlock", data={"passphrase": PASS, "back": "order"})
         assert r.status_code == 303 and r.headers["Location"].startswith("/exec/order")
         landing = text(c.get(r.headers["Location"]))
-        assert "Armed until" in landing and "action='/exec/unlock'" not in landing
+        assert "Armed." in landing and "action='/exec/unlock'" not in landing
 
     def test_the_money_sits_under_the_strip_when_armed(self, order_page, armed, chain):
         armed._balances_cache = (armed.clock(), {"available_funds": 12345.0,

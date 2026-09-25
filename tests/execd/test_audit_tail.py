@@ -1,8 +1,9 @@
 """Three smaller findings from the 2026-08-30 audit, fixed together. [st-kh0l]
 
 **Finding 16** — unlocking after 15:00 CT armed the service until 15:00 the
-*next* day, because ``session_close`` rolls forward when the close has passed.
-An arming expiry must never outlive the session it was granted for.
+*next* day. Superseded 2026-09-24: there is no arming expiry at all now
+(Steve: "never ever place that kind of restriction on me"; co-8mb1z) — the
+arming lasts until LOCK, STOP, stand-down or a restart.
 
 **Finding 15** — four POST routes acted on a body-less request. A cross-origin
 HTML form post needs no CORS preflight, so any page rendered by a browser on
@@ -35,30 +36,17 @@ from .conftest import CALL, SPX_NOW, entry, exit_intent
 TRIGGER = SPX_NOW - 12.5
 
 
-class TestUnlockCannotOutliveTheSession:
-    def test_an_unlock_after_the_close_arms_until_the_end_of_the_day(self, service, clock):
-        """Finding 16 said never until tomorrow's close; Steve (2026-09-14)
-        revoked the trading-hours rule for SPX so after-hours sends can
-        exercise the pipe. The cap is now the end of today, Central."""
-        clock.set_ct(15, 30)
+class TestUnlockHasNoClock:
+    @pytest.mark.parametrize("hour", [7, 10, 15, 23])
+    def test_an_unlock_at_any_hour_arms_with_no_expiry(self, service, clock, hour):
+        clock.set_ct(hour, 30)
         st = service.unlock({"token": "x"})
         assert st["arming"]["state"] == "ARMED"
-        assert st["arming"]["expires_at_ct"] == "23:59 CT"
+        assert "expires_at" not in st["arming"]
         line = service.journal.events("unlock")[-1]
-        assert line["after_close"] is True and line["until"].startswith("2026-08-26T23:59:59")
-
-    def test_an_unlock_before_the_open_arms_until_todays_close(self, service, clock):
-        clock.set_ct(7, 0)
-        service.unlock({"token": "x"})
-        assert service.arming.expires_at.astimezone(
-            service.journal.clock().astimezone().tzinfo) is not None
-        expires = service.arming.status()["expires_at_ct"]
-        assert expires == "15:00 CT"
-
-    def test_an_explicit_until_is_capped_at_todays_close(self, service, clock):
-        service.unlock({"token": "x"}, until=clock() + timedelta(days=2))
-        assert service.arming.status()["expires_at_ct"] == "15:00 CT"
-        assert service.journal.events("unlock")[-1]["capped"] is True
+        assert "until" not in line and "after_close" not in line
+        clock.advance(minutes=60 * 30)
+        assert service.arming.state.value == "ARMED"
 
     def test_exits_still_need_no_window(self, armed, clock, broker):
         """The finding is about arming for entries; getting out after the bell

@@ -21,8 +21,8 @@
 # page refuses re-authorisation. The Schwab instance is the one writer.
 #
 # Its daily limits are its own: a loss here does not count against the
-# Schwab instance's ceiling, nor the reverse. Flat-by-close (14:55 CT) and
-# SPX/SPXW-only come from its own bounds file, seeded from the same example.
+# Schwab instance's ceiling, nor the reverse. SPX/SPXW-only comes from its
+# own bounds file, seeded from the same example. No clock rules (co-8mb1z).
 Description=Strader execd ALPACA — live execution service (loopback 8780; page 8781)
 Documentation=https://github.com/justSteve/Strader
 After=network-online.target

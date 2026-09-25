@@ -11,8 +11,10 @@ Three states:
     that arms itself. Nothing transmits from here — not even an exit, because
     there is nothing to transmit *with*.
 ``ARMED``
-    Steve entered the passphrase on the page. Armed until the session close he
-    chose, or until he stands down. Only here do entries transmit.
+    Steve entered the passphrase on the page. Armed until he presses LOCK or
+    STOP, stands down, or the service restarts — never until a time of day
+    (Steve, 2026-09-24: "never ever place that kind of restriction on me";
+    co-8mb1z). Only here do entries transmit.
 ``STOOD_DOWN``
     He is finished for the day but the credential is still in memory. No new
     positions; exits still work, because a stood-down service that could not
@@ -22,7 +24,7 @@ Crossed with that is the **STOP file** — one ``touch`` from anywhere, includin
 Steve's phone. It blocks entries in every state and blocks no exit in any.
 
 The rule the whole module exists to hold: *nothing here may ever refuse an
-exit for a risk reason.* Window, ceiling, STOP, stand-down — all of them stop
+exit for a risk reason.* Ceiling, STOP, stand-down — all of them stop
 him taking on risk; none of them may strand him in it. The one thing that
 refuses an exit is LOCKED, and that is a statement about capability, not policy.
 """
@@ -35,7 +37,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable
 
-from .bounds import CT, Refusal
+from .bounds import Refusal
 
 
 class ArmState(str, Enum):
@@ -63,20 +65,17 @@ class Arming:
     def __post_init__(self) -> None:
         self.kill_file = Path(self.kill_file)
         self._credential: Any | None = None
-        self._until: datetime | None = None
         self._stood_down: bool = False
         self._unlocked_at: datetime | None = None
 
     # ── transitions ──────────────────────────────────────────────────────
-    def unlock(self, credential: Any, until: datetime) -> ArmState:
+    def unlock(self, credential: Any) -> ArmState:
         """Steve entered the passphrase. Page-only: there is no API route here,
-        and ``tests/execd/test_api.py`` asserts that."""
+        and ``tests/execd/test_api.py`` asserts that. No expiry: armed until
+        LOCK, STOP, stand-down or a restart."""
         if credential is None:
             raise ValueError("unlock needs a credential")
-        if until.tzinfo is None:
-            raise ValueError("unlock 'until' must be timezone-aware")
         self._credential = credential
-        self._until = until
         self._stood_down = False
         self._unlocked_at = self.clock()
         return self.state
@@ -103,7 +102,6 @@ class Arming:
     def lock(self) -> ArmState:
         """Forget the credential. After this only a passphrase brings it back."""
         self._credential = None
-        self._until = None
         self._stood_down = False
         self._unlocked_at = None
         return self.state
@@ -136,15 +134,7 @@ class Arming:
             return ArmState.LOCKED
         if self._stood_down:
             return ArmState.STOOD_DOWN
-        if self._until is not None and self.clock() >= self._until:
-            # Expiry stands down rather than locking: the credential stays
-            # available to close whatever is still open at the bell.
-            return ArmState.STOOD_DOWN
         return ArmState.ARMED
-
-    @property
-    def expires_at(self) -> datetime | None:
-        return self._until
 
     def credential(self) -> Any:
         if self._credential is None:
@@ -157,12 +147,7 @@ class Arming:
         if state is ArmState.LOCKED:
             return Refusal("armed", "the service is locked — no credential in memory")
         if state is ArmState.STOOD_DOWN:
-            expired = self._until is not None and self.clock() >= self._until
-            return Refusal(
-                "armed",
-                "the session has ended — arming expired" if expired
-                else "stood down for the day — nothing new opens",
-            )
+            return Refusal("armed", "stood down — nothing new opens")
         if self.killed:
             return Refusal("stop", "STOP is on — no new positions until it is cleared")
         return None
@@ -175,14 +160,11 @@ class Arming:
 
     # ── reporting ────────────────────────────────────────────────────────
     def status(self) -> dict[str, Any]:
-        until = self._until
         return {
             "state": self.state.value,
             "killed": self.killed,
             "kill_file": str(self.kill_file),
             "unlocked_at": self._unlocked_at.isoformat() if self._unlocked_at else None,
-            "expires_at": until.isoformat() if until else None,
-            "expires_at_ct": until.astimezone(CT).strftime("%H:%M CT") if until else None,
             "permits_entry": self.permits_entry() is None,
             "permits_exit": self.permits_exit() is None,
         }

@@ -13,15 +13,24 @@ bounds is not configurable, because a bound you can switch off is not a bound.
 
 Order of checks matters and is asserted in ``tests/execd/test_bounds.py``:
 instrument, side, order type, quantity, the STOP file, the protective-stop
-inputs, the session window, open positions, the daily ceiling, the price band.
+inputs, open positions, the daily ceiling, the price band.
+
+**No bound here reads the clock or the calendar to refuse or to act.** The
+session window, the 14:50 no-new-entries cutoff, weekdays-only and the 14:55
+flat-by-close were removed on 2026-09-24. Steve: "omg - never ever place that
+kind of restriction on me ... As 0DTE trades, if i don't close them, they
+expire. flat. But I will _never ask that you do it automatically." The old
+keys in a bounds file are ignored, not refused (:data:`RETIRED_KEYS`).
+[co-8mb1z]
 Cheapest and most categorical first, so a refusal names the most fundamental
 thing wrong rather than whichever check happened to run.
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, replace
-from datetime import datetime, time, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 from zoneinfo import ZoneInfo
@@ -30,6 +39,7 @@ from . import CT_TZ
 from .intent import OrderIntent, OrderType, Side
 
 CT = ZoneInfo(CT_TZ)
+log = logging.getLogger("execd.bounds")
 
 
 @dataclass(frozen=True)
@@ -76,12 +86,10 @@ class DayState:
         return replace(self, attempts_used=self.attempts_used + 1)
 
 
-def _parse_hhmm(s: str, label: str) -> time:
-    try:
-        hh, mm = s.split(":")
-        return time(int(hh), int(mm))
-    except (ValueError, AttributeError):
-        raise ValueError(f"{label} must be HH:MM in Central time, not {s!r}") from None
+#: Keys a bounds file may still carry from before 2026-09-24. Read and
+#: ignored, never refused, so an old /etc file cannot stop the service.
+RETIRED_KEYS = frozenset({"open_ct", "close_ct", "no_open_after_ct",
+                          "flat_by_close_ct", "weekdays_only"})
 
 
 @dataclass(frozen=True)
@@ -98,21 +106,6 @@ class Bounds:
     #: ceiling below the price of one position is a number, not a bound.
     daily_loss_ceiling_usd: float = 500.0
     max_attempts: int = 2
-    open_ct: str = "08:30"
-    close_ct: str = "15:00"
-    no_open_after_ct: str = "14:50"
-    #: When the service closes whatever it still holds, by its own hand.
-    #: Steve's ruling, 2026-09-18, on st-9j8e: "9j8e is flat" — the choice was
-    #: flat-by-close or resting the bracket GOOD_TILL_CANCEL so a position
-    #: could be held overnight under its stop. He trades 0DTE and nothing in
-    #: the design wants overnight exposure, so the legs stay DAY orders and
-    #: this is the hand that makes that safe: five minutes before ``close_ct``
-    #: the working entries are pulled and every position is sold at market,
-    #: through FLATTEN's own force. Like every bound it is his to change; it
-    #: is not his to remove, because a DAY bracket with nothing to flatten
-    #: the position it protects is the hole audit finding 38 opened.
-    flat_by_close_ct: str = "14:55"
-    weekdays_only: bool = True
     price_band_pct: float = 0.10      # a BUY limit may sit this far above the ask
     max_quote_age_s: float = 30.0     # older than this is not a live quote
     preview_cost_tolerance_usd: float = 5.00
@@ -125,23 +118,6 @@ class Bounds:
     #: times the fill premium").
     take_profit_multiple: float = 10.0
     take_profit_basis: str = "premium"
-
-    # ── derived ──
-    @property
-    def open_time(self) -> time:
-        return _parse_hhmm(self.open_ct, "open_ct")
-
-    @property
-    def close_time(self) -> time:
-        return _parse_hhmm(self.close_ct, "close_ct")
-
-    @property
-    def no_open_after(self) -> time:
-        return _parse_hhmm(self.no_open_after_ct, "no_open_after_ct")
-
-    @property
-    def flat_by_close(self) -> time:
-        return _parse_hhmm(self.flat_by_close_ct, "flat_by_close_ct")
 
     def problems(self) -> list[str]:
         out: list[str] = []
@@ -181,24 +157,6 @@ class Bounds:
             # fills at once, not a target.
             out.append(f"take_profit_multiple on the premium basis must be above 1, "
                        f"not {self.take_profit_multiple}")
-        try:
-            o, c, n, f = (self.open_time, self.close_time, self.no_open_after,
-                          self.flat_by_close)
-        except ValueError as exc:
-            out.append(str(exc))
-            return out
-        if not o < c:
-            out.append(f"open_ct {self.open_ct} must precede close_ct {self.close_ct}")
-        if not o <= n <= c:
-            out.append(f"no_open_after_ct {self.no_open_after_ct} must sit inside the window")
-        # After the door shuts on new entries and at or before the bell: a
-        # flatten before the no-open cutoff would sell a position the service
-        # would then be free to re-open, and one after the close is a market
-        # order with no market to fill it.
-        if not n <= f <= c:
-            out.append(
-                f"flat_by_close_ct {self.flat_by_close_ct} must sit between "
-                f"no_open_after_ct {self.no_open_after_ct} and close_ct {self.close_ct}")
         return out
 
     def validated(self) -> "Bounds":
@@ -210,6 +168,13 @@ class Bounds:
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> "Bounds":
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+        retired = sorted(set(d) & RETIRED_KEYS)
+        if retired:
+            # A bounds file written before 2026-09-24 still carries these; it
+            # must keep loading, and they must do nothing.
+            log.warning("bounds: ignoring retired clock keys %s — they no longer "
+                        "do anything and may be deleted", ", ".join(retired))
+        d = {k: v for k, v in d.items() if k not in RETIRED_KEYS}
         unknown = sorted(set(d) - known)
         if unknown:
             # Loud, not lenient: a typo in Steve's bounds file must not quietly
@@ -239,11 +204,6 @@ class Bounds:
             "max_open_positions": self.max_open_positions,
             "daily_loss_ceiling_usd": self.daily_loss_ceiling_usd,
             "max_attempts": self.max_attempts,
-            "open_ct": self.open_ct,
-            "close_ct": self.close_ct,
-            "no_open_after_ct": self.no_open_after_ct,
-            "flat_by_close_ct": self.flat_by_close_ct,
-            "weekdays_only": self.weekdays_only,
             "price_band_pct": self.price_band_pct,
             "max_quote_age_s": self.max_quote_age_s,
             "preview_cost_tolerance_usd": self.preview_cost_tolerance_usd,
@@ -269,35 +229,6 @@ def check_instrument(intent: OrderIntent, bounds: Bounds) -> Refusal | None:
     return None
 
 
-#: Roots the session window does not gate on entry (Steve, 2026-09-14). The
-#: arming expiry still ends at the close on a normal unlock; an unlock after
-#: the close arms until the end of the day, for testing.
-#:
-#: Both halves are RULED, not inferred (st-hlah). The 2026-09-15 audit's
-#: finding 63 said the after-hours arming had been read into his hours
-#: revocation rather than stated, and asked whether to refuse it in live.
-#: Steve, 2026-09-18: "accept after hours unlock and submissions". An
-#: after-hours send is his to make; Schwab's own refusal is the answer he
-#: wants to see, and in paper it exercises the whole pipe.
-WINDOW_EXEMPT_ROOTS = frozenset({"SPX", "SPXW"})
-
-
-def check_window(now: datetime, bounds: Bounds, *, opening: bool) -> Refusal | None:
-    """The session gate. ``opening`` applies the earlier no-new-entries cutoff."""
-    local = now.astimezone(CT)
-    if bounds.weekdays_only and local.weekday() >= 5:
-        return Refusal("window", f"{local:%A} is not a trading day")
-    cutoff = bounds.no_open_after if opening else bounds.close_time
-    t = local.time()
-    if t < bounds.open_time:
-        return Refusal(
-            "window",
-            f"{t:%H:%M} CT is before the session opens at {bounds.open_ct}",
-        )
-    if t >= cutoff:
-        label = "no new positions after" if opening else "the session closes at"
-        return Refusal("window", f"{t:%H:%M} CT is past {label} {cutoff:%H:%M} CT")
-    return None
 
 
 def check_price_band(
@@ -364,7 +295,8 @@ def check_entry(
     now: datetime,
     killed: bool = False,
 ) -> Refusal | None:
-    """Every bound an opening order must clear, in order. ``None`` means send."""
+    """Every bound an opening order must clear, in order. ``None`` means send.
+    ``now`` is kept for the callers; no bound here reads the clock."""
     if (r := check_instrument(intent, bounds)) is not None:
         return r
 
@@ -395,15 +327,6 @@ def check_entry(
             "an entry must carry stop_spx and delta — the broker-resident stop "
             "is derived from them and is not optional",
         )
-
-    # Steve, 2026-09-14: "we need to revoke the trading-hours rule when SPX
-    # is the target instrument. It can not fill after hours and placing live
-    # trades can help during testing." SPX and SPXW are the only roots the
-    # service trades, so the window gates nothing today; it stays here for
-    # any root added later, and check_window itself is unchanged.
-    if intent.occ.root not in WINDOW_EXEMPT_ROOTS:
-        if (r := check_window(now, bounds, opening=True)) is not None:
-            return r
 
     if state.open_positions >= bounds.max_open_positions:
         return Refusal(
@@ -441,7 +364,7 @@ def check_entry(
 
 def check_exit(intent: OrderIntent, bounds: Bounds,
                held_qty: int | None = None) -> Refusal | None:
-    """Getting out clears almost nothing. Not the window, not the ceiling, not
+    """Getting out clears almost nothing. Not the ceiling, not
     the STOP file — those all exist to stop Steve *entering* risk, and applying
     them to an exit would trap him in it.
 
@@ -540,18 +463,6 @@ def check_preview_cost(
             f"allows ${expected:.2f} (+${bounds.preview_cost_tolerance_usd:.2f}) — not sending",
         )
     return None
-
-
-def session_close(now: datetime, bounds: Bounds) -> datetime:
-    """The datetime this session's arming expires: today's close in CT."""
-    local = now.astimezone(CT)
-    close = local.replace(
-        hour=bounds.close_time.hour, minute=bounds.close_time.minute,
-        second=0, microsecond=0,
-    )
-    if close <= local:
-        close = close + timedelta(days=1)
-    return close
 
 
 DEFAULT_BOUNDS_PATH = Path("/etc/execd/bounds.yaml")

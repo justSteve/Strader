@@ -17,10 +17,12 @@ Every few seconds while exposed; a slow idle check otherwise; nothing at all
 while LOCKED, because with no credential in memory there is nothing to ask
 the broker with and no exit can be sent anyway.
 
-It is also the hand that closes the day. Since Steve's ruling of 2026-09-18
-("9j8e is flat") every pass asks :meth:`ExecService.flat_by_close` first:
-past 14:55 CT it cancels the working entries and sells what is held, so the
-DAY bracket never has to survive a bell. See that method. [st-9j8e]
+It never acts because of the time of day. Until 2026-09-24 every pass
+also ran a 14:55 CT close-out; Steve: "omg - never ever place that kind of
+restriction on me ... As 0DTE trades, if i don't close them, they expire.
+flat. But I will _never ask that you do it automatically." It is gone, and
+the 2026-09-18 reading of "9j8e is flat" as a request for it was wrong.
+[co-8mb1z]
 
 What it does not do: it never opens anything. ``observe`` and ``reconcile``
 are exit-class — they can only close, and only what the journal and the broker
@@ -68,28 +70,6 @@ class Watcher:
         if svc.arming.state is ArmState.LOCKED:
             return {"skipped": "locked"}
         out: dict[str, Any] = {}
-        # The day's close-out (st-9j8e; Steve, 2026-09-18: "9j8e is flat"). It
-        # answers "not due" on almost every pass and costs nothing; past 14:55
-        # CT it cancels the working entries and sells what is held, because the
-        # bracket's legs are DAY orders and a position carried past the bell
-        # loses both of them. Its own troubles are journaled inside it, and a
-        # failure here must not stop the pass that watches the position it
-        # failed to close.
-        #
-        # ABOVE the exposure check on purpose. Steve also ruled that sends
-        # after hours stand (st-hlah, the same day), and in paper they fill.
-        # If this only ran while something was held, a flat 14:55 would leave
-        # the day unmarked, and the first paper entry he sent at 15:30 to
-        # exercise the pipe would be swept the moment it filled. Reaching the
-        # hour marks the day whether or not there was anything to close, so
-        # the sweep is one event and everything after it is his.
-        try:
-            fbc = svc.flat_by_close()
-            if fbc.get("acted"):
-                out["flat_by_close"] = fbc
-        except Exception as exc:  # noqa: BLE001 — never lose the watch pass
-            log.exception("watch: flat-by-close failed; continuing")
-            out["flat_by_close_error"] = str(exc)
         if not svc.has_exposure():
             return {**out, "skipped": "flat"}
         try:

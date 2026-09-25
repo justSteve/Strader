@@ -354,8 +354,8 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:  # a Refused (after the close) is reported, not hidden
             print(f"execd: unlock refused — {exc}", file=sys.stderr)
             return 3
-        print(f"execd: armed until {service.arming.expires_at}; "
-              f"refresh wall {broker.token_status().get('refresh_wall')}", file=sys.stderr)
+        print(f"execd: armed; refresh wall {broker.token_status().get('refresh_wall')}",
+              file=sys.stderr)
 
     name = "mock" if args.mock else "schwab"
     print(f"execd {config.sha} on {BIND_HOST}:{args.port} — broker={name}, mode={mode}, "
@@ -457,7 +457,7 @@ def _run_alpaca(args: argparse.Namespace, config: ServiceConfig, bounds: Any,
         except Exception as exc:  # a Refused (after the close) is reported, not hidden
             print(f"execd: unlock refused — {exc}", file=sys.stderr)
             return 3
-        print(f"execd: armed until {service.arming.expires_at}", file=sys.stderr)
+        print("execd: armed", file=sys.stderr)
 
     print(f"execd {config.sha} on {BIND_HOST}:{args.port} — broker=alpaca, venue={venue}, "
           f"mode={mode}, state={config.state_dir}, arming={service.arming.state.value}",

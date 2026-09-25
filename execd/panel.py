@@ -466,32 +466,6 @@ def _href(path: str, params: Mapping[str, str] | None) -> str:
 
 # ── entry points ─────────────────────────────────────────────────────────
 
-def flat_by_close_alert(st: Mapping[str, Any]) -> str:
-    """One red line when the day's close-out is past due and something is
-    still there. [st-9j8e]
-
-    Steve ruled flat, so past ``flat_by_close_ct`` the watcher sells what is
-    held and cancels what is working. When that has not taken — the broker
-    unreachable, the service LOCKED, a close the exchange would not fill
-    after hours — the one thing that must not happen is silence. It says what
-    is still there, so the answer is FLATTEN on this same card."""
-    f = st.get("flat_by_close") or {}
-    if not f.get("due") or f.get("done"):
-        return ""
-    held = list(f.get("still_held") or [])
-    working = list(f.get("still_working") or [])
-    if not held and not working:
-        return ""
-    what = []
-    if held:
-        what.append(", ".join(contract_name(s) for s in held))
-    if working:
-        what.append(f"{len(working)} working entr{'y' if len(working) == 1 else 'ies'}")
-    return (f"<div class=refusal>past {esc(f.get('at_ct', ''))} CT and still here: "
-            f"{esc(' · '.join(what))} — the day's close-out has not taken. "
-            f"FLATTEN, or check the broker.</div>")
-
-
 def panel_body(service: ExecService, st: Mapping[str, Any], actions: Mapping[str, str], *,
                now: datetime, order_path: str, sel_query: Mapping[str, str] | None = None,
                refused: str | None = None, dismissed: bool = False) -> tuple[str, str]:
@@ -515,7 +489,7 @@ def panel_body(service: ExecService, st: Mapping[str, Any], actions: Mapping[str
         stage = "none"
     bounds = st.get("bounds") or {}
     sel_query = sel_query or {}
-    body = flat_by_close_alert(st)
+    body = ""
     if stage == "refused":
         body = body_refused(refused or "", order_path, sel_query)
     # the live part always renders while money is live; the resting stages

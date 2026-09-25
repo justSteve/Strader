@@ -129,10 +129,10 @@ def landing(client, r) -> str:
 # ── unlock ────────────────────────────────────────────────────────────────
 
 class TestUnlock:
-    def test_the_right_passphrase_arms_until_the_close(self, page, service):
+    def test_the_right_passphrase_arms_with_no_expiry(self, page, service):
         body = landing(page, page.post("/exec/unlock", data={"passphrase": PASS}))
         assert service.arming.state is ArmState.ARMED
-        assert "Armed until 15:00 CT" in body
+        assert "Armed." in body and "until" not in body.split("Armed.")[1][:40]
         assert service.arming.credential()["app"]["key"] == "TKEY"
 
     def test_the_wrong_passphrase_leaves_it_locked_and_journals_no_value(
@@ -154,10 +154,12 @@ class TestUnlock:
         assert "no vault" in body and "execd_vault_init" in body
         assert service.arming.state is ArmState.LOCKED
 
-    def test_after_the_close_an_unlock_arms_until_the_end_of_the_day(self, page, service, clock):
+    def test_after_the_close_an_unlock_arms_and_stays_armed(self, page, service, clock):
         clock.set_ct(15, 30)
         body = landing(page, page.post("/exec/unlock", data={"passphrase": PASS}))
-        assert "Armed until 23:59 CT" in body and service.arming.state is ArmState.ARMED
+        assert "Armed." in body and service.arming.state is ArmState.ARMED
+        clock.advance(minutes=60 * 20)
+        assert service.arming.state is ArmState.ARMED
 
     def test_the_page_never_shows_a_passphrase_or_token(self, page, service):
         landing(page, page.post("/exec/unlock", data={"passphrase": PASS}))
