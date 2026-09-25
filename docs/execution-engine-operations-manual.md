@@ -579,9 +579,11 @@ LIMIT and `None` otherwise.
 a quote, a clock reading. No I/O, no broker, no credential.
 
 There are **twelve distinct bound names** — `armed`, `instrument`, `side`,
-`order_type`, `qty`, `stop`, `protective_stop`, `same_contract`,
+`order_type`, `qty`, `stop`, `protective_stop`,
 `tick`, `price_band`, `preview_cost`. The `positions` and `ceiling` bounds were
-removed on 2026-09-24 (co-8mb1z). None of them reads the clock:
+removed on 2026-09-24 (co-8mb1z). A second entry in a contract already held
+is an add — one position at the combined size, its stop and target resized
+(`_add_to_position`, journaled `position_added`). None of them reads the clock:
 the `window` bound was removed on 2026-09-24 (co-8mb1z).
 
 **Order of checks for an entry** (`check_entry`), and the order is asserted in
@@ -597,7 +599,6 @@ names the most fundamental thing wrong:
 | 4 | `qty` | `qty > qty_cap` |
 | 5 | `stop` | the STOP file exists |
 | 6 | `protective_stop` | `require_protective_stop` and either `stop_spx` or `delta` is missing |
-| 8 | `same_contract` | a second entry in a contract already held or working — positions are tracked one per contract with their own bracket; a second would orphan the first's legs. Not a risk rule; any other strike opens (co-8mb1z) |
 | 10a | `tick` | the limit (or a stop price) is off the exchange's grid — 0.05 below $3.00, 0.10 at and above it (measured 2026-09-04, st-pohq); an off-grid price is a rejected order, not a tighter one |
 | 11 | `price_band` | no quote; or quote older than `max_quote_age_s`; or not two-sided; or limit above `ask*(1+band)`; or limit below `bid*(1-band)` |
 | 12 | `protective_stop` | no `$SPX` mark; or the stop sign is transposed (`stop_is_consistent` false); or the limit is too cheap for `protective_stop_price` to derive a stop at all |

@@ -47,7 +47,7 @@ FORBIDDEN_NAMES = REMOVED | {"check_window", "check_risk_budget", "session_close
                              "loss_headroom_usd", "attempts_left", "_open_risk_usd"}
 
 #: Refusal names the removed rules used.
-FORBIDDEN_BOUNDS = {"ceiling", "positions", "window"}
+FORBIDDEN_BOUNDS = {"ceiling", "positions", "window", "same_contract"}
 
 
 def modules() -> list[Path]:

@@ -1297,20 +1297,23 @@ class ExecService:
         except BrokerError:
             spx = None
         pos = self._open.get(work.symbol)
-        if pos is None:
-            pos = OpenPosition(
-                symbol=work.symbol, qty=qty, entry_price=fill_px,
-                intent_id=work.intent_id, right=work.right,
-                stop_spx=work.stop_spx, delta=work.delta, entry_spx=spx,
-                entry_order_id=order.order_id, opened_at=self.clock(),
-            )
-            self._open[pos.symbol] = pos
-        else:
+        if pos is not None:
             # The position grew. Its resting bracket is now smaller than what
             # is held, which is the same silent hole in the other direction,
             # so the old legs come off before correctly sized ones go on.
-            self._cancel_bracket(pos)
-            pos.qty += qty
+            self._add_to_position(pos, qty, fill_px, intent_id=work.intent_id,
+                                  order_id=order.order_id, spx=spx,
+                                  stop_spx=work.stop_spx, delta=work.delta,
+                                  found_by="reconcile")
+            self._resolve_working(order.order_id, outcome="filled")
+            return
+        pos = OpenPosition(
+            symbol=work.symbol, qty=qty, entry_price=fill_px,
+            intent_id=work.intent_id, right=work.right,
+            stop_spx=work.stop_spx, delta=work.delta, entry_spx=spx,
+            entry_order_id=order.order_id, opened_at=self.clock(),
+        )
+        self._open[pos.symbol] = pos
         self.journal.record("filled", kind="entry", intent_id=work.intent_id,
                             symbol=pos.symbol, qty=qty, price=fill_px,
                             cost_usd=round(fill_px * CONTRACT_MULTIPLIER * qty, 2),
@@ -1664,18 +1667,6 @@ class ExecService:
                         self.clock(), killed=self.arming.killed)
         if r is not None:
             return r
-        # Not a risk rule — a tracking one. Positions are tracked one per
-        # contract, each with its own bracket, so a second entry in a contract
-        # already held or working would overwrite the first and orphan its
-        # stop and target (measured 2026-09-25 once the one-position limit
-        # that had hidden it was removed, co-8mb1z). Refused, loudly, until
-        # adding to a held contract is built. Any other contract opens freely.
-        held = intent.symbol in self._open or any(
-            w.symbol == intent.symbol for w in self._working.values())
-        if held:
-            return Refusal("same_contract",
-                           f"{intent.symbol.strip()} is already held or working — adding to "
-                           f"a contract already held is not built yet; any other strike opens")
         return self._protective_stop_refusal(intent)
 
     def _protective_stop_refusal(self, intent: OrderIntent) -> Refusal | None:
@@ -1827,6 +1818,18 @@ class ExecService:
             return out
 
         fill_px = order.fill_price if order.fill_price is not None else (intent.limit or 0.0)
+        held = self._open.get(intent.symbol)
+        if held is not None:
+            # He already holds this contract: one position at the combined
+            # size, one bracket resized to it (co-8mb1z).
+            added = self._add_to_position(
+                held, order.filled_qty, fill_px, intent_id=intent.intent_id,
+                order_id=order.order_id, spx=spx, stop_spx=intent.stop_spx,
+                delta=intent.delta, commission_usd=float(prev.commission_usd or 0.0))
+            out["stop_order"] = added.get("stop_order")
+            out["target_order"] = added.get("target_order")
+            out["added_to"] = added.get("added_to")
+            return out
         pos = OpenPosition(
             symbol=intent.symbol, qty=order.filled_qty, entry_price=fill_px,
             intent_id=intent.intent_id, right=intent.occ.right,
@@ -1846,6 +1849,82 @@ class ExecService:
                             order_id=order.order_id)
         out["stop_order"] = self._place_protective_stop(pos, spx)
         out["target_order"] = self._place_take_profit(pos)
+        return out
+
+    def _add_to_position(self, pos: OpenPosition, qty: int, fill_px: float, *,
+                         intent_id: str, order_id: str, spx: float | None,
+                         stop_spx: float | None, delta: float | None,
+                         commission_usd: float = 0.0,
+                         found_by: str | None = None) -> dict[str, Any]:
+        """A fill in a contract already held: one position at the combined
+        size, one stop and one target resized to it. [co-8mb1z]
+
+        Steve, 2026-09-24, on the one-position limit: "No idea where that
+        'only one position' came from." Positions are tracked one per
+        contract, so a second entry in the same contract is an add, not a
+        second position — refusing it would be a new restriction, and
+        tracking it separately would orphan the first bracket.
+
+        The old legs come off first (a leg found already filled is booked
+        against what was held, as every cancel does), the entry price
+        becomes the size-weighted average, and the bracket goes back on for
+        the whole size at the prices already standing — the stop and target
+        he has, or moved to, are kept. A position with no standing price for
+        a leg gets one derived the way a first fill does."""
+        before_qty, before_px = pos.qty, pos.entry_price
+        self._cancel_bracket(pos)
+        if pos.qty <= 0:
+            # A leg filled in the race and the old position is gone; this
+            # fill is a fresh position of its own.
+            self._open.pop(pos.symbol, None)
+            fresh = OpenPosition(
+                symbol=pos.symbol, qty=qty, entry_price=fill_px, intent_id=intent_id,
+                right=pos.right, stop_spx=stop_spx, delta=delta, entry_spx=spx,
+                entry_order_id=order_id, opened_at=self.clock(),
+                entry_commission_usd=commission_usd)
+            self._open[fresh.symbol] = fresh
+            self.journal.record("filled", kind="entry", intent_id=intent_id,
+                                symbol=fresh.symbol, qty=qty, price=fill_px,
+                                cost_usd=round(fill_px * CONTRACT_MULTIPLIER * qty, 2),
+                                spx=spx, stop_spx=stop_spx, delta=delta,
+                                order_id=order_id, found_by=found_by)
+            out: dict[str, Any] = {"added_to": None}
+            out["stop_order"] = (self._place_protective_stop(fresh, spx)
+                                 if spx is not None else None)
+            out["target_order"] = self._place_take_profit(fresh)
+            return out
+        held = pos.qty
+        pos.entry_price = round((pos.entry_price * held + fill_px * qty) / (held + qty), 4)
+        pos.qty = held + qty
+        pos.entry_commission_usd = round(pos.entry_commission_usd + commission_usd, 2)
+        if pos.stop_spx is None:
+            pos.stop_spx = stop_spx
+        if pos.delta is None:
+            pos.delta = delta
+        self.journal.record("filled", kind="entry", intent_id=intent_id,
+                            symbol=pos.symbol, qty=qty, price=fill_px,
+                            cost_usd=round(fill_px * CONTRACT_MULTIPLIER * qty, 2),
+                            spx=spx, stop_spx=stop_spx, delta=delta,
+                            order_id=order_id, found_by=found_by, added_to=pos.intent_id)
+        self.journal.record("position_added", symbol=pos.symbol, intent_id=pos.intent_id,
+                            added_intent_id=intent_id, added_qty=qty, added_price=fill_px,
+                            qty_before=before_qty, qty=pos.qty,
+                            entry_price_before=before_px, entry_price=pos.entry_price)
+        out = {"added_to": pos.intent_id, "stop_order": None, "target_order": None}
+        if pos.exit_in_flight:
+            self.journal.record("stop_unprotected", symbol=pos.symbol, intent_id=pos.intent_id,
+                                qty=pos.qty, detail="added while a close is in flight — "
+                                "the bracket goes back on when the close resolves")
+            return out
+        if pos.stop_price is not None:
+            out["stop_order"] = self._rest_stop_at(pos, pos.stop_price, spx=spx, kind="added")
+        elif spx is not None:
+            out["stop_order"] = self._place_protective_stop(pos, spx)
+        if pos.symbol in self._open:
+            if pos.target_price is not None:
+                out["target_order"] = self._rest_target_at(pos, pos.target_price, kind="added")
+            else:
+                out["target_order"] = self._place_take_profit(pos)
         return out
 
     def _place_protective_stop(self, pos: OpenPosition, spx: float) -> dict[str, Any] | None:
@@ -2902,6 +2981,16 @@ class ExecService:
                 try:
                     right = parse_occ(symbol).right
                 except ValueError:
+                    continue
+                held = self._open.get(symbol)
+                if held is not None:
+                    # an add to a contract already held (co-8mb1z)
+                    q = int(e.get("qty", 0) or 0)
+                    px = float(e.get("price", 0.0) or 0.0)
+                    if q > 0:
+                        held.entry_price = round((held.entry_price * held.qty + px * q)
+                                                 / (held.qty + q), 4)
+                        held.qty += q
                     continue
                 self._open[symbol] = OpenPosition(
                     symbol=symbol, qty=int(e.get("qty", 0) or 0),

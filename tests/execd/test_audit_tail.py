@@ -186,8 +186,8 @@ class TestStopHasTheLastLook:
 class TestMidnightDoesNotForgetAPosition:
     """Finding 9, the rollover half. There is no position limit since
     2026-09-24 (co-8mb1z); what still matters is that a position carried past
-    midnight is still tracked, so a second entry in the same contract cannot
-    overwrite it and orphan its bracket."""
+    midnight is still tracked, so a second entry in the same contract adds to
+    it rather than overwriting it and orphaning its bracket."""
 
     def test_yesterdays_open_position_is_still_tracked(self, armed, clock, broker):
         armed.place(entry(intent_id="wed-1"))
@@ -197,7 +197,8 @@ class TestMidnightDoesNotForgetAPosition:
         assert armed.day_state().open_positions == 0  # the journal's honest count
         armed.unlock({"token": "x"})                  # re-arm for the new session
         out = armed.place(entry(intent_id="thu-1", symbol=CALL))
-        assert out["refused"]["bound"] == "same_contract"
+        assert out["refused"] is None and out["added_to"] == "wed-1"
+        assert [p["qty"] for p in armed.status()["positions"]] == [2]
 
     def test_a_fresh_day_with_nothing_held_is_unaffected(self, armed, clock, broker):
         armed.place(entry(intent_id="wed-2"))

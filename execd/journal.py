@@ -184,7 +184,8 @@ class Journal:
             elif event == "entry_resolved":
                 pending.discard(str(e.get("order_id") or ""))
             elif event == "filled" and e.get("kind") == "entry":
-                opened += 1
+                if not e.get("added_to"):      # an add grows a position, not the count
+                    opened += 1
                 for key in (e.get("intent_id"), e.get("symbol")):
                     if key:
                         opened_keys.add(str(key))

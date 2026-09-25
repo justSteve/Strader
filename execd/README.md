@@ -152,7 +152,6 @@ breaks the suite. Those three live on the page (stage 3), behind the passphrase.
 | `qty` | 1 contract |
 | `stop` | the STOP file blocks entries |
 | `protective_stop` | an entry must carry `stop_spx` and `delta`, and the sign must not be transposed |
-| `same_contract` | a second entry in a contract already held or working — not a risk rule: positions are tracked one per contract, each with its own bracket, and a second would orphan the first's stop and target (co-8mb1z). Any other strike opens |
 | `bracket` | an adjusted stop must sit below the live bid and an adjusted target above it, on the tick grid; a leg that filled before it could be moved is booked and the adjust refused (`filled`) |
 | `tick` | a limit or stop price on the exchange's grid — 0.05 below $3.00, 0.10 at and above (measured, st-pohq); off-grid is a rejected order, and an off-grid stop is no stop |
 | `price_band` | a limit within 10% of the touch, against a quote under 30s old |
@@ -236,6 +235,11 @@ removed and the bounds kept. They are gone now, and
 still records realized P&L as a fact; nothing refuses because of it. Open
 positions are still rebuilt from the journal after a restart — reading back a
 week for a position held past a close (`position_carried`, st-btob).
+
+**A second entry in a contract already held is an add** (co-8mb1z): one
+position at the combined size and a size-weighted entry price; the old
+stop and target come off and one stop and one target go back on for the
+whole size at the prices already standing. Journaled `position_added`.
 
 **What is open is read from the broker, not believed.** The journal is the
 authority on what this service *intended*; only the broker knows what is *held*,

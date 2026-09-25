@@ -818,3 +818,58 @@ class TestManyPositions:
         svc = self.svc(broker, clock, tmp_path)
         svc._open[CALL].stop_price = None
         assert svc.place(self.put())["refused"] is None
+
+
+class TestAddingToAHeldContract:
+    """Steve, 2026-09-24, on the one-position limit: "No idea where that 'only
+    one position' came from." A second entry in a contract already held is
+    an add: one position at the combined size, one stop and one target
+    resized to it, nothing orphaned. [co-8mb1z]"""
+
+    def test_the_add_is_one_position_with_its_bracket_resized(self, armed, broker):
+        first = armed.place(entry(intent_id="add-1"))
+        old_stop = first["stop_order"]["order_id"]
+        old_target = first["target_order"]["order_id"]
+        out = armed.place(entry(intent_id="add-2"))
+        assert out["refused"] is None and out["added_to"] == "add-1"
+
+        pos = armed.status()["positions"]
+        assert len(pos) == 1 and pos[0]["qty"] == 2
+        assert pos[0]["entry_price"] == 2.10
+
+        # the old legs are off, the new ones rest for the whole size
+        assert broker._orders[old_stop].status.value == "CANCELED"
+        assert broker._orders[old_target].status.value == "CANCELED"
+        working = broker.working_orders(CALL)
+        assert sorted((o.order_type.value, o.qty) for o in working) == [("LIMIT", 2), ("STOP", 2)]
+        assert {o.order_id for o in working} == {pos[0]["stop_order_id"], pos[0]["target_order_id"]}
+        assert broker.positions()[0].qty == 2           # the broker agrees on the size
+
+        added = armed.journal.events("position_added")
+        assert added and added[-1]["qty_before"] == 1 and added[-1]["qty"] == 2
+
+    def test_the_standing_stop_and_target_prices_are_kept(self, armed, broker):
+        armed.place(entry(intent_id="keep-1"))
+        armed.adjust(CALL, stop_price=1.20)
+        armed.place(entry(intent_id="keep-2"))
+        pos = armed.status()["positions"][0]
+        assert pos["qty"] == 2 and pos["stop_price"] == 1.20
+
+    def test_a_restart_recovers_the_combined_position(self, broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        first = ExecService(broker, config, clock=clock)
+        first.unlock({"token": "x"})
+        first.place(entry(intent_id="r-1"))
+        first.place(entry(intent_id="r-2"))
+        second = ExecService(broker, config, clock=clock)
+        pos = second.status()["positions"]
+        assert len(pos) == 1 and pos[0]["qty"] == 2
+        assert second.day_state().open_positions == 1
+
+    def test_flatten_sells_the_whole_combined_size(self, armed, broker):
+        armed.place(entry(intent_id="f-1"))
+        armed.place(entry(intent_id="f-2"))
+        armed.flatten()
+        assert armed.status()["positions"] == []
+        assert broker.positions() == []
+        assert broker.working_orders(CALL) == []          # no leg left behind
