@@ -473,11 +473,14 @@ class TestSurface:
         assert "LOCKED" in body and "UNLOCK" in body and "name=passphrase" in body
         assert "FLATTEN" not in body, "nothing to flatten with while locked"
 
-    def test_the_account_page_armed_offers_stop_flatten_stand_down(self, page):
+    def test_the_account_page_armed_offers_stop_and_lock_and_no_stand_down(self, page):
+        """Steve, 2026-09-25: "Remove the 'Stand Down' button. Don't render the
+        'Flatten' button unless there is an open position." (co-8mb1z)"""
         page.post("/exec/unlock", data={"passphrase": PASS})
         body = text(page.get("/exec/account"))
-        assert "ARMED" in body and ">STOP<" in body and "FLATTEN" in body
-        assert ">stand down<" in body and ">lock<" in body
+        assert "ARMED" in body and ">STOP<" in body and ">lock<" in body
+        assert ">stand down<" not in body
+        assert ">FLATTEN<" not in body                  # nothing is open
 
     def test_the_account_page_shows_the_journal_tail(self, page):
         page.post("/exec/unlock", data={"passphrase": PASS})
@@ -493,7 +496,7 @@ class TestSurface:
         rules = {r.rule for r in app.url_map.iter_rules() if r.endpoint != "static"}
         assert rules == {
             "/", "/exec/", "/exec/account", "/exec/unlock", "/exec/stop", "/exec/resume",
-            "/exec/stand-down", "/exec/lock", "/exec/lock/confirm",
+            "/exec/stand-down", "/exec/mode", "/exec/lock", "/exec/lock/confirm",
             "/exec/flatten", "/exec/flatten/confirm",
             "/exec/reauth/link", "/exec/reauth/store",
             "/exec/order", "/exec/order/price", "/exec/order/state",

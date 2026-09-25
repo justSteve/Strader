@@ -11,7 +11,7 @@ only, funnel never — at ``https://mydesk-1.tail89f676.ts.net/exec/``.
 passphrase; every action that *reduces* it does not.
 
 - **Unlock** (passphrase): opens the vault, hands the trading credential to
-  the arming state until today's close. The passphrase never leaves the
+  the arming state until LOCK, STOP or a restart. The passphrase never leaves the
   request — it is not stored, logged, journaled or echoed.
 - **Resume** (passphrase): clears the STOP file. Turning STOP *on* is a bare
   button — from a phone, one tap — because the switch that stops new risk
@@ -23,9 +23,15 @@ passphrase; every action that *reduces* it does not.
   vault under the same passphrase, the market grant to its file. If the
   service is armed at the time, the credential in memory is swapped for the
   new one so the new refresh token is the one in use.
-- **STOP, STAND DOWN, LOCK, FLATTEN**: bare buttons. FLATTEN asks once more
-  on its own page with a single-use nonce (the fire server's rail, carried
-  here), because it transmits.
+- **PAPER → LIVE** (passphrase) and **LIVE → PAPER** (bare): the account
+  page's mode switch (co-8mb1z, Steve 2026-09-25: "support moving between
+  paper and live without need to re-run the installer"). Going live adds
+  capability, going back reduces it — this rule, applied as written.
+- **STOP, LOCK, FLATTEN**: bare buttons. FLATTEN asks once more on its own
+  page with a single-use nonce (the fire server's rail, carried here),
+  because it transmits, and shows only while a position is open. The STAND
+  DOWN button is gone from every screen (Steve, 2026-09-25); the route and
+  the state stay, unused by the page.
 
 Why the passphrase and not a login: the page is reachable only from Steve's
 tailnet devices, and on this box every agent shell is root and can reach the
@@ -236,7 +242,8 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 clock: Callable[[], datetime] = _utcnow,
                 monotonic: Callable[[], float] = time.monotonic,
                 unlock_payload: Callable[[Mapping[str, Any]], Any] | None = None,
-                prefix: str = "/exec", grants: bool = True) -> Flask:
+                prefix: str = "/exec", grants: bool = True,
+                mode_credential: Callable[[Mapping[str, Any], str], Any] | None = None) -> Flask:
     """Build the page app. ``vault`` is the path (or a :class:`Vault`) the
     trading credential lives in; ``market`` the market credential file, if
     the service holds one; ``http_client`` is for tests (an ``httpx.Client``
@@ -337,7 +344,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
 
     @bp.get("/account")
     def account():
-        """Arming, STOP/clear, stand down, lock, the weekly re-authorisation,
+        """Arming, STOP/clear, lock, the PAPER/LIVE switch, the weekly re-authorisation,
         the grants, the journal tail — everything that is not placing an order."""
         return _render_index(service, vault, market, clock, _actions(),
                              msg=request.args.get("msg"), bad=request.args.get("bad"),
@@ -392,6 +399,38 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
             del pw
         service.resume()
         return home("STOP is off.")
+
+    @bp.post("/mode")
+    def mode():
+        """The PAPER/LIVE switch (co-8mb1z). Going live takes the passphrase,
+        as every action that adds capability does; going back to paper does
+        not. ``mode_credential`` is the broker's own say on what the new mode
+        needs from the vault (Alpaca's live keys); a refusal from it, or from
+        the service's one correctness check, is shown in words and the mode
+        stays as it was."""
+        to = request.form.get("to", "")
+        if to not in ("paper", "live"):
+            return home("Choose paper or live.", bad=True)
+        credential = None
+        try:
+            if to == "live":
+                pw = passphrase()
+                try:
+                    vault_payload = open_vault(pw)
+                finally:
+                    del pw
+                if mode_credential is not None:
+                    credential = mode_credential(vault_payload, to)
+            # back to paper: the keys in memory already serve it (Alpaca's
+            # envelope holds every venue the vault had at unlock)
+            service.set_mode(to, credential=credential)
+        except PageRefused as exc:
+            return home(str(exc), bad=True)
+        except ValueError as exc:
+            return home(f"Still {service.config.mode.upper()}: {exc}", bad=True)
+        except Refused as exc:
+            return home(exc.refusal.reason, bad=True)
+        return home(f"Now {to.upper()}.")
 
     @bp.post("/stand-down")
     def stand_down():
@@ -816,7 +855,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         """Absolute paths for every form, so a page served at ``/exec/flatten``
         posts its confirm to ``/exec/flatten/confirm`` and not to a sibling."""
         return {name: url_for(f"exec.{name}") for name in (
-            "index", "account", "unlock", "stop", "resume", "stand_down", "lock", "lock_confirm",
+            "index", "account", "unlock", "stop", "resume", "stand_down", "mode", "lock", "lock_confirm",
             "flatten", "flatten_confirm", "reauth_link", "reauth_store",
             "order", "order_price", "order_state", "order_send",
             "order_adjust", "order_cancel")}
@@ -1025,6 +1064,22 @@ def wall_alert_html(st: dict[str, Any], now: datetime) -> str:
     return f"<div class=bad>trading grant: {_fmt_wall(str(wall), now)}</div>"
 
 
+def mode_switch_html(mode: str, action: str) -> str:
+    """The PAPER/LIVE switch on the account page (co-8mb1z). Going live takes
+    the passphrase; going back to paper is one tap."""
+    if mode == "live":
+        return (f"<div class=card><div class=k>this instance is LIVE — orders reach the "
+                f"broker</div><form method=post action='{action}'>"
+                "<input type=hidden name=to value=paper>"
+                "<button class='big quiet'>switch to PAPER</button></form></div>")
+    return (f"<div class=card><div class=k>this instance is PAPER — switching sends "
+            f"real orders from here on</div><form method=post action='{action}'>"
+            "<input type=hidden name=to value=live>"
+            "<input type=password name=passphrase placeholder='passphrase' "
+            "autocomplete=current-password required>"
+            "<button class='big exit'>switch to LIVE</button></form></div>")
+
+
 def unlock_form(action: str, back: str | None = None) -> str:
     """The passphrase box and UNLOCK — on the account page, and on the
     trading page whenever the service is LOCKED (Steve, 2026-09-15: "if panel
@@ -1094,13 +1149,14 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
                      "autocomplete=current-password required>"
                      "<button class='big quiet'>clear STOP</button></form>")
     if state != "LOCKED":
-        parts.append(f"<form method=post action='{a['flatten']}'>"
-                     "<button class='big exit'>FLATTEN</button></form>")
-        if state == "ARMED":
-            parts.append(f"<form method=post action='{a['stand_down']}'>"
-                         "<button class='big quiet'>stand down</button></form>")
+        # FLATTEN only while there is something to flatten; no STAND DOWN
+        # button on any screen (Steve, 2026-09-25, co-8mb1z)
+        if st["positions"]:
+            parts.append(f"<form method=post action='{a['flatten']}'>"
+                         "<button class='big exit'>FLATTEN</button></form>")
         parts.append(f"<form method=post action='{a['lock']}'>"
                      "<button class='big cancel'>lock</button></form>")
+    parts.append(mode_switch_html(mode, a["mode"]))
 
     # ── the position, with its money ──
     for p in st["positions"]:

@@ -69,9 +69,9 @@ from .bounds import load_bounds
 from .broker import MockBroker
 from .page import DEFAULT_CALLBACK_URL, PAGE_HOST, PAGE_PORT, CredentialFile, create_page
 from .schwab import Credential, SchwabBroker, trading_payload
-from .alpaca import AlpacaBroker, AlpacaCredential, alpaca_payload
+from .alpaca import AlpacaBroker, alpaca_payloads
 from .service import ExecService, ServiceConfig
-from .paper import PaperBroker, read_mode
+from .paper import ModeSwitch, PaperBroker, current_mode
 from .vault import BadPassphrase, Vault, VaultError
 from .watch import INTERVAL_S as WATCH_INTERVAL_S, Watcher
 
@@ -288,7 +288,8 @@ def main(argv: list[str] | None = None) -> int:
 
     bounds = load_bounds(args.bounds)
     try:
-        mode = read_mode(args.mode_file)
+        # the page's switch in the state dir, then the /etc seed (co-8mb1z)
+        mode = current_mode(args.mode_file, args.state_dir)
     except (OSError, ValueError) as exc:
         print(f"execd: mode file unreadable — {exc}", file=sys.stderr)
         return 2
@@ -301,10 +302,11 @@ def main(argv: list[str] | None = None) -> int:
     broker = MockBroker() if args.mock else SchwabBroker(underlying=config.index_symbol,
                                                           roots=bounds.instruments)
     # `broker` stays the transport — bound, checked, printed below as before.
-    # The service gets the paper wrapper over it when the mode says so: reads
-    # and the preview pass through, orders never leave the box (st-k6gl).
-    service_broker = (PaperBroker(broker, book_path=Path(args.state_dir) / "paper-book.json")
-                      if mode == "paper" else broker)
+    # The service gets both sides: the paper book over it (reads and the
+    # preview pass through, orders never leave the box, st-k6gl) and the
+    # transport itself for live, with the page's switch choosing (co-8mb1z).
+    service_broker = ModeSwitch(
+        PaperBroker(broker, book_path=Path(args.state_dir) / "paper-book.json"), broker, mode)
     service = ExecService(service_broker, config)
     if isinstance(broker, SchwabBroker):
         broker.bind(service.arming)
@@ -363,13 +365,14 @@ def main(argv: list[str] | None = None) -> int:
     if mode == "paper":
         print("execd PAPER: quotes, chains, account and the broker's preview are live; "
               "orders fill in a simulated book against live quotes and never reach "
-              f"Schwab. To go live: write 'live' to {args.mode_file} and restart.",
+              "Schwab. The account page switches to LIVE (passphrase).",
               file=sys.stderr)
     return _serve(args, service, market)
 
 
 def _serve(args: argparse.Namespace, service: ExecService, market: CredentialFile | None,
-           unlock_payload: Any = None, grants: bool = True) -> int:
+           unlock_payload: Any = None, grants: bool = True,
+           mode_credential: Any = None) -> int:
     """The watcher, the page and the API — the same for every broker."""
     try:
         claim = claim_state_dir(args.state_dir)
@@ -388,7 +391,8 @@ def _serve(args: argparse.Namespace, service: ExecService, market: CredentialFil
         page = create_page(service, vault=args.vault, market=market,
                            callback_url=args.callback_url,
                            state_dir=args.state_dir, unlock_payload=unlock_payload,
-                           prefix=args.page_prefix, grants=grants)
+                           prefix=args.page_prefix, grants=grants,
+                           mode_credential=mode_credential)
         threading.Thread(
             target=lambda: page.run(host=PAGE_HOST, port=args.page_port, threaded=True),
             name="execd-page", daemon=True).start()
@@ -406,11 +410,12 @@ def _run_alpaca(args: argparse.Namespace, config: ServiceConfig, bounds: Any,
                 mode: str) -> int:
     """``--alpaca``: orders to Alpaca, market data from Schwab's market app.
 
-    The venue IS the mode: ``paper`` → Alpaca's paper venue, ``live`` → live.
-    There is no execd paper book over Alpaca, because Alpaca's paper venue is
-    already a simulated account and wrapping it would mean nothing reached
-    Alpaca at all. The live venue therefore sits behind exactly the gates the
-    live Schwab path does: Steve's mode file, his passphrase, the bounds."""
+    The venue IS the mode: ``paper`` → Alpaca's paper venue, ``live`` → live,
+    both held and switched on the account page (co-8mb1z). There is no execd
+    paper book over Alpaca, because Alpaca's paper venue is already a
+    simulated account and wrapping it would mean nothing reached Alpaca at
+    all. The live venue sits behind exactly the gates the live Schwab path
+    does: the switch takes the passphrase going live, and the bounds."""
     venue = mode
     if args.mock_unlock:
         print("execd: --mock-unlock arms only the mock broker. A real broker "
@@ -435,17 +440,22 @@ def _run_alpaca(args: argparse.Namespace, config: ServiceConfig, bounds: Any,
               "(Alpaca publishes no index data), so the exit loop and the order page "
               "cannot price. Quotes for equities and crypto come from Alpaca.",
               file=sys.stderr)
-    broker = AlpacaBroker(venue, market=data, roots=bounds.instruments)
-    service = ExecService(broker, config)
-    broker.bind(service.arming)
+    sides = {v: AlpacaBroker(v, market=data, roots=bounds.instruments)
+             for v in ("paper", "live")}
+    service = ExecService(ModeSwitch(sides["paper"], sides["live"], mode), config)
+    for side in sides.values():
+        side.bind(service.arming)
 
     def unlock_payload(vault_payload: Any) -> dict[str, Any]:
-        return alpaca_payload(vault_payload, venue)
+        # every venue the vault holds; the one the instance is in must be there
+        return alpaca_payloads(vault_payload, need=service.config.mode)
+
+    def mode_credential(vault_payload: Any, to: str) -> dict[str, Any]:
+        return alpaca_payloads(vault_payload, need=to)
 
     if args.unlock_stdin:
         try:
             payload = unlock_payload(Vault(args.vault).load(_read_passphrase()))
-            AlpacaCredential.from_payload(payload)
         except BadPassphrase:
             print("execd: the vault did not open.", file=sys.stderr)
             return 3
@@ -464,13 +474,14 @@ def _run_alpaca(args: argparse.Namespace, config: ServiceConfig, bounds: Any,
           file=sys.stderr)
     if venue == "paper":
         print("execd ALPACA PAPER: orders go to Alpaca's paper account, not to money. "
-              f"To go live: write 'live' to {args.mode_file} and re-install.", file=sys.stderr)
+              "The account page switches to LIVE (passphrase).", file=sys.stderr)
     else:
         print("execd ALPACA LIVE: orders go to Alpaca's live account once Steve unlocks.",
               file=sys.stderr)
     # grants=False: this instance reads the Schwab grants and never writes
     # them — the Schwab instance is the one writer (co-8mb1z).
-    return _serve(args, service, market, unlock_payload=unlock_payload, grants=False)
+    return _serve(args, service, market, unlock_payload=unlock_payload, grants=False,
+                  mode_credential=mode_credential)
 
 
 if __name__ == "__main__":

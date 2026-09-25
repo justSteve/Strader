@@ -60,7 +60,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from .arming import Arming
+from .arming import Arming, ArmState
 from .bounds import (
     CT, Bounds, DayState, QuoteView, Refusal, check_entry, check_exit,
     check_preview_cost,
@@ -470,6 +470,62 @@ class ExecService:
             # service came back LOCKED (see _recover): now there is a
             # credential to ask the broker with.
             self.reconcile()
+            return self.status()
+
+    def set_mode(self, mode: str, credential: Any = None) -> dict[str, Any]:
+        """Switch this instance between paper and live, now (co-8mb1z).
+
+        Steve, 2026-09-25: "i would like the form to support moving between
+        paper and live without need to re-run the installer." The broker the
+        service holds is a :class:`~execd.paper.ModeSwitch`; this moves it,
+        stamps the journal's ``mode`` on every line from here on, and writes
+        ``<state-dir>/mode`` so a restart comes back in the same mode (it
+        takes precedence over the /etc seed; ``execd.paper.current_mode``).
+
+        **The one refusal is a correctness one.** A paper position or working
+        order cannot be carried into live, nor the reverse — the book it lives
+        in is not the one the service would be asking. So a flip waits until
+        this instance holds nothing, has nothing working, no send without an
+        answer and no leg left loose; FLATTEN is on the same page. Nothing
+        else is checked here — the page asks for the passphrase going live,
+        as for every action that adds capability.
+
+        ``credential``, when given, replaces the one in memory (Alpaca's keys
+        differ by venue); LOCKED stays LOCKED and the next unlock loads the
+        new mode's keys."""
+        from .paper import MODES, write_mode
+        if mode not in MODES:
+            raise ValueError(f"mode must be paper or live, not {mode!r}")
+        with self._lock:
+            old = self.config.mode
+            if mode == old:
+                return self.status()
+            if not hasattr(self.broker, "brokers"):
+                raise Refused(Refusal("mode", "this service was started without a paper/live "
+                                              "switch — restart it with the current install"))
+            held = [p.symbol.strip() for p in self._open.values()]
+            held += [f"working {w.symbol.strip()}" for w in self._working.values()]
+            held += [f"unanswered send {i}" for i in self._unconfirmed]
+            held += [f"loose leg {o}" for o in self._loose_legs]
+            if held:
+                r = Refusal("mode", f"still {old}: {', '.join(held)} — a {old} position or "
+                                    f"order cannot move to {mode}; FLATTEN or cancel first")
+                self.journal.record("refused", kind="mode", to=mode, refused=r.to_dict())
+                raise Refused(r)
+            if credential is not None and self.arming.state is not ArmState.LOCKED:
+                self.arming.replace_credential(credential)
+            write_mode(self.config.state_dir, mode)
+            self.broker.mode = mode
+            self.config.mode = mode
+            self.journal.mode = mode
+            # what the old side's listing said belongs to the old side
+            self._foreign_positions.clear()
+            self._foreign_orders.clear()
+            self._shorts.clear()
+            self._balances_cache = None
+            self.journal.record("mode_changed", old=old, new=mode)
+            if self.arming.state is not ArmState.LOCKED:
+                self.reconcile()
             return self.status()
 
     def _needs_credential(self) -> bool:
@@ -1629,6 +1685,10 @@ class ExecService:
         owned: set[str] = set(self._open) | {w.symbol for w in self._working.values()}
         for day in self.journal.days()[-self.OWNED_LOOKBACK_DAYS:]:
             for e in self.journal.read(day):
+                # a contract opened in the other mode is not this mode's:
+                # a paper fill must not make a live holding "ours" (co-8mb1z)
+                if e.get("mode", self.config.mode) != self.config.mode:
+                    continue
                 ev = e.get("event")
                 if ev in ("sending", "working", "position_adopted") or \
                         (ev == "filled" and e.get("kind") == "entry"):

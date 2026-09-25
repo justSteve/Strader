@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -346,6 +347,108 @@ class PaperBroker:
                                     instruction=f["side"]))
         log.info("paper: book loaded from %s — %d orders, %d positions",
                  self.book_path, len(self._orders), len(self._positions))
+
+
+#: The page's own mode switch, in the instance's state directory (co-8mb1z).
+MODE_STATE_FILE = "mode"
+MODES = ("paper", "live")
+
+
+def current_mode(seed_path: str | Path, state_dir: str | Path) -> str:
+    """The mode this instance runs in, by precedence:
+
+    1. ``<state-dir>/mode`` — written by the page's PAPER/LIVE switch (Steve,
+       2026-09-25: "support moving between paper and live without need to
+       re-run the installer"). The service owns this file, so the switch
+       works with no install and survives a restart.
+    2. the seed file (``/etc/execd/mode``, ``/etc/execd-alpaca/mode``) —
+       Steve's, root-owned, read-only to the service; it decides the mode
+       until the page has been used once.
+    3. ``paper``.
+
+    A state file holding anything but ``paper`` or ``live`` is ignored (with
+    a log line) rather than trusted — the seed decides then."""
+    state = Path(state_dir) / MODE_STATE_FILE
+    try:
+        word = state.read_text(encoding="utf-8").strip().lower()
+    except OSError:
+        word = ""
+    if word in MODES:
+        return word
+    if word:
+        log.error("mode: %s holds %r — ignored; the seed file decides", state, word)
+    return read_mode(seed_path)
+
+
+def write_mode(state_dir: str | Path, mode: str) -> None:
+    """Persist the page's switch: write, fsync, rename."""
+    if mode not in MODES:
+        raise ValueError(f"mode must be paper or live, not {mode!r}")
+    state = Path(state_dir) / MODE_STATE_FILE
+    state.parent.mkdir(parents=True, exist_ok=True)
+    tmp = state.with_name(f".{state.name}.partial")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(mode + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+    tmp.replace(state)
+
+
+class ModeSwitch:
+    """Two brokers, one per mode, and the one in use (co-8mb1z).
+
+    The service holds this in place of a single broker, so a flip on the page
+    changes where every call goes at once: ``mode`` is set by
+    :meth:`execd.service.ExecService.set_mode` and nothing else. On Schwab
+    the paper side is the :class:`PaperBroker` book over the same transport
+    the live side uses; on Alpaca the two sides are its paper and live
+    venues. Anything beyond the Broker protocol (``bind``, ``token_status``,
+    ``balances``, ``excluded_positions``) is the current side's."""
+
+    def __init__(self, paper: Broker, live: Broker, mode: str) -> None:
+        if mode not in MODES:
+            raise ValueError(f"mode must be paper or live, not {mode!r}")
+        self.__dict__["brokers"] = {"paper": paper, "live": live}
+        self.__dict__["mode"] = mode
+
+    @property
+    def current(self) -> Broker:
+        return self.brokers[self.mode]
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.brokers[self.__dict__["mode"]], name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "mode" and value not in MODES:
+            raise ValueError(f"mode must be paper or live, not {value!r}")
+        self.__dict__[name] = value
+
+    def quote(self, symbol: str) -> Quote:
+        return self.current.quote(symbol)
+
+    def chain(self, root: str, expiry: str | None = None) -> dict[str, Any]:
+        return self.current.chain(root, expiry)
+
+    def market_read(self, kind: str, params: dict[str, str]) -> Any:
+        return self.current.market_read(kind, params)
+
+    def preview(self, intent: OrderIntent) -> Preview:
+        return self.current.preview(intent)
+
+    def place(self, intent: OrderIntent) -> OrderResult:
+        return self.current.place(intent)
+
+    def cancel(self, order_id: str) -> OrderResult:
+        return self.current.cancel(order_id)
+
+    def orders(self) -> list[OrderResult]:
+        return self.current.orders()
+
+    def positions(self) -> list[Position]:
+        return self.current.positions()
+
+    def fills_since(self, since: datetime) -> list[Fill]:
+        return self.current.fills_since(since)
 
 
 def read_mode(path: str | Path) -> str:

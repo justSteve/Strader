@@ -143,7 +143,7 @@ install_execd() {
         run bash -c "printf 'paper\n' > '$EXECD_MODE'"
         run chown root:"$EXECD_USER" "$EXECD_MODE"
         run chmod 0640 "$EXECD_MODE"
-        say "mode seeded at $EXECD_MODE: paper (write 'live' there and re-run the install to go live)"
+        say "mode seeded at $EXECD_MODE: paper (the account page switches PAPER/LIVE; its choice, kept in $EXECD_STATE/mode, wins over this seed)"
     fi
 
     # 5c. the Alpaca instance's own directories, bounds and mode file — seeded

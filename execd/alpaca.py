@@ -198,6 +198,31 @@ def alpaca_payload(vault_payload: Any, venue: str) -> dict[str, Any]:
     return payload
 
 
+def alpaca_payloads(vault_payload: Any, need: str | None = None) -> dict[str, Any]:
+    """Every Alpaca venue the vault holds, as the one credential the service
+    keeps in memory: ``{"venues": {"paper": {...}, "live": {...}}}``. Each
+    :class:`AlpacaBroker` takes its own venue's pair from it, so the page's
+    PAPER/LIVE switch (co-8mb1z) moves between venues without asking the
+    vault again. ``need`` names a venue that must be present — the mode the
+    instance is in, or the one the switch is going to; its absence is a
+    ``ValueError`` in words."""
+    venues: dict[str, Any] = {}
+    for venue in VENUES:
+        try:
+            venues[venue] = alpaca_payload(vault_payload, venue)
+        except ValueError:
+            continue
+    if need is not None and need not in venues:
+        raise ValueError(f"the vault holds no Alpaca {need} keys — put them in with "
+                         f"vault-set.py Strader ALPACA_{need.upper()}_API_KEY_ID (and "
+                         f"ALPACA_{need.upper()}_API_SECRET_KEY), then "
+                         f"scripts/execd_vault_init.py --add-alpaca")
+    if not venues:
+        raise ValueError("the vault holds no alpaca section — run "
+                         "scripts/execd_vault_init.py --add-alpaca")
+    return {"venues": venues}
+
+
 # ── wire shapes ──────────────────────────────────────────────────────────
 
 
@@ -345,6 +370,12 @@ class AlpacaBroker:
             payload = self.credential_source()
         except Locked:
             raise BrokerError("the service is locked — no Alpaca credential in memory") from None
+        if isinstance(payload, Mapping) and "venues" in payload:
+            venues = payload.get("venues") or {}
+            if self.venue not in venues:
+                raise BrokerError(f"no Alpaca {self.venue} keys in memory — the vault held "
+                                  f"none when the service was unlocked")
+            payload = venues[self.venue]
         try:
             cred = AlpacaCredential.from_payload(payload)
         except ValueError as exc:

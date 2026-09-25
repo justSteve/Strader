@@ -392,7 +392,7 @@ def body_filled(service, st, facts, actions, now) -> str:
                  "is an SPX level (7585)</div>")
         html += f"<table class=full>{_today_row(st)}</table>"
     html += "<div class=actions>"
-    if st["arming"]["state"] != "LOCKED":
+    if st["arming"]["state"] != "LOCKED" and st["positions"]:
         html += _big_button(actions["flatten"], "FLATTEN", "exit", {"back": "order"})
     if not st["arming"]["killed"]:
         html += _big_button(actions["stop"], "STOP", "stop", {"back": "order"})
@@ -419,7 +419,7 @@ def body_exiting(service, st, facts, actions, now) -> str:
                 f"<tr><td>order</td><td>{esc(p['exit_order_id'])}</td></tr>", _today_row(st)]
         html += "<table class=full>" + "".join(rows) + "</table>"
     html += "<div class=actions>"
-    if st["arming"]["state"] != "LOCKED":
+    if st["arming"]["state"] != "LOCKED" and st["positions"]:
         html += _big_button(actions["flatten"], "FLATTEN AGAIN", "exit", {"back": "order"})
     html += "</div>"
     return html
@@ -596,6 +596,9 @@ PANEL_SCRIPT = """
     var pc = document.getElementById('position'); if (pc && j.position_html !== undefined && !editing()) { var keptp = keepTyped(pc); pc.innerHTML = j.position_html || ''; restoreTyped(pc, keptp); }
     var jn = document.getElementById('journal'); if (jn && j.journal_html) jn.innerHTML = j.journal_html;
     var bl = document.getElementById('balances'); if (bl && j.balances_html) bl.innerHTML = j.balances_html;
+    // the strip — PAPER or LIVE, the arming word, STOP — follows the poll, so a
+    // switch made on the other page shows here without a reload (co-8mb1z)
+    var sp = document.getElementById('strip'); if (sp && j.state_html) sp.outerHTML = j.state_html;
     // The order form's ticket and strikes, priced from this same answer
     // (st-644f). Held off while a box has something typed in it or a
     // reprice of his own is still out, and dropped outright when a newer

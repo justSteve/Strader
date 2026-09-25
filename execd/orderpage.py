@@ -216,7 +216,7 @@ def state_html(st: dict[str, Any], actions: Mapping[str, str] | None = None,
                      "<input type=hidden name=back value='order'>"
                      "<button class='chip stopbtn'>STOP</button></form>")
         right += f"<a class='chip quiet' href='{actions['account']}'>account</a>"
-    return (f"<div class=strip><div class=l>{broker_badge(st)}{badge}{word}</div>"
+    return (f"<div class=strip id=strip><div class=l>{broker_badge(st)}{badge}{word}</div>"
             f"<div class=r>{right}</div></div>")
 
 
