@@ -41,6 +41,9 @@ from execd.paper import PaperBroker
 from execd.service import ExecService, Refused, ServiceConfig
 from execd.stops import take_profit_price
 
+#: the numbers in this file were worked out at 10x (see conftest.bounds)
+TEN_X = Bounds(take_profit_multiple=10.0)
+
 from .conftest import CALL, PUT, SPX_NOW, entry, exit_intent, page_send, schwab_chain_maps
 from .conftest import same_origin  # noqa: E402
 
@@ -417,7 +420,7 @@ class TestPartialExitsResizeBoth:
     @pytest.fixture
     def two_lot(self, broker, clock, tmp_path):
         config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha",
-                               bounds=Bounds(qty_cap=2))
+                               bounds=Bounds(qty_cap=2, take_profit_multiple=10.0))
         svc = ExecService(broker, config, clock=clock)
         svc.unlock({"token": "x"})
         svc.place(entry(intent_id="two-1", qty=2, stop_spx=NEAR_STOP, delta=0.30))
@@ -693,7 +696,7 @@ class TestAdjustOverTheApi:
 
 class TestRecovery:
     def test_a_restart_rebuilds_the_target_like_the_stop(self, broker, clock, tmp_path):
-        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", bounds=TEN_X)
         first = ExecService(broker, config, clock=clock)
         first.unlock({"token": "x"})
         first.place(entry(intent_id="rec-1", stop_spx=NEAR_STOP, delta=0.30))
@@ -707,7 +710,7 @@ class TestRecovery:
         assert after["entry_spx"] == SPX_NOW
 
     def test_a_restart_after_an_adjust_carries_the_new_legs(self, broker, clock, tmp_path):
-        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", bounds=TEN_X)
         first = ExecService(broker, config, clock=clock)
         first.unlock({"token": "x"})
         first.place(entry(intent_id="rec-2", stop_spx=NEAR_STOP, delta=0.30))
@@ -725,7 +728,7 @@ class TestRecovery:
 
     def test_legs_that_were_off_for_a_close_in_flight_do_not_come_back_as_ids(
             self, broker, clock, tmp_path):
-        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", bounds=TEN_X)
         first = ExecService(broker, config, clock=clock)
         first.unlock({"token": "x"})
         first.place(entry(intent_id="rec-3", stop_spx=NEAR_STOP, delta=0.30))
@@ -738,7 +741,7 @@ class TestRecovery:
         assert (p["stop_price"], p["target_price"]) == (1.50, 21.00)   # the prices survive
 
     def test_a_target_that_filled_as_it_landed_is_not_resurrected(self, armed, broker, clock, tmp_path):
-        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", bounds=TEN_X)
         cheap = "SPXW  260826C06450000"
         broker.set_quote(cheap, bid=0.05, ask=0.10)
         first = ExecService(broker, config, clock=clock)
@@ -780,7 +783,7 @@ class TestCancelAndRePrice:
 
     def test_place_records_the_page_query_on_the_working_line_and_recovers_it(
             self, broker, clock, tmp_path):
-        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", bounds=TEN_X)
         broker.rest_limits = True
         first = ExecService(broker, config, clock=clock)
         first.unlock({"token": "x"})
@@ -837,7 +840,7 @@ class TestPaperTarget:
 
     def test_the_target_fills_in_the_book_and_the_sweep_books_it_as_the_target(
             self, paper, live, clock, tmp_path):
-        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", mode="paper")
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", mode="paper", bounds=TEN_X)
         svc = ExecService(paper, config, clock=clock)
         svc.unlock({"token": "x"})
         out = svc.place(entry("pt-3", stop_spx=NEAR_STOP, delta=0.30))
@@ -857,7 +860,7 @@ class TestPaperTarget:
         assert [c[0] for c in live.calls if c[0] in ("place", "cancel")] == []
 
     def test_the_stop_fills_in_the_book_and_the_target_comes_off(self, paper, live, clock, tmp_path):
-        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", mode="paper")
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", mode="paper", bounds=TEN_X)
         svc = ExecService(paper, config, clock=clock)
         svc.unlock({"token": "x"})
         svc.place(entry("pt-4", stop_spx=NEAR_STOP, delta=0.30))
@@ -1565,7 +1568,7 @@ class TestSpxLevelBracket:
             (8.10 - 2.10) * 100 - 1.30)
 
     def test_a_restart_rebuilds_both_levels(self, broker, clock, tmp_path):
-        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", bounds=TEN_X)
         first = ExecService(broker, config, clock=clock)
         first.unlock({"token": "x"})
         first.place(entry(intent_id="lv-rec", stop_spx=NEAR_STOP, delta=0.30))
@@ -1583,7 +1586,7 @@ class TestSpxLevelBracket:
         assert second.observe(SPX_NOW + 20)["fired"][0]["reason"] == "spx-target"
 
     def test_a_restart_after_the_level_was_cleared_carries_no_level(self, broker, clock, tmp_path):
-        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha", bounds=TEN_X)
         first = ExecService(broker, config, clock=clock)
         first.unlock({"token": "x"})
         first.place(entry(intent_id="lv-rec2", stop_spx=NEAR_STOP, delta=0.30))

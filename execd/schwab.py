@@ -60,10 +60,12 @@ happens on Steve's page (stage 3) with his passphrase present, through
 they are re-authorised in one sitting so they expire on the same day, and
 :meth:`token_status` reports both.
 
-**What this module refuses to do.** It sends GET, POST and DELETE. There is no
-PUT — Schwab's replace-order verb — anywhere in it, so a bounded chase
-(st-kdaq) cannot arrive by a one-line change here; it arrives as a cancel and
-a new intent through the bounds. It never retries a send: a POST that timed
+**What this module refuses to do.** It sends GET, POST and DELETE, and PUT
+in exactly one place: :meth:`SchwabBroker.replace_order`, which moves a
+resting *exit* leg (the stop or the take-profit) and refuses anything that
+buys (co-8mb1z, 2026-09-25). So a bounded chase of an entry (st-kdaq) still
+cannot arrive by a one-line change here; it arrives as a cancel and a new
+intent through the bounds. It never retries a send: a POST that timed
 out is reported as :class:`BrokerError` and the service's reconcile finds out
 what the broker actually did. It never logs, prints, or puts in an exception
 message any part of a token, a key, or an account identifier — the account
@@ -523,6 +525,24 @@ def build_oco(stop_intent: OrderIntent, target_intent: OrderIntent) -> dict[str,
             "childOrderStrategies": [build_order(target_intent), build_order(stop_intent)]}
 
 
+def build_triggered(entry: OrderIntent, stop_intent: OrderIntent,
+                    target_intent: OrderIntent) -> dict[str, Any]:
+    """Entry, stop and target as ONE order (co-8mb1z; Steve, 2026-09-25: "My
+    intent is to ensure that Stop Loss is in place as soon as the order is
+    filled -- confirm yes to create all 3 at once"). The entry is the
+    parent, ``orderStrategyType: TRIGGER``; its one child is the OCO pair,
+    which Schwab brings to life when the entry fills — nothing has to happen
+    at this end for the stop to be there.
+
+    **Spec-derived, not yet live-verified**: schwab-py's documented
+    first-triggers-OCO (``lib/schwab-py/docs/order-builder.rst`` lines
+    81-155, ``one_triggers_other(..., one_cancels_other(...))``)."""
+    body = build_order(entry)
+    body["orderStrategyType"] = "TRIGGER"
+    body["childOrderStrategies"] = [build_oco(stop_intent, target_intent)]
+    return body
+
+
 def _scrub_account(body: Any) -> Any:
     """An order body with every account number replaced — Schwab echoes
     ``accountNumber`` on the order and on each child."""
@@ -858,7 +878,75 @@ class SchwabBroker:
             raw=body,
         )
 
-    def place(self, intent: OrderIntent) -> OrderResult:
+    def place_triggered(self, entry: OrderIntent, stop_intent: OrderIntent,
+                        target_intent: OrderIntent) -> OrderResult:
+        """The entry with its OCO bracket attached (:func:`build_triggered`),
+        answered like :meth:`place` — the result is the entry's."""
+        return self.place(entry, body=build_triggered(entry, stop_intent, target_intent))
+
+    def children_of(self, order_id: str) -> tuple[OrderResult | None, OrderResult | None]:
+        """The stop and the take-profit a triggered entry brought to life,
+        read off the entry's own order (its ``childOrderStrategies``), each
+        under its own id. ``(None, None)`` when the order carries none.
+        Spec-derived until the first live triggered order."""
+        h = self.account_hash()
+        body = self._json(self._request("GET", f"/trader/v1/accounts/{h}/orders/{order_id}"),
+                          "order")
+        stop = target = None
+
+        def walk(o: Any) -> None:
+            nonlocal stop, target
+            if not isinstance(o, dict):
+                return
+            for child in o.get("childOrderStrategies") or []:
+                if isinstance(child, dict) and child.get("orderLegCollection"):
+                    if str(child.get("orderType", "")).startswith("STOP") and stop is None:
+                        stop = self._to_result(child)
+                    elif child.get("orderType") == "LIMIT" and target is None:
+                        target = self._to_result(child)
+                walk(child)
+        walk(body)
+        return stop, target
+
+    def replace_order(self, order_id: str, intent: OrderIntent) -> OrderResult:
+        """Move a resting exit leg: ``PUT .../orders/{id}`` with the leg as
+        it should now be (co-8mb1z). Exit legs only — a buy is refused here,
+        so this is never an entry chase (st-kdaq).
+
+        **Spec-derived, not yet live-verified.** The Trader API documents
+        replace as PUT on the order, answered 201 with the NEW order's id in
+        ``Location``; the old order reads REPLACED. What Schwab does to the
+        OCO sibling of a replaced leg is NOT measured — the caller reads the
+        sibling back and journals both raw bodies. A 400 is a rejection,
+        returned; anything else non-2xx is a :class:`BrokerError`; never
+        retried."""
+        if intent.side is not Side.SELL_TO_CLOSE:
+            raise ValueError("replace is for a resting exit leg only — never a buy")
+        h = self.account_hash()
+        path = f"/trader/v1/accounts/{h}/orders/{order_id}"
+        app = app_for(path)
+        cred = self._credential(app)
+        token = self._bearer(app, cred)
+        headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+        try:
+            r = self._client.request("PUT", path, json=build_order(intent), headers=headers)
+        except httpx.HTTPError as exc:
+            raise BrokerError(f"schwab PUT {self._scrub(path)}: {type(exc).__name__}") from None
+        if r.status_code == 400:
+            return OrderResult(
+                order_id=f"rejected:{intent.intent_id}", status=OrderStatus.REJECTED,
+                symbol=intent.symbol, side=intent.side, qty=intent.qty,
+                order_type=intent.order_type,
+                price=intent.limit if intent.order_type is OrderType.LIMIT else intent.stop_price,
+                submitted_at=self.clock(), legs=_intent_leg(intent),
+                message=_error_detail(r) or "replace rejected (HTTP 400)")
+        if r.status_code not in (200, 201):
+            raise BrokerError(f"schwab PUT {self._scrub(path)}: HTTP {r.status_code} "
+                              f"{_error_detail(r)}".rstrip())
+        new_id = _order_id_from_location(r.headers.get("Location")) or order_id
+        return self._get_order(h, new_id)
+
+    def place(self, intent: OrderIntent, *, body: dict[str, Any] | None = None) -> OrderResult:
         """Spec-derived: ``POST .../orders`` → 201, empty body, the new order's
         id in the ``Location`` header; then ``GET .../orders/{id}`` for what
         the broker did with it. A 400 is the broker's rejection and is
@@ -873,7 +961,7 @@ class SchwabBroker:
         app = app_for(path)
         cred = self._credential(app)
         token = self._bearer(app, cred)
-        r = self._send("POST", path, token, None, build_order(intent))
+        r = self._send("POST", path, token, None, body if body is not None else build_order(intent))
         if r.status_code == 400:
             return OrderResult(
                 order_id=f"rejected:{intent.intent_id}", status=OrderStatus.REJECTED,

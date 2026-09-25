@@ -223,6 +223,21 @@ refusing a price off the grid, a stop not below the live bid, or a target not
 above it — how wide he moves his stop is his — and moving the stop
 moves the SPX-mark trigger with it, by the same delta walk in reverse.
 
+**Entry, stop and target go out as ONE order** (co-8mb1z; Steve, 2026-09-25:
+*"My intent is to ensure that Stop Loss is in place as soon as the order is
+filled -- confirm yes to create all 3 at once. We can lower the take profit %
+to 5X"*). Where the broker takes it (Schwab, the paper book), a new entry is
+a TRIGGER order whose child is the OCO pair: stop $20 under the LIMIT (or his
+own), target 5× the LIMIT (`take_profit_multiple` 5.0; the fill is not known
+when the order is built). At the fill the service books the children the
+broker brought to life (`children_of`); if they are not there whole it cancels
+what is, places the pair itself and journals `bracket_fallback`. An add to a
+held contract goes out alone and the pair is resized. Moving a resting stop
+or target is a **replace** (PUT, exit legs only, `replace_order`), not
+cancel-and-new; the sibling is read back and journaled, and if the replace
+took it off the pair goes back on (`replace_broke_oco`). **All of this is
+spec-derived until its first live use.** Alpaca keeps two orders.
+
 **The bracket rests as ONE one-cancels-other order** (co-8mb1z). 2026-09-25
 12:15 CT, live: the stop rested alone and the 10× target, a second
 SELL_TO_CLOSE for the same contract, was rejected by Schwab as an oversell.

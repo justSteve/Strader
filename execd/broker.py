@@ -259,6 +259,11 @@ class MockBroker:
         #: default so the two-order path (a broker without OCO) keeps its own
         #: tests; the OCO tests turn it on.
         self.oco_enabled: bool = False
+        #: entry order id → its bracket, once the entry filled (the OCO
+        #: children a triggered order brought to life), or the bracket's
+        #: intents still waiting on the entry (co-8mb1z)
+        self._children: dict[str, tuple[str, str]] = {}
+        self._pending_children: dict[str, tuple[OrderIntent, OrderIntent]] = {}
 
         #: every call, in order, as ``(method, kwargs)`` — the audit a test reads.
         self.calls: list[tuple[str, dict[str, Any]]] = []
@@ -459,6 +464,54 @@ class MockBroker:
             stop = self._orders[stop.order_id]
         return stop, target
 
+    def place_triggered(self, entry: OrderIntent, stop: OrderIntent,
+                        target: OrderIntent) -> OrderResult:
+        """The entry with its bracket attached as a trigger child: the OCO
+        pair comes alive when the entry fills (co-8mb1z)."""
+        self._record("place_triggered", intent_id=entry.intent_id)
+        order = self.place(entry)
+        if order.is_filled:
+            s, t = self.place_oco(stop, target)
+            self._children[order.order_id] = (s.order_id, t.order_id)
+        elif order.is_working:
+            self._pending_children[order.order_id] = (stop, target)
+        return order
+
+    def children_of(self, order_id: str) -> tuple[OrderResult | None, OrderResult | None]:
+        ids = self._children.get(order_id)
+        if ids is None:
+            return None, None
+        return self._orders.get(ids[0]), self._orders.get(ids[1])
+
+    def replace_order(self, order_id: str, intent: OrderIntent) -> OrderResult:
+        """Replace a resting exit leg with a new price: the old one is
+        CANCELED (REPLACED at Schwab), the new one rests and keeps the OCO
+        link (co-8mb1z). ``replace_breaks_oco`` makes the partner come off,
+        for the case Schwab's answer has not yet told us about."""
+        self._record("replace_order", order_id=order_id, intent_id=intent.intent_id)
+        old = self._orders.get(order_id)
+        if old is None:
+            raise BrokerError(f"no such order: {order_id}")
+        if not old.is_working:
+            return old
+        self._orders[order_id] = replace(old, status=OrderStatus.CANCELED, message="REPLACED")
+        new = self._store(self._new_order(
+            intent, OrderStatus.WORKING,
+            price=intent.stop_price if intent.order_type is OrderType.STOP else intent.limit))
+        partner = self._oco.pop(order_id, None)
+        if partner is not None:
+            self._oco[partner] = new.order_id
+            self._oco[new.order_id] = partner
+            if getattr(self, "replace_breaks_oco", False):
+                other = self._orders.get(partner)
+                if other is not None and other.is_working:
+                    self._orders[partner] = replace(other, status=OrderStatus.CANCELED)
+        if intent.order_type is OrderType.LIMIT:
+            q = self._quotes.get(intent.symbol)
+            if q is not None and q.bid >= float(intent.limit or 0.0):
+                return self.fill_resting(new.order_id)
+        return new
+
     def raw_order(self, order_id: str) -> dict[str, Any]:
         order = self._orders.get(order_id)
         if order is None:
@@ -480,6 +533,7 @@ class MockBroker:
             return pending
         canceled = replace(order, status=OrderStatus.CANCELED)
         self._orders[order_id] = canceled
+        self._pending_children.pop(order_id, None)
         return canceled
 
     def orders(self) -> list[OrderResult]:
@@ -519,6 +573,10 @@ class MockBroker:
                          fill_price=price)
         self._orders[order_id] = filled
         self._apply_fill(filled)
+        pending = self._pending_children.pop(order_id, None)
+        if pending is not None:
+            s, t = self.place_oco(*pending)
+            self._children[order_id] = (s.order_id, t.order_id)
         partner = self._oco.pop(order_id, None)
         if partner is not None:
             self._oco.pop(partner, None)

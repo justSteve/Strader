@@ -133,11 +133,19 @@ class Bounds:
     require_protective_stop: bool = True
     #: The take-profit half of the bracket (Steve, 2026-09-14, st-fn5y: "upon
     #: fill, api should create a resting order at a 10x profit target"). The
-    #: target is the fill price times the multiple on the ``premium`` basis,
-    #: or the fill plus the multiple times the distance to the stop on the
+    #: target is the entry price times the multiple on the ``premium`` basis,
+    #: or the entry plus the multiple times the distance to the stop on the
     #: ``risk`` basis. ``premium`` is RULED (Steve, 2026-09-15: "10x means ten
     #: times the fill premium").
-    take_profit_multiple: float = 10.0
+    #:
+    #: 5×, not 10× — Steve, 2026-09-25: "We can lower the take profit % to 5X.
+    #: In practice I'll be sitting on a ready order to change that according
+    #: to conditions at the time." And since the same day the bracket goes to
+    #: Schwab WITH the entry, as one triggered order, before any fill exists —
+    #: so the multiple is of the entry's LIMIT, not the fill. A buy never
+    #: fills above its limit, so the target is at least 5× the fill.
+    #: [co-8mb1z]
+    take_profit_multiple: float = 5.0
     take_profit_basis: str = "premium"
 
     def problems(self) -> list[str]:

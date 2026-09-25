@@ -64,5 +64,9 @@ require_protective_stop: true
 # premium"). Flipping the basis here is still a one-line edit, no code change.
 # The multiple must be positive, and above 1 on the premium basis (a target
 # at or under the fill is a sale, not a target). Rounded up to the tick.
-take_profit_multiple: 10.0
+# 5x since 2026-09-25 (Steve: "We can lower the take profit % to 5X. In
+# practice I'll be sitting on a ready order to change that according to
+# conditions at the time"), of the entry's LIMIT: the bracket goes to Schwab
+# with the entry, before any fill exists.
+take_profit_multiple: 5.0
 take_profit_basis: premium

@@ -110,6 +110,10 @@ class PaperBroker:
         #: the paper book always holds a bracket as OCO, as Schwab live does —
         #: whatever the transport underneath says of itself
         self.oco_enabled = True
+        #: entry → its live bracket's ids, and entry → the bracket's intents
+        #: still waiting on the entry to fill (a triggered order, co-8mb1z)
+        self._children: dict[str, tuple[str, str]] = {}
+        self._pending_children: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
         self._load()
 
     # ── pass-through: every read, and the broker's own preview ───────────
@@ -164,6 +168,50 @@ class PaperBroker:
             self._save()
             return stop, target
 
+    def place_triggered(self, entry: OrderIntent, stop: OrderIntent,
+                        target: OrderIntent) -> OrderResult:
+        """The entry with its bracket as a trigger child, as it goes to
+        Schwab live (co-8mb1z): the OCO pair rests the moment the entry
+        fills — now, or when the book fills it later. Defined here, never
+        passed through to the live transport."""
+        with self._lock:
+            order = self.place(entry)
+            if order.is_filled:
+                s, t = self.place_oco(stop, target)
+                self._children[order.order_id] = (s.order_id, t.order_id)
+            elif order.status is OrderStatus.WORKING:
+                self._pending_children[order.order_id] = (stop.to_dict(), target.to_dict())
+            self._save()
+            return self._orders[order.order_id]
+
+    def children_of(self, order_id: str) -> tuple[OrderResult | None, OrderResult | None]:
+        with self._lock:
+            self._sweep()
+            ids = self._children.get(order_id)
+            if ids is None:
+                return None, None
+            return self._orders.get(ids[0]), self._orders.get(ids[1])
+
+    def replace_order(self, order_id: str, intent: OrderIntent) -> OrderResult:
+        """A resting exit leg at a new price, keeping its OCO link — the
+        book's stand-in for Schwab's replace (co-8mb1z)."""
+        with self._lock:
+            old = self._orders.get(order_id)
+            if old is None:
+                raise BrokerError(f"paper: no such order: {order_id}")
+            if old.status is not OrderStatus.WORKING:
+                return old
+            self._orders[order_id] = replace(old, status=OrderStatus.CANCELED, message="REPLACED")
+            partner = self._oco.pop(order_id, None)
+            new = self.place(intent)
+            if partner is not None and new.status is OrderStatus.WORKING:
+                self._oco[partner] = new.order_id
+                self._oco[new.order_id] = partner
+            elif partner is not None and new.status is OrderStatus.FILLED:
+                self._cancel_partner(new.order_id, partner)
+            self._save()
+            return self._orders[new.order_id]
+
     def raw_order(self, order_id: str) -> dict[str, Any]:
         """The book's own record of an order — never the live transport's,
         which knows nothing of a paper id."""
@@ -172,6 +220,18 @@ class PaperBroker:
             if order is None:
                 raise BrokerError(f"paper: no such order: {order_id}")
             return {**order.to_dict(), "paper": True, "oco_partner": self._oco.get(order_id)}
+
+    def _activate(self, entry_id: str, pending: tuple[dict[str, Any], dict[str, Any]]) -> tuple[str, str]:
+        """The bracket a triggered entry carried, resting now that it filled."""
+        stop = OrderIntent.from_dict(pending[0])
+        target = OrderIntent.from_dict(pending[1])
+        s = self._new(stop, OrderStatus.WORKING, price=stop.stop_price)
+        t = self._new(target, OrderStatus.WORKING, price=target.limit)
+        self._orders[s.order_id] = s
+        self._orders[t.order_id] = t
+        self._oco[s.order_id] = t.order_id
+        self._oco[t.order_id] = s.order_id
+        return s.order_id, t.order_id
 
     def _cancel_partner(self, filled_id: str, partner_id: str | None) -> None:
         if not partner_id:
@@ -193,6 +253,8 @@ class PaperBroker:
                 return order
             canceled = replace(order, status=OrderStatus.CANCELED)
             self._orders[order_id] = canceled
+            # a triggered entry's bracket never comes alive once it is off
+            self._pending_children.pop(order_id, None)
             self._save()
             return canceled
 
@@ -329,6 +391,10 @@ class PaperBroker:
                          fill_price=round(float(price), 2))
         self._orders[filled.order_id] = filled
         self._cancel_partner(filled.order_id, self._oco.get(filled.order_id))
+        pending = self._pending_children.pop(filled.order_id, None)
+        if pending is not None:
+            s_id, t_id = self._activate(filled.order_id, pending)
+            self._children[filled.order_id] = (s_id, t_id)
         signed = filled.qty if filled.side is Side.BUY_TO_OPEN else -filled.qty
         held = self._positions.get(filled.symbol)
         if held is None:
@@ -352,6 +418,8 @@ class PaperBroker:
         data = {
             "seq": self._seq,
             "oco": dict(self._oco),
+            "children": {k: list(v) for k, v in self._children.items()},
+            "pending_children": {k: list(v) for k, v in self._pending_children.items()},
             "orders": [{**o.to_dict()} for o in self._orders.values()],
             "positions": [p.to_dict() for p in self._positions.values()],
             "fills": [{"order_id": f.order_id, "symbol": f.symbol, "side": f.side.value,
@@ -376,6 +444,10 @@ class PaperBroker:
             raise BrokerError(f"paper: the book at {self.book_path} cannot be read: {exc}") from exc
         self._seq = int(data.get("seq", 0))
         self._oco = {str(k): str(v) for k, v in (data.get("oco") or {}).items()}
+        self._children = {str(k): (str(v[0]), str(v[1]))
+                          for k, v in (data.get("children") or {}).items()}
+        self._pending_children = {str(k): (v[0], v[1])
+                                  for k, v in (data.get("pending_children") or {}).items()}
         for o in data.get("orders", []):
             self._orders[o["order_id"]] = OrderResult(
                 order_id=o["order_id"], status=OrderStatus(o["status"]), symbol=o["symbol"],

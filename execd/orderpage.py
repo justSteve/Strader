@@ -355,7 +355,7 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
             tp = take_profit_price(priced.limit, multiple, basis, stop_price=priced.stop_price)
             net = round((tp - priced.limit) * CONTRACT_MULTIPLIER * priced.lots
                         - priced.commissions_usd, 2)
-            target_txt = (f"take-profit rests at {tp:.2f} <span class=k>({multiple:g}× the fill)</span> → "
+            target_txt = (f"take-profit rests at {tp:.2f} <span class=k>({multiple:g}× the entry)</span> → "
                           f"<span class=pos>{money(net)}</span> <span class=k>if it fills there</span>")
     except (ValueError, TypeError):
         target_txt = ""

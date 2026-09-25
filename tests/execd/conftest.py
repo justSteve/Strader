@@ -65,7 +65,10 @@ def clock() -> Clock:
 
 @pytest.fixture
 def bounds() -> Bounds:
-    return Bounds()
+    # The bracket mechanics here were written, and their numbers worked out,
+    # at 10x; the default became 5x of the limit on 2026-09-25 (co-8mb1z) and
+    # is pinned in test_bounds and test_triggered. 10x keeps these numbers.
+    return Bounds(take_profit_multiple=10.0)
 
 
 @pytest.fixture

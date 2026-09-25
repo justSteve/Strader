@@ -118,7 +118,7 @@ class TestTheCard:
         assert "buy limit 2.10 · sent <span class=ago" in card and "12 s ago" in card
         assert "ask above the limit" in card and ">+0.05<" in card
         assert "bid 2.00 / ask 2.15" in card
-        assert "cut if SPX reaches" in card and "target 10× the fill" in card
+        assert "cut if SPX reaches" in card and "target 10× the entry" in card
         assert "CANCEL AND RE-PRICE" in card and ">STOP<" not in card and ">FLATTEN<" not in card
 
     def test_filled_is_the_live_editor_with_one_net_number(self, page, holding, broker, clock):

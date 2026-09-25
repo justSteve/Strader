@@ -294,10 +294,10 @@ class TestConfiguration:
         }
 
     def test_the_take_profit_defaults_are_the_standing_assumption(self):
-        """Steve's "10x" (2026-09-14, st-fn5y) — premium basis until he rules
-        on premium-vs-risk. The default must not drift while that is open."""
+        """5x of the entry limit on the premium basis — Steve, 2026-09-25: "We
+        can lower the take profit % to 5X" (co-8mb1z; 10x from 2026-09-14)."""
         b = Bounds()
-        assert (b.take_profit_multiple, b.take_profit_basis) == (10.0, "premium")
+        assert (b.take_profit_multiple, b.take_profit_basis) == (5.0, "premium")
 
     @pytest.mark.parametrize("kw", [
         {"take_profit_multiple": 0}, {"take_profit_multiple": -3},

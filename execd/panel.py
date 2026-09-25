@@ -295,7 +295,7 @@ def body_working(service, st, facts, actions, now, bounds) -> str:
             on_fill.append(f"cut if SPX reaches {float(w['stop_spx']):.2f}")
         mult = bounds.get("take_profit_multiple")
         if isinstance(mult, (int, float)) and bounds.get("take_profit_basis", "premium") == "premium":
-            on_fill.append(f"target {float(mult):g}× the fill")
+            on_fill.append(f"target {float(mult):g}× the entry")
         if on_fill:
             rows.append(f"<tr><td>on fill</td><td>{' · '.join(on_fill)}</td></tr>")
         if w.get("order_id"):

@@ -1038,9 +1038,25 @@ class TestNever:
         broker.cancel(placed.order_id)
         assert {c[0] for c in fake.calls} == {"GET", "POST", "DELETE"}
 
-    def test_the_source_has_no_replace_verb(self):
+    def test_put_lives_only_in_the_exit_leg_replace(self):
+        """PUT is Schwab's replace verb. It is here for one thing only since
+        2026-09-25 (co-8mb1z): moving a resting stop or take-profit. The
+        entry chase (st-kdaq) still cannot arrive by it — replace_order
+        refuses anything that buys."""
+        import ast
         source = (REPO / "execd" / "schwab.py").read_text(encoding="utf-8")
-        assert '"PUT"' not in source and ".put(" not in source and "replace_order" not in source
+        assert ".put(" not in source
+        owners = set()
+        for fn in ast.walk(ast.parse(source)):
+            if isinstance(fn, ast.FunctionDef):
+                for node in ast.walk(fn):
+                    if isinstance(node, ast.Constant) and node.value == "PUT":
+                        owners.add(fn.name)
+        assert owners == {"replace_order"}
+
+    def test_replace_refuses_a_buy(self, broker):
+        with pytest.raises(ValueError, match="never a buy"):
+            broker.replace_order("1", intent())
 
     def test_a_transport_failure_is_a_broker_error_with_no_secret(self, cred):
         def down(request: httpx.Request) -> httpx.Response:

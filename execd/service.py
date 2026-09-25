@@ -160,6 +160,9 @@ class WorkingEntry:
     #: the canceled order will be re-priced and re-armed"). ``None`` for an
     #: entry the desk or the API sent.
     page_query: dict[str, str] | None = None
+    #: sent with its bracket attached (a triggered order, co-8mb1z): on the
+    #: fill the broker already holds the stop and the target
+    triggered: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -167,6 +170,7 @@ class WorkingEntry:
             "intent_id": self.intent_id, "right": self.right, "limit": self.limit,
             "stop_spx": self.stop_spx, "delta": self.delta,
             "page_query": dict(self.page_query) if self.page_query else None,
+            "triggered": self.triggered,
         }
 
 
@@ -1379,6 +1383,8 @@ class ExecService:
                             spx=spx, stop_spx=work.stop_spx, delta=work.delta,
                             order_id=order.order_id, found_by="reconcile")
         self._resolve_working(order.order_id, outcome="filled")
+        if work.triggered and self._attach_triggered(pos, order.order_id, spx) is not None:
+            return
         if spx is None:
             self.journal.record("stop_unprotected", symbol=pos.symbol,
                                 intent_id=pos.intent_id, qty=pos.qty,
@@ -1841,9 +1847,18 @@ class ExecService:
             limit=intent.limit, right=intent.occ.right, stop_spx=intent.stop_spx,
             delta=intent.delta, at=self.clock(),
             page_query=dict(page_query) if page_query else None)
-        self.journal.record("sending", kind="entry", spx=spx, **send.to_dict())
+        bracket = self._triggered_bracket(intent, spx)
+        self.journal.record("sending", kind="entry", spx=spx, **send.to_dict(),
+                            triggered=bracket is not None,
+                            **({"stop_price": bracket[0].stop_price,
+                                "target_price": bracket[1].limit} if bracket else {}))
         try:
-            order = self.broker.place(intent)
+            if bracket is not None:
+                # entry, stop and target as ONE order: the pair is alive at
+                # the broker the moment the entry fills (co-8mb1z)
+                order = self.broker.place_triggered(intent, *bracket)
+            else:
+                order = self.broker.place(intent)
         except BrokerError as exc:
             self._unconfirmed[intent.intent_id] = send
             self.journal.record("send_unknown", intent_id=intent.intent_id,
@@ -1870,13 +1885,15 @@ class ExecService:
                 qty=order.qty, intent_id=intent.intent_id, right=intent.occ.right,
                 limit=intent.limit, stop_spx=intent.stop_spx, delta=intent.delta,
                 page_query=dict(page_query) if page_query else None,
+                triggered=bracket is not None,
             )
             self._working[work.order_id] = work
             self.journal.record("working", kind="entry", intent_id=intent.intent_id,
                                 symbol=work.symbol, qty=work.qty,
                                 order_id=work.order_id, status=order.status.value,
                                 limit=work.limit, stop_spx=work.stop_spx,
-                                delta=work.delta, spx=spx, page_query=work.page_query)
+                                delta=work.delta, spx=spx, page_query=work.page_query,
+                                triggered=work.triggered)
             out["working"] = work.to_dict()
             return out
 
@@ -1910,6 +1927,11 @@ class ExecService:
                             cost_usd=round(fill_px * CONTRACT_MULTIPLIER * pos.qty, 2),
                             spx=spx, stop_spx=intent.stop_spx, delta=intent.delta,
                             order_id=order.order_id)
+        if bracket is not None:
+            attached = self._attach_triggered(pos, order.order_id, spx)
+            if attached is not None:
+                out["stop_order"], out["target_order"] = attached
+                return out
         out["stop_order"] = self._place_protective_stop(pos, spx)
         out["target_order"] = self._place_take_profit(pos)
         return out
@@ -2667,6 +2689,89 @@ class ExecService:
                 self._pair_results.pop(k, None)
         return out
 
+    def _triggered_bracket(self, intent: OrderIntent,
+                           spx: float) -> tuple[OrderIntent, OrderIntent] | None:
+        """The stop and target to send WITH the entry, or ``None`` to send the
+        entry alone (co-8mb1z; Steve, 2026-09-25: "My intent is to ensure
+        that Stop Loss is in place as soon as the order is filled -- confirm
+        yes to create all 3 at once").
+
+        The stop is struck from the entry's LIMIT through the intent's own
+        SPX level and delta — the walk the order form used to put it $20
+        under the limit, or at the price or level he typed. A buy never
+        fills above its limit, so the risk to that stop is at most the $20
+        (or his number). The target is the multiple of the limit
+        (``take_profit_multiple``, 5× since the same day).
+
+        Sent alone — the bracket placed after the fill as before — when the
+        broker has no triggered orders (Alpaca here), when the contract is
+        already held or working (an add; ``_add_to_position`` puts one
+        bracket on for the whole size), or when either price cannot be
+        derived."""
+        if not (self._oco() and callable(getattr(self.broker, "place_triggered", None))):
+            return None
+        if intent.symbol in self._open or any(
+                w.symbol == intent.symbol for w in self._working.values()):
+            return None
+        if intent.limit is None or intent.delta is None or intent.stop_spx is None:
+            return None
+        try:
+            stop_price = protective_stop_price(intent.limit, intent.delta, spx, intent.stop_spx)
+            b = self.bounds
+            target_price = take_profit_price(intent.limit, b.take_profit_multiple,
+                                             b.take_profit_basis, stop_price=stop_price)
+        except ValueError:
+            return None
+        base = intent.intent_id
+        stop = OrderIntent(intent_id=f"{base}:stop:{intent.qty}", symbol=intent.symbol,
+                           side=Side.SELL_TO_CLOSE, qty=intent.qty, order_type=OrderType.STOP,
+                           stop_price=stop_price, source="protective-stop",
+                           engine_sha=self.config.sha)
+        target = OrderIntent(intent_id=f"{base}:target:{intent.qty}", symbol=intent.symbol,
+                             side=Side.SELL_TO_CLOSE, qty=intent.qty, order_type=OrderType.LIMIT,
+                             limit=target_price, source="take-profit", engine_sha=self.config.sha)
+        return stop, target
+
+    def _attach_triggered(self, pos: OpenPosition, entry_order_id: str,
+                          spx: float | None) -> tuple[dict[str, Any] | None,
+                                                      dict[str, Any] | None] | None:
+        """The bracket a triggered entry brought to life, booked as the
+        position's legs. ``None`` — after taking off whatever part of it the
+        broker does hold — when it is not there whole: the broker refused the
+        child, it is sized for more than filled (a partial fill), or it
+        cannot be read. The caller then places the pair itself, and the
+        journal says so (``bracket_fallback``)."""
+        kids = getattr(self.broker, "children_of", None)
+        stop = target = None
+        detail = ""
+        if callable(kids):
+            try:
+                stop, target = kids(entry_order_id)
+            except BrokerError as exc:
+                detail = str(exc)
+        whole = (stop is not None and target is not None and stop.is_working
+                 and target.is_working and stop.qty == pos.qty and target.qty == pos.qty)
+        if whole:
+            out = (self._book_stop(pos, float(stop.price or 0.0), stop, spx=spx,
+                                   kind="triggered", oco=True),
+                   self._book_target(pos, float(target.price or 0.0), target,
+                                     kind="triggered", oco=True))
+            return out
+        seen = {leg: (o.status.value if o is not None else None, o.qty if o is not None else None)
+                for leg, o in (("stop", stop), ("target", target))}
+        self.journal.record("bracket_fallback", symbol=pos.symbol, intent_id=pos.intent_id,
+                            entry_order_id=entry_order_id, qty=pos.qty, seen=seen,
+                            detail=detail or "the bracket sent with the entry is not resting "
+                                             "whole — placing it here")
+        for o in (stop, target):
+            if o is not None and o.is_working:
+                try:
+                    self.broker.cancel(o.order_id)
+                except BrokerError as exc:
+                    self.journal.record("error", kind="bracket_fallback", order_id=o.order_id,
+                                        detail=str(exc))
+        return None
+
     def _journal_raw(self, order_id: str | None, why: str) -> None:
         """The broker's own body for an order, on its own journal line, so
         the next stop or target that does something unexpected carries its
@@ -3031,6 +3136,9 @@ class ExecService:
         old_price = pos.stop_price if leg == "stop" else pos.target_price
         old_id = getattr(pos, self._LEG_ATTR[leg])
         given = "spx" if level is not None else "price"
+        if old_id and self._oco() and callable(getattr(self.broker, "replace_order", None)):
+            return self._replace_leg(pos, leg, new_price, bid, level=level,
+                                     old_price=old_price, old_id=old_id, given=given)
         try:
             _canceled, fill = self._pull_leg(pos, leg)
         except BrokerError as exc:
@@ -3088,6 +3196,88 @@ class ExecService:
         return {"moved": True, "old_price": old_price, "new_price": new_price,
                 "order_id": pos.target_order_id, "target_spx": pos.target_spx,
                 "old_target_spx": old_spx, "given": given}
+
+    def _replace_leg(self, pos: OpenPosition, leg: str, new_price: float, bid: float, *,
+                     level: float | None, old_price: float | None, old_id: str,
+                     given: str) -> dict[str, Any]:
+        """Move a resting leg by the broker's replace, not cancel-and-new
+        (co-8mb1z). **Spec-derived until its first live use**; what Schwab
+        does to the OCO sibling of a replaced leg is NOT measured, so the
+        sibling is read back after every replace and both raw bodies are
+        journaled. A sibling the replace took off puts the pair back on as
+        one OCO, and the journal says so (``replace_broke_oco``)."""
+        intent = (self._stop_intent(pos, new_price) if leg == "stop"
+                  else self._target_intent(pos, new_price))
+        try:
+            result = self.broker.replace_order(old_id, intent)
+        except BrokerError as exc:
+            self.journal.record("error", kind=f"replace-{leg}", symbol=pos.symbol,
+                                order_id=old_id, detail=str(exc))
+            raise
+        self._journal_raw(result.order_id, f"replace:{leg}")
+        if result.status is OrderStatus.REJECTED:
+            self.journal.record("refused", kind=f"replace-{leg}", symbol=pos.symbol,
+                                order_id=old_id, detail=result.message)
+            return {"moved": False, "old_price": old_price, "new_price": new_price,
+                    "order_id": old_id, "given": given,
+                    "error": f"the broker would not move the {leg}: "
+                             f"{result.message or 'no reason given'}; the old one stands"}
+        attr = self._LEG_ATTR[leg]
+        if leg == "stop":
+            old_spx = pos.stop_spx
+            new_spx = level if level is not None else self._stop_spx_for(pos, new_price)
+            if new_spx is not None:
+                pos.stop_spx = new_spx
+        else:
+            old_spx = pos.target_spx
+            pos.target_spx = level
+        if result.is_filled:
+            setattr(pos, attr, None)
+            reason = "resting-stop" if leg == "stop" else "target"
+            return {"moved": True, "old_price": old_price, "new_price": new_price,
+                    "given": given, "closed": self._settle(pos, result, reason=reason)}
+        setattr(pos, attr, result.order_id)
+        if leg == "stop":
+            pos.stop_price = new_price
+        else:
+            pos.target_price = new_price
+        self.journal.record(f"{leg}_adjusted", symbol=pos.symbol, intent_id=pos.intent_id,
+                            old_price=old_price, new_price=new_price,
+                            old_order_id=old_id, new_order_id=result.order_id,
+                            replaced=True, given=given, bid=bid, qty=pos.qty,
+                            **({"old_stop_spx": old_spx, "new_stop_spx": pos.stop_spx}
+                               if leg == "stop" else
+                               {"old_target_spx": old_spx, "new_target_spx": pos.target_spx}))
+        # the sibling, read back: still resting, or taken off by the replace?
+        other = "target" if leg == "stop" else "stop"
+        other_id = getattr(pos, self._LEG_ATTR[other])
+        if other_id:
+            self._journal_raw(other_id, f"replace:{leg}:sibling")
+            status = None
+            try:
+                listed = {o.order_id: o for o in self.broker.orders()}
+                status = listed.get(other_id)
+            except BrokerError as exc:
+                self.journal.record("error", kind="replace-sibling", order_id=other_id,
+                                    detail=str(exc))
+            if status is not None and status.is_filled:
+                setattr(pos, self._LEG_ATTR[other], None)
+                self._settle(pos, status, reason="resting-stop" if other == "stop" else "target")
+            elif status is not None and not status.is_working:
+                self.journal.record("replace_broke_oco", symbol=pos.symbol, leg=leg,
+                                    order_id=result.order_id, sibling=other_id,
+                                    sibling_status=status.status.value,
+                                    detail="the replace took the other leg off — the pair "
+                                           "goes back on as one OCO")
+                setattr(pos, self._LEG_ATTR[other], None)
+                if self._clear_other_leg(pos, leg) and pos.symbol in self._open:
+                    self._rest_pair(pos, pos.stop_price, pos.target_price, kind="re-paired")
+        out = {"moved": True, "old_price": old_price, "new_price": new_price,
+               "order_id": getattr(pos, attr), "given": given}
+        out["stop_spx" if leg == "stop" else "target_spx"] = (
+            pos.stop_spx if leg == "stop" else pos.target_spx)
+        out["old_stop_spx" if leg == "stop" else "old_target_spx"] = old_spx
+        return out
 
     def _stop_spx_for(self, pos: OpenPosition, stop_price: float) -> float | None:
         """The SPX level that corresponds to an option-price stop, by the
@@ -3249,6 +3439,7 @@ class ExecService:
                     delta=e.get("delta"),
                     page_query={str(k): str(v) for k, v in query.items()}
                     if isinstance(query, dict) else None,
+                    triggered=bool(e.get("triggered")),
                 )
             elif e.get("event") == "entry_resolved":
                 self._working.pop(str(e.get("order_id", "")), None)
