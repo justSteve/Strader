@@ -18,33 +18,13 @@ instruments: [SPX, SPXW]
 # Contracts per order. The fire server's cap today.
 qty_cap: 1
 
-# How many may be open at once.
-max_open_positions: 1
-
-# The hard ceiling on the day's damage, and how many attempts may be used.
-# An attempt is a filled position (Steve, 2026-09-14): it is held while the
-# position is open and kept only if the position closes at a loss — a close
-# at break-even or better gives its attempt back. A working entry that has
-# not filled holds a position slot but no attempt. A winning trade never
-# raises the ceiling — that bounds how much of the day can go wrong, it is
-# not a running P&L. Both are rebuilt from the journal, so a restart does not
-# reset them.
-#
-# It bounds two things. Loss ALREADY REALIZED: once it reaches the ceiling, no
-# new entry. And the worst case of the entry IN FRONT OF IT: an entry is priced
-# at its limit, walked down to the stop it would rest, and refused if that
-# exceeds the headroom left. The second is what makes the sum of the day's
-# worst cases fit inside the ceiling rather than merely the first one.
-#
-# So this number has to be larger than one position can lose or it can never
-# bind at all: a $2.10 SPX call with a twelve-point stop risks $205 whatever
-# the ceiling says.
-daily_loss_ceiling_usd: 500.0
-# 2 → 10, Steve 2026-09-14: "adjust rule that puts the number of loss
-# transactions from 2 up to 10. the $500 limit remains as is." The seed
-# matches his live file so a fresh install does not quietly revert it. Ten
-# LOSING attempts, per the rule above.
-max_attempts: 10
+# No daily loss ceiling, no limit on how many positions are open, and no
+# count of attempts or losing trades — removed 2026-09-24 and not to come
+# back. Steve, 2026-09-17: "Let's just completely remove that complete
+# calculation. I don't need that level of hand holding." And 2026-09-24:
+# "make sure they are removed now and not restored in the future."
+# A file that still carries max_open_positions, daily_loss_ceiling_usd or
+# max_attempts loads; those lines are ignored and can be deleted.
 
 # No clock rules. There is no session window, no no-new-entries cutoff, no
 # weekdays-only and no flat-by-close: nothing here refuses, closes or locks

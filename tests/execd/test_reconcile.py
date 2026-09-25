@@ -46,9 +46,8 @@ def working_buys(broker: MockBroker) -> list:
 
 
 class TestAWorkingEntryIsNotForgotten:
-    def test_it_occupies_a_position_slot_but_no_attempt(self, armed, broker):
-        """The slot is what closes the entry door. The attempt is Steve's
-        counter of filled positions (2026-09-14), and nothing has filled."""
+    def test_it_is_counted_as_open(self, armed, broker):
+        """Counted as a fact on /status; it closes no door (co-8mb1z)."""
         broker.rest_limits = True
         out = armed.place(entry())
         assert out["order"]["status"] == "WORKING"
@@ -56,7 +55,6 @@ class TestAWorkingEntryIsNotForgotten:
         assert out["target_order"] is None
         day = armed.status()["day"]
         assert day["open_positions"] == 1
-        assert day["attempts_used"] == 0
 
     def test_it_is_visible_as_a_working_order_not_a_position(self, armed, broker):
         broker.rest_limits = True
@@ -66,18 +64,22 @@ class TestAWorkingEntryIsNotForgotten:
         assert status["working"][0]["symbol"] == CALL
         assert status["working"][0]["qty"] == 1
 
-    def test_a_second_entry_is_refused_while_the_first_is_still_working(
+    def test_a_second_entry_goes_out_while_the_first_is_still_working(
             self, armed, broker):
+        """No limit on open positions (Steve, 2026-09-24). [co-8mb1z]"""
         broker.rest_limits = True
         armed.place(entry(intent_id="w-1"))
-        out = armed.place(entry(intent_id="w-2"))
-        assert out["refused"]["bound"] == "positions"
+        out = armed.place(entry(intent_id="w-2", symbol=PUT, limit=1.90,
+                                stop_spx=SPX_NOW + 12.0, delta=0.28))
+        assert out["refused"] is None
+        assert len(working_buys(broker)) == 2
 
-    def test_five_places_cannot_leave_five_live_buy_orders(self, armed, broker):
-        """The audit's own reproduction, as a test. Five calls, one order."""
+    def test_the_same_intent_five_times_is_one_order(self, armed, broker):
+        """The audit's reproduction, now with repeats of ONE intent: the
+        idempotency key, not a position limit, is what stops a double send."""
         broker.rest_limits = True
-        for n in range(1, 6):
-            armed.place(entry(intent_id=f"probe-{n}"))
+        for _ in range(5):
+            armed.place(entry(intent_id="probe-1"))
         assert len(working_buys(broker)) == 1
 
     def test_the_journal_records_it_so_a_restart_recovers_it(
@@ -126,7 +128,6 @@ class TestReconcileResolvesWhatTheBrokerDid:
         armed.reconcile()
         day = armed.status()["day"]
         assert day["open_positions"] == 0
-        assert day["attempts_used"] == 0
         assert armed.place(entry(intent_id="pull-2"))["refused"] is None
 
     def test_a_rejected_working_entry_gives_the_slot_back(self, armed, broker):
@@ -134,7 +135,7 @@ class TestReconcileResolvesWhatTheBrokerDid:
         out = armed.place(entry(intent_id="rej-1"))
         broker.reject_resting(out["order"]["order_id"])
         armed.reconcile()
-        assert armed.status()["day"]["attempts_used"] == 0
+        assert armed.status()["day"]["open_positions"] == 0
 
     def test_an_order_the_broker_has_never_heard_of_keeps_its_slot(
             self, armed, broker):
@@ -155,8 +156,8 @@ class TestReconcileResolvesWhatTheBrokerDid:
         out = armed.place(entry(intent_id="auto-1"))
         broker.fill_resting(out["order"]["order_id"])
 
-        second = armed.place(entry(intent_id="auto-2"))
-        assert second["refused"]["bound"] == "positions"
+        armed.place(entry(intent_id="auto-2"))
+        assert armed.journal.events("filled")[0]["intent_id"] == "auto-1"
         assert armed.status()["positions"][0]["stop_order_id"] is not None
 
     def test_reconcile_is_silent_when_nothing_has_changed(self, armed):
@@ -306,27 +307,12 @@ class TestAnExitIsSizedAgainstTheBroker:
         assert armed.journal.events("exit_unverified")
 
 
-class TestTheDayCeilingCountsWorkingOrders:
-    def test_two_working_entries_fill_the_slots_and_spend_no_attempt(self, armed, broker):
-        """Working entries close the entry door by the position count, not
-        the attempt count: nothing has filled, so no attempt is spent
-        (Steve, 2026-09-14)."""
-        armed.bounds = armed.config.bounds = Bounds(max_open_positions=2)
-        broker.rest_limits = True
-        armed.place(entry(intent_id="a-1"))
-        armed.place(entry(intent_id="a-2", symbol=PUT,
-                          stop_spx=SPX_NOW + 12.0, delta=0.28, limit=1.90))
-        out = armed.place(entry(intent_id="a-3"))
-        assert out["refused"]["bound"] == "positions"
-        assert armed.status()["day"]["attempts_used"] == 0
-        assert armed.status()["day"]["open_positions"] == 2
-
+class TestWorkingOrdersAreCountedNotCapped:
     def test_a_working_entry_that_fills_is_counted_once(self, armed, broker):
         broker.rest_limits = True
         out = armed.place(entry(intent_id="once-1"))
         broker.fill_resting(out["order"]["order_id"])
         armed.reconcile()
-        assert armed.status()["day"]["attempts_used"] == 1
         assert armed.status()["day"]["open_positions"] == 1
 
 
@@ -393,8 +379,8 @@ class TestASendWithNoAnswer:
         assert other["refused"]["bound"] == "send_unconfirmed"
         assert len(broker.calls_to("place")) == 1
         # Once the listing answers, the reconcile every place() runs first
-        # finds the resting order, so the door is now shut by the slot.
-        assert armed.place(entry(intent_id="lost-1"))["refused"]["bound"] == "positions"
+        # finds the resting order, and the same intent is not sent twice.
+        armed.place(entry(intent_id="lost-1"))
         assert len(broker.calls_to("place")) == 1
 
     def test_reconcile_finds_the_resting_order_and_it_becomes_the_working_entry(
@@ -412,8 +398,9 @@ class TestASendWithNoAnswer:
         assert work[0]["intent_id"] == "lost-1" and work[0]["stop_spx"] == SPX_NOW - 12.0
         resolved = armed.journal.events("send_resolved")
         assert resolved[0]["outcome"] == "found" and resolved[0]["order_id"] == resting.order_id
-        # the slot is held: a new entry is refused on positions, not on the send
-        assert armed.place(entry(intent_id="next", symbol=PUT))["refused"]["bound"] == "positions"
+        # the same intent again is answered, never re-sent
+        armed.place(entry(intent_id="lost-1"))
+        assert len(broker.calls_to("place")) == 1
         # and when it fills, the usual promotion rests the bracket
         clock.advance(seconds=1)
         broker.fill_resting(resting.order_id)

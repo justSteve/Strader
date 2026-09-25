@@ -13,7 +13,9 @@ bounds is not configurable, because a bound you can switch off is not a bound.
 
 Order of checks matters and is asserted in ``tests/execd/test_bounds.py``:
 instrument, side, order type, quantity, the STOP file, the protective-stop
-inputs, open positions, the daily ceiling, the price band.
+inputs, the tick grid, the price band. No daily loss ceiling, no limit on
+open positions and no count of attempts (removed 2026-09-24; see
+:class:`Bounds`).
 
 **No bound here reads the clock or the calendar to refuse or to act.** The
 session window, the 14:50 no-new-entries cutoff, weekdays-only and the 14:55
@@ -87,25 +89,44 @@ class DayState:
 
 
 #: Keys a bounds file may still carry from before 2026-09-24. Read and
-#: ignored, never refused, so an old /etc file cannot stop the service.
+#: ignored, never refused, so an old /etc file cannot stop the service. None
+#: of them may come back as a bound (see :class:`Bounds`).
 RETIRED_KEYS = frozenset({"open_ct", "close_ct", "no_open_after_ct",
-                          "flat_by_close_ct", "weekdays_only"})
+                          "flat_by_close_ct", "weekdays_only",
+                          "max_open_positions", "daily_loss_ceiling_usd",
+                          "max_attempts"})
 
 
 @dataclass(frozen=True)
 class Bounds:
-    """Steve's start values (design §3). Every one of these is his to change;
-    none of them is his to remove."""
+    """Steve's values. Every one of these is his to change.
+
+    **Never here, and never to come back** (tests/execd/test_no_hand_holding.py
+    fails if any does): a daily loss ceiling or loss headroom, a limit on
+    open positions, a count of attempts or losing trades, and any rule keyed
+    on the clock or the calendar.
+
+    - Steve, 2026-09-17, on st-bafu: "You have again lost track of per day max
+      loss (it had been updated to $500 and 10 attempts). Let's just
+      completely remove that complete calculation. I don't need that level of
+      hand holding."
+    - Steve, 2026-09-18, on st-644f: "you are _still showing headroom and
+      attempts. remove all aspects of that."
+    - Steve, 2026-09-24: "omg - never ever place that kind of restriction on
+      me ... As 0DTE trades, if i don't close them, they expire. flat. But I
+      will _never ask that you do it automatically."
+    - Steve, 2026-09-24: "' one open position, the $500 daily loss limit '
+      have a sub remove these also. I've already ruled on my desire to
+      eliminate the $500 limit as well as the daily number of losses limit
+      and know those had been removed. make sure they are removed now and not
+      restored in the future. No idea where that 'only one position' came
+      from."
+
+    On 09-17 and 09-18 only the displays were removed and the bounds were
+    kept; that was the misreading. [co-8mb1z]"""
 
     instruments: tuple[str, ...] = ("SPX", "SPXW")
     qty_cap: int = 1
-    max_open_positions: int = 1
-    #: Steve, 2026-08-31, ruling on st-2j80. It was $100, which was smaller than
-    #: what a single SPX contract costs, so it could not bound a trade: a $2.10
-    #: call with a twelve-point stop risks $205 whatever the ceiling says. A
-    #: ceiling below the price of one position is a number, not a bound.
-    daily_loss_ceiling_usd: float = 500.0
-    max_attempts: int = 2
     price_band_pct: float = 0.10      # a BUY limit may sit this far above the ask
     max_quote_age_s: float = 30.0     # older than this is not a live quote
     preview_cost_tolerance_usd: float = 5.00
@@ -125,12 +146,6 @@ class Bounds:
             out.append("instruments must name at least one root")
         if self.qty_cap < 1:
             out.append(f"qty_cap must be at least 1, not {self.qty_cap}")
-        if self.max_open_positions < 1:
-            out.append(f"max_open_positions must be at least 1, not {self.max_open_positions}")
-        if self.daily_loss_ceiling_usd <= 0:
-            out.append("daily_loss_ceiling_usd must be positive")
-        if self.max_attempts < 1:
-            out.append(f"max_attempts must be at least 1, not {self.max_attempts}")
         if not (0 < self.price_band_pct < 1):
             out.append(f"price_band_pct must be within (0, 1), not {self.price_band_pct}")
         if self.max_quote_age_s <= 0:
@@ -172,7 +187,7 @@ class Bounds:
         if retired:
             # A bounds file written before 2026-09-24 still carries these; it
             # must keep loading, and they must do nothing.
-            log.warning("bounds: ignoring retired clock keys %s — they no longer "
+            log.warning("bounds: ignoring retired keys %s — they no longer "
                         "do anything and may be deleted", ", ".join(retired))
         d = {k: v for k, v in d.items() if k not in RETIRED_KEYS}
         unknown = sorted(set(d) - known)
@@ -201,9 +216,6 @@ class Bounds:
         return {
             "instruments": list(self.instruments),
             "qty_cap": self.qty_cap,
-            "max_open_positions": self.max_open_positions,
-            "daily_loss_ceiling_usd": self.daily_loss_ceiling_usd,
-            "max_attempts": self.max_attempts,
             "price_band_pct": self.price_band_pct,
             "max_quote_age_s": self.max_quote_age_s,
             "preview_cost_tolerance_usd": self.preview_cost_tolerance_usd,
@@ -328,31 +340,6 @@ def check_entry(
             "is derived from them and is not optional",
         )
 
-    if state.open_positions >= bounds.max_open_positions:
-        return Refusal(
-            "positions",
-            f"{state.open_positions} position(s) already open — the limit is "
-            f"{bounds.max_open_positions}",
-        )
-
-    if state.attempts_used >= bounds.max_attempts:
-        # Steve, 2026-09-14 (st-fn5y): an attempt is a filled position, and
-        # one that closes at break-even or better gives its attempt back. So
-        # this counts losing closes plus positions still open, not fills.
-        return Refusal(
-            "ceiling",
-            f"{state.attempts_used} of {bounds.max_attempts} attempts used today "
-            f"(losing closes and open positions; a close at break-even or better "
-            f"gives its attempt back)",
-        )
-
-    if state.realized_loss_usd >= bounds.daily_loss_ceiling_usd:
-        return Refusal(
-            "ceiling",
-            f"${state.realized_loss_usd:.2f} realized loss today has reached the "
-            f"${bounds.daily_loss_ceiling_usd:.2f} ceiling",
-        )
-
     if (r := check_tick(intent)) is not None:
         return r
 
@@ -395,55 +382,6 @@ def check_exit(intent: OrderIntent, bounds: Bounds,
     # will not take is no protection at all.
     if (r := check_tick(intent)) is not None:
         return r
-    return None
-
-
-def check_risk_budget(
-    intent: OrderIntent, bounds: Bounds, state: DayState, stop_price: float,
-    *, open_risk_usd: float = 0.0,
-) -> Refusal | None:
-    """What this one entry can lose, against what the day has left. [st-2j80]
-
-    Every other ceiling check looks backwards at loss already realized. None of
-    them looked at the position standing in front of them, so two attempts could
-    each realize more than the whole day's ceiling and every bound would have
-    passed — finding 6 of the 2026-08-30 audit.
-
-    The worst case is the distance from the fill to the resting stop, and the
-    fill is bounded above by the limit, because a buy never pays more than its
-    limit. So the entry is priced at its limit, which is the most it can cost
-    and therefore the most it can lose.
-
-    Checked against the *remaining* headroom rather than the whole ceiling. That
-    is what makes the ceiling hold across attempts: a day that has already lost
-    $205 of a $500 ceiling may only put $295 more at risk, so the sum of the
-    worst cases can never exceed what Steve allowed.
-
-    This is a bound on *intent*, not a guarantee. A gap through the stop, or a
-    market close filled worse than the stop, can still realize more than the
-    number computed here. It bounds what the service knowingly puts at risk,
-    which is the part it controls.
-
-    ``open_risk_usd`` is what the positions already held can still lose to
-    their stops. Until 2026-09-17 nothing subtracted it, and the claim that
-    the sum of the day's worst cases fits the ceiling was true only because
-    ``max_open_positions`` was 1 (audit finding 40, st-s2jj): at 2, two
-    $400-risk positions cleared a $500 ceiling with every bound passing.
-    """
-    from .stops import risk_usd      # local: bounds stays importable on its own
-
-    risk = risk_usd(intent.limit or 0.0, stop_price, intent.qty)
-    headroom = round(bounds.daily_loss_ceiling_usd - state.realized_loss_usd
-                     - open_risk_usd, 2)
-    if risk > headroom:
-        held = (f" after ${state.realized_loss_usd:.2f} lost and ${open_risk_usd:.2f} "
-                f"at risk on what is held" if open_risk_usd else "")
-        return Refusal(
-            "ceiling",
-            f"this entry risks ${risk:.2f} to its stop at ${stop_price:.2f}, and "
-            f"the day has ${headroom:.2f} of its ${bounds.daily_loss_ceiling_usd:.2f} "
-            f"ceiling left{held}",
-        )
     return None
 
 

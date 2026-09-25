@@ -169,7 +169,7 @@ class TestThroughTheService:
         r = w.once()
         assert r["observe"]["fired"][0]["symbol"] == CALL
         st = paper_service.status()
-        assert st["positions"] == [] and st["day"]["attempts_used"] == 1
+        assert st["positions"] == [] and st["day"]["realized_loss_usd"] > 0
         events = [e["event"] for e in paper_service.journal.find("s-3")]
         assert "filled" in events and "exit_triggered" in events
         assert live_calls(live, "place", "cancel") == []             # still nothing live

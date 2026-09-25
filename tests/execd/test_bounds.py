@@ -1,7 +1,7 @@
 """Every bound refuses, and refuses under its own name. [st-eznu]
 
 The name matters as much as the refusal. A journal line reading
-``{"bound": "ceiling"}`` is something Steve can act on; ``{"bound": "invalid"}``
+``{"bound": "price_band"}`` is something Steve can act on; ``{"bound": "invalid"}``
 is not, and a service whose refusals all collapse to one label cannot be
 audited after a bad day.
 
@@ -19,7 +19,7 @@ import pytest
 
 from execd.bounds import (
     Bounds, DayState, QuoteView, check_entry, check_exit, check_instrument,
-    check_preview_cost, check_price_band, check_risk_budget,
+    check_preview_cost, check_price_band,
     load_bounds,
 )
 from execd.intent import OrderIntent, OrderType, Side
@@ -97,20 +97,13 @@ class TestEachBoundRefusesByName:
         me". No hour and no day of the week refuses an entry. [co-8mb1z]"""
         assert refusal(entry(), now=when) is None, when
 
-    def test_positions_refuses_a_second_open_position(self):
-        r = refusal(entry(), state=DayState(open_positions=1))
-        assert r.bound == "positions"
-
-    def test_ceiling_refuses_once_the_attempts_are_spent(self):
-        r = refusal(entry(), state=DayState(attempts_used=2))
-        assert r.bound == "ceiling" and "attempts" in r.reason
-
-    def test_ceiling_refuses_at_the_daily_loss_limit(self):
-        r = refusal(entry(), state=DayState(realized_loss_usd=500.0))
-        assert r.bound == "ceiling" and "$500.00 ceiling" in r.reason
-
-    def test_ceiling_allows_a_dollar_short_of_the_limit(self):
-        assert refusal(entry(), state=DayState(realized_loss_usd=499.0)) is None
+    def test_no_count_of_positions_attempts_or_losses_refuses(self):
+        """Steve, 2026-09-24: "' one open position, the $500 daily loss limit '
+        have a sub remove these also ... make sure they are removed now and
+        not restored in the future." [co-8mb1z]"""
+        state = DayState(open_positions=40, realized_loss_usd=1_000_000.0,
+                         attempts_used=999)
+        assert refusal(entry(), state=state) is None
 
     def test_price_band_refuses_a_limit_far_above_the_offer(self):
         r = refusal(entry(limit=4.00))
@@ -140,59 +133,6 @@ class TestEachBoundRefusesByName:
         assert check_preview_cost(entry(limit=2.10), 210.65, Bounds()) is None
 
 
-class TestTheRiskBudget:
-    """Finding 6 of the 2026-08-30 audit: every ceiling check looked backwards
-    at loss already realized, and none looked at the position standing in front
-    of it, so two attempts could each realize more than the whole day's ceiling
-    with every bound passing. Steve raised the ceiling to $500 on 2026-08-31
-    (st-2j80) because $100 was smaller than one contract's premium and so could
-    never bind at all."""
-
-    def test_an_entry_that_can_lose_more_than_the_day_has_left_is_refused(self):
-        # $2.10 fill down to a $0.05 stop is $205 on one contract.
-        r = check_risk_budget(entry(limit=2.10), Bounds(),
-                              DayState(realized_loss_usd=400.0), stop_price=0.05)
-        assert r.bound == "ceiling"
-        assert "$205.00" in r.reason and "$100.00" in r.reason
-
-    def test_an_entry_inside_the_headroom_passes(self):
-        assert check_risk_budget(entry(limit=2.10), Bounds(), NO_STATE,
-                                 stop_price=0.05) is None
-
-    def test_the_headroom_shrinks_with_the_day(self):
-        """What makes the ceiling hold across attempts: the sum of the worst
-        cases can never exceed what Steve allowed."""
-        spent = DayState(realized_loss_usd=205.0)
-        assert check_risk_budget(entry(limit=2.10), Bounds(), spent, 0.05) is None
-        assert check_risk_budget(entry(limit=2.10, qty=2), Bounds(qty_cap=2),
-                                 spent, 0.05).bound == "ceiling"
-
-    def test_the_headroom_counts_what_is_already_held(self):
-        """Finding 40 (st-s2jj): at max_open_positions 2, two $400-risk
-        positions cleared a $500 ceiling because nothing subtracted the
-        first one's worst case."""
-        r = check_risk_budget(entry(limit=2.10), Bounds(), NO_STATE, 0.05, open_risk_usd=300.0)
-        assert r.bound == "ceiling"
-        assert "$205.00" in r.reason and "$200.00" in r.reason
-        assert "$300.00 at risk on what is held" in r.reason
-        assert check_risk_budget(entry(limit=2.10), Bounds(), NO_STATE, 0.05,
-                                 open_risk_usd=295.0) is None
-        spent = DayState(realized_loss_usd=100.0)
-        assert check_risk_budget(entry(limit=2.10), Bounds(), spent, 0.05,
-                                 open_risk_usd=200.0).bound == "ceiling"
-
-    def test_a_contract_too_dear_for_the_whole_ceiling_is_refused_on_day_one(self):
-        # $8.40 to a $0.05 stop is $835, over the ceiling before anything is lost.
-        r = check_risk_budget(entry(limit=8.40), Bounds(), NO_STATE, stop_price=0.05)
-        assert r.bound == "ceiling" and "$835.00" in r.reason
-
-    def test_a_tighter_stop_buys_a_dearer_contract(self):
-        """The bound is on the distance to the stop, not on the premium: the
-        same $8.40 contract is fine if the stop is close enough."""
-        assert check_risk_budget(entry(limit=8.40), Bounds(), NO_STATE,
-                                 stop_price=4.00) is None
-
-
 class TestOrderOfChecks:
     """An intent that breaks several bounds names the most fundamental one."""
 
@@ -209,15 +149,6 @@ class TestOrderOfChecks:
     def test_the_kill_file_outranks_the_window(self):
         r = refusal(entry(), now=datetime(2026, 8, 26, 3, 0, tzinfo=CT), killed=True)
         assert r.bound == "stop"
-
-    def test_the_position_limit_holds_outside_the_hours_too(self):
-        r = refusal(entry(), state=DayState(open_positions=9),
-                    now=datetime(2026, 8, 26, 3, 0, tzinfo=CT))
-        assert r.bound == "positions"
-
-    def test_the_ceiling_outranks_the_price_band(self):
-        r = refusal(entry(limit=99.0), state=DayState(realized_loss_usd=500))
-        assert r.bound == "ceiling"
 
 
 class TestTheTick:
@@ -301,17 +232,16 @@ class TestConfiguration:
     def test_the_start_values_are_the_ones_in_the_design(self):
         b = Bounds()
         assert b.instruments == ("SPX", "SPXW")
-        assert (b.qty_cap, b.max_open_positions) == (1, 1)
-        assert (b.daily_loss_ceiling_usd, b.max_attempts) == (500.0, 2)
+        assert b.qty_cap == 1
         for gone in ("open_ct", "close_ct", "no_open_after_ct", "flat_by_close_ct",
                      "weekdays_only"):
             assert not hasattr(b, gone), gone        # no clock rules (co-8mb1z)
 
     def test_steves_file_overrides_the_start_values(self, tmp_path):
         p = tmp_path / "bounds.yaml"
-        p.write_text("qty_cap: 2\ndaily_loss_ceiling_usd: 250\ninstruments: [spxw]\n")
+        p.write_text("qty_cap: 2\nprice_band_pct: 0.2\ninstruments: [spxw]\n")
         b = load_bounds(p)
-        assert (b.qty_cap, b.daily_loss_ceiling_usd, b.instruments) == (2, 250, ("SPXW",))
+        assert (b.qty_cap, b.price_band_pct, b.instruments) == (2, 0.2, ("SPXW",))
 
     def test_a_missing_file_falls_back_to_the_start_values(self, tmp_path):
         assert load_bounds(tmp_path / "absent.yaml") == Bounds()
@@ -322,15 +252,16 @@ class TestConfiguration:
         with pytest.raises(ValueError, match="unknown bound"):
             load_bounds(p)
 
-    def test_an_old_file_with_the_retired_clock_keys_still_loads(self, tmp_path):
+    def test_an_old_file_with_the_retired_keys_still_loads(self, tmp_path):
         """/etc files written before 2026-09-24 carry these; they must not
         stop the service from starting, and they must do nothing."""
         p = tmp_path / "bounds.yaml"
         p.write_text('open_ct: "08:30"\nclose_ct: "15:00"\nno_open_after_ct: "14:50"\n'
-                     'flat_by_close_ct: "14:55"\nweekdays_only: true\nqty_cap: 1\n')
+                     'flat_by_close_ct: "14:55"\nweekdays_only: true\nqty_cap: 1\n'
+                     'max_open_positions: 1\ndaily_loss_ceiling_usd: 500.0\nmax_attempts: 10\n')
         assert load_bounds(p) == Bounds()
 
-    def test_the_shipped_example_carries_no_clock_keys(self):
+    def test_the_shipped_example_carries_no_retired_keys(self):
         from pathlib import Path
         import yaml
         from execd.bounds import RETIRED_KEYS
@@ -338,8 +269,7 @@ class TestConfiguration:
         assert not set(yaml.safe_load(example.read_text())) & RETIRED_KEYS
 
     @pytest.mark.parametrize("kw", [
-        {"qty_cap": 0}, {"max_open_positions": 0}, {"daily_loss_ceiling_usd": 0},
-        {"max_attempts": 0}, {"price_band_pct": 1.5}, {"max_quote_age_s": 0},
+        {"qty_cap": 0}, {"price_band_pct": 1.5}, {"max_quote_age_s": 0},
         {"instruments": ()},
     ])
     def test_nonsense_values_are_refused(self, kw):
@@ -357,8 +287,7 @@ class TestConfiguration:
 
     def test_to_dict_names_every_bound_the_service_enforces(self):
         assert set(Bounds().to_dict()) == {
-            "instruments", "qty_cap", "max_open_positions", "daily_loss_ceiling_usd",
-            "max_attempts",
+            "instruments", "qty_cap",
             "price_band_pct", "max_quote_age_s", "preview_cost_tolerance_usd",
             "require_protective_stop",
             "take_profit_multiple", "take_profit_basis",
@@ -418,7 +347,8 @@ class TestTheBoundsAreAllCovered:
     def test_the_scan_finds_the_bounds_it_is_supposed_to(self):
         """A meta-test that silently matched nothing would pass forever."""
         declared = self._declared()
-        assert {"instrument", "qty", "ceiling", "stop"} <= declared
+        assert {"instrument", "qty", "stop", "price_band"} <= declared
+        assert not {"ceiling", "positions"} & declared   # co-8mb1z
         assert "window" not in declared          # no clock bound (co-8mb1z)
         assert len(declared) >= 10
 

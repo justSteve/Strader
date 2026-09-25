@@ -428,14 +428,15 @@ class TestOnlyWhatHeCanBuyAndOnlyToday:
     def test_nothing_counts_attempts_or_headroom_at_him(
             self, order_page, armed, chain):
         """Not on the trading page, not on the operations page, not in the
-        card. The bounds still hold both and /status still reports them."""
+        card — and since 2026-09-24 not in the bounds or /status either
+        (co-8mb1z)."""
         page_send(order_page, {"side": "call", "delta": "0.3"})
         for path in ("/exec/order?side=call&delta=0.3", "/exec/", "/exec/order"):
             body = text(order_page.get(path))
             assert "attempts" not in body, path
             assert "headroom" not in body, path
         st = armed.status()
-        assert st["day"]["attempts_left"] >= 0 and st["day"]["loss_headroom_usd"] > 0
+        assert "attempts_left" not in st["day"] and "loss_headroom_usd" not in st["day"]
 
     def test_the_poll_prices_the_loaded_strike_and_answers_with_the_ticket(
             self, order_page, armed, chain):

@@ -63,7 +63,7 @@ from typing import Any, Callable
 from .arming import Arming
 from .bounds import (
     CT, Bounds, DayState, QuoteView, Refusal, check_entry, check_exit,
-    check_preview_cost, check_risk_budget,
+    check_preview_cost,
 )
 from .broker import (
     COMMISSION_PER_CONTRACT_USD, Broker, BrokerError, OrderResult, OrderStatus, Position, Quote,
@@ -142,8 +142,8 @@ class WorkingEntry:
     case, and until this existed the service handed the caller its order id and
     forgot it: no slot taken, no attempt debited, no protective stop owed, and
     nothing that ever looked at it again. It is not a position — nothing is held
-    — but it is the only thing between the caller and one, so it holds a slot
-    and an attempt until :meth:`ExecService.reconcile` learns what became of it.
+    — but it is the only thing between the caller and one, so it is tracked
+    until :meth:`ExecService.reconcile` learns what became of it.
     """
 
     order_id: str
@@ -534,10 +534,6 @@ class ExecService:
             "day": {
                 "open_positions": day.open_positions,
                 "realized_loss_usd": day.realized_loss_usd,
-                "attempts_used": day.attempts_used,
-                "attempts_left": max(0, self.bounds.max_attempts - day.attempts_used),
-                "loss_headroom_usd": round(
-                    max(0.0, self.bounds.daily_loss_ceiling_usd - day.realized_loss_usd), 2),
             },
             # One quote read per position per status call: the position row
             # and the day row are struck at the same price (14:37 CT today
@@ -780,6 +776,13 @@ class ExecService:
             # belief, and the journal does not know what filled while nothing
             # was watching. [st-v7oa]
             self.reconcile()
+            # The reconcile may just have found this very intent at the broker
+            # (a send whose answer was lost): ask again before sending.
+            replay = self._replay(intent.intent_id)
+            if replay is not None:
+                self.journal.record("replayed", intent_id=intent.intent_id,
+                                    order_id=replay.get("order", {}).get("order_id"))
+                return {**replay, "replayed": True}
 
             self.journal.record("request", kind="place", intent_id=intent.intent_id,
                                 intent=intent.to_dict())
@@ -1657,18 +1660,22 @@ class ExecService:
                            f"nothing else goes out until reconcile has accounted for it")
         quote = self._quote_view(intent.symbol)
         state = self.day_state()
-        # The journal's count is today's file; what the service is actually
-        # holding can be older. A position carried past midnight fell out of
-        # the day's count at rollover and its slot came free while it was
-        # still open (audit finding 9, st-kh0l). The larger of the two numbers
-        # is the honest one — max, not sum, so nothing counts twice.
-        live = len(self._open) + len(self._working)
-        if live > state.open_positions:
-            state = replace(state, open_positions=live)
         r = check_entry(intent, self.bounds, state, quote,
                         self.clock(), killed=self.arming.killed)
         if r is not None:
             return r
+        # Not a risk rule — a tracking one. Positions are tracked one per
+        # contract, each with its own bracket, so a second entry in a contract
+        # already held or working would overwrite the first and orphan its
+        # stop and target (measured 2026-09-25 once the one-position limit
+        # that had hidden it was removed, co-8mb1z). Refused, loudly, until
+        # adding to a held contract is built. Any other contract opens freely.
+        held = intent.symbol in self._open or any(
+            w.symbol == intent.symbol for w in self._working.values())
+        if held:
+            return Refusal("same_contract",
+                           f"{intent.symbol.strip()} is already held or working — adding to "
+                           f"a contract already held is not built yet; any other strike opens")
         return self._protective_stop_refusal(intent)
 
     def _protective_stop_refusal(self, intent: OrderIntent) -> Refusal | None:
@@ -1706,40 +1713,13 @@ class ExecService:
         # right time for both is while refusing is still free. [st-2j80]
         worst_fill = intent.limit if intent.limit is not None else 0.0
         try:
-            stop_price = protective_stop_price(worst_fill, intent.delta, spx,
-                                               intent.stop_spx)
+            protective_stop_price(worst_fill, intent.delta, spx, intent.stop_spx)
         except ValueError as exc:
             return Refusal("protective_stop",
                            f"no resting stop can be derived for this entry: {exc}")
-        open_risk, bare = self._open_risk_usd()
-        if bare:
-            # A held position with no stop — adopted, or one whose stop would
-            # not rest — has no worst case to sum. Its risk is unbounded, so
-            # the entry door stays shut until it has a stop or is flat
-            # (finding 40's second note, st-s2jj).
-            return Refusal(
-                "ceiling",
-                f"{', '.join(sym.strip() for sym in bare)} is held with no stop — its "
-                f"risk is unbounded, so nothing new opens until it has a stop or is flat")
-        return check_risk_budget(intent, self.bounds, self.day_state(), stop_price,
-                                 open_risk_usd=open_risk)
-
-    def _open_risk_usd(self, *, except_symbol: str | None = None) -> tuple[float, list[str]]:
-        """What the positions already held can still lose to their stops, and
-        the symbols of any that carry no stop price at all (unbounded). A stop
-        price counts whether or not its order is confirmed resting: the
-        SPX-mark loop watches the level either way, and the ceiling is a
-        bound on what the service knowingly risks (st-s2jj)."""
-        total = 0.0
-        bare: list[str] = []
-        for pos in self._open.values():
-            if pos.symbol == except_symbol:
-                continue
-            if pos.stop_price is None:
-                bare.append(pos.symbol)
-                continue
-            total += risk_usd(pos.entry_price, pos.stop_price, pos.qty)
-        return round(total, 2), bare
+        # No daily loss ceiling, no headroom, no count of positions or losses
+        # (Steve, 2026-09-24; see ``execd.bounds.Bounds``). [co-8mb1z]
+        return None
 
     def _place_entry(self, intent: OrderIntent, *,
                      page_query: dict[str, str] | None = None) -> dict[str, Any]:
@@ -2452,10 +2432,9 @@ class ExecService:
         refusals, each named: no such position; a close already in flight
         (the bracket is off while it works); a price off the tick grid; a
         stop not below the live bid or a target not above it (either would
-        fill at once — a sale, not a trigger); a stop at or above the target;
-        and a stop moved so wide that the position's risk to it exceeds the
-        day's headroom, which is the ceiling doing to an adjusted stop what
-        it does to an entry. A cancel that finds the leg already filled books
+        fill at once — a sale, not a trigger); and a stop at or above the
+        target. How wide he moves his stop is his (no daily ceiling since
+        2026-09-24, co-8mb1z). A cancel that finds the leg already filled books
         that fill and refuses the adjust with what happened.
 
         Moving the stop price also moves the SPX-mark trigger the loop
@@ -2738,20 +2717,6 @@ class ExecService:
             target_word = f"SPX {target_level:g} → {new_target:.2f}" if target_level is not None else f"{new_target:.2f}"
             return Refusal("bracket", f"the stop ({stop_word}) must sit below the "
                                       f"target ({target_word})")
-        if stop_given and new_stop is not None:
-            risk = risk_usd(pos.entry_price, new_stop, pos.qty)
-            state = self.day_state()
-            # the other positions' worst cases come off the headroom too (st-s2jj)
-            others, _bare = self._open_risk_usd(except_symbol=pos.symbol)
-            headroom = round(self.bounds.daily_loss_ceiling_usd - state.realized_loss_usd
-                             - others, 2)
-            if risk > headroom:
-                held = f" and ${others:.2f} at risk on the other positions held" if others else ""
-                return Refusal(
-                    "ceiling",
-                    f"{name('stop', new_stop)} puts ${risk:.2f} at risk on this position, "
-                    f"and the day has ${headroom:.2f} of its "
-                    f"${self.bounds.daily_loss_ceiling_usd:.2f} ceiling left{held}")
         return None
 
     def _refuse_adjust(self, symbol: str, refusal: Refusal) -> dict[str, Any]:
@@ -2888,10 +2853,22 @@ class ExecService:
         return {"refused": refusal.to_dict(), "order": None, "mode": self.config.mode}
 
     def _replay(self, intent_id: str) -> dict[str, Any] | None:
-        """An intent id the journal has already sent is answered, never re-sent."""
+        """An intent id the journal has already sent is answered, never re-sent.
+
+        ``placed`` is the ordinary answer. A send whose answer was lost and
+        which the orphan sweep later found at the broker (``send_resolved``
+        found) has no ``placed`` line, so it is answered from that line; until
+        2026-09-24 the one-open-position limit was what refused a repeat of it,
+        and that limit is gone (co-8mb1z)."""
         for entry in self.journal.find(intent_id):
             if entry.get("event") == "placed":
                 return {"refused": None, "order": entry.get("order"),
+                        "replayed_from": entry.get("ts")}
+        for entry in self.journal.find(intent_id):
+            if entry.get("event") == "send_resolved" and entry.get("outcome") == "found":
+                return {"refused": None,
+                        "order": {"order_id": entry.get("order_id"),
+                                  "status": entry.get("status")},
                         "replayed_from": entry.get("ts")}
         return None
 

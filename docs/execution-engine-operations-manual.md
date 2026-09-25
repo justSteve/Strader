@@ -523,8 +523,7 @@ second Flask app on `127.0.0.1:8779`, published tailnet-only by
 ```
 now, now_ct, sha,
 arming:    {state, killed, kill_file, unlocked_at, permits_entry, permits_exit}
-day:       {open_positions, realized_loss_usd, attempts_used, attempts_left,
-            loss_headroom_usd}
+day:       {open_positions, realized_loss_usd}      # facts; nothing gates on them
 positions: [OpenPosition… — each with stop_order_id, stop_price,
             target_order_id, target_price, entry_spx and a valuation
             carrying at_stop_usd and at_target_usd]
@@ -580,8 +579,9 @@ LIMIT and `None` otherwise.
 a quote, a clock reading. No I/O, no broker, no credential.
 
 There are **twelve distinct bound names** — `armed`, `instrument`, `side`,
-`order_type`, `qty`, `stop`, `protective_stop`, `positions`,
-`ceiling`, `tick`, `price_band`, `preview_cost`. None of them reads the clock:
+`order_type`, `qty`, `stop`, `protective_stop`, `same_contract`,
+`tick`, `price_band`, `preview_cost`. The `positions` and `ceiling` bounds were
+removed on 2026-09-24 (co-8mb1z). None of them reads the clock:
 the `window` bound was removed on 2026-09-24 (co-8mb1z).
 
 **Order of checks for an entry** (`check_entry`), and the order is asserted in
@@ -597,13 +597,10 @@ names the most fundamental thing wrong:
 | 4 | `qty` | `qty > qty_cap` |
 | 5 | `stop` | the STOP file exists |
 | 6 | `protective_stop` | `require_protective_stop` and either `stop_spx` or `delta` is missing |
-| 8 | `positions` | `open_positions >= max_open_positions` |
-| 9 | `ceiling` | `attempts_used >= max_attempts` — an attempt is a filled position, held while open and kept only if it closes at a loss; a close at break-even or better gives it back (Steve, 2026-09-14, st-fn5y, §5.20); a working entry holds a slot (row 8) but no attempt |
-| 10 | `ceiling` | `realized_loss_usd >= daily_loss_ceiling_usd` |
+| 8 | `same_contract` | a second entry in a contract already held or working — positions are tracked one per contract with their own bracket; a second would orphan the first's legs. Not a risk rule; any other strike opens (co-8mb1z) |
 | 10a | `tick` | the limit (or a stop price) is off the exchange's grid — 0.05 below $3.00, 0.10 at and above it (measured 2026-09-04, st-pohq); an off-grid price is a rejected order, not a tighter one |
 | 11 | `price_band` | no quote; or quote older than `max_quote_age_s`; or not two-sided; or limit above `ask*(1+band)`; or limit below `bid*(1-band)` |
 | 12 | `protective_stop` | no `$SPX` mark; or the stop sign is transposed (`stop_is_consistent` false); or the limit is too cheap for `protective_stop_price` to derive a stop at all |
-| 12a | `ceiling` | the entry's own worst case — limit down to its derived stop, `check_risk_budget` — exceeds `daily_loss_ceiling_usd` minus loss already realized |
 | 13 | `preview_cost` | the broker's preview total exceeds `max_cost_usd + preview_cost_tolerance_usd`; or the broker would not accept the order |
 
 Steps 12 and 13 run inside `ExecService`, not `check_entry` — 12 in
@@ -613,8 +610,7 @@ Steps 12 and 13 run inside `ExecService`, not `check_entry` — 12 in
 side really is `SELL_TO_CLOSE`, — *only when the service knows the size* —
 that `qty <= held_qty`, and that any price it carries is on the tick grid (an
 off-grid stop is no stop, and refusing it cannot trap him). When `held_qty` is `None` the order goes through, because
-refusing on ignorance is how an exit gate traps someone. Not the
-ceiling, not the STOP file, not stand-down. The one thing that refuses an exit
+refusing on ignorance is how an exit gate traps someone. Not the STOP file, not stand-down. The one thing that refuses an exit
 is LOCKED, and that is a statement about capability, not policy.
 
 ### 5.6 `POST /place` — the one path that transmits
@@ -704,20 +700,9 @@ parse, which is what a kill mid-write looks like. Surfacing it as data rather
 than raising means the rest of the day is still the audit.
 
 **The day is derived, not remembered.** `day_state()` rebuilds
-`open_positions`, `realized_loss_usd` and `attempts_used` by reading the file,
-so a restart mid-session recovers the ceiling rather than resetting it.
-`attempts_used` is the positions this service opened that are still open plus
-its losing closes: a `filled`+`kind=entry` line holds an attempt until the
-position's last `closed` line (`remaining_qty` falsy), and then the attempt is
-kept only if the position's `pnl_usd` summed over its `closed` lines is below
-zero. Steve, 2026-09-14 (st-fn5y): *"An 'attempt' is a 'filled position'. Any
-attempt that breaks even or better doesn't decrement the counter."* A `working`
-entry holds a position slot and no attempt; an adopted position holds a slot
-and no attempt. A partial close debits the loss immediately but only frees the
-position slot — and judges the attempt — when `remaining_qty` is falsy.
-**Losses only debit the ceiling** — a winning trade does not raise it. That is
-FD0's `Budget` semantics carried across unchanged; the attempts rule is the
-one thing that changed, on his word.
+`open_positions` and `realized_loss_usd` by reading the file, so a restart
+mid-session recovers them. They are facts on `/status`; nothing refuses
+because of them. **Removed 2026-09-24 (co-8mb1z)** — no daily loss ceiling, no headroom, no limit on open positions, no count of attempts or losses. Steve: *"' one open position, the $500 daily loss limit ' have a sub remove these also. I've already ruled on my desire to eliminate the $500 limit as well as the daily number of losses limit and know those had been removed. make sure they are removed now and not restored in the future. No idea where that 'only one position' came from."* His earlier rulings were 2026-09-17 (st-bafu) and 09-18 (st-644f); both times only the displays went. `tests/execd/test_no_hand_holding.py` fails if any comes back.
 
 Read API: `read(day)`, `days()`, `find(intent_id, day)`, `tail(n, day)`,
 `events(*names, day)`, `day_state(day)`, `path_for(day)`, `today()`.
@@ -753,9 +738,6 @@ restarted to pick up a change.
 |---|---|
 | `instruments` | `[SPX, SPXW]` |
 | `qty_cap` | `1` |
-| `max_open_positions` | `1` |
-| `daily_loss_ceiling_usd` | `500.0` (Steve, 2026-08-31, st-2j80 — was `100.0`) |
-| `max_attempts` | `10` (Steve, 2026-09-14: "from 2 up to 10. the $500 limit remains as is"; the code default is still `2`) |
 | `price_band_pct` | `0.10` |
 | `max_quote_age_s` | `30.0` |
 | `preview_cost_tolerance_usd` | `5.00` |
@@ -765,43 +747,21 @@ restarted to pick up a change.
 
 **An unknown key is a start-up error, not a silent default** — a typo must not
 leave the service running under limits Steve did not choose. Validation also
-rejects an empty `instruments`, `qty_cap < 1`, `max_open_positions < 1`, a
-non-positive ceiling, `max_attempts < 1`, `price_band_pct` outside `(0,1)`, a
+rejects an empty `instruments`, `qty_cap < 1`, `price_band_pct` outside `(0,1)`, a
 non-positive `max_quote_age_s`, a `take_profit_basis` other than `premium` or `risk`, a
 non-positive `take_profit_multiple`, and a premium-basis multiple at or under
 1 (fill × 1 is the fill — a sale, not a target). A file that exists but is
 wrong **raises**; a file that is absent falls back to the start values.
-The retired clock keys (`open_ct`, `close_ct`, `no_open_after_ct`,
-`flat_by_close_ct`, `weekdays_only`) are the one exception to the
+The retired keys (`open_ct`, `close_ct`, `no_open_after_ct`,
+`flat_by_close_ct`, `weekdays_only`, `max_open_positions`,
+`daily_loss_ceiling_usd`, `max_attempts`) are the one exception to the
 unknown-key rule: a file that still carries them loads, the keys are ignored
 with a log line, and they can be deleted.
 
-**The ceiling bounds the position in front of it, not only the day behind it.**
-Until 2026-08-31, `check_entry` refused a new entry once *realized* loss reached
-the ceiling and never asked what the entry it was about to admit could lose, so
-two attempts could each realize more than the whole day's ceiling with every
-bound passing — finding 6 of case st-5qjq. `check_risk_budget` now prices the
-entry at its limit, which is the most a buy can pay and therefore the most it
-can lose, walks it down to the stop the entry would rest, and refuses if that
-exceeds the headroom left. Checked against the *remaining* headroom, which is
-what makes the sum of the day's worst cases fit inside the ceiling.
-The headroom subtracts the worst cases of the positions already held as
-well as the losses already realized (`_open_risk_usd`, st-s2jj, audit
-finding 40): until 2026-09-17 it subtracted realized loss only, and the
-claim held because `max_open_positions` was 1. `adjust` counts the *other*
-positions' worst cases the same way when a stop is moved wider. A position
-held with no stop price — adopted, or a stop that would not rest — has no
-worst case to sum: its risk is unbounded, and no new entry opens until it
-has a stop or is flat.
-
-The same ruling raised the ceiling from $100 to $500. At $100 the bound could
-never bind: a $2.10 SPX call with a twelve-point stop risks $205 whatever the
-ceiling says, so the only entries that fit were ones too cheap to be real
-trades. At $500, measured against the service's own stop arithmetic, a $2.10
-call risks $205 and sends, a $5.00 call with a ten-point stop risks $400 and
-sends, and an $8.40 call with a twenty-point stop risks $835 and is refused —
-the same contract with an eight-point stop risks $400 and sends. The bound is on
-the distance to the stop, not on the premium.
+**Removed 2026-09-24 (co-8mb1z)** — no daily loss ceiling, no headroom, no limit on open positions, no count of attempts or losses. Steve: *"' one open position, the $500 daily loss limit ' have a sub remove these also. I've already ruled on my desire to eliminate the $500 limit as well as the daily number of losses limit and know those had been removed. make sure they are removed now and not restored in the future. No idea where that 'only one position' came from."* His earlier rulings were 2026-09-17 (st-bafu) and 09-18 (st-644f); both times only the displays went. `tests/execd/test_no_hand_holding.py` fails if any comes back. The risk-budget check (`check_risk_budget`, finding 6 of case st-5qjq) and its
+headroom arithmetic went with the ceiling; the stop is still derived before
+the send, so a contract too cheap to leave room for a stop is still refused
+(`protective_stop`). the distance to the stop, not on the premium.
 
 The *shape* of the bounds is not configurable. There is no key that switches a
 bound off, because a bound you can switch off is not a bound.
@@ -1393,7 +1353,9 @@ its position line, the status card's *today* row, and the operations page's
 past the attempt count is still refused, in the refusal's own words, and
 `GET /status` still carries `day.loss_headroom_usd` and
 `day.attempts_left` for the heartbeats and the audit. What went is the
-counting-at-him, not the counting.
+counting-at-him, not the counting. **That reading was wrong**: he had asked
+for the rule to go, not only its display, and on 2026-09-24 the bounds went
+too (co-8mb1z).
 
 **Only strikes he can buy** (st-644f; Steve: *"in the list of strike you
 offer, exclude any that exceed limit of the available funds"*). A row is
@@ -1562,9 +1524,8 @@ the budget, *more* or a second money figure, they are history.
    the `Ticket` / `Derivation` on `Priced`, the noise-floor and *YOUR STOP
    RISKS* warnings and the old `fd0_html` table are removed. `Priced` now
    carries `stop_spx`, `stop_price`, `stop_loss_usd` and `warnings`
-   directly. The form does not judge the size of a stop; the service's
-   ceiling (§3) still refuses an entry that does not fit the day, in its
-   own words. A `budget` or `attempts` key on an old link or an old working
+   directly. The form does not judge the size of a stop, and since
+   2026-09-24 neither does the service (co-8mb1z). A `budget` or `attempts` key on an old link or an old working
    entry's `page_query` is ignored.
 6. *"completely remove the text wall under more."* The *more* fold and its
    rows are gone.
@@ -1632,10 +1593,8 @@ Exit-class: legal while STOPped or stood down, needs a credential. Each price
 given is checked, and the refusal is named: `position` (nothing open in that
 contract), `exit_in_flight` (the bracket is off while a close works), `tick`
 (off the grid), `bracket` (a stop not below the live bid, a target not above
-it — either would fill at once), `ceiling` (a stop moved so wide that the
-position's risk to it exceeds the day's headroom — the ceiling doing to an
-adjusted stop what `check_risk_budget` does to an entry; tightening never meets
-it). A move is the same motion every other path uses — cancel the leg, rest a
+it — either would fill at once). How wide he moves his stop is his (the
+`ceiling` refusal went on 2026-09-24, co-8mb1z). A move is the same motion every other path uses — cancel the leg, rest a
 new one (there is no replace-order; the transport has no PUT). A cancel that
 finds the leg already filled books that fill and refuses the adjust as
 `filled`, with what happened. A new price the broker will not rest brings the
@@ -1653,9 +1612,7 @@ on 2026-09-16 10:19 CT a target strike was typed, focus left the box, the
 nothing — the journal holds no request for it. The status JSON carries `target_price`, `target_order_id` and
 the valuation row `at_target_usd` (the same arithmetic as `at_stop_usd`).
 
-**Attempts count losing fills only.** §5.8. Ten `max_attempts` are ten losing
-positions; a winner or a scratch gives its attempt back; a working entry
-holds a slot and no attempt.
+**No attempts rule** since 2026-09-24 (co-8mb1z), §5.8.
 
 **An unchanged leg stays; UPDATE once; best and worst** (st-ff5j, Steve
 2026-09-15 14:07 CT: *"Stop moved from 10.30 to 10.30 … the running total

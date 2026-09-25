@@ -64,11 +64,14 @@ class TestTheEntryPath:
         assert armed.place(entry())["refused"]["bound"] == "stop"
         assert sent_orders(broker) == []
 
-    def test_a_second_position_is_refused_while_one_is_open(self, armed):
+    def test_a_second_position_opens_beside_the_first(self, armed):
+        """Steve, 2026-09-24: "No idea where that 'only one position' came
+        from." There is no limit on open positions. [co-8mb1z]"""
         armed.place(entry(intent_id="t-1"))
         out = armed.place(entry(intent_id="t-2", symbol=PUT, limit=1.90,
                                 stop_spx=SPX_NOW + 12, delta=0.28))
-        assert out["refused"]["bound"] == "positions"
+        assert out["refused"] is None
+        assert len(armed.status()["positions"]) == 2
 
     def test_a_broker_rejection_is_recorded_and_leaves_no_position(self, armed, broker):
         broker.reject_next = "buying power"
@@ -550,47 +553,37 @@ class TestPollFills:
         assert armed.journal.events("error")
 
 
-class TestTheDailyCeiling:
-    def test_two_losses_spend_the_attempts(self, armed, broker):
-        for i in range(2):
-            armed.place(entry(intent_id=f"a-{i}"))
+class TestNoDailyLimits:
+    """No daily loss ceiling, no headroom, no count of attempts or losses.
+    Steve, 2026-09-17: "Let's just completely remove that complete
+    calculation. I don't need that level of hand holding." And 2026-09-24:
+    "make sure they are removed now and not restored in the future."
+    [co-8mb1z]"""
+
+    def test_losing_trades_never_run_out(self, armed, broker):
+        for i in range(12):
+            assert armed.place(entry(intent_id=f"a-{i}"))["refused"] is None
             armed.flatten()
-        out = armed.place(entry(intent_id="a-2"))
-        assert out["refused"]["bound"] == "ceiling"
-        assert "attempts" in out["refused"]["reason"]
+        assert armed.place(entry(intent_id="a-12"))["refused"] is None
 
-    def test_the_loss_ceiling_refuses_before_the_attempts_run_out(self, armed):
+    def test_a_large_realized_loss_refuses_nothing(self, armed):
         armed.journal.record("filled", kind="entry", symbol=PUT, qty=1, price=2.0)
-        armed.journal.record("closed", symbol=PUT, pnl_usd=-500.0)
-        out = armed.place(entry(intent_id="after-loss"))
-        assert out["refused"]["bound"] == "ceiling"
-        assert "$500.00" in out["refused"]["reason"]
+        armed.journal.record("closed", symbol=PUT, pnl_usd=-50_000.0)
+        assert armed.place(entry(intent_id="after-loss"))["refused"] is None
 
-    def test_the_ceiling_survives_a_restart(self, broker, clock, tmp_path):
-        """A restart that reset the budget would hand Steve a fresh $500 of
-        loss and two fresh attempts. This box restarts."""
-        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
-        first = ExecService(broker, config, clock=clock)
-        first.unlock({"token": "x"})
-        first.place(entry(intent_id="pre-restart"))
-        first.flatten()
+    def test_an_entry_that_risks_more_than_500_sends(self, armed, broker):
+        dear = "SPXW  260826C06350000"
+        broker.set_quote(dear, bid=8.30, ask=8.40)
+        out = armed.place(entry(intent_id="dear", symbol=dear, limit=8.40,
+                                stop_spx=SPX_NOW - 25, delta=0.78))
+        assert out["refused"] is None, out
 
-        second = ExecService(broker, config, clock=clock)
-        second.unlock({"token": "x"})
-        assert second.day_state().attempts_used == 1
-        assert second.status()["day"]["attempts_left"] == 1
-
-    def test_an_entry_that_can_lose_more_than_the_day_has_left_never_sends(
-            self, armed, broker):
-        """Finding 6, and it is checked while refusing is still free — the
-        broker sees nothing. A $2.10 limit down to its $0.05 stop is $205, and
-        the day has $150 left."""
+    def test_status_carries_no_headroom_or_attempts(self, armed):
         armed.journal.record("filled", kind="entry", symbol=PUT, qty=1, price=2.0)
-        armed.journal.record("closed", symbol=PUT, pnl_usd=-350.0)
-        out = armed.place(entry(intent_id="over-budget"))
-        assert out["refused"]["bound"] == "ceiling"
-        assert "$205.00" in out["refused"]["reason"]
-        assert sent_orders(broker) == []
+        armed.journal.record("closed", symbol=PUT, pnl_usd=-35.0)
+        day = armed.status()["day"]
+        assert day["realized_loss_usd"] == 35.0          # a fact, never a gate
+        assert "loss_headroom_usd" not in day and "attempts_left" not in day
 
     def test_the_same_entry_passes_with_the_day_untouched(self, armed):
         assert armed.place(entry(intent_id="in-budget"))["refused"] is None
@@ -607,13 +600,6 @@ class TestTheDailyCeiling:
         assert out["refused"]["bound"] == "protective_stop"
         assert "no resting stop can be derived" in out["refused"]["reason"]
         assert sent_orders(broker) == []
-
-    def test_status_reports_the_headroom(self, armed):
-        armed.journal.record("filled", kind="entry", symbol=PUT, qty=1, price=2.0)
-        armed.journal.record("closed", symbol=PUT, pnl_usd=-35.0)
-        day = armed.status()["day"]
-        assert day["realized_loss_usd"] == 35.0
-        assert day["loss_headroom_usd"] == 465.0
 
 
 class TestRecoveryAfterRestart:
@@ -803,51 +789,32 @@ class TestCancel:
         assert armed.status()["working"] == []
 
 
-class TestTheCeilingCountsWhatIsHeld:
-    """Audit finding 40 (st-s2jj): check_risk_budget and adjust subtracted
-    realized loss only, so the 'sum of the day's worst cases' claim held by
-    max_open_positions being 1. Pinned here at 2."""
+class TestManyPositions:
+    """Several positions at once, each stop his to place. [co-8mb1z]"""
 
-    def svc(self, broker, clock, tmp_path, ceiling: float):
-        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha",
-                               bounds=Bounds(daily_loss_ceiling_usd=ceiling, max_open_positions=2))
+    def svc(self, broker, clock, tmp_path):
+        config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha")
         svc = ExecService(broker, config, clock=clock)
         svc.unlock({"token": "x"})
-        # the call: 2.10 in, stop 1.50 → $60 at risk
         svc.place(entry(intent_id="held-call", stop_spx=SPX_NOW - 2.0, delta=0.30))
-        assert svc.journal.events("stop_placed")[0]["risk_usd"] == 60.0
         return svc
 
     @staticmethod
     def put():
-        # 1.90 in, stop 1.35 (on the grid) → $55 at risk
         return entry(intent_id="held-put", symbol=PUT, limit=1.90, stop_spx=SPX_NOW + 2.0, delta=0.28)
 
-    def test_a_second_entry_must_fit_beside_the_first(self, broker, clock, tmp_path):
-        svc = self.svc(broker, clock, tmp_path, ceiling=100.0)
-        out = svc.place(self.put())
-        assert out["refused"]["bound"] == "ceiling"
-        assert "$55.00" in out["refused"]["reason"] and "$40.00" in out["refused"]["reason"]
-        assert "$60.00 at risk on what is held" in out["refused"]["reason"]
-        assert len(svc.status()["positions"]) == 1
-
-    def test_a_second_entry_that_fits_beside_the_first_opens(self, broker, clock, tmp_path):
-        svc = self.svc(broker, clock, tmp_path, ceiling=120.0)
+    def test_a_second_entry_opens_beside_the_first(self, broker, clock, tmp_path):
+        svc = self.svc(broker, clock, tmp_path)
         assert svc.place(self.put())["refused"] is None
         assert len(svc.status()["positions"]) == 2
 
-    def test_widening_one_stop_counts_the_other_position(self, broker, clock, tmp_path):
-        svc = self.svc(broker, clock, tmp_path, ceiling=200.0)
-        assert svc.place(self.put())["refused"] is None       # $60 + $55 held
-        out = svc.adjust(CALL, stop_price=0.10)               # $200 on the call alone
-        assert out["refused"]["bound"] == "ceiling"
-        assert "$55.00 at risk on the other positions held" in out["refused"]["reason"]
-        assert "$145.00" in out["refused"]["reason"]
-        assert svc.adjust(CALL, stop_price=1.00)["refused"] is None   # $110 ≤ $145
+    def test_a_stop_can_be_widened_whatever_else_is_held(self, broker, clock, tmp_path):
+        svc = self.svc(broker, clock, tmp_path)
+        assert svc.place(self.put())["refused"] is None
+        assert svc.adjust(CALL, stop_price=0.10)["refused"] is None
 
-    def test_a_held_position_with_no_stop_shuts_the_entry_door(self, broker, clock, tmp_path):
-        svc = self.svc(broker, clock, tmp_path, ceiling=500.0)
-        svc._open[CALL].stop_price = None          # a stop that would not rest, or adopted
-        out = svc.place(self.put())
-        assert out["refused"]["bound"] == "ceiling"
-        assert "held with no stop" in out["refused"]["reason"] and "unbounded" in out["refused"]["reason"]
+    def test_a_held_position_with_no_stop_does_not_shut_the_entry_door(
+            self, broker, clock, tmp_path):
+        svc = self.svc(broker, clock, tmp_path)
+        svc._open[CALL].stop_price = None
+        assert svc.place(self.put())["refused"] is None

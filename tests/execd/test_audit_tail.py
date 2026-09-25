@@ -124,7 +124,6 @@ class TestCancelGuardsTheStop:
         out = armed.place(entry(intent_id="guard-4"))
         result = armed.cancel(out["order"]["order_id"])
         assert result["order"]["status"] == "CANCELED"
-        assert armed.status()["day"]["attempts_used"] == 0
 
 
 class TestStopHasTheLastLook:
@@ -184,19 +183,21 @@ class TestStopHasTheLastLook:
         assert [kw for kw in broker.calls_to("place")] == []
 
 
-class TestMidnightDoesNotFreeASlot:
-    """Finding 9, the rollover half: the day's count is rebuilt from today's
-    journal file, so a position carried past midnight fell out of it and its
-    slot came free while it was still open. The service now takes the larger
-    of the journal's count and what it is actually holding."""
+class TestMidnightDoesNotForgetAPosition:
+    """Finding 9, the rollover half. There is no position limit since
+    2026-09-24 (co-8mb1z); what still matters is that a position carried past
+    midnight is still tracked, so a second entry in the same contract cannot
+    overwrite it and orphan its bracket."""
 
-    def test_yesterdays_open_position_still_holds_its_slot(self, armed, clock):
+    def test_yesterdays_open_position_is_still_tracked(self, armed, clock, broker):
         armed.place(entry(intent_id="wed-1"))
         clock.set_ct(10, 0, day=27)                  # Thursday, new journal file
+        broker.set_quote(CALL, bid=2.00, ask=2.10)   # yesterday's quote is stale
+        broker.set_quote("$SPX", bid=SPX_NOW - 0.25, ask=SPX_NOW + 0.25, last=SPX_NOW)
         assert armed.day_state().open_positions == 0  # the journal's honest count
         armed.unlock({"token": "x"})                  # re-arm for the new session
         out = armed.place(entry(intent_id="thu-1", symbol=CALL))
-        assert out["refused"]["bound"] == "positions"
+        assert out["refused"]["bound"] == "same_contract"
 
     def test_a_fresh_day_with_nothing_held_is_unaffected(self, armed, clock, broker):
         armed.place(entry(intent_id="wed-2"))

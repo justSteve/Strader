@@ -254,20 +254,6 @@ class TestOneCancelsTheOther:
         events = [e["event"] for e in holding.journal.read()]
         assert events.index("canceled") < events.index("closed")
 
-    def test_a_target_win_gives_the_attempt_back(self, holding, broker, clock):
-        assert holding.status()["day"]["attempts_used"] == 1     # held while open
-        clock.advance(minutes=1)
-        broker.fill_resting(pos_of(holding)["target_order_id"])
-        holding.poll_fills()
-        day = holding.status()["day"]
-        assert day["attempts_used"] == 0 and day["attempts_left"] == holding.bounds.max_attempts
-
-    def test_a_stop_loss_keeps_the_attempt(self, holding, broker, clock):
-        clock.advance(minutes=1)
-        broker.fill_resting(pos_of(holding)["stop_order_id"])
-        holding.poll_fills()
-        assert holding.status()["day"]["attempts_used"] == 1
-
     def test_both_legs_filled_is_booked_once_and_the_short_is_loud(self, holding, broker, clock):
         """The race lost on both sides: the stop filled, and before the cancel
         reached the target it filled too. One close is booked against what
@@ -572,16 +558,14 @@ class TestAdjust:
         assert broker.calls_to("cancel") == []
         assert holding.journal.events("refused")[-1]["kind"] == "adjust"
 
-    def test_a_stop_wider_than_the_days_headroom_is_refused(self, holding):
-        """The ceiling does to an adjusted stop what it does to an entry: a
-        stop at 0.05 puts $205 at risk, and the day has $150 left."""
+    def test_a_stop_moved_wide_is_his_to_move(self, holding):
+        """No daily ceiling on an adjusted stop (co-8mb1z): a stop at 0.05
+        after a $350 loss today is allowed."""
         holding.journal.record("closed", symbol="other", pnl_usd=-350.0)
-        out = holding.adjust(CALL, stop_price=0.05)
-        assert out["refused"]["bound"] == "ceiling"
-        assert "$205.00" in out["refused"]["reason"] and "$150.00" in out["refused"]["reason"]
-        assert pos_of(holding)["stop_price"] == 1.50
+        assert holding.adjust(CALL, stop_price=0.05)["refused"] is None
+        assert pos_of(holding)["stop_price"] == 0.05
 
-    def test_tightening_the_stop_never_meets_the_ceiling(self, holding):
+    def test_tightening_the_stop_after_a_loss_is_allowed(self, holding):
         holding.journal.record("closed", symbol="other", pnl_usd=-480.0)
         assert holding.adjust(CALL, stop_price=1.95)["refused"] is None
 
@@ -775,44 +759,15 @@ class TestRecovery:
         assert second.status()["positions"] == []
 
 
-# ── D. the attempts rule, through the service ────────────────────────────
+# ── D. no attempts rule (removed 2026-09-24, co-8mb1z) ────────────────────
 
-class TestAttemptsThroughTheService:
-    def test_a_winning_flatten_gives_the_attempt_back(self, holding, broker):
-        broker.set_quote(CALL, bid=2.60, ask=2.70)
-        holding.flatten(reason="test")
-        day = holding.status()["day"]
-        assert day["attempts_used"] == 0 and day["attempts_left"] == holding.bounds.max_attempts
-        assert day["realized_loss_usd"] == 0.0
-
-    def test_a_losing_flatten_keeps_it(self, holding, broker):
-        holding.flatten(reason="test")                          # sells at the 2.00 bid
-        assert holding.status()["day"]["attempts_used"] == 1
-
-    def test_a_working_entry_holds_a_slot_and_no_attempt_then_fills_and_holds_one(
-            self, armed, broker):
-        broker.rest_limits = True
-        out = armed.place(entry(intent_id="att-1", stop_spx=NEAR_STOP, delta=0.30))
-        day = armed.status()["day"]
-        assert (day["open_positions"], day["attempts_used"]) == (1, 0)
-        broker.fill_resting(out["order"]["order_id"])
-        armed.reconcile()
-        day = armed.status()["day"]
-        assert (day["open_positions"], day["attempts_used"]) == (1, 1)
-
-    def test_max_attempts_counts_losses_only(self, armed, broker):
-        armed.bounds = armed.config.bounds = Bounds(max_attempts=2)
-        for i in range(3):                                      # three winners
-            armed.place(entry(intent_id=f"w-{i}", stop_spx=NEAR_STOP, delta=0.30))
-            broker.set_quote(CALL, bid=2.60, ask=2.70)
+class TestNoAttemptsRule:
+    def test_losses_never_run_out(self, armed, broker):
+        for i in range(12):                                     # twelve losers
+            assert armed.place(entry(intent_id=f"l-{i}", stop_spx=NEAR_STOP,
+                                     delta=0.30))["refused"] is None
             armed.flatten(reason="test")
-            broker.set_quote(CALL, bid=2.00, ask=2.10)
-        assert armed.status()["day"]["attempts_used"] == 0
-        for i in range(2):                                      # two losers
-            armed.place(entry(intent_id=f"l-{i}", stop_spx=NEAR_STOP, delta=0.30))
-            armed.flatten(reason="test")
-        out = armed.place(entry(intent_id="third-loss", stop_spx=NEAR_STOP, delta=0.30))
-        assert out["refused"]["bound"] == "ceiling" and "attempts" in out["refused"]["reason"]
+        assert "attempts_left" not in armed.status()["day"]
 
 
 # ── E. cancel and re-price ───────────────────────────────────────────────
@@ -899,7 +854,6 @@ class TestPaperTarget:
         assert svc.status()["positions"] == []
         book = {o.order_id: o.status for o in paper.orders()}
         assert book["paper-0002"] is OrderStatus.CANCELED         # the stop came off
-        assert svc.status()["day"]["attempts_used"] == 0           # a win gives it back
         assert [c[0] for c in live.calls if c[0] in ("place", "cancel")] == []
 
     def test_the_stop_fills_in_the_book_and_the_target_comes_off(self, paper, live, clock, tmp_path):
@@ -913,7 +867,6 @@ class TestPaperTarget:
         assert r["picked_up"][0]["reason"] == "protective-stop"
         book = {o.order_id: o.status for o in paper.orders()}
         assert book["paper-0003"] is OrderStatus.CANCELED
-        assert svc.status()["day"]["attempts_used"] == 1
 
 
 # ── the page ─────────────────────────────────────────────────────────────

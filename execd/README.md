@@ -112,7 +112,7 @@ be reached.
 
 | | |
 |---|---|
-| `GET /status` | arming state, the day's headroom, open positions, the bounds in force |
+| `GET /status` | arming state, open positions, the day's realized P&L as a fact, the bounds in force |
 | `GET /quote?symbol=` · `GET /chain?root=` | market data through the service, so nothing else needs a credential |
 | `GET /orders` · `GET /positions` · `GET /journal?n=` | what the broker holds, what the service tracks, what it recorded |
 | `POST /preview` | price an intent through every bound, transmit nothing |
@@ -124,7 +124,7 @@ be reached.
 
 | `GET /marketdata/<kind>` | the raw Schwab body for `quotes`, `chains` or `pricehistory`, query allow-listed to that resource's own parameters — the readers' door (stage 3) |
 
-**The trading page** (`execd/orderform.py` + `execd/orderpage.py`, stage 4; refined 2026-09-15, st-shhi, design `docs/design/order-page/`): `/exec/` and `/exec/order` — one strip (mode, arming word, STOP, an *account* link — no clock since st-644f, 2026-09-18), BULLISH/BEARISH, the expiry as a label with the δ target (starts at 0.80; blank = nearest to spot) and RE-PRICE on one row, the strikes around spot with bid/ask/delta that the account can pay for (st-644f), the ticket stripped to the decision (st-bafu, 2026-09-18: the contract at its price, the cost, the stop as the dollars it loses or the level he typed, the take-profit — no budget, no attempts, no derivation, no *more*, one money figure under the strip, the trading grant's wall on the account page) — its price follows the live ask until the padlock beside it is tapped, then it is frozen and PREVIEW sends that number (st-2s4u; RE-PRICE keeps the tapped strike and reprices at the market; on a previewed card it previews the same strike again in one tap), a **stop** box beside δ pre-filled with the price a flat $20 loss rests at (`DEFAULT_STOP_LOSS_USD`) — typed over, a '.' makes it a dollar price and none an SPX level, the ticket and the intent follow it (st-m3bl, 2026-09-17) — SEND, one tap, with a single-use token issued with the page (the PREVIEW step went with st-igw0, 2026-09-16; the broker's own preview runs inside the place); unlock, clear STOP, stand down, lock and the weekly re-authorisation live on `/exec/account`, never on the trading page; the chain reader is `execd/compose.py` (moved from `strader/execution/`, which re-exports it; the form no longer runs its FD0 derivation). **Since st-644f (2026-09-18)** nothing on any surface counts the day's headroom or its attempts at him — the bounds still refuse past either, and `/status` still reports both; the strikes offered exclude any the account cannot pay for (ask × 100 × lots against available funds, the loaded strike kept and marked, an unreadable account filtering nothing); the *next* expiry chip is gone; and the poll carries the selection, so `/exec/order/state` prices the loaded strike itself and the ticket follows the market with no tap — one chain read per poll where the quote-only answer took two. Manual §5.19. Since st-fn5y the position card carries the bracket's live editor — the stop and the target in two inputs, one UPDATE button — and a working entry carries CANCEL AND RE-PRICE, which pulls it and brings the form back priced from the selection it was sent from. Manual §5.20. Since st-2j3m (2026-09-16) either box takes an SPX level as well as a price — a value with a '.' is dollars, without one an SPX level; the level is walked into the price that rests and is what the loop watches, a target level firing a market close when the mark reaches it. Since st-4ezg the top of the page is **the status panel** (`execd/panel.py`): one card that changes shape with the order's stage — no order, PREVIEWED, WORKING, FILLED, SELLING, CLOSED, REFUSED — read off the status body and the day's journal; every time on it *x ago*, and no clock (st-644f); contracts named `C7630`; one net number, commissions in; the filled stage is the bracket editor with FLATTEN and STOP; `more`/`less` folds the detail rows. Manual §5.21.
+**The trading page** (`execd/orderform.py` + `execd/orderpage.py`, stage 4; refined 2026-09-15, st-shhi, design `docs/design/order-page/`): `/exec/` and `/exec/order` — one strip (mode, arming word, STOP, an *account* link — no clock since st-644f, 2026-09-18), BULLISH/BEARISH, the expiry as a label with the δ target (starts at 0.80; blank = nearest to spot) and RE-PRICE on one row, the strikes around spot with bid/ask/delta that the account can pay for (st-644f), the ticket stripped to the decision (st-bafu, 2026-09-18: the contract at its price, the cost, the stop as the dollars it loses or the level he typed, the take-profit — no budget, no attempts, no derivation, no *more*, one money figure under the strip, the trading grant's wall on the account page) — its price follows the live ask until the padlock beside it is tapped, then it is frozen and PREVIEW sends that number (st-2s4u; RE-PRICE keeps the tapped strike and reprices at the market; on a previewed card it previews the same strike again in one tap), a **stop** box beside δ pre-filled with the price a flat $20 loss rests at (`DEFAULT_STOP_LOSS_USD`) — typed over, a '.' makes it a dollar price and none an SPX level, the ticket and the intent follow it (st-m3bl, 2026-09-17) — SEND, one tap, with a single-use token issued with the page (the PREVIEW step went with st-igw0, 2026-09-16; the broker's own preview runs inside the place); unlock, clear STOP, stand down, lock and the weekly re-authorisation live on `/exec/account`, never on the trading page; the chain reader is `execd/compose.py` (moved from `strader/execution/`, which re-exports it; the form no longer runs its FD0 derivation). **Since st-644f (2026-09-18)** nothing on any surface counts the day's headroom or its attempts at him — and since 2026-09-24 neither exists in the bounds or `/status` either (co-8mb1z); the strikes offered exclude any the account cannot pay for (ask × 100 × lots against available funds, the loaded strike kept and marked, an unreadable account filtering nothing); the *next* expiry chip is gone; and the poll carries the selection, so `/exec/order/state` prices the loaded strike itself and the ticket follows the market with no tap — one chain read per poll where the quote-only answer took two. Manual §5.19. Since st-fn5y the position card carries the bracket's live editor — the stop and the target in two inputs, one UPDATE button — and a working entry carries CANCEL AND RE-PRICE, which pulls it and brings the form back priced from the selection it was sent from. Manual §5.20. Since st-2j3m (2026-09-16) either box takes an SPX level as well as a price — a value with a '.' is dollars, without one an SPX level; the level is walked into the price that rests and is what the loop watches, a target level firing a market close when the mark reaches it. Since st-4ezg the top of the page is **the status panel** (`execd/panel.py`): one card that changes shape with the order's stage — no order, PREVIEWED, WORKING, FILLED, SELLING, CLOSED, REFUSED — read off the status body and the day's journal; every time on it *x ago*, and no clock (st-644f); contracts named `C7630`; one net number, commissions in; the filled stage is the bracket editor with FLATTEN and STOP; `more`/`less` folds the detail rows. Manual §5.21.
 
 **Paper mode** (`execd/paper.py`, stage 4): `/etc/execd/mode` says `paper` (the
 default, seeded by the install) or `live`. In paper every read and the broker's
@@ -152,8 +152,7 @@ breaks the suite. Those three live on the page (stage 3), behind the passphrase.
 | `qty` | 1 contract |
 | `stop` | the STOP file blocks entries |
 | `protective_stop` | an entry must carry `stop_spx` and `delta`, and the sign must not be transposed |
-| `positions` | 1 open at a time |
-| `ceiling` | $500 realized loss, 10 attempts (2 at the design; 10 by Steve, 2026-09-14) — an attempt is a filled position, held while it is open and kept only if it closes at a loss; a close at break-even or better gives it back (Steve, 2026-09-14, st-fn5y). Rebuilt from the journal, so a restart does not reset it; and the entry's own worst case, limit down to its derived stop, must fit the headroom left — as must a stop moved wider by `adjust`; the headroom is what remains after the day's realized losses *and* the worst cases of the positions already held, so the sum of the day's worst cases fits the ceiling at any `max_open_positions`, not only at 1 — and a position held with no stop (adopted, or a stop that would not rest) has no worst case to sum, so it shuts the entry door until it has one or is flat (st-s2jj) |
+| `same_contract` | a second entry in a contract already held or working — not a risk rule: positions are tracked one per contract, each with its own bracket, and a second would orphan the first's stop and target (co-8mb1z). Any other strike opens |
 | `bracket` | an adjusted stop must sit below the live bid and an adjusted target above it, on the tick grid; a leg that filled before it could be moved is booked and the adjust refused (`filled`) |
 | `tick` | a limit or stop price on the exchange's grid — 0.05 below $3.00, 0.10 at and above (measured, st-pohq); off-grid is a rejected order, and an off-grid stop is no stop |
 | `price_band` | a limit within 10% of the touch, against a quote under 30s old |
@@ -169,7 +168,7 @@ contract is one this service trades, that the side really closes, and that it
 is not larger than the position (selling more than you hold is an opening sale
 wearing an exit's label). Nothing that exists to keep Steve out of risk may
 keep him in it, so `flatten` works while STOPped, while stood down, at any
-hour and with the ceiling breached. An exit for a contract the service is not
+hour. An exit for a contract the service is not
 tracking is sized against the broker's own position; only when the broker
 cannot be reached at all does the order go through unsized, journaled as
 `exit_unverified`, because refusing on ignorance is how an exit gate traps
@@ -205,8 +204,8 @@ the smaller size, because a leg larger than the position would sell contracts
 Steve no longer owns. Both legs are edited from the page, never pulled apart:
 `cancel` refuses either leg's order id, and `adjust` moves either by the same
 cancel-then-rest motion (there is no replace-order; the transport has no PUT),
-refusing a price off the grid, a stop not below the live bid, a target not
-above it, or a stop moved wider than the day's headroom — and moving the stop
+refusing a price off the grid, a stop not below the live bid, or a target not
+above it — how wide he moves his stop is his — and moving the stop
 moves the SPX-mark trigger with it, by the same delta walk in reverse.
 
 **One close in flight per position, and the bracket comes off before the close
@@ -227,38 +226,25 @@ because "get me out" must not wait behind an earlier, slower exit. One residual
 is recorded on `st-97z1`: a *partial* manual exit leaves the full-size bracket
 standing while it rests.
 
-**The day is derived from the journal, not remembered.** Open positions, the
-realized-loss ceiling and the attempts used are rebuilt by reading the file
-(`execd/journal.py`), so a restart recovers them — reading back a week for a
-position held past a close, which comes back with its levels and leg ids as
-`position_carried` (st-btob). Losses only debit the ceiling;
-a winner does not raise it. Attempts follow Steve's 2026-09-14 rule (st-fn5y):
-*"an 'attempt' is a 'filled position'. Any attempt that breaks even or better
-doesn't decrement the counter"* — so an attempt is held by a filled position
-while it is open and kept only if it closes at a loss, judged on the whole
-position's P&L once nothing is left; a working entry holds a position slot (it
-closes the entry door) but no attempt. On this box, restarts are not
-hypothetical.
-
-**The ceiling bounds the position in front of it, not only the day behind it.**
-Every ceiling check used to look backwards at loss already realized, so two
-attempts could each realize more than the whole day's ceiling with every bound
-passing. `check_risk_budget` prices an entry at its limit — the most a buy can
-pay, so the most it can lose — walks it down to the stop it would rest, and
-refuses if that exceeds the headroom left. The same arithmetic, run before the
-send rather than after the fill, is why a contract too cheap to leave room for a
-stop is now refused instead of becoming a live unprotected position. Steve
-raised the ceiling from $100 to $500 on 2026-08-31 to make the bound bindable:
-below the price of one position it is a number, not a bound.
+**No daily loss ceiling, no limit on open positions, no count of attempts
+or losses** (co-8mb1z). Steve, 2026-09-24: *"' one open position, the $500 daily loss limit ' have a sub remove these also. I've already ruled on my desire to eliminate the $500 limit as well as the daily number of losses limit and know those had been removed. make sure they are removed now and not restored in the future."* He had ruled the first time on
+2026-09-17 (st-bafu: *"Let's just completely remove that complete
+calculation. I don't need that level of hand holding."*) and again on 09-18
+(st-644f: *"remove all aspects of that"*); both times only the displays were
+removed and the bounds kept. They are gone now, and
+`tests/execd/test_no_hand_holding.py` fails if any comes back. The journal
+still records realized P&L as a fact; nothing refuses because of it. Open
+positions are still rebuilt from the journal after a restart — reading back a
+week for a position held past a close (`position_carried`, st-btob).
 
 **What is open is read from the broker, not believed.** The journal is the
 authority on what this service *intended*; only the broker knows what is *held*,
 and `ExecService.reconcile` asks it — at start-up, before every entry, before an
 exit is sized, and before a flatten. An entry the broker acknowledges without
-filling is a `working` entry: it holds a position slot (not an attempt — an
-attempt is a filled position, Steve 2026-09-14) until reconcile learns what
-became of it, so an order resting at the broker can no longer be repeated
-without limit. Filled ones become tracked positions and get the bracket they
+filling is a `working` entry: it is tracked until reconcile learns what
+became of it. A repeat of the same intent is answered from the journal, never
+re-sent — including one whose answer was lost and the orphan sweep found
+(`send_resolved`). Filled ones become tracked positions and get the bracket they
 were owed; cancelled and rejected ones give the slot back; ones the broker cannot account for keep it, because holding a slot only
 refuses new risk while forgetting one creates it. A close this service sent and the
 listing does not show is kept in flight for 90 s before it is declared unknown (st-b7i4),
@@ -389,11 +375,10 @@ throughout the day."*). The same installed code runs twice:
 | state (journal, STOP, arming) | `/var/lib/execd` | `/var/lib/execd-alpaca` |
 | bounds, mode | `/etc/execd/` | `/etc/execd-alpaca/` |
 
-**Each instance has its own limits.** The loss ceiling, attempts and
-one-open-position are counted per instance from its own journal: a loss on
-Alpaca does not count against Schwab's ceiling, and the reverse. SPX/SPXW-only
-applies to both, from each one's bounds file (both seeded from
-`bounds.example.yaml`).
+**Each instance has its own bounds file** (both seeded from
+`bounds.example.yaml`): SPX/SPXW-only, the contract cap, the protective stop
+and the price band apply to both. There is no daily loss ceiling, attempt
+count or position limit on either (co-8mb1z).
 
 **No clock rules, on either instance** (co-8mb1z). Nothing refuses, closes or
 locks because of the hour or the day: no session window, no 14:50 cutoff, no
