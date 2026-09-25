@@ -252,6 +252,13 @@ class MockBroker:
         self._positions: dict[str, Position] = {}
         self._fills: list[Fill] = []
         self._seq = 0
+        #: OCO partners, both ways: when one fills the other is cancelled,
+        #: the way Schwab holds a bracket placed as one order (co-8mb1z)
+        self._oco: dict[str, str] = {}
+        #: standing: does this mock hold a bracket as one OCO order? Off by
+        #: default so the two-order path (a broker without OCO) keeps its own
+        #: tests; the OCO tests turn it on.
+        self.oco_enabled: bool = False
 
         #: every call, in order, as ``(method, kwargs)`` — the audit a test reads.
         self.calls: list[tuple[str, dict[str, Any]]] = []
@@ -430,6 +437,34 @@ class MockBroker:
         self._apply_fill(order)
         return order
 
+    def place_oco(self, stop_intent: OrderIntent,
+                  target_intent: OrderIntent) -> tuple[OrderResult, OrderResult]:
+        """The bracket as one-cancels-other (co-8mb1z): both legs rest, and
+        when either fills the other is cancelled by the broker. A target the
+        bid is already through fills at once and takes the stop with it."""
+        self._record("place_oco", stop=stop_intent.intent_id, target=target_intent.intent_id)
+        if (msg := self.reject_next) is not None:
+            self.reject_next = None
+            return (self._store(self._new_order(stop_intent, OrderStatus.REJECTED, message=msg)),
+                    self._store(self._new_order(target_intent, OrderStatus.REJECTED, message=msg)))
+        stop = self._store(self._new_order(stop_intent, OrderStatus.WORKING,
+                                           price=stop_intent.stop_price))
+        target = self._store(self._new_order(target_intent, OrderStatus.WORKING,
+                                             price=target_intent.limit))
+        self._oco[stop.order_id] = target.order_id
+        self._oco[target.order_id] = stop.order_id
+        q = self._quotes.get(target_intent.symbol)
+        if q is not None and q.bid >= float(target_intent.limit or 0.0):
+            target = self.fill_resting(target.order_id)
+            stop = self._orders[stop.order_id]
+        return stop, target
+
+    def raw_order(self, order_id: str) -> dict[str, Any]:
+        order = self._orders.get(order_id)
+        if order is None:
+            raise BrokerError(f"no such order: {order_id}")
+        return {**order.to_dict(), "oco_partner": self._oco.get(order_id)}
+
     def cancel(self, order_id: str) -> OrderResult:
         self._record("cancel", order_id=order_id)
         order = self._orders.get(order_id)
@@ -484,6 +519,13 @@ class MockBroker:
                          fill_price=price)
         self._orders[order_id] = filled
         self._apply_fill(filled)
+        partner = self._oco.pop(order_id, None)
+        if partner is not None:
+            self._oco.pop(partner, None)
+            other = self._orders.get(partner)
+            if other is not None and other.is_working:
+                self._orders[partner] = replace(other, status=OrderStatus.CANCELED,
+                                                message="OCO: the other leg filled")
         return filled
 
     def trigger_stop(self, order_id: str) -> OrderResult:

@@ -223,6 +223,21 @@ refusing a price off the grid, a stop not below the live bid, or a target not
 above it — how wide he moves his stop is his — and moving the stop
 moves the SPX-mark trigger with it, by the same delta walk in reverse.
 
+**The bracket rests as ONE one-cancels-other order** (co-8mb1z). 2026-09-25
+12:15 CT, live: the stop rested alone and the 10× target, a second
+SELL_TO_CLOSE for the same contract, was rejected by Schwab as an oversell.
+Where the broker offers it (`place_oco`: Schwab, the paper book, the mock
+when asked), the two legs go on as an OCO parent with two children
+(`execd/schwab.py` `build_oco`, the shape schwab-py documents —
+**spec-derived, not yet live-verified**); each leg keeps its own id, so
+tracking, the leg reconcile and recovery are unchanged. Any single-leg rest
+(an adjust, a re-rest) takes the other leg off and puts the pair back on
+together. Alpaca has no `place_oco` here and rests two legs as before. Every
+leg placed and every fill booked journals the broker's own body as
+`order_raw`, and `GET /orders/<id>/raw` on the loopback API reads it
+(account numbers scrubbed) — `stopType` as Schwab echoes it and each
+execution's time and price, which `/orders` drops.
+
 **One close in flight per position, and the bracket comes off before the close
 goes on.** The SPX-mark loop and the broker-resident stop are designed to fire
 at the same price, so the service never lets both a close and a resting leg

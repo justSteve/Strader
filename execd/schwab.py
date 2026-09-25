@@ -502,6 +502,38 @@ def build_order(intent: OrderIntent) -> dict[str, Any]:
     return body
 
 
+def build_oco(stop_intent: OrderIntent, target_intent: OrderIntent) -> dict[str, Any]:
+    """The protective stop and the take-profit as ONE order at Schwab: an OCO
+    parent with the two single-leg children (co-8mb1z).
+
+    2026-09-25 12:15 CT, live: the stop rested as its own order and the 10×
+    target, sent as a second SELL_TO_CLOSE for the same one contract, was
+    rejected — "not enough available cash/buying power … may result in an
+    oversold/overbought position". Held as one-cancels-other the broker sees
+    one exit, not two.
+
+    **Spec-derived, not yet live-verified.** The shape is the one schwab-py
+    documents and builds — ``orderStrategyType: OCO`` with the children in
+    ``childOrderStrategies``, each a complete SINGLE order
+    (``lib/schwab-py/docs/order-builder.rst`` lines 99-114,
+    ``lib/schwab-py/schwab/orders/common.py`` ``one_cancels_other``). The
+    parent carries no session, duration or legs of its own. The first live
+    bracket after the install is the first recording of Schwab's answer."""
+    return {"orderStrategyType": "OCO",
+            "childOrderStrategies": [build_order(target_intent), build_order(stop_intent)]}
+
+
+def _scrub_account(body: Any) -> Any:
+    """An order body with every account number replaced — Schwab echoes
+    ``accountNumber`` on the order and on each child."""
+    if isinstance(body, dict):
+        return {k: ("<account>" if k == "accountNumber" else _scrub_account(v))
+                for k, v in body.items()}
+    if isinstance(body, list):
+        return [_scrub_account(v) for v in body]
+    return body
+
+
 class SchwabBroker:
     """The :class:`~execd.broker.Broker` protocol over the Trader API.
 
@@ -910,6 +942,76 @@ class SchwabBroker:
     def orders(self) -> list[OrderResult]:
         return [self._to_result(o) for o in self._orders_raw()]
 
+    def raw_order(self, order_id: str) -> dict[str, Any]:
+        """Schwab's own body for one order, as it answered it — every field
+        the normalised :class:`OrderResult` drops (``stopType`` as Schwab
+        echoes it, ``orderActivityCollection`` with each execution's time and
+        price, the child orders of an OCO). Read-only, one GET; account
+        numbers scrubbed; no token anywhere near it (co-8mb1z)."""
+        h = self.account_hash()
+        body = self._json(self._request("GET", f"/trader/v1/accounts/{h}/orders/{order_id}"),
+                          "order")
+        if not isinstance(body, dict):
+            raise BrokerError("schwab order body is not an object")
+        return _scrub_account(body)
+
+    def place_oco(self, stop_intent: OrderIntent,
+                  target_intent: OrderIntent) -> tuple[OrderResult, OrderResult]:
+        """The bracket as one OCO order (:func:`build_oco`). Returns the two
+        children as ``(stop, target)``, each under its own order id so the
+        service tracks, cancels and reconciles the legs as it always has.
+
+        Spec-derived like :meth:`place`: a 201 with the parent's id in
+        ``Location``, then a read of the parent for its children's ids. A 400
+        is both legs rejected, in Schwab's words. A parent that cannot be
+        read back leaves both legs WORKING under ids that say so, and the
+        leg reconcile reports them unaccounted — loud, never silent."""
+        h = self.account_hash()
+        path = f"/trader/v1/accounts/{h}/orders"
+        app = app_for(path)
+        cred = self._credential(app)
+        token = self._bearer(app, cred)
+        r = self._send("POST", path, token, None, build_oco(stop_intent, target_intent))
+
+        def synthetic(intent: OrderIntent, status: OrderStatus, oid: str, msg: str) -> OrderResult:
+            return OrderResult(
+                order_id=oid, status=status, symbol=intent.symbol, side=intent.side,
+                qty=intent.qty, order_type=intent.order_type,
+                price=intent.limit if intent.order_type is OrderType.LIMIT else intent.stop_price,
+                submitted_at=self.clock(), legs=_intent_leg(intent), message=msg)
+
+        if r.status_code == 400:
+            why = _error_detail(r) or "rejected (HTTP 400)"
+            return (synthetic(stop_intent, OrderStatus.REJECTED, f"rejected:{stop_intent.intent_id}", why),
+                    synthetic(target_intent, OrderStatus.REJECTED, f"rejected:{target_intent.intent_id}", why))
+        if r.status_code not in (200, 201):
+            raise BrokerError(f"schwab POST {self._scrub(path)} (OCO): HTTP {r.status_code} "
+                              f"{_error_detail(r)}".rstrip())
+        parent = _order_id_from_location(r.headers.get("Location"))
+        if parent is None:
+            msg = ("placed (HTTP 201) but the broker returned no order id — reconcile must "
+                   "find the legs in the broker's listing")
+            return (synthetic(stop_intent, OrderStatus.WORKING, f"unnamed:{stop_intent.intent_id}", msg),
+                    synthetic(target_intent, OrderStatus.WORKING, f"unnamed:{target_intent.intent_id}", msg))
+        try:
+            body = self._json(self._request("GET", f"/trader/v1/accounts/{h}/orders/{parent}"),
+                              "order")
+        except BrokerError as exc:
+            body = None
+            detail = str(exc)
+        children = [c for c in ((body or {}).get("childOrderStrategies") or [])
+                    if isinstance(c, dict)] if isinstance(body, dict) else []
+        stop = next((c for c in children if str(c.get("orderType", "")).startswith("STOP")), None)
+        target = next((c for c in children if c.get("orderType") == "LIMIT"), None)
+        if stop is None or target is None:
+            msg = (f"placed as OCO {parent}; its legs could not be read back"
+                   + (f" ({detail})" if body is None else "") + " — status unknown until reconcile")
+            return (self._to_result(stop) if stop else
+                    synthetic(stop_intent, OrderStatus.WORKING, f"oco:{parent}:stop", msg),
+                    self._to_result(target) if target else
+                    synthetic(target_intent, OrderStatus.WORKING, f"oco:{parent}:target", msg))
+        return self._to_result(stop), self._to_result(target)
+
     def balances(self) -> dict[str, float | None]:
         """The account's money, from ``securitiesAccount.currentBalances`` —
         recorded 2026-09-05 (``tests/fixtures/schwab/account_positions.json``).
@@ -1036,7 +1138,22 @@ class SchwabBroker:
                     "toEnteredTime": _iso_z(now + timedelta(days=1))}), "orders")
         if not isinstance(body, list):
             raise BrokerError("schwab orders body is not a list")
-        return [o for o in body if isinstance(o, dict)]
+        # An OCO bracket is a parent with its legs in childOrderStrategies
+        # (co-8mb1z): the legs are what the service tracks, so they are
+        # listed as orders of their own; a parent with no legs of its own
+        # is not an order anything here acts on.
+        out: list[dict[str, Any]] = []
+
+        def walk(o: Any) -> None:
+            if not isinstance(o, dict):
+                return
+            if o.get("orderLegCollection"):
+                out.append(o)
+            for child in o.get("childOrderStrategies") or []:
+                walk(child)
+        for o in body:
+            walk(o)
+        return out
 
     def _get_order(self, account_hash: str, order_id: str) -> OrderResult:
         body = self._json(self._request("GET", f"/trader/v1/accounts/{account_hash}/orders/{order_id}"),

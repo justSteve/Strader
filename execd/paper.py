@@ -104,6 +104,12 @@ class PaperBroker:
         self._positions: dict[str, Position] = {}
         self._fills: list[Fill] = []
         self._seq = 0
+        #: OCO partners, both ways (co-8mb1z): a bracket rests as one
+        #: one-cancels-other order live, so it does here too
+        self._oco: dict[str, str] = {}
+        #: the paper book always holds a bracket as OCO, as Schwab live does —
+        #: whatever the transport underneath says of itself
+        self.oco_enabled = True
         self._load()
 
     # ── pass-through: every read, and the broker's own preview ───────────
@@ -141,6 +147,41 @@ class PaperBroker:
                 return self._fill(self._new(intent, OrderStatus.WORKING, price=limit), px)
             px = q.ask if intent.side is Side.BUY_TO_OPEN else q.bid
             return self._fill(self._new(intent, OrderStatus.WORKING), px)
+
+    def place_oco(self, stop_intent: OrderIntent,
+                  target_intent: OrderIntent) -> tuple[OrderResult, OrderResult]:
+        """The bracket as one-cancels-other in the book, the way it rests
+        live (co-8mb1z). Defined here, never passed through: the live
+        transport's OCO would send a real order."""
+        with self._lock:
+            stop = self.place(stop_intent)
+            target = self.place(target_intent)
+            if target.is_filled:
+                self._cancel_partner(target.order_id, stop.order_id)
+                return self._orders[stop.order_id], target
+            self._oco[stop.order_id] = target.order_id
+            self._oco[target.order_id] = stop.order_id
+            self._save()
+            return stop, target
+
+    def raw_order(self, order_id: str) -> dict[str, Any]:
+        """The book's own record of an order — never the live transport's,
+        which knows nothing of a paper id."""
+        with self._lock:
+            order = self._orders.get(order_id)
+            if order is None:
+                raise BrokerError(f"paper: no such order: {order_id}")
+            return {**order.to_dict(), "paper": True, "oco_partner": self._oco.get(order_id)}
+
+    def _cancel_partner(self, filled_id: str, partner_id: str | None) -> None:
+        if not partner_id:
+            return
+        self._oco.pop(filled_id, None)
+        self._oco.pop(partner_id, None)
+        other = self._orders.get(partner_id)
+        if other is not None and other.status is OrderStatus.WORKING:
+            self._orders[partner_id] = replace(other, status=OrderStatus.CANCELED,
+                                               message="OCO: the other leg filled")
 
     def cancel(self, order_id: str) -> OrderResult:
         with self._lock:
@@ -189,7 +230,10 @@ class PaperBroker:
         # leg was paying for two Schwab quotes it did not need — 1.2 s of the
         # 3 s an UPDATE took on 2026-09-15 (st-bmaz).
         quotes: dict[str, Quote | None] = {}
-        for order in list(self._orders.values()):
+        for oid in list(self._orders):
+            # re-read: an OCO partner filled earlier in this sweep has just
+            # cancelled this one (co-8mb1z)
+            order = self._orders[oid]
             if order.status is not OrderStatus.WORKING:
                 continue
             if order.symbol not in quotes:
@@ -284,6 +328,7 @@ class PaperBroker:
         filled = replace(order, status=OrderStatus.FILLED, filled_qty=order.qty,
                          fill_price=round(float(price), 2))
         self._orders[filled.order_id] = filled
+        self._cancel_partner(filled.order_id, self._oco.get(filled.order_id))
         signed = filled.qty if filled.side is Side.BUY_TO_OPEN else -filled.qty
         held = self._positions.get(filled.symbol)
         if held is None:
@@ -306,6 +351,7 @@ class PaperBroker:
             return
         data = {
             "seq": self._seq,
+            "oco": dict(self._oco),
             "orders": [{**o.to_dict()} for o in self._orders.values()],
             "positions": [p.to_dict() for p in self._positions.values()],
             "fills": [{"order_id": f.order_id, "symbol": f.symbol, "side": f.side.value,
@@ -329,6 +375,7 @@ class PaperBroker:
             # fresh start would forget an open paper position.
             raise BrokerError(f"paper: the book at {self.book_path} cannot be read: {exc}") from exc
         self._seq = int(data.get("seq", 0))
+        self._oco = {str(k): str(v) for k, v in (data.get("oco") or {}).items()}
         for o in data.get("orders", []):
             self._orders[o["order_id"]] = OrderResult(
                 order_id=o["order_id"], status=OrderStatus(o["status"]), symbol=o["symbol"],

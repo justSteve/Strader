@@ -106,8 +106,9 @@ class TestMarketDataPassThrough:
 
     def test_journal_tail(self, client):
         post(client, "/place", entry().to_dict())
-        events = [e["event"] for e in client.get("/journal?n=4").json["entries"]]
-        assert events == ["placed", "filled", "stop_placed", "target_placed"]
+        events = [e["event"] for e in client.get("/journal?n=6").json["entries"]
+                  if e["event"] != "order_raw"]      # the broker's own body, beside each leg
+        assert events[-4:] == ["placed", "filled", "stop_placed", "target_placed"]
 
 
 class TestPlacing:
@@ -214,6 +215,8 @@ class TestTheRoutesThatDoNotExist:
         rules = {r.rule for r in app.url_map.iter_rules() if r.endpoint != "static"}
         assert rules == {
             "/status", "/quote", "/chain", "/orders", "/positions", "/journal",
+            # co-8mb1z: the broker's own body for one order, read-only
+            "/orders/<order_id>/raw",
             "/preview", "/place", "/cancel", "/flatten", "/stand-down", "/stop",
             "/observe", "/poll-fills",
             # stage 3 (st-p8k8): the raw market-data pass-through for the

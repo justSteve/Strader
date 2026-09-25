@@ -108,6 +108,16 @@ def create_app(service: ExecService) -> Flask:
     def orders():
         return jsonify({"orders": [o.to_dict() for o in service.orders()]})
 
+    @app.get("/orders/<order_id>/raw")
+    def order_raw(order_id: str):
+        """The broker's own body for one order — ``stopType`` as it echoes
+        it, each execution's time and price, an OCO's children — which the
+        normalised ``/orders`` drops (co-8mb1z). Read-only; account numbers
+        scrubbed by the transport; no credential in it."""
+        if not order_id.replace("-", "").replace(":", "").isalnum() or len(order_id) > 64:
+            raise ValueError(f"not an order id: {order_id!r}")
+        return jsonify({"order_id": order_id, "raw": service.raw_order(order_id)})
+
     @app.get("/positions")
     def positions():
         return jsonify({

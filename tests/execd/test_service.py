@@ -35,7 +35,7 @@ class TestTheEntryPath:
         assert out["refused"] is None
         assert out["order"]["status"] == "FILLED"
         assert out["order"]["fill_price"] == 2.10
-        events = [e["event"] for e in armed.journal.read()]
+        events = [e["event"] for e in armed.journal.read() if e["event"] != "order_raw"]
         assert events == ["unlock", "request", "preview", "sending", "placed", "filled",
                           "stop_placed", "target_placed"]
 
@@ -686,7 +686,7 @@ class TestTheJournalReproducesTheDay:
         armed.place(entry(intent_id="day-1"))
         armed.observe(SPX_NOW - 12.5)
         armed.stand_down()
-        events = [e["event"] for e in armed.journal.read()]
+        events = [e["event"] for e in armed.journal.read() if e["event"] != "order_raw"]
         # The bracket's cancels precede the close's placement since st-97z1
         # (the stop) and st-fn5y (the take-profit): the legs are designed to
         # fire at the same prices the close is sent at, so none may be live at

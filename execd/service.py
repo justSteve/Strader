@@ -449,6 +449,9 @@ class ExecService:
         #: booked the same fill against it: three closes for two orders.
         #: Rebuilt from the day's ``closed`` lines at recovery.
         self._booked_exits: set[str] = set()
+        #: what the last OCO placement answered for each leg, by order id —
+        #: the answer a second ``_rest_*_at`` for a leg already paired gives
+        self._pair_results: dict[str, dict[str, Any]] = {}
         self._last_fill_poll = clock()
         self._recover()
 
@@ -2000,6 +2003,15 @@ class ExecService:
             self.journal.record("stop_unprotected", symbol=pos.symbol,
                                 intent_id=pos.intent_id, detail=str(exc))
             return None
+        if self._oco() and pos.target_price is None:
+            # the target is known before the stop rests, so the two go on
+            # as one OCO order at once rather than stop-then-replace (co-8mb1z)
+            b = self.bounds
+            try:
+                pos.target_price = take_profit_price(pos.entry_price, b.take_profit_multiple,
+                                                     b.take_profit_basis, stop_price=price)
+            except ValueError:
+                pos.target_price = None      # _place_take_profit says why
         return self._rest_stop_at(pos, price, spx=spx, kind="entry")
 
     def _place_take_profit(self, pos: OpenPosition) -> dict[str, Any] | None:
@@ -2211,6 +2223,12 @@ class ExecService:
 
     def _book_close(self, pos: OpenPosition, *, order_id: str, exit_px: float,
                     closed_qty: int, reason: str, why: str) -> dict[str, Any]:
+        self._journal_raw(order_id, f"fill:{reason}")
+        return self._book_close_inner(pos, order_id=order_id, exit_px=exit_px,
+                                      closed_qty=closed_qty, reason=reason, why=why)
+
+    def _book_close_inner(self, pos: OpenPosition, *, order_id: str, exit_px: float,
+                          closed_qty: int, reason: str, why: str) -> dict[str, Any]:
         """The one place a close is booked. Take the other leg(s) of the
         bracket off, then write the ``closed`` line, then resize or drop.
 
@@ -2461,7 +2479,7 @@ class ExecService:
         The stop first: it is the protection. The target only if the stop's
         placement did not itself close the position."""
         self._rest_stop_at(pos, pos.stop_price)
-        if pos.symbol in self._open:
+        if pos.symbol in self._open and not pos.target_order_id:
             self._rest_target_at(pos, pos.target_price)
 
     def _rest_stop_at(self, pos: OpenPosition, price: float | None, *,
@@ -2477,18 +2495,38 @@ class ExecService:
                                 intent_id=pos.intent_id, qty=pos.qty,
                                 detail=f"no stop price to rest ({kind})")
             return None
-        stop_intent = OrderIntent(
-            intent_id=f"{pos.intent_id}:stop:{pos.qty}", symbol=pos.symbol,
-            side=Side.SELL_TO_CLOSE, qty=pos.qty, order_type=OrderType.STOP,
-            stop_price=price, source="protective-stop", engine_sha=self.config.sha,
-        )
+        if self._oco() and pos.stop_order_id:
+            return self._resting_dict(pos, "stop")     # rested with its pair already
+        if self._oco() and pos.target_price is not None and pos.symbol in self._open:
+            if self._clear_other_leg(pos, "target"):
+                return self._rest_pair(pos, price, pos.target_price, spx=spx, kind=kind)["stop"]
+            if pos.symbol not in self._open:
+                return None
         try:
-            result = self.broker.place(stop_intent)
+            result = self.broker.place(self._stop_intent(pos, price))
         except BrokerError as exc:
             self.journal.record("stop_unprotected", symbol=pos.symbol,
                                 intent_id=pos.intent_id, qty=pos.qty, stop_price=price,
                                 detail=f"broker refused the {kind} stop: {exc}")
             return None
+        return self._book_stop(pos, price, result, spx=spx, kind=kind)
+
+    def _stop_intent(self, pos: OpenPosition, price: float) -> OrderIntent:
+        return OrderIntent(
+            intent_id=f"{pos.intent_id}:stop:{pos.qty}", symbol=pos.symbol,
+            side=Side.SELL_TO_CLOSE, qty=pos.qty, order_type=OrderType.STOP,
+            stop_price=price, source="protective-stop", engine_sha=self.config.sha,
+        )
+
+    def _target_intent(self, pos: OpenPosition, price: float) -> OrderIntent:
+        return OrderIntent(
+            intent_id=f"{pos.intent_id}:target:{pos.qty}", symbol=pos.symbol,
+            side=Side.SELL_TO_CLOSE, qty=pos.qty, order_type=OrderType.LIMIT,
+            limit=price, source="take-profit", engine_sha=self.config.sha,
+        )
+
+    def _book_stop(self, pos: OpenPosition, price: float, result: OrderResult, *,
+                   spx: float | None, kind: str, oco: bool = False) -> dict[str, Any] | None:
         if result.status is OrderStatus.REJECTED:
             self.journal.record("stop_unprotected", symbol=pos.symbol,
                                 intent_id=pos.intent_id, qty=pos.qty, stop_price=price,
@@ -2502,7 +2540,8 @@ class ExecService:
                             stop_price=price, stop_spx=pos.stop_spx, spx=spx,
                             delta=pos.delta, qty=pos.qty, order_id=result.order_id,
                             kind=kind, risk_usd=risk_usd(pos.entry_price, price, pos.qty),
-                            order=result.to_dict())
+                            oco=oco, order=result.to_dict())
+        self._journal_raw(result.order_id, "stop_placed")
         return result.to_dict()
 
     def _rest_target_at(self, pos: OpenPosition, price: float | None, *,
@@ -2518,18 +2557,24 @@ class ExecService:
                                 intent_id=pos.intent_id, qty=pos.qty,
                                 detail=f"no target price to rest ({kind})")
             return None
-        target_intent = OrderIntent(
-            intent_id=f"{pos.intent_id}:target:{pos.qty}", symbol=pos.symbol,
-            side=Side.SELL_TO_CLOSE, qty=pos.qty, order_type=OrderType.LIMIT,
-            limit=price, source="take-profit", engine_sha=self.config.sha,
-        )
+        if self._oco() and pos.target_order_id:
+            return self._resting_dict(pos, "target")   # rested with its pair already
+        if self._oco() and pos.stop_price is not None and pos.symbol in self._open:
+            if self._clear_other_leg(pos, "stop"):
+                return self._rest_pair(pos, pos.stop_price, price, kind=kind)["target"]
+            if pos.symbol not in self._open:
+                return None
         try:
-            result = self.broker.place(target_intent)
+            result = self.broker.place(self._target_intent(pos, price))
         except BrokerError as exc:
             self.journal.record("target_unprotected", symbol=pos.symbol,
                                 intent_id=pos.intent_id, qty=pos.qty, target_price=price,
                                 detail=f"broker refused the {kind} take-profit: {exc}")
             return None
+        return self._book_target(pos, price, result, kind=kind)
+
+    def _book_target(self, pos: OpenPosition, price: float, result: OrderResult, *,
+                     kind: str, oco: bool = False) -> dict[str, Any] | None:
         if result.status is OrderStatus.REJECTED:
             self.journal.record("target_unprotected", symbol=pos.symbol,
                                 intent_id=pos.intent_id, qty=pos.qty, target_price=price,
@@ -2543,7 +2588,7 @@ class ExecService:
                     basis=b.take_profit_basis, multiple=b.take_profit_multiple,
                     qty=pos.qty, order_id=result.order_id, kind=kind,
                     reward_usd=round((price - pos.entry_price) * CONTRACT_MULTIPLIER * pos.qty, 2),
-                    order=result.to_dict())
+                    oco=oco, order=result.to_dict())
         if result.is_filled:
             # The bid was already at or through the target when it landed.
             # That is the exit, taken at once; recovery must not rebuild a
@@ -2555,7 +2600,98 @@ class ExecService:
         pos.target_order_id = result.order_id
         pos.target_price = price
         self.journal.record("target_placed", **line)
+        self._journal_raw(result.order_id, "target_placed")
         return result.to_dict()
+
+    # ── the bracket as one OCO order (co-8mb1z) ──────────────────────────
+    def _oco(self) -> bool:
+        """Does the broker hold a bracket as one-cancels-other? Schwab, the
+        paper book and the mock do; a broker without ``place_oco`` (Alpaca
+        options) rests the two legs as before."""
+        return (callable(getattr(self.broker, "place_oco", None))
+                and bool(getattr(self.broker, "oco_enabled", True)))
+
+    def _resting_dict(self, pos: OpenPosition, leg: str) -> dict[str, Any]:
+        oid = getattr(pos, self._LEG_ATTR[leg])
+        return (self._pair_results.get(oid)
+                or {"order_id": oid, "status": "WORKING",
+                    "price": pos.stop_price if leg == "stop" else pos.target_price})
+
+    def _clear_other_leg(self, pos: OpenPosition, leg: str) -> bool:
+        """The other leg off, so the two can go back on as one pair. ``False``
+        when it will not come off — the broker unreachable or the cancel not
+        confirmed (the leg rests as its own order then) — or when it had
+        already filled, which is booked here as the close it is."""
+        if not getattr(pos, self._LEG_ATTR[leg]):
+            return True
+        order_id = getattr(pos, self._LEG_ATTR[leg])
+        try:
+            _canceled, fill = self._pull_leg(pos, leg)
+        except BrokerError as exc:
+            self.journal.record("error", kind=f"cancel-{leg}", symbol=pos.symbol,
+                                order_id=order_id, detail=f"{exc} — the other leg rests on its own")
+            return False
+        if fill is not None:
+            self._settle(pos, fill, reason="resting-stop" if leg == "stop" else "target")
+            return False
+        return True
+
+    def _rest_pair(self, pos: OpenPosition, stop_price: float, target_price: float, *,
+                   spx: float | None = None, kind: str = "resized") -> dict[str, Any]:
+        """Both legs as ONE one-cancels-other order at the broker, for what
+        is held now (co-8mb1z). 2026-09-25 12:15 CT, live: the 10× target
+        sent as its own SELL_TO_CLOSE beside the resting stop was rejected
+        by Schwab as an oversell, so the target never rested. Booked and
+        journaled leg by leg exactly as two single orders were — the same
+        ``stop_placed`` / ``target_placed`` lines, marked ``oco`` — so
+        recovery, the leg reconcile and the page read them unchanged."""
+        try:
+            stop, target = self.broker.place_oco(self._stop_intent(pos, stop_price),
+                                                 self._target_intent(pos, target_price))
+        except BrokerError as exc:
+            self.journal.record("stop_unprotected", symbol=pos.symbol, intent_id=pos.intent_id,
+                                qty=pos.qty, stop_price=stop_price,
+                                detail=f"broker refused the {kind} bracket (OCO): {exc}")
+            self.journal.record("target_unprotected", symbol=pos.symbol, intent_id=pos.intent_id,
+                                qty=pos.qty, target_price=target_price,
+                                detail=f"broker refused the {kind} bracket (OCO): {exc}")
+            return {"stop": None, "target": None}
+        out = {"stop": self._book_stop(pos, stop_price, stop, spx=spx, kind=kind, oco=True)}
+        out["target"] = (self._book_target(pos, target_price, target, kind=kind, oco=True)
+                         if pos.symbol in self._open else None)
+        for leg in ("stop", "target"):
+            if out[leg] and out[leg].get("order_id"):
+                self._pair_results[out[leg]["order_id"]] = out[leg]
+        if len(self._pair_results) > 200:
+            for k in list(self._pair_results)[:-100]:
+                self._pair_results.pop(k, None)
+        return out
+
+    def _journal_raw(self, order_id: str | None, why: str) -> None:
+        """The broker's own body for an order, on its own journal line, so
+        the next stop or target that does something unexpected carries its
+        own evidence (co-8mb1z; 2026-09-25: a stop filled at the entry price
+        and the normalised order said nothing of why). Best effort: a read
+        that fails is noted and nothing else changes."""
+        read = getattr(self.broker, "raw_order", None)
+        if not order_id or not callable(read) or str(order_id).startswith(
+                ("rejected:", "unnamed:", "oco:", "adopted:")):
+            return
+        try:
+            body = read(order_id)
+        except (BrokerError, Exception) as exc:  # evidence is never worth a failure
+            self.journal.record("order_raw", order_id=order_id, why=why,
+                                error=f"{type(exc).__name__}: {exc}")
+            return
+        self.journal.record("order_raw", order_id=order_id, why=why, body=body)
+
+    def raw_order(self, order_id: str) -> dict[str, Any]:
+        """The broker's raw body for one order, for the loopback API's
+        ``GET /orders/<id>/raw`` (co-8mb1z). Read-only."""
+        read = getattr(self.broker, "raw_order", None)
+        if not callable(read):
+            raise BrokerError("this broker has no raw order read")
+        return read(order_id)
 
     # ── the live editor: both trigger conditions ─────────────────────────
     def adjust(self, symbol: str, *, stop_price: float | None = None,
