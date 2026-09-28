@@ -874,6 +874,23 @@ class TestOrdersAndFills:
         assert [(f.order_id, f.side, f.qty, f.price) for f in fills] == [("2", Side.SELL_TO_CLOSE, 1, 2.40)]
         assert fills[0].at == datetime(2026, 9, 4, 15, 2, tzinfo=timezone.utc)
 
+    def test_an_oco_cancel_is_not_a_fill(self, broker, fake):
+        """2026-09-28 11:56 CT, live: the stop filled at 10.80 and Schwab wrote
+        the OCO's cancel of the 55.50 target as an EXECUTION with
+        executionType CANCELED, qty 1, price 0.0. Read as a fill it booked the
+        target sold at 0.00 (-$1,090 on a -$10 stop-out) [st-5n3s]."""
+        stop = spec_order(2, status="FILLED", instruction="SELL_TO_CLOSE", order_type="STOP",
+                          price=None, stop_price=10.70, fills=[(1, 10.80, "2026-09-28T16:56:43+0000")])
+        target = spec_order(3, status="CANCELED", instruction="SELL_TO_CLOSE", price=55.50,
+                            fills=[(1, 0.0, "2026-09-28T16:56:43+0000")])
+        target["orderActivityCollection"][0]["executionType"] = "CANCELED"
+        target["filledQuantity"] = 0.0
+        fake.orders[2], fake.orders[3] = stop, target
+        fills = broker.fills_since(datetime(2026, 9, 28, 16, 55, tzinfo=timezone.utc))
+        assert [(f.order_id, f.price) for f in fills] == [("2", 10.80)]
+        by_id = {o.order_id: o for o in broker.orders()}
+        assert by_id["3"].fill_price is None and by_id["2"].fill_price == 10.80
+
     def test_fills_are_sorted_by_time(self, broker, fake):
         fake.orders[2] = spec_order(2, status="FILLED", fills=[(1, 2.40, "2026-09-04T15:02:00+0000")])
         fake.orders[1] = spec_order(1, status="FILLED", fills=[(1, 2.08, "2026-09-04T14:31:03+0000")])
@@ -984,11 +1001,14 @@ class TestMultiLegOrders:
 
     def test_no_fill_in_the_account_borrows_another_legs_symbol(self, broker, account):
         """The general form of the same defect, over all 72 recorded execution
-        legs: a fill's symbol is the symbol of the leg its legId names."""
+        legs: a fill's symbol is the symbol of the leg its legId names. The
+        recording holds 72 EXECUTION legs; 25 are cancels or replaces at 0.00
+        (executionType CANCELED) and are not fills [st-5n3s]."""
         wanted = {(str(o["orderId"]), leg["legId"]): leg["instrument"]["symbol"]
                   for o in recorded_orders() for leg in o["orderLegCollection"]}
         fills = broker.fills_since(BEFORE_THE_RECORDING)
-        assert len(fills) == 72
+        assert len(fills) == 47
+        assert all(f.price > 0 for f in fills)
         for f in fills:
             assert f.symbol == wanted[(f.order_id, f.leg_id)]
 

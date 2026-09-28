@@ -684,6 +684,16 @@ class TestAStageChangeAlwaysPaints:
         assert "poll failed" in script and "throw new Error('HTTP '" in script
 
 
+    def test_a_parked_cursor_does_not_hold_the_ticket(self, order_page):
+        """2026-09-28: a stop keyed, Enter, the caret left in the box — the
+        price stopped following Schwab until he clicked out. The ticket guard
+        is typing within TYPING_MS, not focus [st-5n3s]; driven in headless
+        Chromium: focused-idle, after-pause and after-Enter all read not busy,
+        mid-typing reads busy."""
+        body = text(order_page.get("/exec/order?side=call"))
+        assert "(Date.now() - typedAt) < TYPING_MS" in body
+        assert "if (e.key === 'Enter' && ours(e.target)) typedAt = 0;" in body
+
 class TestARefusedSendIsShown:
     """2026-09-15 09:54 CT: Steve tapped SEND and saw nothing —
     Schwab's own preview had refused the order (buying power) and the page

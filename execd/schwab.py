@@ -1189,7 +1189,7 @@ class SchwabBroker:
         for o in self._orders_raw():
             by_id = {leg.leg_id: leg for leg in _legs(o) if leg.leg_id is not None}
             for act in o.get("orderActivityCollection") or []:
-                if not isinstance(act, dict) or act.get("activityType") != "EXECUTION":
+                if not _is_fill(act):
                     continue
                 for leg in act.get("executionLegs") or []:
                     if not isinstance(leg, dict):
@@ -1337,6 +1337,21 @@ def _legs(o: Mapping[str, Any]) -> tuple[OrderLeg, ...]:
     return tuple(out)
 
 
+def _is_fill(act: Any) -> bool:
+    """An ``orderActivityCollection`` entry that is money changing hands.
+
+    ``activityType == EXECUTION`` is not enough: Schwab writes a cancel —
+    including the OCO's own cancel of the sibling leg — as an EXECUTION with
+    ``executionType: CANCELED``, the cancelled quantity and a price of 0.0.
+    Read as a fill, the target an OCO cancelled on 2026-09-28 11:56 CT was
+    booked as sold at 0.00 (-$1,090 on a -$10 stop-out) and the real stop
+    fill was then called an oversell [st-5n3s]. 25 of the 72 execution legs
+    in the 09-05 recording are these. A missing ``executionType`` still
+    counts, as it did before."""
+    return (isinstance(act, dict) and act.get("activityType") == "EXECUTION"
+            and act.get("executionType", "FILL") == "FILL")
+
+
 def _net_fill_price(o: Mapping[str, Any], legs: tuple[OrderLeg, ...]) -> float | None:
     """The net premium per contract a multi-leg order actually filled at.
 
@@ -1354,7 +1369,7 @@ def _net_fill_price(o: Mapping[str, Any], legs: tuple[OrderLeg, ...]) -> float |
     total = 0.0
     seen = False
     for act in o.get("orderActivityCollection") or []:
-        if not isinstance(act, dict) or act.get("activityType") != "EXECUTION":
+        if not _is_fill(act):
             continue
         for el in act.get("executionLegs") or []:
             if not isinstance(el, dict):
@@ -1379,7 +1394,7 @@ def _avg_fill_price(o: Mapping[str, Any]) -> float | None:
     total_qty = 0.0
     total_val = 0.0
     for act in o.get("orderActivityCollection") or []:
-        if not isinstance(act, dict) or act.get("activityType") != "EXECUTION":
+        if not _is_fill(act):
             continue
         for leg in act.get("executionLegs") or []:
             if not isinstance(leg, dict):

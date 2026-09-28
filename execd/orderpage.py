@@ -160,7 +160,15 @@ _SCRIPT = """
   // third when the ask moved far enough to trigger a reprice of its own.
   // Locked, the server renders the live ask beside the locked price, so the
   // padlock needs nothing here either.
-  function editing(){ var a = document.activeElement; return !!(a && a.tagName === 'INPUT' && ((form && form.contains(a)) || a.id === 'pxbox')); }
+  // Editing is typing, not holding the cursor (st-5n3s). Steve, 2026-09-28:
+  // keyed a stop, hit Enter, left the caret in the box, and the ticket stopped
+  // following Schwab until he clicked out. Focus alone held every poll paint
+  // off; now a box holds it only while a keystroke is still unapplied.
+  var typedAt = 0, TYPING_MS = 1500;
+  function ours(a){ return !!(a && a.tagName === 'INPUT' && ((form && form.contains(a)) || a.id === 'pxbox')); }
+  document.addEventListener('input', function(e){ if (ours(e.target)) typedAt = Date.now(); }, true);
+  document.addEventListener('keydown', function(e){ if (e.key === 'Enter' && ours(e.target)) typedAt = 0; }, true);
+  function editing(){ return ours(document.activeElement) && (Date.now() - typedAt) < TYPING_MS; }
   window.__lots = form && form.elements['lots'] ? (form.elements['lots'].value || '1') : '1';
 })();
 </script>
