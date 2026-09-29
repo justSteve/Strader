@@ -207,6 +207,11 @@ LEG_REREST_COOLDOWN_S = 300.0
 #: beside a working market sell, with observe() free to fire a second one
 #: (audit finding 26, st-b7i4). The same grace, for the same reason.
 EXIT_SETTLE_S = POSITION_SETTLE_S
+#: A leg moved in TOS is REPLACED at Schwab and a new order takes its place:
+#: same contract, same instruction, entered within about a second of the old
+#: one's close (7 of 7 replaces in the 09-05 recording, all inside 1 s). The
+#: new order is the one this service follows [st-5n3s].
+REPLACE_MATCH_S = 5.0
 #: The fill sweep asks the broker for fills since the last poll minus this,
 #: not since the last poll: a fill stamped with the exchange's clock at T and
 #: listed only after the sweep at T+1 had moved the watermark past it was
@@ -233,6 +238,7 @@ _CARRIED_EVENTS = frozenset((
     "filled", "stop_placed", "target_placed", "stop_adjusted", "target_adjusted",
     "canceled", "position_adopted", "position_gone", "position_corrected",
     "leg_unconfirmed", "leg_resolved", "exit_unfilled", "exit_resolved", "closed",
+    "leg_replaced", "leg_cancelled_outside",
 ))
 #: An adjust identical to the last completed one, arriving inside this many
 #: seconds of its answer, is a replay (browser or proxy re-sending after a
@@ -329,6 +335,10 @@ class OpenPosition:
     target_unaccounted: bool = False
     stop_rerested_at: datetime | None = None
     target_rerested_at: datetime | None = None
+    #: a leg Steve cancelled in TOS (st-5n3s): left off — not re-rested, not
+    #: watched on the SPX mark — until he sets it again on the form
+    stop_off_by_hand: bool = False
+    target_off_by_hand: bool = False
     #: the close this service has sent and not yet seen resolve. While this is
     #: set the SPX-mark loop does not fire again — re-sending a market close
     #: every tick until one fills was finding 2 of the 2026-08-30 audit, an
@@ -389,6 +399,8 @@ class OpenPosition:
             "stop_state": self.leg_state("stop"),
             "target_order_id": self.target_order_id, "target_price": self.target_price,
             "target_state": self.leg_state("target"),
+            "stop_off_by_hand": self.stop_off_by_hand,
+            "target_off_by_hand": self.target_off_by_hand,
             "target_spx": self.target_spx,
             "entry_spx": self.entry_spx,
             "entry_order_id": self.entry_order_id,
@@ -1146,7 +1158,8 @@ class ExecService:
             elif pos.target_order_id and fill.order_id == pos.target_order_id:
                 kind, why = "target", "resting-target"
                 pos.target_order_id = None
-            elif pos.stop_order_id or pos.target_order_id:
+            elif (pos.stop_order_id or pos.target_order_id
+                  or pos.stop_off_by_hand or pos.target_off_by_hand):
                 # A sell on a held symbol from an order this service did not
                 # place — closed by hand in the broker's app, or expired
                 # (paper's expiry fill). Until 2026-09-15 this was skipped and
@@ -1193,6 +1206,7 @@ class ExecService:
         leaves every belief in place and says so.
         """
         with self._lock:
+            self._last_reconcile_at = self.clock()
             try:
                 broker_orders = {o.order_id: o for o in self.broker.orders()}
             except BrokerError as exc:
@@ -1225,6 +1239,15 @@ class ExecService:
                     "legs": legs, "loose": loose, "found": found,
                     "adopted": adopted, "corrected": corrected, "gone": gone,
                     "error": None}
+
+    def reconcile_if_stale(self, max_age_s: float) -> dict[str, Any] | None:
+        """``reconcile`` unless one ran inside ``max_age_s`` — the watcher
+        and an open page both ask on a ~3 s beat, and three GETs a pass
+        twice over would crowd Schwab's 120-a-minute ceiling (st-5n3s)."""
+        last = getattr(self, "_last_reconcile_at", None)
+        if last is not None and (self.clock() - last).total_seconds() < max_age_s:
+            return None
+        return self.reconcile()
 
     def _known_order_ids(self) -> set[str]:
         ids: set[str] = set(self._working) | set(self._loose_legs)
@@ -1344,6 +1367,30 @@ class ExecService:
             if order.is_filled:
                 promoted.append(work.symbol)
                 self._promote(work, order)
+            elif order.is_replaced and (new := self._replacement_of(order, broker_orders)):
+                # Steve re-priced the working entry in TOS (st-5n3s): the new
+                # order is the entry now. Journaled as the old one resolving
+                # and the new one working, so recovery reads it unchanged.
+                self._working.pop(order_id, None)
+                self.journal.record("entry_resolved", order_id=order_id, outcome="replaced",
+                                    symbol=work.symbol, intent_id=work.intent_id,
+                                    detail=f"re-priced outside this service (TOS) as {new.order_id}")
+                work.order_id = new.order_id
+                if new.price is not None:
+                    work.limit = float(new.price)
+                self._working[new.order_id] = work
+                self.journal.record("working", kind="entry", intent_id=work.intent_id,
+                                    symbol=work.symbol, qty=work.qty, order_id=work.order_id,
+                                    status=new.status.value, limit=work.limit,
+                                    stop_spx=work.stop_spx, delta=work.delta,
+                                    page_query=work.page_query, triggered=work.triggered,
+                                    found_by="replace")
+                if new.is_filled:
+                    promoted.append(work.symbol)
+                    self._promote(work, new)
+            elif order.is_replaced and (self.clock() - (order.closed_at or self.clock())
+                                        ).total_seconds() < LEG_SETTLE_S:
+                continue        # its replacement is not listed yet
             else:
                 released.append(order_id)
                 self._resolve_working(order_id, outcome=order.status.value.lower(),
@@ -1483,6 +1530,10 @@ class ExecService:
         out: list[dict[str, Any]] = []
         now = self.clock()
         for pos in list(self._open.values()):
+            # each leg's order as listed before this pass touches the ids, so
+            # a leg can ask whether its sibling was moved in the same breath
+            listed = {leg: broker_orders.get(getattr(pos, self._LEG_ATTR[leg]) or "")
+                      for leg in ("stop", "target")}
             for leg in ("stop", "target"):
                 id_attr = self._LEG_ATTR[leg]
                 order_id = getattr(pos, id_attr)
@@ -1528,6 +1579,28 @@ class ExecService:
                                 "outcome": "filled",
                                 **self._settle(pos, order, reason=close_kind)})
                     break            # the position is closed or resized; its other leg went with it
+                if order.is_replaced:
+                    new = self._replacement_of(order, broker_orders)
+                    if new is not None:
+                        out.append(self._follow_replace(pos, leg, order, new))
+                        continue
+                    # the new order is not listed yet — the same lag grace a
+                    # missing leg gets, then it is read as a cancel
+                    since = getattr(pos, unlisted_attr)
+                    if since is None:
+                        setattr(pos, unlisted_attr, now)
+                        continue
+                    if (now - since).total_seconds() < LEG_SETTLE_S:
+                        continue
+                    setattr(pos, unlisted_attr, None)
+                other = listed["target" if leg == "stop" else "stop"]
+                moved_with_sibling = (
+                    other is not None and other.is_replaced
+                    and other.closed_at is not None and order.closed_at is not None
+                    and abs((other.closed_at - order.closed_at).total_seconds()) <= REPLACE_MATCH_S)
+                if (order.is_hand_cancel or order.is_replaced) and not moved_with_sibling:
+                    out.append(self._leg_cancelled_outside(pos, leg, order))
+                    continue
                 outcome = order.status.value.lower()
                 setattr(pos, id_attr, None)
                 in_flight = pos.exit_in_flight
@@ -1570,6 +1643,94 @@ class ExecService:
                 if pos.symbol not in self._open:
                     break            # the re-rested leg filled as it landed
         return out
+
+    def _replacement_of(self, old: OrderResult, broker_orders: dict[str, OrderResult],
+                        depth: int = 0) -> OrderResult | None:
+        """The order that replaced ``old`` — a leg or an entry moved in TOS.
+        Schwab's listing does not link them; the match is the same contract
+        and instruction, entered within ``REPLACE_MATCH_S`` of the old one's
+        close, and not an order this service already tracks. Moved twice
+        between passes, the chain is followed to its working end."""
+        known = self._known_order_ids()
+        ref = old.closed_at
+        best: OrderResult | None = None
+        best_gap = REPLACE_MATCH_S
+        for o in broker_orders.values():
+            if (o.order_id == old.order_id or o.order_id in known or o.symbol != old.symbol
+                    or o.side is not old.side or o.is_multi_leg):
+                continue
+            if ref is None:
+                gap = (o.submitted_at - old.submitted_at).total_seconds()
+                if gap < 0:
+                    continue
+            else:
+                gap = abs((o.submitted_at - ref).total_seconds())
+            if gap <= best_gap:
+                best, best_gap = o, gap
+        if best is not None and best.is_replaced and depth < 5:
+            return self._replacement_of(best, broker_orders, depth + 1) or best
+        return best
+
+    def _follow_replace(self, pos: OpenPosition, leg: str, old: OrderResult,
+                        new: OrderResult) -> dict[str, Any]:
+        """Steve moved a resting leg in TOS: the new order is the leg now, at
+        its price. The SPX level the loop watches moves with it (a stop's
+        level walked from the new price; a target becomes a premium limit),
+        because a loop still watching the old level would close the position
+        where he has just said not to [st-5n3s]."""
+        id_attr = self._LEG_ATTR[leg]
+        old_price = getattr(pos, f"{leg}_price")
+        setattr(pos, id_attr, new.order_id)
+        setattr(pos, f"{leg}_unlisted_since", None)
+        setattr(pos, f"{leg}_unaccounted", False)
+        setattr(pos, f"{leg}_off_by_hand", False)
+        if new.price is not None:
+            setattr(pos, f"{leg}_price", float(new.price))
+        if leg == "stop":
+            pos.stop_spx = (self._stop_spx_for(pos, float(new.price))
+                            if new.price is not None else None)
+            level = {"stop_spx": pos.stop_spx}
+        else:
+            pos.target_spx = None
+            level = {"target_spx": None}
+        self.journal.record(
+            "leg_replaced", kind=self._LEG_KIND[leg], symbol=pos.symbol,
+            intent_id=pos.intent_id, old_order_id=old.order_id, order_id=new.order_id,
+            old_price=old_price, **{f"{leg}_price": getattr(pos, f"{leg}_price")},
+            qty=new.qty, broker_status=new.raw_status or new.status.value, **level,
+            detail=f"moved outside this service (TOS) from {old_price} to "
+                   f"{getattr(pos, f'{leg}_price')} — the form follows the new order")
+        return {"symbol": pos.symbol, "leg": self._LEG_KIND[leg], "order_id": new.order_id,
+                "outcome": "replaced", "old_order_id": old.order_id}
+
+    def _leg_cancelled_outside(self, pos: OpenPosition, leg: str,
+                               order: OrderResult) -> dict[str, Any]:
+        """Steve cancelled a resting leg in TOS. Until 2026-09-29 it was
+        re-rested at its standing price — the form putting back what he had
+        just taken off. Now it stays off: no id, no price, and no SPX level
+        for the loop to close on. Setting it again on the form puts it back
+        [st-5n3s]."""
+        id_attr = self._LEG_ATTR[leg]
+        price = getattr(pos, f"{leg}_price")
+        setattr(pos, id_attr, None)
+        setattr(pos, f"{leg}_price", None)
+        setattr(pos, f"{leg}_off_by_hand", True)
+        setattr(pos, f"{leg}_unlisted_since", None)
+        setattr(pos, f"{leg}_unaccounted", False)
+        if leg == "stop":
+            pos.stop_spx = None
+        else:
+            pos.target_spx = None
+        word = {"stop": "stop", "target": "target"}[leg]
+        self.journal.record(
+            "leg_cancelled_outside", kind=self._LEG_KIND[leg], symbol=pos.symbol,
+            intent_id=pos.intent_id, order_id=order.order_id, price=price,
+            broker_status=order.raw_status or order.status.value,
+            detail=f"the {word} at {price} was cancelled outside this service (TOS) — "
+                   f"left off: not re-rested, not watched on the SPX mark. Set it on "
+                   f"the form to put it back")
+        return {"symbol": pos.symbol, "leg": self._LEG_KIND[leg], "order_id": order.order_id,
+                "outcome": "cancelled_outside", "rerested": None}
 
     def _resolve_working(self, order_id: str, outcome: str, detail: str = "") -> None:
         work = self._working.pop(order_id, None)
@@ -2499,9 +2660,11 @@ class ExecService:
     def _rest_bracket(self, pos: OpenPosition) -> None:
         """Both legs back on at their standing prices, for what is held now.
         The stop first: it is the protection. The target only if the stop's
-        placement did not itself close the position."""
-        self._rest_stop_at(pos, pos.stop_price)
-        if pos.symbol in self._open and not pos.target_order_id:
+        placement did not itself close the position. A leg Steve cancelled in
+        TOS stays off (st-5n3s)."""
+        if not pos.stop_off_by_hand:
+            self._rest_stop_at(pos, pos.stop_price)
+        if pos.symbol in self._open and not pos.target_order_id and not pos.target_off_by_hand:
             self._rest_target_at(pos, pos.target_price)
 
     def _rest_stop_at(self, pos: OpenPosition, price: float | None, *,
@@ -2888,6 +3051,11 @@ class ExecService:
                     f"cancel that close first, or let it fill"))
             q = self.broker.quote(symbol)          # a BrokerError propagates: 502
             bid = float(q.bid)
+            # a leg set on the form after it was cancelled in TOS is his again
+            if stop_price is not None or stop_spx is not None:
+                pos.stop_off_by_hand = False
+            if target_price is not None or target_spx is not None:
+                pos.target_off_by_hand = False
             # A leg given as an SPX level is walked into its price first; the
             # price then meets every refusal a dollar price does (st-2j3m).
             if stop_spx is not None or target_spx is not None:
@@ -3392,6 +3560,7 @@ class ExecService:
                 if pos is not None:
                     pos.stop_order_id = e.get("order_id")
                     pos.stop_price = e.get("stop_price")
+                    pos.stop_off_by_hand = False
                     if e.get("stop_spx") is not None:
                         pos.stop_spx = e.get("stop_spx")
                     if e.get("delta") is not None:
@@ -3401,6 +3570,7 @@ class ExecService:
                 if pos is not None:
                     pos.target_price = e.get("target_price")
                     pos.target_spx = e.get("target_spx")
+                    pos.target_off_by_hand = False
                     # a target that filled the moment it landed never rested;
                     # the closed line that follows drops the position anyway
                     pos.target_order_id = None if e.get("filled_at_once") else e.get("order_id")
@@ -3421,6 +3591,24 @@ class ExecService:
                     attr = "stop_order_id" if e.get("kind") == "protective-stop" else "target_order_id"
                     if getattr(pos, attr) == e.get("order_id"):
                         setattr(pos, attr, None)
+            elif e.get("event") == "leg_replaced":
+                pos = self._open.get(str(e.get("symbol", "")))
+                if pos is not None:
+                    leg = "stop" if e.get("kind") == "protective-stop" else "target"
+                    setattr(pos, self._LEG_ATTR[leg], e.get("order_id"))
+                    if e.get(f"{leg}_price") is not None:
+                        setattr(pos, f"{leg}_price", e.get(f"{leg}_price"))
+                    setattr(pos, f"{leg}_spx", e.get(f"{leg}_spx"))
+                    setattr(pos, f"{leg}_off_by_hand", False)
+            elif e.get("event") == "leg_cancelled_outside":
+                pos = self._open.get(str(e.get("symbol", "")))
+                if pos is not None:
+                    leg = "stop" if e.get("kind") == "protective-stop" else "target"
+                    if getattr(pos, self._LEG_ATTR[leg]) == e.get("order_id"):
+                        setattr(pos, self._LEG_ATTR[leg], None)
+                        setattr(pos, f"{leg}_price", None)
+                        setattr(pos, f"{leg}_spx", None)
+                        setattr(pos, f"{leg}_off_by_hand", True)
             elif e.get("event") == "working" and e.get("kind") == "entry":
                 symbol = str(e.get("symbol", ""))
                 order_id = str(e.get("order_id", ""))

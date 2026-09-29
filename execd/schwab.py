@@ -1286,6 +1286,8 @@ class SchwabBroker:
             filled_qty=filled, fill_price=fill_price,
             submitted_at=_iso(o.get("enteredTime"), self.clock()), message=message,
             legs=legs, strategy="" if strategy == "NONE" else strategy,
+            raw_status=raw_status,
+            closed_at=_iso(o.get("closeTime"), self.clock()) if o.get("closeTime") else None,
         )
 
 

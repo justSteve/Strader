@@ -45,7 +45,10 @@ from .service import ExecService, Refused
 log = logging.getLogger("execd.watch")
 
 #: How often the mark is read while a position or working entry exists.
-INTERVAL_S = 5.0
+INTERVAL_S = 3.0
+#: A pass within this long of the last reconcile (the open page's poll runs
+#: one too) reads the mark but does not ask the broker again (st-5n3s).
+RECONCILE_MIN_GAP_S = 2.5
 #: How often the watcher looks for exposure when there is none.
 IDLE_INTERVAL_S = 30.0
 
@@ -73,7 +76,7 @@ class Watcher:
         if not svc.has_exposure():
             return {**out, "skipped": "flat"}
         try:
-            rec = svc.reconcile()
+            rec = svc.reconcile_if_stale(RECONCILE_MIN_GAP_S) or {}
             out["reconcile"] = rec
             if isinstance(rec, dict) and rec.get("error"):
                 # reconcile reports a broker failure rather than raising it;

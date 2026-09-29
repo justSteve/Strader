@@ -608,8 +608,13 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         has no clock and only fills when it is read. One reconcile per poll,
         and only while something is actually working, buys the screen the
         broker's own truth for the seconds when it decides what he taps."""
+        # Held positions too, since 2026-09-29: Steve runs TOS beside the
+        # form and a leg he moves or a close he makes there should reach
+        # the card on the next paint, not the watcher's next beat (st-5n3s).
         if service.has_working():
             service.reconcile()          # reports a broker failure, never raises
+        elif service.has_exposure():
+            service.reconcile_if_stale(2.5)
         st = service.status()
         quote = None
         error = None

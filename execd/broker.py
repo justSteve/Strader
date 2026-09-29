@@ -155,6 +155,22 @@ class OrderResult:
     message: str = ""
     legs: tuple[OrderLeg, ...] = ()
     strategy: str = ""                  # the broker's complex-strategy word
+    #: the broker's own status word before it was folded into ``status`` —
+    #: REPLACED and EXPIRED both read CANCELED there, and the service has to
+    #: tell a leg Steve moved in TOS from one he cancelled [st-5n3s]
+    raw_status: str = ""
+    closed_at: datetime | None = None   # when the broker closed it, if it says
+
+    @property
+    def is_replaced(self) -> bool:
+        return self.raw_status == "REPLACED"
+
+    @property
+    def is_hand_cancel(self) -> bool:
+        """CANCELED and nothing else: not a replace, not an expiry, not a
+        rejection. The service's own cancels clear the id as they go, so a
+        tracked leg that reads this was cancelled outside it."""
+        return self.raw_status == "CANCELED"
 
     @property
     def is_filled(self) -> bool:

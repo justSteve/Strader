@@ -361,12 +361,16 @@ def body_filled(service, st, facts, actions, now) -> str:
         # (audit findings 39 and 41, st-vqmr).
         stop_note = (f"<span class='money {money_class(v.get('at_stop_usd'))}'>{money(v.get('at_stop_usd'))}</span>"
                      if p.get("stop_state") else "<span class='money neg'>NO STOP RESTING</span>")
+        if not p.get("stop_state") and p.get("stop_off_by_hand"):
+            stop_note += "<span class='money neg'>CANCELLED IN TOS — NOTHING HERE WILL CLOSE IT</span>"
         if p.get("stop_state") == "unaccounted":
             stop_note += "<span class='money neg'>NOT IN THE BROKER'S LISTING</span>"
         if p.get("stop_spx") is not None:
             stop_note += f"<span class=level>SPX {float(p['stop_spx']):.2f}</span>"
         target_note = (f"<span class='money {money_class(v.get('at_target_usd'))}'>{money(v.get('at_target_usd'))}</span>"
                        if p.get("target_state") else "<span class='money amber'>NO TARGET RESTING</span>")
+        if not p.get("target_state") and p.get("target_off_by_hand"):
+            target_note += "<span class='money amber'>CANCELLED IN TOS</span>"
         if p.get("target_state") == "unaccounted":
             target_note += "<span class='money amber'>NOT IN THE BROKER'S LISTING</span>"
         if p.get("target_spx") is not None:
