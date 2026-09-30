@@ -1409,3 +1409,225 @@ def _avg_fill_price(o: Mapping[str, Any]) -> float | None:
     if total_qty <= 0:
         return None
     return round(total_val / total_qty, 4)
+
+
+# ── the account-activity stream: a doorbell for the fill sweep ────────────
+#
+# Steve, 2026-09-30: "yes" — execd's transport module may hold a receive-only
+# websocket for ACCT_ACTIVITY [st-8bls]. The same day his probe settled the
+# gate the bead was held on: with ThinkOrSwim open, a streamer session on the
+# TRADING app logged in, subscribed, carried a TOS order's whole lifecycle
+# (OrderCreated … CancelAccepted … OrderUROutCompleted) and TOS was untouched.
+#
+# The stream is a DOORBELL, not a ledger. Any account event rings the watcher,
+# which reconciles against the order endpoints at once instead of on its next
+# 3 s beat; the orders endpoint stays the one source of truth for what filled
+# at what price. So nothing here parses a fill, the fill event's shape (not
+# yet seen live) does not matter, and a stream that is down costs exactly the
+# latency it was saving — never correctness. It is journaled once per outage
+# and retried with backoff, the watcher's own discipline.
+#
+# Receive-only: the frames it sends are LOGIN, SUBS and LOGOUT, nothing else.
+
+STREAM_RECV_TIMEOUT_S = 45.0     # Schwab heartbeats roughly every 10-20 s
+STREAM_LOCKED_WAIT_S = 5.0       # re-check arming while the service is LOCKED
+STREAM_BACKOFF_S = (1.0, 2.0, 5.0, 15.0, 30.0, 60.0)
+_STREAM_QUIET_TYPES = {"SUBSCRIBED"}
+
+
+class StreamError(RuntimeError):
+    """The streamer refused or dropped us; the loop backs off and retries."""
+
+
+def stream_request(info: Mapping[str, Any], rid: int, service: str, command: str,
+                   parameters: Mapping[str, Any]) -> dict[str, Any]:
+    """One streamer request frame, in the shape the streamer expects."""
+    return {"requests": [{
+        "service": service,
+        "requestid": str(rid),
+        "command": command,
+        "SchwabClientCustomerId": info["schwabClientCustomerId"],
+        "SchwabClientCorrelId": info["schwabClientCorrelId"],
+        "parameters": dict(parameters),
+    }]}
+
+
+def activity_types(frame: Mapping[str, Any]) -> list[str]:
+    """The ACCT_ACTIVITY message types a frame carries, SUBSCRIBED left out.
+
+    A ``notify`` frame is a heartbeat or an admin notice and carries none; a
+    ``notify`` with a content code is the streamer telling us it is closing
+    the session, and raises so the loop reconnects rather than sitting on a
+    socket that will say nothing more."""
+    for n in frame.get("notify") or []:
+        if isinstance(n, Mapping) and "heartbeat" not in n:
+            code = (n.get("content") or {}).get("code")
+            if code not in (None, 0):
+                raise StreamError(f"streamer notice code {code}: "
+                                  f"{(n.get('content') or {}).get('msg', '')}")
+    out: list[str] = []
+    for d in frame.get("data") or []:
+        if not isinstance(d, Mapping) or d.get("service") != "ACCT_ACTIVITY":
+            continue
+        for c in d.get("content") or []:
+            t = str((c or {}).get("2") or "")
+            if t and t not in _STREAM_QUIET_TYPES:
+                out.append(t)
+    return out
+
+
+def response_code(frame: Mapping[str, Any], command: str) -> int | None:
+    for r in frame.get("response") or []:
+        if isinstance(r, Mapping) and r.get("command") == command:
+            return int((r.get("content") or {}).get("code", -1))
+    return None
+
+
+class AccountStream:
+    """Hold the ACCT_ACTIVITY subscription while the service is ARMED and
+    ring ``on_event`` on every account event.
+
+    :param broker: the :class:`SchwabBroker` whose TRADING credential and
+        access token the stream logs in with — the same in-memory credential,
+        no second copy.
+    :param on_event: called with the list of event types, from the stream's
+        thread. The watcher's ``ring`` — it only sets an Event.
+    :param record: ``journal.record``-shaped, for the once-per-outage lines.
+    :param connect: ``websockets.sync.client.connect``-shaped, for tests.
+    """
+
+    def __init__(self, broker: "SchwabBroker", on_event: Callable[[list[str]], None], *,
+                 record: Callable[..., Any] | None = None,
+                 connect: Callable[..., Any] | None = None,
+                 sleep: Callable[[float], None] | None = None,
+                 recv_timeout_s: float = STREAM_RECV_TIMEOUT_S) -> None:
+        self.broker = broker
+        self.on_event = on_event
+        self._record = record or (lambda *a, **k: None)
+        self._connect = connect
+        self._stop = threading.Event()
+        self._sleep = sleep or self._stop.wait
+        self.recv_timeout_s = recv_timeout_s
+        self.state = "idle"             # idle | locked | connecting | up | down
+        self.events = 0
+        self.last_event_at: str | None = None
+        self.last_error: str | None = None
+        self._down_journaled = False
+
+    # ── status, for the status page ──────────────────────────────────────
+    def status(self) -> dict[str, Any]:
+        return {"state": self.state, "events": self.events,
+                "last_event_at": self.last_event_at, "last_error": self.last_error}
+
+    # ── one session ──────────────────────────────────────────────────────
+    def _connector(self) -> Callable[..., Any]:
+        if self._connect is None:
+            from websockets.sync.client import connect  # the one socket in the package
+            self._connect = connect
+        return self._connect
+
+    def _await(self, ws: Any, command: str) -> int:
+        deadline = time.monotonic() + 15.0
+        while (left := deadline - time.monotonic()) > 0:
+            frame = json.loads(ws.recv(timeout=left))
+            code = response_code(frame, command)
+            if code is not None:
+                return code
+            self._dispatch(frame)
+        raise StreamError(f"no {command} answer in 15 s")
+
+    def _dispatch(self, frame: Mapping[str, Any]) -> None:
+        types = activity_types(frame)
+        if types:
+            self.events += len(types)
+            self.last_event_at = datetime.now(timezone.utc).isoformat()
+            self.on_event(types)
+
+    def session(self) -> None:
+        """Log in, subscribe, and pump frames until the socket or the arming
+        ends it. Raises :class:`StreamError` (or a transport error) on a drop."""
+        cred = self.broker._credential(App.TRADING)          # BrokerError while LOCKED
+        token = self.broker._bearer(App.TRADING, cred)
+        prefs = self.broker._request("GET", "/trader/v1/userPreference").json()
+        try:
+            info = prefs["streamerInfo"][0]
+            url = info["streamerSocketUrl"]
+        except (KeyError, IndexError, TypeError):
+            raise StreamError("userPreference carried no streamerInfo") from None
+        self.state = "connecting"
+        with self._connector()(url, open_timeout=15) as ws:
+            ws.send(json.dumps(stream_request(info, 0, "ADMIN", "LOGIN", {
+                "Authorization": token,
+                "SchwabClientChannel": info["schwabClientChannel"],
+                "SchwabClientFunctionId": info["schwabClientFunctionId"],
+            })))
+            if (code := self._await(ws, "LOGIN")) != 0:
+                raise StreamError(f"LOGIN refused, code {code}")
+            ws.send(json.dumps(stream_request(info, 1, "ACCT_ACTIVITY", "SUBS", {
+                "keys": info["schwabClientCorrelId"], "fields": "0,1,2,3"})))
+            if (code := self._await(ws, "SUBS")) != 0:
+                raise StreamError(f"ACCT_ACTIVITY SUBS refused, code {code}")
+            self._up()
+            try:
+                while not self._stop.is_set():
+                    # Still armed? A lock takes the credential away; the
+                    # session it logged in with must not outlive it.
+                    self.broker._credential(App.TRADING)
+                    try:
+                        raw = ws.recv(timeout=self.recv_timeout_s)
+                    except TimeoutError:
+                        raise StreamError(f"no frame, not even a heartbeat, in "
+                                          f"{self.recv_timeout_s:.0f} s") from None
+                    self._dispatch(json.loads(raw))
+            finally:
+                try:
+                    ws.send(json.dumps(stream_request(info, 2, "ADMIN", "LOGOUT", {})))
+                except Exception:  # noqa: BLE001 — the socket may already be gone
+                    pass
+
+    def _up(self) -> None:
+        self.state = "up"
+        self.last_error = None
+        self._record("stream", detail="account-activity stream up")
+        self._down_journaled = False
+
+    def _down(self, detail: str) -> None:
+        self.state = "down"
+        self.last_error = detail
+        if not self._down_journaled:
+            # Once per outage, like the watcher's broker line. Fills still
+            # arrive by the watcher's poll; only the doorbell is missing.
+            self._record("error", kind="stream",
+                         detail=f"account-activity stream down — fills fall back to "
+                                f"the poll: {detail}")
+            self._down_journaled = True
+
+    # ── the loop ─────────────────────────────────────────────────────────
+    def run(self) -> None:
+        attempt = 0
+        while not self._stop.is_set():
+            try:
+                self.session()
+                attempt = 0
+            except BrokerError as exc:
+                # LOCKED is not an outage; it is the state the service rests in.
+                if "locked" in str(exc):
+                    if self.state != "locked":
+                        self.state = "locked"
+                    self._sleep(STREAM_LOCKED_WAIT_S)
+                    continue
+                self._down(str(exc))
+            except Exception as exc:  # noqa: BLE001 — the loop must outlive any session
+                self._down(f"{type(exc).__name__}: {exc}")
+            if self._stop.is_set():
+                break
+            self._sleep(STREAM_BACKOFF_S[min(attempt, len(STREAM_BACKOFF_S) - 1)])
+            attempt += 1
+
+    def start(self) -> threading.Thread:
+        t = threading.Thread(target=self.run, name="execd-stream", daemon=True)
+        t.start()
+        return t
+
+    def stop(self) -> None:
+        self._stop.set()

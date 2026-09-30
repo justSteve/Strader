@@ -51,24 +51,42 @@ INTERVAL_S = 3.0
 RECONCILE_MIN_GAP_S = 2.5
 #: How often the watcher looks for exposure when there is none.
 IDLE_INTERVAL_S = 30.0
+#: A pass the account stream rang for reconciles unless one ran this recently.
+#: Schwab sends an order's events in a burst (eleven in ~20 s for one cancelled
+#: TOS order, 2026-09-30); the Event coalesces a burst, this spaces the GETs.
+RING_RECONCILE_GAP_S = 1.0
 
 
 class Watcher:
     def __init__(self, service: ExecService, *, interval_s: float = INTERVAL_S,
                  idle_interval_s: float = IDLE_INTERVAL_S,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] | None = None) -> None:
         self.service = service
         self.interval_s = interval_s
         self.idle_interval_s = idle_interval_s
-        self._sleep = sleep
         self._stop = threading.Event()
+        #: set by the account-activity stream (st-8bls): an event at the
+        #: broker ends the wait early. Tests inject ``sleep`` and ring by hand.
+        self._wake = threading.Event()
+        self._sleep = sleep or self._wait
         self._broker_down = False
         self.passes = 0
+
+    # ── the doorbell ─────────────────────────────────────────────────────
+    def ring(self, types: Any = None) -> None:
+        """Something happened at the broker — look now, not at the next beat.
+        Called from the stream's thread; only sets an Event. [st-8bls]"""
+        self._wake.set()
+
+    def _wait(self, timeout: float) -> None:
+        self._wake.wait(timeout)
 
     # ── one pass ─────────────────────────────────────────────────────────
     def once(self) -> dict[str, Any]:
         """One pass. Returns what it did, for the tests and the log."""
         self.passes += 1
+        rung = self._wake.is_set()
+        self._wake.clear()
         svc = self.service
         if svc.arming.state is ArmState.LOCKED:
             return {"skipped": "locked"}
@@ -76,7 +94,10 @@ class Watcher:
         if not svc.has_exposure():
             return {**out, "skipped": "flat"}
         try:
-            rec = svc.reconcile_if_stale(RECONCILE_MIN_GAP_S) or {}
+            rec = svc.reconcile_if_stale(RING_RECONCILE_GAP_S if rung
+                                         else RECONCILE_MIN_GAP_S) or {}
+            if rung:
+                out["rung"] = True
             out["reconcile"] = rec
             if isinstance(rec, dict) and rec.get("error"):
                 # reconcile reports a broker failure rather than raising it;
@@ -120,3 +141,4 @@ class Watcher:
 
     def stop(self) -> None:
         self._stop.set()
+        self._wake.set()

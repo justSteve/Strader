@@ -68,7 +68,7 @@ from .api import BIND_HOST, BIND_PORT, create_app
 from .bounds import load_bounds
 from .broker import MockBroker
 from .page import DEFAULT_CALLBACK_URL, PAGE_HOST, PAGE_PORT, CredentialFile, create_page
-from .schwab import Credential, SchwabBroker, trading_payload
+from .schwab import AccountStream, Credential, SchwabBroker, trading_payload
 from .alpaca import AlpacaBroker, alpaca_payloads
 from .service import ExecService, ServiceConfig
 from .paper import ModeSwitch, PaperBroker, current_mode
@@ -240,6 +240,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="seconds between SPX-mark reads while a position or working entry "
                         "exists — the exit loop and the fill sweep (default: %(default)s; "
                         "0 turns the watcher off, for trials only)")
+    p.add_argument("--no-stream", action="store_true",
+                   help="do not hold the ACCT_ACTIVITY stream; fills are seen on the "
+                        "watcher's beat only (st-8bls)")
     return p
 
 
@@ -309,6 +312,7 @@ def main(argv: list[str] | None = None) -> int:
         PaperBroker(broker, book_path=Path(args.state_dir) / "paper-book.json"), broker, mode)
     service = ExecService(service_broker, config)
     if isinstance(broker, SchwabBroker):
+        service.stream_transport = broker
         broker.bind(service.arming)
         if args.market_credential:
             try:
@@ -383,8 +387,19 @@ def _serve(args: argparse.Namespace, service: ExecService, market: CredentialFil
         # The loop that watches a live position: fills picked up, the SPX-mark
         # exit fired. Without it a fill rests its broker stop and then sits
         # unwatched until the next place or flatten (st-k6gl).
-        Watcher(service, interval_s=args.watch_interval).start()
+        watcher = Watcher(service, interval_s=args.watch_interval)
+        watcher.start()
         print(f"execd watch: every {args.watch_interval:g}s while exposed", file=sys.stderr)
+        transport = getattr(service, "stream_transport", None)
+        if isinstance(transport, SchwabBroker) and not args.no_stream:
+            # The doorbell (st-8bls): an account event at Schwab rings the
+            # watcher so a fill is seen in about a second, not on the next
+            # beat. Idle while LOCKED; a stream that is down costs latency
+            # only — the watcher's poll is still the fill sweep.
+            stream = AccountStream(transport, watcher.ring, record=service.journal.record)
+            service.stream = stream
+            stream.start()
+            print("execd stream: ACCT_ACTIVITY doorbell on (idle while LOCKED)", file=sys.stderr)
     else:
         print("execd watch: OFF — no SPX-mark exit loop, no fill sweep", file=sys.stderr)
     if not args.no_page:

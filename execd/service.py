@@ -431,6 +431,10 @@ class ExecService:
                                mode=config.mode, broker=config.broker)
         self.arming = Arming(state / "STOP", clock=clock)
         self._lock = threading.RLock()
+        #: the ACCT_ACTIVITY doorbell and the transport it logs in through,
+        #: set by ``__main__`` for the Schwab broker only (st-8bls).
+        self.stream: Any = None
+        self.stream_transport: Any = None
         self._open: dict[str, OpenPosition] = {}
         self._working: dict[str, WorkingEntry] = {}
         #: bracket legs whose position is gone but whose cancel was never
@@ -622,6 +626,7 @@ class ExecService:
             "mode": self.config.mode,
             "broker": self.config.broker,
             "arming": self.arming.status(),
+            "stream": self.stream.status() if self.stream is not None else None,
             "day": {
                 "open_positions": day.open_positions,
                 "realized_loss_usd": day.realized_loss_usd,

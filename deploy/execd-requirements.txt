@@ -21,3 +21,4 @@ idna==3.13
 certifi==2026.4.22
 cffi==2.0.0
 pycparser==3.0
+websockets==16.0

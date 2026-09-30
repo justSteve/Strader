@@ -51,13 +51,17 @@ FORBIDDEN_ROOTS = {"schwab", "broker_schwab", "schwab_py"}
 #: ``http.client``, and ``urllib.request`` was not named at all.
 FORBIDDEN_TRANSPORTS = {"httpx", "requests", "urllib3", "socket", "aiohttp",
                         "urllib", "http", "http.client", "ftplib", "telnetlib",
-                        "xmlrpc"}
+                        "xmlrpc", "websockets", "websocket", "ssl"}
 
 #: The modules allowed one transport. Stage 2 (st-w2nw): the Trader API
 #: client; co-8mb1z (2026-09-23): the Alpaca client, the design change Steve
 #: asked for. Widening this again is a design change, not a fix.
 TRANSPORT_MODULES = ("schwab.py", "alpaca.py")
 TRANSPORT_ALLOWED = {"httpx"}
+#: Per-module widening. Steve, 2026-09-30, "yes": schwab.py may hold one
+#: receive-only websocket for the ACCT_ACTIVITY doorbell [st-8bls]. Nowhere
+#: else — ``websockets`` is in FORBIDDEN_TRANSPORTS for every other module.
+TRANSPORT_EXTRA = {"schwab.py": {"websockets", "websockets.sync.client"}}
 
 
 def modules() -> list[Path]:
@@ -104,7 +108,7 @@ def test_no_module_imports_the_hobbled_broker_library(path: Path):
 def test_only_the_transport_module_has_a_transport(path: Path):
     found = imported_roots(path) & FORBIDDEN_TRANSPORTS
     if path.name in TRANSPORT_MODULES:
-        found -= TRANSPORT_ALLOWED
+        found -= TRANSPORT_ALLOWED | TRANSPORT_EXTRA.get(path.name, set())
     assert not found, (
         f"{path.name} imports {sorted(found)}. The only transport in this "
         f"package is {sorted(TRANSPORT_ALLOWED)} in {', '.join(TRANSPORT_MODULES)}; "
