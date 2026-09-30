@@ -137,27 +137,24 @@ _SCRIPT = """
     clearTimeout(window.__t); window.__t = setTimeout(reprice, 600); });
   document.addEventListener('keydown', function(e){ if (!e.target || e.target.id !== 'pxbox' || e.key !== 'Enter') return;
     e.preventDefault(); clearTimeout(window.__t); reprice(); e.target.blur(); });
-  // the stop steppers (Steve, 2026-09-30): a price steps on the exchange's
-  // grid — 0.05 under $3.00, 0.10 from it, every step a multiple of 5 cents —
-  // and an SPX level steps 5 points onto a multiple of 5. An off-grid value
-  // snaps to the grid in the direction pressed. Each tap is what typing the
-  // number would be: the hidden `stop` carries it and the ticket reprices.
-  function stepStop(v, dir){
-    if (v.indexOf('.') >= 0) {
-      var c = Math.round(parseFloat(v) * 100); if (isNaN(c)) return null;
-      var t = dir > 0 ? (c >= 300 ? 10 : 5) : (c > 300 ? 10 : 5);
-      var n = dir > 0 ? Math.floor(c / t) * t + t : Math.ceil(c / t) * t - t;
-      if (dir < 0 && c > 300 && n < 300) n = 300;
-      if (n < 5) n = 5;
-      return (n / 100).toFixed(2); }
-    var x = parseFloat(v); if (isNaN(x)) return null;
-    var m = dir > 0 ? Math.floor(x / 5) * 5 + 5 : Math.ceil(x / 5) * 5 - 5;
-    return String(m); }
+  // the stop steppers (Steve, 2026-09-30: the default stop sits .2 under
+  // the limit; steps of .1, and the repricing stays live after a step).
+  // + widens the stop under the limit by 0.10, − narrows it; the distance rides on the hidden
+  // `stopoff` and a typed stop is dropped, so every reprice — his and the
+  // poll's — strikes the stop from the live limit and the box follows it.
+  function stepOff(dir){
+    var px = document.getElementById('pxbox'), lim = px ? parseFloat(px.value) : NaN;
+    var cur = (stopBox.value || '').trim(), of = form.elements['stopoff'], off = NaN;
+    if (!isNaN(lim) && cur.indexOf('.') >= 0) off = lim - parseFloat(cur);
+    if (isNaN(off) || off <= 0) off = of && of.value ? parseFloat(of.value) : 0.20;
+    var n = Math.round(off * 100) + dir * 10; if (n < 5) n = 5;
+    return { off: (n / 100).toFixed(2), lim: lim }; }
   document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('button.step') : null;
-    if (!b || !stopBox) return; e.preventDefault();
-    var v = (stopBox.value || stopBox.getAttribute('data-derived') || '').trim(); if (!v) return;
-    var n = stepStop(v, Number(b.getAttribute('data-step'))); if (n === null) return;
-    stopBox.value = n; var sf = stopField(); if (sf) sf.value = n;
+    if (!b || !stopBox || !form) return; e.preventDefault();
+    var r = stepOff(Number(b.getAttribute('data-step')));
+    var of = form.elements['stopoff']; if (of) of.value = r.off;
+    var sf = stopField(); if (sf) sf.value = '';
+    if (!isNaN(r.lim)) stopBox.value = Math.max(0.05, r.lim - parseFloat(r.off)).toFixed(2);
     clearTimeout(window.__t); window.__t = setTimeout(reprice, 300); });
   window.__followStop = function(j){ if (!stopBox || stopTouched() || !j || j.stop_price == null) return;
     if (document.activeElement === stopBox) return;
@@ -639,6 +636,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             f"{strike_field}{lots_field}"
             f"<input type=hidden name=limit value='{limit_val}'>"
             f"<input type=hidden name=stop value='{esc(sel.stop or '')}'>"
+            f"<input type=hidden name=stopoff value='{f'{sel.stopoff:.2f}' if sel.stopoff else ''}'>"
             # The expiry is the day, said once, not a button. There is no
             # 'next' chip: Steve, 2026-09-18, "remove the 'next' button"
             # (st-644f) — he trades the session he is in. A URL that carries
@@ -651,12 +649,12 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             f"<label class='dl stopl' title=\"a '.' makes it a price (8.30); none makes it an SPX level (7610)\">"
             f"<span class=k>stop: strike or price</span>"
             # the steppers (Steve, 2026-09-30): + to the left of the box, −
-            # to the right; a price moves a grid tick (0.05 under $3, 0.10
-            # from $3), an SPX level 5 points, landing on multiples of 5
-            "<button type=button class=step data-step=1 aria-label='raise the stop'>+</button>"
+            # to the right; each widens or narrows the stop loss by 0.10
+            # under the limit, and the stop keeps following the live price
+            "<button type=button class=step data-step=1 aria-label='widen the stop 0.10'>+</button>"
             f"<input id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off "
             f"value='{esc(stop_val)}' data-derived='{derived}'>"
-            "<button type=button class=step data-step=-1 aria-label='lower the stop'>&minus;</button></label>"
+            "<button type=button class=step data-step=-1 aria-label='narrow the stop 0.10'>&minus;</button></label>"
             "<button class='chip quiet' name=reprice value=1>RE-PRICE</button></div>"
             "</form>")
         # strikes around spot — only the ones the account can pay for (st-644f)

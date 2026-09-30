@@ -695,16 +695,24 @@ class TestAStageChangeAlwaysPaints:
         assert "if (e.key === 'Enter' && ours(e.target)) typedAt = 0;" in body
 
     def test_the_stop_has_steppers_plus_left_minus_right(self, order_page):
-        """Steve, 2026-09-30: + to the left of the stop box, − to the right,
-        steps in multiples of 5 (a price on the 0.05/0.10 grid, an SPX level
-        in 5s). Driven in headless Chromium: 10.70 +→10.80, −→10.60;
-        2.95 +→3.00; 3.00 −→2.95; 7612 +→7615, −→7610 [st-5n3s]."""
+        """Steve, 2026-09-30: + to the left of the stop box, − to the right;
+        each moves the stop loss 0.10 under the limit and the stop keeps
+        following the live price (the distance rides as ``stopoff``). Driven
+        in headless Chromium [st-5n3s]."""
         body = text(order_page.get("/exec/order?side=call"))
         label = body.split("class='dl stopl'")[1].split("</label>")[0]
         plus, box, minus = (label.index("data-step=1 "), label.index("id=stopbox"),
                             label.index("data-step=-1"))
         assert plus < box < minus
-        assert "function stepStop(v, dir)" in body
+        assert "name=stopoff" in body and "function stepOff(dir)" in body
+
+    def test_a_stepped_stop_loss_is_struck_from_the_live_limit(self, order_page):
+        """0.30 under the 32.40 limit is a 32.10 stop and a $30 loss; the
+        default stays the flat $20 (0.20) when no distance is carried."""
+        body = text(order_page.get("/exec/order?side=call&stopoff=0.30"))
+        assert "stop loss <b class=neg>$30.00</b>" in body and "value='32.10'" in body
+        plain = text(order_page.get("/exec/order?side=call"))
+        assert "stop loss <b class=neg>$20.00</b>" in plain
 
 class TestARefusedSendIsShown:
     """2026-09-15 09:54 CT: Steve tapped SEND and saw nothing —

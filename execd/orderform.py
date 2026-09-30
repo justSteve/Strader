@@ -132,6 +132,13 @@ class Selection:
     #: a '.' makes it a dollar option price, none makes it an SPX level.
     #: ``None`` is the box untouched — the flat-loss stop stands.
     stop: str | None = None
+    #: The stop as a distance under the limit, per contract, in option
+    #: points (Steve, 2026-09-30: "our default stop loss is currently .2 -
+    #: i'd like the steppers to increase/decrease by .1 and the repricing
+    #: should remain live"). Set by the steppers; the stop is struck from it
+    #: every time the ticket is priced, so it follows the live limit.
+    #: ``None`` is the flat-loss default.
+    stopoff: float | None = None
 
     @property
     def right(self) -> str:
@@ -155,11 +162,13 @@ class Selection:
         # market", so a lock riding on the same form is dropped.
         limit = None if args.get("reprice") else _as_float(args.get("limit"))
         stop = str(args.get("stop") or "").strip() or None
+        stopoff = _as_float(args.get("stopoff"))
         return cls(side=side, expiry=expiry,
                    strike=strike if strike and strike > 0 else None,
                    delta=abs(delta) if delta is not None else None, lots=lots,
                    limit=round(limit, 2) if limit and limit > 0 else None,
-                   stop=stop)
+                   stop=stop,
+                   stopoff=round(stopoff, 2) if stopoff and stopoff > 0 else None)
 
     def as_query(self, **override: Any) -> dict[str, str]:
         """The selection as query/hidden fields; ``override`` replaces or,
@@ -171,6 +180,7 @@ class Selection:
             "lots": str(self.lots) if self.lots != 1 else None,
             "limit": f"{self.limit:.2f}" if self.limit is not None else None,
             "stop": self.stop,
+            "stopoff": f"{self.stopoff:.2f}" if self.stopoff is not None else None,
         }
         d.update(override)
         return {k: str(v) for k, v in d.items() if v is not None}
@@ -406,7 +416,7 @@ def price(service: ExecService, sel: Selection) -> Priced:
     if sel.stop:
         _apply_stop_of_his_own(out, c, spx)
     else:
-        _apply_flat_loss_stop(out, c, spx)
+        _apply_flat_loss_stop(out, c, spx, per_contract=sel.stopoff)
     return out
 
 
@@ -429,7 +439,8 @@ def _level_for(right: str, spx: float, limit: float, stop_price: float, delta: f
     return math.ceil(round((spx + distance) * 100, 6)) / 100
 
 
-def _apply_flat_loss_stop(out: Priced, c: Contract, spx: float) -> None:
+def _apply_flat_loss_stop(out: Priced, c: Contract, spx: float, *,
+                          per_contract: float | None = None) -> None:
     """The stop the ticket starts with: ``DEFAULT_STOP_LOSS_USD`` under the
     limit for the whole ticket, on the tick grid. [st-bafu]
 
@@ -440,7 +451,9 @@ def _apply_flat_loss_stop(out: Priced, c: Contract, spx: float) -> None:
     room under it cannot carry a stop, and the ticket says so and offers no
     SEND — an entry with no stop is the state the service must not reach."""
     limit = out.limit
-    per_contract = DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * out.lots)
+    # the steppers' distance, when he has set one (st-5n3s), else the flat $20
+    if per_contract is None:
+        per_contract = DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * out.lots)
     floor_tick = tick_for(0.0)
     stop = _round_up_to_tick(max(limit - per_contract, floor_tick), floor_tick)
     cap = round(limit - tick_for(limit), 2)
