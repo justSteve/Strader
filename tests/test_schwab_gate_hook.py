@@ -95,6 +95,27 @@ BLOCKED = [
     ("stop the unit", "systemctl stop strader-execd.service"),
     ("restart the unit", "sudo systemctl restart strader-execd"),
     ("pkill the service", "pkill -f 'python -m execd'"),
+    # Gate 8 (st-7lw9): reading a credential into the transcript. The first
+    # row is the 2026-08-25 incident's own shape.
+    ("the incident: command grep -rn from root", "command grep -rn 'desk-' ."),
+    ("command grep -r, repo path", "command grep -rl KEY /root/projects/Strader"),
+    ("pathed grep -R", "/usr/bin/grep -R secret ."),
+    ("escaped grep", "\\grep -rn x ./"),
+    ("egrep recursive", "egrep -r 'a|b' ."),
+    ("rg no-ignore", "rg --no-ignore foo ."),
+    ("rg -uu", "rg -uu foo /root"),
+    ("recursive into .beads", "command grep -r x .beads"),
+    ("recursive mid-chain", "cd /root/projects/Strader && command grep -rn x ."),
+    ("cat .env", "cat .env"),
+    ("head .env, path", "head -3 /root/projects/Strader/.env"),
+    ("grep in .env", "grep SCHWAB .env"),
+    ("sed on beads env", "sed -n 1p .beads/.env"),
+    ("beads credential key", "xxd .beads/.beads-credential-key"),
+    ("tokens file", "cat tokens/schwab_token.json"),
+    ("execd market json", "jq . /var/lib/execd/market.json"),
+    ("execd trading json", "cat /var/lib/execd/trading.json"),
+    ("gate key", "cat ~/.schwab_gate_key"),
+    ("pipe into reader", "ls && cat .env"),
 ]
 
 ALLOWED = [
@@ -136,6 +157,19 @@ ALLOWED = [
     ("a script that calls powershell inside", "bash factory/scripts/record-boot-event.sh --list"),
     ("commit message naming strace", 'git commit -m "gate 7 denies gdb and strace"'),
     ("proc status, not mem", "cat /proc/4242/status"),
+    # Gate 8 controls: mentions, listings, templates, the shim, narrowed sweeps.
+    ("shim grep -r from root (skips ignored)", "grep -rn 'desk-' ."),
+    ("command grep -r with --include", "command grep -rn x --include='*.py' ."),
+    ("command grep -r in a subdir", "command grep -rn x docs/"),
+    ("command grep, not recursive", "command grep -n x docs/a2a/inbox.md"),
+    ("rg default (skips ignored)", "rg foo ."),
+    ("ls .env", "ls -la .env"),
+    ("check-ignore .env", "git check-ignore -v .env"),
+    ("the template", "cat .env.template"),
+    ("commit message naming .env", 'git commit -m "gate 8: cat .env is refused"'),
+    ("ls the execd state dir", "ls -la /var/lib/execd/"),
+    ("cat the execd mode file", "cat /var/lib/execd/mode"),
+    ("grep mentioning tokens dir in docs", "grep -rn 'tokens/' docs/"),
 ]
 
 

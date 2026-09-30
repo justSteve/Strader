@@ -227,4 +227,46 @@ if echo "$COMMAND" | grep -qE "$STOP_SERVICE" || echo "$COMMAND" | grep -qE "$KI
   exit 2
 fi
 
+# Gate 8: READING a credential into the transcript. [st-7lw9, Steve chose (a) 2026-09-30]
+#
+# Found by tripping it, 2026-08-25: `command grep -rn <desk-url> .` from the
+# repo root matched the untracked .env and printed the Schwab key and secret
+# into an agent transcript. The Read tool's deny list covers .env; the Bash
+# side had nothing, and gate 4 gates WRITES only.
+#
+# Two clauses, because a filename deny alone would not have caught the
+# incident — that grep never named the file.
+#
+# 8a. A content-reading verb at command position whose segment names a
+#     credential file. ls, stat, git check-ignore and a commit message naming
+#     one stay free: the verb must be in command position, and ls is not a
+#     content verb. .env.template / .env.example are not credentials.
+# 8b. A recursive search that does NOT skip gitignored files — `command grep
+#     -r`, a pathed or escaped grep, egrep/fgrep, rg with -u/--no-ignore —
+#     rooted at a tree holding a credential (., .., the repo, /root, ~, /,
+#     .beads, tokens, the execd state dirs), with no --include to narrow it.
+#     The shim `grep -r` skips ignored files (measured 2026-09-30: it does not
+#     list .env; `command grep -rl` does), so the bare form stays free.
+CMD_POS='(^|[;|&(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?'
+READ_VERBS='(cat|tac|less|more|head|tail|grep|egrep|fgrep|rg|ugrep|sed|awk|strings|xxd|od|hexdump|base64|cut|sort|uniq|diff|jq|nl|bat|command[[:space:]]+grep|\\grep|[^[:space:]"'\'']*/grep)'
+CRED_FILE='((^|[[:space:]/=<"'\''])\.env([[:space:]"'\'';|&)]|$)|\.beads-credential-key|\.schwab_(gate|fire)_key|(^|[[:space:]=<])(\./)?tokens/|/var/lib/execd/[^[:space:]]*\.json|/etc/execd/)'
+while IFS= read -r SEG; do
+  if echo "$SEG" | grep -qE "^[[:space:]]*(sudo[[:space:]]+)?$READ_VERBS([[:space:]]|$)" \
+     && echo "$SEG" | grep -qE "$CRED_FILE"; then
+    echo "SCHWAB GATE: that reads a credential file (.env, tokens/, the execd vault/credentials, a gate key) into the transcript. [st-7lw9]" >&2
+    exit 2
+  fi
+done < <(echo "$COMMAND" | sed -E 's/(\&\&|\|\||[;|&(])/\n/g')
+# 8b is judged on the whole command, not the split segments, so a quoted '|'
+# inside a search pattern cannot split the recursive flag away from its root.
+UNSKIPPING_RECURSIVE="$CMD_POS"'((command[[:space:]]+grep|\\grep|[^[:space:]"'\'']*/grep|egrep|fgrep)[[:space:]].*(-[a-zA-Z]*[rR]|--recursive|--dereference-recursive)|rg[[:space:]].*(-u|--no-ignore))'
+CRED_ROOT='[[:space:]](\.|\./|\.\.|\.\./|/|~|~/|/root/?|/root/projects/?|/root/projects/Strader/?|\.beads/?|tokens/?|/var/lib/execd/?|/etc/execd/?)([[:space:]]|$)'
+if echo "$COMMAND" | grep -qE "$UNSKIPPING_RECURSIVE" \
+   && echo "$COMMAND " | grep -qE "$CRED_ROOT" \
+   && ! echo "$COMMAND" | grep -qE -- '--include'; then
+  echo "SCHWAB GATE: a recursive search that does not skip gitignored files, rooted where .env / tokens / the vault live, prints credentials." >&2
+  echo "             Narrow it: --include='*.py', a subdirectory, or the plain grep shim (it skips ignored files). [st-7lw9]" >&2
+  exit 2
+fi
+
 exit 0
