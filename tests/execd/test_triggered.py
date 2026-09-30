@@ -305,3 +305,63 @@ class TestTwentyMeansTwenty:
         out = svc.place(entry(intent_id="n-1", stop_price=1.90))
         assert out["stop_order"]["price"] == 1.90
         assert svc.journal.events("stop_restruck") == []
+
+
+class TestTheBracketFiredFirst:
+    """2026-09-30 13:24 / 13:38 CT, paper [st-0f5q]: the triggered stop filled
+    within a second of the entry, before the service first read the bracket.
+    It read "stop FILLED, target CANCELED" as a bracket that failed to rest,
+    placed a second one, booked the close as 'closed-outside-this-service',
+    and at 13:24 the second stop filled too — the account went short."""
+
+    def _fire_on_fill(self, mb, leg=0):
+        orig = mb.place_triggered
+
+        def fire(entry, stop, target):
+            order = orig(entry, stop, target)
+            mb.fill_resting(mb._children[order.order_id][leg])
+            mb.cancel(mb._children[order.order_id][1 - leg])     # the OCO sibling
+            return order
+        mb.place_triggered = fire
+
+    def test_a_stop_that_fired_first_is_booked_as_the_stop(self, svc, mb):
+        self._fire_on_fill(mb)
+        svc.place(entry(intent_id="f-1", stop_price=1.90))
+        assert svc.journal.events("bracket_fallback") == []
+        assert svc.journal.events("oversold") == []
+        closed, = svc.journal.events("closed")
+        assert (closed["kind"], closed["reason"]) == ("protective-stop", "resting-stop")
+        assert CALL not in svc._open
+        # no second bracket: the only OCO is the one the entry carried
+        assert len(mb.calls_to("place_oco")) == 1
+        assert legs(mb) == []
+        fired, = svc.journal.events("bracket_fired")
+        assert fired["leg"] == "stop"
+
+    def test_a_target_that_fired_first_is_booked_as_the_target(self, svc, mb):
+        self._fire_on_fill(mb, leg=1)
+        svc.place(entry(intent_id="f-2", stop_price=1.90))
+        closed, = svc.journal.events("closed")
+        assert (closed["kind"], closed["reason"]) == ("target", "resting-target")
+        assert svc.journal.events("bracket_fallback") == []
+
+
+class TestTheStopFollowsABetterFill:
+    """The triggered stop is struck under the LIMIT. A fill better than the
+    limit moves it down by the improvement — the ticket's dollars measured
+    from the fill (st-0f5q; 13:24 CT: 9.20 limit, 8.80 fill, 9.00 stop)."""
+
+    def test_a_fill_under_the_limit_moves_the_stop_down_by_the_difference(self, svc, mb):
+        mb.set_quote(CALL, bid=1.90, ask=2.00)           # fills at 2.00 on a 2.10 limit
+        svc.place(entry(intent_id="b-1", stop_price=1.90))
+        pos = svc._open[CALL]
+        assert pos.entry_price == 2.00
+        assert pos.stop_price == 1.80                    # $20 under the fill, not $10
+        line, = svc.journal.events("stop_follows_fill")
+        assert (line["stop_was"], line["stop_to"]) == (1.90, 1.80)
+        assert legs(mb) == [("LIMIT", 1, 10.50), ("STOP", 1, 1.80)]
+
+    def test_a_fill_at_the_limit_leaves_the_stop(self, svc, mb):
+        svc.place(entry(intent_id="b-2", stop_price=1.90))
+        assert svc._open[CALL].stop_price == 1.90
+        assert svc.journal.events("stop_follows_fill") == []

@@ -72,7 +72,7 @@ from .intent import OrderIntent, OrderType, Side, parse_occ
 from .journal import Journal
 from .stops import (
     CONTRACT_MULTIPLIER, exit_triggered, level_for, on_tick, premium_at_level, protective_stop_price,
-    risk_usd, stop_is_consistent, take_profit_price, target_reached,
+    risk_usd, stop_is_consistent, take_profit_price, target_reached, tick_for,
 )
 
 
@@ -1465,7 +1465,8 @@ class ExecService:
                             spx=spx, stop_spx=work.stop_spx, delta=work.delta,
                             order_id=order.order_id, found_by="reconcile")
         self._resolve_working(order.order_id, outcome="filled")
-        if work.triggered and self._attach_triggered(pos, order.order_id, spx) is not None:
+        if work.triggered and self._attach_triggered(pos, order.order_id, spx,
+                                                        limit=work.limit) is not None:
             return
         if spx is None:
             self.journal.record("stop_unprotected", symbol=pos.symbol,
@@ -2151,7 +2152,7 @@ class ExecService:
                             spx=spx, stop_spx=intent.stop_spx, delta=intent.delta,
                             order_id=order.order_id)
         if bracket is not None:
-            attached = self._attach_triggered(pos, order.order_id, spx)
+            attached = self._attach_triggered(pos, order.order_id, spx, limit=intent.limit)
             if attached is not None:
                 out["stop_order"], out["target_order"] = attached
                 return out
@@ -2958,8 +2959,8 @@ class ExecService:
         return stop, target
 
     def _attach_triggered(self, pos: OpenPosition, entry_order_id: str,
-                          spx: float | None) -> tuple[dict[str, Any] | None,
-                                                      dict[str, Any] | None] | None:
+                          spx: float | None, *, limit: float | None = None,
+                          ) -> tuple[dict[str, Any] | None, dict[str, Any] | None] | None:
         """The bracket a triggered entry brought to life, booked as the
         position's legs. ``None`` — after taking off whatever part of it the
         broker does hold — when it is not there whole: the broker refused the
@@ -2974,6 +2975,43 @@ class ExecService:
                 stop, target = kids(entry_order_id)
             except BrokerError as exc:
                 detail = str(exc)
+        # The bracket already did its work (st-0f5q). 2026-09-30 13:24 and
+        # 13:38 CT, paper: the triggered stop filled within a second of the
+        # entry, before anything here looked. "Stop FILLED, target CANCELED"
+        # is an OCO that fired, not a bracket that failed to rest — read as
+        # the latter, a second bracket went on, the close was booked as
+        # 'closed-outside-this-service', and at 13:24 the second stop filled
+        # too and left the account short. So: book the legs as this
+        # position's own and settle the fill as the stop (or target) it is.
+        fired = next((o for o in (stop, target)
+                      if o is not None and o.is_filled and o.qty == pos.qty), None)
+        if fired is not None:
+            leg = "stop" if fired is stop else "target"
+            # The sibling is held as a leg so the close takes it off; the leg
+            # that filled is not — held, the close would "cancel" it, find it
+            # filled, and book the same fill twice (oversold).
+            if stop is not None:
+                pos.stop_price = float(stop.price or 0.0)
+                if leg != "stop":
+                    pos.stop_order_id = stop.order_id
+            if target is not None:
+                pos.target_price = float(target.price or 0.0)
+                if leg != "target":
+                    pos.target_order_id = target.order_id
+            self.journal.record("bracket_fired", symbol=pos.symbol, intent_id=pos.intent_id,
+                                entry_order_id=entry_order_id, leg=leg,
+                                order_id=fired.order_id, price=fired.fill_price,
+                                detail=f"the {leg} sent with the entry filled before the "
+                                       f"bracket was first read — booked as its own")
+            # named as the fill sweep names a leg that filled
+            kind, why = (("protective-stop", "resting-stop") if leg == "stop"
+                         else ("target", "resting-target"))
+            closed = self._book_close(
+                pos, order_id=fired.order_id,
+                exit_px=fired.fill_price if fired.fill_price is not None else 0.0,
+                closed_qty=min(_filled_qty_of(fired), pos.qty), reason=kind, why=why)
+            done = {**fired.to_dict(), "closed": closed}
+            return (done, None) if leg == "stop" else (None, done)
         whole = (stop is not None and target is not None and stop.is_working
                  and target.is_working and stop.qty == pos.qty and target.qty == pos.qty)
         if whole:
@@ -2981,6 +3019,7 @@ class ExecService:
                                    kind="triggered", oco=True),
                    self._book_target(pos, float(target.price or 0.0), target,
                                      kind="triggered", oco=True))
+            self._stop_follows_fill(pos, limit)
             return out
         seen = {leg: (o.status.value if o is not None else None, o.qty if o is not None else None)
                 for leg, o in (("stop", stop), ("target", target))}
@@ -2996,6 +3035,28 @@ class ExecService:
                     self.journal.record("error", kind="bracket_fallback", order_id=o.order_id,
                                         detail=str(exc))
         return None
+
+    def _stop_follows_fill(self, pos: OpenPosition, limit: float | None) -> None:
+        """A triggered stop was struck under the LIMIT, the one price known
+        at the send. A fill better than the limit leaves it nearer the fill
+        than the ticket said — 13:24 CT 2026-09-30, a 9.20 limit filled at
+        8.80 put the 9.00 stop above the fill. Move it down by the
+        improvement, so the stop's dollars are measured from the fill
+        (st-0f5q, st-7p5u "dollars"). Through ``_adjust``: its refusals
+        (a stop not below the bid, off the grid) apply, and a refusal leaves
+        the stop where it was, journaled."""
+        if limit is None or pos.stop_price is None or pos.entry_price >= limit - 1e-9:
+            return
+        improvement = limit - pos.entry_price
+        want = pos.stop_price - improvement
+        tick = tick_for(want)
+        want = round(math.floor(round(want / tick, 6)) * tick, 2)
+        if want <= 0 or want >= pos.stop_price:
+            return
+        self.journal.record("stop_follows_fill", symbol=pos.symbol, intent_id=pos.intent_id,
+                            limit=limit, fill=pos.entry_price, stop_was=pos.stop_price,
+                            stop_to=want)
+        self._adjust(pos.symbol, stop_price=want, target_price=None)
 
     def _journal_raw(self, order_id: str | None, why: str) -> None:
         """The broker's own body for an order, on its own journal line, so
