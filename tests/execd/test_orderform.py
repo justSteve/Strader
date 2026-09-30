@@ -694,6 +694,18 @@ class TestAStageChangeAlwaysPaints:
         assert "(Date.now() - typedAt) < TYPING_MS" in body
         assert "if (e.key === 'Enter' && ours(e.target)) typedAt = 0;" in body
 
+    def test_the_stop_has_steppers_plus_left_minus_right(self, order_page):
+        """Steve, 2026-09-30: + to the left of the stop box, − to the right,
+        steps in multiples of 5 (a price on the 0.05/0.10 grid, an SPX level
+        in 5s). Driven in headless Chromium: 10.70 +→10.80, −→10.60;
+        2.95 +→3.00; 3.00 −→2.95; 7612 +→7615, −→7610 [st-5n3s]."""
+        body = text(order_page.get("/exec/order?side=call"))
+        label = body.split("class='dl stopl'")[1].split("</label>")[0]
+        plus, box, minus = (label.index("data-step=1 "), label.index("id=stopbox"),
+                            label.index("data-step=-1"))
+        assert plus < box < minus
+        assert "function stepStop(v, dir)" in body
+
 class TestARefusedSendIsShown:
     """2026-09-15 09:54 CT: Steve tapped SEND and saw nothing —
     Schwab's own preview had refused the order (buying power) and the page

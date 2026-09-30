@@ -50,6 +50,8 @@ _ORDER_STYLE = """
  .row{display:flex;align-items:center;gap:.6em;flex-wrap:wrap}
  .row .grow{flex-grow:1}
  .exp2 a.chip{color:#9ca3af;background:transparent;border:1px solid #374151}.exp2 a.chip.on{background:#1f2937;color:#fff;border-color:#1f2937}
+ button.step{width:44px;height:44px;border-radius:8px;border:1px solid #374151;background:#1f2937;color:#f9fafb;
+   font-size:1.3em;font-weight:700;padding:0;touch-action:manipulation;cursor:pointer}
  .dl{display:flex;align-items:center;gap:.4em}.dl.stopl input{width:6.2em}.dl input{width:5em;height:44px;box-sizing:border-box;font-size:1.15em;text-align:center;
        padding:0 .5em;border-radius:8px;border:2px solid #9ca3af;background:#111827;color:#e5e7eb}
  .side a{outline:0}.side a.on{outline:3px solid #e5e7eb}.side a.bear.off{background:#7f1d1d;color:#fca5a5}.side a.bull.off{background:#064e3b;color:#6ee7b7}
@@ -135,6 +137,28 @@ _SCRIPT = """
     clearTimeout(window.__t); window.__t = setTimeout(reprice, 600); });
   document.addEventListener('keydown', function(e){ if (!e.target || e.target.id !== 'pxbox' || e.key !== 'Enter') return;
     e.preventDefault(); clearTimeout(window.__t); reprice(); e.target.blur(); });
+  // the stop steppers (Steve, 2026-09-30): a price steps on the exchange's
+  // grid — 0.05 under $3.00, 0.10 from it, every step a multiple of 5 cents —
+  // and an SPX level steps 5 points onto a multiple of 5. An off-grid value
+  // snaps to the grid in the direction pressed. Each tap is what typing the
+  // number would be: the hidden `stop` carries it and the ticket reprices.
+  function stepStop(v, dir){
+    if (v.indexOf('.') >= 0) {
+      var c = Math.round(parseFloat(v) * 100); if (isNaN(c)) return null;
+      var t = dir > 0 ? (c >= 300 ? 10 : 5) : (c > 300 ? 10 : 5);
+      var n = dir > 0 ? Math.floor(c / t) * t + t : Math.ceil(c / t) * t - t;
+      if (dir < 0 && c > 300 && n < 300) n = 300;
+      if (n < 5) n = 5;
+      return (n / 100).toFixed(2); }
+    var x = parseFloat(v); if (isNaN(x)) return null;
+    var m = dir > 0 ? Math.floor(x / 5) * 5 + 5 : Math.ceil(x / 5) * 5 - 5;
+    return String(m); }
+  document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('button.step') : null;
+    if (!b || !stopBox) return; e.preventDefault();
+    var v = (stopBox.value || stopBox.getAttribute('data-derived') || '').trim(); if (!v) return;
+    var n = stepStop(v, Number(b.getAttribute('data-step'))); if (n === null) return;
+    stopBox.value = n; var sf = stopField(); if (sf) sf.value = n;
+    clearTimeout(window.__t); window.__t = setTimeout(reprice, 300); });
   window.__followStop = function(j){ if (!stopBox || stopTouched() || !j || j.stop_price == null) return;
     if (document.activeElement === stopBox) return;
     var v = Number(j.stop_price).toFixed(2); stopBox.value = v; stopBox.setAttribute('data-derived', v); };
@@ -625,8 +649,14 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             "<span class=grow></span>"
             f"<label class=dl><span class=k>δ</span><input name=delta inputmode=decimal value='{delta_val}' placeholder='spot'></label>"
             f"<label class='dl stopl' title=\"a '.' makes it a price (8.30); none makes it an SPX level (7610)\">"
-            f"<span class=k>stop: strike or price</span><input id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off "
-            f"value='{esc(stop_val)}' data-derived='{derived}'></label>"
+            f"<span class=k>stop: strike or price</span>"
+            # the steppers (Steve, 2026-09-30): + to the left of the box, −
+            # to the right; a price moves a grid tick (0.05 under $3, 0.10
+            # from $3), an SPX level 5 points, landing on multiples of 5
+            "<button type=button class=step data-step=1 aria-label='raise the stop'>+</button>"
+            f"<input id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off "
+            f"value='{esc(stop_val)}' data-derived='{derived}'>"
+            "<button type=button class=step data-step=-1 aria-label='lower the stop'>&minus;</button></label>"
             "<button class='chip quiet' name=reprice value=1>RE-PRICE</button></div>"
             "</form>")
         # strikes around spot — only the ones the account can pay for (st-644f)
