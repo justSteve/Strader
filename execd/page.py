@@ -66,9 +66,9 @@ from .broker import BrokerError
 from .schwab import (VAULT_VERSION, App, Credential, authorize_url, code_from_received_url,
                      exchange, new_client, trading_payload, verify_grant)
 from .intent import OrderIntent
-from .orderform import (SEND_NONCE_TTL_S, Selection, intent_for, limit_at, parse_leg_text, price,
-                        stamp)
-from .orderpage import (balances_html, journal_html, position_html, send_fields_html,
+from .orderform import (LOTS_MAX, SEND_NONCE_TTL_S, Selection, intent_for, limit_at,
+                        parse_leg_text, price, stamp)
+from .orderpage import (balances_html, journal_html, position_html, send_fields_html, sendable,
                         quote_html, render_order, state_html, strikes_html, ticket_html,
                         broker_badge)
 from .service import CONTRACT_MULTIPLIER, ExecService, Refused
@@ -548,7 +548,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
 
     def _selection(args) -> Selection:
         return Selection.from_args(args, today=_today(),
-                                   lots_cap=service.bounds.qty_cap)
+                                   lots_cap=LOTS_MAX)
 
     def _order_page(sel: Selection, **kw):
         priced = price(service, sel) if sel.side else None
@@ -570,8 +570,10 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         sel = _selection(request.args)
         priced = price(service, sel)
         body = priced.to_dict()
-        balances = service.status().get("balances")
+        st = service.status()
+        balances = st.get("balances")
         body["fd0_html"] = ticket_html(priced, service.bounds, balances)
+        body["sendable"] = sendable(priced, balances, st)
         # the strikes the account can pay for, the same filter the poll uses
         body["strikes_html"] = strikes_html(priced, url_for("exec.order"), balances)
         body["send_fields_html"] = send_fields_html(sel)
@@ -638,6 +640,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 "strikes_html": strikes_html(priced, url_for("exec.order"),
                                              st.get("balances")),
                 "send_fields_html": send_fields_html(sel),
+                "sendable": sendable(priced, st.get("balances"), st),
                 "contract": priced.to_dict().get("contract"),
                 "stop_price": priced.stop_price,
             }
@@ -651,7 +654,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 # arithmetic, the script only writes the text
                 if q.ask:
                     lots = Selection.from_args({"lots": lots_arg},
-                                               today=_today(), lots_cap=service.bounds.qty_cap).lots
+                                               today=_today(), lots_cap=LOTS_MAX).lots
                     limit_now = limit_at(q.ask)
                     cost_now = _money(-(limit_now * CONTRACT_MULTIPLIER * lots)).lstrip("-")
             except BrokerError as exc:
@@ -1152,7 +1155,8 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     # ── state ── (Steve, 2026-09-15: "way too many words in execd screen …
     # no need to define PAPER" — the badge is the word, the state is the
     # word, and the only sentence left is STOP when it is on)
-    stop_line = ("<div class=stop-on>STOP IS ON</div>" if arming["killed"] else "")
+    stop_line = ("<div class=stop-on>STOP IS ON — an unlock clears it</div>"
+                 if arming["killed"] else "")
     sub = {"LOCKED": "", "ARMED": "", "STOOD_DOWN": "exits only"}[state]
     mode = str(st.get("mode", "live"))
     mode_badge = ("<span class='badge paper'>PAPER</span>" if mode == "paper"
@@ -1165,14 +1169,9 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     # ── controls ──
     if state == "LOCKED":
         parts.append(unlock_form(a["unlock"]))
-    # no STOP button (Steve, 2026-09-30: "The STOP button serves no purpose.
-    # just remove it from both trade and account screen"); a STOP already on
-    # is still shown and cleared here
-    if arming["killed"]:
-        parts.append(f"<form method=post action='{a['resume']}'>"
-                     "<input type=password name=passphrase placeholder='passphrase' "
-                     "autocomplete=current-password required>"
-                     "<button class='big quiet'>clear STOP</button></form>")
+    # no STOP and no clear-STOP (Steve, 2026-09-30: "The STOP button serves
+    # no purpose. just remove it from both trade and account screen ... The
+    # 'lock' is sufficent"); an unlock clears a STOP left on
     if state != "LOCKED":
         # FLATTEN only while there is something to flatten; no STAND DOWN
         # button on any screen (Steve, 2026-09-25, co-8mb1z)

@@ -99,6 +99,9 @@ DEFAULT_STOP_LOSS_USD = 20.0
 #: page's default. ``choose`` itself still answers nearest-to-spot when a
 #: caller passes no delta at all.
 DEFAULT_DELTA = 0.80
+#: No contract cap (Steve, 2026-09-30, st-5n3s); this only keeps a typo in
+#: the lots box from reaching the broker as 1000 — buying power is the limit
+LOTS_MAX = 99
 #: A SEND token is issued with the page and lives this long, single use —
 #: long, because it exists to stop a replay or a double send, not to time
 #: him out (st-igw0: the PREVIEW step is gone, SEND is the one action).

@@ -45,8 +45,8 @@ class TestTheEntryPath:
         assert armed.day_state().open_positions == 1
 
     def test_a_refused_entry_transmits_nothing(self, armed, broker):
-        out = armed.place(entry(qty=99))
-        assert out["refused"]["bound"] == "qty"
+        out = armed.place(entry(symbol="AAPL  260826C00190000"))
+        assert out["refused"]["bound"] == "instrument"
         assert sent_orders(broker) == []
 
     def test_a_locked_service_refuses_and_transmits_nothing(self, service, broker):
@@ -122,8 +122,8 @@ class TestThePreviewGate:
         assert sent_orders(broker) == []
 
     def test_preview_reports_a_refusal_without_pricing_it(self, armed, broker):
-        out = armed.preview(entry(qty=99))
-        assert out["refused"]["bound"] == "qty"
+        out = armed.preview(entry(symbol="AAPL  260826C00190000"))
+        assert out["refused"]["bound"] == "instrument"
         assert broker.calls_to("preview") == []
 
 
@@ -323,7 +323,7 @@ class TestPartialExits:
     @pytest.fixture
     def two_lot(self, broker, clock, tmp_path):
         config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha",
-                               bounds=Bounds(qty_cap=2))
+                               bounds=Bounds())
         svc = ExecService(broker, config, clock=clock)
         svc.unlock({"token": "x"})
         svc.place(entry(intent_id="two-1", qty=2, stop_spx=SPX_NOW - 2.0, delta=0.30))
@@ -661,7 +661,7 @@ class TestRecoveryAfterRestart:
     def test_a_partially_closed_position_recovers_at_its_remaining_size(
             self, broker, clock, tmp_path):
         config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha",
-                               bounds=Bounds(qty_cap=2))
+                               bounds=Bounds())
         first = ExecService(broker, config, clock=clock)
         first.unlock({"token": "x"})
         first.place(entry(intent_id="two-1", qty=2, stop_spx=SPX_NOW - 2.0, delta=0.30))
@@ -702,10 +702,9 @@ class TestTheJournalReproducesTheDay:
         assert {e["sha"] for e in armed.journal.read()} == {"testsha"}
 
     def test_a_refusal_names_its_bound_in_the_journal(self, armed):
-        armed.place(entry(qty=99))
+        armed.place(entry(symbol="AAPL  260826C00190000"))
         refused = armed.journal.events("refused")[0]
-        assert refused["refused"] == {"bound": "qty",
-                                      "reason": "99 contracts is over the 1-contract cap"}
+        assert refused["refused"]["bound"] == "instrument"
 
     def test_the_journal_never_carries_the_credential(self, armed):
         armed.unlock({"refresh_token": "sekrit-value"})
@@ -873,3 +872,15 @@ class TestAddingToAHeldContract:
         assert armed.status()["positions"] == []
         assert broker.positions() == []
         assert broker.working_orders(CALL) == []          # no leg left behind
+
+
+class TestLockIsTheOneSwitch:
+    def test_an_unlock_clears_a_stop_left_on(self, service):
+        """Steve, 2026-09-30: "The STOP button serves no purpose ... The
+        'lock' is sufficent." A STOP left on is cleared by the passphrase
+        unlock, and journaled [st-5n3s]."""
+        service.arming.stop()
+        assert service.arming.killed
+        service.unlock({"token": "x"})
+        assert not service.arming.killed
+        assert service.journal.events("stop_cleared")

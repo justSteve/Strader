@@ -218,7 +218,8 @@ class TestPage:
         assert "tap a strike" in body and "name=delta" not in body
         chosen = body.split("<tr class='chosen'>")[1].split("</tr>")[0]
         assert ">6350<" in chosen
-        assert "stop loss <b class=neg>$20.00</b>" in body and "take-profit rests at" in body
+        # no stop-loss or take-profit line on the opening ticket (2026-09-30)
+        assert "id=stopline" not in body and "take-profit rests at" not in body
         assert ">SEND<" in body and "PREVIEW" not in body and "name=nonce value='" in body
         body = text(order_page.get("/exec/order?side=call&delta="))
         assert ">6350<" in body.split("<tr class='chosen'>")[1].split("</tr>")[0]
@@ -347,7 +348,7 @@ class TestPage:
     def test_embed_has_no_shell(self, order_page):
         body = text(order_page.get("/exec/order?side=call&embed=1"))
         assert "<h1>" not in body and "tailnet only" not in body and "class=embed" in body
-        assert "id=stopline>stop loss" in body
+        assert "id=stopbox" in body
 
     def test_every_form_and_link_stays_under_exec(self, order_page):
         body = text(order_page.get("/exec/order?side=call&delta=0.3"))
@@ -452,7 +453,7 @@ class TestOnlyWhatHeCanBuyAndOnlyToday:
         operations page) still answers with the quote alone."""
         j = order_page.get(f"/exec/order/state?symbol={CALL}&side=call&strike=6400").json
         assert j["quote"]["ask"] == 2.10 and j["spx"] == SPX_NOW
-        assert "2.10" in j["fd0_html"] and "stop loss" in j["fd0_html"]
+        assert "2.10" in j["fd0_html"] and "id=strikebox" in j["fd0_html"]
         assert ">6400<" in j["strikes_html"] and "send_fields_html" in j
         assert j["contract"]["symbol"] == CALL and j["stop_price"] is not None
 
@@ -536,10 +537,11 @@ class TestThePadlockAndRePrice:
         body = text(order_page.get("/exec/order?side=call&strike=6400"))
         card = body.split("<div id=fd0>")[1].split("<form")[0]
         # centred, no 'at', no total (Steve, 2026-09-30, iPad)
-        assert "<div class='trow tcenter'><div class=tbig>C6400 × 1 <input id=pxbox" in card
-        assert "value='2.10'" in card and "id=cost" not in card
-        assert "<span id=stopline>stop loss <b class=neg>$20.00</b></span>" in card
-        assert "take-profit rests at 21.00" in card
+        # the strike and contracts are boxes with steppers, no P/C (2026-09-30)
+        assert "<div class='trow tcenter'><div class=tbig><span class=stepper>" in card
+        assert "id=strikebox" in card and "value='6400'" in card and "id=lotsbox" in card
+        assert "C6400" not in card and "value='2.10'" in card and "id=cost" not in card
+        assert "id=stopline" not in card and "take-profit" not in card
         for gone in ("trading grant", "available", "cut if SPX", "stop rests at", "budget",
                      "attempts left", "FD0", "<details class=more", ">more<", "to buy it",
                      "the most this attempt may lose", "wobble allowance", "bid / ask",
@@ -701,6 +703,25 @@ class TestAStageChangeAlwaysPaints:
         assert "(Date.now() - typedAt) < TYPING_MS" in body
         assert "if (e.key === 'Enter' && ours(e.target)) typedAt = 0;" in body
 
+    def test_send_is_off_until_the_ticket_is_an_order(self, order_page, armed):
+        """Steve, 2026-09-30: a close-at level on the wrong side for a
+        bearish open looked like it would send. SEND is disabled until the
+        ticket is an order that may go, and every poll says so [st-5n3s]."""
+        ok = text(order_page.get("/exec/order?side=put&strike=6300"))
+        assert "<button class='big send'>SEND</button>" in ok
+        bad = text(order_page.get("/exec/order?side=put&strike=6300&exitspx=6370"))   # under SPX 6380
+        assert "<button class='big send' disabled>SEND</button>" in bad
+        assert order_page.get("/exec/order/price?side=put&strike=6300&exitspx=6370").json["sendable"] is False
+        assert order_page.get("/exec/order/price?side=put&strike=6300").json["sendable"] is True
+        assert "button.send:disabled" in ok and "sb.disabled = !j.sendable" in ok
+
+    def test_contracts_and_strike_are_boxes_and_there_is_no_one_contract_cap(self, order_page):
+        body = text(order_page.get("/exec/order?side=call&strike=6400&lots=3"))
+        assert "id=lotsbox" in body and "aria-label='contracts' value='3'" in body
+        assert "name=lots value='3'" in body.split("<form id=sel")[1]
+        j = order_page.get("/exec/order/price?side=call&strike=6400&lots=3").json
+        assert j["cost_usd"] == 630.0 and j["error"] is None
+
     def test_the_stop_has_steppers_plus_left_minus_right(self, order_page):
         """Steve, 2026-09-30: + to the left of the stop box, − to the right,
         each 0.10 on the stop's distance under the entry; the stop box and
@@ -721,17 +742,20 @@ class TestAStageChangeAlwaysPaints:
         plain = text(order_page.get("/exec/order?side=call"))
         assert "id=stopbox" in plain and "value='.2' data-default='.2'" in plain
         assert "id=exitbox inputmode=numeric enterkeyhint=done autocomplete=off value='NA'" in plain
-        assert "stop loss <b class=neg>$20.00</b>" in plain
-        body = text(order_page.get("/exec/order?side=call&stopoff=0.30"))
-        assert "value='.3' data-default='.2'" in body and "stop loss <b class=neg>$30.00</b>" in body
+        j = order_page.get("/exec/order/price?side=call&strike=6400").json
+        assert j["stop_price"] == 1.90                              # 2.10 − .2
+        body = text(order_page.get("/exec/order?side=call&strike=6400&stopoff=0.30"))
+        assert "value='.3' data-default='.2'" in body
+        assert order_page.get("/exec/order/price?side=call&strike=6400&stopoff=0.30").json["stop_price"] == 1.80
         lvl = text(order_page.get("/exec/order?side=call&strike=6400&exitspx=6376"))
         assert "value='NA' data-default='.2'" in lvl and "value='6376'" in lvl
-        assert "<span id=stopline>market close if SPX falls to <b>6376</b></span>" in lvl
-        put = text(order_page.get("/exec/order?side=put&strike=6300&exitspx=6384"))
-        assert "<span id=stopline>market close if SPX rises to <b>6384</b></span>" in put
+        j = order_page.get("/exec/order/price?side=call&strike=6400&exitspx=6376").json
+        assert j["stop_spx"] == 6376.0 and j["stop_set_by"] == "spx"
+        j = order_page.get("/exec/order/price?side=put&strike=6300&exitspx=6384").json
+        assert j["stop_spx"] == 6384.0 and j["error"] is None
         # NA in the SPX box is no level
-        na = text(order_page.get("/exec/order?side=call&exitspx=NA"))
-        assert "stop loss <b class=neg>$20.00</b>" in na
+        j = order_page.get("/exec/order/price?side=call&strike=6400&exitspx=NA").json
+        assert j["stop_price"] == 1.90 and j["stop_set_by"] is None
 
 class TestARefusedSendIsShown:
     """2026-09-15 09:54 CT: Steve tapped SEND and saw nothing —
@@ -855,7 +879,7 @@ class TestAStopOfHisOwn:
         2026-09-30), but a URL that carries one is still dollars, and SEND
         carries it."""
         body = text(order_page.get("/exec/order?side=call&strike=6400&stop=1.50"))
-        assert "<span id=stopline>stop loss <b class=neg>$60.00</b></span>" in body
+        assert order_page.get("/exec/order/price?side=call&strike=6400&stop=1.50").json["stop_price"] == 1.50
         assert "name='stop' value='1.50'" in body.split("id=sendfields")[1].split("</span>")[0]
         hrefs = [h.split("'")[0] for h in body.split("href='")[1:]]
         assert not any("stop=" in h for h in hrefs), hrefs

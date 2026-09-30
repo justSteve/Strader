@@ -123,6 +123,16 @@ class TestTheCard:
         assert "cut if SPX reaches" in card and "target 10× the entry" in card
         assert "CANCEL AND RE-PRICE" in card and ">STOP<" not in card and ">FLATTEN<" not in card
 
+    def test_the_cards_stop_and_target_have_steppers(self, page, holding):
+        """Steve, 2026-09-30: after a fill, the take-profit updates the same
+        way the stop does — + left of the box, − right, then SET [st-5n3s]."""
+        card = panel_of(text(page.get("/exec/order")))
+        for leg in ("stop", "target"):
+            form = card.split(f"data-leg={leg}>")[1].split("</form>")[0]
+            plus, box, minus, set_ = (form.index("data-step=1 "), form.index(f"name={leg} "),
+                                      form.index("data-step=-1"), form.index(">SET<"))
+            assert plus < box < minus < set_
+
     def test_filled_is_the_live_editor_with_one_net_number(self, page, holding, broker, clock):
         clock.advance(seconds=95)
         broker.set_quote(CALL, bid=2.30, ask=2.40)
@@ -138,7 +148,7 @@ class TestTheCard:
         assert f"{v['at_stop_usd']:+,.2f}".replace("+", "+$").replace("-", "-$") in card
         assert ">SET<" in card
         assert "action='/exec/flatten'" in card and ">FLATTEN<" in card
-        assert "action='/exec/stop'" in card and ">STOP<" in card
+        assert "action='/exec/stop'" not in card and ">STOP<" not in card     # no STOP (2026-09-30)
         # no footer, no explanatory line under the controls
         assert "tailnet only" not in card
 

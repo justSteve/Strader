@@ -66,12 +66,10 @@ class TestEachBoundRefusesByName:
                                 stop_spx=SPX_NOW - 12, delta=0.3))
         assert r.bound == "order_type" and "blank cheque" in r.reason
 
-    def test_qty_refuses_more_than_the_cap(self):
-        r = refusal(entry(qty=2))
-        assert r.bound == "qty" and "1-contract cap" in r.reason
-
-    def test_qty_allows_exactly_the_cap(self):
-        assert refusal(entry(qty=2), bounds=Bounds(qty_cap=2)) is None
+    def test_there_is_no_contract_cap(self):
+        """Steve, 2026-09-30: "we can remove the 'only 1 contract permitted'
+        rule" — buying power is the limit (st-5n3s)."""
+        assert refusal(entry(qty=2)) is None and refusal(entry(qty=20)) is None
 
     def test_stop_refuses_while_the_kill_file_is_present(self):
         r = refusal(entry(), killed=True)
@@ -143,8 +141,8 @@ class TestOrderOfChecks:
                     now=datetime(2026, 8, 30, 3, 0, tzinfo=CT), killed=True)
         assert r.bound == "instrument"
 
-    def test_quantity_outranks_the_kill_file(self):
-        assert refusal(entry(qty=99), killed=True).bound == "qty"
+    def test_the_instrument_outranks_the_kill_file(self):
+        assert refusal(entry(symbol="AAPL  260826C00190000"), killed=True).bound == "instrument"
 
     def test_the_kill_file_outranks_the_window(self):
         r = refusal(entry(), now=datetime(2026, 8, 26, 3, 0, tzinfo=CT), killed=True)
@@ -232,16 +230,16 @@ class TestConfiguration:
     def test_the_start_values_are_the_ones_in_the_design(self):
         b = Bounds()
         assert b.instruments == ("SPX", "SPXW")
-        assert b.qty_cap == 1
+        assert not hasattr(b, "qty_cap")             # no contract cap (st-5n3s)
         for gone in ("open_ct", "close_ct", "no_open_after_ct", "flat_by_close_ct",
                      "weekdays_only"):
             assert not hasattr(b, gone), gone        # no clock rules (co-8mb1z)
 
     def test_steves_file_overrides_the_start_values(self, tmp_path):
         p = tmp_path / "bounds.yaml"
-        p.write_text("qty_cap: 2\nprice_band_pct: 0.2\ninstruments: [spxw]\n")
+        p.write_text("price_band_pct: 0.2\ninstruments: [spxw]\n")
         b = load_bounds(p)
-        assert (b.qty_cap, b.price_band_pct, b.instruments) == (2, 0.2, ("SPXW",))
+        assert (b.price_band_pct, b.instruments) == (0.2, ("SPXW",))
 
     def test_a_missing_file_falls_back_to_the_start_values(self, tmp_path):
         assert load_bounds(tmp_path / "absent.yaml") == Bounds()
@@ -269,7 +267,7 @@ class TestConfiguration:
         assert not set(yaml.safe_load(example.read_text())) & RETIRED_KEYS
 
     @pytest.mark.parametrize("kw", [
-        {"qty_cap": 0}, {"price_band_pct": 1.5}, {"max_quote_age_s": 0},
+        {"price_band_pct": 1.5}, {"max_quote_age_s": 0},
         {"instruments": ()},
     ])
     def test_nonsense_values_are_refused(self, kw):
@@ -287,7 +285,7 @@ class TestConfiguration:
 
     def test_to_dict_names_every_bound_the_service_enforces(self):
         assert set(Bounds().to_dict()) == {
-            "instruments", "qty_cap",
+            "instruments",
             "price_band_pct", "max_quote_age_s", "preview_cost_tolerance_usd",
             "require_protective_stop",
             "take_profit_multiple", "take_profit_basis",
@@ -347,7 +345,7 @@ class TestTheBoundsAreAllCovered:
     def test_the_scan_finds_the_bounds_it_is_supposed_to(self):
         """A meta-test that silently matched nothing would pass forever."""
         declared = self._declared()
-        assert {"instrument", "qty", "stop", "price_band"} <= declared
+        assert {"instrument", "stop", "price_band"} <= declared
         assert not {"ceiling", "positions"} & declared   # co-8mb1z
         assert "window" not in declared          # no clock bound (co-8mb1z)
         assert len(declared) >= 10

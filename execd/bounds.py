@@ -94,7 +94,10 @@ class DayState:
 RETIRED_KEYS = frozenset({"open_ct", "close_ct", "no_open_after_ct",
                           "flat_by_close_ct", "weekdays_only",
                           "max_open_positions", "daily_loss_ceiling_usd",
-                          "max_attempts"})
+                          "max_attempts",
+                          # Steve, 2026-09-30: "we can remove the 'only 1
+                          # contract permitted' rule" (st-5n3s)
+                          "qty_cap"})
 
 
 @dataclass(frozen=True)
@@ -126,7 +129,6 @@ class Bounds:
     kept; that was the misreading. [co-8mb1z]"""
 
     instruments: tuple[str, ...] = ("SPX", "SPXW")
-    qty_cap: int = 1
     price_band_pct: float = 0.10      # a BUY limit may sit this far above the ask
     max_quote_age_s: float = 30.0     # older than this is not a live quote
     preview_cost_tolerance_usd: float = 5.00
@@ -152,8 +154,6 @@ class Bounds:
         out: list[str] = []
         if not self.instruments:
             out.append("instruments must name at least one root")
-        if self.qty_cap < 1:
-            out.append(f"qty_cap must be at least 1, not {self.qty_cap}")
         if not (0 < self.price_band_pct < 1):
             out.append(f"price_band_pct must be within (0, 1), not {self.price_band_pct}")
         if self.max_quote_age_s <= 0:
@@ -223,7 +223,6 @@ class Bounds:
     def to_dict(self) -> dict[str, Any]:
         return {
             "instruments": list(self.instruments),
-            "qty_cap": self.qty_cap,
             "price_band_pct": self.price_band_pct,
             "max_quote_age_s": self.max_quote_age_s,
             "preview_cost_tolerance_usd": self.preview_cost_tolerance_usd,
@@ -330,12 +329,6 @@ def check_entry(
         return Refusal(
             "order_type",
             f"entries are LIMIT only — {intent.order_type.value} gives the book a blank cheque",
-        )
-
-    if intent.qty > bounds.qty_cap:
-        return Refusal(
-            "qty",
-            f"{intent.qty} contracts is over the {bounds.qty_cap}-contract cap",
         )
 
     if killed:

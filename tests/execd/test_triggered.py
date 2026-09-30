@@ -122,7 +122,7 @@ class TestAllThreeAtOnce:
         assert pos["stop_order_id"] and pos["target_order_id"]
 
     def test_a_child_sized_for_more_than_filled_is_replaced(self, svc, mb, clock, tmp_path):
-        s = make(mb, clock, tmp_path / "two", bounds=Bounds(qty_cap=2))
+        s = make(mb, clock, tmp_path / "two", bounds=Bounds())
         mb.partial_fill_qty = 1
         s.place(entry(intent_id="a-5", qty=2))
         fb = s.journal.events("bracket_fallback")

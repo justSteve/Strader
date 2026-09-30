@@ -64,6 +64,11 @@ _ORDER_STYLE = """
  button.lock.on{background:#1f2937;border-color:#fbbf24;color:#fbbf24}
  .tbig #live{font-size:.6em;font-weight:400;vertical-align:middle}
  .trow.tcenter{justify-content:center}
+ button.send:disabled{opacity:.35;cursor:not-allowed}
+ .stepper{display:inline-flex;align-items:center;gap:4px}
+ input.numbox{width:3.6em;height:44px;box-sizing:border-box;font-size:1em;font-weight:700;text-align:center;
+   border:2px solid #9ca3af;border-radius:8px;background:#111827;color:#f9fafb}
+ #lotsbox{width:2.2em}
  input.pxbox{text-align:right;width:4.2em;font-size:1em;font-weight:700;padding:.1em .25em;border:2px solid #fbbf24;border-radius:6px;background:#111827;color:#f9fafb}
  .foot{display:flex;justify-content:space-between;gap:.75em;color:#9ca3af;font-size:.9em;margin-top:.4em}
  .money{display:flex;justify-content:space-between;align-items:baseline;gap:.75em;margin:0 0 .6em;font-size:1.05em}
@@ -93,11 +98,15 @@ _SCRIPT = """
   window.__paintTicket = function(j){ if (!j) return;
     // the price box lives in the ticket: a repaint while he is in it keeps
     // what he typed and where the caret was (co-8mb1z)
-    var px = document.getElementById('pxbox'), had = !!(px && document.activeElement === px);
-    var pv = had ? px.value : null, pc = had ? px.selectionStart : null;
-    var f = document.getElementById('fd0'); if (f && j.fd0_html) f.innerHTML = j.fd0_html;
-    if (had) { var nx = document.getElementById('pxbox'); if (nx) { nx.value = pv; nx.focus();
+    // (and so do the strike and contracts boxes, st-5n3s)
+    var f = document.getElementById('fd0'), ae = document.activeElement;
+    var had = !!(f && ae && ae.id && f.contains(ae)), hid = had ? ae.id : null;
+    var pv = had ? ae.value : null, pc = null; try { pc = had ? ae.selectionStart : null; } catch (e) {}
+    if (f && j.fd0_html) f.innerHTML = j.fd0_html;
+    if (had) { var nx = document.getElementById(hid); if (nx) { nx.value = pv; nx.focus();
       try { nx.setSelectionRange(pc, pc); } catch (e) {} } }
+    if (j.sendable !== undefined) { var sb = document.querySelector('form.sendform button.send');
+      if (sb) sb.disabled = !j.sendable; }
     var s = document.getElementById('strikes'); if (s && j.strikes_html) s.innerHTML = j.strikes_html;
     var p = document.getElementById('sendfields'); if (p && j.send_fields_html) p.innerHTML = j.send_fields_html;
     if (j.contract) window.__sym = j.contract.symbol;
@@ -167,13 +176,35 @@ _SCRIPT = """
   // under the entry by 0.10, − narrows it; a box reading NA starts from the
   // default .2. The close-at-SPX box goes to NA.
   document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('button.step') : null;
-    if (!b || !stopBox || !form) return; e.preventDefault();
+    if (!b || !stopBox || !form) return;
+    var fr = b.getAttribute('data-for'); if (fr && fr !== 'stop') return; e.preventDefault();
     var cur = num(stopBox.value); if (isNaN(cur) || cur <= 0) cur = num(stopBox.getAttribute('data-default') || '.2');
     var n = Math.round(cur * 100) + Number(b.getAttribute('data-step')) * 10; if (n < 5) n = 5;
     stopBox.value = shortPts(n / 100); stopLive(n / 100); soon(300); });
   // the stop box holds a distance, which does not move with the market;
   // nothing to follow (kept for the poll's call)
   window.__followStop = function(j){};
+  // the strike and contracts boxes on the ticket (Steve, 2026-09-30): typed
+  // or stepped, each writes its hidden field and reprices; a new strike is a
+  // new contract, so the padlock's price goes with the old one. Strikes
+  // step 5 points; contracts 1, never under 1. The boxes live in #fd0,
+  // which the poll repaints — hence delegation.
+  function setField(n, v){ var el = form ? form.elements[n] : null; if (el) el.value = v; }
+  function strikeTo(v){ if (isNaN(v) || v <= 0) return; setField('strike', String(v)); setField('delta', '');
+    var lf = lockField(); if (lf) lf.value = ''; }
+  function lotsTo(v){ if (isNaN(v)) return; v = Math.max(1, Math.min(99, Math.round(v)));
+    setField('lots', String(v)); window.__lots = String(v); return v; }
+  document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('button.step') : null;
+    if (!b || !form) return; var fr = b.getAttribute('data-for'); if (fr !== 'strike' && fr !== 'lots') return;
+    e.preventDefault(); var box = document.getElementById(fr + 'box'); if (!box) return;
+    var d = Number(b.getAttribute('data-step')), v = parseFloat(box.value);
+    if (fr === 'strike') { if (isNaN(v)) return; v = Math.round(v / 5) * 5 + d * 5; box.value = String(v); strikeTo(v); }
+    else { v = lotsTo((isNaN(v) ? 1 : v) + d); box.value = String(v); }
+    soon(300); });
+  document.addEventListener('input', function(e){ var t = e.target; if (!t || (t.id !== 'strikebox' && t.id !== 'lotsbox')) return;
+    var v = parseFloat(t.value); if (t.id === 'strikebox') strikeTo(v); else lotsTo(v); soon(700); });
+  document.addEventListener('keydown', function(e){ var t = e.target; if (!t || (t.id !== 'strikebox' && t.id !== 'lotsbox') || e.key !== 'Enter') return;
+    e.preventDefault(); soon(0); t.blur(); });
   // the padlock (st-2s4u): the lock is the hidden limit on the form, the
   // server renders the ticket from it, so a tap only flips the field and
   // reprices. The chip is inside #fd0 and is re-rendered, hence delegation.
@@ -204,7 +235,9 @@ _SCRIPT = """
   function ours(a){ return !!(a && a.tagName === 'INPUT' && ((form && form.contains(a)) || a.id === 'pxbox')); }
   document.addEventListener('input', function(e){ if (ours(e.target)) typedAt = Date.now(); }, true);
   document.addEventListener('keydown', function(e){ if (e.key === 'Enter' && ours(e.target)) typedAt = 0; }, true);
-  function editing(){ return ours(document.activeElement) && (Date.now() - typedAt) < TYPING_MS; }
+  function ours2(a){ return ours(a) || !!(a && a.tagName === 'INPUT' && a.closest && a.closest('#fd0')); }
+  document.addEventListener('input', function(e){ if (ours2(e.target)) typedAt = Date.now(); }, true);
+  function editing(){ return ours2(document.activeElement) && (Date.now() - typedAt) < TYPING_MS; }
   window.__lots = form && form.elements['lots'] ? (form.elements['lots'].value || '1') : '1';
 })();
 </script>
@@ -269,10 +302,8 @@ def state_html(st: dict[str, Any], actions: Mapping[str, str] | None = None,
     word = f"<span class='word {state}'>{state.replace('_', ' ')}</span>"
     right = ""
     if actions:
-        if a["killed"]:
-            right = (f"<a class='chip stop-on' href='{actions['account']}'>STOP ON · clear</a>")
-        # no STOP button on the order page (Steve, 2026-09-30, iPad preview);
-        # it stays on the account page, and STOP ON still shows here
+        # no STOP anywhere (Steve, 2026-09-30: "The 'lock' is sufficent");
+        # an unlock clears one left on
         right += f"<a class='chip quiet' href='{actions['account']}'>account</a>"
     return (f"<div class=strip id=strip><div class=l>{broker_badge(st)}{badge}{word}</div>"
             f"<div class=r>{right}</div></div>")
@@ -369,10 +400,22 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
             f"title='{'locked — tap to follow the ask' if locked else 'following the ask — tap to lock'}'>"
             f"{'&#128274;' if locked else '&#128275;'}</button>")
     live = (f"<span id=live class=k>ask {c.ask_pts:.2f} now</span>" if locked else "<span id=live class=k></span>")
-    # when the number on the screen was read (st-sk9r): the ask's time while
-    # following, the moment of the lock while locked; the poll keeps it current
-    # centred, no 'at', no priced-at time, no total (Steve, 2026-09-30, iPad)
-    head = (f"<div class='trow tcenter'><div class=tbig>{esc(name)} × {priced.lots} "
+    # Centred: the strike and the contracts as boxes with the + − steppers
+    # (Steve, 2026-09-30: "make input controls for both the target strike ...
+    # and the number of contracts ... drop the P (or C). Use the same + -
+    # pattern"), then the entry price and its padlock. No 'at', no
+    # priced-at time, no total, no stop-loss line and no take-profit line —
+    # the take-profit is said once the broker has accepted it (st-5n3s).
+    def stepper(field: str, value: str, mode: str, label: str) -> str:
+        return (f"<span class=stepper><button type=button class=step data-for={field} data-step=1 "
+                f"aria-label='{label} up'>+</button>"
+                f"<input id={field}box class=numbox inputmode={mode} enterkeyhint=done autocomplete=off "
+                f"aria-label='{label}' value='{value}'>"
+                f"<button type=button class=step data-for={field} data-step=-1 "
+                f"aria-label='{label} down'>&minus;</button></span>")
+    head = (f"<div class='trow tcenter'><div class=tbig>"
+            f"{stepper('strike', f'{c.strike:g}', 'numeric', 'strike')} × "
+            f"{stepper('lots', str(priced.lots), 'numeric', 'contracts')} "
             # the entry price is a box (co-8mb1z, Steve 2026-09-25: "i want to
             # be able to set the price of my entry"): it shows the limit that
             # will be sent, on the grid; typing in it is locking at that price
@@ -380,42 +423,30 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
             f"aria-label='entry price' value='{priced.limit:.2f}'> {lock} {live}</div></div>")
     if priced.error:
         return f"<div class=card>{head}<div class=bad>{esc(priced.error)}</div></div>"
-    # One stop line (Steve, 2026-09-17: "keep amount of loss unless i
-    # override with a strike"): the dollars the resting stop loses, or the
-    # level he typed. A long call is cut when SPX falls to the level, a long
-    # put when it rises to it.
-    if priced.stop_set_by == "spx":
-        verb = "falls to" if c.right == "CALL" else "rises to"
-        stop_line = f"<span id=stopline>market close if SPX {verb} <b>{priced.stop_spx:g}</b></span>"
-    else:
-        stop_line = (f"<span id=stopline>stop loss "
-                     f"<b class=neg>{usd(priced.stop_loss_usd)}</b></span>")
-    line2 = f"<div class=trow>{stop_line}</div>"
-    for w in priced.warnings:
-        line2 += f"<div class=warn>{esc(w)}</div>"
-    target_txt = ""
-    try:
-        multiple = float(getattr(bounds, "take_profit_multiple", 0) or 0)
-        basis = str(getattr(bounds, "take_profit_basis", "premium") or "premium")
-        if multiple > 1 and priced.limit:
-            tp = take_profit_price(priced.limit, multiple, basis, stop_price=priced.stop_price)
-            net = round((tp - priced.limit) * CONTRACT_MULTIPLIER * priced.lots
-                        - priced.commissions_usd, 2)
-            target_txt = (f"take-profit rests at {tp:.2f} <span class=k>({multiple:g}× the entry)</span> → "
-                          f"<span class=pos>{money(net)}</span> <span class=k>if it fills there</span>")
-    except (ValueError, TypeError):
-        target_txt = ""
-    line3 = f"<div class='trow k'><span>{target_txt}</span></div>" if target_txt else ""
+    line2 = "".join(f"<div class=warn>{esc(w)}</div>" for w in priced.warnings)
     # Said only when the account cannot pay for it — the refusal of
-    # 2026-09-15 09:54 CT was exactly this arithmetic. When it can, the
-    # ticket says nothing about the account: the one money figure is under
-    # the strip (st-bafu).
+    # 2026-09-15 09:54 CT was exactly this arithmetic. SEND is off with it.
     short = ""
-    avail = (balances or {}).get("available_funds")
-    if isinstance(avail, (int, float)) and priced.cost_usd is not None and priced.cost_usd > avail:
+    avail = spendable(balances)
+    if avail is not None and priced.cost_usd is not None and priced.cost_usd > avail:
         short = (f"<div class=bad>this needs {usd(priced.cost_usd)} and the "
                  f"account has {usd(avail)} available — Schwab will refuse it</div>")
-    return f"<div class=card>{head}{line2}{line3}{short}</div>"
+    return f"<div class=card>{head}{line2}{short}</div>"
+
+
+def sendable(priced: Priced | None, balances: dict[str, Any] | None,
+             st: Mapping[str, Any] | None = None) -> bool:
+    """Is the ticket an order that may go? (Steve, 2026-09-30: "SEND should
+    be disabled until a valid entry is active".) A contract at a price, no
+    fault on the ticket (a close-at level on the wrong side is one), an
+    account that can pay for it, and a service that permits an entry."""
+    if priced is None or not priced.ready or priced.error:
+        return False
+    avail = spendable(balances)
+    if avail is not None and priced.cost_usd is not None and priced.cost_usd > avail:
+        return False
+    arming = (st or {}).get("arming") or {}
+    return bool(arming.get("permits_entry", True))
 
 
 def spendable(balances: dict[str, Any] | None) -> float | None:
@@ -627,13 +658,16 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
         # (st-igw0 — the PREVIEW step is gone; the service runs the broker's
         # own preview inside every place). The script sends it by fetch and
         # paints the answer; the plain form redirects.
-        if priced.ready and send_nonce:
+        # SEND is off until the ticket is an order that may go (Steve,
+        # 2026-09-30); every poll turns it on or off again (st-5n3s)
+        if send_nonce:
+            ok = sendable(priced, st.get("balances"), st)
             parts.append(
                 f"<form method=post action='{actions['order_send']}' class=sendform>"
                 f"<span id=sendfields>{send_fields_html(sel)}</span>"
                 f"<input type=hidden name=nonce value='{esc(send_nonce)}'>"
                 "<input type=hidden name=ajax value=''>"
-                "<button class='big send'>SEND</button></form>")
+                f"<button class='big send'{'' if ok else ' disabled'}>SEND</button></form>")
         # expiry, δ target and RE-PRICE on one row — one GET form, no script needed.
         # The form carries the chosen strike, so RE-PRICE reprices THAT strike
         # (Steve, 2026-09-15: "simply reprice existing strike" — before st-2s4u
@@ -644,12 +678,14 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
         # close-at-SPX level — no δ box and no RE-PRICE (Steve, 2026-09-30,
         # iPad); the poll reprices it live. A δ in a URL still caps the
         # strike choice.
+        # the strike and the lots ride the form always: their boxes on the
+        # ticket write them (st-5n3s)
         strike_field = (f"<input type=hidden name=strike value='{sel.strike:g}'>"
-                        if sel.strike is not None else "")
+                        if sel.strike is not None else "<input type=hidden name=strike value=''>")
         delta_field = (f"<input type=hidden name=delta value='{sel.delta:g}'>"
                        if sel.delta is not None and abs(sel.delta - DEFAULT_DELTA) > 1e-9 else "")
         # more than one lot rides the form so a reprice keeps it
-        lots_field = f"<input type=hidden name=lots value='{sel.lots}'>" if sel.lots != 1 else ""
+        lots_field = f"<input type=hidden name=lots value='{sel.lots}'>"
         limit_val = f"{sel.limit:.2f}" if sel.limit is not None else ""
         # Two boxes, one live (Steve, 2026-09-30): the stop as its dollar
         # distance under the limit (".2" — the flat $20 at one lot), or a

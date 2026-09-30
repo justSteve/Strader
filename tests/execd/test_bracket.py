@@ -420,7 +420,7 @@ class TestPartialExitsResizeBoth:
     @pytest.fixture
     def two_lot(self, broker, clock, tmp_path):
         config = ServiceConfig(state_dir=tmp_path / "execd", sha="testsha",
-                               bounds=Bounds(qty_cap=2, take_profit_multiple=10.0))
+                               bounds=Bounds(take_profit_multiple=10.0))
         svc = ExecService(broker, config, clock=clock)
         svc.unlock({"token": "x"})
         svc.place(entry(intent_id="two-1", qty=2, stop_spx=NEAR_STOP, delta=0.30))

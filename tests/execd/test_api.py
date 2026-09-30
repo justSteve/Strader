@@ -41,7 +41,7 @@ class TestReads:
         r = client.get("/status")
         assert r.status_code == 200
         assert r.json["arming"]["state"] == "ARMED"
-        assert r.json["bounds"]["qty_cap"] == 1
+        assert "qty_cap" not in r.json["bounds"]          # no contract cap (st-5n3s)
 
     def test_quote(self, client):
         r = client.get(f"/quote?symbol={CALL}")
@@ -119,10 +119,9 @@ class TestPlacing:
         assert r.json["stop_order"]["order_type"] == "STOP"
 
     def test_a_refusal_is_a_409_naming_the_bound(self, client):
-        r = post(client, "/place", entry(qty=99).to_dict())
+        r = post(client, "/place", entry(symbol="AAPL  260826C00190000").to_dict())
         assert r.status_code == 409
-        assert r.json["refused"] == {"bound": "qty",
-                                     "reason": "99 contracts is over the 1-contract cap"}
+        assert r.json["refused"]["bound"] == "instrument" and "AAPL" in r.json["refused"]["reason"]
 
     def test_a_locked_service_refuses_with_409(self, locked_client):
         r = post(locked_client, "/place", entry().to_dict())
@@ -151,8 +150,8 @@ class TestPlacing:
         assert broker.calls_to("place") == []
 
     def test_a_previewed_refusal_is_also_a_409(self, client):
-        r = post(client, "/preview", entry(qty=99).to_dict())
-        assert r.status_code == 409 and r.json["refused"]["bound"] == "qty"
+        r = post(client, "/preview", entry(symbol="AAPL  260826C00190000").to_dict())
+        assert r.status_code == 409 and r.json["refused"]["bound"] == "instrument"
 
 
 class TestGettingOut:

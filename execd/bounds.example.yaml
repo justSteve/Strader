@@ -15,8 +15,7 @@
 # What may be traded at all. Roots, not symbols.
 instruments: [SPX, SPXW]
 
-# Contracts per order. The fire server's cap today.
-qty_cap: 1
+# No contract cap: removed 2026-09-30 (st-5n3s); a qty_cap key is ignored.
 
 # No daily loss ceiling, no limit on how many positions are open, and no
 # count of attempts or losing trades — removed 2026-09-24 and not to come

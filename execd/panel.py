@@ -73,6 +73,8 @@ PANEL_STYLE = """
  .panel .editor .level{font-size:.85em;color:#9ca3af;margin-left:.6em}
  .panel .hint{margin-top:6px;font-size:.8em;color:#6b7280}
  .panel .editor form{margin:0}.panel .legrow{display:flex;gap:6px;align-items:stretch}
+ .panel .legrow button.step{width:44px;min-width:44px;border-radius:8px;border:1px solid #374151;background:#1f2937;color:#f9fafb;
+   font-size:1.3em;font-weight:700;padding:0;touch-action:manipulation}
  .panel .editor button.set{min-height:44px;padding:0 12px;border-radius:8px;border:1px solid #374151;font-weight:700;cursor:pointer;background:#1f2937;color:#e5e7eb;font-family:inherit}
  .panel .editor button.set:disabled{opacity:.5}
  .panel #adjustnote{margin-top:8px;min-height:1.2em}.panel #adjustnote.bad{background:#7f1d1d;border:1px solid #ef4444;border-radius:8px;padding:.4em .7em;color:#fecaca}
@@ -232,7 +234,8 @@ def _link_button(href: str, word: str, cls: str) -> str:
 def _arming_line(st: Mapping[str, Any], actions: Mapping[str, str]) -> str:
     a = st["arming"]
     if a.get("killed"):
-        return "<div class='k stop-on' style='margin-top:8px'>STOP IS ON — no new positions</div>"
+        return ("<div class='k stop-on' style='margin-top:8px'>STOP IS ON — no new positions; "
+                "an unlock clears it</div>")
     if a["state"] == "LOCKED":
         return ""   # the passphrase box sits under the strip (st-2hei)
     if a["state"] != "ARMED":
@@ -387,7 +390,13 @@ def body_filled(service, st, facts, actions, now) -> str:
                     f"<input type=hidden name=symbol value='{esc(sym)}'>"
                     "<input type=hidden name=ajax value=''>"
                     f"<label>{leg}<span class=legrow>"
+                    # + left, − right, as on the order form (Steve, 2026-09-30:
+                    # "the screen that shows after a fill should permit the
+                    # same pattern of updating take profit as we are using
+                    # for SL"); a step moves the box, SET sends it (st-5n3s)
+                    f"<button type=button class=step data-for=leg data-step=1 aria-label='{leg} up 0.10'>+</button>"
                     f"<input name={leg} inputmode=decimal enterkeyhint=go autocomplete=off value='{val}'>"
+                    f"<button type=button class=step data-for=leg data-step=-1 aria-label='{leg} down 0.10'>&minus;</button>"
                     f"<button class=set aria-label='set the {leg}'>SET</button></span>{note}</label></form>")
         html += ("<div id=adjustnote class=k></div><div class=editor>"
                  + leg_form("stop", stop_val, stop_note)
@@ -398,8 +407,8 @@ def body_filled(service, st, facts, actions, now) -> str:
     html += "<div class=actions>"
     if st["arming"]["state"] != "LOCKED" and st["positions"]:
         html += _big_button(actions["flatten"], "FLATTEN", "exit", {"back": "order"})
-    if not st["arming"]["killed"]:
-        html += _big_button(actions["stop"], "STOP", "stop", {"back": "order"})
+    # no STOP on the card either (Steve, 2026-09-30: "i do not want a STOP
+    # button to display on the trade screen"); lock is the one switch
     html += "</div>" + _arming_line(st, actions)
     return html
 
@@ -662,6 +671,15 @@ PANEL_SCRIPT = """
         if (window.__panelPoll) window.__panelPoll(true); })
       .catch(function(err){ if (b) { b.disabled = false; b.textContent = 'SEND'; }
         answerBox('not sent, or not answered — ' + (err && err.message ? err.message : err) + '. Read the card before sending again.', true); }); });
+  // the card's stop and target steppers (st-5n3s): a price moves 0.10, an
+  // SPX level (no '.') 1 point; the box keeps the number until SET sends it
+  document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('button.step') : null;
+    if (!b || b.getAttribute('data-for') !== 'leg') return; e.preventDefault();
+    var box = b.parentNode ? b.parentNode.querySelector('input[name]') : null; if (!box) return;
+    var t = (box.value || '').trim(), d = Number(b.getAttribute('data-step')), v = parseFloat(t);
+    if (isNaN(v)) return;
+    if (t.indexOf('.') >= 0) { var c = Math.round(v * 100) + d * 10; if (c < 5) c = 5; box.value = (c / 100).toFixed(2); }
+    else box.value = String(Math.round(v) + d); });
   document.addEventListener('submit', function(e){ var f = e.target; if (!f || !f.classList || !f.classList.contains('adjust')) return;
     var b = f.querySelector('button'); if (b && b.disabled) { e.preventDefault(); return; }
     if (!window.fetch || !window.FormData) { if (b) { b.disabled = true; b.textContent = '…'; } inflight = true; return; }

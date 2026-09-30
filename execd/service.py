@@ -494,6 +494,13 @@ class ExecService:
             state = self.arming.unlock(credential)
             self.journal.record("unlock", state=state.value,
                                 refresh_wall=_wall_of(credential))
+            # Lock is the one switch (Steve, 2026-09-30: "The STOP button
+            # serves no purpose ... The 'lock' is sufficent"): an unlock —
+            # the passphrase, page-only — clears a STOP left on (st-5n3s)
+            if self.arming.killed:
+                self.arming.resume()
+                self.journal.record("stop_cleared", detail="cleared by the unlock — lock is "
+                                                           "the one switch")
             # The start-up reconcile, deferred from the constructor when the
             # service came back LOCKED (see _recover): now there is a
             # credential to ask the broker with.
