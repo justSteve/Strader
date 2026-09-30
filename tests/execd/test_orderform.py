@@ -98,15 +98,21 @@ class TestSelection:
 # ── the choice ───────────────────────────────────────────────────────────
 
 class TestChoice:
-    def test_default_is_nearest_to_spot(self, armed, chain):
+    def test_default_is_the_highest_legal_delta_under_the_cap(self, armed, chain):
+        """Steve, 2026-09-30: "the opening order should use the highest delta
+        that creates a legal order. Max delta remains .8" [st-5n3s]."""
         contracts, spx = load_chain(armed, DAY, "CALL")
         assert spx == SPX_NOW and [c.strike for c in contracts][:3] == [6350, 6360, 6370]
-        assert choose(contracts, spx, strike=None, delta=None).strike == 6380
+        assert choose(contracts, spx, strike=None, delta=None).strike == 6350      # δ 0.78
+        # the account cannot pay 32.40 or 16.80: the highest it can is 6380 (10.20)
+        assert choose(contracts, spx, strike=None, delta=None, funds=1500.0).strike == 6380
+        # nothing it can pay: the nearest the cap is still shown, the ticket says why
+        assert choose(contracts, spx, strike=None, delta=None, funds=10.0).strike == 6350
 
     def test_delta_override_picks_the_nearest_delta(self, armed, chain):
         contracts, spx = load_chain(armed, DAY, "CALL")
         assert choose(contracts, spx, strike=None, delta=0.30).strike == 6400
-        assert choose(contracts, spx, strike=None, delta=0.65).strike == 6360
+        assert choose(contracts, spx, strike=None, delta=0.65).strike == 6370       # a cap: δ 0.60
 
     def test_a_tapped_strike_wins_and_a_missing_one_says_so(self, armed, chain):
         contracts, spx = load_chain(armed, DAY, "PUT")
@@ -206,16 +212,16 @@ class TestPage:
         assert "reauth" not in body and "re-authorise" not in body   # account controls live elsewhere
 
     def test_a_side_starts_at_the_delta_target_and_a_blank_box_means_spot(self, order_page):
-        """The δ box starts at 0.80 (Steve, 2026-09-15): the .78 row is chosen.
-        A blank box — the field present and empty — means nearest to spot."""
+        """The δ cap is 0.80 (Steve, 2026-09-15; the box is gone since
+        2026-09-30): the .78 row is chosen."""
         body = text(order_page.get("/exec/order?side=call"))
-        assert "tap a strike" in body and "value='0.8'" in body
+        assert "tap a strike" in body and "name=delta" not in body
         chosen = body.split("<tr class='chosen'>")[1].split("</tr>")[0]
         assert ">6350<" in chosen
         assert "stop loss <b class=neg>$20.00</b>" in body and "take-profit rests at" in body
         assert ">SEND<" in body and "PREVIEW" not in body and "name=nonce value='" in body
         body = text(order_page.get("/exec/order?side=call&delta="))
-        assert ">6380<" in body.split("<tr class='chosen'>")[1].split("</tr>")[0]
+        assert ">6350<" in body.split("<tr class='chosen'>")[1].split("</tr>")[0]
 
     def test_delta_override_and_a_tapped_strike(self, order_page):
         body = text(order_page.get("/exec/order?side=call&delta=0.30"))
@@ -500,19 +506,17 @@ class TestThePadlockAndRePrice:
     def test_re_price_keeps_the_tapped_strike(self, order_page):
         body = text(order_page.get("/exec/order?side=put&strike=6300"))
         form = body.split("<form id=sel")[1].split("</form>")[0]
-        assert "name=strike value='6300'" in form and "name=reprice value=1>RE-PRICE" in form
+        assert "name=strike value='6300'" in form and "RE-PRICE" not in body     # gone 2026-09-30
         assert "name=limit value=''" in form
         # what the RE-PRICE button submits: the strike stays, the box is blank
         body = text(order_page.get("/exec/order?side=put&expiry=2026-08-26&strike=6300&delta=&limit=&reprice=1"))
         assert ">6300<" in body.split("<tr class='chosen'>")[1].split("</tr>")[0]
 
     def test_the_ticket_says_when_it_was_priced(self, order_page):
-        """Beside the price, the time the ask was read — 'priced HH:MM:SS' in
-        Chicago time, from the service's clock (st-sk9r, audit note 37); the
-        poll's script rewrites it from the quote's as_of while following."""
+        """Removed (Steve, 2026-09-30, iPad): no 'priced HH:MM:SS' on the
+        ticket; the clock on the money row is the time."""
         body = text(order_page.get("/exec/order?side=call&strike=6400"))
-        head = body.split("<div class=trow>")[1].split("</div></div>")[0]
-        assert "<span id=priced class=k>priced 10:00:00</span>" in head   # MIDSESSION, 15:00 UTC
+        assert "id=priced" not in body and "priced 10:00:00" not in body
         # the poll never rewrites the head alone: a moved ask reprices the whole ticket (st-hzr6)
         assert "window.__lastReprice" in body and "px.textContent" not in body
 
@@ -531,7 +535,9 @@ class TestThePadlockAndRePrice:
         armed._balances_cache = (now, {"available_funds": 1234.5, "option_buying_power": 2345.0})
         body = text(order_page.get("/exec/order?side=call&strike=6400"))
         card = body.split("<div id=fd0>")[1].split("<form")[0]
-        assert "C6400 × 1 at <input id=pxbox" in card and "value='2.10'" in card and "id=cost>$210.00" in card
+        # centred, no 'at', no total (Steve, 2026-09-30, iPad)
+        assert "<div class='trow tcenter'><div class=tbig>C6400 × 1 <input id=pxbox" in card
+        assert "value='2.10'" in card and "id=cost" not in card
         assert "<span id=stopline>stop loss <b class=neg>$20.00</b></span>" in card
         assert "take-profit rests at 21.00" in card
         for gone in ("trading grant", "available", "cut if SPX", "stop rests at", "budget",
@@ -548,13 +554,13 @@ class TestThePadlockAndRePrice:
     def test_the_padlock_on_the_ticket(self, order_page):
         body = text(order_page.get("/exec/order?side=call&strike=6400"))
         assert "id=lock class='lock'" in body and "&#128275;" in body and "data-limit='2.10'" in body
-        assert "aria-label='entry price' value='2.10'" in body and "id=cost>$210.00" in body
+        assert "aria-label='entry price' value='2.10'" in body and "id=cost" not in body
         assert "<span id=live class=k></span>" in body
         locked = text(order_page.get("/exec/order?side=call&strike=6400&limit=2.00"))
         assert "id=lock class='lock on'" in locked and "&#128274;" in locked
-        assert "aria-label='entry price' value='2.00'" in locked and "id=cost>$200.00" in locked
+        assert "aria-label='entry price' value='2.00'" in locked
         assert "ask 2.10 now" in locked
-        # SEND carries the lock; the RE-PRICE form holds it for the script to flip
+        # SEND carries the lock; the selection form holds it for the script to flip
         assert "name='limit' value='2.00'" in locked.split("id=sendfields")[1].split("</span>")[0]
         assert "name=limit value='2.00'" in locked.split("<form id=sel")[1].split("</form>")[0]
         # a strike, an expiry or a side is a new price: the lock does not travel
@@ -619,7 +625,7 @@ class TestLockedInPlaceAndFewerWords:
         armed._balances_cache = (armed.clock(), {"available_funds": 12345.0,
                                                  "option_buying_power": 2345.0})
         body = text(order_page.get("/exec/order?side=call"))
-        money = body.index("<div class=money><span id=clock")
+        money = body.index("<div class=money><span><span id=clock")
         assert body.index("class=strip") < money < body.index("class=side")
         # one money figure (st-bafu): "option buying power and available is redundant"
         # the clock left, the figure right (Steve, 2026-09-30, iPad)
@@ -652,7 +658,7 @@ class TestLockedInPlaceAndFewerWords:
                       "tailnet only", "vault present", "blocks new positions",
                       "asks once more", "forget the credential", "do both in one sitting"):
             assert words not in body, words
-        assert "<span class='badge live'>LIVE</span>" in body and ">STOP<" in body
+        assert "<span class='badge live'>LIVE</span>" in body and ">STOP<" not in body
         assert "re-authorise (weekly)" in body and ">Today<" in body
 
 
@@ -696,24 +702,36 @@ class TestAStageChangeAlwaysPaints:
         assert "if (e.key === 'Enter' && ours(e.target)) typedAt = 0;" in body
 
     def test_the_stop_has_steppers_plus_left_minus_right(self, order_page):
-        """Steve, 2026-09-30: + to the left of the stop box, − to the right;
-        each moves the stop loss 0.10 under the limit and the stop keeps
-        following the live price (the distance rides as ``stopoff``). Driven
-        in headless Chromium [st-5n3s]."""
+        """Steve, 2026-09-30: + to the left of the stop box, − to the right,
+        each 0.10 on the stop's distance under the entry; the stop box and
+        the close-at-SPX box share one centred row. Driven in headless
+        Chromium [st-5n3s]."""
         body = text(order_page.get("/exec/order?side=call"))
-        label = body.split("class='dl stopl'")[1].split("</label>")[0]
+        row = body.split("<div class='row stops'>")[1].split("</div>")[0]
+        label = row.split("class='dl stopl'")[1].split("</label>")[0]
         plus, box, minus = (label.index("data-step=1 "), label.index("id=stopbox"),
                             label.index("data-step=-1"))
-        assert plus < box < minus
-        assert "name=stopoff" in body and "function stepOff(dir)" in body
+        assert plus < box < minus and "id=exitbox" in row
+        assert ".row.stops{justify-content:center" in body
 
-    def test_a_stepped_stop_loss_is_struck_from_the_live_limit(self, order_page):
-        """0.30 under the 32.40 limit is a 32.10 stop and a $30 loss; the
-        default stays the flat $20 (0.20) when no distance is carried."""
-        body = text(order_page.get("/exec/order?side=call&stopoff=0.30"))
-        assert "stop loss <b class=neg>$30.00</b>" in body and "value='32.10'" in body
+    def test_the_stop_box_is_the_distance_and_the_boxes_swap_to_na(self, order_page):
+        """The box shows .2 — the stop's distance — not the stop price;
+        0.30 under the 32.40 limit is a $30 stop. A close-at-SPX level puts
+        NA in the stop box, and the default puts NA in the SPX box."""
         plain = text(order_page.get("/exec/order?side=call"))
+        assert "id=stopbox" in plain and "value='.2' data-default='.2'" in plain
+        assert "id=exitbox inputmode=numeric enterkeyhint=done autocomplete=off value='NA'" in plain
         assert "stop loss <b class=neg>$20.00</b>" in plain
+        body = text(order_page.get("/exec/order?side=call&stopoff=0.30"))
+        assert "value='.3' data-default='.2'" in body and "stop loss <b class=neg>$30.00</b>" in body
+        lvl = text(order_page.get("/exec/order?side=call&strike=6400&exitspx=6376"))
+        assert "value='NA' data-default='.2'" in lvl and "value='6376'" in lvl
+        assert "<span id=stopline>market close if SPX falls to <b>6376</b></span>" in lvl
+        put = text(order_page.get("/exec/order?side=put&strike=6300&exitspx=6384"))
+        assert "<span id=stopline>market close if SPX rises to <b>6384</b></span>" in put
+        # NA in the SPX box is no level
+        na = text(order_page.get("/exec/order?side=call&exitspx=NA"))
+        assert "stop loss <b class=neg>$20.00</b>" in na
 
 class TestARefusedSendIsShown:
     """2026-09-15 09:54 CT: Steve tapped SEND and saw nothing —
@@ -832,32 +850,15 @@ class TestAStopOfHisOwn:
             intent_for(p, intent_id="page-x", engine_sha="t")
 
 
-    def test_the_box_is_on_the_page_pre_filled_with_the_flat_twenty_dollar_stop(self, order_page, armed, chain):
-        base = price(armed, Selection(side="call", expiry=DAY, strike=6400))
-        assert base.stop_price == 1.90                     # 2.10 − $20
-        body = text(order_page.get("/exec/order?side=call&strike=6400"))
-        form = body.split("<form id=sel")[1].split("</form>")[0]
-        assert f"id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off value='{base.stop_price:.2f}' data-derived='{base.stop_price:.2f}'" in form
-        assert "name=stop value=''" in form
-        assert "the resting stop, in dollars (8.30)" in form and "name=exitspx id=exitbox" in form
-        assert "your price" not in body and "your level" not in body
-        assert "function stopField()" in body and "window.__followStop = function(j)" in body
-        assert "fd.set('stop', sf.elements['stop'].value || '')" in body
-
-    def test_his_stop_rides_the_form_the_ticket_and_no_link(self, order_page):
+    def test_a_stop_price_in_a_url_still_prices_and_rides_send(self, order_page):
+        """The page no longer writes ``stop`` (the box is a distance since
+        2026-09-30), but a URL that carries one is still dollars, and SEND
+        carries it."""
         body = text(order_page.get("/exec/order?side=call&strike=6400&stop=1.50"))
-        form = body.split("<form id=sel")[1].split("</form>")[0]
-        assert "name=stop value='1.50'" in form and "id=stopbox" in form and "value='1.50' data-derived=" in form
-        # a price he typed still shows as the dollars it loses; a level shows as the level
         assert "<span id=stopline>stop loss <b class=neg>$60.00</b></span>" in body
         assert "name='stop' value='1.50'" in body.split("id=sendfields")[1].split("</span>")[0]
         hrefs = [h.split("'")[0] for h in body.split("href='")[1:]]
         assert not any("stop=" in h for h in hrefs), hrefs
-        level = text(order_page.get("/exec/order?side=call&strike=6400&exitspx=6376"))
-        assert "<span id=exitline>market close if SPX falls to <b>6376</b></span>" in level
-        assert "name='exitspx' value='6376'" in level.split("id=sendfields")[1].split("</span>")[0]
-        put = text(order_page.get("/exec/order?side=put&strike=6300&exitspx=6384"))
-        assert "<span id=exitline>market close if SPX rises to <b>6384</b></span>" in put
 
     def test_the_price_json_carries_the_stop_for_the_box_to_follow(self, order_page):
         j = order_page.get("/exec/order/price?side=call&strike=6400").json
@@ -876,12 +877,12 @@ class TestAStopOfHisOwn:
         assert armed.journal.events("sending")[-1]["page_query"]["stop"] == "1.50"
 
     def test_send_closes_at_market_on_his_spx_level(self, order_page, armed, chain):
-        """The close level fires on its own, nearer than the dollar stop's
-        level (0.50 walks to 6374.67), and survives into the position."""
-        page_send(order_page, {"side": "call", "strike": "6400", "stop": "0.50",
-                               "exitspx": "6377"})
+        """The close-at-SPX level is the stop as a level: the SPX loop
+        closes at market there, and the resting stop at Schwab is the walked
+        price (6377 is 3 points under 6380 at δ 0.30: 2.10 − 0.90 = 1.20)."""
+        page_send(order_page, {"side": "call", "strike": "6400", "exitspx": "6377"})
         p = armed.status()["positions"][0]
-        assert p["exit_spx"] == 6377 and p["stop_price"] == 0.50
+        assert p["exit_spx"] == 6377 and p["stop_spx"] == 6377 and p["stop_price"] == 1.20
         assert armed.journal.events("sending")[-1]["exit_spx"] == 6377
         assert armed.observe(SPX_NOW - 2.9)["fired"] == []
         assert armed.observe(SPX_NOW - 3.0)["fired"][0]["closed"] is True

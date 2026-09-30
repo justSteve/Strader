@@ -279,9 +279,16 @@ def window(contracts: list[Contract], spx: float, n: int = STRIKES_EACH_SIDE) ->
 
 
 def choose(contracts: list[Contract], spx: float, *, strike: float | None,
-           delta: float | None) -> Contract:
-    """A tapped strike wins; else the delta override; else nearest to spot
-    (Steve's ruling, 2026-09-14). Ties go to the tighter spread."""
+           delta: float | None, funds: float | None = None, lots: int = 1,
+           stop_off: float | None = None) -> Contract:
+    """A tapped strike wins. Otherwise the opening strike is the HIGHEST
+    delta, at or under the cap (``delta``, 0.80 by default), that makes a
+    legal order (Steve, 2026-09-30: "the opening order should use the
+    highest delta that creates a legal order. Max delta remains .8"): the
+    account can pay for it at the limit, and the limit leaves room for the
+    stop under it. When nothing qualifies — an unread account qualifies
+    everything — the nearest to the cap is shown, with the ticket saying
+    what is wrong. Ties go to the tighter spread."""
     if not contracts:
         raise ValueError("the chain has no contracts to choose from")
     if strike is not None:
@@ -289,12 +296,40 @@ def choose(contracts: list[Contract], spx: float, *, strike: float | None,
             if abs(c.strike - strike) < 1e-6:
                 return c
         raise ValueError(f"no strike {strike:g} in the chain")
-    if delta is not None:
-        return min(contracts, key=lambda c: (abs(c.abs_delta - delta), c.spread_pts))
-    return min(contracts, key=lambda c: (abs(c.strike - spx), c.spread_pts))
+    cap = delta if delta is not None else DEFAULT_DELTA
+    lots = max(1, lots)
+    off = stop_off if stop_off is not None else DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * lots)
+
+    def legal(c: Contract) -> bool:
+        if not (0 < c.abs_delta <= cap + 1e-9) or c.ask_pts <= 0:
+            return False
+        lim = limit_at(c.ask_pts)
+        if funds is not None and lim * CONTRACT_MULTIPLIER * lots > funds:
+            return False
+        return lim - off >= tick_for(0.0)
+    ok = [c for c in contracts if legal(c)]
+    if ok:
+        return max(ok, key=lambda c: (c.abs_delta, -c.spread_pts))
+    return min(contracts, key=lambda c: (abs(c.abs_delta - cap), c.spread_pts))
 
 
 # ── the priced ticket ────────────────────────────────────────────────────
+
+def _funds(service: ExecService) -> float | None:
+    """What the account can put into a new long option, or ``None`` when it
+    cannot be read — the strike choice then judges price and stop only."""
+    try:
+        b = service._balances_cached(service.clock())
+    except Exception:  # noqa: BLE001 — an unreadable account narrows nothing
+        return None
+    if not b or b.get("error"):
+        return None
+    for key in ("available_funds", "option_buying_power"):
+        v = b.get(key)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return float(v)
+    return None
+
 
 def nearest_tick(pts: float) -> float:
     """A typed entry price on the exchange's grid, to the nearest tick —
@@ -407,7 +442,8 @@ def price(service: ExecService, sel: Selection) -> Priced:
         return out
     out.contracts = window(contracts, spx)
     try:
-        c = choose(contracts, spx, strike=sel.strike, delta=sel.delta)
+        c = choose(contracts, spx, strike=sel.strike, delta=sel.delta,
+                   funds=_funds(service), lots=sel.lots, stop_off=sel.stopoff)
     except ValueError as exc:
         out.error = str(exc)
         return out
@@ -420,16 +456,13 @@ def price(service: ExecService, sel: Selection) -> Priced:
     if not (0 < c.abs_delta <= 1):
         out.error = f"the chain gives no usable delta for {c.strike:g} — no stop can be struck"
         return out
-    if sel.stop:
+    # one of the two boxes is live, the other reads NA (Steve, 2026-09-30):
+    # a close-at-SPX level is the stop, as a level; otherwise the stop is
+    # the dollar distance under the limit
+    if sel.exitspx is not None or sel.stop:
         _apply_stop_of_his_own(out, c, spx)
     else:
         _apply_flat_loss_stop(out, c, spx, per_contract=sel.stopoff)
-    if sel.exitspx is not None and not out.error:
-        if not stop_is_consistent(c.right, spx, sel.exitspx):
-            side = "below" if c.right == "CALL" else "above"
-            out.error = (f"close at SPX {sel.exitspx:g}: a {'call' if c.right == 'CALL' else 'put'}'s "
-                         f"close level sits {side} the market, and {spx:.2f} is not — it would "
-                         f"close at once")
     return out
 
 
@@ -506,15 +539,18 @@ def _apply_stop_of_his_own(out: Priced, c: Contract, spx: float) -> None:
     of his stop (st-bafu: the budget, the noise floor and their warnings
     left with the derivation); the service's ceiling does."""
     sel = out.selection
-    if out.limit is None or not sel.stop:
+    if out.limit is None or not (sel.stop or sel.exitspx is not None):
         return
-    # the box is dollars only since 2026-09-30 (Steve: "dedicate that control
-    # to the dollar amount"); an SPX level goes in the close-at-SPX box
-    try:
-        kind, value = "price", float(sel.stop.strip())
-    except ValueError:
-        out.error = f"your stop: {sel.stop.strip()!r} is not a price (10.30)"
-        return
+    # the level comes from the close-at-SPX box (Steve, 2026-09-30); a stop
+    # price from a URL's ``stop`` is dollars
+    if sel.exitspx is not None:
+        kind, value = "spx", float(sel.exitspx)
+    else:
+        try:
+            kind, value = "price", float(sel.stop.strip())
+        except ValueError:
+            out.error = f"your stop: {sel.stop.strip()!r} is not a price (10.30)"
+            return
     right = c.right
     word = "call" if right == "CALL" else "put"
     delta = _wire_delta(c)
@@ -537,13 +573,13 @@ def _apply_stop_of_his_own(out: Priced, c: Contract, spx: float) -> None:
         level = value
         if not stop_is_consistent(right, spx, level):
             side = "below" if right == "CALL" else "above"
-            out.error = (f"your stop: a {word}'s stop sits {side} the market, and SPX {level:g} "
-                         f"is not {side} the {spx:.2f} mark — it would fire at once")
+            out.error = (f"close at SPX {level:g}: a {word}'s close level sits {side} the market, "
+                         f"and SPX {level:g} is not {side} the {spx:.2f} mark — it would fire at once")
             return
         try:
             stop_price = protective_stop_price(out.limit, delta, spx, level)
         except ValueError as exc:
-            out.error = f"your stop: SPX {level:g} walks to no price a stop can rest at: {exc}"
+            out.error = f"close at SPX {level:g} walks to no price a stop can rest at: {exc}"
             return
         if out.limit - abs(spx - level) * delta <= 0:
             # the same clamp the service's own stop gets

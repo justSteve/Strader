@@ -103,7 +103,7 @@ class TestTheCard:
         card = panel_of(body)
         strip = body.split("id=strip>")[1].split("</div></div>")[0]
         assert "id=clock" not in strip
-        assert "<div class=money><span id=clock class=clock></span><span id=balances>" in body
+        assert "<div class=money><span><span id=clock class=clock></span> <span class='k day'>" in body
         # the position's own best/worst water marks are labelled and stay
         assert "class=ago data-at=" in card                    # the fill, ticking
         assert "id=updated class=ago" in card
@@ -311,9 +311,13 @@ class TestTheAccountsMoney:
         broker.set_balances(available_funds=150.0, option_buying_power=150.0, buying_power=300.0)
         service.unlock({"t": 1})
         service._balances_cache = None            # the unlock's status read came before the money
+        # the opening strike is one the account can pay for (Steve,
+        # 2026-09-30: "the highest delta that creates a legal order"); a
+        # tapped one it cannot is still said
         body = text(page.get("/exec/order?side=call&delta=0.3"))
         assert "<span id=balances><b>$150.00</b></span>" in body and "available $150.00" not in body
-        assert "option buying power" not in body
+        assert "option buying power" not in body and "this needs" not in body
+        body = text(page.get("/exec/order?side=call&strike=6400"))
         assert "this needs $210.00 and the account has $150.00 available" in body
         broker.set_balances(available_funds=1607.24, option_buying_power=1607.24)
         service._balances_cache = None

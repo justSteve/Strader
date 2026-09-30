@@ -20,7 +20,7 @@ import json
 from datetime import datetime
 from typing import Any, Mapping
 
-from .orderform import POLL_S, Priced, Selection
+from .orderform import DEFAULT_DELTA, DEFAULT_STOP_LOSS_USD, POLL_S, Priced, Selection
 from .panel import COLORS, PANEL_SCRIPT, PANEL_STYLE, WORDS, contract_name, panel_html, stage_of as panel_stage_of
 from .service import CONTRACT_MULTIPLIER, CT, ExecService
 from .stops import take_profit_price
@@ -48,6 +48,7 @@ _ORDER_STYLE = """
  .chip.stopbtn{background:#dc2626;color:#fff}.chip.quiet{background:#1f2937;color:#9ca3af}
  .chip.stop-on{background:#7f1d1d;color:#fca5a5}
  .row{display:flex;align-items:center;gap:.6em;flex-wrap:wrap}
+ .row.stops{justify-content:center;gap:1.2em;margin:.5em 0}
  .row .grow{flex-grow:1}
  .exp2 a.chip{color:#9ca3af;background:transparent;border:1px solid #374151}.exp2 a.chip.on{background:#1f2937;color:#fff;border-color:#1f2937}
  button.step{width:44px;height:44px;border-radius:8px;border:1px solid #374151;background:#1f2937;color:#f9fafb;
@@ -62,7 +63,8 @@ _ORDER_STYLE = """
        cursor:pointer;vertical-align:middle;color:#9ca3af;padding:0 .4em;font-family:inherit}
  button.lock.on{background:#1f2937;border-color:#fbbf24;color:#fbbf24}
  .tbig #live{font-size:.6em;font-weight:400;vertical-align:middle}
- input.pxbox{width:4.2em;font-size:1em;font-weight:700;padding:.1em .25em;border:2px solid #fbbf24;border-radius:6px;background:#111827;color:#f9fafb}
+ .trow.tcenter{justify-content:center}
+ input.pxbox{text-align:right;width:4.2em;font-size:1em;font-weight:700;padding:.1em .25em;border:2px solid #fbbf24;border-radius:6px;background:#111827;color:#f9fafb}
  .foot{display:flex;justify-content:space-between;gap:.75em;color:#9ca3af;font-size:.9em;margin-top:.4em}
  .money{display:flex;justify-content:space-between;align-items:baseline;gap:.75em;margin:0 0 .6em;font-size:1.05em}
  .money b{font-size:1.2em}
@@ -116,19 +118,42 @@ _SCRIPT = """
   window.__pollSeq = function(){ return seq; };
   // a new delta is a new contract: the lock goes with the old one
   function unlockThenReprice(){ var lf = lockField(); if (lf) lf.value = ''; reprice(); }
-  if (form) { ['delta', 'exitspx'].forEach(function(n){ var el = form.elements[n];
-    var fn = (n === 'delta') ? unlockThenReprice : reprice;
-    if (el) { el.addEventListener('change', fn); el.addEventListener('input', function(){ clearTimeout(window.__t); window.__t = setTimeout(fn, 600); }); } }); }
-  // the stop box (st-m3bl): the visible box follows the flat-loss stop
-  // until he types in it; from then on the hidden `stop` on this form
-  // carries his text — dollars with a '.', an SPX level without — and the
-  // ticket is repriced from it. Cleared, it goes back to following.
-  var stopBox = document.getElementById('stopbox');
+  if (form) { ['delta'].forEach(function(n){ var el = form.elements[n];
+    if (el) { el.addEventListener('change', unlockThenReprice); } }); }
+  // Two boxes, one live (Steve, 2026-09-30): the stop box is the stop's
+  // dollar distance under the entry (".2"), riding on the hidden
+  // `stopoff`; the close-at-SPX box is a level that closes at market.
+  // Typing in either writes NA in the other, so the ticket is priced from
+  // exactly one. The poll keeps repricing from whichever is live.
+  var stopBox = document.getElementById('stopbox'), exitBox = document.getElementById('exitbox');
   function stopField(){ return form ? form.elements['stop'] : null; }
-  function stopTouched(){ var sf = stopField(); return !!(sf && sf.value); }
-  if (stopBox) { stopBox.addEventListener('input', function(){ var sf = stopField(); if (!sf) return;
-      sf.value = stopBox.value.trim(); clearTimeout(window.__t); window.__t = setTimeout(reprice, 600); });
-    stopBox.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); clearTimeout(window.__t); reprice(); stopBox.blur(); } }); }
+  function offField(){ return form ? form.elements['stopoff'] : null; }
+  function num(v){ v = (v || '').trim(); if (!v || /^na$/i.test(v)) return NaN; return parseFloat(v); }
+  function soon(ms){ clearTimeout(window.__t); window.__t = setTimeout(reprice, ms); }
+  function stopLive(off){ var of = offField(), sf = stopField();
+    if (of) of.value = isNaN(off) ? '' : off.toFixed(2); if (sf) sf.value = '';
+    if (exitBox) exitBox.value = 'NA'; }
+  function exitLive(){ var of = offField(), sf = stopField(); if (of) of.value = ''; if (sf) sf.value = '';
+    if (stopBox) stopBox.value = 'NA'; }
+  function shortPts(n){ var t = n.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''); return t.indexOf('0.') === 0 ? t.slice(1) : t; }
+  if (stopBox) {
+    stopBox.addEventListener('input', function(){ var v = num(stopBox.value);
+      if (!isNaN(v) && v > 0) stopLive(v); soon(600); });
+    stopBox.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); soon(0); stopBox.blur(); } }); }
+  if (exitBox) {
+    exitBox.addEventListener('input', function(){ var v = num(exitBox.value);
+      if (!isNaN(v)) exitLive();
+      else if (!exitBox.value.trim() && stopBox) { stopBox.value = stopBox.getAttribute('data-default') || '.2'; stopLive(NaN); exitBox.value = ''; }
+      soon(600); });
+    exitBox.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); soon(0); exitBox.blur(); } });
+    // a tap into a box that reads NA clears it for typing
+    [stopBox, exitBox].forEach(function(bx){ if (bx) bx.addEventListener('focus', function(){ if (/^na$/i.test(bx.value.trim())) bx.value = ''; }); });
+    // left empty, a box says what it means again: NA for the SPX level, or
+    // the stop's distance when the SPX box is the one that is NA
+    exitBox.addEventListener('blur', function(){ if (!exitBox.value.trim()) exitBox.value = 'NA'; });
+    if (stopBox) stopBox.addEventListener('blur', function(){ if (!stopBox.value.trim()) {
+      var of = offField(); stopBox.value = (of && of.value) ? shortPts(parseFloat(of.value))
+        : (/^na$/i.test(exitBox.value.trim()) || !exitBox.value.trim() ? (stopBox.getAttribute('data-default') || '.2') : 'NA'); } }); }
   // the entry price box (co-8mb1z): typing is locking at that price — the
   // hidden limit carries it, the server puts it on the grid and the stop
   // follows it; an empty box goes back to following the ask
@@ -136,32 +161,19 @@ _SCRIPT = """
     var lf = lockField(); if (!lf) return; lf.value = e.target.value.trim();
     var b = document.getElementById('lock'); if (b) { b.classList.toggle('on', !!lf.value); b.innerHTML = lf.value ? '&#128274;' : '&#128275;'; }
     clearTimeout(window.__t); window.__t = setTimeout(reprice, 600); });
-  var exitBox = document.getElementById('exitbox');
-  if (exitBox) exitBox.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); clearTimeout(window.__t); reprice(); exitBox.blur(); } });
   document.addEventListener('keydown', function(e){ if (!e.target || e.target.id !== 'pxbox' || e.key !== 'Enter') return;
     e.preventDefault(); clearTimeout(window.__t); reprice(); e.target.blur(); });
-  // the stop steppers (Steve, 2026-09-30: the default stop sits .2 under
-  // the limit; steps of .1, and the repricing stays live after a step).
-  // + widens the stop under the limit by 0.10, − narrows it; the distance rides on the hidden
-  // `stopoff` and a typed stop is dropped, so every reprice — his and the
-  // poll's — strikes the stop from the live limit and the box follows it.
-  function stepOff(dir){
-    var px = document.getElementById('pxbox'), lim = px ? parseFloat(px.value) : NaN;
-    var cur = (stopBox.value || '').trim(), of = form.elements['stopoff'], off = NaN;
-    if (!isNaN(lim) && cur.indexOf('.') >= 0) off = lim - parseFloat(cur);
-    if (isNaN(off) || off <= 0) off = of && of.value ? parseFloat(of.value) : 0.20;
-    var n = Math.round(off * 100) + dir * 10; if (n < 5) n = 5;
-    return { off: (n / 100).toFixed(2), lim: lim }; }
+  // the stop steppers (Steve, 2026-09-30): + widens the stop's distance
+  // under the entry by 0.10, − narrows it; a box reading NA starts from the
+  // default .2. The close-at-SPX box goes to NA.
   document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('button.step') : null;
     if (!b || !stopBox || !form) return; e.preventDefault();
-    var r = stepOff(Number(b.getAttribute('data-step')));
-    var of = form.elements['stopoff']; if (of) of.value = r.off;
-    var sf = stopField(); if (sf) sf.value = '';
-    if (!isNaN(r.lim)) stopBox.value = Math.max(0.05, r.lim - parseFloat(r.off)).toFixed(2);
-    clearTimeout(window.__t); window.__t = setTimeout(reprice, 300); });
-  window.__followStop = function(j){ if (!stopBox || stopTouched() || !j || j.stop_price == null) return;
-    if (document.activeElement === stopBox) return;
-    var v = Number(j.stop_price).toFixed(2); stopBox.value = v; stopBox.setAttribute('data-derived', v); };
+    var cur = num(stopBox.value); if (isNaN(cur) || cur <= 0) cur = num(stopBox.getAttribute('data-default') || '.2');
+    var n = Math.round(cur * 100) + Number(b.getAttribute('data-step')) * 10; if (n < 5) n = 5;
+    stopBox.value = shortPts(n / 100); stopLive(n / 100); soon(300); });
+  // the stop box holds a distance, which does not move with the market;
+  // nothing to follow (kept for the poll's call)
+  window.__followStop = function(j){};
   // the padlock (st-2s4u): the lock is the hidden limit on the form, the
   // server renders the ticket from it, so a tap only flips the field and
   // reprices. The chip is inside #fd0 and is re-rendered, hence delegation.
@@ -297,6 +309,12 @@ def last_refusal(service: ExecService, now: datetime | None = None) -> str | Non
     return f"{word}Refused ({r.get('bound')}): {r.get('reason')}. Nothing sent."
 
 
+def short_pts(v: float) -> str:
+    """An option-point distance the way Steve writes it: ".2", ".25", "1.5"."""
+    t = f"{float(v):.2f}".rstrip("0").rstrip(".")
+    return t[1:] if t.startswith("0.") else t
+
+
 def usd(v: Any) -> str:
     """An unsigned dollar figure — a balance, a cost — never the signed P&L
     form ``money`` gives."""
@@ -353,16 +371,13 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
     live = (f"<span id=live class=k>ask {c.ask_pts:.2f} now</span>" if locked else "<span id=live class=k></span>")
     # when the number on the screen was read (st-sk9r): the ask's time while
     # following, the moment of the lock while locked; the poll keeps it current
-    when = (f"priced {priced.priced_at.astimezone(CT).strftime('%H:%M:%S')}"
-            if priced.priced_at is not None else "")
-    head = (f"<div class=trow><div class=tbig>{esc(name)} × {priced.lots} at "
+    # centred, no 'at', no priced-at time, no total (Steve, 2026-09-30, iPad)
+    head = (f"<div class='trow tcenter'><div class=tbig>{esc(name)} × {priced.lots} "
             # the entry price is a box (co-8mb1z, Steve 2026-09-25: "i want to
             # be able to set the price of my entry"): it shows the limit that
             # will be sent, on the grid; typing in it is locking at that price
             f"<input id=pxbox class=pxbox inputmode=decimal enterkeyhint=go autocomplete=off "
-            f"aria-label='entry price' value='{priced.limit:.2f}'> {lock} {live} "
-            f"<span id=priced class=k>{when}</span></div>"
-            f"<div class=tbig id=cost>{money(-(priced.cost_usd or 0)).lstrip('-')}</div></div>")
+            f"aria-label='entry price' value='{priced.limit:.2f}'> {lock} {live}</div></div>")
     if priced.error:
         return f"<div class=card>{head}<div class=bad>{esc(priced.error)}</div></div>"
     # One stop line (Steve, 2026-09-17: "keep amount of loss unless i
@@ -371,14 +386,10 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
     # put when it rises to it.
     if priced.stop_set_by == "spx":
         verb = "falls to" if c.right == "CALL" else "rises to"
-        stop_line = f"<span id=stopline>stop if SPX {verb} <b>{priced.stop_spx:g}</b></span>"
+        stop_line = f"<span id=stopline>market close if SPX {verb} <b>{priced.stop_spx:g}</b></span>"
     else:
         stop_line = (f"<span id=stopline>stop loss "
                      f"<b class=neg>{usd(priced.stop_loss_usd)}</b></span>")
-    if priced.selection.exitspx is not None:
-        verb = "falls to" if c.right == "CALL" else "rises to"
-        stop_line += (f"<span id=exitline>market close if SPX {verb} "
-                      f"<b>{priced.selection.exitspx:g}</b></span>")
     line2 = f"<div class=trow>{stop_line}</div>"
     for w in priced.warnings:
         line2 += f"<div class=warn>{esc(w)}</div>"
@@ -583,7 +594,11 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     else:
         # the ticking CT clock left, the buying power right (Steve,
         # 2026-09-30); the panel script paints #clock every second
-        top.append(f"<div class=money><span id=clock class=clock></span>"
+        # the date beside the clock (Steve, 2026-09-30) — the session's
+        # expiry, today unless a URL says otherwise
+        day = (sel.expiry or today).strftime("%m-%d")
+        top.append(f"<div class=money><span><span id=clock class=clock></span> "
+                   f"<span class='k day'>{day}</span></span>"
                    f"<span id=balances>{balances_html(st.get('balances'))}</span></div>")
     parts[0:0] = top
     # The stage card shows only when there is a stage to show: with nothing
@@ -625,52 +640,47 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
         # the strike was not on the form and RE-PRICE re-chose by delta), and
         # the lock as a hidden field the script toggles; the RE-PRICE button's
         # own field, reprice=1, means at the market and drops the lock.
-        delta_val = f"{sel.delta:g}" if sel.delta is not None else ""
+        # The form: the chosen strike, the lock, the stop's distance and the
+        # close-at-SPX level — no δ box and no RE-PRICE (Steve, 2026-09-30,
+        # iPad); the poll reprices it live. A δ in a URL still caps the
+        # strike choice.
         strike_field = (f"<input type=hidden name=strike value='{sel.strike:g}'>"
                         if sel.strike is not None else "")
+        delta_field = (f"<input type=hidden name=delta value='{sel.delta:g}'>"
+                       if sel.delta is not None and abs(sel.delta - DEFAULT_DELTA) > 1e-9 else "")
         # more than one lot rides the form so a reprice keeps it
         lots_field = f"<input type=hidden name=lots value='{sel.lots}'>" if sel.lots != 1 else ""
         limit_val = f"{sel.limit:.2f}" if sel.limit is not None else ""
-        # the stop box (st-m3bl): pre-filled with the flat-loss stop's price
-        # (st-bafu) and following it until touched; touched, the hidden `stop` carries
-        # the text as typed and the rule is applied when the ticket is priced
-        # — a '.' is dollars, none is an SPX level. The visible box has no
-        # name of its own, so an untouched box never overrides anything.
-        derived = f"{priced.stop_price:.2f}" if priced.stop_price is not None else ""
-        stop_val = sel.stop if sel.stop else derived
+        # Two boxes, one live (Steve, 2026-09-30): the stop as its dollar
+        # distance under the limit (".2" — the flat $20 at one lot), or a
+        # close-at-SPX level; typing in either writes NA in the other.
+        exit_on = sel.exitspx is not None
+        off = sel.stopoff if sel.stopoff is not None else DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * sel.lots)
+        stop_val = "NA" if exit_on else short_pts(off)
+        exit_val = f"{sel.exitspx:g}" if exit_on else "NA"
         parts.append(
             f"<form id=sel method=get action='{order}'>"
             f"<input type=hidden name=side value='{sel.side}'>"
             f"<input type=hidden name=expiry value='{exp.isoformat()}'>"
-            f"{strike_field}{lots_field}"
+            f"{strike_field}{delta_field}{lots_field}"
             f"<input type=hidden name=limit value='{limit_val}'>"
             f"<input type=hidden name=stop value='{esc(sel.stop or '')}'>"
-            f"<input type=hidden name=stopoff value='{f'{sel.stopoff:.2f}' if sel.stopoff else ''}'>"
-            # The expiry is the day, said once, not a button. There is no
-            # 'next' chip: Steve, 2026-09-18, "remove the 'next' button"
-            # (st-644f) — he trades the session he is in. A URL that carries
-            # another expiry is still priced and still shown here, so
-            # nothing is lost but the tap that offered it.
-            "<div class='row exp2'>"
-            f"<span class='chip on'>{exp.strftime('%m-%d')}</span>"
-            "<span class=grow></span>"
-            f"<label class=dl><span class=k>δ</span><input name=delta inputmode=decimal value='{delta_val}' placeholder='spot'></label>"
-            "<label class='dl stopl' title='the resting stop, in dollars (8.30)'>"
+            f"<input type=hidden name=stopoff value='{f'{sel.stopoff:.2f}' if sel.stopoff and not exit_on else ''}'>"
+            "<div class='row stops'>"
+            "<label class='dl stopl' title='the stop, in dollars under the entry (.2)'>"
             "<span class=k>stop $</span>"
             # the steppers (Steve, 2026-09-30): + to the left of the box, −
-            # to the right; each widens or narrows the stop loss by 0.10
-            # under the limit, and the stop keeps following the live price
+            # to the right; each widens or narrows the stop by 0.10
             "<button type=button class=step data-step=1 aria-label='widen the stop 0.10'>+</button>"
             f"<input id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off "
-            f"value='{esc(stop_val)}' data-derived='{derived}'>"
+            f"value='{stop_val}' data-default='{short_pts(DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * sel.lots))}'>"
             "<button type=button class=step data-step=-1 aria-label='narrow the stop 0.10'>&minus;</button></label>"
-            # the close-at-SPX box (Steve, 2026-09-30): a whole SPX level that
-            # closes the position at market when crossed; empty sets none
+            # the close-at-SPX box: a whole SPX level at which the position
+            # is closed at market
             "<label class='dl exitl' title='closes at market when SPX crosses it (7610)'>"
             "<span class=k>close at SPX</span>"
             f"<input name=exitspx id=exitbox inputmode=numeric enterkeyhint=done autocomplete=off "
-            f"value='{f'{sel.exitspx:g}' if sel.exitspx is not None else ''}' placeholder='none'></label>"
-            "<button class='chip quiet' name=reprice value=1>RE-PRICE</button></div>"
+            f"value='{exit_val}'></label></div>"
             "</form>")
         # strikes around spot — only the ones the account can pay for (st-644f)
         parts.append("<div class=card><div id=strikes>"

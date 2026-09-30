@@ -73,7 +73,8 @@ class TestTheStopFollowsTheEntry:
 
     def test_the_stop_box_is_on_the_form(self, form):
         body = text(form.get("/exec/order?side=call&strike=6400"))
-        assert "id=stopbox" in body and "data-derived='1.90'" in body
+        # the box holds the stop's distance under the entry (Steve, 2026-09-30)
+        assert "id=stopbox" in body and "value='.2' data-default='.2'" in body
 
 
 class TestSendThenReprice:

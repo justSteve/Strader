@@ -1165,9 +1165,10 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     # ── controls ──
     if state == "LOCKED":
         parts.append(unlock_form(a["unlock"]))
-    if not arming["killed"]:
-        parts.append(f"<form method=post action='{a['stop']}'><button class='big stop'>STOP</button></form>")
-    else:
+    # no STOP button (Steve, 2026-09-30: "The STOP button serves no purpose.
+    # just remove it from both trade and account screen"); a STOP already on
+    # is still shown and cleared here
+    if arming["killed"]:
         parts.append(f"<form method=post action='{a['resume']}'>"
                      "<input type=password name=passphrase placeholder='passphrase' "
                      "autocomplete=current-password required>"

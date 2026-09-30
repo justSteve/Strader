@@ -478,7 +478,9 @@ class TestSurface:
         'Flatten' button unless there is an open position." (co-8mb1z)"""
         page.post("/exec/unlock", data={"passphrase": PASS})
         body = text(page.get("/exec/account"))
-        assert "ARMED" in body and ">STOP<" in body and ">lock<" in body
+        # no STOP button (Steve, 2026-09-30: "just remove it from both trade
+        # and account screen")
+        assert "ARMED" in body and ">STOP<" not in body and ">lock<" in body
         assert ">stand down<" not in body
         assert ">FLATTEN<" not in body                  # nothing is open
 
