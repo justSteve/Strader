@@ -69,6 +69,18 @@ _ORDER_STYLE = """
  input.numbox{width:3.6em;height:44px;box-sizing:border-box;font-size:1em;font-weight:700;text-align:center;
    border:2px solid #9ca3af;border-radius:8px;background:#111827;color:#f9fafb}
  #lotsbox{width:2.2em}
+ /* the ticket head on one line at iPad width (Steve, 2026-09-30: "tighten") */
+ .tcenter .tbig{display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:nowrap;font-size:1.25em}
+ .tcenter .stepper{gap:2px}
+ .tcenter button.step{width:34px;height:40px;font-size:1.1em}
+ .tcenter input.numbox{height:40px;width:3.1em;padding:0 .1em}
+ .tcenter #lotsbox{width:1.7em}
+ .tcenter input.pxbox{height:40px;width:3.5em;box-sizing:border-box}
+ .tcenter button.lock{min-width:38px;height:40px;padding:0 4px}
+ .tcenter #live:empty{display:none}
+ @media (max-width:430px){.tcenter .tbig{font-size:1.05em;gap:2px}.tcenter button.step{width:28px}
+   .tcenter input.numbox{width:2.9em}.tcenter #lotsbox{width:1.6em}.tcenter input.pxbox{width:3.3em}
+   .tcenter button.lock{min-width:32px}}
  input.pxbox{text-align:right;width:4.2em;font-size:1em;font-weight:700;padding:.1em .25em;border:2px solid #fbbf24;border-radius:6px;background:#111827;color:#f9fafb}
  .foot{display:flex;justify-content:space-between;gap:.75em;color:#9ca3af;font-size:.9em;margin-top:.4em}
  .money{display:flex;justify-content:space-between;align-items:baseline;gap:.75em;margin:0 0 .6em;font-size:1.05em}
