@@ -72,6 +72,7 @@ from .orderpage import (balances_html, journal_html, position_html, send_fields_
                         quote_html, render_order, state_html, strikes_html, ticket_html,
                         broker_badge)
 from .service import CONTRACT_MULTIPLIER, ExecService, Refused
+from .stops import _round_up_to_tick, tick_for
 from .vault import BadPassphrase, Vault, VaultError, VaultMissing
 
 #: The page's loopback port. ``tailscale serve --bg --set-path /exec
@@ -576,7 +577,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         body["sendable"] = sendable(priced, balances, st)
         # the strikes the account can pay for, the same filter the poll uses
         body["strikes_html"] = strikes_html(priced, url_for("exec.order"), balances)
-        body["send_fields_html"] = send_fields_html(sel)
+        body["send_fields_html"] = send_fields_html(sel, priced)
         return body
 
     @bp.get("/order/state")
@@ -639,7 +640,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 "fd0_html": ticket_html(priced, service.bounds, st.get("balances")),
                 "strikes_html": strikes_html(priced, url_for("exec.order"),
                                              st.get("balances")),
-                "send_fields_html": send_fields_html(sel),
+                "send_fields_html": send_fields_html(sel, priced),
                 "sendable": sendable(priced, st.get("balances"), st),
                 "contract": priced.to_dict().get("contract"),
                 "stop_price": priced.stop_price,
@@ -659,14 +660,12 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                     cost_now = _money(-(limit_now * CONTRACT_MULTIPLIER * lots)).lstrip("-")
             except BrokerError as exc:
                 error = str(exc)
-        from .panel import journal_facts, panel_body
+        from .panel import closed_html, journal_facts, panel_body
         stage, body = panel_body(service, st, _actions(), now=clock(),
                                  order_path=url_for("exec.order"), refused=refused)
-        last_close = journal_facts(service).get("last_close") or {}
         return {"mode": st["mode"], "arming": st["arming"], "day": st["day"],
-                # the stamp of the day's last close, so a card NEW ORDER
-                # dismissed stays dismissed under the poll (st-igw0)
-                "last_close_ts": last_close.get("ts"),
+                # the day's closed positions, a folded card each (st-qqxj)
+                "closed_html": closed_html(journal_facts(service), clock()),
                 "pnl": st.get("pnl"), "positions": st["positions"],
                 "working": st["working"],
                 "quote": quote, "spx": spx,
@@ -704,11 +703,10 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
 
         def answer(msg: str | None, bad: str | None, *, replayed: bool = False):
             if wants_json:
-                # a "not filled yet" answer belongs to the working stage: the
-                # page drops it once the card has moved on — a paper fill
-                # lands inside this same answer (Steve, 2026-09-30, st-5n3s)
+                # an answer about a stage belongs to it, and the page drops it
+                # once the card has moved on (Steve, 2026-09-30, st-5n3s)
                 return {"ok": bad is None, "msg": msg, "bad": bad, "replayed": replayed,
-                        "msg_stage": "working" if msg and "not filled yet" in msg else None,
+                        "msg_stage": msg_stage(msg),
                         "send_nonce": nonces.issue("send", SEND_NONCE_TTL_S),
                         **_state_payload(sel_symbol(sel), request.form.get("lots"),
                                          refused=bad, sel=sel if sel.side else None)}
@@ -768,6 +766,23 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 sent_outcomes.pop(k, None)
         return answer(msg, bad)
 
+    def msg_stage(msg: str | None) -> str | None:
+        """The card stage a SEND answer speaks of, or ``None``. "not filled
+        yet" is the working stage — a paper fill lands inside the same answer
+        (paper-0061, st-5n3s). "SENT AND FILLED" is the filled stage: it went
+        on saying so under a position that had closed (Steve, 2026-09-30:
+        "The SENT AND FILLED caption box is still not updating if a close
+        occurs", st-qqxj); a stop out, a target, a FLATTEN or a sale in TOS
+        all move the card on and take the caption with them. One that says
+        the position closed inside the answer is about no live stage."""
+        if not msg:
+            return None
+        if "not filled yet" in msg:
+            return "working"
+        if "SENT AND FILLED" in msg and "the position is closed" not in msg:
+            return "filled"
+        return None
+
     def sel_symbol(sel: Selection) -> str:
         """The chosen contract's symbol for the state payload's quote, or
         nothing — a send that refused before pricing has none."""
@@ -799,7 +814,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                                              "target_price": _form_price("target_price"),
                                              "stop_spx": None, "target_spx": None}
             for leg in ("stop", "target"):
-                parsed = _form_leg(leg)
+                parsed = _form_leg(leg) or _form_leg_boxes(leg, symbol)
                 if parsed is not None:
                     legs[f"{leg}_{parsed[0]}"] = parsed[1]
             if all(v is None for v in legs.values()):
@@ -881,6 +896,47 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         if not raw:
             return None
         return parse_leg_text(raw, leg)
+
+    def _form_leg_boxes(leg: str, symbol: str) -> tuple[str, float] | None:
+        """The open position's two boxes for a leg, as the ticket's stop is
+        (Steve, 2026-09-30: "The 'open position' screen should display both
+        SL and TP controls the same way they are rendered on the pre-order
+        screen. Offer both strike and amount triggers", st-qqxj):
+        ``<leg>off``, the leg's dollar distance from the fill in option
+        points (".3" — 0.30 under it for the stop, over it for the target),
+        and ``<leg>spx``, an SPX level. ``live`` names the one he typed in;
+        the other reads NA. The distance becomes a price on the tick grid,
+        rounded up (a stop never further than he asked; a target as
+        ``take_profit_price`` rounds) — the service's adjust takes it from
+        there. ``("price", 11.40)`` / ``("spx", 7690.0)`` / nothing."""
+        def box(name: str) -> str:
+            v = (request.form.get(name) or "").strip()
+            return "" if v.lower() == "na" else v
+        off, level = box(f"{leg}off"), box(f"{leg}spx")
+        live = (request.form.get("live") or "").strip()
+        use = live if live in ("off", "spx") and (off if live == "off" else level) else (
+            "off" if off else ("spx" if level else ""))
+        if use == "spx":
+            try:
+                return "spx", float(level)
+            except ValueError:
+                raise ValueError(f"{leg} at SPX must be a level (7610), not {level!r}") from None
+        if use != "off":
+            return None
+        try:
+            d = float(off)
+        except ValueError:
+            raise ValueError(f"{leg} $ must be a dollar distance (.3), not {off!r}") from None
+        if d <= 0:
+            raise ValueError(f"{leg} $ must be more than nothing, not {off!r}")
+        held = next((p for p in service.status()["positions"] if p.get("symbol") == symbol), None)
+        if held is None:
+            raise ValueError(f"no open position in {symbol.strip() or 'that contract'}")
+        entry = float(held["entry_price"])
+        px = entry - d if leg == "stop" else entry + d
+        if px <= 0:
+            raise ValueError(f"a {leg} {d:.2f} under the {entry:.2f} fill is below nothing")
+        return "price", _round_up_to_tick(px, tick_for(px))
 
     def _actions() -> dict[str, str]:
         """Absolute paths for every form, so a page served at ``/exec/flatten``

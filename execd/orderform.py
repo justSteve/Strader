@@ -607,12 +607,14 @@ def intent_for(priced: Priced, *, intent_id: str, engine_sha: str) -> dict[str, 
         "delta": _wire_delta(priced.contract),
         "source": SOURCE, "engine_sha": engine_sha,
     }
-    if priced.stop_set_by != "level" and priced.stop_price is not None:
+    if priced.stop_set_by != "spx" and priced.stop_price is not None:
         # A stop in dollars stays dollars (Steve, 2026-09-30: "dollars",
         # st-7p5u): the price under the limit rides with the intent, and the
         # service re-strikes the SPX level from the mark at the send, so SPX
         # moving between pricing and send cannot turn $20 into $40. A stop
-        # set as a level (no '.') is a level and sends none.
+        # set as a level — the close-at-SPX box — is a level and sends none;
+        # ``stop_set_by`` says "spx" for it (st-qqxj: this compared against
+        # "level", which it never is, so his level was re-struck at the send).
         d["stop_price"] = float(priced.stop_price)
     if priced.selection.exitspx is not None:
         d["exit_spx"] = priced.selection.exitspx      # his close level (st-5n3s)

@@ -21,7 +21,8 @@ from datetime import datetime
 from typing import Any, Mapping
 
 from .orderform import DEFAULT_DELTA, DEFAULT_STOP_LOSS_USD, POLL_S, Priced, Selection
-from .panel import COLORS, PANEL_SCRIPT, PANEL_STYLE, WORDS, contract_name, panel_html, stage_of as panel_stage_of
+from .panel import (COLORS, PANEL_SCRIPT, PANEL_STYLE, WORDS, closed_html, contract_name, panel_html,
+                    short_pts, stage_of as panel_stage_of)
 from .service import CONTRACT_MULTIPLIER, CT, ExecService
 from .stops import take_profit_price
 
@@ -83,8 +84,10 @@ _ORDER_STYLE = """
    .tcenter button.lock{min-width:32px}}
  input.pxbox{text-align:right;width:4.2em;font-size:1em;font-weight:700;padding:.1em .25em;border:2px solid #fbbf24;border-radius:6px;background:#111827;color:#f9fafb}
  .foot{display:flex;justify-content:space-between;gap:.75em;color:#9ca3af;font-size:.9em;margin-top:.4em}
- .money{display:flex;justify-content:space-between;align-items:baseline;gap:.75em;margin:0 0 .6em;font-size:1.05em}
- .money b{font-size:1.2em}
+ /* div: the card's money notes are spans of class money too */
+ div.money{display:flex;justify-content:space-between;align-items:baseline;gap:.75em;margin:0 0 .6em;font-size:1.05em}
+ div.money b{font-size:1.2em}
+ div.money .clock{font-size:1.15em;font-weight:600;color:#9ca3af;font-variant-numeric:tabular-nums;letter-spacing:.02em}
  details.journalbox{margin-top:.6em}details.journalbox summary{list-style:none;display:inline-flex}
  details.journalbox summary::-webkit-details-marker{display:none}
  #journal pre{white-space:pre-wrap;word-break:break-all;font-size:.8em;color:#cbd5e1;margin:0}
@@ -352,12 +355,6 @@ def last_refusal(service: ExecService, now: datetime | None = None) -> str | Non
     return f"{word}Refused ({r.get('bound')}): {r.get('reason')}. Nothing sent."
 
 
-def short_pts(v: float) -> str:
-    """An option-point distance the way Steve writes it: ".2", ".25", "1.5"."""
-    t = f"{float(v):.2f}".rstrip("0").rstrip(".")
-    return t[1:] if t.startswith("0.") else t
-
-
 def usd(v: Any) -> str:
     """An unsigned dollar figure — a balance, a cost — never the signed P&L
     form ``money`` gives."""
@@ -580,11 +577,21 @@ def working_html(w: dict[str, Any], cancel_action: str | None) -> str:
     return html + "</div>"
 
 
-def send_fields_html(sel: Selection) -> str:
+def send_fields_html(sel: Selection, priced: Priced | None = None) -> str:
     """The selection as the SEND form's hidden fields — kept fresh by the
-    script so SEND carries what the ticket shows (the lock included)."""
+    script so SEND carries what the ticket shows (the lock included).
+
+    The strike the ticket shows is pinned here (st-qqxj). A ticket chosen by
+    δ carried no strike, so SEND chose again by δ from the chain at the send
+    — 2026-09-30 13:38 CT went out as ``delta=0.8`` with no strike — and a
+    market that moved between the paint and the tap could send a strike he
+    was not looking at. The form keeps following δ; SEND sends the row on
+    the ticket."""
+    q = sel.as_query()
+    if sel.strike is None and priced is not None and priced.contract is not None:
+        q = sel.as_query(strike=f"{priced.contract.strike:g}", delta=None)
     return "".join(f"<input type=hidden name='{k}' value='{esc(v)}'>"
-                   for k, v in sel.as_query().items())
+                   for k, v in q.items())
 
 
 # ── the page ─────────────────────────────────────────────────────────────
@@ -597,10 +604,11 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     st = service.status()
     order = actions["order"]
     parts: list[str] = []
-    # A finished order — closed or refused — stays on the card only until the
-    # next order begins: NEW ORDER (?new=1) or picking a side clears it
-    # (Steve, 2026-09-15: "New Order button should clear prior order screen
-    # before all else").
+    # A refusal stays on the card only until the next order begins: picking
+    # a side (or ?new=1) clears it (Steve, 2026-09-15: "New Order button
+    # should clear prior order screen before all else"). A close is not on
+    # the card at all now — it is a folded card of its own at the foot of
+    # the page (st-qqxj).
     starting_over = fresh or bool(sel.side)
     if not bad and not msg and not starting_over:
         bad = last_refusal(service, now=service.clock())
@@ -613,13 +621,9 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     # red box above the card, and the card keeps its controls.
     from .panel import journal_facts
     facts = journal_facts(service)
-    live_stage = panel_stage_of(st, facts, refused=bad)
-    dismissed = starting_over and live_stage in ("closed", "refused")
+    dismissed = starting_over and panel_stage_of(st, facts, refused=bad) == "refused"
     panel = panel_html(service, st, actions, now=service.clock(), order_path=order,
                        sel_query=sel.as_query(), refused=bad, dismissed=dismissed)
-    if dismissed:
-        stamp_ = str((facts.get("last_close") or {}).get("ts") or "")
-        panel = panel.replace("<div id=panel ", f"<div id=panel data-dismissed='{esc(stamp_)}' ", 1)
     if bad and "data-stage=refused" not in panel:
         parts.append(f"<div class=bad>{esc(bad)}</div>")
     # the strip first — the same on every stage (st-shhi); under it, the
@@ -636,19 +640,21 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
         top.append(unlock_form(actions["unlock"], back="order"))
     else:
         # the ticking CT clock left, the buying power right (Steve,
-        # 2026-09-30); the panel script paints #clock every second
-        # the date beside the clock (Steve, 2026-09-30) — the session's
-        # expiry, today unless a URL says otherwise
+        # 2026-09-30); the panel script paints #clock every second. The date
+        # sits to the LEFT of the clock in the clock's own font (Steve,
+        # 2026-09-30: "date should be positioned to left of time - use same
+        # font", st-qqxj) — the session's expiry, today unless a URL says
+        # otherwise
         day = (sel.expiry or today).strftime("%m-%d")
-        top.append(f"<div class=money><span><span id=clock class=clock></span> "
-                   f"<span class='k day'>{day}</span></span>"
+        top.append(f"<div class=money><span class=when><span id=day class=clock>{day}</span> "
+                   f"<span id=clock class=clock></span></span>"
                    f"<span id=balances>{balances_html(st.get('balances'))}</span></div>")
     parts[0:0] = top
     # The stage card shows only when there is a stage to show: with nothing
     # held, nothing working and no answer to show, the page opens on the
     # side buttons. The card is still on the page, hidden, so a SEND answered
     # in place has somewhere to paint (st-igw0).
-    show = (st["positions"] or st["working"] or bad or msg or "data-stage=none" not in panel)
+    show = (st["positions"] or st["working"] or bad or "data-stage=none" not in panel)
     parts.append(panel if show else panel.replace("<div id=panel ", "<div id=panel hidden ", 1))
     parts.append("<div id=answer></div>")
 
@@ -666,20 +672,6 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
         # portion): the ticket and SEND, then the tuning — expiry, δ, RE-PRICE
         # — and the strikes. The ticket — what is sent, the stop, the take-profit
         parts.append(f"<div id=fd0>{ticket_html(priced, service.bounds, st.get('balances'))}</div>")
-        # the one action on this stage: SEND, one tap from the decision
-        # (st-igw0 — the PREVIEW step is gone; the service runs the broker's
-        # own preview inside every place). The script sends it by fetch and
-        # paints the answer; the plain form redirects.
-        # SEND is off until the ticket is an order that may go (Steve,
-        # 2026-09-30); every poll turns it on or off again (st-5n3s)
-        if send_nonce:
-            ok = sendable(priced, st.get("balances"), st)
-            parts.append(
-                f"<form method=post action='{actions['order_send']}' class=sendform>"
-                f"<span id=sendfields>{send_fields_html(sel)}</span>"
-                f"<input type=hidden name=nonce value='{esc(send_nonce)}'>"
-                "<input type=hidden name=ajax value=''>"
-                f"<button class='big send'{'' if ok else ' disabled'}>SEND</button></form>")
         # expiry, δ target and RE-PRICE on one row — one GET form, no script needed.
         # The form carries the chosen strike, so RE-PRICE reprices THAT strike
         # (Steve, 2026-09-15: "simply reprice existing strike" — before st-2s4u
@@ -730,6 +722,23 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             f"<input name=exitspx id=exitbox inputmode=numeric enterkeyhint=done autocomplete=off "
             f"value='{exit_val}'></label></div>"
             "</form>")
+        # the one action on this stage: SEND, one tap from the decision
+        # (st-igw0 — the PREVIEW step is gone; the service runs the broker's
+        # own preview inside every place). The script sends it by fetch and
+        # paints the answer; the plain form redirects. It sits under the
+        # stop and close-at row (Steve, 2026-09-30: "move the stop and close
+        # at line to above the send button", st-qqxj), so the last thing set
+        # before the tap is the stop.
+        # SEND is off until the ticket is an order that may go (Steve,
+        # 2026-09-30); every poll turns it on or off again (st-5n3s)
+        if send_nonce:
+            ok = sendable(priced, st.get("balances"), st)
+            parts.append(
+                f"<form method=post action='{actions['order_send']}' class=sendform>"
+                f"<span id=sendfields>{send_fields_html(sel, priced)}</span>"
+                f"<input type=hidden name=nonce value='{esc(send_nonce)}'>"
+                "<input type=hidden name=ajax value=''>"
+                f"<button class='big send'{'' if ok else ' disabled'}>SEND</button></form>")
         # strikes around spot — only the ones the account can pay for (st-644f)
         parts.append("<div class=card><div id=strikes>"
                      f"{strikes_html(priced, order, st.get('balances'))}</div></div>")
@@ -739,6 +748,10 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     # the day, one line: the money and nothing else (st-644f — no attempts,
     # no headroom; see position_html)
     pnl = st.get("pnl") or {}
+    # the day's closed positions, a folded card each, newest on top — the
+    # foot of the page (Steve, 2026-09-30, st-qqxj); the poll keeps it fresh
+    closed = closed_html(facts, service.clock())
+    parts.append(f"<div id=closed>{closed}</div>")
     parts.append(f"<div class=foot><span>today {money(pnl.get('day_usd'))}</span></div>")
     # the journal, one tap away, kept fresh by the poll
     parts.append("<details id=journalbox class=journalbox><summary class='chip quiet'>journal</summary>"

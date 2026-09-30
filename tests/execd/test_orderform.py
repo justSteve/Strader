@@ -275,8 +275,8 @@ class TestPage:
         assert [c[0] for c in chain.calls if c[0] == "place"] == ["place", "place", "place"]
         # the position, its money and the bracket editor are on the page now
         assert "FILLED" in landing and "NET NOW" in landing and "C6400 × 1" in landing
-        assert "value='21.00'" in landing and ">SET<" in landing
-        assert "name=stop inputmode" in landing and "name=target inputmode" in landing
+        assert "name=targetoff class=offbox" in landing and ">SET<" in landing
+        assert "name=stopoff class=offbox" in landing and "name=stopspx class=spxbox" in landing
 
     def test_a_send_answered_in_place_paints_the_card_and_re_arms_the_button(self, order_page, armed, chain):
         page = text(order_page.get("/exec/order?side=call&delta=0.3"))
@@ -630,7 +630,7 @@ class TestLockedInPlaceAndFewerWords:
         armed._balances_cache = (armed.clock(), {"available_funds": 12345.0,
                                                  "option_buying_power": 2345.0})
         body = text(order_page.get("/exec/order?side=call"))
-        money = body.index("<div class=money><span><span id=clock")
+        money = body.index("<div class=money><span class=when><span id=day class=clock>")
         assert body.index("class=strip") < money < body.index("class=side")
         # one money figure (st-bafu): "option buying power and available is redundant"
         # the clock left, the figure right (Steve, 2026-09-30, iPad)
@@ -682,8 +682,10 @@ class TestAStageChangeAlwaysPaints:
         chain.fill_resting(p["stop_order_id"])
         armed.poll_fills()
         s = order_page.get(f"/exec/order/state?symbol={p['symbol']}&lots=1").json
-        assert s["panel_stage"] == "closed" and "P&amp;L" in s["panel_body_html"]
-        assert "-$20.00" in s["panel_body_html"] and "protective-stop" in s["panel_body_html"]
+        # the close leaves the card for a folded card of its own (st-qqxj):
+        # the card goes back to no order on the first tick, the stack has it
+        assert s["panel_stage"] == "none" and "data-stage=none" in s["panel_body_html"]
+        assert "-$20.00" in s["closed_html"] and ">stop<" in s["closed_html"]
 
     def test_the_script_paints_a_stage_change_over_a_focused_input_and_drops_the_stale_message(self, order_page):
         body = text(order_page.get("/exec/order?side=call"))

@@ -899,14 +899,21 @@ def text(r) -> str:
     return r.get_data(as_text=True)
 
 
+def box(html: str, name: str) -> str:
+    """The value a named box on the position card shows (st-qqxj: each leg
+    is a dollar box ``<leg>off`` and an SPX box ``<leg>spx``)."""
+    return html.split(f"name={name} ")[1].split("value='")[1].split("'")[0]
+
+
 class TestThePage:
     def test_the_position_card_shows_the_target_and_the_editor(self, page, holding):
         body = text(page.get("/exec/order"))
         assert "FILLED" in body and "NET NOW" in body
-        assert "value='21.00'" in body and "value='1.50'" in body
         assert "action='/exec/order/adjust'" in body and ">SET<" in body
-        assert "name=stop inputmode=decimal enterkeyhint=go autocomplete=off value='1.50'" in body
-        assert "name=target inputmode=decimal enterkeyhint=go autocomplete=off value='21.00'" in body
+        # fill 2.10: the stop 1.50 is .6 under it at SPX 6378, the target
+        # 21.00 is 18.9 over it with no level (st-qqxj)
+        assert (box(body, "stopoff"), box(body, "stopspx")) == (".6", "6378")
+        assert (box(body, "targetoff"), box(body, "targetspx")) == ("18.9", "NA")
         assert f"name=symbol value='{CALL}'" in body
 
     def test_the_state_json_carries_the_target_and_the_editor_fragment(self, page, holding):
@@ -923,7 +930,7 @@ class TestThePage:
         landing = text(page.get(r.headers["Location"]))
         assert "Stop moved from 1.50 to 1.80" in landing
         assert "Target moved from 21.00 to 25.00" in landing
-        assert "value='1.80'" in landing and "value='25.00'" in landing
+        assert box(landing, "stopoff") == ".3" and box(landing, "targetoff") == "22.9"
         assert (pos_of(holding)["stop_price"], pos_of(holding)["target_price"]) == (1.80, 25.00)
 
     def test_update_with_one_field_blank_moves_only_the_other(self, page, holding):
@@ -1332,18 +1339,20 @@ class TestOneLegEnterToSend:
         forms = card.split("class='adjust leg'")
         assert len(forms) == 3 and ">UPDATE<" not in card
         assert "data-leg=stop" in card and "data-leg=target" in card
-        assert card.count("enterkeyhint=go") == 2 and card.count(">SET<") == 2
+        # two boxes a leg, a dollar and an SPX one (st-qqxj); Enter sends either
+        assert card.count("enterkeyhint=go") == 4 and card.count(">SET<") == 2
         assert "id=adjustnote" in card
         stop_form = card.split("data-leg=stop")[1].split("</form>")[0]
-        assert "name=stop inputmode" in stop_form and "name=target inputmode" not in stop_form
+        assert "name=stopoff " in stop_form and "name=stopspx " in stop_form
+        assert "name=target" not in stop_form
 
     def test_an_ajax_set_answers_in_place_with_the_repainted_card(self, page, holding):
         r = page.post("/exec/order/adjust", data={"symbol": CALL, "target_price": "25", "ajax": "1"})
         assert r.status_code == 200
         j = r.json
         assert j["ok"] is True and j["msg"] == "Target moved from 21.00 to 25.00." and j["bad"] is None
-        assert j["panel_stage"] == "filled" and "value='25.00'" in j["panel_body_html"]
-        assert "value='1.50'" in j["panel_body_html"]              # the stop untouched
+        assert j["panel_stage"] == "filled" and box(j["panel_body_html"], "targetoff") == "22.9"
+        assert box(j["panel_body_html"], "stopoff") == ".6"         # the stop untouched
         assert pos_of(holding)["target_price"] == 25.0 and pos_of(holding)["stop_price"] == 1.50
 
     def test_an_ajax_refusal_is_words_not_a_redirect(self, page, holding):
@@ -1644,12 +1653,12 @@ class TestSpxLevelOnThePage:
         r = page.post("/exec/order/adjust", data={"symbol": CALL, "target": "6400", "ajax": "1"})
         assert r.json["msg"] == "Target set by SPX 6400.00 → rests at 8.10 (was 21.00)."
         card = r.json["panel_body_html"]
-        assert "value='8.10'" in card and "<span class=level>SPX 6400.00</span>" in card
-        assert "<span class=level>SPX 6378.00</span>" in card            # the stop's, beside it
+        assert box(card, "targetoff") == "6" and box(card, "targetspx") == "6400"
+        assert box(card, "stopspx") == "6378"                            # the stop's, beside it
         r = page.post("/exec/order/adjust", data={"symbol": CALL, "target": "25.0", "ajax": "1"})
         assert r.json["msg"] == ("Target moved from 8.10 to 25.00 (a price: nothing fires on "
                                  "the SPX mark for it now).")
-        assert "SPX 6400.00" not in r.json["panel_body_html"]
+        assert box(r.json["panel_body_html"], "targetspx") == "NA"
 
     def test_a_level_that_only_moves_the_level_says_so(self, page, holding):
         page.post("/exec/order/adjust", data={"symbol": CALL, "stop": "6376", "ajax": "1"})
@@ -1681,9 +1690,14 @@ class TestSpxLevelOnThePage:
         r = page.post("/exec/order/adjust", data={"symbol": CALL, "stop_price": "1.80", "ajax": "1"})
         assert r.json["ok"] is True and pos_of(holding)["stop_price"] == 1.80
 
-    def test_the_card_states_the_rule_and_shows_the_stop_level(self, page, holding):
+    def test_the_card_offers_each_leg_both_ways_and_shows_the_stop_level(self, page, holding):
+        """The '.' rule's one box per leg became two (st-qqxj): a dollar box
+        and an SPX box, so the rule needs no line under the controls. The
+        route still reads a ``stop`` / ``target`` field by the rule."""
         body = text(page.get("/exec/order"))
         card = body.split("<div id=panel ")[1].split("<div class=side>")[0]
-        assert "a number with a '.' is a price (10.30); without one it is an SPX level (7585)" in card
-        assert "<span class=level>SPX 6378.00</span>" in card
-        assert "name=stop inputmode=decimal" in card and "name=target inputmode=decimal" in card
+        assert "a number with a '.' is a price" not in card
+        assert box(card, "stopspx") == "6378"
+        for leg in ("stop", "target"):
+            assert f"name={leg}off class=offbox inputmode=decimal" in card
+            assert f"name={leg}spx class=spxbox inputmode=decimal" in card

@@ -103,11 +103,15 @@ class TestTheCard:
         card = panel_of(body)
         strip = body.split("id=strip>")[1].split("</div></div>")[0]
         assert "id=clock" not in strip
-        assert "<div class=money><span><span id=clock class=clock></span> <span class='k day'>" in body
+        # the date to the LEFT of the clock, in the clock's own font (Steve,
+        # 2026-09-30, st-qqxj)
+        assert ("<div class=money><span class=when><span id=day class=clock>08-26</span> "
+                "<span id=clock class=clock></span></span>") in body
         # the position's own best/worst water marks are labelled and stay
         assert "class=ago data-at=" in card                    # the fill, ticking
-        assert "id=updated class=ago" in card
-        assert ">pause<" in card and ">less<" in card and "id=refresh" in card
+        # no 'updated', pause or less (Steve, 2026-09-30, st-qqxj); refresh stays
+        assert "id=updated" not in card and ">pause<" not in card and ">less<" not in card
+        assert "id=refresh" in card
 
     def test_working_names_the_gap_to_the_ask_and_offers_only_cancel(self, page, armed, broker, clock):
         broker.rest_limits = True
@@ -134,13 +138,17 @@ class TestTheCard:
 
     def test_the_cards_stop_and_target_have_steppers(self, page, holding):
         """Steve, 2026-09-30: after a fill, the take-profit updates the same
-        way the stop does — + left of the box, − right, then SET [st-5n3s]."""
+        way the stop does — + left of the box, − right, then SET [st-5n3s];
+        and as the ticket's stop row is, a dollar box between the steppers
+        and an SPX box after it (st-qqxj)."""
         card = panel_of(text(page.get("/exec/order")))
         for leg in ("stop", "target"):
             form = card.split(f"data-leg={leg}>")[1].split("</form>")[0]
-            plus, box, minus, set_ = (form.index("data-step=1 "), form.index(f"name={leg} "),
-                                      form.index("data-step=-1"), form.index(">SET<"))
-            assert plus < box < minus < set_
+            plus, box, minus, spx, set_ = (form.index("data-step=1 "), form.index(f"name={leg}off "),
+                                           form.index("data-step=-1"), form.index(f"name={leg}spx "),
+                                           form.index(">SET<"))
+            assert plus < box < minus < spx < set_
+            assert "class='dl stopl'" in form and "class='dl exitl'" in form
 
     def test_filled_is_the_live_editor_with_one_net_number(self, page, holding, broker, clock):
         clock.advance(seconds=95)
@@ -152,8 +160,8 @@ class TestTheCard:
         v = pos_of(holding)["valuation"]
         assert "NET NOW" in card and f"+${v['net_if_closed_usd']:.2f}" in card
         assert "SPX 6380.00, cut " in card
-        assert "name=stop inputmode=decimal enterkeyhint=go autocomplete=off value='1.50'" in card
-        assert "name=target inputmode=decimal enterkeyhint=go autocomplete=off value='21.00'" in card
+        assert "aria-label='stop in dollars' value='.6'" in card
+        assert "aria-label='target in dollars' value='18.9'" in card
         assert f"{v['at_stop_usd']:+,.2f}".replace("+", "+$").replace("-", "-$") in card
         assert ">SET<" in card
         assert "action='/exec/flatten'" in card and ">FLATTEN<" in card
@@ -193,20 +201,27 @@ class TestTheCard:
         assert "reason</td><td>spx-stop" in card and "stop · target</td><td>cancelled" in card
         assert "FLATTEN AGAIN" in card and ">SET<" not in card and ">STOP<" not in card
 
-    def test_closed_shows_the_last_close_and_offers_a_new_order(self, page, holding, broker, clock):
+    def test_a_close_folds_into_its_own_card_at_the_foot(self, page, holding, broker, clock):
+        """Steve, 2026-09-30: "after a position has closed for whatever
+        reason, collapse it's details - let's consider each position to be a
+        card unto itself - stack them at the bottom of the screen" [st-qqxj].
+        The card goes back to no order, hidden; the close is a folded card
+        under the strikes, its line the contract, the CT time, the money and
+        why, its details one tap away."""
         clock.advance(seconds=99)
         broker.set_quote(CALL, bid=2.30, ask=2.40)
         holding.flatten()
         clock.advance(seconds=40)
         body = text(page.get("/exec/order"))
-        card = panel_of(body)
-        assert stage_word(body) == "CLOSED"
-        assert "C6400 × 1 · closed <span class=ago" in card and "40 s ago" in card
-        assert "P&amp;L" in card and "+$20.00" in card
-        assert "2.10 → 2.30 · held 1 m 39 s" in card
-        assert "reason</td><td>flatten" in card
-        assert "realized +$20.00 over 1 close(s)" in card
-        assert ">NEW ORDER</a>" in card and "href='/exec/order?new=1'" in card
+        assert "<div id=panel hidden class='card panel'>" in body and "data-stage=none" in body
+        assert ">NEW ORDER</a>" not in body and "data-stage=closed" not in body
+        stack = body.split("<div id=closed>")[1].split("<div class=foot>")[0]
+        assert body.index("class=side") < body.index("<div id=closed>") < body.index("class=foot")
+        assert "<details class='card closedcard' data-key='br-1'>" in stack   # folded: no open
+        head = stack.split("<summary>")[1].split("</summary>")[0]
+        assert "C6400 × 1" in head and "10:01:39" in head and "+$20.00" in head and "FLATTEN" in head
+        assert "2.10 → 2.30 · held 1 m 39 s" in stack
+        assert "<tr><td>reason</td><td>FLATTEN</td></tr>" in stack
 
     def test_a_refusal_with_nothing_live_is_the_refused_stage(self, page, armed):
         armed.stop()
@@ -293,16 +308,17 @@ class TestNewOrderClearsTheCard:
     before all else." A closed or refused card is history the moment the
     next order begins — NEW ORDER, or a side picked."""
 
-    def test_closed_stays_until_new_order_or_a_side(self, page, holding, broker, clock):
+    def test_a_closed_card_stays_in_the_stack_whatever_begins_next(self, page, holding, broker, clock):
+        """A close is not the card's any more (st-qqxj), so there is nothing
+        for NEW ORDER or a side to clear: the day's closes stay folded at the
+        foot on every load."""
         stop_id = pos_of(holding)["stop_order_id"]
         clock.advance(seconds=1)
         broker.trigger_stop(stop_id)
         holding.poll_fills()
-        body = text(page.get("/exec/order"))
-        assert "data-stage=closed" in body                     # the answer, first
-        assert "data-stage=closed" not in text(page.get("/exec/order?new=1"))
-        assert "data-stage=closed" not in text(page.get("/exec/order?side=call"))
-        assert "data-stage=closed" in text(page.get("/exec/order"))   # a plain reload still shows it
+        for url in ("/exec/order", "/exec/order?new=1", "/exec/order?side=call"):
+            body = text(page.get(url))
+            assert "data-stage=closed" not in body and "data-key='br-1'" in body, url
 
     def test_refused_clears_the_same_way(self, page, service, broker):
         from execd.broker import Preview
@@ -351,27 +367,23 @@ class TestTheAccountsMoney:
         assert "account: no balances set on the mock" in body
 
 
-class TestADismissedCloseStaysDismissedUnderThePoll:
-    """The card is on the page hidden when there is nothing to show (st-igw0,
-    so a SEND answered in place can paint into it). A close NEW ORDER
-    dismissed must not come back on the next poll."""
+class TestTheClosedStackUnderThePoll:
+    """The poll carries the day's closed cards and the card's own stage; the
+    script hides the card when it goes back to no order and repaints the
+    stack only when it changed, keeping a card he opened open (st-qqxj)."""
 
-    def test_the_page_marks_the_dismissed_close_and_the_poll_names_it(self, page, holding, broker, clock):
+    def test_the_poll_carries_the_stack_and_the_script_keeps_what_is_open(self, page, holding, broker, clock):
         stop_id = pos_of(holding)["stop_order_id"]
         clock.advance(seconds=1)
         broker.trigger_stop(stop_id)
         holding.poll_fills()
-        ts = holding.journal.events("closed")[-1]["ts"]
-        fresh = text(page.get("/exec/order?new=1"))
-        assert f"<div id=panel hidden data-dismissed='{ts}' " in fresh
-        assert "data-stage=none" in fresh and "data-stage=closed" not in fresh
         s = page.get("/exec/order/state").get_json()
-        assert s["panel_stage"] == "closed" and s["last_close_ts"] == ts
-        script = fresh.split("var STATE = ")[1]
-        assert "data-dismissed" in script and "String(j.last_close_ts || '')" in script
-        # a plain reload still shows the answer, unmarked
-        plain = text(page.get("/exec/order"))
-        assert "data-stage=closed" in plain and "data-dismissed=" not in plain.split("<script>")[0]
+        assert s["panel_stage"] == "none" and "last_close_ts" not in s
+        assert "data-key='br-1'" in s["closed_html"]
+        script = text(page.get("/exec/order")).split("var STATE = ")[1]
+        assert "pn.hidden = (j.panel_stage === 'none')" in script
+        assert "cs.__html !== j.closed_html" in script and "details[open]" in script
+        assert "data-dismissed" not in script and "last_close_ts" not in script
 
 
 class TestATypedNumberOutlivesTheRepaint:
