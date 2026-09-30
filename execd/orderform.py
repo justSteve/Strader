@@ -76,7 +76,7 @@ from .broker import COMMISSION_PER_CONTRACT_USD, CONTRACT_MULTIPLIER, BrokerErro
 from .compose import Contract, parse_chain
 from .intent import OrderIntent
 from .service import ExecService
-from .stops import (_floor_to, _round_up_to_tick, on_tick, protective_stop_price, risk_usd,
+from .stops import (_floor_to, _round_up_to_tick, level_for, on_tick, protective_stop_price, risk_usd,
                     stop_is_consistent, tick_for)
 
 log = logging.getLogger("execd.orderform")
@@ -477,15 +477,9 @@ def _wire_delta(c: Contract) -> float:
 
 
 def _level_for(right: str, spx: float, limit: float, stop_price: float, delta: float) -> float:
-    """The SPX level that walks to ``stop_price`` — the inverse of
-    ``protective_stop_price`` — rounded to the cent **away from spot**. The
-    service rounds the walked price *up* to the tick, so a level a hair
-    nearer spot than exact would rest the stop one tick higher than the
-    number on the ticket; a hair farther lands on it."""
-    distance = (limit - stop_price) / delta
-    if right == "CALL":
-        return math.floor(round((spx - distance) * 100, 6)) / 100
-    return math.ceil(round((spx + distance) * 100, 6)) / 100
+    """The SPX level that walks to ``stop_price`` — ``stops.level_for``, which
+    the service also calls to re-strike a dollar stop at the send."""
+    return level_for(right, spx, limit, stop_price, delta)
 
 
 def _apply_flat_loss_stop(out: Priced, c: Contract, spx: float, *,
@@ -613,6 +607,13 @@ def intent_for(priced: Priced, *, intent_id: str, engine_sha: str) -> dict[str, 
         "delta": _wire_delta(priced.contract),
         "source": SOURCE, "engine_sha": engine_sha,
     }
+    if priced.stop_set_by != "level" and priced.stop_price is not None:
+        # A stop in dollars stays dollars (Steve, 2026-09-30: "dollars",
+        # st-7p5u): the price under the limit rides with the intent, and the
+        # service re-strikes the SPX level from the mark at the send, so SPX
+        # moving between pricing and send cannot turn $20 into $40. A stop
+        # set as a level (no '.') is a level and sends none.
+        d["stop_price"] = float(priced.stop_price)
     if priced.selection.exitspx is not None:
         d["exit_spx"] = priced.selection.exitspx      # his close level (st-5n3s)
     OrderIntent.from_dict(d).validated()

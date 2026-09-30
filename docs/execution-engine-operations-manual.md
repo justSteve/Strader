@@ -1404,6 +1404,18 @@ commissions.
 `delta` from the ticket — the same wire form the desk sends. The journal
 shows who sent.
 
+**A dollar stop stays dollars** (Steve, 2026-09-30, "dollars", st-7p5u).
+A stop set in dollars — the flat $20, the steppers' distance, or a typed
+price — also sends its `stop_price`. At the send the service strikes the
+SPX level again from the mark the order goes out on (`stops.level_for`), so
+the resting stop is exactly the ticket's price and $20 means $20 however SPX
+moved while the ticket was priced. The journal says `stop_restruck` with
+both levels when it moved. A stop set as a level (no '.') is a level and
+sends no price. Before this, the level was fixed at pricing: the first paper
+ticket (2026-09-18) rested $40 under its fill after SPX rose 0.38. Still a
+level: the stop on an add (the whole bracket re-rests from the position's
+level) and a broker without triggered orders (Alpaca).
+
 **No passphrase on SEND**: arming already happened; the token is single use
 and dies in 60 s, and the service's price-band and quote-age rules refuse a
 stale ticket regardless. Agents cannot reach the page port (gate 7).

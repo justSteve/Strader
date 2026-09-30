@@ -187,6 +187,19 @@ def take_profit_price(fill_px: float, multiple: float, basis: str = "premium",
     return round(price, 2)
 
 
+def level_for(right: str, spx: float, base_px: float, stop_price: float,
+              delta: float) -> float:
+    """The SPX level that walks ``base_px`` down to ``stop_price`` from
+    ``spx`` — the inverse of :func:`protective_stop_price` — rounded to the
+    cent **away from spot**. That function rounds the walked price *up* to
+    the tick, so a level a hair nearer spot than exact would rest the stop one
+    tick higher than asked; a hair farther lands on it. [st-7p5u]"""
+    distance = (base_px - stop_price) / delta
+    if _sign_for(right) > 0:
+        return math.floor(round((spx - distance) * 100, 6)) / 100
+    return math.ceil(round((spx + distance) * 100, 6)) / 100
+
+
 def _sign_for(right: str) -> int:
     """+1 when the option gains as SPX rises (a call), −1 when it gains as SPX
     falls (a put). Raises on anything else rather than defaulting."""

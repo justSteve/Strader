@@ -268,3 +268,40 @@ class TestTheSchwabTransport:
         moved = OrderIntent(intent_id="x", symbol=CALL, side=Side.SELL_TO_CLOSE, qty=1,
                             order_type=OrderType.STOP, stop_price=1.50)
         assert tsb.replace_order(stop.order_id, moved).status is OrderStatus.REJECTED
+
+
+class TestTwentyMeansTwenty:
+    """Steve, 2026-09-30: "dollars" [st-7p5u]. The first paper ticket
+    (2026-09-18) was priced at one SPX mark and sent at another; the stop's
+    SPX level, struck at pricing, walked to $40 under the fill instead of $20.
+    A stop set in dollars now carries its price, and the service re-strikes
+    the level from the mark at the send."""
+
+    MOVED = SPX_NOW + 1.27          # SPX rises 1.27 between pricing and send
+
+    def _move(self, mb):
+        mb.set_quote("$SPX", bid=self.MOVED - 0.25, ask=self.MOVED + 0.25, last=self.MOVED)
+
+    def test_a_dollar_stop_stays_twenty_dollars_when_spx_moves(self, svc, mb):
+        self._move(mb)
+        out = svc.place(entry(intent_id="d-1", stop_price=1.90))
+        assert out["stop_order"]["price"] == 1.90          # $20 under the 2.10 limit
+        line, = svc.journal.events("stop_restruck")
+        assert line["stop_spx_priced"] == 6379.33
+        assert line["stop_spx"] == pytest.approx(self.MOVED - 0.20 / 0.30, abs=0.01)
+        # the SPX-mark exit loop watches the re-struck level, not the stale one
+        pos = svc._open[CALL]
+        assert pos.stop_spx == line["stop_spx"]
+
+    def test_a_level_stop_is_still_a_level(self, svc, mb):
+        """No stop_price on the intent — the stop was set as an SPX level —
+        so the level holds and the price walks, as before."""
+        self._move(mb)
+        out = svc.place(entry(intent_id="l-1"))
+        assert out["stop_order"]["price"] < 1.90
+        assert svc.journal.events("stop_restruck") == []
+
+    def test_no_move_no_restrike(self, svc, mb):
+        out = svc.place(entry(intent_id="n-1", stop_price=1.90))
+        assert out["stop_order"]["price"] == 1.90
+        assert svc.journal.events("stop_restruck") == []

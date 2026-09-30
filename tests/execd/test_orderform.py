@@ -199,6 +199,9 @@ class TestPrice:
         assert i == {"intent_id": "page-20260826T100000", "symbol": CALL, "side": "BUY_TO_OPEN",
                      "qty": 1, "order_type": "LIMIT", "limit": 2.10,
                      "stop_spx": 6379.33, "delta": 0.3,
+                     # the $20 stop rides as dollars; the service re-strikes
+                     # the level at the send (st-7p5u)
+                     "stop_price": 1.90,
                      "source": "page", "engine_sha": "testsha"}
 
 

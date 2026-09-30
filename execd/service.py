@@ -71,7 +71,7 @@ from .broker import (
 from .intent import OrderIntent, OrderType, Side, parse_occ
 from .journal import Journal
 from .stops import (
-    CONTRACT_MULTIPLIER, exit_triggered, on_tick, premium_at_level, protective_stop_price,
+    CONTRACT_MULTIPLIER, exit_triggered, level_for, on_tick, premium_at_level, protective_stop_price,
     risk_usd, stop_is_consistent, take_profit_price, target_reached,
 )
 
@@ -2015,6 +2015,22 @@ class ExecService:
                         f"no {self.config.index_symbol} mark at the send ({exc}) — "
                         "not sending"),
                 kind="place")
+        # Twenty means twenty (Steve, 2026-09-30, "dollars", st-7p5u). An
+        # entry whose stop was set in dollars carries the ticket's stop price;
+        # its SPX level was struck at the mark the ticket was priced on, and
+        # the first paper ticket (2026-09-18) showed what that costs: SPX rose
+        # 0.38 before the fill and a $20 stop rested $40 under it. So the
+        # level is struck again here, from the mark the send goes out on, and
+        # the triggered bracket below walks it back to exactly that price.
+        if (intent.stop_price is not None and intent.limit is not None
+                and intent.delta):
+            restruck = level_for(intent.occ.right, spx, intent.limit,
+                                 intent.stop_price, intent.delta)
+            if restruck != intent.stop_spx:
+                self.journal.record("stop_restruck", intent_id=intent.intent_id,
+                                    spx=spx, stop_price=intent.stop_price,
+                                    stop_spx_priced=intent.stop_spx, stop_spx=restruck)
+                intent = replace(intent, stop_spx=restruck)
         # The cut was checked against a mark read before the preview, a broker
         # round trip ago. Cycle 1 on 2026-09-14 was sent with the index already
         # through its cut — 7630.88 against a call stop at 7631.13 — and was
