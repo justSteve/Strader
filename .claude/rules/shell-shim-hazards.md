@@ -14,5 +14,7 @@ took the whole distro down twice in four minutes (18 GB grep, OOM).
    allocating.** Kill it (`pgrep -x 2.1.233`), then rewrite the command.
 
 Also: shimmed `grep -r` skips gitignored files, so for "is anything left?"
-sweeps use `command grep -r`. Full post-mortem:
+sweeps use `command grep -r`. From the repo root (or any tree holding `.env`,
+`tokens/`, `.beads`) give it `--include=...` or a subdirectory: schwab-gate
+gate 8 refuses an unnarrowed one, since 2026-08-25 it printed `.env` (st-7lw9). Full post-mortem:
 `docs/retired-rules/shell-shim-hazards.md`.
