@@ -541,7 +541,7 @@ class TestThePadlockAndRePrice:
             assert gone not in body, gone
         assert body.count("option buying power") == 1
         # the boxes are drawn as boxes and the stop box says what it takes
-        assert "border:2px solid #9ca3af" in body and "stop: strike or price</span><input id=stopbox" in body
+        assert "border:2px solid #9ca3af" in body and "stop: strike or price</span><button type=button class=step data-step=1" in body
         # the padlock answers the tap and a second tap inside half a second is the same tap
         assert "window.__lockTap" in body and "b.classList.toggle('on', !!lf.value)" in body
 
