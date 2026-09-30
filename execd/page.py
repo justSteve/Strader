@@ -704,7 +704,11 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
 
         def answer(msg: str | None, bad: str | None, *, replayed: bool = False):
             if wants_json:
+                # a "not filled yet" answer belongs to the working stage: the
+                # page drops it once the card has moved on — a paper fill
+                # lands inside this same answer (Steve, 2026-09-30, st-5n3s)
                 return {"ok": bad is None, "msg": msg, "bad": bad, "replayed": replayed,
+                        "msg_stage": "working" if msg and "not filled yet" in msg else None,
                         "send_nonce": nonces.issue("send", SEND_NONCE_TTL_S),
                         **_state_payload(sel_symbol(sel), request.form.get("lots"),
                                          refused=bad, sel=sel if sel.side else None)}

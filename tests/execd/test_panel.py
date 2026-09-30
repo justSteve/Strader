@@ -123,6 +123,15 @@ class TestTheCard:
         assert "cut if SPX reaches" in card and "target 10× the entry" in card
         assert "CANCEL AND RE-PRICE" in card and ">STOP<" not in card and ">FLATTEN<" not in card
 
+    def test_a_not_filled_yet_caption_goes_when_the_card_moves_on(self, page):
+        """2026-09-30, paper-0061: the fill landed inside the SEND answer, the
+        card said FILLED and the caption still said WORKING. The caption is
+        tied to the working stage and dropped once the card leaves it [st-5n3s]."""
+        body = text(page.get("/exec/order"))
+        assert "if (forStage && stageNow() && stageNow() !== forStage) return;" in body
+        assert "document.querySelector('#answer [data-for-stage]')" in body
+        assert "answerBox(j.bad || j.msg || '', !!j.bad, j.msg_stage || null)" in body
+
     def test_the_cards_stop_and_target_have_steppers(self, page, holding):
         """Steve, 2026-09-30: after a fill, the take-profit updates the same
         way the stop does — + left of the box, − right, then SET [st-5n3s]."""

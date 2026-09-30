@@ -603,6 +603,10 @@ PANEL_SCRIPT = """
     if (pn && j.panel_stage && j.panel_stage !== 'none' && !dismissed) pn.hidden = false;
     if (body && j.panel_body_html && !dismissed && !inflight && (changed || !editing())) { var kept = keepTyped(body); body.innerHTML = j.panel_body_html; restoreTyped(body, kept); }
     if (changed) { var m = document.querySelector('.msg'); if (m) m.parentNode.removeChild(m); }
+    // a caption tied to a stage goes when the card leaves it — "not filled
+    // yet" under a FILLED card was 2026-09-30's paper-0061 (st-5n3s)
+    var tied = document.querySelector('#answer [data-for-stage]');
+    if (tied && stageNow() && tied.getAttribute('data-for-stage') !== stageNow()) tied.parentNode.removeChild(tied);
     var w = document.getElementById('stageword'); if (w && j.panel_stage && !dismissed) { w.textContent = WORDS[j.panel_stage] || j.panel_stage; w.style.color = COLORS[j.panel_stage] || '#e5e7eb'; }
     var u = document.getElementById('updated'); if (u) { u.setAttribute('data-at', String(Date.now())); u.textContent = 'just now'; }
     var qd = document.getElementById('quote'); if (qd && j.quote_html) qd.innerHTML = j.quote_html;
@@ -651,8 +655,12 @@ PANEL_SCRIPT = """
   // SEND, one tap, answered in place (st-igw0): the button goes dead while
   // the order is out, the answer lands in #answer above the card, the card
   // paints from the same answer, and a fresh token arms the button again.
-  function answerBox(text, bad){ var a = document.getElementById('answer'); if (!a) return;
-    a.innerHTML = ''; if (!text) return; var d = document.createElement('div'); d.className = bad ? 'bad' : 'msg';
+  function answerBox(text, bad, forStage){ var a = document.getElementById('answer'); if (!a) return;
+    a.innerHTML = ''; if (!text) return;
+    // an answer about a stage the card has already left is not said (st-5n3s)
+    if (forStage && stageNow() && stageNow() !== forStage) return;
+    var d = document.createElement('div'); d.className = bad ? 'bad' : 'msg';
+    if (forStage) d.setAttribute('data-for-stage', forStage);
     d.textContent = text; a.appendChild(d); var old = document.querySelector('.msg:not(#answer .msg)'); if (old && !bad) old.parentNode.removeChild(old); }
   document.addEventListener('submit', function(e){ var f = e.target; if (!f || !f.classList || !f.classList.contains('sendform')) return;
     var b = f.querySelector('button'); if (b && b.disabled) { e.preventDefault(); return; }
@@ -665,7 +673,7 @@ PANEL_SCRIPT = """
     if (b) { b.disabled = true; b.textContent = 'SENDING…'; }
     fetch(f.getAttribute('action'), {method: 'POST', body: fd, headers: {'Accept': 'application/json'}})
       .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function(j){ apply(j); answerBox(j.bad || j.msg || '', !!j.bad);
+      .then(function(j){ apply(j); answerBox(j.bad || j.msg || '', !!j.bad, j.msg_stage || null);
         var n = f.querySelector('input[name=nonce]'); if (n && j.send_nonce) n.value = j.send_nonce;
         if (b) { b.disabled = false; b.textContent = 'SEND'; }
         if (window.__panelPoll) window.__panelPoll(true); })
