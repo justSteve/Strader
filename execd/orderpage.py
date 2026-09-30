@@ -752,7 +752,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
     # foot of the page (Steve, 2026-09-30, st-qqxj); the poll keeps it fresh
     closed = closed_html(facts, service.clock())
     parts.append(f"<div id=closed>{closed}</div>")
-    parts.append(f"<div class=foot><span>today {money(pnl.get('day_usd'))}</span></div>")
+    parts.append(f"<div class=foot><span id=today>today {money(pnl.get('day_usd'))}</span></div>")
     # the journal, one tap away, kept fresh by the poll
     parts.append("<details id=journalbox class=journalbox><summary class='chip quiet'>journal</summary>"
                  f"<div class=card id=journal>{journal_html(service)}</div></details>")

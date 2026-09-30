@@ -279,3 +279,13 @@ class TestTheThirtyCentStop:
         script = text(order_page.get("/exec/order?side=call")).split("var STATE = ")[1]
         assert "['stop', 'stopoff', 'exitspx', 'limit', 'lots'].forEach" in script
         assert "fd.set('strike', sk.value); fd.delete('delta');" in script
+
+
+def test_the_poll_carries_the_days_total_with_the_closed_cards():
+    """The closed cards repainted after a close while the 'today' line under
+    them kept the old total until a reload (seen in the 2026-09-30 shots:
+    three cards summing −$80 over 'today −$10'). The poll now carries it."""
+    import inspect
+    from execd import page, panel
+    assert "today_text" in inspect.getsource(page)
+    assert "getElementById('today')" in panel.PANEL_SCRIPT

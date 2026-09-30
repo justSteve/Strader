@@ -746,6 +746,7 @@ PANEL_SCRIPT = """
       for (var i = 0; i < ds.length; i++) open[ds[i].getAttribute('data-key')] = true;
       cs.innerHTML = j.closed_html; cs.__html = j.closed_html;
       ds = cs.querySelectorAll('details'); for (var i2 = 0; i2 < ds.length; i2++) if (open[ds[i2].getAttribute('data-key')]) ds[i2].open = true; }
+    var td = document.getElementById('today'); if (td && j.today_text) td.textContent = j.today_text;
     var qd = document.getElementById('quote'); if (qd && j.quote_html) qd.innerHTML = j.quote_html;
     var pc = document.getElementById('position'); if (pc && j.position_html !== undefined && !editing()) { var keptp = keepTyped(pc); pc.innerHTML = j.position_html || ''; restoreTyped(pc, keptp); }
     var jn = document.getElementById('journal'); if (jn && j.journal_html) jn.innerHTML = j.journal_html;

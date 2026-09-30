@@ -660,12 +660,15 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                     cost_now = _money(-(limit_now * CONTRACT_MULTIPLIER * lots)).lstrip("-")
             except BrokerError as exc:
                 error = str(exc)
-        from .panel import closed_html, journal_facts, panel_body
+        from .panel import closed_html, journal_facts, money, panel_body
         stage, body = panel_body(service, st, _actions(), now=clock(),
                                  order_path=url_for("exec.order"), refused=refused)
         return {"mode": st["mode"], "arming": st["arming"], "day": st["day"],
                 # the day's closed positions, a folded card each (st-qqxj)
                 "closed_html": closed_html(journal_facts(service), clock()),
+                # the day's total under the closed cards, repainted with them —
+                # a close changed the cards and left this line stale until a reload
+                "today_text": f"today {money((st.get('pnl') or {}).get('day_usd'))}",
                 "pnl": st.get("pnl"), "positions": st["positions"],
                 "working": st["working"],
                 "quote": quote, "spx": spx,
