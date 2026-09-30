@@ -52,6 +52,7 @@ _ORDER_STYLE = """
  .exp2 a.chip{color:#9ca3af;background:transparent;border:1px solid #374151}.exp2 a.chip.on{background:#1f2937;color:#fff;border-color:#1f2937}
  button.step{width:44px;height:44px;border-radius:8px;border:1px solid #374151;background:#1f2937;color:#f9fafb;
    font-size:1.3em;font-weight:700;padding:0;touch-action:manipulation;cursor:pointer}
+ .dl.exitl input{width:5.6em}
  .dl{display:flex;align-items:center;gap:.4em}.dl.stopl input{width:6.2em}.dl input{width:5em;height:44px;box-sizing:border-box;font-size:1.15em;text-align:center;
        padding:0 .5em;border-radius:8px;border:2px solid #9ca3af;background:#111827;color:#e5e7eb}
  .side a{outline:0}.side a.on{outline:3px solid #e5e7eb}.side a.bear.off{background:#7f1d1d;color:#fca5a5}.side a.bull.off{background:#064e3b;color:#6ee7b7}
@@ -115,7 +116,7 @@ _SCRIPT = """
   window.__pollSeq = function(){ return seq; };
   // a new delta is a new contract: the lock goes with the old one
   function unlockThenReprice(){ var lf = lockField(); if (lf) lf.value = ''; reprice(); }
-  if (form) { ['delta'].forEach(function(n){ var el = form.elements[n];
+  if (form) { ['delta', 'exitspx'].forEach(function(n){ var el = form.elements[n];
     var fn = (n === 'delta') ? unlockThenReprice : reprice;
     if (el) { el.addEventListener('change', fn); el.addEventListener('input', function(){ clearTimeout(window.__t); window.__t = setTimeout(fn, 600); }); } }); }
   // the stop box (st-m3bl): the visible box follows the flat-loss stop
@@ -135,6 +136,8 @@ _SCRIPT = """
     var lf = lockField(); if (!lf) return; lf.value = e.target.value.trim();
     var b = document.getElementById('lock'); if (b) { b.classList.toggle('on', !!lf.value); b.innerHTML = lf.value ? '&#128274;' : '&#128275;'; }
     clearTimeout(window.__t); window.__t = setTimeout(reprice, 600); });
+  var exitBox = document.getElementById('exitbox');
+  if (exitBox) exitBox.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); clearTimeout(window.__t); reprice(); exitBox.blur(); } });
   document.addEventListener('keydown', function(e){ if (!e.target || e.target.id !== 'pxbox' || e.key !== 'Enter') return;
     e.preventDefault(); clearTimeout(window.__t); reprice(); e.target.blur(); });
   // the stop steppers (Steve, 2026-09-30: the default stop sits .2 under
@@ -256,10 +259,8 @@ def state_html(st: dict[str, Any], actions: Mapping[str, str] | None = None,
     if actions:
         if a["killed"]:
             right = (f"<a class='chip stop-on' href='{actions['account']}'>STOP ON · clear</a>")
-        else:
-            right = (f"<form method=post action='{actions['stop']}' class=inline>"
-                     "<input type=hidden name=back value='order'>"
-                     "<button class='chip stopbtn'>STOP</button></form>")
+        # no STOP button on the order page (Steve, 2026-09-30, iPad preview);
+        # it stays on the account page, and STOP ON still shows here
         right += f"<a class='chip quiet' href='{actions['account']}'>account</a>"
     return (f"<div class=strip id=strip><div class=l>{broker_badge(st)}{badge}{word}</div>"
             f"<div class=r>{right}</div></div>")
@@ -310,7 +311,8 @@ def balances_html(b: dict[str, Any] | None) -> str:
         return "<span class=k>account not read</span>"
     if b.get("error"):
         return f"<span class=k>account: {esc(b['error'])}</span>"
-    return f"<span>option buying power <b>{usd(b.get('option_buying_power'))}</b></span>"
+    # the figure alone, right-aligned beside the clock (Steve, 2026-09-30)
+    return f"<b>{usd(b.get('option_buying_power'))}</b>"
 
 
 def journal_html(service: ExecService, n: int = 20) -> str:
@@ -373,6 +375,10 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
     else:
         stop_line = (f"<span id=stopline>stop loss "
                      f"<b class=neg>{usd(priced.stop_loss_usd)}</b></span>")
+    if priced.selection.exitspx is not None:
+        verb = "falls to" if c.right == "CALL" else "rises to"
+        stop_line += (f"<span id=exitline>market close if SPX {verb} "
+                      f"<b>{priced.selection.exitspx:g}</b></span>")
     line2 = f"<div class=trow>{stop_line}</div>"
     for w in priced.warnings:
         line2 += f"<div class=warn>{esc(w)}</div>"
@@ -575,7 +581,10 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
         from .page import unlock_form
         top.append(unlock_form(actions["unlock"], back="order"))
     else:
-        top.append(f"<div class=money id=balances>{balances_html(st.get('balances'))}</div>")
+        # the ticking CT clock left, the buying power right (Steve,
+        # 2026-09-30); the panel script paints #clock every second
+        top.append(f"<div class=money><span id=clock class=clock></span>"
+                   f"<span id=balances>{balances_html(st.get('balances'))}</span></div>")
     parts[0:0] = top
     # The stage card shows only when there is a stage to show: with nothing
     # held, nothing working and no answer to show, the page opens on the
@@ -646,8 +655,8 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             f"<span class='chip on'>{exp.strftime('%m-%d')}</span>"
             "<span class=grow></span>"
             f"<label class=dl><span class=k>δ</span><input name=delta inputmode=decimal value='{delta_val}' placeholder='spot'></label>"
-            f"<label class='dl stopl' title=\"a '.' makes it a price (8.30); none makes it an SPX level (7610)\">"
-            f"<span class=k>stop: strike or price</span>"
+            "<label class='dl stopl' title='the resting stop, in dollars (8.30)'>"
+            "<span class=k>stop $</span>"
             # the steppers (Steve, 2026-09-30): + to the left of the box, −
             # to the right; each widens or narrows the stop loss by 0.10
             # under the limit, and the stop keeps following the live price
@@ -655,6 +664,12 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             f"<input id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off "
             f"value='{esc(stop_val)}' data-derived='{derived}'>"
             "<button type=button class=step data-step=-1 aria-label='narrow the stop 0.10'>&minus;</button></label>"
+            # the close-at-SPX box (Steve, 2026-09-30): a whole SPX level that
+            # closes the position at market when crossed; empty sets none
+            "<label class='dl exitl' title='closes at market when SPX crosses it (7610)'>"
+            "<span class=k>close at SPX</span>"
+            f"<input name=exitspx id=exitbox inputmode=numeric enterkeyhint=done autocomplete=off "
+            f"value='{f'{sel.exitspx:g}' if sel.exitspx is not None else ''}' placeholder='none'></label>"
             "<button class='chip quiet' name=reprice value=1>RE-PRICE</button></div>"
             "</form>")
         # strikes around spot — only the ones the account can pay for (st-644f)

@@ -262,12 +262,14 @@ class UnconfirmedSend:
     delta: float | None
     at: datetime
     page_query: dict[str, str] | None = None
+    exit_spx: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {"intent_id": self.intent_id, "symbol": self.symbol, "qty": self.qty,
                 "limit": self.limit, "right": self.right, "stop_spx": self.stop_spx,
                 "delta": self.delta, "at": self.at.isoformat(),
-                "page_query": dict(self.page_query) if self.page_query else None}
+                "page_query": dict(self.page_query) if self.page_query else None,
+                "exit_spx": self.exit_spx}
 
     def matches(self, order: OrderResult) -> bool:
         """The broker order this send would have become: same contract, same
@@ -339,6 +341,10 @@ class OpenPosition:
     #: watched on the SPX mark — until he sets it again on the form
     stop_off_by_hand: bool = False
     target_off_by_hand: bool = False
+    #: his SPX close level from the order form (st-5n3s): crossed, the SPX
+    #: loop closes at market. Held by intent id in the service and attached
+    #: here, so every path that makes a position picks it up.
+    exit_spx: float | None = None
     #: the close this service has sent and not yet seen resolve. While this is
     #: set the SPX-mark loop does not fire again — re-sending a market close
     #: every tick until one fills was finding 2 of the 2026-08-30 audit, an
@@ -400,6 +406,7 @@ class OpenPosition:
             "target_order_id": self.target_order_id, "target_price": self.target_price,
             "target_state": self.leg_state("target"),
             "stop_off_by_hand": self.stop_off_by_hand,
+            "exit_spx": self.exit_spx,
             "target_off_by_hand": self.target_off_by_hand,
             "target_spx": self.target_spx,
             "entry_spx": self.entry_spx,
@@ -447,6 +454,8 @@ class ExecService:
         #: every execution leg the fill sweep has seen, as (order_id, leg_id,
         #: at): the overlapping window returns each one again (st-b7i4)
         self._swept_fills: set[tuple[str, int | None, str]] = set()
+        #: SPX close levels from the order form, by intent id (st-5n3s)
+        self._exit_levels: dict[str, float] = {}
         self._mark_refused_streak = 0
         #: working buy orders on this service's instruments that it did not
         #: send and cannot match to a send — order_id → OrderResult dict,
@@ -613,7 +622,8 @@ class ExecService:
             # One quote read per position per status call: the position row
             # and the day row are struck at the same price (14:37 CT today
             # they were not — two reads, two bids, two different nets).
-            "positions": [{**p.to_dict(), "valuation": v} for p, v in valuations],
+            "positions": [{**(self._attach_exit_level(p) or p).to_dict(), "valuation": v}
+                          for p, v in valuations],
             "working": [w.to_dict() for w in self._working.values()],
             # The three things that must never be silent (2026-09-15 audit,
             # st-7ah8 / st-zm2u): a leg resting with no position behind it, a
@@ -1029,7 +1039,8 @@ class ExecService:
                 self._mark_refused_streak = 0
             self._last_mark = (float(spx), self.clock())
             for pos in list(self._open.values()):
-                if pos.stop_spx is None and pos.target_spx is None:
+                self._attach_exit_level(pos)
+                if pos.stop_spx is None and pos.target_spx is None and pos.exit_spx is None:
                     continue
                 if pos.exit_in_flight:
                     # A close is already working at the broker. Firing again
@@ -1040,7 +1051,13 @@ class ExecService:
                                     "reason": pos.exit_reason})
                     continue
                 reason = None
-                if pos.stop_spx is not None and exit_triggered(pos.right, spx, pos.stop_spx):
+                if pos.exit_spx is not None and exit_triggered(pos.right, spx, pos.exit_spx):
+                    reason = "spx-exit"
+                    self.journal.record("exit_triggered", symbol=pos.symbol,
+                                        spx=spx, exit_spx=pos.exit_spx,
+                                        intent_id=pos.intent_id,
+                                        detail="his SPX close level from the order form")
+                elif pos.stop_spx is not None and exit_triggered(pos.right, spx, pos.stop_spx):
                     reason = "spx-stop"
                     self.journal.record("exit_triggered", symbol=pos.symbol,
                                         spx=spx, stop_spx=pos.stop_spx,
@@ -1063,6 +1080,12 @@ class ExecService:
                     fired.append({"symbol": pos.symbol, "closed": False,
                                   "error": str(exc)})
             return {"spx": spx, "fired": fired, "pending": pending, "refused": None}
+
+    def _attach_exit_level(self, pos: OpenPosition) -> None:
+        if pos.exit_spx is None:
+            lvl = self._exit_levels.get(pos.intent_id)
+            if lvl is not None:
+                pos.exit_spx = lvl
 
     def _mark_refusal(self, spx: Any) -> str | None:
         """A mark the exit loop must not act on: not a number, not a price
@@ -1924,6 +1947,14 @@ class ExecService:
                 f"a {intent.occ.right_word} stop at {intent.stop_spx:g} is already "
                 f"triggered with SPX at {spx:g} — the sign is transposed",
             )
+        if intent.exit_spx is not None and not stop_is_consistent(
+                intent.occ.right, spx, intent.exit_spx):
+            side = "below" if intent.occ.right == "C" else "above"
+            return Refusal(
+                "exit_spx",
+                f"the SPX close level {intent.exit_spx:g} is not {side} SPX {spx:g} — "
+                f"it would close the {intent.occ.right_word} the moment it filled",
+            )
 
         # Derive the stop the entry would rest, here, before anything is sent.
         # It was previously derived only after the fill, which meant an intent
@@ -2007,7 +2038,10 @@ class ExecService:
             intent_id=intent.intent_id, symbol=intent.symbol, qty=intent.qty,
             limit=intent.limit, right=intent.occ.right, stop_spx=intent.stop_spx,
             delta=intent.delta, at=self.clock(),
-            page_query=dict(page_query) if page_query else None)
+            page_query=dict(page_query) if page_query else None,
+            exit_spx=intent.exit_spx)
+        if intent.exit_spx is not None:
+            self._exit_levels[intent.intent_id] = float(intent.exit_spx)
         bracket = self._triggered_bracket(intent, spx)
         self.journal.record("sending", kind="entry", spx=spx, **send.to_dict(),
                             triggered=bracket is not None,
@@ -3525,9 +3559,13 @@ class ExecService:
             if day >= today:
                 continue
             entries.extend(e for e in self.journal.read(day)
-                           if e.get("event") in _CARRIED_EVENTS)
+                           if e.get("event") in _CARRIED_EVENTS
+                           or (e.get("event") == "sending" and e.get("exit_spx") is not None))
         entries.extend(self.journal.read())
         for e in entries:
+            if e.get("event") == "sending" and e.get("exit_spx") is not None:
+                self._exit_levels[str(e.get("intent_id", ""))] = float(e["exit_spx"])
+                continue
             if e.get("event") == "filled" and e.get("kind") == "entry":
                 symbol = str(e.get("symbol", ""))
                 if not symbol:

@@ -539,9 +539,9 @@ class TestThePadlockAndRePrice:
                      "the most this attempt may lose", "wobble allowance", "bid / ask",
                      "NOISE FLOOR", "name=budget", "name=attempts"):
             assert gone not in body, gone
-        assert body.count("option buying power") == 1
+        assert body.count("id=balances") == 1
         # the boxes are drawn as boxes and the stop box says what it takes
-        assert "border:2px solid #9ca3af" in body and "stop: strike or price</span><button type=button class=step data-step=1" in body
+        assert "border:2px solid #9ca3af" in body and "<span class=k>stop $</span><button type=button class=step data-step=1" in body
         # the padlock answers the tap and a second tap inside half a second is the same tap
         assert "window.__lockTap" in body and "b.classList.toggle('on', !!lf.value)" in body
 
@@ -619,10 +619,11 @@ class TestLockedInPlaceAndFewerWords:
         armed._balances_cache = (armed.clock(), {"available_funds": 12345.0,
                                                  "option_buying_power": 2345.0})
         body = text(order_page.get("/exec/order?side=call"))
-        money = body.index("class=money id=balances")
+        money = body.index("<div class=money><span id=clock")
         assert body.index("class=strip") < money < body.index("class=side")
         # one money figure (st-bafu): "option buying power and available is redundant"
-        assert "option buying power <b>$2,345.00</b>" in body and "available" not in body
+        # the clock left, the figure right (Steve, 2026-09-30, iPad)
+        assert "<span id=balances><b>$2,345.00</b></span>" in body and "available" not in body
         assert "class=foot id=balances" not in body
 
     def test_a_near_or_past_wall_is_one_red_line_on_the_account_page(self, order_page, armed):
@@ -793,17 +794,23 @@ class TestAStopOfHisOwn:
         assert i["stop_spx"] == 6378.0 and i["limit"] == 2.10
         assert p.to_dict()["stop_set_by"] == "price" and p.to_dict()["stop_text"] == "1.50"
 
-    def test_a_level_is_the_trigger_and_its_price_is_walked_forward(self, armed, chain):
-        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="6376"))
-        assert p.error is None and p.stop_set_by == "spx"
-        assert p.stop_spx == 6376.0 and p.stop_price == 0.90   # 2.10 − 4 × 0.30
-        assert intent_for(p, intent_id="page-x", engine_sha="t")["stop_spx"] == 6376.0
-        assert p.warnings == []            # the form does not judge the size of his stop (st-bafu)
+    def test_the_stop_box_is_dollars_only(self, armed, chain):
+        """Steve, 2026-09-30: "dedicate that control to the dollar amount" —
+        a number without a '.' is dollars now, not an SPX level [st-5n3s]."""
+        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="2"))
+        assert p.error is None and p.stop_set_by == "price" and p.stop_price == 2.00
 
-    def test_a_put_level_sits_above_the_market(self, armed, chain):
-        p = price(armed, Selection(side="put", expiry=DAY, strike=6300, stop="6384"))
-        assert p.error is None and p.stop_spx == 6384.0
-        assert p.stop_price == round(p.limit - 4 * p.contract.abs_delta, 2) or p.stop_price > 0
+    def test_the_close_level_rides_the_intent_on_the_losing_side(self, armed, chain):
+        """The close-at-SPX box: a call's level below spot, a put's above;
+        the wrong side would close at once and is words on the ticket."""
+        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, exitspx=6376))
+        assert p.error is None
+        assert intent_for(p, intent_id="page-x", engine_sha="t")["exit_spx"] == 6376
+        bad = price(armed, Selection(side="call", expiry=DAY, strike=6400, exitspx=6385))
+        assert bad.error and bad.error.startswith("close at SPX 6385")
+        put = price(armed, Selection(side="put", expiry=DAY, strike=6300, exitspx=6384))
+        assert put.error is None
+        assert price(armed, Selection(side="put", expiry=DAY, strike=6300, exitspx=6375)).error
 
     def test_a_tight_stop_is_his_call_and_the_form_says_nothing(self, armed, chain):
         p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="2.05"))
@@ -814,9 +821,8 @@ class TestAStopOfHisOwn:
         ("2.10", "not below the 2.10 limit"),
         ("2.50", "not below the 2.10 limit"),
         ("0.00", "must be positive"),
-        ("6385", "a call's stop sits below the market, and SPX 6385 is not below the 6380.00 mark"),
-        ("abc", "must be a number"),
-        ("1e-1", "not a whole SPX level"),
+        ("6385", "not below the 2.10 limit"),
+        ("abc", "is not a price"),
     ])
     def test_a_stop_that_cannot_be_one_is_words_on_the_ticket_and_no_send(self, armed, chain, raw, words):
         p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop=raw))
@@ -825,10 +831,6 @@ class TestAStopOfHisOwn:
         with pytest.raises(ValueError, match="your stop"):
             intent_for(p, intent_id="page-x", engine_sha="t")
 
-    def test_a_level_past_zero_rests_one_tick_and_says_so(self, armed, chain):
-        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="6370"))
-        assert p.error is None and p.stop_price == 0.05 and p.stop_spx == 6370.0
-        assert any(w.startswith("SPX 6370 WALKS THE OPTION BELOW ZERO") for w in p.warnings)
 
     def test_the_box_is_on_the_page_pre_filled_with_the_flat_twenty_dollar_stop(self, order_page, armed, chain):
         base = price(armed, Selection(side="call", expiry=DAY, strike=6400))
@@ -837,7 +839,7 @@ class TestAStopOfHisOwn:
         form = body.split("<form id=sel")[1].split("</form>")[0]
         assert f"id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off value='{base.stop_price:.2f}' data-derived='{base.stop_price:.2f}'" in form
         assert "name=stop value=''" in form
-        assert "makes it a price (8.30); none makes it an SPX level (7610)" in form
+        assert "the resting stop, in dollars (8.30)" in form and "name=exitspx id=exitbox" in form
         assert "your price" not in body and "your level" not in body
         assert "function stopField()" in body and "window.__followStop = function(j)" in body
         assert "fd.set('stop', sf.elements['stop'].value || '')" in body
@@ -851,18 +853,17 @@ class TestAStopOfHisOwn:
         assert "name='stop' value='1.50'" in body.split("id=sendfields")[1].split("</span>")[0]
         hrefs = [h.split("'")[0] for h in body.split("href='")[1:]]
         assert not any("stop=" in h for h in hrefs), hrefs
-        level = text(order_page.get("/exec/order?side=call&strike=6400&stop=6376"))
-        assert "<span id=stopline>stop if SPX falls to <b>6376</b></span>" in level
-        assert "stop loss" not in level and "YOUR STOP RISKS" not in level
-        put = text(order_page.get("/exec/order?side=put&strike=6300&stop=6384"))
-        assert "<span id=stopline>stop if SPX rises to <b>6384</b></span>" in put
+        level = text(order_page.get("/exec/order?side=call&strike=6400&exitspx=6376"))
+        assert "<span id=exitline>market close if SPX falls to <b>6376</b></span>" in level
+        assert "name='exitspx' value='6376'" in level.split("id=sendfields")[1].split("</span>")[0]
+        put = text(order_page.get("/exec/order?side=put&strike=6300&exitspx=6384"))
+        assert "<span id=exitline>market close if SPX rises to <b>6384</b></span>" in put
 
     def test_the_price_json_carries_the_stop_for_the_box_to_follow(self, order_page):
         j = order_page.get("/exec/order/price?side=call&strike=6400").json
         assert j["stop_set_by"] is None and j["stop_text"] is None and j["stop_price"]
-        j = order_page.get("/exec/order/price?side=call&strike=6400&stop=6376").json
-        assert j["stop_set_by"] == "spx" and j["stop_price"] == 0.90 and j["stop_spx"] == 6376.0
-        assert "name='stop' value='6376'" in j["send_fields_html"]
+        j = order_page.get("/exec/order/price?side=call&strike=6400&exitspx=6376").json
+        assert "name='exitspx' value='6376'" in j["send_fields_html"]
 
     def test_send_rests_his_price_and_watches_its_level(self, order_page, armed, chain):
         r = page_send(order_page, {"side": "call", "strike": "6400", "stop": "1.50"})
@@ -874,12 +875,17 @@ class TestAStopOfHisOwn:
         assert req["intent"]["stop_spx"] == 6378.0
         assert armed.journal.events("sending")[-1]["page_query"]["stop"] == "1.50"
 
-    def test_send_rests_the_walked_price_for_his_level(self, order_page, armed, chain):
-        page_send(order_page, {"side": "call", "strike": "6400", "stop": "6376"})
+    def test_send_closes_at_market_on_his_spx_level(self, order_page, armed, chain):
+        """The close level fires on its own, nearer than the dollar stop's
+        level (0.50 walks to 6374.67), and survives into the position."""
+        page_send(order_page, {"side": "call", "strike": "6400", "stop": "0.50",
+                               "exitspx": "6377"})
         p = armed.status()["positions"][0]
-        assert p["stop_spx"] == 6376.0 and p["stop_price"] == 0.90
-        assert armed.observe(SPX_NOW - 3.9)["fired"] == []
-        assert armed.observe(SPX_NOW - 4.0)["fired"][0]["closed"] is True
+        assert p["exit_spx"] == 6377 and p["stop_price"] == 0.50
+        assert armed.journal.events("sending")[-1]["exit_spx"] == 6377
+        assert armed.observe(SPX_NOW - 2.9)["fired"] == []
+        assert armed.observe(SPX_NOW - 3.0)["fired"][0]["closed"] is True
+        assert armed.journal.events("exit_triggered")[-1]["exit_spx"] == 6377
 
     def test_a_bad_stop_is_not_sent(self, order_page, armed, chain):
         r = page_send(order_page, {"side": "call", "strike": "6400", "stop": "6385"})

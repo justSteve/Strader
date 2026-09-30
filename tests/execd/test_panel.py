@@ -95,13 +95,15 @@ class TestTheCard:
     def test_no_clock_beside_the_arming_word_and_the_card_still_ticks(
             self, page, holding, clock):
         """Steve, 2026-09-18: "remove the timestamp the order was armed"
-        (st-644f). The strip's ticking clock sat immediately after the ARMED
-        word, with no label, and read as the moment the service was armed. It
-        is gone from the whole page; the card's relative 'ago' stamps, which
-        say how old a fill or a poll is, stay."""
+        (st-644f) — not beside the arming word. Steve, 2026-09-30 (iPad): the
+        clock comes back on the money row, left, with the buying power
+        right-aligned; the strip stays clockless. The card's relative 'ago'
+        stamps stay."""
         body = text(page.get("/exec/order"))
         card = panel_of(body)
-        assert "id=clock" not in body                          # no clock anywhere on the page
+        strip = body.split("id=strip>")[1].split("</div></div>")[0]
+        assert "id=clock" not in strip
+        assert "<div class=money><span id=clock class=clock></span><span id=balances>" in body
         # the position's own best/worst water marks are labelled and stay
         assert "class=ago data-at=" in card                    # the fill, ticking
         assert "id=updated class=ago" in card
@@ -310,14 +312,15 @@ class TestTheAccountsMoney:
         service.unlock({"t": 1})
         service._balances_cache = None            # the unlock's status read came before the money
         body = text(page.get("/exec/order?side=call&delta=0.3"))
-        assert "option buying power <b>$150.00</b>" in body and "available $150.00" not in body
+        assert "<span id=balances><b>$150.00</b></span>" in body and "available $150.00" not in body
+        assert "option buying power" not in body
         assert "this needs $210.00 and the account has $150.00 available" in body
         broker.set_balances(available_funds=1607.24, option_buying_power=1607.24)
         service._balances_cache = None
         body = text(page.get("/exec/order?side=call&delta=0.3"))
         assert "available" not in body and "after this" not in body
         j = page.get("/exec/order/state").get_json()
-        assert "option buying power <b>$1,607.24</b>" in j["balances_html"]
+        assert j["balances_html"] == "<b>$1,607.24</b>"
 
     def test_a_broker_that_cannot_say_is_said_not_hidden(self, page, service, broker):
         service.unlock({"t": 1})

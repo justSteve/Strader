@@ -139,6 +139,10 @@ class Selection:
     #: every time the ticket is priced, so it follows the live limit.
     #: ``None`` is the flat-loss default.
     stopoff: float | None = None
+    #: The SPX level that closes the position at market (Steve, 2026-09-30:
+    #: "dedicate that control to the dollar amount and add an input to hold
+    #: the strike that triggers a closing market order"). ``None`` sets none.
+    exitspx: float | None = None
 
     @property
     def right(self) -> str:
@@ -163,12 +167,14 @@ class Selection:
         limit = None if args.get("reprice") else _as_float(args.get("limit"))
         stop = str(args.get("stop") or "").strip() or None
         stopoff = _as_float(args.get("stopoff"))
+        exitspx = _as_float(args.get("exitspx"))
         return cls(side=side, expiry=expiry,
                    strike=strike if strike and strike > 0 else None,
                    delta=abs(delta) if delta is not None else None, lots=lots,
                    limit=round(limit, 2) if limit and limit > 0 else None,
                    stop=stop,
-                   stopoff=round(stopoff, 2) if stopoff and stopoff > 0 else None)
+                   stopoff=round(stopoff, 2) if stopoff and stopoff > 0 else None,
+                   exitspx=round(exitspx, 2) if exitspx and exitspx > 0 else None)
 
     def as_query(self, **override: Any) -> dict[str, str]:
         """The selection as query/hidden fields; ``override`` replaces or,
@@ -181,6 +187,7 @@ class Selection:
             "limit": f"{self.limit:.2f}" if self.limit is not None else None,
             "stop": self.stop,
             "stopoff": f"{self.stopoff:.2f}" if self.stopoff is not None else None,
+            "exitspx": f"{self.exitspx:g}" if self.exitspx is not None else None,
         }
         d.update(override)
         return {k: str(v) for k, v in d.items() if v is not None}
@@ -417,6 +424,12 @@ def price(service: ExecService, sel: Selection) -> Priced:
         _apply_stop_of_his_own(out, c, spx)
     else:
         _apply_flat_loss_stop(out, c, spx, per_contract=sel.stopoff)
+    if sel.exitspx is not None and not out.error:
+        if not stop_is_consistent(c.right, spx, sel.exitspx):
+            side = "below" if c.right == "CALL" else "above"
+            out.error = (f"close at SPX {sel.exitspx:g}: a {'call' if c.right == 'CALL' else 'put'}'s "
+                         f"close level sits {side} the market, and {spx:.2f} is not — it would "
+                         f"close at once")
     return out
 
 
@@ -495,10 +508,12 @@ def _apply_stop_of_his_own(out: Priced, c: Contract, spx: float) -> None:
     sel = out.selection
     if out.limit is None or not sel.stop:
         return
+    # the box is dollars only since 2026-09-30 (Steve: "dedicate that control
+    # to the dollar amount"); an SPX level goes in the close-at-SPX box
     try:
-        kind, value = parse_leg_text(sel.stop, "stop")
-    except ValueError as exc:
-        out.error = f"your stop: {exc}"
+        kind, value = "price", float(sel.stop.strip())
+    except ValueError:
+        out.error = f"your stop: {sel.stop.strip()!r} is not a price (10.30)"
         return
     right = c.right
     word = "call" if right == "CALL" else "put"
@@ -559,6 +574,8 @@ def intent_for(priced: Priced, *, intent_id: str, engine_sha: str) -> dict[str, 
         "delta": _wire_delta(priced.contract),
         "source": SOURCE, "engine_sha": engine_sha,
     }
+    if priced.selection.exitspx is not None:
+        d["exit_spx"] = priced.selection.exitspx      # his close level (st-5n3s)
     OrderIntent.from_dict(d).validated()
     return d
 

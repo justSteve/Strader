@@ -92,6 +92,10 @@ class OrderIntent:
     stop_price: float | None = None     # premium points, for STOP (the protective stop)
     stop_spx: float | None = None       # SPX level at which the service exits (entries)
     delta: float | None = None          # |delta| at compose (entries), for the protective stop
+    #: SPX level that closes the position at market when crossed (Steve,
+    #: 2026-09-30: "add an input to hold the strike that triggers a closing
+    #: market order"); ``None`` sets none. Independent of the resting stop.
+    exit_spx: float | None = None
     source: str = ""                    # "intent-desk" | "rule:<id>" | "flatten" | "protective-stop"
     engine_sha: str = ""
 
@@ -133,6 +137,8 @@ class OrderIntent:
             out.append("a STOP order needs a positive stop_price")
         if self.order_type == OrderType.MARKET and self.limit is not None:
             out.append("a MARKET order carries no limit")
+        if self.exit_spx is not None and self.exit_spx <= 0:
+            out.append(f"exit_spx must be a positive SPX level, not {self.exit_spx!r}")
         if self.delta is not None and not (0 < abs(self.delta) <= 1):
             out.append(f"delta must be within (0, 1], not {self.delta!r}")
         return out
@@ -167,6 +173,7 @@ class OrderIntent:
             stop_price=_as_float(d.get("stop_price")),
             stop_spx=_as_float(d.get("stop_spx")),
             delta=_as_float(d.get("delta")),
+            exit_spx=_as_float(d.get("exit_spx")),
             source=str(d.get("source", "")),
             engine_sha=str(d.get("engine_sha", "")),
         )
