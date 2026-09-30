@@ -106,6 +106,11 @@ class Watcher:
             spx = svc.spx_mark()
             out["spx"] = spx
             out["observe"] = svc.observe(spx)
+            # the trailing stop (st-s1y1): after the exit loop, so a position
+            # the mark just closed is not trailed
+            trailed = svc.trail()
+            if trailed:
+                out["trail"] = trailed
         except BrokerError as exc:
             if not self._broker_down:
                 svc.journal.record("error", kind="watch", detail=f"broker: {exc}")

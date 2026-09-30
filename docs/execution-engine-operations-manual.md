@@ -1404,6 +1404,18 @@ commissions.
 `delta` from the ticket — the same wire form the desk sends. The journal
 shows who sent.
 
+**The trailing stop** (Steve, 2026-09-30, st-s1y1): *"as soon as it
+reaches $50 or better move the SL to +$30. From that point on, for every
++100 move the SL to current value - $50."* The watcher runs it every pass
+while a position is open, on the card's own number — net if closed, after
+commissions. At +$50 the stop goes to +$30; at +$150, +$250, … it goes to
+the net at that moment less $50. It only ever raises the stop, each tier
+moves once, and the move is an ordinary adjust: refused (e.g. the bid is
+already at the new stop) it is journaled and tried again 15 s later.
+Journal line `trail`. The four numbers are bounds (`trail_arm_usd`,
+`trail_arm_lock_usd`, `trail_step_usd`, `trail_gap_usd`); `trail_arm_usd: 0`
+in Steve's bounds file turns it off.
+
 **A dollar stop stays dollars** (Steve, 2026-09-30, "dollars", st-7p5u).
 A stop set in dollars — the flat $20, the steppers' distance, or a typed
 price — also sends its `stop_price`. At the send the service strikes the

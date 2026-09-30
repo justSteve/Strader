@@ -365,3 +365,72 @@ class TestTheStopFollowsABetterFill:
         svc.place(entry(intent_id="b-2", stop_price=1.90))
         assert svc._open[CALL].stop_price == 1.90
         assert svc.journal.events("stop_follows_fill") == []
+
+
+class TestTheTrailingStop:
+    """Steve, 2026-09-30 [st-s1y1]: "as soon as it reaches $50 or better move
+    the SL to +$30. From that point on, for every +100 move the SL to current
+    value - $50." In the card's own number: net if closed, after commissions."""
+
+    def _open(self, svc, mb):
+        svc.place(entry(intent_id="tr-1", stop_price=1.90))
+        return svc._open[CALL]
+
+    def _bid(self, mb, bid):
+        mb.set_quote(CALL, bid=bid, ask=round(bid + 0.10, 2))
+
+    def _net(self, svc, pos):
+        return svc.valuation(pos)["net_if_closed_usd"]
+
+    def test_nothing_moves_under_fifty(self, svc, mb):
+        pos = self._open(svc, mb)
+        self._bid(mb, 2.40)
+        assert self._net(svc, pos) < 50
+        assert svc.trail() == []
+        assert pos.stop_price == 1.90
+
+    def test_at_fifty_the_stop_locks_thirty(self, svc, mb):
+        pos = self._open(svc, mb)
+        self._bid(mb, 2.70)
+        assert self._net(svc, pos) >= 50
+        moved, = svc.trail()
+        assert moved["tier"] == 0 and moved["lock_usd"] == 30.0
+        at_stop = svc.valuation(pos)["at_stop_usd"]
+        assert 30.0 <= at_stop < 35.0                    # +$30, up to one tick
+        assert svc.trail() == []                          # a tier moves once
+
+    def test_each_hundred_past_that_locks_current_less_fifty(self, svc, mb):
+        pos = self._open(svc, mb)
+        self._bid(mb, 2.70)
+        svc.trail()
+        self._bid(mb, 3.40)                               # net ≈ 128: still tier 0
+        assert svc.trail() == []
+        self._bid(mb, 3.80)                               # net ≈ 168: tier 1
+        net = self._net(svc, pos)
+        moved, = svc.trail()
+        assert moved["tier"] == 1
+        at_stop = svc.valuation(pos)["at_stop_usd"]
+        assert net - 50 <= at_stop < net - 50 + 10       # one 0.10 tick above $3
+        self._bid(mb, 4.80)                               # net ≈ 268: tier 2
+        net2 = self._net(svc, pos)
+        moved, = svc.trail()
+        assert moved["tier"] == 2
+        assert net2 - 50 <= svc.valuation(pos)["at_stop_usd"] < net2 - 50 + 10
+
+    def test_it_never_lowers_the_stop(self, svc, mb):
+        pos = self._open(svc, mb)
+        self._bid(mb, 2.70)
+        svc.trail()
+        high = pos.stop_price
+        self._bid(mb, 2.45)
+        assert svc.trail() == []
+        assert pos.stop_price == high
+
+    def test_off_when_the_arm_is_zero(self, mb, clock, tmp_path):
+        svc = ExecService(mb, ServiceConfig(state_dir=tmp_path / "execd", sha="t",
+                                            bounds=Bounds(trail_arm_usd=0)), clock=clock)
+        svc.unlock({"token": "x"})
+        pos = self._open(svc, mb)
+        self._bid(mb, 3.00)
+        assert svc.trail() == []
+        assert pos.stop_price == 1.90

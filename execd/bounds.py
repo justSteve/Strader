@@ -149,6 +149,15 @@ class Bounds:
     #: [co-8mb1z]
     take_profit_multiple: float = 5.0
     take_profit_basis: str = "premium"
+    #: The trailing stop (Steve, 2026-09-30, st-s1y1): "as soon as it reaches
+    #: $50 or better move the SL to +$30. From that point on, for every +100
+    #: move the SL to current value - $50." In the position's own dollars,
+    #: net of commissions — the number on his card. ``trail_arm_usd`` 0 turns
+    #: it off. Only ever raises the stop.
+    trail_arm_usd: float = 50.0
+    trail_arm_lock_usd: float = 30.0
+    trail_step_usd: float = 100.0
+    trail_gap_usd: float = 50.0
 
     def problems(self) -> list[str]:
         out: list[str] = []
@@ -171,6 +180,11 @@ class Bounds:
                 "stop is what survives this box dying, and a bound you can switch "
                 "off is not a bound"
             )
+        if self.trail_arm_usd < 0 or self.trail_step_usd <= 0 or self.trail_gap_usd < 0:
+            out.append("trail_arm_usd must be >= 0, trail_step_usd > 0, trail_gap_usd >= 0")
+        if self.trail_arm_usd > 0 and not (0 <= self.trail_arm_lock_usd < self.trail_arm_usd):
+            out.append("trail_arm_lock_usd must be at least 0 and under trail_arm_usd — "
+                       "a lock at or past the arm would rest the stop at the bid")
         if self.take_profit_basis not in ("premium", "risk"):
             out.append(f"take_profit_basis must be 'premium' or 'risk', not {self.take_profit_basis!r}")
         if self.take_profit_multiple <= 0:
@@ -229,6 +243,10 @@ class Bounds:
             "require_protective_stop": self.require_protective_stop,
             "take_profit_multiple": self.take_profit_multiple,
             "take_profit_basis": self.take_profit_basis,
+            "trail_arm_usd": self.trail_arm_usd,
+            "trail_arm_lock_usd": self.trail_arm_lock_usd,
+            "trail_step_usd": self.trail_step_usd,
+            "trail_gap_usd": self.trail_gap_usd,
         }
 
 

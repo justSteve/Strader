@@ -193,6 +193,9 @@ class FakeService:
     def observe(self, spx):
         return {}
 
+    def trail(self):
+        return []
+
 
 def test_a_ring_reconciles_on_the_short_gap_and_a_beat_on_the_long():
     svc = FakeService()

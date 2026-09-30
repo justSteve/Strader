@@ -187,6 +187,10 @@ POSITION_SETTLE_S = 90.0
 #: market-sell each one for nothing (audit finding 32 / 04 §7, st-xv5e).
 #: The resting bracket at the broker is the exit while a mark is refused; a
 #: genuine gap is accepted once the window has passed.
+#: A trailing-stop move the adjust refused is tried again after this long,
+#: not on every 3 s pass (st-s1y1).
+TRAIL_RETRY_S = 15.0
+
 MARK_BAND_PCT = 1.0
 MARK_BAND_WINDOW_S = 300.0
 
@@ -340,6 +344,10 @@ class OpenPosition:
     #: a leg Steve cancelled in TOS (st-5n3s): left off — not re-rested, not
     #: watched on the SPX mark — until he sets it again on the form
     stop_off_by_hand: bool = False
+    #: the trailing stop's last tier moved to (-1: not yet armed) and when a
+    #: refused move may be tried again (st-s1y1)
+    trail_tier: int = -1
+    trail_retry_at: datetime | None = None
     target_off_by_hand: bool = False
     #: his SPX close level from the order form (st-5n3s): crossed, the SPX
     #: loop closes at market. Held by intent id in the service and attached
@@ -406,6 +414,7 @@ class OpenPosition:
             "target_order_id": self.target_order_id, "target_price": self.target_price,
             "target_state": self.leg_state("target"),
             "stop_off_by_hand": self.stop_off_by_hand,
+            "trail_tier": self.trail_tier,
             "exit_spx": self.exit_spx,
             "target_off_by_hand": self.target_off_by_hand,
             "target_spx": self.target_spx,
@@ -3035,6 +3044,66 @@ class ExecService:
                     self.journal.record("error", kind="bracket_fallback", order_id=o.order_id,
                                         detail=str(exc))
         return None
+
+    # ── the trailing stop (st-s1y1) ──────────────────────────────────────
+    def trail(self) -> list[dict[str, Any]]:
+        """Raise each open position's stop by Steve's rule. Called by the
+        watcher every pass while exposed.
+
+        Steve, 2026-09-30: *"as soon as it reaches $50 or better move the SL
+        to +$30. From that point on, for every +100 move the SL to current
+        value - $50."* Tier 0 arms at ``trail_arm_usd`` (net if closed, the
+        card's number) and locks ``trail_arm_lock_usd``; tier k ≥ 1 is
+        reached at arm + k × step and locks the net then less the gap. A
+        tier moves the stop once; the stop only ever goes up. The move is an
+        ordinary ``_adjust`` — its refusals hold (not below the bid, a close
+        in flight), a refusal is retried after ``TRAIL_RETRY_S``, and the
+        SPX-mark trigger moves with the price as for any adjust."""
+        b = self.bounds
+        if b.trail_arm_usd <= 0:
+            return []
+        out: list[dict[str, Any]] = []
+        with self._lock:
+            for pos in list(self._open.values()):
+                moved = self._trail_one(pos, b)
+                if moved is not None:
+                    out.append(moved)
+        return out
+
+    def _trail_one(self, pos: OpenPosition, b: Bounds) -> dict[str, Any] | None:
+        if pos.exit_in_flight or pos.stop_order_id is None or pos.stop_off_by_hand:
+            return None
+        now = self.clock()
+        if pos.trail_retry_at is not None and now < pos.trail_retry_at:
+            return None
+        v = self.valuation(pos)
+        net, bid = v.get("net_if_closed_usd"), v.get("bid")
+        if net is None or bid is None or net < b.trail_arm_usd:
+            return None
+        tier = int((net - b.trail_arm_usd) // b.trail_step_usd)
+        if tier <= pos.trail_tier:
+            return None
+        lock = b.trail_arm_lock_usd if tier == 0 else net - b.trail_gap_usd
+        raw = pos.entry_price + (lock + v["commissions_usd"]) / (CONTRACT_MULTIPLIER * pos.qty)
+        tick = tick_for(raw)
+        # up to the grid so the lock is at least what he said; down when up
+        # would sit on the bid (a stop at the bid is a sale, and refused)
+        price = round(math.ceil(round(raw / tick, 6)) * tick, 2)
+        if price >= bid:
+            price = round(math.floor(round(raw / tick, 6)) * tick, 2)
+        if pos.stop_price is not None and price <= pos.stop_price + 1e-9:
+            pos.trail_tier = tier           # the stop is already there or higher
+            return None
+        line = dict(symbol=pos.symbol, intent_id=pos.intent_id, net_usd=net, tier=tier,
+                    lock_usd=round(lock, 2), stop_was=pos.stop_price, stop_to=price, bid=bid)
+        self.journal.record("trail", **line)
+        res = self._adjust(pos.symbol, stop_price=price, target_price=None)
+        if res.get("refused") is None:
+            pos.trail_tier = tier
+            pos.trail_retry_at = None
+        else:
+            pos.trail_retry_at = now + timedelta(seconds=TRAIL_RETRY_S)
+        return {**line, "result": res}
 
     def _stop_follows_fill(self, pos: OpenPosition, limit: float | None) -> None:
         """A triggered stop was struck under the LIMIT, the one price known

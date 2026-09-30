@@ -289,7 +289,23 @@ class TestConfiguration:
             "price_band_pct", "max_quote_age_s", "preview_cost_tolerance_usd",
             "require_protective_stop",
             "take_profit_multiple", "take_profit_basis",
+            "trail_arm_usd", "trail_arm_lock_usd", "trail_step_usd", "trail_gap_usd",
         }
+
+    def test_the_trail_defaults_are_steves_rule(self):
+        """Steve, 2026-09-30 (st-s1y1): at $50 move the SL to +$30; then for
+        every +$100, the SL to current value − $50."""
+        b = Bounds()
+        assert (b.trail_arm_usd, b.trail_arm_lock_usd, b.trail_step_usd,
+                b.trail_gap_usd) == (50.0, 30.0, 100.0, 50.0)
+
+    @pytest.mark.parametrize("kw", [
+        {"trail_arm_usd": -1}, {"trail_step_usd": 0}, {"trail_arm_lock_usd": 50.0},
+        {"trail_arm_lock_usd": -5}, {"trail_gap_usd": -1},
+    ])
+    def test_a_trail_that_cannot_work_will_not_load(self, kw):
+        with pytest.raises(ValueError):
+            Bounds.from_dict(kw)
 
     def test_the_take_profit_defaults_are_the_standing_assumption(self):
         """5x of the entry limit on the premium basis — Steve, 2026-09-25: "We
