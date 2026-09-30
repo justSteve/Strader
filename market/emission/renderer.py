@@ -28,7 +28,7 @@ USE::
 
     render("sweep-print", "reason", {
         "direction": "buy", "span": (7555.00, 7555.50),
-        "ticks_swept": 3, "total_size": 49,
+        "levels_swept": 3, "total_size": 49,
     })
     # 'buy sweep 7555.00->7555.50 (3 tick-levels, 49 contracts)'
 

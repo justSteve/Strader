@@ -160,7 +160,7 @@ def test_sweep_print():
     number, three words, review finding 1. Both surfaces now render from the
     lexicon and neither can name it: st-bkvt."""
     said = speak(SweepPrint(**_base(), direction="buy", start_price=7436.0,
-                            end_price=7438.0, ticks_swept=8, total_size=412))
+                            end_price=7438.0, levels_swept=8, total_size=412))
     assert said == ("Buy sweep, eight tick-levels through to seventy-four "
                     "thirty-eight, four hundred twelve contracts.")
 

@@ -23,8 +23,15 @@ class SweepPrint(Signal):
     direction: Literal["buy", "sell"] = "buy"
     start_price: float = 0.0
     end_price: float = 0.0
-    ticks_swept: int = 0
+    #: prices that carried size (SWEEP_LEVEL_MIN_SIZE / _SHARE) — a COUNT OF
+    #: PRICE LEVELS, not ticks of travel; was ``ticks_swept``, renamed because
+    #: the name read as distance (st-hnl7) and it now counts only levels with
+    #: size (st-r6ni)
+    levels_swept: int = 0
     total_size: int = 0
+    #: every price the run traded and the contracts there, in the order the
+    #: aggressor walked — so a lopsided run is visible, not hidden in a count
+    level_sizes: tuple[tuple[float, int], ...] = ()
     # The two fields that make "one aggressor" and "near-instantly" checkable
     # rather than asserted [2026-08-27]. Until then this docstring described a
     # single participant crossing the book while the gates only counted levels

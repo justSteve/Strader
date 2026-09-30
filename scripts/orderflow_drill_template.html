@@ -1655,14 +1655,19 @@ const emSpan = (a, b) => {
 function emGist(e) {
   switch (e.type) {
     case "SweepPrint":
-      // ticks_swept is a COUNT OF PRICE LEVELS, not ticks of travel (engine.py
-      // _end_run: ticks = len(r["prices"])). Rendering it as "ticks" reads as
-      // distance and misled Steve on the 8/07 close. Say levels. [st-hnl7]
-      // ticks_swept is a COUNT OF PRICES TOUCHED, not ticks of travel and not
-      // structural levels — "level" is already taken on this page (armed level
-      // chips, Mancini chips, "Price approaching level"). Say prices, and give
-      // the span in points so the size of the thing is never in doubt. [st-hnl7]
-      return `${e.direction || "?"} ${emN(e.total_size)} across ${emN(e.ticks_swept)} prices, `
+      // The split, not a count [st-r6ni, st-hnl7]. "buy 538 across 3 prices,
+      // 7685->7685.5 (0.50 pts)" hid that 481 went off at one price and read as
+      // arithmetic gone wrong (three prices, two gaps). Each price and what it
+      // carried, in the order the aggressor walked; the engine counts a price
+      // toward the sweep only when it carries size. An event from before the
+      // split existed falls back to the count and span.
+      if (Array.isArray(e.level_sizes) && e.level_sizes.length) {
+        const parts = e.level_sizes
+          .filter(l => Array.isArray(l) && l.length === 2)
+          .map(([p, n]) => `${emN(n)} at ${emP(p)}`);
+        return `${e.direction || "?"} ${emN(e.total_size)}: ${parts.join(" · ")}`;
+      }
+      return `${e.direction || "?"} ${emN(e.total_size)} across ${emN(e.levels_swept ?? e.ticks_swept)} prices, `
         + `${emP(e.start_price)}→${emP(e.end_price)}${emSpan(e.start_price, e.end_price)}`;
     case "ImbalanceStack": {
       const px = (e.prices || []).filter(p => typeof p === "number" && isFinite(p));

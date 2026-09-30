@@ -184,7 +184,7 @@ def _flush_reclaim_confirm():
             anchor_kind="support", state="confirmed", beats=["flush", "flip", "stall", "confirm"],
             fire_index=1, confidence=0.8, mancini_confluence=True),
         _ev(9, bars, type="SweepPrint", direction="buy", start_price=7723.0,
-            end_price=7724.5, ticks_swept=6, total_size=300, confidence=1.0),
+            end_price=7724.5, levels_swept=6, total_size=300, confidence=1.0),
     ]
     return bars, events
 

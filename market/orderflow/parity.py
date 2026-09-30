@@ -84,6 +84,14 @@ def _overridden():
             setattr(mod, name, value)
 
 
+def _plain(v):
+    """Tuples to lists, all the way down (``level_sizes`` is pairs), floats
+    rounded — the shape JSON gives back, so a snapshot compares equal."""
+    if isinstance(v, (tuple, list)):
+        return [_plain(x) for x in v]
+    return round(v, 4) if isinstance(v, float) else v
+
+
 def serialize(sig: Signal) -> dict:
     """Signal → plain dict: type name + every dataclass field, timestamps as
     ISO strings, floats rounded to the tick grid's 2 decimals."""
@@ -95,7 +103,7 @@ def serialize(sig: Signal) -> dict:
         elif isinstance(v, float):
             v = round(v, 4)
         elif isinstance(v, tuple):
-            v = [round(x, 4) if isinstance(x, float) else x for x in v]
+            v = _plain(v)
         out[f.name] = v
     return out
 

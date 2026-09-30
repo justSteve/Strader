@@ -104,14 +104,14 @@ def test_engine_golden_sensitized(trades, monkeypatch):
     assert sum(isinstance(s, SweepPrint) for s in sigs) == 5
     assert e.large_lot_count == 3
     first = next(s for s in sigs if isinstance(s, SweepPrint))
-    assert (first.direction, first.ticks_swept, first.total_size) == ("buy", 3, 49)
+    assert (first.direction, first.levels_swept, first.total_size) == ("buy", 3, 49)
     h = hashlib.sha256()
     for s in sigs:
         h.update(repr(s).encode())
     # Repinned 2026-08-26 [st-bkvt]: `repr` covers `reason`, and the sweep's
     # reason now renders from the lexicon — "3 levels" became "3 tick-levels".
     # No engine behaviour moved: the assertions above (count, direction,
-    # ticks_swept, total_size, large-lot count) all held across the change,
+    # levels_swept, total_size, large-lot count) all held across the change,
     # and the regenerated parity snapshot diffs only those five strings.
     #
     # Repinned 2026-08-27: SweepPrint gained span_ms and concentration, the two
@@ -122,7 +122,16 @@ def test_engine_golden_sensitized(trades, monkeypatch):
     # production gates are relaxed to fixture scale here, so this golden pins
     # serialization, not the new rule — the rule's evidence is the re-emission
     # diff over archived tape.
-    assert h.hexdigest() == "63e29085dab3ea13287fd192bd42ed318a113941091fac9359f5b230b199de6a"
+    #
+    # Repinned 2026-09-30 [st-r6ni, st-hnl7]: ``ticks_swept`` renamed
+    # ``levels_swept``; SweepPrint gained ``level_sizes``; and a price now
+    # counts only when it carries size (5 contracts and 2.5% of the run). Two
+    # of the five fixture sweeps each carried a dust price (4 contracts at
+    # 7555.75, 2 at 7557.75 — both under 5) and now count 3 prices,
+    # not 4 — confidence 0.67 -> 0.50, reason "4" -> "3 tick-levels". The
+    # other three are unchanged but for the rename and the new field. All five
+    # still fire; the behavioural assertions above hold.
+    assert h.hexdigest() == "650336fa1255c8b05c67b400f5ac934c82be284fd34c7721acb334a23b5b22ad"
 
 
 # ── imbalance golden (st-su4) ────────────────────────────────────────────────

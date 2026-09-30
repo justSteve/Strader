@@ -163,9 +163,16 @@ def test_a_window_is_a_strict_subset_of_the_full_day_on_both_paths(knobs):
         assert rec in full
 
 
-@corpus
+#: 08-25's two sweeps were both single-price fills wearing a one-lot tail
+#: (30 / 512 / 1, 38 / 550 / 2) and stopped emitting under the level floor
+#: (st-r6ni); 09-10 carries sweeps with size at every price.
+SWEEP_DAY = date(2026, 9, 10)
+
+
+@pytest.mark.skipif(not has_es_day(SWEEP_DAY), reason=f"{SWEEP_DAY} not in data/corpus")
 def test_sweeps_only_runs_the_engine_path_alone(knobs):
     rr.clear_cache()
-    only = rr.replay_day(DAY, rr.Region(DAY, DAY), rr.Filter(kinds=frozenset({rr.KIND_SWEEP})), knobs)
+    only = rr.replay_day(SWEEP_DAY, rr.Region(SWEEP_DAY, SWEEP_DAY),
+                         rr.Filter(kinds=frozenset({rr.KIND_SWEEP})), knobs)
     assert only and {r["kind"] for r in only} == {rr.KIND_SWEEP}
     assert not any(k[1] == rr.PATH_TAPE for k in rr._CACHE), "the tape path ran for a sweeps-only ask"

@@ -43,6 +43,8 @@ from market.signals.orderflow_config import (
     LARGE_LOT_MIN_SIZE,
     PIVOT_FILTER_TICKS,
     SWEEP_MAX_SPAN_MS,
+    SWEEP_LEVEL_MIN_SHARE,
+    SWEEP_LEVEL_MIN_SIZE,
     SWEEP_MIN_CONCENTRATION,
     SWEEP_MIN_SIZE,
     SWEEP_MIN_TICKS,
@@ -81,6 +83,16 @@ class _RollingMedian:
         n = len(s)
         mid = n // 2
         return float(s[mid]) if n % 2 else (s[mid - 1] + s[mid]) / 2.0
+
+
+def level_split(levels: dict[int, int], total: int, *,
+                ascending: bool) -> list[tuple[float, int, bool]]:
+    """Each price a run traded, in the order the aggressor walked it:
+    ``(price, contracts, counts)`` where ``counts`` says whether the price
+    carries enough size to count as a level swept [st-r6ni]."""
+    floor = max(SWEEP_LEVEL_MIN_SIZE, SWEEP_LEVEL_MIN_SHARE * total)
+    return [(round(k * TICK, 2), n, n >= floor)
+            for k, n in sorted(levels.items(), reverse=not ascending)]
 
 
 class OrderflowEngine:
@@ -170,14 +182,17 @@ class OrderflowEngine:
                 r["last_price"] = t.price
                 r["size"] += t.size
                 r["biggest"] = max(r["biggest"], t.size)
-                r["prices"].add(round(t.price / TICK))
+                k = round(t.price / TICK)
+                r["prices"].add(k)
+                r["levels"][k] = r["levels"].get(k, 0) + t.size
                 return out
             out.extend(self._end_run())
         if t.side in ("B", "A"):
             self._run = {"side": t.side, "start_ts": t.ts, "last_ts": t.ts,
                          "start_price": t.price, "last_price": t.price,
                          "size": t.size, "biggest": t.size,
-                         "prices": {round(t.price / TICK)}}
+                         "prices": {round(t.price / TICK)},
+                         "levels": {round(t.price / TICK): t.size}}
         return out
 
     def _end_run(self) -> list[Signal]:
@@ -196,22 +211,29 @@ class OrderflowEngine:
         concentration = r["biggest"] / r["size"] if r["size"] else 0.0
         if span_ms > SWEEP_MAX_SPAN_MS or concentration < SWEEP_MIN_CONCENTRATION:
             return []
+        # A PRICE COUNTS ONLY WHEN IT CARRIES SIZE [st-r6ni]. The count above
+        # is prices touched; a one-lot tail two ticks up made a single-price
+        # fill read as a three-price sweep (08-21 09:05 CT: 481 / 51 / 6).
+        levels = level_split(r["levels"], r["size"], ascending=r["side"] == "B")
+        swept = sum(1 for _, _, counts in levels if counts)
+        if swept < SWEEP_MIN_TICKS:
+            return []
         direction = "buy" if r["side"] == "B" else "sell"
-        ticks = len(r["prices"])
         return [SweepPrint(
             timestamp=r["last_ts"], source="orderflow.sweep",
-            confidence=min(1.0, ticks / (2 * SWEEP_MIN_TICKS)),
+            confidence=min(1.0, swept / (2 * SWEEP_MIN_TICKS)),
             # The line said "N levels" here and "N ticks" in speech.py for one
             # field the lexicon had already named tick-level. Both now render
             # from that one word — st-bkvt, Desk Ruling 1 item 5.
             reason=render("sweep-print", "reason", {
                 "direction": direction,
                 "span": (r["start_price"], r["last_price"]),
-                "ticks_swept": ticks,
+                "levels_swept": swept,
                 "total_size": r["size"],
             }),
             direction=direction, start_price=r["start_price"],
-            end_price=r["last_price"], ticks_swept=ticks, total_size=r["size"],
+            end_price=r["last_price"], levels_swept=swept, total_size=r["size"],
+            level_sizes=tuple((p, n) for p, n, _ in levels),
             span_ms=round(span_ms, 3), concentration=round(concentration, 4),
         )]
 

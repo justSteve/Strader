@@ -149,7 +149,7 @@ def _ordinal(n: int) -> str:
 def _sweep_print(s: SweepPrint) -> str:
     return render("sweep-print", "speech", {
         "direction": s.direction,
-        "ticks_swept": s.ticks_swept,
+        "levels_swept": s.levels_swept,
         "end_price": s.end_price,
         "total_size": s.total_size,
     })

@@ -72,7 +72,7 @@ def test_buy_sweep_emitted_on_run_end():
     sweeps = [s for s in sigs if isinstance(s, SweepPrint)]
     assert len(sweeps) == 1
     s = sweeps[0]
-    assert s.direction == "buy" and s.ticks_swept == SWEEP_MIN_TICKS
+    assert s.direction == "buy" and s.levels_swept == SWEEP_MIN_TICKS
     assert s.total_size == 200 + 20 * (SWEEP_MIN_TICKS - 1)
     assert s.span_ms == 0.0
     assert s.concentration >= 0.5
@@ -177,3 +177,60 @@ def test_double_run_identical():
     a = OrderflowEngine().run(trades)
     b = OrderflowEngine().run(trades)
     assert a == b
+
+
+# ── a price counts only when it carries size [st-r6ni] ─────────────────────
+
+def _run_at(prices_sizes, side="B"):
+    """One run: each (price, size) a print 1 ms apart, all one side."""
+    from datetime import datetime, timedelta, timezone
+    from market.entities.trade import Trade
+    t0 = datetime(2026, 8, 21, 14, 5, 1, 814000, tzinfo=timezone.utc)
+    out = []
+    for i, (p, n) in enumerate(prices_sizes):
+        out.append(Trade(ts=t0 + timedelta(microseconds=100 * i), symbol="ESU6",
+                         instrument_id=1, price=p, size=n, side=side))
+    # a print the other way ends the run
+    out.append(Trade(ts=t0 + timedelta(seconds=1), symbol="ESU6", instrument_id=1,
+                     price=prices_sizes[-1][0],
+                     size=1, side="A" if side == "B" else "B"))
+    return out
+
+
+def _sweeps(trades, monkeypatch):
+    import market.orderflow.engine as eng
+    from market.signals.orderflow import SweepPrint
+    # the span and one-print gates off, so the level floor is what is tested
+    monkeypatch.setattr(eng, "SWEEP_MAX_SPAN_MS", 10**9)
+    monkeypatch.setattr(eng, "SWEEP_MIN_CONCENTRATION", 0.0)
+    e = eng.OrderflowEngine()
+    return [s for t in trades for s in e.process(t) if isinstance(s, SweepPrint)]
+
+
+def test_the_0821_run_is_not_a_three_price_sweep(monkeypatch):
+    """Steve, 2026-08-21: "7685.00 to 7685.5 is not across 3 prices." The
+    deduplicated tape: 481 at 7685.00, 51 at 7685.25, 6 at 7685.50."""
+    trades = _run_at([(7685.00, 481), (7685.25, 51), (7685.50, 6)])
+    assert _sweeps(trades, monkeypatch) == []
+
+
+def test_a_walk_with_size_at_every_price_is_a_sweep_and_carries_its_split(monkeypatch):
+    trades = _run_at([(7685.00, 200), (7685.25, 150), (7685.50, 120)])
+    s, = _sweeps(trades, monkeypatch)
+    assert s.levels_swept == 3
+    assert s.level_sizes == ((7685.0, 200), (7685.25, 150), (7685.5, 120))
+    assert s.confidence == 0.5
+
+
+def test_a_dust_price_does_not_raise_the_confidence(monkeypatch):
+    """Four prices touched, three with size: confidence from the three."""
+    trades = _run_at([(7685.00, 200), (7685.25, 150), (7685.50, 120), (7685.75, 2)])
+    s, = _sweeps(trades, monkeypatch)
+    assert s.levels_swept == 3 and s.confidence == 0.5
+    assert s.level_sizes[-1] == (7685.75, 2)       # shown, not counted
+
+
+def test_a_sell_split_is_in_walk_order(monkeypatch):
+    trades = _run_at([(7685.50, 200), (7685.25, 150), (7685.00, 120)], side="A")
+    s, = _sweeps(trades, monkeypatch)
+    assert [p for p, _ in s.level_sizes] == [7685.5, 7685.25, 7685.0]

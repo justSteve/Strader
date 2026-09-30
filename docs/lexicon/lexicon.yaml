@@ -616,7 +616,8 @@ terms:
     status: ratified
     live: live
     definition: >
-      One aggressive order eating multiple book price-levels (>= 3 ticks).
+      One aggressive order eating multiple book price-levels (>= 3 prices,
+      each carrying real size — a one-lot tail does not count, st-r6ni).
       Your candlestick-hindsight "sweep" — it kept its name, compounded.
     on_the_chart: The long single-print tail; on candles, the wick you already spot.
   - term: absorption-read
@@ -841,7 +842,7 @@ emission:
       kind: count
       live: live
       display: {one: tick-level, many: tick-levels}
-      fields: [SweepPrint.ticks_swept]
+      fields: [SweepPrint.levels_swept]
     - id: ladder-rung
       term: ladder-rung
       kind: count
@@ -910,8 +911,8 @@ emission:
       signal: SweepPrint
       name: sweep-print
       surfaces:
-        reason: "{direction} {@name} {span} ({ticks_swept}, {total_size})"
-        speech: "{direction} {@name}, {ticks_swept} through to {end_price}, {total_size}."
+        reason: "{direction} {@name} {span} ({levels_swept}, {total_size})"
+        speech: "{direction} {@name}, {levels_swept} through to {end_price}, {total_size}."
       note: >
         The whole emission, both surfaces, which is the point — this is the
         one the review is named for and it is migrated completely rather than

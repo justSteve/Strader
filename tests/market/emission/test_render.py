@@ -40,10 +40,10 @@ def test_sweep_reason_and_speech_use_the_same_word_for_the_same_field():
     it, because neither template can spell it."""
     written = render("sweep-print", "reason", {
         "direction": "buy", "span": (7555.00, 7555.50),
-        "ticks_swept": 3, "total_size": 49,
+        "levels_swept": 3, "total_size": 49,
     })
     spoken = render("sweep-print", "speech", {
-        "direction": "buy", "ticks_swept": 3,
+        "direction": "buy", "levels_swept": 3,
         "end_price": 7555.50, "total_size": 49,
     })
     assert "tick-level" in written and "tick-level" in spoken
@@ -59,13 +59,13 @@ def test_sweep_reason_and_speech_use_the_same_word_for_the_same_field():
 def test_sweep_reason_is_the_documented_string():
     assert render("sweep-print", "reason", {
         "direction": "buy", "span": (7555.00, 7555.50),
-        "ticks_swept": 3, "total_size": 49,
+        "levels_swept": 3, "total_size": 49,
     }) == "buy sweep 7555.00->7555.50 (3 tick-levels, 49 contracts)"
 
 
 def test_sweep_speech_is_the_documented_string():
     assert render("sweep-print", "speech", {
-        "direction": "buy", "ticks_swept": 8,
+        "direction": "buy", "levels_swept": 8,
         "end_price": 7438.0, "total_size": 412,
     }) == ("Buy sweep, eight tick-levels through to seventy-four thirty-eight, "
            "four hundred twelve contracts.")
@@ -74,7 +74,7 @@ def test_sweep_speech_is_the_documented_string():
 def test_counts_of_one_take_the_singular():
     assert "1 tick-level," in render("sweep-print", "reason", {
         "direction": "sell", "span": (7555.00, 7555.00),
-        "ticks_swept": 1, "total_size": 1,
+        "levels_swept": 1, "total_size": 1,
     })
 
 
@@ -88,7 +88,7 @@ def test_renders_reports_declared_silence_without_raising():
 def test_missing_value_is_an_error_not_an_empty_slot():
     with pytest.raises(SlotError, match="no value for {total_size}"):
         render("sweep-print", "reason", {
-            "direction": "buy", "span": (1.0, 2.0), "ticks_swept": 3,
+            "direction": "buy", "span": (1.0, 2.0), "levels_swept": 3,
         })
 
 
@@ -97,7 +97,7 @@ def test_value_with_no_slot_is_an_error():
     being emitted — the failure mode nobody notices for a month."""
     with pytest.raises(SlotError, match="passed but not in the template"):
         render("sweep-print", "speech", {
-            "direction": "buy", "ticks_swept": 3, "end_price": 1.0,
+            "direction": "buy", "levels_swept": 3, "end_price": 1.0,
             "total_size": 9, "start_price": 0.0,
         })
 
@@ -115,7 +115,7 @@ def test_unknown_surface_is_refused():
 def test_enum_member_outside_the_declared_set():
     with pytest.raises(SlotError, match="not a member of 'aggressor-side'"):
         render("sweep-print", "speech", {
-            "direction": "sideways", "ticks_swept": 3,
+            "direction": "sideways", "levels_swept": 3,
             "end_price": 1.0, "total_size": 9,
         })
 
@@ -123,7 +123,7 @@ def test_enum_member_outside_the_declared_set():
 def test_count_wants_an_int():
     with pytest.raises(SlotError, match="wants an int"):
         render("sweep-print", "speech", {
-            "direction": "buy", "ticks_swept": 3.5,
+            "direction": "buy", "levels_swept": 3.5,
             "end_price": 1.0, "total_size": 9,
         })
 
@@ -133,7 +133,7 @@ def test_bool_is_not_an_int_here():
     call-site bug every time, so it is refused rather than counted."""
     with pytest.raises(SlotError, match="wants an int"):
         render("sweep-print", "speech", {
-            "direction": "buy", "ticks_swept": True,
+            "direction": "buy", "levels_swept": True,
             "end_price": 1.0, "total_size": 9,
         })
 
@@ -142,7 +142,7 @@ def test_span_wants_a_pair():
     with pytest.raises(SlotError, match="wants a \\(start, end\\) pair"):
         render("sweep-print", "reason", {
             "direction": "buy", "span": 7555.0,
-            "ticks_swept": 3, "total_size": 9,
+            "levels_swept": 3, "total_size": 9,
         })
 
 
@@ -368,7 +368,7 @@ def _templates():
 def test_no_template_contains_a_field_display_word():
     """THE MECHANISM, asserted. A template holds slots and connective tissue.
     The moment one spells a quantity's word — "3 tick-levels" written out
-    instead of "{ticks_swept}" — that surface owns a second copy of the word
+    instead of "{levels_swept}" — that surface owns a second copy of the word
     and the two can drift, which is the whole defect back again."""
     words = set()
     for q in schema()["quantities"].values():

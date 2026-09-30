@@ -81,6 +81,23 @@ SWEEP_WINDOW_MS = 250           # event-time window; never wall-clock
 #     one print >= 80%                   3.8/day
 SWEEP_MAX_SPAN_MS = 5           # first print to last; "simultaneously"
 SWEEP_MIN_CONCENTRATION = 0.5   # largest single print / total run size
+# ── a level counts only when it carries size [st-r6ni] ──────────────────────
+# Steve, 2026-08-21, on "buy 538 across 3 prices, 7685->7685.5": "7685.00 to
+# 7685.5 is not across 3 prices." 481 of the 538 went off at 7685.00; the other
+# two prices carried 51 and 6. A price counts toward SWEEP_MIN_TICKS only when
+# it carries at least this many contracts AND this share of the run. Chosen by
+# measurement — see scripts/measurement/sweep_level_size.py and the table in
+# docs/measurement/2026-09-30-sweep-level-size.md.
+#
+# Measured 2026-09-30 over 40 RTH sessions (08-06..09-30), production gates:
+# 140 sweeps. The smallest price's share of its run is continuous above ~2%;
+# below 2% sit 51 of them, whose smallest price carried a median of 2
+# contracts (max 16) — the one-lot-tail population. The floor removes that
+# band and does not judge the continuum above it: 84 of 140 still emit
+# (2.1/day). The 08-21 09:05 run (481 / 51 / 6) no longer counts its third
+# price and is not a sweep.
+SWEEP_LEVEL_MIN_SIZE = 5        # contracts at one price
+SWEEP_LEVEL_MIN_SHARE = 0.025   # that price's share of the run
 
 # ── divergence pivots (spec §2) [literature seed; calibrate st-wnc] ─────────
 PIVOT_FILTER_TICKS = 8          # swing high/low confirmation filter (2.0 pts)
