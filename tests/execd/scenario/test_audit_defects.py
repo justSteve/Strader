@@ -214,7 +214,6 @@ def test_d10_eight_lots_are_not_refused_by_the_preview(make):
 
 # ── D11 ──────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D11"))
 @pytest.mark.parametrize("where", ["another-contract", "the-held-contract"])
 def test_d11_a_sell_to_open_is_not_a_close(make, where):
     """Steve sells a fly's body in TOS (SELL_TO_OPEN). Not a close of

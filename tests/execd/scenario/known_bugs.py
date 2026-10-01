@@ -60,11 +60,6 @@ KNOWN: dict[str, dict[str, str]] = {
             "title": "check_preview_cost compares the preview total WITH commission to the cap "
                      "WITHOUT it — eight lots or more at the ask are always refused",
             "detail": "0.65 × qty passes the $5 tolerance at 8 contracts."},
-    "D11": {"invariant": "(assertion)", "pinned_by": _T + "test_d11_a_sell_to_open_is_not_a_close",
-            "title": "the fill sweep treats any SELL_* as a close: a SELL_TO_OPEN (a fly leg in "
-                     "TOS) writes unattributed_sell, and on a held contract books an external close",
-            "detail": "_pick_up_fills reads Fill.side, which the transport reduces from the "
-                      "instruction (schwab._side_of); Fill.instruction is not consulted."},
     "D12": {"invariant": "false_short_alarm", "pinned_by": _T + "test_d12_rest_fill_and_fire_between_passes",
             "title": "a resting triggered entry that fills and stops out between two reconciles "
                      "raises 'unattributed_sell — the account is short; check the broker' for "

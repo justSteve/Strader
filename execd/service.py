@@ -1161,6 +1161,14 @@ class ExecService:
         for fill in fills:
             if fill.side is not Side.SELL_TO_CLOSE:
                 continue
+            if fill.instruction and fill.instruction != "SELL_TO_CLOSE":
+                # The transport folds every SELL_* into SELL_TO_CLOSE for its
+                # convenience field; the instruction is the broker's own word.
+                # A SELL_TO_OPEN — the short wings of a fly he trades by hand —
+                # is not a close: read as one it wrote "the account is short"
+                # and, on a contract this service holds, booked an outside close
+                # and pulled the bracket (st-3wf8).
+                continue
             key = (fill.order_id, fill.leg_id, fill.at.isoformat())
             if key in self._swept_fills:
                 continue                # the overlap's own repeat; the same event
