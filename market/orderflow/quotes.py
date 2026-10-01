@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Iterator
 from zoneinfo import ZoneInfo
 
+from market.corpus.paths import resolve_existing
 from market.entities.book import BookEvent
 
 logger = logging.getLogger(__name__)
@@ -50,9 +51,14 @@ def read_mbp1_day(day: _date | Path) -> Iterator[BookEvent]:
     regression (single-pull ordering assumption violated). Unparseable rows
     are logged and skipped, matching the trades reader's tolerance.
     """
-    path = day if isinstance(day, Path) else mbp1_day_path(day)
-    if not path.exists():
-        raise FileNotFoundError(f"no MBP-1 corpus file at {path}")
+    requested = day if isinstance(day, Path) else mbp1_day_path(day)
+    # a compacted day lives only as .jsonl.gz (corpus_compact_databento.py
+    # removes the source) — resolve through the shared helper, never the raw
+    # path, or a packed day reads as a missing one [st-epa3]
+    path = resolve_existing(requested)
+    if path is None:
+        raise FileNotFoundError(
+            f"no MBP-1 corpus file at {requested} (nor {requested}.gz)")
 
     prev_ts: datetime | None = None
     bad = 0
