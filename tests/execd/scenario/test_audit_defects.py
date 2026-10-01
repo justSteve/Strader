@@ -108,7 +108,6 @@ def test_d3_the_childrens_read_fails(make, fault):
 
 # ── D4 ───────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D4"))
 @pytest.mark.parametrize("prints", ["5ms-apart", "same-ms", "working-between"])
 def test_d4_a_close_in_two_prints(make, prints):
     """Two lots; the stop executes as 1 + 1. The whole close is booked, and

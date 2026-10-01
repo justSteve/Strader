@@ -20,12 +20,6 @@ _S = "test_sequences.py::"
 
 KNOWN: dict[str, dict[str, str]] = {
     # ── the audit (2026-10-01) ───────────────────────────────────────────
-    "D4": {"invariant": "resting_sell_without_position, short_position",
-           "pinned_by": _T + "test_d4_a_close_in_two_prints",
-           "title": "a close in two prints books only the first; the stop and target are "
-                    "re-rested on a flat account (and two prints in one millisecond collide)",
-           "detail": "_pick_up_fills books per print, clears the leg id although the order "
-                     "may still be WORKING, and dedupes on (order_id, leg_id, at)."},
     "D5": {"invariant": "two_stops", "pinned_by": _T + "test_d5_a_partly_filled_entry",
            "title": "a partly filled working entry is adopted, then added to when it completes: "
                     "the tracked size doubles",

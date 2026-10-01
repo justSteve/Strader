@@ -506,9 +506,19 @@ class ExecService:
         #: the last mark ``observe`` acted on, and when — the band a new mark
         #: is judged against (st-xv5e)
         self._last_mark: tuple[float, datetime] | None = None
-        #: every execution leg the fill sweep has seen, as (order_id, leg_id,
-        #: at): the overlapping window returns each one again (st-b7i4)
-        self._swept_fills: set[tuple[str, int | None, str]] = set()
+        #: every print the fill sweep has seen, as (order_id, leg_id, at,
+        #: qty, price) → how many times one window held it: the overlapping
+        #: window returns each print again (st-b7i4), and two prints of one
+        #: order in the same millisecond share every field — counted, not
+        #: deduped, or the second was dropped as the first's repeat (st-ymgs)
+        self._swept_fills: dict[tuple[Any, ...], int] = {}
+        #: by sell order id: contracts the sweep has seen printed, contracts
+        #: booked closed (from any path — a print, a place answer, a cancel
+        #: that found the order filled), and the order's own size. A close
+        #: in two prints is booked by these, not once per order id (st-ymgs)
+        self._printed_qty: dict[str, int] = {}
+        self._booked_qty: dict[str, int] = {}
+        self._sell_qty: dict[str, int] = {}
         #: SPX close levels from the order form, by intent id (st-5n3s)
         self._exit_levels: dict[str, float] = {}
         self._mark_refused_streak = 0
@@ -1212,6 +1222,12 @@ class ExecService:
             return {"picked_up": [], "error": str(exc)}
         self._last_fill_poll = now
         picked: list[dict[str, Any]] = []
+        # The window's new prints, by order: each order is booked once per
+        # sweep for what printed since the last, so a close in two prints is
+        # one close of both, and one the broker is still working is a part.
+        counts: dict[tuple[Any, ...], int] = {}
+        fresh_prints: dict[str, list[Any]] = {}
+        listing: dict[str, OrderResult] | None = None
         for fill in fills:
             if fill.side is not Side.SELL_TO_CLOSE:
                 continue
@@ -1223,19 +1239,29 @@ class ExecService:
                 # and, on a contract this service holds, booked an outside close
                 # and pulled the bracket (st-3wf8).
                 continue
-            key = (fill.order_id, fill.leg_id, fill.at.isoformat())
-            if key in self._swept_fills:
+            key = (fill.order_id, fill.leg_id, fill.at.isoformat(), fill.qty, fill.price)
+            counts[key] = counts.get(key, 0) + 1
+            if counts[key] <= self._swept_fills.get(key, 0):
                 continue                # the overlap's own repeat; the same event
-            self._swept_fills.add(key)
-            if fill.order_id in self._booked_exits:
+            self._swept_fills[key] = counts[key]
+            fresh_prints.setdefault(fill.order_id, []).append(fill)
+        for order_id, prints in fresh_prints.items():
+            fill = prints[0]
+            printed = self._printed_qty.get(order_id, 0) + sum(p.qty for p in prints)
+            self._printed_qty[order_id] = printed
+            booked_before = self._booked_qty.get(order_id, 0)
+            fresh = printed - booked_before
+            if fresh <= 0:
                 # Already booked — from the place answer (a market close, a
-                # target that filled as it landed) or an earlier sweep. A fill
-                # made inside the broker call carries a time after the `now`
-                # read above it, so the next window returns it again; the
-                # flatten fill paper-0030 came back as `unattributed_sell`
-                # four minutes later and stop fill paper-0032 was booked
-                # twice (2026-09-16). Silent: it is the same event.
+                # target that filled as it landed), a cancel that found it
+                # filled, or an earlier sweep. A fill made inside the broker
+                # call carries a time after the `now` read above it, so the
+                # next window returns it again; the flatten fill paper-0030
+                # came back as `unattributed_sell` four minutes later and stop
+                # fill paper-0032 was booked twice (2026-09-16). Silent: it is
+                # the same event.
                 continue
+            px = round(sum(p.price * p.qty for p in prints) / max(1, sum(p.qty for p in prints)), 2)
             pos = self._open.get(fill.symbol)
             if pos is None:
                 # A sell on a symbol this service is not holding. Until
@@ -1247,23 +1273,47 @@ class ExecService:
                     continue
                 self._unattributed.add(fill.order_id)
                 self.journal.record("unattributed_sell", symbol=fill.symbol,
-                                    order_id=fill.order_id, qty=fill.qty, price=fill.price,
+                                    order_id=fill.order_id, qty=fresh, price=px,
                                     detail="a SELL_TO_CLOSE filled on a symbol this service "
                                            "holds no position in — if it is this service's "
                                            "leg the account is short; check the broker")
                 continue
+            # The order is done when what printed covers its size; until
+            # then the broker is still working the rest, and its id stays —
+            # cleared on the first print, the rest was re-rested beside the
+            # part still working (st-ymgs).
+            done = printed >= self._sell_qty.get(order_id, pos.qty + booked_before)
+            if not done and order_id in (pos.stop_order_id, pos.target_order_id,
+                                         pos.exit_order_id):
+                # Short of its size by the prints: the broker's word on the
+                # order decides — one listing read, only for a part.
+                if listing is None:
+                    try:
+                        listing = {o.order_id: o for o in self.broker.orders()}
+                    except BrokerError:
+                        listing = {}
+                listed = listing.get(order_id)
+                done = listed is not None and not listed.is_working
+            keep: str | None = None
             if fill.order_id == pos.exit_order_id:
                 # The close this service sent and was waiting on. [st-97z1]
                 kind = pos.exit_reason or "exit"
                 why = "in-flight-close"
-                pos.exit_order_id = None
-                pos.exit_reason = None
+                if done:
+                    pos.exit_order_id = None
+                    pos.exit_reason = None
             elif pos.stop_order_id and fill.order_id == pos.stop_order_id:
                 kind, why = "protective-stop", "resting-stop"
-                pos.stop_order_id = None        # it filled; nothing to cancel
+                if done:
+                    pos.stop_order_id = None    # it filled; nothing to cancel
+                else:
+                    keep = "stop"
             elif pos.target_order_id and fill.order_id == pos.target_order_id:
                 kind, why = "target", "resting-target"
-                pos.target_order_id = None
+                if done:
+                    pos.target_order_id = None
+                else:
+                    keep = "target"
             elif (pos.stop_order_id or pos.target_order_id
                   or pos.stop_off_by_hand or pos.target_off_by_hand):
                 # A sell on a held symbol from an order this service did not
@@ -1275,10 +1325,10 @@ class ExecService:
                 kind, why = "external", "closed-outside-this-service"
             else:
                 kind, why = "protective-stop", "resting-stop"
-            closed_qty = min(fill.qty, pos.qty) if fill.qty > 0 else pos.qty
-            booked = self._book_close(pos, order_id=fill.order_id, exit_px=fill.price,
-                                      closed_qty=closed_qty, reason=kind, why=why)
-            picked.append({"symbol": pos.symbol, "exit_price": fill.price,
+            closed_qty = min(fresh, pos.qty)
+            booked = self._book_close(pos, order_id=fill.order_id, exit_px=px,
+                                      closed_qty=closed_qty, reason=kind, why=why, keep=keep)
+            picked.append({"symbol": pos.symbol, "exit_price": px,
                            "pnl_usd": booked["pnl_usd"],
                            "remaining_qty": booked["remaining_qty"],
                            "order_id": fill.order_id, "reason": kind})
@@ -2513,6 +2563,7 @@ class ExecService:
         if not order.is_filled:
             pos.exit_order_id = order.order_id
             pos.exit_reason = intent.source or "exit"
+            self._sell_qty[order.order_id] = order.qty
             self.journal.record("exit_unfilled", symbol=pos.symbol,
                                 reason=pos.exit_reason, order_id=order.order_id,
                                 status=order.status.value, intent_id=pos.intent_id)
@@ -2590,6 +2641,7 @@ class ExecService:
         if not order.is_filled:
             pos.exit_order_id = order.order_id
             pos.exit_reason = reason
+            self._sell_qty[order.order_id] = order.qty
             self.journal.record("exit_unfilled", symbol=pos.symbol, reason=reason,
                                 order_id=order.order_id, status=order.status.value,
                                 intent_id=pos.intent_id)
@@ -2627,18 +2679,31 @@ class ExecService:
         """Book a close the broker reported as an order — a filled market
         close, or a leg found filled by a cancel. See ``_book_close``."""
         exit_px = order.fill_price if order.fill_price is not None else 0.0
-        closed_qty = min(_filled_qty_of(order), pos.qty)
+        # what the order filled, less what is already booked of it — a print
+        # the sweep booked first is not booked again (st-ymgs)
+        closed_qty = min(_filled_qty_of(order) - self._booked_qty.get(order.order_id, 0),
+                         pos.qty)
+        if closed_qty <= 0:
+            return {"symbol": pos.symbol, "qty": 0, "remaining_qty": pos.qty,
+                    "entry_price": pos.entry_price, "exit_price": exit_px, "pnl_usd": 0.0,
+                    "net_pnl_usd": 0.0, "reason": reason, "order_id": order.order_id,
+                    "closed": pos.symbol not in self._open, "already_booked": True,
+                    "stop_canceled": None, "stop_replaced": None, "target_canceled": None,
+                    "target_replaced": None, "also_filled": []}
         return self._book_close(pos, order_id=order.order_id, exit_px=exit_px,
                                 closed_qty=closed_qty, reason=reason, why=reason)
 
     def _book_close(self, pos: OpenPosition, *, order_id: str, exit_px: float,
-                    closed_qty: int, reason: str, why: str) -> dict[str, Any]:
+                    closed_qty: int, reason: str, why: str,
+                    keep: str | None = None) -> dict[str, Any]:
         self._journal_raw(order_id, f"fill:{reason}")
         return self._book_close_inner(pos, order_id=order_id, exit_px=exit_px,
-                                      closed_qty=closed_qty, reason=reason, why=why)
+                                      closed_qty=closed_qty, reason=reason, why=why,
+                                      keep=keep)
 
     def _book_close_inner(self, pos: OpenPosition, *, order_id: str, exit_px: float,
-                          closed_qty: int, reason: str, why: str) -> dict[str, Any]:
+                          closed_qty: int, reason: str, why: str,
+                          keep: str | None = None) -> dict[str, Any]:
         """The one place a close is booked. Take the other leg(s) of the
         bracket off, then write the ``closed`` line, then resize or drop.
 
@@ -2658,8 +2723,13 @@ class ExecService:
         rests new ones at the same prices for what is left. The mock never
         fills partially unless asked; a real broker does."""
         self._booked_exits.add(order_id)
-        stop_canceled, stop_fill = self._cancel_leg_quietly(pos, "stop")
-        target_canceled, target_fill = self._cancel_leg_quietly(pos, "target")
+        self._booked_qty[order_id] = self._booked_qty.get(order_id, 0) + closed_qty
+        # ``keep``: the leg that printed part of the close and is still
+        # working the rest. It is the close; it stays (st-ymgs).
+        stop_canceled, stop_fill = ((None, None) if keep == "stop"
+                                    else self._cancel_leg_quietly(pos, "stop"))
+        target_canceled, target_fill = ((None, None) if keep == "target"
+                                        else self._cancel_leg_quietly(pos, "target"))
 
         remaining = pos.qty - closed_qty
         pnl = self._pnl_usd(pos, exit_px, closed_qty)
@@ -2677,7 +2747,19 @@ class ExecService:
             also_filled.append(other.to_dict())
 
         restopped = retargeted = None
-        if remaining:
+        if remaining and (keep is not None or pos.exit_in_flight):
+            # The rest of the close is still working at the broker — a leg
+            # part-filled, or a close part-printed. Nothing goes back on
+            # beside it: a second sell for what that order is already
+            # selling is a short waiting for a print (st-ymgs).
+            pos.qty = remaining
+            other = ("target" if keep == "stop" else "stop") if keep else None
+            if other is not None and getattr(pos, self._LEG_ATTR[other]) is None:
+                self.journal.record(
+                    f"{other}_unprotected", symbol=pos.symbol, intent_id=pos.intent_id,
+                    qty=remaining, detail=f"the {keep} filled {closed_qty} and is working the "
+                                          f"rest — the {other} goes back on when it resolves")
+        elif remaining:
             pos.qty = remaining
             # A leg whose cancel is not confirmed is still resting at its old
             # size; re-resting beside it would be two legs for one position.
@@ -2705,8 +2787,11 @@ class ExecService:
         excess — both legs filled, a short — is ``oversold``. Returns what is
         still held afterwards."""
         held = pos.qty if remaining is None else remaining
-        qty = min(_filled_qty_of(order), held)
+        before = self._booked_qty.get(order.order_id, 0)
+        filled = max(0, _filled_qty_of(order) - before)       # not booked yet (st-ymgs)
+        qty = min(filled, held)
         px = order.fill_price if order.fill_price is not None else 0.0
+        self._booked_qty[order.order_id] = before + filled    # the excess is the oversold below
         if qty > 0:
             pnl = self._pnl_usd(pos, px, qty)
             fees = self._close_fees(pos, qty, held=held)
@@ -2717,7 +2802,7 @@ class ExecService:
                                 exit_price=px, pnl_usd=pnl, **fees(pnl),
                                 order_id=order.order_id,
                                 reason=reason, detail="found filled by the cancel")
-        excess = _filled_qty_of(order) - qty
+        excess = filled - qty
         if excess > 0:
             self.journal.record(
                 "oversold", symbol=pos.symbol, intent_id=pos.intent_id,
@@ -2952,6 +3037,7 @@ class ExecService:
             return None
         pos.stop_order_id = result.order_id
         pos.stop_price = price
+        self._sell_qty[result.order_id] = result.qty or pos.qty
         self.journal.record("stop_placed", symbol=pos.symbol, intent_id=pos.intent_id,
                             stop_price=price, stop_spx=pos.stop_spx, spx=spx,
                             delta=pos.delta, qty=pos.qty, order_id=result.order_id,
@@ -3015,6 +3101,7 @@ class ExecService:
             return {**result.to_dict(), "closed": settled}
         pos.target_order_id = result.order_id
         pos.target_price = price
+        self._sell_qty[result.order_id] = result.qty or pos.qty
         self.journal.record("target_placed", **line)
         self._journal_raw(result.order_id, "target_placed")
         return result.to_dict()
@@ -4002,6 +4089,8 @@ class ExecService:
                 if pos is not None:
                     self._bracket_read(pos)
                     pos.stop_order_id = e.get("order_id")
+                    if e.get("order_id") and e.get("qty"):
+                        self._sell_qty[str(e["order_id"])] = int(e["qty"])
                     pos.stop_price = e.get("stop_price")
                     pos.stop_off_by_hand = False
                     if e.get("stop_spx") is not None:
@@ -4017,6 +4106,8 @@ class ExecService:
                     # a target that filled the moment it landed never rested;
                     # the closed line that follows drops the position anyway
                     pos.target_order_id = None if e.get("filled_at_once") else e.get("order_id")
+                    if e.get("order_id") and e.get("qty"):
+                        self._sell_qty[str(e["order_id"])] = int(e["qty"])
             elif e.get("event") in ("stop_adjusted", "target_adjusted") and e.get("replaced"):
                 # A leg moved by the broker's replace (an adjust, the trail,
                 # the stop following a better fill) writes no *_placed line —
@@ -4164,6 +4255,8 @@ class ExecService:
                 remaining = e.get("remaining_qty")
                 if e.get("order_id"):
                     self._booked_exits.add(str(e["order_id"]))
+                    oid = str(e["order_id"])
+                    self._booked_qty[oid] = self._booked_qty.get(oid, 0) + int(e.get("qty") or 0)
                 pos = self._open.get(symbol)
                 if remaining and pos is not None:
                     if isinstance(e.get("entry_fees_usd"), (int, float)):
