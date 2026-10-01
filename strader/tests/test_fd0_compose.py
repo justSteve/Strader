@@ -40,9 +40,10 @@ def _contract(delta=-0.30, bid=1.45, ask=1.60, strike=7415.0) -> Contract:
 
 def test_the_stop_loss_starts_at_steves_flat_20():
     """No day's budget and no attempts (co-8mb1z); one number per ticket,
-    the same $20 the order form starts at (st-bafu)."""
-    from execd.orderform import DEFAULT_STOP_LOSS_USD as FORM_DEFAULT
-    assert StopLoss().usd == DEFAULT_STOP_LOSS_USD == FORM_DEFAULT == 20.0
+    the $20 of st-bafu. The order form's own default moved to 0.30 a
+    contract on 2026-10-01 (st-d7nt); FD0's desk ticket keeps its $20."""
+    from execd.orderform import DEFAULT_STOP_PTS
+    assert StopLoss().usd == DEFAULT_STOP_LOSS_USD == 20.0 and DEFAULT_STOP_PTS == 0.30
 
 
 # ----------------------------------------------------------------- chain ---

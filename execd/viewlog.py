@@ -292,12 +292,10 @@ class ViewLog:
         prev = rec.setdefault("decision", {})
         prev["changed"] = True
         try:
-            from .orderform import DEFAULT_STOP_LOSS_USD, why_not
-            from .stops import CONTRACT_MULTIPLIER
+            from .orderform import DEFAULT_STOP_PTS, why_not
             sel = priced.selection
             lots = max(1, sel.lots)
-            off = (sel.stopoff if sel.stopoff is not None
-                   else DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * lots))
+            off = sel.stopoff if sel.stopoff is not None else DEFAULT_STOP_PTS
             cap = priced.cap if priced.cap is not None else 0.8
             chosen_sym = priced.contract.symbol if priced.contract is not None else None
             rows = []

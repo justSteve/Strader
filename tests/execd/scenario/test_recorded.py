@@ -18,22 +18,22 @@ from .tape import recorded
 
 
 #: The recorded chain quotes the in-the-money calls 0.20 wide (7685: 21.70/
-#: 21.90 at 18:00 UTC), so the form's default $20 stop rests AT the bid —
-#: H2, refused at the ticket since 2026-10-01 (st-yeph). Sessions that are
-#: about something else send a stop wider than the spread.
+#: 21.90 at 18:00 UTC), so the old $20 stop rested AT the bid — H2, refused
+#: at the ticket since 2026-10-01 (st-yeph). The default is 0.30 a contract
+#: since the same day (st-d7nt), wider than that spread.
 
 
-def test_the_default_stop_on_the_recorded_chain_is_refused_and_a_wider_one_goes(make):
+def test_a_twenty_cent_stop_on_the_recorded_chain_is_refused_and_the_default_goes(make):
     scn = make(recorded(from_s=540, to_s=600))           # 13:24 CT
-    t = scn.ticket("call")
+    t = scn.ticket("call", stopoff=0.20)
     q = scn.quote(t.contract.symbol)
     assert round(q.ask - q.bid, 2) == 0.20 and t.stop_price == q.bid
     assert t.error and "would rest at or above" in t.error
     with pytest.raises(ValueError, match="widen the stop"):
         scn.intent(t)
-    wide = scn.ticket("call", stopoff=0.30)
-    assert wide.error is None
-    assert scn.send(wide)["refused"] is None
+    default = scn.ticket("call")
+    assert default.error is None and default.stop_price < q.bid
+    assert scn.send(default)["refused"] is None
 
 
 def test_1320_to_1330_two_entries_on_the_recorded_market(make):

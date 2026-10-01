@@ -1396,7 +1396,7 @@ unbounded `service.chain`. Answers while LOCKED (the market credential).
 
 **The limit** is the ask rounded up on the service's tick grid
 (`stops.tick_for`: 0.05 under $3, 0.10 at and above), so the `tick` rule
-cannot refuse it. **The stop** starts at a flat $20 loss under that limit
+cannot refuse it. **The stop** (since 2026-10-01: 0.30 a contract under the limit, `DEFAULT_STOP_PTS`, st-d7nt) started at a flat $20 loss under that limit
 (`DEFAULT_STOP_LOSS_USD`, st-bafu below); the ticket shows the loss before
 commissions.
 
@@ -1526,7 +1526,11 @@ the budget, *more* or a second money figure, they are history.
    stop box, **stop if SPX falls to 6376** (*rises to* for a put). A price
    he typed still shows as the dollars it loses. The cut line, *stop rests
    at*, and the *your price / your level* markers are gone.
-4. *"stop loss amount should initially be set to flat $20."* The stop
+4. *"stop loss amount should initially be set to flat $20."* **Superseded
+   2026-10-01** (st-d7nt; Steve: *"update my default SL to .3"*): the stop
+   now starts 0.30 a contract under the limit (`DEFAULT_STOP_PTS`), $30 a
+   contract, $60 on two lots; and the limit is the mid plus 0.05, never
+   above the ask (*"Mid + $5 hoping for better / quicker fills"*). The stop
    starts at `DEFAULT_STOP_LOSS_USD` = $20 for the whole ticket: the limit
    less 0.20 for one lot, on the tick grid — rounded **up** to the grid
    when the per-contract loss is not a whole tick, so it never risks more

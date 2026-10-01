@@ -251,6 +251,8 @@ class TrafficBuffer:
         self._tx: list[tuple[str, list[Line]]] = []
         #: intent id -> (the order's size, the ``filled`` events already said)
         self._pending: dict[str, tuple[int, int]] = {}
+        #: re-arms already said (st-d7nt)
+        self._rearms: set[str] = set()
         self._lock = threading.Lock()
         self.dropped = 0
 
@@ -324,6 +326,31 @@ class TrafficBuffer:
             self._tx.clear()
             self._pending.clear()
             return cleared
+
+    def note_rearm(self, rearm: Mapping[str, Any]) -> bool:
+        """The stop-out that re-armed the form, inside its SEND's block when
+        this page sent it, else a block of its own (st-d7nt):
+        ``← STOP FILLED 2 @ 9.80 — form re-armed: CALL 7720 @ mid``.
+        Once per re-arm. Returns True when it added the line."""
+        with self._lock:
+            rid = str(rearm.get("id"))
+            if rid in self._rearms:
+                return False
+            self._rearms.add(rid)
+            px = rearm.get("fill_price")
+            line = Line(hhmmss(rearm.get("at")), "in",
+                        f"STOP FILLED {rearm.get('lots')}"
+                        + (f" @ {float(px):.2f}" if px is not None else "")
+                        + f" — form re-armed: {str(rearm.get('side', '')).upper()} "
+                          f"{float(rearm.get('strike') or 0):g} @ mid")
+            key = rearm.get("intent_id")
+            block = next((ls for k, ls in self._tx if k == key), None) if key else None
+            if block is not None:
+                block.append(line)
+            else:
+                self._tx.append((f"rearm-{rid}", [Line(line.at, "head", f"{(self.mode or '').upper()} STOP-OUT".strip()), line]))
+            self._trim()
+            return True
 
     def forget(self, keys: Iterable[str]) -> None:
         """Stop waiting on SENDs that are no longer working and never

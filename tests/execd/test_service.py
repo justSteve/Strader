@@ -707,7 +707,7 @@ class TestTheJournalReproducesTheDay:
         assert events == [
             "unlock", "request", "preview", "sending", "placed", "filled", "stop_placed",
             "target_placed", "exit_triggered", "canceled", "canceled", "placed",
-            "closed", "stand_down",
+            "closed", "form_rearmed", "stand_down",       # a stop-out re-arms the form (st-d7nt)
         ]
 
     def test_every_line_carries_the_installed_sha(self, armed):

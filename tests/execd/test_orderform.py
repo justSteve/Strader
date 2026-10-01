@@ -135,13 +135,14 @@ class TestPrice:
         p = price(armed, Selection(side="call", expiry=DAY, delta=0.30))
         assert p.error is None and p.contract.symbol == CALL
         assert p.limit == 2.10 and p.cost_usd == 210.0 and p.commissions_usd == 1.30
-        # the stop starts at a flat $20 under the limit (st-bafu): 2.10 − 0.20,
-        # and its level is the walk back through delta, 0.20 / 0.30 = 0.67 pts
-        assert p.stop_price == 1.90 and p.stop_loss_usd == 20.0 and p.stop_set_by is None
-        assert p.stop_spx == 6379.33 and p.stop_spx < SPX_NOW        # a call cuts below spot
-        assert p.net_at_stop_usd == pytest.approx(-20.0 - 1.30)
+        # the stop starts 0.30 a contract under the limit (Steve, 2026-10-01,
+        # st-d7nt: "update my default SL to .3"): 2.10 − 0.30, and its level
+        # is the walk back through delta, 0.30 / 0.30 = 1 pt
+        assert p.stop_price == 1.80 and p.stop_loss_usd == 30.0 and p.stop_set_by is None
+        assert p.stop_spx == 6379.0 and p.stop_spx < SPX_NOW         # a call cuts below spot
+        assert p.net_at_stop_usd == pytest.approx(-30.0 - 1.30)
         d = p.to_dict()
-        assert d["contract"]["chosen"] and d["stop_spx"] == 6379.33 and d["stop_loss_usd"] == 20.0
+        assert d["contract"]["chosen"] and d["stop_spx"] == 6379.0 and d["stop_loss_usd"] == 30.0
         for gone in ("derivation", "budget_usd", "attempts", "max_loss_usd"):
             assert gone not in d, gone
         assert [s["strike"] for s in d["strikes"]] == [6350, 6360, 6370, 6380, 6390, 6400, 6410, 6420]
@@ -177,13 +178,15 @@ class TestPrice:
                 i = intent_for(p, intent_id="page-x", engine_sha="t")
                 rests = protective_stop_price(p.limit, i["delta"], p.spx, i["stop_spx"])
                 assert rests == p.stop_price, (side, c.strike, rests, p.stop_price)
-                assert p.stop_loss_usd <= 20.0
+                assert p.stop_loss_usd <= 30.0
 
-    def test_the_flat_stop_is_for_the_whole_ticket_and_never_more(self, armed, chain):
+    def test_the_default_stop_is_per_contract(self, armed, chain):
+        """0.30 a contract whatever the lots (st-d7nt): $60 on two, $90 on
+        three — it replaced the flat $20 for the whole ticket."""
         two = price(armed, Selection(side="call", expiry=DAY, strike=6400, lots=2))
-        assert two.stop_price == 2.00 and two.stop_loss_usd == 20.0
+        assert two.stop_price == 1.80 and two.stop_loss_usd == 60.0
         three = price(armed, Selection(side="call", expiry=DAY, strike=6400, lots=3))
-        assert three.stop_price == 2.05 and three.stop_loss_usd == 15.0   # 0.0667 is off the grid: up, not down
+        assert three.stop_price == 1.80 and three.stop_loss_usd == 90.0
 
     def test_a_cheap_contract_rests_one_tick_and_a_one_tick_limit_has_no_stop(self, armed, chain):
         p = price(armed, Selection(side="call", expiry=DAY, strike=6400, limit=0.15))
@@ -198,10 +201,10 @@ class TestPrice:
         i = intent_for(p, intent_id="page-20260826T100000", engine_sha="testsha")
         assert i == {"intent_id": "page-20260826T100000", "symbol": CALL, "side": "BUY_TO_OPEN",
                      "qty": 1, "order_type": "LIMIT", "limit": 2.10,
-                     "stop_spx": 6379.33, "delta": 0.3,
-                     # the $20 stop rides as dollars; the service re-strikes
+                     "stop_spx": 6379.0, "delta": 0.3,
+                     # the $30 stop rides as dollars; the service re-strikes
                      # the level at the send (st-7p5u)
-                     "stop_price": 1.90,
+                     "stop_price": 1.80,
                      "source": "page", "engine_sha": "testsha"}
 
 
@@ -406,7 +409,7 @@ class TestOnlyWhatHeCanBuyAndOnlyToday:
         table = body.split("<table class=strikes>")[1].split("</table>")[0]
         chosen = table.split("<tr class='chosen'>")[1].split("</tr>")[0]
         assert ">6350<" in chosen and "over the account" in chosen
-        assert "this needs $3,240.00 and the account has $1,000.00" in body
+        assert "this needs $3,230.00 and the account has $1,000.00" in body   # 32.30, mid + 0.05
 
     def test_an_account_that_cannot_be_read_hides_no_strike(
             self, order_page, armed, chain):
@@ -688,7 +691,7 @@ class TestAStageChangeAlwaysPaints:
         # the close leaves the card for a folded card of its own (st-qqxj):
         # the card goes back to no order on the first tick, the stack has it
         assert s["panel_stage"] == "none" and "data-stage=none" in s["panel_body_html"]
-        assert "-$20.00" in s["closed_html"] and ">stop<" in s["closed_html"]
+        assert "-$30.00" in s["closed_html"] and ">stop<" in s["closed_html"]
 
     def test_the_script_paints_a_stage_change_over_a_focused_input_and_drops_the_stale_message(self, order_page):
         body = text(order_page.get("/exec/order?side=call"))
@@ -729,9 +732,8 @@ class TestAStageChangeAlwaysPaints:
         assert "name=lots value='3'" in body.split("<form id=sel")[1]
         j = order_page.get("/exec/order/price?side=call&strike=6400&lots=3&stopoff=0.20").json
         assert j["cost_usd"] == 630.0 and j["error"] is None
-        # the flat $20 over three lots is 0.05 a contract: 2.05 over the 2.00
-        # bid, refused (st-yeph)
-        j = order_page.get("/exec/order/price?side=call&strike=6400&lots=3").json
+        # a stop of 0.05 a contract is 2.05, over the 2.00 bid: refused (st-yeph)
+        j = order_page.get("/exec/order/price?side=call&strike=6400&lots=3&stopoff=0.05").json
         assert "at or above the 2.00 bid" in j["error"]
 
     def test_the_stop_has_steppers_plus_left_minus_right(self, order_page):
@@ -748,18 +750,18 @@ class TestAStageChangeAlwaysPaints:
         assert ".row.stops{justify-content:center" in body
 
     def test_the_stop_box_is_the_distance_and_a_level_is_refused(self, order_page):
-        """The box shows .2 — the stop's distance — not the stop price;
+        """The box shows .3 — the stop's distance — not the stop price;
         0.30 under the 32.40 limit is a $30 stop. There is no SPX box on the
         entry (Steve, 2026-10-01, st-a54y); a link that still carries a
         close-at level is refused in words and SEND is off."""
         plain = text(order_page.get("/exec/order?side=call"))
-        assert "id=stopbox" in plain and "value='.2' data-default='.2'" in plain
+        assert "id=stopbox" in plain and "value='.3' data-default='.3'" in plain
         assert "exitbox" not in plain and "close at SPX" not in plain
         j = order_page.get("/exec/order/price?side=call&strike=6400").json
-        assert j["stop_price"] == 1.90                              # 2.10 − .2
-        body = text(order_page.get("/exec/order?side=call&strike=6400&stopoff=0.30"))
-        assert "value='.3' data-default='.2'" in body
-        assert order_page.get("/exec/order/price?side=call&strike=6400&stopoff=0.30").json["stop_price"] == 1.80
+        assert j["stop_price"] == 1.80                              # 2.10 − .3
+        body = text(order_page.get("/exec/order?side=call&strike=6400&stopoff=0.50"))
+        assert "value='.5' data-default='.3'" in body
+        assert order_page.get("/exec/order/price?side=call&strike=6400&stopoff=0.50").json["stop_price"] == 1.60
         lvl = text(order_page.get("/exec/order?side=call&strike=6400&exitspx=6376"))
         assert "dollars only" in lvl and "<button class='big send' disabled>SEND</button>" in lvl
         for q in ("side=call&strike=6400&exitspx=6376", "side=put&strike=6300&exitspx=6384"):
@@ -767,7 +769,7 @@ class TestAStageChangeAlwaysPaints:
             assert "dollars only" in j["error"] and j["sendable"] is False
         # NA in the SPX box is no level
         j = order_page.get("/exec/order/price?side=call&strike=6400&exitspx=NA").json
-        assert j["stop_price"] == 1.90 and j["stop_set_by"] is None
+        assert j["stop_price"] == 1.80 and j["stop_set_by"] is None
 
 class TestARefusedSendIsShown:
     """2026-09-15 09:54 CT: Steve tapped SEND and saw nothing —
@@ -842,7 +844,7 @@ class TestAStopOfHisOwn:
         p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="1.50"))
         assert p.error is None and p.stop_set_by == "price"
         assert p.stop_price == 1.50 and p.stop_spx == 6378.0    # (2.10 − 1.50)/0.30 = 2 pts
-        assert base.stop_price == 1.90 and base.stop_set_by is None
+        assert base.stop_price == 1.80 and base.stop_set_by is None
         assert p.stop_loss_usd == 60.0 and p.net_at_stop_usd == pytest.approx(-60.0 - 1.30)
         i = intent_for(p, intent_id="page-x", engine_sha="t")
         assert i["stop_spx"] == 6378.0 and i["limit"] == 2.10
@@ -867,7 +869,7 @@ class TestAStopOfHisOwn:
                 intent_for(p, intent_id="page-x", engine_sha="t")
         ok = intent_for(price(armed, Selection(side="call", expiry=DAY, strike=6400)),
                         intent_id="page-y", engine_sha="t")
-        assert "exit_spx" not in ok and ok["stop_price"] == 1.90
+        assert "exit_spx" not in ok and ok["stop_price"] == 1.80
 
     def test_a_stop_at_or_over_the_bid_is_refused_and_one_under_it_goes(self, armed, chain):
         """Steve, 2026-10-01 (st-yeph): "in those conditions it should

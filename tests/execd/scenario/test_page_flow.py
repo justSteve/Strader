@@ -40,8 +40,8 @@ class TestTheTicketIsWhatIsSent:
         screen = OrderScreen(scn)
         first = screen.pick("call", delta=0.5)
         screen.tap(first["contract"]["strike"] + 5)
-        shown = screen.step_stop(+1)                       # 0.20 → 0.30
-        assert round(shown["limit"] - shown["stop_price"], 2) == 0.30
+        shown = screen.step_stop(+1)                       # 0.30 → 0.40
+        assert round(shown["limit"] - shown["stop_price"], 2) == 0.40
         answer = screen.send()
         assert answer["ok"] is True and answer["msg_stage"] == "filled", answer.get("bad")
         received_matches_shown(answer, shown)
@@ -53,8 +53,8 @@ class TestTheTicketIsWhatIsSent:
         screen = OrderScreen(scn)
         screen.pick("put", delta=0.5)
         screen.step_stop(+3)
-        shown = screen.step_stop(-1)                       # 0.20 → 0.50 → 0.40
-        assert round(shown["limit"] - shown["stop_price"], 2) == 0.40
+        shown = screen.step_stop(-1)                       # 0.30 → 0.60 → 0.50
+        assert round(shown["limit"] - shown["stop_price"], 2) == 0.50
         received_matches_shown(screen.send(), shown)
 
     def test_a_stale_close_at_box_is_refused_at_send(self, make):
@@ -74,16 +74,18 @@ class TestTheTicketIsWhatIsSent:
         assert answer["ok"] is False and "dollars only" in answer["bad"]
         assert answer["_received"] is None and scn.events("sending") == []
 
-    def test_the_default_stop_on_two_lots_in_a_dime_market_is_refused_and_widened_goes(self, make):
-        """st-yeph, the case that raised it: the flat $20 over two lots is
-        0.10 a contract, at the bid of a 0.10-wide market. The screen says
-        why and SEND is off; a SEND that goes anyway is refused at the page
-        and nothing reaches the service. A stepper tap widens it past the
-        spread and the same ticket goes."""
+    def test_a_dime_stop_on_two_lots_in_a_dime_market_is_refused_and_widened_goes(self, make):
+        """st-yeph, the case that raised it: 0.10 a contract on two lots
+        (the old flat $20; now a stop he types, the default being 0.30 since
+        st-d7nt), at the bid of a 0.10-wide market. The screen says why and
+        SEND is off; a SEND that goes anyway is refused at the page and
+        nothing reaches the service. A stepper tap widens it past the spread
+        and the same ticket goes."""
         scn = make(ramp((0, 6380.0), (120, 6380.0), spread=0.10))
         screen = OrderScreen(scn)
         screen.pick("call", delta=0.5)
-        shown = screen.lots(2)
+        screen.lots(2)
+        shown = screen.type_stop("0.10")
         assert "would rest at or above" in shown["error"] and shown["sendable"] is False
         answer = screen.send()
         assert answer["ok"] is False and "widen the stop" in answer["bad"]

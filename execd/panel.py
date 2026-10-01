@@ -762,6 +762,9 @@ PANEL_SCRIPT = """
       cs.innerHTML = j.closed_html; cs.__html = j.closed_html;
       ds = cs.querySelectorAll('details'); for (var i2 = 0; i2 < ds.length; i2++) if (open[ds[i2].getAttribute('data-key')]) ds[i2].open = true; }
     var td = document.getElementById('today'); if (td && j.today_text) td.textContent = j.today_text;
+    // a stop fill re-armed the order form (st-d7nt): the order page loads the
+    // prepopulated ticket once per re-arm. It never sends.
+    if (j.rearm && window.__onRearm) { try { window.__onRearm(j.rearm); } catch (e) {} }
     // the SEND traffic buffer (st-qnbg): repainted only when it changed,
     // scrolled to its newest line at the bottom
     var tr = document.getElementById('traffic');

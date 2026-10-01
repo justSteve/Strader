@@ -28,7 +28,7 @@ from urllib.parse import urlencode
 
 #: what the stop steppers move the stop box by (orderpage: 0.10 a tap)
 STEP = 0.10
-DEFAULT_STOPOFF = 0.20
+DEFAULT_STOPOFF = 0.30
 _HIDDEN = re.compile(r"name='([^']+)' value='([^']*)'")
 _NONCE = re.compile(r"name=nonce value='([^']+)'")
 _CPNL = re.compile(r"<span class='cpnl [a-z]+'>([^<]+)</span>")

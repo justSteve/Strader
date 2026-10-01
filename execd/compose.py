@@ -29,7 +29,8 @@ came from a $100 day split over two attempts — ``remaining / attempts_left``
 remove that complete calculation. I don't need that level of hand holding";
 2026-09-24: "make sure they are removed now and not restored in the future."
 The loss is now one number per ticket, :class:`StopLoss`, starting at his
-flat $20 (``DEFAULT_STOP_LOSS_USD``, the order form's own default, st-bafu).
+flat $20 (``DEFAULT_STOP_LOSS_USD``, st-bafu; the order form's own default is
+0.30 a contract since 2026-10-01, ``orderform.DEFAULT_STOP_PTS``, st-d7nt).
 
 2026-08-23, the join with the intent dialect (st-79z.3): the engine now takes
 the contract the dialect chose (``compose(..., contract=)``) instead of always

@@ -188,7 +188,7 @@ def test_d8_tier_zero_locks_a_loss(make):
 def test_d9_the_day_is_continuous_through_a_close(make, part):
     if part == "close-is-net":
         scn = make(pinned((0, 9.10, 9.20), (3, 9.05, 9.15), (6, 8.95, 9.05), (30, 8.95, 9.05)))
-        scn.send(scn.ticket("call", strike=7690))
+        scn.send(scn.ticket("call", strike=7690, stopoff=0.20))
         scn.tick()
         pos = scn.position(C)
         fees = pos.entry_commission_usd + 0.65

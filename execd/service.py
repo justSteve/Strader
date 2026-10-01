@@ -556,6 +556,9 @@ class ExecService:
         #: what the last OCO placement answered for each leg, by order id —
         #: the answer a second ``_rest_*_at`` for a leg already paired gives
         self._pair_results: dict[str, dict[str, Any]] = {}
+        #: the order form's re-arm after a stop fill, until the next entry
+        #: fills (st-d7nt)
+        self._rearm: dict[str, Any] | None = None
         self._last_fill_poll = clock()
         self._recover()
 
@@ -660,6 +663,26 @@ class ExecService:
                 self.reconcile()
             return self.status()
 
+    def _rearm_after_stop(self, pos: OpenPosition, fill_px: float, qty: int,
+                          order_id: str) -> None:
+        """Hold what the order form needs to re-arm after a stop-out (Steve,
+        2026-10-01, st-d7nt): the same side and strike, pinned, the limit at
+        the plain mid, the default stop. The page reads it off ``/status``
+        on its next poll and PREPOPULATES the ticket. Nothing here or there
+        sends: SEND stays his tap. One side's re-arm is never the other's
+        (st-n4tr) — it is dropped on a switch and carries its mode."""
+        try:
+            occ = parse_occ(pos.symbol)
+        except ValueError:
+            return
+        self._rearm = {"id": f"{pos.intent_id or pos.symbol.strip()}:{order_id}",
+                       "mode": self.config.mode, "symbol": pos.symbol,
+                       "side": "call" if occ.right == "C" else "put",
+                       "strike": occ.strike, "expiry": occ.expiry.isoformat(),
+                       "lots": qty, "fill_price": fill_px, "intent_id": pos.intent_id,
+                       "at": self.clock().isoformat()}
+        self.journal.record("form_rearmed", **self._rearm)
+
     def _reset_mode_state(self) -> None:
         """Everything held in memory that belongs to one side (st-n4tr).
         The switch is refused while anything is open, working, unanswered
@@ -682,6 +705,7 @@ class ExecService:
         self._foreign_positions.clear()
         self._booked_exits.clear()
         self._pair_results.clear()
+        self._rearm = None
         self._balances_cache = None
 
     def _needs_credential(self) -> bool:
@@ -746,6 +770,9 @@ class ExecService:
             "stream": self.stream.status() if self.stream is not None else None,
             # the view log's health: lines, drops, write errors (st-6pfc)
             "view_log": self.view_log.health() if self.view_log is not None else None,
+            # the form's re-arm after a stop fill — prepopulate only (st-d7nt)
+            "rearm": (dict(self._rearm) if self._rearm is not None
+                      and self._rearm.get("mode") == self.config.mode else None),
             "day": {
                 "open_positions": day.open_positions,
                 "realized_loss_usd": day.realized_loss_usd,
@@ -2524,6 +2551,7 @@ class ExecService:
             ticket_stop_price=intent.stop_price)
         if intent.exit_spx is not None:
             self._exit_levels[intent.intent_id] = float(intent.exit_spx)
+        self._rearm = None          # a new entry is going out: the re-arm is spent (st-d7nt)
         self.journal.record("sending", kind="entry", spx=spx, **send.to_dict(),
                             **({"stop_price": bracket[0].stop_price,
                                 "target_price": bracket[1].limit} if bracket else {}))
@@ -2992,6 +3020,15 @@ class ExecService:
                 continue
             remaining = self._book_found_fill(pos, other, other_reason, remaining=remaining)
             also_filled.append(other.to_dict())
+        # His stop took him out — the resting stop the broker filled, or the
+        # SPX-mark loop's close at the stop's level, filled — and nothing
+        # else did: the form is re-armed for a quick re-entry (st-d7nt). A
+        # real fill only — a price above nothing; an OCO cancel that reads
+        # back as a 0.00 "fill" is not one (st-5n3s) — and never a target, a
+        # FLATTEN or a cancel.
+        if (reason in ("protective-stop", "spx-stop") and exit_px and exit_px > 0
+                and not remaining and not also_filled):
+            self._rearm_after_stop(pos, exit_px, closed_qty, order_id)
 
         restopped = retargeted = None
         if remaining and (keep is not None or pos.exit_in_flight):

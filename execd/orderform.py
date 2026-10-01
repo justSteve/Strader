@@ -21,10 +21,11 @@ The flow, top to bottom on ``/exec/order``:
    shown as the strikes around spot with bid, ask and delta. The default row
    is nearest to spot (his ruling); a delta override picks the row whose
    |delta| is nearest; a row can be tapped directly.
-3. The ticket: the limit on the service's own tick grid and the stop — a
-   flat ``DEFAULT_STOP_LOSS_USD`` loss under the limit until he types a
-   stop of his own (Steve, 2026-09-17: "stop loss amount should initially
-   be set to flat $20"; st-bafu). There is no budget, no attempts and no
+3. The ticket: the limit — the mid plus 0.05, never above the ask, on the
+   service's own tick grid (Steve, 2026-10-01, st-d7nt) — and the stop,
+   ``DEFAULT_STOP_PTS`` (0.30) a contract under the limit until he types a
+   stop of his own (Steve, 2026-10-01: "update my default SL to .3"; it was
+   the flat $20 of 2026-09-17, st-bafu). There is no budget, no attempts and no
    derivation on the form: the FD0 budget the form once carried was a
    second budget beside the service's own bounds, and he had it removed
    ("Let's just completely remove that complete calculation"). The
@@ -88,11 +89,16 @@ CHAIN_STRIKES = 40
 STRIKES_EACH_SIDE = 8
 #: The source word the service journals for a page intent.
 SOURCE = "page"
-#: The loss the stop starts at, for the whole ticket, before commissions
-#: (Steve, 2026-09-17: "stop loss amount should initially be set to flat
-#: $20", st-bafu). The resting stop is the limit less this, on the tick
-#: grid; a stop of his own in the box replaces it.
-DEFAULT_STOP_LOSS_USD = 20.0
+#: The stop the ticket starts at: this far under the limit, per contract, on
+#: the tick grid — $30 a contract, $60 on two lots (Steve, 2026-10-01: "update
+#: my default SL to .3", st-d7nt). It replaced the flat $20 for the whole
+#: ticket of 2026-09-17 ("stop loss amount should initially be set to flat
+#: $20", st-bafu). A stop of his own in the box, or the steppers' distance,
+#: replaces it.
+DEFAULT_STOP_PTS = 0.30
+#: What the offer adds to the mid (Steve, 2026-10-01: "Mid + $5 hoping for
+#: better / quicker fills", st-d7nt) — never past the ask (``limit_at``).
+OFFER_OVER_MID_PTS = 0.05
 #: The δ target the form starts at when no delta and no strike is given.
 #: Steve, 2026-09-15 (st-shhi), from his 2026-08-19 words that 0.8 is the
 #: consensus point to buy a single; it replaces "nearest to spot" as the
@@ -147,6 +153,9 @@ class Selection:
     #: permit a $$ SL"); still read so a stale page or link carrying it is
     #: refused in words rather than dropped silently.
     exitspx: float | None = None
+    #: the ticket re-armed after a stop-out prices its limit at the plain mid
+    #: (st-d7nt); a new strike, or a new fill, drops it
+    atmid: bool = False
 
     @property
     def right(self) -> str:
@@ -178,7 +187,8 @@ class Selection:
                    limit=round(limit, 2) if limit and limit > 0 else None,
                    stop=stop,
                    stopoff=round(stopoff, 2) if stopoff and stopoff > 0 else None,
-                   exitspx=round(exitspx, 2) if exitspx and exitspx > 0 else None)
+                   exitspx=round(exitspx, 2) if exitspx and exitspx > 0 else None,
+                   atmid=str(args.get("atmid") or "") == "1" and strike is not None and strike > 0)
 
     def as_query(self, **override: Any) -> dict[str, str]:
         """The selection as query/hidden fields; ``override`` replaces or,
@@ -192,6 +202,7 @@ class Selection:
             "stop": self.stop,
             "stopoff": f"{self.stopoff:.2f}" if self.stopoff is not None else None,
             "exitspx": f"{self.exitspx:g}" if self.exitspx is not None else None,
+            "atmid": "1" if self.atmid else None,
         }
         d.update(override)
         return {k: str(v) for k, v in d.items() if v is not None}
@@ -302,7 +313,7 @@ def choose(contracts: list[Contract], spx: float, *, strike: float | None,
         raise ValueError(f"no strike {strike:g} in the chain")
     cap = delta if delta is not None else DEFAULT_DELTA
     lots = max(1, lots)
-    off = stop_off if stop_off is not None else DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * lots)
+    off = stop_off if stop_off is not None else DEFAULT_STOP_PTS
     ok = [c for c in contracts if why_not(c, cap=cap, funds=funds, lots=lots, off=off) is None]
     if ok:
         return max(ok, key=lambda c: (c.abs_delta, -c.spread_pts))
@@ -318,7 +329,7 @@ def why_not(c: Contract, *, cap: float, funds: float | None, lots: int,
         return "no two-sided market"
     if not (0 < c.abs_delta <= cap + 1e-9):
         return "over the cap" if c.abs_delta > cap else "no delta"
-    lim = limit_at(c.ask_pts)
+    lim = limit_at(c.bid_pts, c.ask_pts)
     if funds is not None and lim * CONTRACT_MULTIPLIER * max(1, lots) > funds:
         return "can't afford"
     if lim - off < tick_for(0.0):
@@ -352,11 +363,30 @@ def nearest_tick(pts: float) -> float:
     return round(max(t, round(pts / t) * t), 2)
 
 
-def limit_at(ask_pts: float) -> float:
-    """The buy limit the form sends for an ask: the ask rounded up to the
-    service's own tick grid. One place, so the page's live head, the priced
-    ticket and the state poll all say the same number."""
-    return _round_up_to_tick(ask_pts, tick_for(ask_pts))
+def limit_at(bid_pts: float | None, ask_pts: float) -> float:
+    """The buy limit the form offers: the mid plus 0.05, up to the tick grid,
+    and never above the ask rounded up to the grid (Steve, 2026-10-01: "Mid
+    + $5 hoping for better / quicker fills", accepting the min so the offer
+    never prices above the ask; st-d7nt). With no bid there is no mid, and
+    the offer is the ask. One place, so the page's live head, the priced
+    ticket and the state poll all say the same number. A price he types or
+    padlocks is his, and is not this."""
+    ask_up = _round_up_to_tick(ask_pts, tick_for(ask_pts))
+    if bid_pts is None or bid_pts <= 0 or ask_pts <= 0 or bid_pts > ask_pts:
+        return ask_up
+    over = (bid_pts + ask_pts) / 2 + OFFER_OVER_MID_PTS
+    return min(ask_up, _round_up_to_tick(over, tick_for(over)))
+
+
+def mid_at(bid_pts: float, ask_pts: float) -> float:
+    """The plain mid on the tick grid, to the nearest tick — the re-armed
+    ticket's limit after a stop-out (st-d7nt), with no 0.05 over it."""
+    if bid_pts <= 0:
+        return limit_at(None, ask_pts)
+    mid = (bid_pts + ask_pts) / 2
+    t = tick_for(mid)
+    # a mid on the half tick goes up to the next one (8.70/9.20 → 9.00)
+    return round(max(t, math.floor(round(mid / t, 6) + 0.5) * t), 2)
 
 
 @dataclass
@@ -473,7 +503,14 @@ def price(service: ExecService, sel: Selection) -> Priced:
     # above), rounded up — the service refuses a price off the grid. A locked
     # price (the padlock, st-2s4u) is the limit instead, whatever the ask is
     # now; the service's price band judges it at the send.
-    out.limit = nearest_tick(sel.limit) if sel.limit is not None else limit_at(c.ask_pts)
+    # his typed or padlocked price; else the plain mid on a ticket re-armed
+    # after a stop-out (st-d7nt, until he changes strike); else the offer
+    if sel.limit is not None:
+        out.limit = nearest_tick(sel.limit)
+    elif sel.atmid:
+        out.limit = mid_at(c.bid_pts, c.ask_pts)
+    else:
+        out.limit = limit_at(c.bid_pts, c.ask_pts)
     if not (0 < c.abs_delta <= 1):
         out.error = f"the chain gives no usable delta for {c.strike:g} — no stop can be struck"
         return out
@@ -530,19 +567,19 @@ def _level_for(right: str, spx: float, limit: float, stop_price: float, delta: f
 
 def _apply_flat_loss_stop(out: Priced, c: Contract, spx: float, *,
                           per_contract: float | None = None) -> None:
-    """The stop the ticket starts with: ``DEFAULT_STOP_LOSS_USD`` under the
-    limit for the whole ticket, on the tick grid. [st-bafu]
+    """The stop the ticket starts with: ``DEFAULT_STOP_PTS`` under the
+    limit per contract, on the tick grid (st-d7nt; the flat $20 for the
+    whole ticket before it, st-bafu).
 
-    Rounded *up* to the grid when the loss per contract is not a whole tick
-    (more than one lot), so the ticket never risks more than the flat
-    figure; held one tick under the limit and one tick above nothing, the
+    Rounded *up* to the grid when the distance is not a whole tick, so the
+    ticket never risks more than it says; held one tick under the limit and one tick above nothing, the
     same two clamps the service's own stop gets. A limit with no tick of
     room under it cannot carry a stop, and the ticket says so and offers no
     SEND — an entry with no stop is the state the service must not reach."""
     limit = out.limit
-    # the steppers' distance, when he has set one (st-5n3s), else the flat $20
+    # the steppers' distance, when he has set one (st-5n3s), else 0.30
     if per_contract is None:
-        per_contract = DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * out.lots)
+        per_contract = DEFAULT_STOP_PTS
     floor_tick = tick_for(0.0)
     stop = _round_up_to_tick(max(limit - per_contract, floor_tick), floor_tick)
     cap = round(limit - tick_for(limit), 2)

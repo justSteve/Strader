@@ -166,7 +166,7 @@ class TestThePage:
         page_send(order_page, {"side": "call", "strike": "6400", "stop": "2.05"})
         h = order_page.get("/exec/order/state?side=call").json["traffic_html"]
         assert "{" not in h and "&quot;" not in h                     # no JSON, anywhere
-        assert "→ execd: BUY 1 SPX 6400C LMT 2.10, stop $20" in h
+        assert "→ execd: BUY 1 SPX 6400C LMT 2.10, stop $30" in h
         assert "← FILLED 1 @ 2.10" in h
         assert "← REFUSED at the page: the stop 2.05 would rest at or above the 2.00 bid" in h
         assert h.count("tl-head") == 2

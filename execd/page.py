@@ -67,7 +67,7 @@ from .broker import BrokerError
 from .schwab import (VAULT_VERSION, App, Credential, authorize_url, code_from_received_url,
                      exchange, new_client, trading_payload, verify_grant)
 from .intent import OrderIntent
-from .orderform import (LOTS_MAX, SEND_NONCE_TTL_S, Selection, intent_for, limit_at,
+from .orderform import (DEFAULT_STOP_PTS, LOTS_MAX, SEND_NONCE_TTL_S, Selection, intent_for, limit_at,
                         parse_leg_text, price, stamp)
 from .orderpage import (balances_html, journal_html, position_html, send_fields_html, sendable,
                         quote_html, render_order, state_html, strikes_html, ticket_html,
@@ -654,6 +654,23 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 traffic.forget(k for k in pend if k not in live)
             except Exception:  # the pane is a view: it never breaks a poll
                 log.exception("traffic: the fills could not be read")
+        # the form re-armed after a stop fill (st-d7nt): its line in the
+        # traffic pane, and the selection the page loads — prepopulated only;
+        # SEND is never pressed for him
+        rearm = st.get("rearm")
+        rearm_out = None
+        if rearm:
+            try:
+                traffic.note_rearm(rearm)
+            except Exception:  # noqa: BLE001
+                log.exception("traffic: the re-arm line could not be added")
+            q = {"side": rearm["side"], "expiry": rearm["expiry"],
+                 "strike": f"{float(rearm['strike']):g}", "atmid": "1",
+                 "stopoff": f"{DEFAULT_STOP_PTS:.2f}"}
+            if int(rearm.get("lots") or 1) != 1:
+                q["lots"] = str(int(rearm["lots"]))
+            rearm_out = {"id": rearm["id"],
+                         "url": url_for("exec.order") + "?" + "&".join(f"{k}={v}" for k, v in q.items())}
         quote = None
         error = None
         spx = None
@@ -668,7 +685,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 quote = {"symbol": c.symbol, "bid": c.bid_pts, "ask": c.ask_pts,
                          "mid": round((c.bid_pts + c.ask_pts) / 2, 4), "last": None,
                          "age_s": 0.0}
-                limit_now = limit_at(c.ask_pts)
+                limit_now = limit_at(c.bid_pts, c.ask_pts)
                 cost_now = _money(-(limit_now * CONTRACT_MULTIPLIER * priced.lots)).lstrip("-")
             error = priced.error
             extra = {
@@ -691,7 +708,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 if q.ask:
                     lots = Selection.from_args({"lots": lots_arg},
                                                today=_today(), lots_cap=LOTS_MAX).lots
-                    limit_now = limit_at(q.ask)
+                    limit_now = limit_at(q.bid, q.ask)
                     cost_now = _money(-(limit_now * CONTRACT_MULTIPLIER * lots)).lstrip("-")
             except BrokerError as exc:
                 error = str(exc)
@@ -721,6 +738,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 # the SEND traffic buffer (st-qnbg), so a send made from
                 # another screen shows here too
                 "traffic_html": traffic_html(traffic),
+                "rearm": rearm_out,
                 # the ticket, the strikes and SEND's fields when the caller
                 # carried a selection to price (st-644f)
                 **extra}

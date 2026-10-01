@@ -58,7 +58,7 @@ class TestSeed1TheBracketFiredFirst:
         scn = make(tape)
         scn.wait_until(2)
         t = scn.ticket("call", strike=7690, limit=9.20)
-        assert t.stop_price == 9.00 and "at or above the 8.70 bid" in t.error
+        assert t.stop_price == 8.90 and "at or above the 8.70 bid" in t.error
         with pytest.raises(ValueError, match="widen the stop"):
             scn.intent(t)
         scn.run(30)
@@ -81,15 +81,16 @@ class TestSeed1TheBracketFiredFirst:
 class TestSeed2TheStopFollowsTheFill:
     def test_a_fill_under_the_limit_keeps_the_tickets_dollars(self, make):
         """A 2.10 limit (locked) into a 1.95/2.00 market fills at 2.00; the
-        1.90 stop it carried moves to 1.80 — $20 from the fill."""
+        1.80 stop it carried moves to 1.70 — $30 (the 0.30 default, st-d7nt)
+        from the fill."""
         tape = scripted(frames(C7720, 0.30, 7696.0, (0, 1.95, 2.00), (60, 1.95, 2.00)),
                         start=T1324)
         scn = make(tape)
         t = scn.ticket("call", strike=7720, limit=2.10)
-        assert t.stop_price == 1.90
+        assert t.stop_price == 1.80
         scn.send(t)
         assert scn.position(C7720).entry_price == 2.00
-        assert scn.resting(C7720)["stop"] == [1.80]
+        assert scn.resting(C7720)["stop"] == [1.70]
         scn.run(30)
 
 
@@ -107,7 +108,7 @@ class TestSeed3TwentyMeansTwenty:
         screen = OrderScreen(scn)
         screen.pick("call")
         screen.tap(7685)
-        shown = screen.step_stop(+1)                     # the .2 default, one tap: .3
+        shown = screen.type_stop("0.30")                 # .3 under (the default since st-d7nt)
         assert (shown["limit"], shown["stop_price"]) == (11.80, 11.50)
         answer = screen.send()
         assert answer["ok"] is True, answer.get("bad")

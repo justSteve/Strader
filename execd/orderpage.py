@@ -20,7 +20,7 @@ import json
 from datetime import datetime
 from typing import Any, Mapping
 
-from .orderform import DEFAULT_DELTA, DEFAULT_STOP_LOSS_USD, POLL_S, Priced, Selection
+from .orderform import DEFAULT_DELTA, DEFAULT_STOP_PTS, POLL_S, Priced, Selection
 from .traffic import render_html as render_traffic, style as traffic_style
 from .panel import (COLORS, PANEL_SCRIPT, PANEL_STYLE, WORDS, closed_html, contract_name, panel_html,
                     short_pts, stage_of as panel_stage_of)
@@ -195,12 +195,20 @@ _SCRIPT = """
   // which the poll repaints — hence delegation.
   function setField(n, v){ var el = form ? form.elements[n] : null; if (el) el.value = v; }
   function strikeTo(v){ if (isNaN(v) || v <= 0) return; setField('strike', String(v)); setField('delta', '');
-    var lf = lockField(); if (lf) lf.value = ''; }
+    setField('atmid', ''); var lf = lockField(); if (lf) lf.value = ''; }
   // the strike back to following the market (st-6ogv): the box cleared,
   // or a fill — a new position resets the form. The lock goes with it.
-  function strikeAuto(){ setField('strike', ''); setField('delta', '');
+  function strikeAuto(){ setField('strike', ''); setField('delta', ''); setField('atmid', '');
     var lf = lockField(); if (lf) lf.value = ''; }
   window.__onFilled = function(){ if (!form) return; strikeAuto(); reprice(); };
+  // the re-arm after a stop fill (st-d7nt): load the prepopulated ticket —
+  // same side and strike, pinned, the limit at the mid, the default stop —
+  // once per re-arm. Prepopulate only: nothing here presses SEND.
+  window.__onRearm = function(r){ if (!r || !r.id || !r.url) return;
+    var seen = null; try { seen = sessionStorage.getItem('execd.rearm'); } catch (e) {}
+    if (seen === r.id || window.__rearmSeen === r.id) return;
+    window.__rearmSeen = r.id; try { sessionStorage.setItem('execd.rearm', r.id); } catch (e) {}
+    window.location.href = r.url; };
   function lotsTo(v){ if (isNaN(v)) return; v = Math.max(1, Math.min(99, Math.round(v)));
     setField('lots', String(v)); window.__lots = String(v); return v; }
   document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('button.step') : null;
@@ -503,7 +511,8 @@ def spendable(balances: dict[str, Any] | None) -> float | None:
 
 def affordable(c: Any, lots: int, funds: float | None) -> bool:
     """Can the account buy ``lots`` of this contract at its ask? The ask, not
-    the mid: the ask is what the form sends as the limit."""
+    the offer: the form's limit is the mid plus 0.05, never above the ask
+    (st-d7nt), so the ask is what it can cost at most."""
     if funds is None:
         return True
     return c.ask_pts * CONTRACT_MULTIPLIER * max(1, lots) <= funds
@@ -575,7 +584,8 @@ def strikes_html(priced: Priced, order_path: str,
         chosen = chosen_sym is not None and c.symbol == chosen_sym
         dear = not affordable(c, priced.lots, funds)
         # a new strike is a new price: the lock does not travel with it
-        href = _link(order_path, sel.as_query(strike=f"{c.strike:g}", delta=None, limit=None, stop=None))
+        href = _link(order_path, sel.as_query(strike=f"{c.strike:g}", delta=None, limit=None, stop=None,
+                                              atmid=None))
         rows.append(
             f"<tr class='{'chosen' if chosen else ''}'>"
             f"<td><a href='{href}'>{c.strike:g}</a></td>"
@@ -762,7 +772,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
         # st-a54y: "At entry, only permit a $$ SL but after a fill the level
         # should become an option again"): the close-at-SPX box is gone from
         # this row; the position card keeps its "at SPX" box.
-        off = sel.stopoff if sel.stopoff is not None else DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * sel.lots)
+        off = sel.stopoff if sel.stopoff is not None else DEFAULT_STOP_PTS
         stop_val = short_pts(off)
         parts.append(
             f"<form id=sel method=get action='{order}'>"
@@ -770,6 +780,8 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             f"<input type=hidden name=expiry value='{exp.isoformat()}'>"
             f"{strike_field}{delta_field}{lots_field}"
             f"<input type=hidden name=limit value='{limit_val}'>"
+            # the re-armed ticket's mid pricing (st-d7nt); a new strike drops it
+            f"<input type=hidden name=atmid value='{'1' if sel.atmid else ''}'>"
             f"<input type=hidden name=stop value='{esc(sel.stop or '')}'>"
             f"<input type=hidden name=stopoff value='{f'{sel.stopoff:.2f}' if sel.stopoff else ''}'>"
             "<div class='row stops'>"
@@ -779,7 +791,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             # to the right; each widens or narrows the stop by 0.10
             "<button type=button class=step data-step=1 aria-label='widen the stop 0.10'>+</button>"
             f"<input id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off "
-            f"value='{stop_val}' data-default='{short_pts(DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * sel.lots))}'>"
+            f"value='{stop_val}' data-default='{short_pts(DEFAULT_STOP_PTS)}'>"
             "<button type=button class=step data-step=-1 aria-label='narrow the stop 0.10'>&minus;</button></label>"
             "</div></form>")
         # the one action on this stage: SEND, one tap from the decision

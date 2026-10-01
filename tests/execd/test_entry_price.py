@@ -60,11 +60,12 @@ class TestThePriceBox:
 
 
 class TestTheStopFollowsTheEntry:
-    def test_the_stop_is_the_entry_less_20_until_he_types_one(self, armed, form):
+    def test_the_stop_is_the_entry_less_30_until_he_types_one(self, armed, form):
+        """0.30 a contract (Steve, 2026-10-01, st-d7nt; the flat $20 before)."""
         today = armed.clock().date()
-        for limit, stop in (("2.10", 1.90), ("1.50", 1.30), ("1.00", 0.80)):
+        for limit, stop in (("2.10", 1.80), ("1.50", 1.20), ("1.00", 0.70)):
             p = price(armed, Selection.from_args({**SEL, "limit": limit}, today=today))
-            assert p.stop_price == stop and p.stop_loss_usd == 20.0
+            assert p.stop_price == stop and p.stop_loss_usd == 30.0
 
     def test_his_own_stop_stays_his(self, armed, form):
         today = armed.clock().date()
@@ -74,7 +75,7 @@ class TestTheStopFollowsTheEntry:
     def test_the_stop_box_is_on_the_form(self, form):
         body = text(form.get("/exec/order?side=call&strike=6400"))
         # the box holds the stop's distance under the entry (Steve, 2026-09-30)
-        assert "id=stopbox" in body and "value='.2' data-default='.2'" in body
+        assert "id=stopbox" in body and "value='.3' data-default='.3'" in body
 
 
 class TestSendThenReprice:
@@ -100,7 +101,7 @@ class TestSendThenReprice:
         assert len(work) == 1 and work[0]["limit"] == 2.00
 
     def test_the_stop_follows_the_new_price(self, form, broker, armed):
-        """$20 under whichever entry is working: the stop price moves with the
+        """$30 under whichever entry is working: the stop price moves with the
         entry, and the SPX level the intent carries — $20 of premium walked
         through delta — is the same distance from spot either way."""
         broker.rest_limits = True
@@ -109,7 +110,7 @@ class TestSendThenReprice:
         first = price(armed, Selection.from_args({**SEL, "limit": "1.90"}, today=today))
         page_send(form, {**SEL, "limit": "2.00"})
         second = price(armed, Selection.from_args({**SEL, "limit": "2.00"}, today=today))
-        assert (first.stop_price, second.stop_price) == (1.70, 1.80)
+        assert (first.stop_price, second.stop_price) == (1.60, 1.70)
         assert armed.status()["working"][0]["stop_spx"] == second.stop_spx
 
     def test_a_cancel_the_broker_has_not_confirmed_sends_nothing_new(self, form, broker, armed):

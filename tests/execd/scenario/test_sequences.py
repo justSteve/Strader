@@ -51,7 +51,7 @@ class TestEntries:
         assert out["order"]["status"] == "FILLED" and out["order"]["fill_price"] == t.limit
         assert scn.resting(sym) == {"stop": [t.stop_price],
                                     "target": [take_profit_price(t.limit, 5.0)]}
-        assert round(t.limit - t.stop_price, 2) == 0.20            # the flat $20
+        assert round(t.limit - t.stop_price, 2) == 0.30            # 0.30 a contract (st-d7nt)
         scn.run(30)
         assert scn.held() == {sym: 1}
 
@@ -86,7 +86,7 @@ class TestEntries:
         assert scn.held() == {t.contract.symbol: 1}, "sold on the pass that filled it"
         fill, = scn.events("filled")
         # the ticket's $20 behind the mark at the fill, not the send's
-        assert abs(fill["spx"] - fill["stop_spx"] - 0.20 / abs(fill["delta"])) <= 0.011
+        assert abs(fill["spx"] - fill["stop_spx"] - 0.30 / abs(fill["delta"])) <= 0.011
         scn.run(9)
         assert all(c["kind"] != "spx-stop" or c["exit_price"] <= round(t.limit - 0.20, 2)
                    for c in scn.closes())
@@ -123,7 +123,7 @@ class TestEntries:
         scn.wait_until(30)
         after = scn.ticket("call", strike=6380)
         assert after.limit > before.limit and after.limit == after.contract.ask_pts
-        assert round(after.limit - after.stop_price, 2) == 0.20
+        assert round(after.limit - after.stop_price, 2) == 0.30
 
 
 # ── fills against the stop sent with them ────────────────────────────────
@@ -144,7 +144,7 @@ class TestFills:
                          Frame(2, 7696.0, quotes={sym: (1.95, 2.00)}),
                          Frame(60, 7696.0, quotes={sym: (1.95, 2.00)})], start=T1324)
         scn = make(tape)
-        t = scn.ticket("call", strike=7720, limit=2.10)
+        t = scn.ticket("call", strike=7720, limit=2.10, stopoff=0.20)
         assert t.stop_price == 1.90
         scn.wait_until(2)
         scn.send(t)
@@ -180,17 +180,18 @@ class TestFills:
         scn.send(t)
         scn.run(9)
 
-    @pytest.mark.parametrize("spread, lots", [(0.30, 1), (0.10, 2)], ids=["wide", "two-lots"])
-    def test_a_stop_at_or_over_the_bid_is_refused_at_the_ticket(self, make, spread, lots):
-        """H2 (st-yeph): 0.30 wide under the 0.20 default; or the case that
-        raised it, an ordinary 0.10 market at two lots, where the flat $20
-        is 0.10 a contract — the stop at the bid, sold on the fill. Steve,
-        2026-10-01: "in those conditions it should refuse". The ticket says
-        so and offers no intent; the service refuses the same intent sent
-        around the page, and nothing goes to the book."""
+    @pytest.mark.parametrize("spread, lots, tight", [(0.30, 1, 0.20), (0.10, 2, 0.10)],
+                             ids=["wide", "two-lots"])
+    def test_a_stop_at_or_over_the_bid_is_refused_at_the_ticket(self, make, spread, lots, tight):
+        """H2 (st-yeph): a 0.20 stop under a 0.30-wide market's offer; or
+        the case that raised it, 0.10 a contract (then the flat $20 on two
+        lots) in an ordinary 0.10 market — the stop at the bid, sold on the
+        fill. Steve, 2026-10-01: "in those conditions it should refuse". The
+        ticket says so and offers no intent; the service refuses the same
+        intent sent around the page, and nothing goes to the book."""
         from dataclasses import replace
         scn = make(flat(spread=spread))
-        t = scn.ticket("call", delta=0.5, lots=lots)
+        t = scn.ticket("call", delta=0.5, lots=lots, stopoff=tight)
         q = scn.quote(t.contract.symbol)
         assert t.stop_price >= q.bid
         assert t.error == (f"the stop {t.stop_price:.2f} would rest at or above the "
@@ -208,7 +209,10 @@ class TestFills:
         """He widens the stop one step past the spread and the same ticket
         is sent, fills, and its stop rests under the bid."""
         scn = make(flat(spread=spread))
-        t = scn.ticket("call", delta=0.5, lots=lots, stopoff=round(spread + 0.10, 2))
+        # at the ask, so it fills on the send (the offer is mid + 0.05, st-d7nt)
+        ask = scn.ticket("call", delta=0.5, lots=lots).contract.ask_pts
+        t = scn.ticket("call", delta=0.5, lots=lots, limit=ask,
+                       stopoff=round(spread + 0.10, 2))
         assert t.error is None
         out = scn.send(t)
         assert out["refused"] is None and out["order"]["status"] == "FILLED"

@@ -73,9 +73,11 @@ class TestTheShape:
         assert S.STOP_TRIGGER == "MARK"
         assert build_oco(STOP, TARGET)["childOrderStrategies"][1]["stopType"] == "MARK"
 
-    def test_the_20_dollar_default_is_untouched(self):
-        from execd.orderform import DEFAULT_STOP_LOSS_USD
-        assert DEFAULT_STOP_LOSS_USD == 20.0
+    def test_the_default_stop_is_his_30_cents_a_contract(self):
+        """Steve, 2026-10-01 (st-d7nt): "update my default SL to .3" — it
+        was the flat $20 for the whole ticket (2026-09-17, st-bafu)."""
+        from execd.orderform import DEFAULT_STOP_PTS
+        assert DEFAULT_STOP_PTS == 0.30
 
 
 # ── the transport ────────────────────────────────────────────────────────
