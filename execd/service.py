@@ -3086,11 +3086,14 @@ class ExecService:
         lock = b.trail_arm_lock_usd if tier == 0 else net - b.trail_gap_usd
         raw = pos.entry_price + (lock + v["commissions_usd"]) / (CONTRACT_MULTIPLIER * pos.qty)
         tick = tick_for(raw)
-        # up to the grid so the lock is at least what he said; down when up
-        # would sit on the bid (a stop at the bid is a sale, and refused)
+        # up to the grid so the lock is at least what he said. When that
+        # price would sit on the bid (a stop at the bid is a sale, refused),
+        # wait for the bid to move rather than round down: rounding down
+        # could lock less than he said — at 7 lots in at 3.00 with the bid
+        # 3.10 it locked a net LOSS of $9.10 (st-n1t1).
         price = round(math.ceil(round(raw / tick, 6)) * tick, 2)
         if price >= bid:
-            price = round(math.floor(round(raw / tick, 6)) * tick, 2)
+            return None
         if pos.stop_price is not None and price <= pos.stop_price + 1e-9:
             pos.trail_tier = tier           # the stop is already there or higher
             return None
@@ -3770,6 +3773,26 @@ class ExecService:
                     # a target that filled the moment it landed never rested;
                     # the closed line that follows drops the position anyway
                     pos.target_order_id = None if e.get("filled_at_once") else e.get("order_id")
+            elif e.get("event") in ("stop_adjusted", "target_adjusted") and e.get("replaced"):
+                # A leg moved by the broker's replace (an adjust, the trail,
+                # the stop following a better fill) writes no *_placed line —
+                # this is its only record. Unread, a restart brought back the
+                # OLD id and price, and on a broker without raw_status (paper)
+                # the old leg read as lost and was re-rested beside the moved
+                # one: two stops, a short when both filled (st-5813).
+                pos = self._open.get(str(e.get("symbol", "")))
+                if pos is not None:
+                    if e.get("event") == "stop_adjusted":
+                        pos.stop_order_id = e.get("new_order_id")
+                        pos.stop_price = e.get("new_price")
+                        pos.stop_off_by_hand = False
+                        if e.get("new_stop_spx") is not None:
+                            pos.stop_spx = e.get("new_stop_spx")
+                    else:
+                        pos.target_order_id = e.get("new_order_id")
+                        pos.target_price = e.get("new_price")
+                        pos.target_off_by_hand = False
+                        pos.target_spx = e.get("new_target_spx")
             elif e.get("event") in ("stop_adjusted", "target_adjusted") and e.get("level_only"):
                 # a level moved without the leg being re-rested (st-2j3m):
                 # no *_placed line follows, so the level is read from here

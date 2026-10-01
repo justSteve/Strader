@@ -434,3 +434,49 @@ class TestTheTrailingStop:
         self._bid(mb, 3.00)
         assert svc.trail() == []
         assert pos.stop_price == 1.90
+
+
+    def test_it_waits_rather_than_lock_less_than_it_said(self, mb, clock, tmp_path):
+        """7 lots in at 3.00, bid 3.10 (net >= $50): the +$30 stop is 3.05 on
+        the grid, which is the bid's tick — rounding DOWN to 3.00 locked a net
+        loss of $9.10 (st-n1t1). It waits for the bid instead."""
+        sym = "SPXW  260826C06400000"
+        svc = make(mb, clock, tmp_path)
+        mb.set_quote(sym, bid=2.95, ask=3.00)
+        svc.place(entry(intent_id="tr-7", qty=7, limit=3.00, stop_price=2.90))
+        pos = svc._open[sym]
+        mb.set_quote(sym, bid=3.10, ask=3.20)
+        assert svc.valuation(pos)["net_if_closed_usd"] >= 50
+        before = pos.stop_price
+        assert svc.trail() == []
+        assert pos.stop_price == before
+        assert (svc.valuation(pos)["at_stop_usd"] or 0) < 30   # still the entry stop
+
+
+class TestAMovedStopSurvivesARestart:
+    """A leg moved by replace writes only ``stop_adjusted`` (replaced=True).
+    Until 2026-10-01 a restart ignored it: the old id and price came back, and
+    on paper the old leg read as lost and was re-rested beside the moved one —
+    two stops, a short when both filled (st-5813)."""
+
+    def test_the_moved_stop_is_the_one_recovered_and_there_is_one(self, svc, mb, clock):
+        svc.place(entry(intent_id="rs-1", stop_price=1.90))
+        mb.set_quote(CALL, bid=2.60, ask=2.70)
+        clock.advance(seconds=30)
+        out = svc.adjust(CALL, stop_price=2.20)
+        assert out.get("refused") is None
+        moved_id = svc._open[CALL].stop_order_id
+        clock.advance(seconds=30)
+        again = ExecService(mb, svc.config, clock=clock)
+        again.unlock({"token": "x"})
+        pos = again._open[CALL]
+        assert (pos.stop_order_id, pos.stop_price) == (moved_id, 2.20)
+        again.reconcile()
+        stops = [o for o in mb.working_orders(CALL) if o.order_type is OrderType.STOP]
+        assert [(o.order_id, o.price) for o in stops] == [(moved_id, 2.20)]
+        # a drop through it closes the position once and leaves nothing short
+        mb.set_quote(CALL, bid=1.50, ask=1.60)
+        mb.fill_resting(moved_id)
+        again.reconcile()
+        assert mb.positions() == []
+        assert again.journal.events("oversold") == []
