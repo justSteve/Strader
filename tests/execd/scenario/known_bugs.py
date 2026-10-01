@@ -1,0 +1,147 @@
+"""Open defects the scenarios pin — one place. [st-ug1h]
+
+``D1``–``D15`` are the 2026-10-01 audit's findings (handed to this harness
+to pin, each as a scenario); ``H1``–``H4`` are what the harness itself found
+running its own sequences. Each entry names the invariant (or the assertion)
+it breaks and the test that pins it — an ``xfail(strict=True)``: when the
+defect is fixed that test passes, the strict xfail turns red, and whoever
+fixed it deletes the entry here and the marker there in the same commit.
+
+A scenario that must run past an open defect to test something else — a
+seed case for a different 09-30 bug, a generated walk — may ``waive`` the
+invariant, citing the entry by key. A waiver whose key is not here is
+refused (``harness.Scenario``), so a fixed defect cannot stay waived.
+"""
+
+from __future__ import annotations
+
+_T = "test_audit_defects.py::"
+_S = "test_sequences.py::"
+
+KNOWN: dict[str, dict[str, str]] = {
+    # ── the audit (2026-10-01) ───────────────────────────────────────────
+    "D1": {"invariant": "two_stops, resting_sell_exceeds_held, short_position", "pinned_by": _T + "test_d1_restart_after_a_replace",
+           "title": "a restart after a replaced leg (adjust, the trail, _stop_follows_fill) "
+                    "restores the old stop id and price; on paper it is re-rested beside the "
+                    "moved one — two stops, a short if both fire",
+           "detail": "_replace_leg journals only stop_adjusted/target_adjusted replaced=True; "
+                     "_recover applies level_only adjust lines alone. Paper's REPLACED leg has "
+                     "no raw_status, so _reconcile_legs reads it as leg_lost and re-rests."},
+    "D2": {"invariant": "two_stops", "pinned_by": _T + "test_d2_a_triggered_send_whose_answer_was_lost",
+           "title": "a triggered send whose answer was lost is found by the orphan sweep as an "
+                    "untriggered entry, and a second bracket goes on",
+           "detail": "UnconfirmedSend has no triggered flag; the WorkingEntry the sweep makes "
+                     "defaults triggered=False, so _promote places its own pair beside the "
+                     "children the broker already rests."},
+    "D3": {"invariant": "two_stops", "pinned_by": _T + "test_d3_the_childrens_read_fails",
+           "title": "children_of raising, or a fallback cancel answered PENDING_CANCEL, puts a "
+                    "second bracket beside the one the entry carried",
+           "detail": "_attach_triggered falls back and places a pair whatever the cancel of "
+                     "the carried children answered (or with no ids to cancel at all)."},
+    "D4": {"invariant": "resting_sell_without_position, short_position",
+           "pinned_by": _T + "test_d4_a_close_in_two_prints",
+           "title": "a close in two prints books only the first; the stop and target are "
+                    "re-rested on a flat account (and two prints in one millisecond collide)",
+           "detail": "_pick_up_fills books per print, clears the leg id although the order "
+                     "may still be WORKING, and dedupes on (order_id, leg_id, at)."},
+    "D5": {"invariant": "two_stops", "pinned_by": _T + "test_d5_a_partly_filled_entry",
+           "title": "a partly filled working entry is adopted, then added to when it completes: "
+                    "the tracked size doubles",
+           "detail": "_reconcile_working skips a WORKING order with filledQuantity; the "
+                     "position sweep adopts the part, _promote adds the whole."},
+    "D6": {"invariant": "open_mismatch", "pinned_by": _T + "test_d6_the_watcher_sleeps_on_an_unconfirmed_send",
+           "title": "has_exposure ignores unconfirmed sends and loose legs, so the watcher "
+                    "sleeps while the broker holds an order (or a fill) the service has no id for",
+           "detail": "Watcher.once returns 'flat' before any reconcile; nothing finds the send."},
+    "D7": {"invariant": "bracket_not_linked", "pinned_by": _T + "test_d7_a_close_deferred_by_a_pending_cancel",
+           "title": "a close deferred by a PENDING_CANCEL target re-rests an unlinked stop "
+                    "beside the target every pass",
+           "detail": "_take_bracket_off → DEFERRED → _rest_stop_at as a single order (the pair "
+                     "cannot be cleared), then observe fires again next pass and churns it."},
+    "D8": {"invariant": "trail_locked_a_loss", "pinned_by": _T + "test_d8_tier_zero_locks_a_loss",
+           "title": "the trail's tier 0 rounds down onto the grid and can lock a net loss "
+                    "(7 lots in at 3.00, bid 3.10 → stop 3.00, −$9.10)",
+           "detail": "_trail_one floors when the ceiling sits on the bid; on the 0.10 grid with "
+                     "fees of 7 lots that is at or under the entry."},
+    "D9": {"invariant": "(assertion)", "pinned_by": _T + "test_d9_the_day_is_continuous_through_a_close",
+           "title": "closed lines are gross while the card is net of fees; a promoted or "
+                    "recovered position carries entry commission 0",
+           "detail": "the day total jumps by the fees at the close; _promote/_recover never "
+                     "set entry_commission_usd."},
+    "D10": {"invariant": "(refusal)", "pinned_by": _T + "test_d10_eight_lots_are_not_refused_by_the_preview",
+            "title": "check_preview_cost compares the preview total WITH commission to the cap "
+                     "WITHOUT it — eight lots or more at the ask are always refused",
+            "detail": "0.65 × qty passes the $5 tolerance at 8 contracts."},
+    "D11": {"invariant": "(assertion)", "pinned_by": _T + "test_d11_a_sell_to_open_is_not_a_close",
+            "title": "the fill sweep treats any SELL_* as a close: a SELL_TO_OPEN (a fly leg in "
+                     "TOS) writes unattributed_sell, and on a held contract books an external close",
+            "detail": "_pick_up_fills reads Fill.side, which the transport reduces from the "
+                      "instruction (schwab._side_of); Fill.instruction is not consulted."},
+    "D12": {"invariant": "false_short_alarm", "pinned_by": _T + "test_d12_rest_fill_and_fire_between_passes",
+            "title": "a resting triggered entry that fills and stops out between two reconciles "
+                     "raises 'unattributed_sell — the account is short; check the broker' for "
+                     "its own stop",
+            "detail": "_pick_up_fills runs before _reconcile_working promotes the entry; the "
+                      "close is then booked correctly as bracket_fired."},
+    "D13": {"invariant": "(assertion)", "pinned_by": _T + "test_d13_what_a_restart_forgets",
+            "title": "the fill watermark resets on restart and trail_tier is not recovered",
+            "detail": "_last_fill_poll = clock() at construction; nothing journals or replays "
+                      "the tier."},
+    "D14": {"invariant": "(assertion)", "pinned_by": _T + "test_d14_the_doorbell",
+            "title": "the stream's backoff never resets after a session that came up; a ring "
+                     "during a reconcile is skipped",
+            "detail": "AccountStream.run resets attempt only when session() returns; "
+                      "Watcher.once clears the ring before its reconcile and the next pass "
+                      "finds the reconcile fresh."},
+    "D15": {"invariant": "(assertion)", "pinned_by": _T + "test_d15_the_restrike",
+            "title": "the re-strike at the $3.00 boundary rests a 2.95 stop at 2.90; a "
+                     "negative-delta put intent is flipped",
+            "detail": "protective_stop_price caps one 0.10 tick under a 3.00 limit; level_for "
+                      "divides by a signed delta."},
+    # ── found by the harness ─────────────────────────────────────────────
+    "H1": {"invariant": "stop_not_below_bid_when_placed",
+           "pinned_by": _S + "TestFills::test_fill_much_better_than_the_limit",
+           "title": "the stop sent with the entry is struck under the LIMIT, not the market — a "
+                    "market already under the limit by the stop distance fills the entry under "
+                    "a stop above the bid, and it fires at once",
+           "detail": "13:24 CT 09-30: 9.20 limit, market 8.70/8.80 → 9.00 stop over an 8.70 bid; "
+                     "paper fires it on the first read (−$10). bracket_fired books it right; "
+                     "_stop_follows_fill never gets the chance."},
+    "H2": {"invariant": "stop_not_below_bid_when_placed",
+           "pinned_by": _S + "TestFills::test_spread_wider_than_the_stop_distance",
+           "title": "the entry's stop is never judged against the bid — a spread as wide as the "
+                    "stop distance rests it at or over the bid",
+           "detail": "adjust refuses a stop at or over the bid; the triggered bracket does not "
+                     "ask. 0.30 wide with the 0.20 default: 0.10 over the bid, fired by the "
+                     "first 0.05 down-tick of the mark. And at TWO lots the flat $20 ticket "
+                     "is $10 a contract — 0.10 under the ask, which is the bid of an ordinary "
+                     "0.10-wide market above $3 (seen first in the two-lot partial-exit "
+                     "sequence)."},
+    "H3": {"invariant": "(refusal)",
+           "pinned_by": _S + "TestFills::test_a_dollar_stop_survives_spx_moving_before_the_send",
+           "title": "a dollar-stop entry is refused 'the sign is transposed' when SPX moves past "
+                    "the priced level before the send, though the re-strike would rest it",
+           "detail": "_protective_stop_refusal checks the priced stop_spx before _place_entry "
+                     "re-strikes it (87ced9c). At delta 0.70 a 0.20 stop is 0.29 SPX points: "
+                     "the page's own SEND (chain read, then $SPX) can lose it by a tick."},
+    "H4": {"invariant": "stop_level_crossed_at_fill",
+           "pinned_by": _S + "TestEntries::test_a_dip_buy_limit_is_not_sold_by_its_own_level",
+           "title": "a resting limit under the market fills with its SPX stop level already "
+                    "behind the index — the SPX loop market-sells it on the same pass",
+           "detail": "the level is struck at the SEND's mark; a call limit 0.60 under the ask "
+                     "fills ~1.2 SPX points lower, past a level 0.4 under the send's mark: "
+                     "filled at 8.60, sold at 8.50 by spx-stop in the same watcher pass."},
+}
+
+
+def require(key: str) -> dict[str, str]:
+    if key not in KNOWN:
+        raise KeyError(f"{key} is not an open defect (tests/execd/scenario/known_bugs.py) — "
+                       f"if it was fixed, remove the waiver that cites it")
+    return KNOWN[key]
+
+
+def reason(key: str) -> str:
+    """The xfail reason for the scenario that pins ``key``."""
+    k = require(key)
+    return f"{key} ({k['invariant']}): {k['title']}"

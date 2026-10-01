@@ -49,3 +49,13 @@ def _no_clipboard(monkeypatch):
     monkeypatch.setattr(payload_emitter, "_default_run",
                         lambda cmd, text: pushed.append(text) or 0)
     return pushed
+
+
+def pytest_addoption(parser):
+    """``--scenario-wide``: the execd scenario harness's wide mode — hundreds
+    of generated tapes and the whole recorded half hour instead of the fast
+    handful (tests/execd/scenario/README.md). Here, at the root, because an
+    option is only read from a conftest pytest loads at start-up, and this
+    is the one every invocation loads. [st-ug1h]"""
+    parser.addoption("--scenario-wide", action="store_true", default=False,
+                     help="execd scenario harness: run the wide mode (st-ug1h)")
