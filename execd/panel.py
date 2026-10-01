@@ -825,13 +825,14 @@ PANEL_SCRIPT = """
     var fd = new FormData(f); fd.set('ajax', '1');
     // what the boxes say rides every SEND as typed, even if the reprice that
     // refreshes the hidden fields has not come back yet (st-m3bl). Since
-    // 2026-09-30 the stop box writes `stopoff`, the close-at box `exitspx`,
-    // the price box `limit` — only `stop` was carried, so a .3 typed and
-    // SENT inside the 600 ms before the reprice went out as the old stop
-    // (st-qqxj). The strike the ticket shows is pinned in the hidden fields;
-    // a strike he typed or stepped replaces it.
+    // 2026-09-30 the stop box writes `stopoff`, the price box `limit` —
+    // only `stop` was carried, so a .3 typed and SENT inside the 600 ms
+    // before the reprice went out as the old stop (st-qqxj). The close-at
+    // box is gone from the entry (st-a54y, 2026-10-01). The strike the
+    // ticket shows is pinned in the hidden fields; a strike he typed or
+    // stepped replaces it.
     var sf = document.getElementById('sel');
-    if (sf) { ['stop', 'stopoff', 'exitspx', 'limit', 'lots'].forEach(function(n){
+    if (sf) { ['stop', 'stopoff', 'limit', 'lots'].forEach(function(n){
         var el = sf.elements[n]; if (el) fd.set(n, el.value || ''); });
       var sk = sf.elements['strike']; if (sk && sk.value) { fd.set('strike', sk.value); fd.delete('delta'); } }
     if (b) { b.disabled = true; b.textContent = 'SENDING…'; }

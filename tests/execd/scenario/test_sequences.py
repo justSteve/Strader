@@ -91,19 +91,31 @@ class TestEntries:
         assert all(c["kind"] != "spx-stop" or c["exit_price"] <= round(t.limit - 0.20, 2)
                    for c in scn.closes())
 
-    @pytest.mark.xfail(strict=True, reason=reason("H5"))
-    def test_a_dip_buy_with_a_level_stop_fills_past_its_level(self, make):
-        """The same dip with his close-at-SPX level 0.5 under the send's
-        mark: the limit fills past the level, and the level — his, kept as
-        typed (st-d3va) — sells it on the pass that fills it."""
+    def test_an_entry_carrying_an_spx_stop_is_refused(self, make):
+        """H5 was a dip-buy limit with his close-at-SPX level under the
+        send's mark: it filled past the level and the level sold it on the
+        pass that filled it (st-a54y). Steve, 2026-10-01: "At entry, only
+        permit a $$ SL but after a fill the level should become an option
+        again." The ticket refuses the level in words, and the service
+        refuses an intent that carries one — a level with no dollar price,
+        or a close-at level — so a stale page or a direct call cannot send
+        it. Nothing rests, nothing is held."""
+        from dataclasses import replace
         scn = make(ramp((0, 6380), (30, 6380), (90, 6376), (150, 6376)))
         live = scn.ticket("call", strike=6380)
-        t = scn.ticket("call", strike=6380, limit=round(live.limit - 0.60, 2),
-                       exitspx=6379.5)
-        assert t.stop_set_by == "spx"
-        scn.send(t)
-        scn.run(150, until=lambda s: bool(s.held()))
-        assert scn.held() == {t.contract.symbol: 1}, "sold on the pass that filled it"
+        dip = round(live.limit - 0.60, 2)
+        t = scn.ticket("call", strike=6380, limit=dip, exitspx=6379.5)
+        assert t.error and "dollars only" in t.error
+        with pytest.raises(ValueError, match="dollars only"):
+            scn.intent(t)
+        ok = scn.intent(scn.ticket("call", strike=6380, limit=dip))
+        for i, bad in enumerate((replace(ok, intent_id="lvl-1", stop_price=None),
+                                 replace(ok, intent_id="lvl-2", exit_spx=6379.5))):
+            out = scn.send(bad)
+            assert out["refused"]["bound"] == "entry_stop_dollars", out
+        scn.run(150)
+        assert scn.held() == {} and scn.working() == []
+        assert scn.events("sending") == []
 
     def test_the_unlocked_ticket_follows_the_ask(self, make):
         scn = make(ramp((0, 6380), (30, 6384)))
@@ -168,16 +180,42 @@ class TestFills:
         scn.send(t)
         scn.run(9)
 
-    @pytest.mark.xfail(strict=True, reason=reason("H2"))
     @pytest.mark.parametrize("spread, lots", [(0.30, 1), (0.10, 2)], ids=["wide", "two-lots"])
-    def test_spread_wider_than_the_stop_distance(self, make, spread, lots):
-        """0.30 wide under the 0.20 default; or an ordinary 0.10 market at
-        two lots, where the flat $20 is 0.10 a contract."""
+    def test_a_stop_at_or_over_the_bid_is_refused_at_the_ticket(self, make, spread, lots):
+        """H2 (st-yeph): 0.30 wide under the 0.20 default; or the case that
+        raised it, an ordinary 0.10 market at two lots, where the flat $20
+        is 0.10 a contract — the stop at the bid, sold on the fill. Steve,
+        2026-10-01: "in those conditions it should refuse". The ticket says
+        so and offers no intent; the service refuses the same intent sent
+        around the page, and nothing goes to the book."""
+        from dataclasses import replace
         scn = make(flat(spread=spread))
         t = scn.ticket("call", delta=0.5, lots=lots)
         q = scn.quote(t.contract.symbol)
         assert t.stop_price >= q.bid
-        scn.send(t)
+        assert t.error == (f"the stop {t.stop_price:.2f} would rest at or above the "
+                           f"{q.bid:.2f} bid and sell on the fill — widen the stop")
+        with pytest.raises(ValueError, match="widen the stop"):
+            scn.intent(t)
+        wide = scn.intent(scn.ticket("call", delta=0.5, lots=lots, stopoff=spread + 0.10))
+        out = scn.send(replace(wide, intent_id="around-the-page", stop_price=t.stop_price))
+        assert out["refused"]["bound"] == "stop_over_bid", out
+        assert "at or above" in out["refused"]["reason"]
+        assert scn.events("sending") == [] and scn.held() == {}
+
+    @pytest.mark.parametrize("spread, lots", [(0.30, 1), (0.10, 2)], ids=["wide", "two-lots"])
+    def test_the_same_ticket_widened_goes_through(self, make, spread, lots):
+        """He widens the stop one step past the spread and the same ticket
+        is sent, fills, and its stop rests under the bid."""
+        scn = make(flat(spread=spread))
+        t = scn.ticket("call", delta=0.5, lots=lots, stopoff=round(spread + 0.10, 2))
+        assert t.error is None
+        out = scn.send(t)
+        assert out["refused"] is None and out["order"]["status"] == "FILLED"
+        sym = t.contract.symbol
+        assert sole_stop(scn, sym) < scn.quote(sym).bid
+        scn.run(30)
+        assert scn.held() == {sym: lots}
 
     def test_a_dollar_stop_survives_spx_moving_before_the_send(self, make):
         """Priced at 7696.00, sent with SPX at 7695.60: the ticket's level
@@ -420,23 +458,34 @@ class TestTrail:
 # ── the SPX-mark exit loop ───────────────────────────────────────────────
 
 class TestTheSpxLoop:
-    def test_a_close_at_level_fires_once_and_takes_the_bracket_off(self, make):
+    """An SPX stop is the position card's after the fill (Steve, 2026-10-01,
+    st-a54y: "after a fill the level should become an option again"): the
+    entry goes in with its dollar stop and the level is set on the card."""
+
+    def test_a_level_set_on_the_card_after_the_fill_fires_once_and_takes_the_bracket_off(self, make):
         scn = make(ramp((0, 6380), (15, 6380), (75, 6370), (100, 6370)))
-        t = scn.ticket("call", delta=0.5, exitspx=6376)
-        assert t.stop_set_by == "spx" and t.stop_spx == 6376.0
-        scn.send(t)
+        t = scn.ticket("call", delta=0.5)
+        assert t.stop_set_by is None and t.error is None
+        out = scn.send(t)
+        assert out["order"]["status"] == "FILLED"
         sym = t.contract.symbol
+        moved = scn.adjust(sym, stop_spx=6376)
+        assert moved["refused"] is None, moved
+        assert scn.position(sym).stop_spx == 6376.0
         scn.run(100, until=lambda s: not s.held())
         close, = scn.closes()
-        assert close["kind"] in ("spx-exit", "protective-stop")
+        assert close["kind"] in ("spx-stop", "protective-stop")
         assert scn.working(sym) == []
-        if close["kind"] == "spx-exit":
+        if close["kind"] == "spx-stop":
             assert scn.events("exit_triggered")[0]["spx"] <= 6376.0
 
     def test_a_put_level_from_below(self, make):
         scn = make(ramp((0, 6380), (15, 6380), (75, 6390), (100, 6390)))
-        t = scn.ticket("put", delta=0.5, exitspx=6384)
+        t = scn.ticket("put", delta=0.5)
         scn.send(t)
+        sym = t.contract.symbol
+        assert scn.adjust(sym, stop_spx=6384)["refused"] is None
+        assert scn.position(sym).stop_spx == 6384.0
         scn.run(100, until=lambda s: not s.held())
         close, = scn.closes()
-        assert close["kind"] in ("spx-exit", "protective-stop") and close["pnl_usd"] < 0
+        assert close["kind"] in ("spx-stop", "protective-stop") and close["pnl_usd"] < 0

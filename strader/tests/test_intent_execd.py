@@ -98,6 +98,11 @@ def test_go_previews_a_single_through_execd(tmp_path):
     assert i["limit"] == 1.55                                   # the ask, as priced
     assert i["stop_spx"] == t.stop_trigger_spx
     assert i["delta"] == pytest.approx(abs(t.derivation.delta_live), abs=1e-4)
+    # the stop goes as dollars — the price FD0's level walks to from the
+    # compose mark — never as a level alone (Steve, 2026-10-01, st-a54y)
+    from execd.stops import protective_stop_price
+    assert i["stop_price"] == protective_stop_price(i["limit"], i["delta"],
+                                                    t.spx_at_compose, i["stop_spx"])
     assert i["source"] == "intent-desk"
     assert i["intent_id"].startswith("desk-")
 

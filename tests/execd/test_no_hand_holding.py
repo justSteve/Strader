@@ -11,6 +11,14 @@ On 09-17 and 09-18 only the displays went and the bounds stayed. This file
 fails if any of them comes back: as a field of ``Bounds``, as a key in the
 shipped example, as a refusal keyed on them, or as a clock read in the
 service. An old ``/etc`` file that still carries the keys must keep loading.
+
+One exception, carved out by Steve on 2026-10-01 (st-yeph: "in those
+conditions it should refuse"): an entry whose stop would rest at or above
+the bid is refused, at the page and the service — a stop that sells on the
+fill, not a judgement of its size. The 09-17 ruling stands for everything
+else; ``test_a_stop_at_or_over_the_bid_is_refused_and_one_under_it_goes``
+(test_orderform.py) pins the exception and that a stop one tick under the
+bid goes with nothing said.
 """
 
 from __future__ import annotations

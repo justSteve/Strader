@@ -144,40 +144,25 @@ _SCRIPT = """
   function unlockThenReprice(){ var lf = lockField(); if (lf) lf.value = ''; reprice(); }
   if (form) { ['delta'].forEach(function(n){ var el = form.elements[n];
     if (el) { el.addEventListener('change', unlockThenReprice); } }); }
-  // Two boxes, one live (Steve, 2026-09-30): the stop box is the stop's
-  // dollar distance under the entry (".2"), riding on the hidden
-  // `stopoff`; the close-at-SPX box is a level that closes at market.
-  // Typing in either writes NA in the other, so the ticket is priced from
-  // exactly one. The poll keeps repricing from whichever is live.
-  var stopBox = document.getElementById('stopbox'), exitBox = document.getElementById('exitbox');
+  // The stop box is the stop's dollar distance under the entry (".2"),
+  // riding on the hidden `stopoff`. Dollars only at entry (Steve,
+  // 2026-10-01, st-a54y): the close-at-SPX box is gone from the ticket.
+  var stopBox = document.getElementById('stopbox');
   function stopField(){ return form ? form.elements['stop'] : null; }
   function offField(){ return form ? form.elements['stopoff'] : null; }
   function num(v){ v = (v || '').trim(); if (!v || /^na$/i.test(v)) return NaN; return parseFloat(v); }
   function soon(ms){ clearTimeout(window.__t); window.__t = setTimeout(reprice, ms); }
   function stopLive(off){ var of = offField(), sf = stopField();
-    if (of) of.value = isNaN(off) ? '' : off.toFixed(2); if (sf) sf.value = '';
-    if (exitBox) exitBox.value = 'NA'; }
-  function exitLive(){ var of = offField(), sf = stopField(); if (of) of.value = ''; if (sf) sf.value = '';
-    if (stopBox) stopBox.value = 'NA'; }
+    if (of) of.value = isNaN(off) ? '' : off.toFixed(2); if (sf) sf.value = ''; }
   function shortPts(n){ var t = n.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''); return t.indexOf('0.') === 0 ? t.slice(1) : t; }
   if (stopBox) {
     stopBox.addEventListener('input', function(){ var v = num(stopBox.value);
       if (!isNaN(v) && v > 0) stopLive(v); soon(600); });
     stopBox.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); soon(0); stopBox.blur(); } }); }
-  if (exitBox) {
-    exitBox.addEventListener('input', function(){ var v = num(exitBox.value);
-      if (!isNaN(v)) exitLive();
-      else if (!exitBox.value.trim() && stopBox) { stopBox.value = stopBox.getAttribute('data-default') || '.2'; stopLive(NaN); exitBox.value = ''; }
-      soon(600); });
-    exitBox.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); soon(0); exitBox.blur(); } });
-    // a tap into a box that reads NA clears it for typing
-    [stopBox, exitBox].forEach(function(bx){ if (bx) bx.addEventListener('focus', function(){ if (/^na$/i.test(bx.value.trim())) bx.value = ''; }); });
-    // left empty, a box says what it means again: NA for the SPX level, or
-    // the stop's distance when the SPX box is the one that is NA
-    exitBox.addEventListener('blur', function(){ if (!exitBox.value.trim()) exitBox.value = 'NA'; });
-    if (stopBox) stopBox.addEventListener('blur', function(){ if (!stopBox.value.trim()) {
-      var of = offField(); stopBox.value = (of && of.value) ? shortPts(parseFloat(of.value))
-        : (/^na$/i.test(exitBox.value.trim()) || !exitBox.value.trim() ? (stopBox.getAttribute('data-default') || '.2') : 'NA'); } }); }
+  // left empty, the stop box says the stop's distance again
+  if (stopBox) stopBox.addEventListener('blur', function(){ if (!stopBox.value.trim()) {
+    var of = offField(); stopBox.value = (of && of.value) ? shortPts(parseFloat(of.value))
+      : (stopBox.getAttribute('data-default') || '.2'); } });
   // the entry price box (co-8mb1z): typing is locking at that price — the
   // hidden limit carries it, the server puts it on the grid and the stop
   // follows it; an empty box goes back to following the ask
@@ -189,7 +174,7 @@ _SCRIPT = """
     e.preventDefault(); clearTimeout(window.__t); reprice(); e.target.blur(); });
   // the stop steppers (Steve, 2026-09-30): + widens the stop's distance
   // under the entry by 0.10, − narrows it; a box reading NA starts from the
-  // default .2. The close-at-SPX box goes to NA.
+  // default .2.
   document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('button.step') : null;
     if (!b || !stopBox || !form) return;
     var fr = b.getAttribute('data-for'); if (fr && fr !== 'stop') return; e.preventDefault();
@@ -691,13 +676,13 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
         # more than one lot rides the form so a reprice keeps it
         lots_field = f"<input type=hidden name=lots value='{sel.lots}'>"
         limit_val = f"{sel.limit:.2f}" if sel.limit is not None else ""
-        # Two boxes, one live (Steve, 2026-09-30): the stop as its dollar
-        # distance under the limit (".2" — the flat $20 at one lot), or a
-        # close-at-SPX level; typing in either writes NA in the other.
-        exit_on = sel.exitspx is not None
+        # The stop as its dollar distance under the limit (".2" — the flat
+        # $20 at one lot). Dollars only at entry (Steve, 2026-10-01,
+        # st-a54y: "At entry, only permit a $$ SL but after a fill the level
+        # should become an option again"): the close-at-SPX box is gone from
+        # this row; the position card keeps its "at SPX" box.
         off = sel.stopoff if sel.stopoff is not None else DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * sel.lots)
-        stop_val = "NA" if exit_on else short_pts(off)
-        exit_val = f"{sel.exitspx:g}" if exit_on else "NA"
+        stop_val = short_pts(off)
         parts.append(
             f"<form id=sel method=get action='{order}'>"
             f"<input type=hidden name=side value='{sel.side}'>"
@@ -705,7 +690,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             f"{strike_field}{delta_field}{lots_field}"
             f"<input type=hidden name=limit value='{limit_val}'>"
             f"<input type=hidden name=stop value='{esc(sel.stop or '')}'>"
-            f"<input type=hidden name=stopoff value='{f'{sel.stopoff:.2f}' if sel.stopoff and not exit_on else ''}'>"
+            f"<input type=hidden name=stopoff value='{f'{sel.stopoff:.2f}' if sel.stopoff else ''}'>"
             "<div class='row stops'>"
             "<label class='dl stopl' title='the stop, in dollars under the entry (.2)'>"
             "<span class=k>stop $</span>"
@@ -715,13 +700,7 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
             f"<input id=stopbox inputmode=decimal enterkeyhint=done autocomplete=off "
             f"value='{stop_val}' data-default='{short_pts(DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * sel.lots))}'>"
             "<button type=button class=step data-step=-1 aria-label='narrow the stop 0.10'>&minus;</button></label>"
-            # the close-at-SPX box: a whole SPX level at which the position
-            # is closed at market
-            "<label class='dl exitl' title='closes at market when SPX crosses it (7610)'>"
-            "<span class=k>close at SPX</span>"
-            f"<input name=exitspx id=exitbox inputmode=numeric enterkeyhint=done autocomplete=off "
-            f"value='{exit_val}'></label></div>"
-            "</form>")
+            "</div></form>")
         # the one action on this stage: SEND, one tap from the decision
         # (st-igw0 — the PREVIEW step is gone; the service runs the broker's
         # own preview inside every place). The script sends it by fetch and

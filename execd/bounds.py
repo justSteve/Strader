@@ -126,7 +126,13 @@ class Bounds:
       from."
 
     On 09-17 and 09-18 only the displays were removed and the bounds were
-    kept; that was the misreading. [co-8mb1z]"""
+    kept; that was the misreading. [co-8mb1z]
+
+    **One exception, his** (Steve, 2026-10-01, st-yeph: "in those conditions
+    it should refuse"): an entry whose stop would rest at or above the bid is
+    refused — at the page and the service (``ExecService._stop_over_bid_
+    refusal``), not here as a bound. The 09-17 ruling stands for everything
+    else."""
 
     instruments: tuple[str, ...] = ("SPX", "SPXW")
     price_band_pct: float = 0.10      # a BUY limit may sit this far above the ask

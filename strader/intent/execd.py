@@ -43,6 +43,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from execd.intent import OrderIntent
+from execd.stops import protective_stop_price
 from market.entities.chain import Chain
 from market.ingest.schwab import chain_from_schwab
 from strader.execution.compose import Ticket
@@ -194,6 +195,17 @@ def intent_for(order: Order, bracket: dict[str, Any] | None, *, intent_id: str,
         t = Ticket.from_dict(bracket)
         d["stop_spx"] = float(t.stop_trigger_spx)
         d["delta"] = round(abs(float(t.derivation.delta_live)), 4)
+        # The entry's stop is dollars only (Steve, 2026-10-01, st-a54y: "At
+        # entry, only permit a $$ SL"). FD0 derives its cut as an SPX level;
+        # it goes to the service as the price that level walks to from the
+        # compose mark, so the service re-strikes the level from its own mark
+        # at the send and the fill, as it does every ticket's. A level alone
+        # is refused there.
+        try:
+            d["stop_price"] = protective_stop_price(d["limit"], d["delta"],
+                                                    float(t.spx_at_compose), d["stop_spx"])
+        except ValueError:
+            pass            # no price to rest: the service refuses it in words
     OrderIntent.from_dict(d).validated()
     return d
 

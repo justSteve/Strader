@@ -23,6 +23,7 @@ from execd.bounds import Bounds
 from execd.broker import MockBroker
 from execd.intent import OrderIntent, OrderType, Side
 from execd.service import ExecService, ServiceConfig
+from execd.stops import protective_stop_price
 
 CT = ZoneInfo("America/Chicago")
 
@@ -96,7 +97,18 @@ def armed(service: ExecService) -> ExecService:
 def entry(intent_id: str = "t-001", symbol: str = CALL, qty: int = 1,
           limit: float = 2.10, stop_spx: float | None = SPX_NOW - 12.0,
           delta: float | None = 0.30, **kw) -> OrderIntent:
-    """A well-formed opening intent. A call, so its stop sits below spot."""
+    """A well-formed opening intent. A call, so its stop sits below spot.
+
+    Its stop is in dollars, as every entry's must be (Steve, 2026-10-01,
+    st-a54y: "At entry, only permit a $$ SL"): ``stop_price`` is the walk of
+    ``stop_spx`` from ``SPX_NOW`` through ``delta`` unless the test names
+    one; ``stop_price=None`` builds the level-only entry the service
+    refuses."""
+    if "stop_price" not in kw and stop_spx is not None and delta and limit:
+        try:
+            kw["stop_price"] = protective_stop_price(limit, delta, SPX_NOW, stop_spx)
+        except ValueError:
+            pass
     return OrderIntent(
         intent_id=intent_id, symbol=symbol, side=Side.BUY_TO_OPEN, qty=qty,
         order_type=OrderType.LIMIT, limit=limit, stop_spx=stop_spx, delta=delta,

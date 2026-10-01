@@ -76,8 +76,8 @@ from .broker import COMMISSION_PER_CONTRACT_USD, CONTRACT_MULTIPLIER, BrokerErro
 from .compose import Contract, parse_chain
 from .intent import OrderIntent
 from .service import ExecService
-from .stops import (_floor_to, _round_up_to_tick, level_for, on_tick, protective_stop_price, risk_usd,
-                    stop_is_consistent, tick_for)
+from .stops import (_floor_to, _round_up_to_tick, entry_stop_base, entry_stop_over_bid, level_for,
+                    on_tick, protective_stop_price, risk_usd, tick_for)
 
 log = logging.getLogger("execd.orderform")
 
@@ -142,9 +142,10 @@ class Selection:
     #: every time the ticket is priced, so it follows the live limit.
     #: ``None`` is the flat-loss default.
     stopoff: float | None = None
-    #: The SPX level that closes the position at market (Steve, 2026-09-30:
-    #: "dedicate that control to the dollar amount and add an input to hold
-    #: the strike that triggers a closing market order"). ``None`` sets none.
+    #: The SPX level that closed the position at market (Steve, 2026-09-30).
+    #: Gone from the entry form (Steve, 2026-10-01, st-a54y: "At entry, only
+    #: permit a $$ SL"); still read so a stale page or link carrying it is
+    #: refused in words rather than dropped silently.
     exitspx: float | None = None
 
     @property
@@ -459,14 +460,42 @@ def price(service: ExecService, sel: Selection) -> Priced:
     if not (0 < c.abs_delta <= 1):
         out.error = f"the chain gives no usable delta for {c.strike:g} — no stop can be struck"
         return out
-    # one of the two boxes is live, the other reads NA (Steve, 2026-09-30):
-    # a close-at-SPX level is the stop, as a level; otherwise the stop is
-    # the dollar distance under the limit
-    if sel.exitspx is not None or sel.stop:
+    # The entry's stop is dollars only (Steve, 2026-10-01: "At entry, only
+    # permit a $$ SL but after a fill the level should become an option
+    # again"). The close-at-SPX box is gone from the ticket; a stale page or
+    # a link that still carries ``exitspx`` is refused in words, and the
+    # service refuses the same intent. The level is the position card's.
+    if sel.exitspx is not None:
+        out.error = ENTRY_STOP_DOLLARS_ONLY
+        return out
+    if sel.stop:
         _apply_stop_of_his_own(out, c, spx)
     else:
         _apply_flat_loss_stop(out, c, spx, per_contract=sel.stopoff)
+    if out.error is None and out.stop_price is not None and out.stop_spx is not None:
+        _refuse_stop_over_bid(out, c, spx)
     return out
+
+
+#: Why a ticket carrying an SPX stop level is refused (st-a54y).
+ENTRY_STOP_DOLLARS_ONLY = ("the entry's stop is dollars only — an SPX level can be set on "
+                           "the position card once it fills")
+
+
+def _refuse_stop_over_bid(out: Priced, c: Contract, spx: float) -> None:
+    """The ticket refuses a stop that would rest at or above the bid (Steve,
+    2026-10-01, st-yeph: "in those conditions it should refuse"); he widens
+    the stop. The stop judged is the one the service will send: struck from
+    the limit, or from the ask when the market is under the limit
+    (st-n3e8), through the ticket's level and delta — the service asks the
+    same question of the same numbers at the send."""
+    try:
+        resting = protective_stop_price(entry_stop_base(out.limit, c.ask_pts),
+                                        _wire_delta(c), spx, out.stop_spx)
+    except ValueError:
+        return
+    if (why := entry_stop_over_bid(resting, c.bid_pts)) is not None:
+        out.error = why
 
 
 def _wire_delta(c: Contract) -> float:
@@ -525,66 +554,43 @@ def _apply_stop_of_his_own(out: Priced, c: Contract, spx: float) -> None:
     at the limit — the inverse of ``protective_stop_price`` — so the intent
     still carries a level and the service rests his number when it fills at
     the limit with the mark where it was (a better fill or a moved mark
-    re-walks from the level, which is the instrument). **A level** (no
-    '.'): the level is the trigger as typed, and the resting price is the
-    walk forward.
+    re-walks from the level, which is the instrument). A level is no
+    longer a stop the entry may carry (Steve, 2026-10-01, st-a54y: "At
+    entry, only permit a $$ SL"); it is the position card's after the fill.
 
     Refused in words on the ticket — SEND is then refused with the same
     words: a price off the tick grid, at or above the limit, or not
-    positive; a level on the wrong side of spot for the right, or one that
-    walks to a price nothing can rest at. The form does not judge the size
-    of his stop (st-bafu: the budget, the noise floor and their warnings
-    left with the derivation); the service's ceiling does."""
+    positive. The form does not judge the size of his stop (st-bafu: the
+    budget, the noise floor and their warnings left with the derivation),
+    with one exception: a stop that would rest at or above the bid
+    (st-yeph, 2026-10-01; ``_refuse_stop_over_bid``)."""
     sel = out.selection
-    if out.limit is None or not (sel.stop or sel.exitspx is not None):
+    if out.limit is None or not sel.stop:
         return
-    # the level comes from the close-at-SPX box (Steve, 2026-09-30); a stop
-    # price from a URL's ``stop`` is dollars
-    if sel.exitspx is not None:
-        kind, value = "spx", float(sel.exitspx)
-    else:
-        try:
-            kind, value = "price", float(sel.stop.strip())
-        except ValueError:
-            out.error = f"your stop: {sel.stop.strip()!r} is not a price (10.30)"
-            return
+    # dollars only at entry (Steve, 2026-10-01, st-a54y): the close-at-SPX
+    # box is gone, and a stop price from a URL's ``stop`` is dollars
+    kind = "price"
+    try:
+        value = float(sel.stop.strip())
+    except ValueError:
+        out.error = f"your stop: {sel.stop.strip()!r} is not a price (10.30)"
+        return
     right = c.right
-    word = "call" if right == "CALL" else "put"
     delta = _wire_delta(c)
-    if kind == "price":
-        if value <= 0:
-            out.error = f"your stop: a stop price must be positive, not {value:g}"
-            return
-        if not on_tick(value):
-            tick = tick_for(value)
-            out.error = (f"your stop: {value:.2f} is not on the {tick:.2f} grid SPX options "
-                         f"quote in {'at and above' if tick > 0.05 else 'below'} $3.00")
-            return
-        if value >= out.limit:
-            out.error = (f"your stop: {value:.2f} is not below the {out.limit:.2f} limit — "
-                         f"it would fill at once")
-            return
-        stop_price = round(value, 2)
-        level = _level_for(right, spx, out.limit, stop_price, delta)
-    else:
-        level = value
-        if not stop_is_consistent(right, spx, level):
-            side = "below" if right == "CALL" else "above"
-            out.error = (f"close at SPX {level:g}: a {word}'s close level sits {side} the market, "
-                         f"and SPX {level:g} is not {side} the {spx:.2f} mark — it would fire at once")
-            return
-        try:
-            stop_price = protective_stop_price(out.limit, delta, spx, level)
-        except ValueError as exc:
-            out.error = f"close at SPX {level:g} walks to no price a stop can rest at: {exc}"
-            return
-        if out.limit - abs(spx - level) * delta <= 0:
-            # the same clamp the service's own stop gets
-            # (stops.protective_stop_price): a level that walks the option
-            # below nothing rests one tick above it, and the SPX loop at his
-            # level is the stop that fires
-            out.warnings.append(f"SPX {level:g} WALKS THE OPTION BELOW ZERO — the resting stop is "
-                                f"one tick, {stop_price:.2f}; the SPX loop at {level:g} is the stop")
+    if value <= 0:
+        out.error = f"your stop: a stop price must be positive, not {value:g}"
+        return
+    if not on_tick(value):
+        tick = tick_for(value)
+        out.error = (f"your stop: {value:.2f} is not on the {tick:.2f} grid SPX options "
+                     f"quote in {'at and above' if tick > 0.05 else 'below'} $3.00")
+        return
+    if value >= out.limit:
+        out.error = (f"your stop: {value:.2f} is not below the {out.limit:.2f} limit — "
+                     f"it would fill at once")
+        return
+    stop_price = round(value, 2)
+    level = _level_for(right, spx, out.limit, stop_price, delta)
     out.stop_spx = round(level, 2)
     out.stop_price = stop_price
     out.stop_set_by = kind
@@ -607,17 +613,16 @@ def intent_for(priced: Priced, *, intent_id: str, engine_sha: str) -> dict[str, 
         "delta": _wire_delta(priced.contract),
         "source": SOURCE, "engine_sha": engine_sha,
     }
-    if priced.stop_set_by != "spx" and priced.stop_price is not None:
-        # A stop in dollars stays dollars (Steve, 2026-09-30: "dollars",
-        # st-7p5u): the price under the limit rides with the intent, and the
-        # service re-strikes the SPX level from the mark at the send, so SPX
-        # moving between pricing and send cannot turn $20 into $40. A stop
-        # set as a level — the close-at-SPX box — is a level and sends none;
-        # ``stop_set_by`` says "spx" for it (st-qqxj: this compared against
-        # "level", which it never is, so his level was re-struck at the send).
-        d["stop_price"] = float(priced.stop_price)
-    if priced.selection.exitspx is not None:
-        d["exit_spx"] = priced.selection.exitspx      # his close level (st-5n3s)
+    if priced.stop_price is None or priced.selection.exitspx is not None:
+        # dollars only at entry (Steve, 2026-10-01, st-a54y)
+        raise ValueError(ENTRY_STOP_DOLLARS_ONLY)
+    # A stop in dollars stays dollars (Steve, 2026-09-30: "dollars",
+    # st-7p5u): the price under the limit rides with the intent, and the
+    # service re-strikes the SPX level from the mark at the send, so SPX
+    # moving between pricing and send cannot turn $20 into $40. The entry
+    # carries no SPX stop level of its own and no close-at-SPX level
+    # (st-a54y); both are the position card's after the fill.
+    d["stop_price"] = float(priced.stop_price)
     OrderIntent.from_dict(d).validated()
     return d
 

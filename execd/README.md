@@ -278,7 +278,26 @@ or losses** (co-8mb1z). Steve, 2026-09-24: *"' one open position, the $500 daily
 calculation. I don't need that level of hand holding."*) and again on 09-18
 (st-644f: *"remove all aspects of that"*); both times only the displays were
 removed and the bounds kept. They are gone now, and
-`tests/execd/test_no_hand_holding.py` fails if any comes back. The journal
+`tests/execd/test_no_hand_holding.py` fails if any comes back.
+**One exception to 09-17** (Steve, 2026-10-01, st-yeph: *"in those
+conditions it should refuse"*): the entry ticket refuses a stop that would
+rest at or above the bid — the dollar stop as a per-contract price, struck
+from the limit or from the ask when the market is under the limit (H1,
+st-n3e8), against the live bid at the send — at the page
+(`orderform._refuse_stop_over_bid`) and the service
+(`ExecService._stop_over_bid_refusal`, bound `stop_over_bid`), as `adjust`
+refuses the same state on an open position. He widens the stop. The 09-17
+ruling stands for everything else.
+
+**The entry's stop is dollars only** (Steve, 2026-10-01, st-a54y: *"i'd
+prefer to define the entry form as not permitting using an spx level as the
+SL. At entry, only permit a $$ SL but after a fill the level should become
+an option again."*): the close-at-SPX box is gone from the order page's stop
+row; a stale page or link carrying `exitspx` is refused in words; the
+service refuses an entry intent with `exit_spx` or with no `stop_price`
+(bound `entry_stop_dollars`). The desk's FD0 path sends its cut as the
+price its level walks to. After the fill the position card's "at SPX" box
+sets the stop as a level, unchanged. The journal
 still records realized P&L as a fact; nothing refuses because of it. Open
 positions are still rebuilt from the journal after a restart — reading back a
 week for a position held past a close (`position_carried`, st-btob).

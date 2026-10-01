@@ -305,12 +305,13 @@ class TestTwentyMeansTwenty:
         pos = svc._open[CALL]
         assert pos.stop_spx == line["stop_spx"]
 
-    def test_a_level_stop_is_still_a_level(self, svc, mb):
-        """No stop_price on the intent — the stop was set as an SPX level —
-        so the level holds and the price walks, as before."""
+    def test_a_level_stop_is_refused_at_entry(self, svc, mb):
+        """No stop_price on the intent — the stop set as an SPX level. Until
+        2026-10-01 the level held and the price walked; now the entry's stop
+        is dollars only (Steve, st-a54y) and the level is refused."""
         self._move(mb)
-        out = svc.place(entry(intent_id="l-1"))
-        assert out["stop_order"]["price"] < 1.90
+        out = svc.place(entry(intent_id="l-1", stop_price=None))
+        assert out["refused"]["bound"] == "entry_stop_dollars"
         assert svc.journal.events("stop_restruck") == []
 
     def test_no_move_no_restrike(self, svc, mb):

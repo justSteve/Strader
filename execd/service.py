@@ -71,8 +71,9 @@ from .broker import (
 from .intent import OrderIntent, OrderType, Side, parse_occ
 from .journal import Journal
 from .stops import (
-    CONTRACT_MULTIPLIER, exit_triggered, level_for, on_tick, premium_at_level, protective_stop_price,
-    risk_usd, stop_is_consistent, take_profit_price, target_reached, tick_for,
+    CONTRACT_MULTIPLIER, entry_stop_base, entry_stop_over_bid, exit_triggered, level_for, on_tick,
+    premium_at_level, protective_stop_price, risk_usd, stop_is_consistent, take_profit_price,
+    target_reached, tick_for,
 )
 
 
@@ -2262,6 +2263,8 @@ class ExecService:
                 "an entry must carry stop_spx and delta — the broker-resident "
                 "stop is derived from them and is not optional",
             )
+        if (r := self._entry_stop_level_refusal(intent)) is not None:
+            return r
         # Judge the level that will be sent: a dollar stop's level is struck
         # again from this mark at the send (_restruck), so the priced one is
         # not what rests. Checked as priced, SPX moving 0.29 points past it
@@ -2283,6 +2286,11 @@ class ExecService:
                 f"it would close the {intent.occ.right_word} the moment it filled",
             )
 
+        # The stop that would rest with the entry, against the bid now
+        # (st-yeph); asked again at the send, on the quote it goes out on.
+        if (r := self._stop_over_bid_refusal(intent, spx, self._quote_view(intent.symbol))) is not None:
+            return r
+
         # Derive the stop the entry would rest, here, before anything is sent.
         # It was previously derived only after the fill, which meant an intent
         # priced too cheaply to leave room for a stop became a live position
@@ -2299,6 +2307,59 @@ class ExecService:
         # No daily loss ceiling, no headroom, no count of positions or losses
         # (Steve, 2026-09-24; see ``execd.bounds.Bounds``). [co-8mb1z]
         return None
+
+    @staticmethod
+    def _entry_stop_level_refusal(intent: OrderIntent) -> Refusal | None:
+        """The entry's stop is dollars only (Steve, 2026-10-01, st-a54y: "i'd
+        prefer to define the entry form as not permitting using an spx level
+        as the SL. At entry, only permit a $$ SL but after a fill the level
+        should become an option again").
+
+        A dollar stop carries ``stop_price`` — the ticket's price under the
+        limit — and its ``stop_spx`` is only the walk the service re-strikes
+        from the mark at the send and at the fill. An entry with a level and
+        no price, or with a close-at-SPX ``exit_spx``, carries an SPX stop
+        level while it rests, and a resting limit that filled with the index
+        already past that level was market-sold on the pass that filled it
+        (H5). Refused here, at the service, so a stale page or a direct call
+        cannot bring it back; the level is the position card's after the
+        fill (``adjust(stop_spx=...)``)."""
+        if intent.exit_spx is not None:
+            return Refusal(
+                "entry_stop_dollars",
+                f"the entry carries a close-at-SPX level ({intent.exit_spx:g}) — the entry's "
+                f"stop is dollars only; set an SPX level on the position card once it fills")
+        if intent.stop_price is None:
+            return Refusal(
+                "entry_stop_dollars",
+                f"the entry carries its stop as an SPX level ({intent.stop_spx:g}) with no "
+                f"dollar stop price — the entry's stop is dollars only; set an SPX level on "
+                f"the position card once it fills")
+        return None
+
+    def _stop_over_bid_refusal(self, intent: OrderIntent, spx: float,
+                               q: QuoteView | None) -> Refusal | None:
+        """The ticket refuses a stop that would rest at or above the bid
+        (Steve, 2026-10-01, st-yeph: "in those conditions it should
+        refuse") — he widens the stop. The one carve-out from his 09-17 "no
+        hand holding" ruling, which stands for everything else.
+
+        The stop judged is the one the entry would rest: struck from the
+        limit, or from the ask when the market is already under the limit
+        (``entry_stop_base``, st-n3e8), through the intent's level and
+        delta. Judged against the live bid as ``adjust`` judges a stop on an
+        open position (``_adjust_refusal``); the page asks the same of the
+        same numbers (``orderform._refuse_stop_over_bid``). No quote, no
+        judgement — the price band has already refused a missing quote."""
+        if q is None or intent.limit is None or intent.delta is None or intent.stop_spx is None:
+            return None
+        try:
+            resting = protective_stop_price(entry_stop_base(intent.limit, q.ask),
+                                            intent.delta, spx, intent.stop_spx)
+        except ValueError:
+            return None             # refused below, as no stop that can be derived
+        why = entry_stop_over_bid(resting, q.bid)
+        return None if why is None else Refusal("stop_over_bid", why)
 
     @staticmethod
     def _restruck(intent: OrderIntent, spx: float) -> OrderIntent:
@@ -2396,9 +2457,15 @@ class ExecService:
         # dollars under the price it fills at; the SPX level is unchanged —
         # it is the ticket's distance from the mark (st-n3e8).
         q = self._quote_view(intent.symbol)
-        base = intent.limit
-        if base is not None and q is not None and 0 < q.ask < base:
-            base = round(q.ask, 2)
+        base = entry_stop_base(intent.limit, q.ask if q is not None else None) \
+            if intent.limit is not None else None
+        # ...and that stop is refused if it would rest at or above the bid
+        # this send goes out on (Steve, 2026-10-01, st-yeph: "in those
+        # conditions it should refuse"). Before st-yeph H1 struck it from the
+        # ask and sent it whatever the spread; a spread as wide as the stop
+        # distance rested it at or over the bid, to sell on the fill.
+        if (r := self._stop_over_bid_refusal(intent, spx, q)) is not None:
+            return self._refuse(intent, r, kind="place")
         bracket = self._triggered_bracket(intent, spx, base=base)
         send = UnconfirmedSend(
             intent_id=intent.intent_id, symbol=intent.symbol, qty=intent.qty,

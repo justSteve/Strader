@@ -18,14 +18,17 @@ otherwise walk into are not re-found here; each is pinned by its own strict
 xfail (``known_bugs.py``) and the avoidance below names it, so it comes out
 when the defect is fixed:
 
-* H2 — a stop distance at or under the spread: no entry on a wide frame,
-  and two or more lots carry a stop distance of 0.30 or more;
+* H2 — fixed (st-yeph, 2026-10-01): a stop distance at or under the
+  spread is refused at the ticket. The sessions still enter on no wide
+  frame and give two or more lots a stop distance of 0.30 or more, so
+  they keep entering rather than being refused;
 * D1 — no restart once a leg of the open position has been replaced
   (the trail, an adjust, a better fill);
 * D8 — at most three lots (the tier-0 rounding needs about six);
-* H1, H5 — resting entries (wide mode only) fill in gapped and wide
-  markets; the stop that cannot follow the fill, and a close-at-SPX level
-  the fill is already past, are waived there.
+* H6 — resting entries (wide mode only) fill in gapped and wide markets;
+  the stop that cannot follow the fill is waived there. (H5, a close-at
+  level the fill is already past, cannot happen since no entry carries an
+  SPX stop level, st-a54y; an SPX level is the card's after the fill.)
 """
 
 from __future__ import annotations
@@ -57,10 +60,6 @@ def session(scn, rng: random.Random, *, resting: bool) -> dict[str, int]:
                 stopoff = 0.50                                  # H2
             sel = {"delta": rng.choice([0.3, 0.4, 0.5, 0.6, 0.7, 0.8]), "lots": lots,
                    "stopoff": stopoff}
-            if rng.random() < 0.15:
-                sign = -1 if side == "call" else 1
-                sel = {"delta": sel["delta"], "lots": lots,
-                       "exitspx": round(scn.spx + sign * rng.choice([2, 3, 5])), "stopoff": None}
             t = scn.ticket(side, **sel)
             if t.ready and not t.error:
                 if resting and rng.random() < 0.3:
@@ -95,7 +94,7 @@ def test_a_generated_session(make, walk_seed, request):
     wide = wide_mode(request.config)
     tape = random_walk(walk_seed, steps=600 if wide else 200, gap_prob=0.02, gap_pts=5.0,
                        stale_prob=0.02, stale_len=4, wide_prob=0.03, sigma_pts=0.9)
-    waive = {"stop_level_crossed_at_fill": "H5", "stop_dollars_off_ticket": "H6"} if wide else None
+    waive = {"stop_dollars_off_ticket": "H6"} if wide else None
     scn = make(tape, waive=waive)
     done = session(scn, random.Random(walk_seed * 7919 + 1), resting=wide)
     # what was closed was booked once per contract sold

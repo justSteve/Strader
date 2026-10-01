@@ -41,11 +41,12 @@ DAY = dt.date(2026, 8, 26)
 
 class TestTheStopRowIsAboveSend:
     def test_ticket_then_the_stop_row_then_send_then_the_strikes(self, order_page):
-        """Steve: "move the stop and close at line to above the send button"."""
+        """Steve: "move the stop and close at line to above the send button".
+        The close-at box has since left the entry (st-a54y, 2026-10-01)."""
         body = text(order_page.get("/exec/order?side=call&delta=0.3"))
-        at = [body.index(s) for s in ("<div id=fd0>", "<form id=sel ", "id=stopbox", "id=exitbox",
+        at = [body.index(s) for s in ("<div id=fd0>", "<form id=sel ", "id=stopbox",
                                       "class=sendform", "<div id=strikes>")]
-        assert at == sorted(at)
+        assert at == sorted(at) and "id=exitbox" not in body
 
 
 # ── 3. no 'updated', pause or less ───────────────────────────────────────
@@ -249,16 +250,16 @@ class TestTheThirtyCentStop:
         out = svc.place(OrderIntent.from_dict(intent))
         assert out["stop_order"]["price"] == 11.50           # 6734ac9 rested 11.60
 
-    def test_a_close_at_level_is_a_level_and_sends_no_stop_price(self, armed, chain):
-        """87ced9c meant a level to stay a level, but compared ``stop_set_by``
-        with "level", which it never is — the close-at box sets "spx" — so a
-        close-at ticket carried a price too and the service re-struck his
-        level from it at the send."""
+    def test_a_close_at_level_is_refused_at_entry(self, armed, chain):
+        """87ced9c meant a level to stay a level; since 2026-10-01 (Steve,
+        st-a54y: "At entry, only permit a $$ SL") a level is not an entry's
+        stop at all, and a link carrying the old box's ``exitspx`` is
+        refused in words rather than sent."""
         p = price(armed, Selection.from_args({"side": "call", "strike": "6400", "exitspx": "6376"},
                                              today=DAY))
-        assert p.stop_set_by == "spx" and p.stop_spx == 6376.0
-        d = intent_for(p, intent_id="lvl", engine_sha="t")
-        assert "stop_price" not in d and d["stop_spx"] == 6376.0 and d["exit_spx"] == 6376.0
+        assert p.error and "dollars only" in p.error and p.stop_set_by is None
+        with pytest.raises(ValueError, match="dollars only"):
+            intent_for(p, intent_id="lvl", engine_sha="t")
 
     def test_send_carries_the_strike_on_the_ticket(self, order_page):
         """The 13:38 SEND went out as ``delta=0.8`` with no strike: SEND chose
@@ -273,11 +274,11 @@ class TestTheThirtyCentStop:
         assert "name='strike' value='6400'" in j["send_fields_html"]
 
     def test_send_carries_what_the_boxes_say_before_the_reprice_is_back(self, order_page):
-        """The stop box writes ``stopoff`` (and the close-at box ``exitspx``)
-        600 ms before its reprice goes out; SEND read only ``stop`` from the
-        form, so a .3 typed and sent inside that window went as the old stop."""
+        """The stop box writes ``stopoff`` 600 ms before its reprice goes
+        out; SEND read only ``stop`` from the form, so a .3 typed and sent
+        inside that window went as the old stop."""
         script = text(order_page.get("/exec/order?side=call")).split("var STATE = ")[1]
-        assert "['stop', 'stopoff', 'exitspx', 'limit', 'lots'].forEach" in script
+        assert "['stop', 'stopoff', 'limit', 'lots'].forEach" in script
         assert "fd.set('strike', sk.value); fd.delete('delta');" in script
 
 

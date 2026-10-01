@@ -328,7 +328,9 @@ class TestPage:
         body = text(c.get("/exec/order?side=put"))
         assert "6400" in body and ">LOCKED<" in body and "FLATTEN" not in body
         assert "href='/exec/account'" in body
-        r = page_send(c, {"side": "put"})
+        # a stop wide of the 22.00/22.40 market, so the ticket is sendable
+        # and LOCKED is what refuses it (st-yeph refuses the $20 default)
+        r = page_send(c, {"side": "put", "stopoff": "0.50"})
         assert "Refused (" in text(c.get(r.headers["Location"]))
 
     def test_paper_mode_is_the_badge_and_the_send_fills_in_the_book(self, service, chain, clock, mono, tmp_path):
@@ -399,7 +401,8 @@ class TestOnlyWhatHeCanBuyAndOnlyToday:
         """The row he is standing on never vanishes under him — it is marked
         instead, and the ticket says what Schwab will do with it."""
         self._funds(armed, chain, 1000.0)
-        body = text(order_page.get("/exec/order?side=call&strike=6350"))
+        # 32.00/32.40: a stop wide of the bid (st-yeph refuses the $20 one)
+        body = text(order_page.get("/exec/order?side=call&strike=6350&stopoff=0.50"))
         table = body.split("<table class=strikes>")[1].split("</table>")[0]
         chosen = table.split("<tr class='chosen'>")[1].split("</tr>")[0]
         assert ">6350<" in chosen and "over the account" in chosen
@@ -724,40 +727,44 @@ class TestAStageChangeAlwaysPaints:
         body = text(order_page.get("/exec/order?side=call&strike=6400&lots=3"))
         assert "id=lotsbox" in body and "aria-label='contracts' value='3'" in body
         assert "name=lots value='3'" in body.split("<form id=sel")[1]
-        j = order_page.get("/exec/order/price?side=call&strike=6400&lots=3").json
+        j = order_page.get("/exec/order/price?side=call&strike=6400&lots=3&stopoff=0.20").json
         assert j["cost_usd"] == 630.0 and j["error"] is None
+        # the flat $20 over three lots is 0.05 a contract: 2.05 over the 2.00
+        # bid, refused (st-yeph)
+        j = order_page.get("/exec/order/price?side=call&strike=6400&lots=3").json
+        assert "at or above the 2.00 bid" in j["error"]
 
     def test_the_stop_has_steppers_plus_left_minus_right(self, order_page):
         """Steve, 2026-09-30: + to the left of the stop box, − to the right,
-        each 0.10 on the stop's distance under the entry; the stop box and
-        the close-at-SPX box share one centred row. Driven in headless
-        Chromium [st-5n3s]."""
+        each 0.10 on the stop's distance under the entry, on one centred
+        row. Driven in headless Chromium [st-5n3s]. The close-at-SPX box that
+        shared the row is gone (Steve, 2026-10-01, st-a54y)."""
         body = text(order_page.get("/exec/order?side=call"))
         row = body.split("<div class='row stops'>")[1].split("</div>")[0]
         label = row.split("class='dl stopl'")[1].split("</label>")[0]
         plus, box, minus = (label.index("data-step=1 "), label.index("id=stopbox"),
                             label.index("data-step=-1"))
-        assert plus < box < minus and "id=exitbox" in row
+        assert plus < box < minus and "exitbox" not in body and "exitspx" not in row
         assert ".row.stops{justify-content:center" in body
 
-    def test_the_stop_box_is_the_distance_and_the_boxes_swap_to_na(self, order_page):
+    def test_the_stop_box_is_the_distance_and_a_level_is_refused(self, order_page):
         """The box shows .2 — the stop's distance — not the stop price;
-        0.30 under the 32.40 limit is a $30 stop. A close-at-SPX level puts
-        NA in the stop box, and the default puts NA in the SPX box."""
+        0.30 under the 32.40 limit is a $30 stop. There is no SPX box on the
+        entry (Steve, 2026-10-01, st-a54y); a link that still carries a
+        close-at level is refused in words and SEND is off."""
         plain = text(order_page.get("/exec/order?side=call"))
         assert "id=stopbox" in plain and "value='.2' data-default='.2'" in plain
-        assert "id=exitbox inputmode=numeric enterkeyhint=done autocomplete=off value='NA'" in plain
+        assert "exitbox" not in plain and "close at SPX" not in plain
         j = order_page.get("/exec/order/price?side=call&strike=6400").json
         assert j["stop_price"] == 1.90                              # 2.10 − .2
         body = text(order_page.get("/exec/order?side=call&strike=6400&stopoff=0.30"))
         assert "value='.3' data-default='.2'" in body
         assert order_page.get("/exec/order/price?side=call&strike=6400&stopoff=0.30").json["stop_price"] == 1.80
         lvl = text(order_page.get("/exec/order?side=call&strike=6400&exitspx=6376"))
-        assert "value='NA' data-default='.2'" in lvl and "value='6376'" in lvl
-        j = order_page.get("/exec/order/price?side=call&strike=6400&exitspx=6376").json
-        assert j["stop_spx"] == 6376.0 and j["stop_set_by"] == "spx"
-        j = order_page.get("/exec/order/price?side=put&strike=6300&exitspx=6384").json
-        assert j["stop_spx"] == 6384.0 and j["error"] is None
+        assert "dollars only" in lvl and "<button class='big send' disabled>SEND</button>" in lvl
+        for q in ("side=call&strike=6400&exitspx=6376", "side=put&strike=6300&exitspx=6384"):
+            j = order_page.get("/exec/order/price?" + q).json
+            assert "dollars only" in j["error"] and j["sendable"] is False
         # NA in the SPX box is no level
         j = order_page.get("/exec/order/price?side=call&strike=6400&exitspx=NA").json
         assert j["stop_price"] == 1.90 and j["stop_set_by"] is None
@@ -844,24 +851,38 @@ class TestAStopOfHisOwn:
     def test_the_stop_box_is_dollars_only(self, armed, chain):
         """Steve, 2026-09-30: "dedicate that control to the dollar amount" —
         a number without a '.' is dollars now, not an SPX level [st-5n3s]."""
-        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="2"))
-        assert p.error is None and p.stop_set_by == "price" and p.stop_price == 2.00
+        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="1"))
+        assert p.error is None and p.stop_set_by == "price" and p.stop_price == 1.00
 
-    def test_the_close_level_rides_the_intent_on_the_losing_side(self, armed, chain):
-        """The close-at-SPX box: a call's level below spot, a put's above;
-        the wrong side would close at once and is words on the ticket."""
-        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, exitspx=6376))
-        assert p.error is None
-        assert intent_for(p, intent_id="page-x", engine_sha="t")["exit_spx"] == 6376
-        bad = price(armed, Selection(side="call", expiry=DAY, strike=6400, exitspx=6385))
-        assert bad.error and bad.error.startswith("close at SPX 6385")
-        put = price(armed, Selection(side="put", expiry=DAY, strike=6300, exitspx=6384))
-        assert put.error is None
-        assert price(armed, Selection(side="put", expiry=DAY, strike=6300, exitspx=6375)).error
+    def test_a_close_level_never_rides_the_intent(self, armed, chain):
+        """Steve, 2026-10-01 (st-a54y): "At entry, only permit a $$ SL but
+        after a fill the level should become an option again". A close-at
+        level from a stale page or a link — either side of spot — is words
+        on the ticket, and ``intent_for`` refuses it in the same words."""
+        for side, strike, level in (("call", 6400, 6376), ("call", 6400, 6385),
+                                    ("put", 6300, 6384), ("put", 6300, 6375)):
+            p = price(armed, Selection(side=side, expiry=DAY, strike=strike, exitspx=level))
+            assert p.error and "dollars only" in p.error
+            with pytest.raises(ValueError, match="dollars only"):
+                intent_for(p, intent_id="page-x", engine_sha="t")
+        ok = intent_for(price(armed, Selection(side="call", expiry=DAY, strike=6400)),
+                        intent_id="page-y", engine_sha="t")
+        assert "exit_spx" not in ok and ok["stop_price"] == 1.90
 
-    def test_a_tight_stop_is_his_call_and_the_form_says_nothing(self, armed, chain):
-        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="2.05"))
-        assert p.error is None and p.stop_price == 2.05 and p.warnings == []
+    def test_a_stop_at_or_over_the_bid_is_refused_and_one_under_it_goes(self, armed, chain):
+        """Steve, 2026-10-01 (st-yeph): "in those conditions it should
+        refuse" — the one carve-out from his 09-17 "no hand holding" ruling.
+        Until then this test was "a tight stop is his call and the form
+        says nothing". 2.00/2.10: a stop of 2.05, or 2.00, sells on the
+        fill; 1.95 is one tick under the bid and goes, with nothing said."""
+        for raw in ("2.05", "2.00"):
+            p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop=raw))
+            assert p.error == (f"the stop {raw} would rest at or above the 2.00 bid and "
+                               f"sell on the fill — widen the stop")
+            with pytest.raises(ValueError, match="widen the stop"):
+                intent_for(p, intent_id="page-x", engine_sha="t")
+        p = price(armed, Selection(side="call", expiry=DAY, strike=6400, stop="1.95"))
+        assert p.error is None and p.stop_price == 1.95 and p.warnings == []
 
     @pytest.mark.parametrize("raw, words", [
         ("1.83", "not on the 0.05 grid"),
@@ -893,7 +914,7 @@ class TestAStopOfHisOwn:
         j = order_page.get("/exec/order/price?side=call&strike=6400").json
         assert j["stop_set_by"] is None and j["stop_text"] is None and j["stop_price"]
         j = order_page.get("/exec/order/price?side=call&strike=6400&exitspx=6376").json
-        assert "name='exitspx' value='6376'" in j["send_fields_html"]
+        assert "dollars only" in j["error"]
 
     def test_send_rests_his_price_and_watches_its_level(self, order_page, armed, chain):
         r = page_send(order_page, {"side": "call", "strike": "6400", "stop": "1.50"})
@@ -905,17 +926,21 @@ class TestAStopOfHisOwn:
         assert req["intent"]["stop_spx"] == 6378.0
         assert armed.journal.events("sending")[-1]["page_query"]["stop"] == "1.50"
 
-    def test_send_closes_at_market_on_his_spx_level(self, order_page, armed, chain):
-        """The close-at-SPX level is the stop as a level: the SPX loop
-        closes at market there, and the resting stop at Schwab is the walked
-        price (6377 is 3 points under 6380 at δ 0.30: 2.10 − 0.90 = 1.20)."""
-        page_send(order_page, {"side": "call", "strike": "6400", "exitspx": "6377"})
+    def test_send_with_a_close_level_is_not_sent_and_the_card_takes_the_level(
+            self, order_page, armed, chain):
+        """A stale page's close-at level is refused at SEND and nothing goes
+        to the service (st-a54y). After a fill the level is the card's:
+        6377 is 3 points under 6380 at δ 0.30, 2.10 − 0.90 = 1.20."""
+        r = page_send(order_page, {"side": "call", "strike": "6400", "exitspx": "6377"})
+        assert "dollars only" in text(order_page.get(r.headers["Location"]))
+        assert armed.status()["positions"] == [] and armed.journal.events("sending") == []
+        page_send(order_page, {"side": "call", "strike": "6400"})
+        out = armed.adjust(CALL, stop_spx=6377)
+        assert out["refused"] is None
         p = armed.status()["positions"][0]
-        assert p["exit_spx"] == 6377 and p["stop_spx"] == 6377 and p["stop_price"] == 1.20
-        assert armed.journal.events("sending")[-1]["exit_spx"] == 6377
+        assert p["stop_spx"] == 6377 and p["stop_price"] == 1.20
         assert armed.observe(SPX_NOW - 2.9)["fired"] == []
         assert armed.observe(SPX_NOW - 3.0)["fired"][0]["closed"] is True
-        assert armed.journal.events("exit_triggered")[-1]["exit_spx"] == 6377
 
     def test_a_bad_stop_is_not_sent(self, order_page, armed, chain):
         r = page_send(order_page, {"side": "call", "strike": "6400", "stop": "6385"})

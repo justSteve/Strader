@@ -57,14 +57,42 @@ class TestTheTicketIsWhatIsSent:
         assert round(shown["limit"] - shown["stop_price"], 2) == 0.40
         received_matches_shown(screen.send(), shown)
 
-    def test_the_close_at_box_sends_a_level_and_no_price(self, make):
+    def test_a_stale_close_at_box_is_refused_at_send(self, make):
+        """The close-at-SPX box is gone from the entry (Steve, 2026-10-01,
+        st-a54y: "At entry, only permit a $$ SL"). A page painted before the
+        install still has it: what it types is refused in words on the
+        ticket, SEND is off, and a SEND that goes anyway reaches no
+        service."""
         scn = make(flat())
         screen = OrderScreen(scn)
         screen.pick("call", delta=0.5)
+        body = screen.client.get("/exec/order?side=call&delta=0.5").get_data(as_text=True)
+        assert "id=exitbox" not in body and "close at SPX" not in body
         shown = screen.type_exit(6376)
-        assert shown["stop_set_by"] == "spx" and shown["stop_spx"] == 6376.0
-        got = received_matches_shown(screen.send(), shown)
-        assert got["exit_spx"] == 6376.0
+        assert "dollars only" in shown["error"] and shown["sendable"] is False
+        answer = screen.send()
+        assert answer["ok"] is False and "dollars only" in answer["bad"]
+        assert answer["_received"] is None and scn.events("sending") == []
+
+    def test_the_default_stop_on_two_lots_in_a_dime_market_is_refused_and_widened_goes(self, make):
+        """st-yeph, the case that raised it: the flat $20 over two lots is
+        0.10 a contract, at the bid of a 0.10-wide market. The screen says
+        why and SEND is off; a SEND that goes anyway is refused at the page
+        and nothing reaches the service. A stepper tap widens it past the
+        spread and the same ticket goes."""
+        scn = make(ramp((0, 6380.0), (120, 6380.0), spread=0.10))
+        screen = OrderScreen(scn)
+        screen.pick("call", delta=0.5)
+        shown = screen.lots(2)
+        assert "would rest at or above" in shown["error"] and shown["sendable"] is False
+        answer = screen.send()
+        assert answer["ok"] is False and "widen the stop" in answer["bad"]
+        assert answer["_received"] is None and scn.events("sending") == []
+        shown = screen.step_stop(+1)                       # wider than the dime spread
+        assert shown["error"] is None and shown["sendable"] is True
+        answer = screen.send()
+        assert answer["ok"] is True and answer["msg_stage"] == "filled", answer.get("bad")
+        received_matches_shown(answer, shown)
 
     def test_the_padlock_and_three_lots(self, make):
         scn = make(ramp((0, 6380), (30, 6380), (60, 6379.7), (120, 6379.7)))

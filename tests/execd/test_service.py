@@ -31,7 +31,8 @@ def sent_orders(broker: MockBroker) -> list[dict]:
 
 class TestTheEntryPath:
     def test_a_good_entry_fills_and_is_journaled(self, armed, broker):
-        out = armed.place(entry())
+        # a stop the walk does not clamp, so its level is not struck again
+        out = armed.place(entry(stop_spx=SPX_NOW - 2.0))
         assert out["refused"] is None
         assert out["order"]["status"] == "FILLED"
         assert out["order"]["fill_price"] == 2.10
@@ -180,11 +181,23 @@ class TestTheProtectiveStop:
         assert line["risk_usd"] == 60.0
         assert line["stop_spx"] == SPX_NOW - 2.0 and line["delta"] == 0.30
 
-    def test_an_entry_whose_stop_sign_is_transposed_is_refused_before_the_send(self, armed, broker):
-        # a CALL stop ABOVE spot is already triggered
-        out = armed.place(entry(stop_spx=SPX_NOW + 12))
-        assert out["refused"]["bound"] == "protective_stop"
-        assert "transposed" in out["refused"]["reason"]
+    def test_an_entry_whose_stop_is_an_spx_level_is_refused_before_the_send(self, armed, broker):
+        """Steve, 2026-10-01 (st-a54y): "At entry, only permit a $$ SL but
+        after a fill the level should become an option again". A level with
+        no dollar price — a transposed one included (a CALL stop ABOVE spot)
+        — is refused as a level, before anything is sent."""
+        for i, level in enumerate((SPX_NOW - 12, SPX_NOW + 12)):
+            out = armed.place(entry(intent_id=f"lvl-{i}", stop_spx=level, stop_price=None))
+            assert out["refused"]["bound"] == "entry_stop_dollars"
+            assert "dollars only" in out["refused"]["reason"]
+        assert sent_orders(broker) == []
+
+    def test_an_entry_carrying_a_close_at_spx_level_is_refused(self, armed, broker):
+        out = armed.place(entry(stop_spx=SPX_NOW - 2.0, exit_spx=SPX_NOW - 3.0))
+        assert out["refused"]["bound"] == "entry_stop_dollars"
+        assert "close-at-SPX" in out["refused"]["reason"]
+        assert armed.preview(entry(intent_id="pv-1", stop_spx=SPX_NOW - 2.0,
+                                   exit_spx=SPX_NOW - 3.0))["refused"]["bound"] == "entry_stop_dollars"
         assert sent_orders(broker) == []
 
     def test_an_entry_is_refused_when_the_index_mark_is_missing(self, armed, broker):
@@ -203,12 +216,14 @@ class TestTheProtectiveStop:
         assert out["refused"]["bound"] == "protective_stop"
         assert sent_orders(broker) == []
 
-    def test_an_entry_whose_cut_is_crossed_while_it_is_priced_is_refused_at_the_send(
+    def test_an_entry_whose_cut_is_crossed_while_it_is_priced_is_struck_again_at_the_send(
             self, armed, broker, monkeypatch):
         """Finding 32 (st-xv5e): cycle 1 on 2026-09-14 passed the consistency
         check on one mark, the broker previewed, and the send read a fresh
-        mark already through the cut — the position was born past it. The
-        cut is checked again on the mark the send is journaled with."""
+        mark already through the cut — the position was born past it. Every
+        entry's stop is dollars now (st-a54y), struck again from the mark
+        the send goes out on (st-7p5u), so the priced level being crossed
+        moves the level with the index and the ticket's stop rests."""
         real_preview = broker.preview
 
         def preview(intent):
@@ -219,13 +234,12 @@ class TestTheProtectiveStop:
             return out
 
         monkeypatch.setattr(broker, "preview", preview)
-        out = armed.place(entry(stop_spx=SPX_NOW - 12))
-        assert out["refused"]["bound"] == "protective_stop"
-        assert "moved through the cut" in out["refused"]["reason"]
-        assert sent_orders(broker) == []
-        assert armed.status()["positions"] == []
-        line = armed.journal.events("refused")[-1]
-        assert line["kind"] == "place" and "moved through the cut" in line["refused"]["reason"]
+        out = armed.place(entry(stop_spx=SPX_NOW - 2.0))
+        assert out["refused"] is None
+        line, = armed.journal.events("stop_restruck")
+        assert line["stop_spx_priced"] == SPX_NOW - 2.0
+        assert line["stop_spx"] < SPX_NOW - 12.5           # behind the send's mark
+        assert out["stop_order"]["price"] == 1.50          # the ticket's price
 
     def test_a_mark_lost_during_the_preview_refuses_the_send(self, armed, broker, monkeypatch):
         real_preview = broker.preview
@@ -452,9 +466,9 @@ class TestTheSpxExitLoop:
         assert armed.status()["positions"] == []
 
     def test_observe_does_nothing_short_of_the_level(self, armed, broker):
-        armed.place(entry(stop_spx=SPX_NOW - 12))
+        armed.place(entry(stop_spx=SPX_NOW - 5))
         before = len(sent_orders(broker))
-        assert armed.observe(SPX_NOW - 11.0)["fired"] == []
+        assert armed.observe(SPX_NOW - 4.0)["fired"] == []
         assert len(sent_orders(broker)) == before
 
     def test_a_zero_mark_fires_nothing(self, armed, broker):
@@ -514,10 +528,10 @@ class TestTheSpxExitLoop:
         assert not broker.working_orders(CALL)
 
     def test_the_exit_is_journaled_with_the_level_that_fired_it(self, armed):
-        armed.place(entry(stop_spx=SPX_NOW - 12))
-        armed.observe(SPX_NOW - 12.5)
+        armed.place(entry(stop_spx=SPX_NOW - 5))
+        armed.observe(SPX_NOW - 5.5)
         line = armed.journal.events("exit_triggered")[0]
-        assert line["spx"] == SPX_NOW - 12.5 and line["stop_spx"] == SPX_NOW - 12
+        assert line["spx"] == SPX_NOW - 5.5 and line["stop_spx"] == SPX_NOW - 5
 
 
 class TestPollFills:
@@ -596,9 +610,8 @@ class TestNoDailyLimits:
         cheap = "SPXW  260826C06500000"
         broker.set_quote(cheap, bid=0.05, ask=0.05)
         out = armed.place(entry(intent_id="too-cheap", symbol=cheap, limit=0.05,
-                                stop_spx=SPX_NOW - 12, delta=0.30))
+                                stop_spx=SPX_NOW - 12, delta=0.30, stop_price=0.05))
         assert out["refused"]["bound"] == "protective_stop"
-        assert "no resting stop can be derived" in out["refused"]["reason"]
         assert sent_orders(broker) == []
 
 
@@ -649,14 +662,14 @@ class TestRecoveryAfterRestart:
             return real_place(intent)
 
         monkeypatch.setattr(broker, "place", place)
-        first.place(entry(intent_id="live-1", stop_spx=SPX_NOW - 12))
+        first.place(entry(intent_id="live-1", stop_spx=SPX_NOW - 5))
         assert first.journal.events("stop_unprotected")
 
         monkeypatch.setattr(broker, "place", real_place)
         second = ExecService(broker, config, clock=clock)
         second.unlock({"token": "x"})
-        assert second.status()["positions"][0]["stop_spx"] == SPX_NOW - 12
-        assert second.observe(SPX_NOW - 12.5)["fired"][0]["closed"] is True
+        assert second.status()["positions"][0]["stop_spx"] == SPX_NOW - 5
+        assert second.observe(SPX_NOW - 5.5)["fired"][0]["closed"] is True
 
     def test_a_partially_closed_position_recovers_at_its_remaining_size(
             self, broker, clock, tmp_path):
@@ -683,7 +696,7 @@ class TestRecoveryAfterRestart:
 
 class TestTheJournalReproducesTheDay:
     def test_a_full_round_trip_reads_back_in_order(self, armed, broker):
-        armed.place(entry(intent_id="day-1"))
+        armed.place(entry(intent_id="day-1", stop_spx=SPX_NOW - 2.0))
         armed.observe(SPX_NOW - 12.5)
         armed.stand_down()
         events = [e["event"] for e in armed.journal.read() if e["event"] != "order_raw"]

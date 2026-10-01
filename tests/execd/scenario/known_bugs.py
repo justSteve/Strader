@@ -21,16 +21,12 @@ _S = "test_sequences.py::"
 KNOWN: dict[str, dict[str, str]] = {
     # ── the audit (2026-10-01): all fifteen fixed ───────────────────────
     # ── found by the harness ─────────────────────────────────────────────
-    "H2": {"invariant": "stop_not_below_bid_when_placed",
-           "pinned_by": _S + "TestFills::test_spread_wider_than_the_stop_distance",
-           "title": "the entry's stop is never judged against the bid — a spread as wide as the "
-                    "stop distance rests it at or over the bid",
-           "detail": "adjust refuses a stop at or over the bid; the triggered bracket does not "
-                     "ask. 0.30 wide with the 0.20 default: 0.10 over the bid, fired by the "
-                     "first 0.05 down-tick of the mark. And at TWO lots the flat $20 ticket "
-                     "is $10 a contract — 0.10 under the ask, which is the bid of an ordinary "
-                     "0.10-wide market above $3 (seen first in the two-lot partial-exit "
-                     "sequence)."},
+    # H2 (st-yeph) fixed 2026-10-01 by Steve's ruling "in those conditions it
+    # should refuse": the ticket and the service refuse a stop that would
+    # rest at or above the bid (TestFills::test_a_stop_at_or_over_the_bid_
+    # is_refused_at_the_ticket). H5 (st-a54y) closed by his ruling the same
+    # day, "At entry, only permit a $$ SL": no entry carries an SPX stop
+    # level (TestEntries::test_an_entry_carrying_an_spx_stop_is_refused).
     "H6": {"invariant": "stop_dollars_off_ticket",
            "pinned_by": _S + "TestFills::test_a_resting_entry_filled_in_a_market_wider_than_its_stop",
            "title": "a resting entry filled in a market wider than its stop: the stop cannot "
@@ -41,18 +37,10 @@ KNOWN: dict[str, dict[str, str]] = {
                      "limit that fills later in a gapped, wide market (generated wide seed 90: "
                      "15.40 limit, filled 15.20 with the bid 14.00, a 1.00 ticket) still has "
                      "_stop_follows_fill refused 'not below the bid'. The same root as H2 — a "
-                     "spread wider than the stop distance — so it waits on Steve's H2 decision "
-                     "(no refusal or warning is added here: tests/execd/test_no_hand_holding.py)."},
-    "H5": {"invariant": "stop_level_crossed_at_fill",
-           "pinned_by": _S + "TestEntries::test_a_dip_buy_with_a_level_stop_fills_past_its_level",
-           "title": "a resting limit with a LEVEL stop (his close-at-SPX box) fills with the "
-                    "index already past his level — the SPX loop market-sells it on the same "
-                    "pass",
-           "detail": "the residual of H4 (st-d3va): a dollar stop is now struck again from the "
-                     "mark at the fill, but a level stop keeps the level he typed, so a dip "
-                     "that fills the limit past it closes the position at once. Whether a "
-                     "level the market has already crossed at the fill should still fire is "
-                     "Steve's call, not a mechanical fix — open for his decision."},
+                     "spread wider than the stop distance. Steve's H2 ruling (st-yeph, "
+                     "2026-10-01) refuses it at the entry ticket's send; a limit that rests "
+                     "and fills later in a wider market is past that check, and what the "
+                     "stop does then is st-91yu, open."},
 }
 
 

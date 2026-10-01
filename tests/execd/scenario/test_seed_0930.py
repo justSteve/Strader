@@ -22,6 +22,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import pytest
+
 from .screen import OrderScreen
 from .tape import CT, Frame, occ, scripted
 
@@ -41,23 +43,26 @@ def frames(sym, delta, spx0, *rows):
 
 
 class TestSeed1TheBracketFiredFirst:
-    def test_1324_the_stop_that_filled_first_is_booked_as_the_stop(self, make):
+    def test_1324_the_stop_that_would_fire_first_is_refused_at_the_ticket(self, make):
         """13:24 CT: the 9.20 limit (locked) went out into a 8.70/8.80
         market, filled 8.80 under its 9.00 stop, and the stop fired on the
         first read. Since H1 (st-n3e8) that stop is struck from the 8.80 ask
-        and rests under the bid, so the race is reached here the other way
-        it still can be: a market wider than the stop's distance at the
-        limit — 8.70/9.20 — puts the 9.00 stop over the bid (H2, waived)
-        and it fires before the bracket is first read."""
+        and rests under the bid. The other way to the race — a market wider
+        than the stop's distance at the limit, 8.70/9.20, the 9.00 stop over
+        the bid — is refused at the ticket since 2026-10-01 (st-yeph: "in
+        those conditions it should refuse"), so nothing is sent. The race
+        itself, a stop that fills before the bracket is first read, is still
+        reached by a gap between two passes (the next test)."""
         tape = scripted(frames(C7690, 0.60, 7696.0, (0, 9.10, 9.20), (2, 8.70, 9.20),
                                (60, 8.70, 9.20)), start=T1324)
-        scn = make(tape, waive={"stop_not_below_bid_when_placed": "H2"})
+        scn = make(tape)
         scn.wait_until(2)
-        scn.send(scn.ticket("call", strike=7690, limit=9.20))
+        t = scn.ticket("call", strike=7690, limit=9.20)
+        assert t.stop_price == 9.00 and "at or above the 8.70 bid" in t.error
+        with pytest.raises(ValueError, match="widen the stop"):
+            scn.intent(t)
         scn.run(30)
-        close, = scn.closes()
-        assert (close["kind"], close["reason"]) == ("protective-stop", "resting-stop")
-        assert scn.events("bracket_fallback") == [] and scn.events("oversold") == []
+        assert scn.events("sending") == [] and scn.closes() == []
         assert scn.held() == {} and scn.working() == []
 
     def test_a_gap_through_entry_and_stop_between_two_passes(self, make):

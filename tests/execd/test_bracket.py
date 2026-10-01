@@ -201,7 +201,9 @@ class TestTheTargetRestsOnTheFill:
         ten-cent option whose bid jumps to 0.30 as the 0.15 target lands). That fill is the close,
         booked as the target, and the stop comes off."""
         cheap = "SPXW  260826C06450000"
-        broker.set_quote(cheap, bid=0.05, ask=0.10)
+        # 0.10/0.20: the 0.05 stop under a 0.20 limit rests under the bid
+        # (a stop at or over the bid is refused at entry, st-yeph)
+        broker.set_quote(cheap, bid=0.10, ask=0.20)
         armed.bounds = armed.config.bounds = Bounds(take_profit_multiple=1.2)
         real_place = broker.place
 
@@ -211,7 +213,7 @@ class TestTheTargetRestsOnTheFill:
             return real_place(intent)
 
         broker.place = place
-        out = armed.place(entry(intent_id="br-7", symbol=cheap, limit=0.10,
+        out = armed.place(entry(intent_id="br-7", symbol=cheap, limit=0.20,
                                 stop_spx=NEAR_STOP, delta=0.30))
         assert out["order"]["status"] == "FILLED"
         assert out["target_order"]["closed"]["reason"] == "target"

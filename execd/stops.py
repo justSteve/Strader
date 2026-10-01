@@ -127,6 +127,31 @@ def protective_stop_price(fill_px: float, delta_abs: float, spx_now: float,
     return round(price, 2)
 
 
+def entry_stop_base(limit: float, ask: float | None) -> float:
+    """The price the stop sent with an entry is struck from: the limit, or
+    the ask when the market is already under it — a marketable limit fills
+    at the offer (st-n3e8, H1)."""
+    if ask is not None and 0 < float(ask) < float(limit):
+        return round(float(ask), 2)
+    return float(limit)
+
+
+def entry_stop_over_bid(stop_price: float, bid: float | None) -> str | None:
+    """The ticket refuses a stop that would rest at or above the bid (Steve,
+    2026-10-01, st-yeph: "in those conditions it should refuse") — the one
+    exception to his 09-17 "no hand holding" ruling. A sell stop at or over
+    the bid sells on the fill. The same test the adjust makes of a stop on
+    an open position; the page and the service both ask it, of the stop
+    struck from :func:`entry_stop_base`. ``None`` when it may go, or when
+    there is no bid to judge against; else the reason, in his words."""
+    if bid is None:
+        return None
+    if float(stop_price) >= float(bid):
+        return (f"the stop {float(stop_price):.2f} would rest at or above the "
+                f"{float(bid):.2f} bid and sell on the fill — widen the stop")
+    return None
+
+
 def risk_usd(fill_px: float, stop_price: float, qty: int = 1) -> float:
     """What the resting stop caps the loss at, before fees, in dollars."""
     return round((float(fill_px) - float(stop_price)) * CONTRACT_MULTIPLIER * int(qty), 2)

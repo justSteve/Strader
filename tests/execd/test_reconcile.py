@@ -387,7 +387,7 @@ class TestASendWithNoAnswer:
             self, armed, broker, clock):
         broker.accept_then_fail_next = "read timed out"
         with pytest.raises(BrokerError):
-            armed.place(entry(intent_id="lost-1"))
+            armed.place(entry(intent_id="lost-1", stop_spx=SPX_NOW - 2.0))
         resting = broker.working_orders(CALL)[0]
         out = armed.reconcile()
         assert out["found"] == [{"intent_id": "lost-1", "outcome": "found",
@@ -395,7 +395,7 @@ class TestASendWithNoAnswer:
         assert armed.status()["unconfirmed_sends"] == []
         work = armed.status()["working"]
         assert [w["order_id"] for w in work] == [resting.order_id]
-        assert work[0]["intent_id"] == "lost-1" and work[0]["stop_spx"] == SPX_NOW - 12.0
+        assert work[0]["intent_id"] == "lost-1" and work[0]["stop_spx"] == SPX_NOW - 2.0
         resolved = armed.journal.events("send_resolved")
         assert resolved[0]["outcome"] == "found" and resolved[0]["order_id"] == resting.order_id
         # the same intent again is answered, never re-sent

@@ -1550,7 +1550,14 @@ the budget, *more* or a second money figure, they are history.
    RISKS* warnings and the old `fd0_html` table are removed. `Priced` now
    carries `stop_spx`, `stop_price`, `stop_loss_usd` and `warnings`
    directly. The form does not judge the size of a stop, and since
-   2026-09-24 neither does the service (co-8mb1z). A `budget` or `attempts` key on an old link or an old working
+   2026-09-24 neither does the service (co-8mb1z). **One exception**
+   (Steve, 2026-10-01, st-yeph: *"in those conditions it should refuse"*):
+   a stop that would rest at or above the bid is refused at the page and
+   the service, and he widens it — a stop that sells on the fill, not a
+   judgement of its size. The 09-17 ruling stands for everything else.
+   And the entry's stop is dollars only (Steve, 2026-10-01, st-a54y): no
+   close-at-SPX box on the entry, an SPX level on the position card after
+   the fill. A `budget` or `attempts` key on an old link or an old working
    entry's `page_query` is ignored.
 6. *"completely remove the text wall under more."* The *more* fold and its
    rows are gone.

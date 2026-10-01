@@ -189,6 +189,6 @@ def test_a_waiver_must_cite_an_open_defect_for_that_invariant(make):
     with pytest.raises(KeyError):
         make(tape, waive={"two_stops": "D99"})
     with pytest.raises(ValueError):
-        make(tape, waive={"short_position": "H2"})
-    scn = make(tape, waive={"stop_not_below_bid_when_placed": "H2"})
-    assert scn.waived == {"stop_not_below_bid_when_placed": "H2"}
+        make(tape, waive={"short_position": "H6"})
+    scn = make(tape, waive={"stop_dollars_off_ticket": "H6"})
+    assert scn.waived == {"stop_dollars_off_ticket": "H6"}
