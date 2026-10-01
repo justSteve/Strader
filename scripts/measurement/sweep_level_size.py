@@ -56,13 +56,9 @@ def corpus_days(limit: int) -> list[date]:
 def sweeps_for(d: date, gates: str) -> list[SweepPrint]:
     eng.SWEEP_LEVEL_MIN_SIZE = 0
     eng.SWEEP_LEVEL_MIN_SHARE = 0.0
-    if gates == "pre-0827":
-        eng.SWEEP_MAX_SPAN_MS = 10**9
-        eng.SWEEP_MIN_CONCENTRATION = 0.0
-    else:
-        from market.signals import orderflow_config as cfg
-        eng.SWEEP_MAX_SPAN_MS = cfg.SWEEP_MAX_SPAN_MS
-        eng.SWEEP_MIN_CONCENTRATION = cfg.SWEEP_MIN_CONCENTRATION
+    # Since 2026-10-01 a sweep is one match event (st-exmw); the run-window,
+    # span and concentration gates this compared are retired, so both gate
+    # sets now run the event detector. Kept for the archived report's shape.
     start = datetime.combine(d, time(8, 30), CT)
     end = datetime.combine(d, time(15, 0), CT)
     e = eng.OrderflowEngine()

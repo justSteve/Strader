@@ -12,8 +12,8 @@ State maintained per engine instance:
   - Large-lot: print size ≥ LARGE_LOT_K × rolling median of the last
     LARGE_LOT_MEDIAN_WINDOW print sizes. Silent during warm-up (the window
     must fill first) so live and replay see identical state.
-  - Sweep runs: same-side prints whose event-time gaps stay within
-    SWEEP_WINDOW_MS and whose prices advance monotonically with the side;
+  - Sweeps: one match event — consecutive same-side prints sharing
+    (sequence, ts_event), i.e. one aggressor order's fills (st-exmw);
     a ``SweepPrint`` is emitted when a qualifying run ENDS (≥ SWEEP_MIN_TICKS
     distinct levels) — end-of-run emission keeps the signal deterministic.
   - Swing pivots: zigzag with PIVOT_FILTER_TICKS confirmation. On each
@@ -42,13 +42,10 @@ from market.signals.orderflow_config import (
     LARGE_LOT_MEDIAN_WINDOW,
     LARGE_LOT_MIN_SIZE,
     PIVOT_FILTER_TICKS,
-    SWEEP_MAX_SPAN_MS,
     SWEEP_LEVEL_MIN_SHARE,
     SWEEP_LEVEL_MIN_SIZE,
-    SWEEP_MIN_CONCENTRATION,
     SWEEP_MIN_SIZE,
     SWEEP_MIN_TICKS,
-    SWEEP_WINDOW_MS,
     TICK,
 )
 
@@ -172,13 +169,17 @@ class OrderflowEngine:
 
     # ── sweep detection ─────────────────────────────────────────────────────
     def _update_sweep(self, t: Trade) -> list[Signal]:
+        """ONE MATCH EVENT IS ONE ORDER [st-exmw, 2026-10-01]. Every fill of
+        one aggressor order shares the event's ``(sequence, ts_event)`` — the
+        key the corpus dedup used to collapse, which is why this could not be
+        seen before. A run is now exactly that: consecutive same-side prints
+        of one event. The 250 ms window and the span/concentration gates were
+        stand-ins for "one order" on a tape that had lost the other fills."""
         out: list[Signal] = []
         r = self._run
         if r is not None:
-            gap_ms = (t.ts - r["last_ts"]).total_seconds() * 1000.0
-            advancing = (t.price >= r["last_price"]) if r["side"] == "B" else (t.price <= r["last_price"])
-            if t.side == r["side"] and gap_ms <= SWEEP_WINDOW_MS and advancing:
-                r["last_ts"] = t.ts
+            if (t.side == r["side"] and t.ts == r["last_ts"]
+                    and t.sequence == r["sequence"]):
                 r["last_price"] = t.price
                 r["size"] += t.size
                 r["biggest"] = max(r["biggest"], t.size)
@@ -188,7 +189,8 @@ class OrderflowEngine:
                 return out
             out.extend(self._end_run())
         if t.side in ("B", "A"):
-            self._run = {"side": t.side, "start_ts": t.ts, "last_ts": t.ts,
+            self._run = {"side": t.side, "sequence": t.sequence,
+                         "start_ts": t.ts, "last_ts": t.ts,
                          "start_price": t.price, "last_price": t.price,
                          "size": t.size, "biggest": t.size,
                          "prices": {round(t.price / TICK)},
@@ -199,25 +201,18 @@ class OrderflowEngine:
         r, self._run = self._run, None
         if r is None or len(r["prices"]) < SWEEP_MIN_TICKS or r["size"] < SWEEP_MIN_SIZE:
             return []
-        # ONE ORDER, NOT A CROWD [2026-08-27]. The gates above measure how much
-        # aggression happened; these two measure whether it came from a single
-        # participant. Without them the emission fires ~42x a session on
-        # thirteen small prints leaning the same way for 56ms, which is a real
-        # thing but is not a sweep. See orderflow_config for the measurement.
-        # Both are recorded on the signal, not just tested — the span is the
-        # field that best separates the two populations and it was previously
-        # computed and thrown away, so nothing downstream could filter on it.
         span_ms = (r["last_ts"] - r["start_ts"]).total_seconds() * 1000.0
         concentration = r["biggest"] / r["size"] if r["size"] else 0.0
-        if span_ms > SWEEP_MAX_SPAN_MS or concentration < SWEEP_MIN_CONCENTRATION:
-            return []
         # A PRICE COUNTS ONLY WHEN IT CARRIES SIZE [st-r6ni]. The count above
         # is prices touched; a one-lot tail two ticks up made a single-price
-        # fill read as a three-price sweep (08-21 09:05 CT: 481 / 51 / 6).
+        # fill read as a three-price sweep (08-21 09:05 CT).
         levels = level_split(r["levels"], r["size"], ascending=r["side"] == "B")
         swept = sum(1 for _, _, counts in levels if counts)
         if swept < SWEEP_MIN_TICKS:
             return []
+        # the span named is the counted prices', not a dust tail's (audit #2)
+        counted = [p for p, _, c in levels if c]
+        r["start_price"], r["last_price"] = counted[0], counted[-1]
         direction = "buy" if r["side"] == "B" else "sell"
         return [SweepPrint(
             timestamp=r["last_ts"], source="orderflow.sweep",

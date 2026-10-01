@@ -51,12 +51,11 @@ PARITY_BAR_N = 500
 
 # fixture-scale floors; every value here is part of the harness contract
 PARITY_OVERRIDES = {
-    # The two single-order gates are relaxed to fixture scale for the same
-    # reason SWEEP_MIN_SIZE is: the parity tape is synthetic and its prints
-    # are evenly sized and spaced, so the production gates would emit
-    # nothing and the harness would silently stop pinning the sweep path.
-    _engine_mod: {"SWEEP_MIN_SIZE": 30, "LARGE_LOT_MIN_SIZE": 20,
-                  "SWEEP_MAX_SPAN_MS": 10**9, "SWEEP_MIN_CONCENTRATION": 0.0},
+    # SWEEP_MIN_SIZE at fixture scale: the parity tape's match events are
+    # small, so the production floor would emit nothing and the harness
+    # would silently stop pinning the sweep path. (The span/concentration
+    # gates relaxed here until 2026-10-01 are retired, st-exmw.)
+    _engine_mod: {"SWEEP_MIN_SIZE": 30, "LARGE_LOT_MIN_SIZE": 20},
     _recognizer_mod: {"FLUSH_DELTA_MIN": 30, "QUIET_DELTA_MAX": 10,
                       "FLIP_DELTA_MIN": 20, "CONFIRM_DELTA_MIN": 25},
 }

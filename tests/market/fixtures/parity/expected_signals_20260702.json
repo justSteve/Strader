@@ -1,47 +1,19 @@
 [
  {
   "type": "SweepPrint",
-  "timestamp": "2026-07-02T08:30:00.015586-05:00",
-  "source": "orderflow.sweep",
-  "confidence": 0.5,
-  "reason": "buy sweep 7555.00->7555.50 (3 tick-levels, 49 contracts)",
-  "direction": "buy",
-  "start_price": 7555.0,
-  "end_price": 7555.5,
-  "levels_swept": 3,
-  "total_size": 49,
-  "level_sizes": [
-   [
-    7555.0,
-    5
-   ],
-   [
-    7555.25,
-    21
-   ],
-   [
-    7555.5,
-    23
-   ]
-  ],
-  "span_ms": 0.743,
-  "concentration": 0.4694
- },
- {
-  "type": "SweepPrint",
-  "timestamp": "2026-07-02T08:30:00.025939-05:00",
+  "timestamp": "2026-07-02T08:30:00.025791-05:00",
   "source": "orderflow.sweep",
   "confidence": 0.6667,
-  "reason": "buy sweep 7555.50->7556.25 (4 tick-levels, 70 contracts)",
+  "reason": "buy sweep 7555.50->7556.25 (4 tick-levels, 66 contracts)",
   "direction": "buy",
   "start_price": 7555.5,
   "end_price": 7556.25,
   "levels_swept": 4,
-  "total_size": 70,
+  "total_size": 66,
   "level_sizes": [
    [
     7555.5,
-    13
+    10
    ],
    [
     7555.75,
@@ -53,43 +25,11 @@
    ],
    [
     7556.25,
-    21
+    20
    ]
   ],
-  "span_ms": 3.304,
-  "concentration": 0.3143
- },
- {
-  "type": "SweepPrint",
-  "timestamp": "2026-07-02T08:30:00.036533-05:00",
-  "source": "orderflow.sweep",
-  "confidence": 0.5,
-  "reason": "sell sweep 7555.75->7555.00 (3 tick-levels, 66 contracts)",
-  "direction": "sell",
-  "start_price": 7555.75,
-  "end_price": 7555.0,
-  "levels_swept": 3,
-  "total_size": 66,
-  "level_sizes": [
-   [
-    7555.75,
-    4
-   ],
-   [
-    7555.5,
-    12
-   ],
-   [
-    7555.25,
-    26
-   ],
-   [
-    7555.0,
-    24
-   ]
-  ],
-  "span_ms": 8.2,
-  "concentration": 0.1364
+  "span_ms": 0.0,
+  "concentration": 0.3333
  },
  {
   "type": "SetupRecognition",
@@ -113,17 +53,13 @@
   "timestamp": "2026-07-02T08:30:00.152126-05:00",
   "source": "orderflow.sweep",
   "confidence": 0.5,
-  "reason": "sell sweep 7554.25->7553.50 (3 tick-levels, 43 contracts)",
+  "reason": "sell sweep 7554.00->7553.50 (3 tick-levels, 39 contracts)",
   "direction": "sell",
-  "start_price": 7554.25,
+  "start_price": 7554.0,
   "end_price": 7553.5,
   "levels_swept": 3,
-  "total_size": 43,
+  "total_size": 39,
   "level_sizes": [
-   [
-    7554.25,
-    4
-   ],
    [
     7554.0,
     11
@@ -137,8 +73,8 @@
     9
    ]
   ],
-  "span_ms": 6.635,
-  "concentration": 0.4419
+  "span_ms": 0.0,
+  "concentration": 0.4872
  },
  {
   "type": "SetupRecognition",
@@ -179,107 +115,19 @@
  },
  {
   "type": "SweepPrint",
-  "timestamp": "2026-07-02T08:30:01.441960-05:00",
-  "source": "orderflow.sweep",
-  "confidence": 0.5,
-  "reason": "buy sweep 7557.00->7557.75 (3 tick-levels, 33 contracts)",
-  "direction": "buy",
-  "start_price": 7557.0,
-  "end_price": 7557.75,
-  "levels_swept": 3,
-  "total_size": 33,
-  "level_sizes": [
-   [
-    7557.0,
-    9
-   ],
-   [
-    7557.25,
-    8
-   ],
-   [
-    7557.5,
-    14
-   ],
-   [
-    7557.75,
-    2
-   ]
-  ],
-  "span_ms": 46.229,
-  "concentration": 0.2121
- },
- {
-  "type": "SweepPrint",
-  "timestamp": "2026-07-02T13:00:00.734093-05:00",
-  "source": "orderflow.sweep",
-  "confidence": 0.5,
-  "reason": "sell sweep 7482.50->7482.00 (3 tick-levels, 41 contracts)",
-  "direction": "sell",
-  "start_price": 7482.5,
-  "end_price": 7482.0,
-  "levels_swept": 3,
-  "total_size": 41,
-  "level_sizes": [
-   [
-    7482.5,
-    11
-   ],
-   [
-    7482.25,
-    11
-   ],
-   [
-    7482.0,
-    19
-   ]
-  ],
-  "span_ms": 178.31,
-  "concentration": 0.4634
- },
- {
-  "type": "SweepPrint",
-  "timestamp": "2026-07-02T13:00:03.013479-05:00",
-  "source": "orderflow.sweep",
-  "confidence": 0.5,
-  "reason": "buy sweep 7481.25->7481.75 (3 tick-levels, 56 contracts)",
-  "direction": "buy",
-  "start_price": 7481.25,
-  "end_price": 7481.75,
-  "levels_swept": 3,
-  "total_size": 56,
-  "level_sizes": [
-   [
-    7481.25,
-    5
-   ],
-   [
-    7481.5,
-    28
-   ],
-   [
-    7481.75,
-    23
-   ]
-  ],
-  "span_ms": 4.933,
-  "concentration": 0.3036
- },
- {
-  "type": "SweepPrint",
   "timestamp": "2026-07-02T13:00:21.131856-05:00",
   "source": "orderflow.sweep",
   "confidence": 0.5,
-  "reason": "buy sweep 7481.00->7481.50 (3 tick-levels, 69 contracts)",
+  "reason": "buy sweep 7481.00->7481.50 (3 tick-levels, 66 contracts)",
   "direction": "buy",
   "start_price": 7481.0,
   "end_price": 7481.5,
   "levels_swept": 3,
-  "total_size": 69,
+  "total_size": 66,
   "level_sizes": [
    [
     7481.0,
-    25
+    22
    ],
    [
     7481.25,
@@ -290,8 +138,8 @@
     19
    ]
   ],
-  "span_ms": 125.877,
-  "concentration": 0.3623
+  "span_ms": 0.0,
+  "concentration": 0.3788
  },
  {
   "type": "Level",

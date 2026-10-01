@@ -181,18 +181,21 @@ def test_double_run_identical():
 
 # ── a price counts only when it carries size [st-r6ni] ─────────────────────
 
-def _run_at(prices_sizes, side="B"):
-    """One run: each (price, size) a print 1 ms apart, all one side."""
+def _run_at(prices_sizes, side="B", one_event=True):
+    """One aggressor order: its fills share the match event's timestamp and
+    sequence (st-exmw). ``one_event=False`` spreads them over separate events
+    100 us apart — a crowd, not an order."""
     from datetime import datetime, timedelta, timezone
     from market.entities.trade import Trade
     t0 = datetime(2026, 8, 21, 14, 5, 1, 814000, tzinfo=timezone.utc)
     out = []
     for i, (p, n) in enumerate(prices_sizes):
-        out.append(Trade(ts=t0 + timedelta(microseconds=100 * i), symbol="ESU6",
-                         instrument_id=1, price=p, size=n, side=side))
+        out.append(Trade(ts=t0 if one_event else t0 + timedelta(microseconds=100 * i),
+                         symbol="ESU6", instrument_id=1, price=p, size=n, side=side,
+                         sequence=4242 if one_event else 4242 + i))
     # a print the other way ends the run
     out.append(Trade(ts=t0 + timedelta(seconds=1), symbol="ESU6", instrument_id=1,
-                     price=prices_sizes[-1][0],
+                     sequence=9999, price=prices_sizes[-1][0],
                      size=1, side="A" if side == "B" else "B"))
     return out
 
@@ -201,8 +204,6 @@ def _sweeps(trades, monkeypatch):
     import market.orderflow.engine as eng
     from market.signals.orderflow import SweepPrint
     # the span and one-print gates off, so the level floor is what is tested
-    monkeypatch.setattr(eng, "SWEEP_MAX_SPAN_MS", 10**9)
-    monkeypatch.setattr(eng, "SWEEP_MIN_CONCENTRATION", 0.0)
     e = eng.OrderflowEngine()
     return [s for t in trades for s in e.process(t) if isinstance(s, SweepPrint)]
 
@@ -234,3 +235,15 @@ def test_a_sell_split_is_in_walk_order(monkeypatch):
     trades = _run_at([(7685.50, 200), (7685.25, 150), (7685.00, 120)], side="A")
     s, = _sweeps(trades, monkeypatch)
     assert [p for p, _ in s.level_sizes] == [7685.5, 7685.25, 7685.0]
+
+
+def test_the_same_fills_over_separate_events_are_a_crowd_not_a_sweep(monkeypatch):
+    """One order is one match event. Three events leaning the same way are
+    three aggressors, however close together (st-exmw)."""
+    trades = _run_at([(7685.00, 200), (7685.25, 150), (7685.50, 120)], one_event=False)
+    assert _sweeps(trades, monkeypatch) == []
+
+
+def test_under_two_hundred_contracts_is_not_a_sweep(monkeypatch):
+    trades = _run_at([(7685.00, 80), (7685.25, 60), (7685.50, 50)])
+    assert _sweeps(trades, monkeypatch) == []

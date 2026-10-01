@@ -101,19 +101,18 @@ def test_engine_golden_sensitized(trades, monkeypatch):
     from market.signals.orderflow import SweepPrint
     monkeypatch.setattr(eng, "SWEEP_MIN_SIZE", 30)
     # fixture scale, as above — the synthetic tape has no dominant prints
-    monkeypatch.setattr(eng, "SWEEP_MAX_SPAN_MS", 10**9)
-    monkeypatch.setattr(eng, "SWEEP_MIN_CONCENTRATION", 0.0)
     monkeypatch.setattr(eng, "LARGE_LOT_MIN_SIZE", 20)
     e = eng.OrderflowEngine()
     sigs = e.run(trades)
-    assert len(sigs) == 8
-    assert sum(isinstance(s, SweepPrint) for s in sigs) == 8
+    # 2026-10-01 [st-exmw]: a sweep is ONE match event. The fixture holds
+    # exactly three that fill at 3+ prices with size — the three the old
+    # (sequence, ts_event) dedup collapsed to one print each.
+    sweeps = [s for s in sigs if isinstance(s, SweepPrint)]
+    assert [(s.direction, s.levels_swept, s.total_size) for s in sweeps] == [
+        ("buy", 4, 66), ("sell", 3, 39), ("buy", 3, 66)]
+    assert sweeps[2].level_sizes == ((7481.0, 22), (7481.25, 25), (7481.5, 19))
+    assert len(sigs) == 3
     assert e.large_lot_count == 4
-    first = next(s for s in sigs if isinstance(s, SweepPrint))
-    assert (first.direction, first.levels_swept, first.total_size) == ("buy", 3, 49)
-    # the sweep the old dedup erased: one match event's fills at three prices
-    assert any(s.level_sizes == ((7481.0, 25), (7481.25, 25), (7481.5, 19))
-               for s in sigs if isinstance(s, SweepPrint))
     h = hashlib.sha256()
     for s in sigs:
         h.update(repr(s).encode())
@@ -145,7 +144,10 @@ def test_engine_golden_sensitized(trades, monkeypatch):
     # event (the old (sequence, ts_event) dedup dropped them). Three sweeps
     # appear that the short tape hid, asserted by name above; the five before
     # are unchanged.
-    assert h.hexdigest() == "5a50c2f19b40cc90645d8fe185ab4338ab96d21453eccef4cf3bf5ab6f8c246c"
+    #
+    # Repinned 2026-10-01 again [st-exmw]: the detector is one match event,
+    # not a 250 ms run; the behaviour is asserted above by name.
+    assert h.hexdigest() == "e2244f3d07fcf175d1aca876c77c350b673869c7662968438697ee7beb81570c"
 
 
 # ── imbalance golden (st-su4) ────────────────────────────────────────────────

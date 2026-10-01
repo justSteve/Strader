@@ -43,9 +43,22 @@ STACK_MIN = 3                   # consecutive same-direction imbalances = stacke
 LARGE_LOT_K = 10.0              # multiple of rolling median print size
 LARGE_LOT_MIN_SIZE = 100        # absolute contract floor (AND with the above)
 LARGE_LOT_MEDIAN_WINDOW = 500   # prints in the rolling-median warm-up window
-SWEEP_MIN_TICKS = 3             # distinct price levels walked by one aggressor
-SWEEP_MIN_SIZE = 100            # total contracts in the run (AND with above)
-SWEEP_WINDOW_MS = 250           # event-time window; never wall-clock
+SWEEP_MIN_TICKS = 3             # distinct priced levels one aggressor order filled at
+# ── ONE MATCH EVENT IS ONE ORDER [st-exmw, 2026-10-01] ─────────────────────
+# Every fill of one aggressor order shares its match event's (sequence,
+# ts_event). The corpus dedup collapsed exactly that key until 2026-10-01, so
+# the detector could not see an order's fills together and approximated "one
+# order" with a 250 ms run window plus the span and concentration gates below.
+# With the fills kept, the order is visible directly: a sweep is one event,
+# one side, >= SWEEP_MIN_TICKS prices each carrying size, >= SWEEP_MIN_SIZE
+# contracts. Measured 2026-10-01 over six RTH sessions (08-21, 09-10, 09-24,
+# 09-25, 09-29, 09-30):
+#     total >= 100   88.8/day        total >= 250   2.7/day
+#     total >= 150   22.7/day        total >= 300   1.7/day
+#     total >= 200    6.5/day  <- adopted: the 08-27 calibration's own target
+#                                  (6.0/day, "a substantial move by a high
+#                                  funded entity just crashing thru the book")
+SWEEP_MIN_SIZE = 200            # contracts in the one event
 # ── what makes a run ONE ORDER rather than a crowd [2026-08-27] ─────────────
 # Steve, seeing a 3-level 129-contract callout: "sweep implies a substantial
 # move by a high funded entity just crashing thru the book." The four gates
@@ -79,8 +92,11 @@ SWEEP_WINDOW_MS = 250           # event-time window; never wall-clock
 #     one print >= 50%                  13.2/day
 #     span<=5ms AND one print >= 50%     6.0/day   <- adopted, median 256 lots
 #     one print >= 80%                   3.8/day
-SWEEP_MAX_SPAN_MS = 5           # first print to last; "simultaneously"
-SWEEP_MIN_CONCENTRATION = 0.5   # largest single print / total run size
+#
+# RETIRED 2026-10-01 [st-exmw]: SWEEP_WINDOW_MS (250), SWEEP_MAX_SPAN_MS (5)
+# and SWEEP_MIN_CONCENTRATION (0.5). They stood in for "one order" on a tape
+# missing 3-5 % of its prints — mostly the other fills of the very orders
+# they tried to identify. One match event is the order itself.
 # ── a level counts only when it carries size [st-r6ni] ──────────────────────
 # Steve, 2026-08-21, on "buy 538 across 3 prices, 7685->7685.5": "7685.00 to
 # 7685.5 is not across 3 prices." 481 of the 538 went off at 7685.00; the other

@@ -616,8 +616,10 @@ terms:
     status: ratified
     live: live
     definition: >
-      One aggressive order eating multiple book price-levels (>= 3 prices,
-      each carrying real size — a one-lot tail does not count, st-r6ni).
+      One aggressive order eating multiple book price-levels: one match
+      event (its fills share the exchange's sequence and timestamp), >= 200
+      contracts, >= 3 prices each carrying real size — a one-lot tail does
+      not count (st-r6ni, st-exmw).
       Your candlestick-hindsight "sweep" — it kept its name, compounded.
     on_the_chart: The long single-print tail; on candles, the wick you already spot.
   - term: absorption-read
