@@ -144,10 +144,26 @@ def test_redelivered_rows_are_deduped(tmp_path):
     path = _write_day(tmp_path, rows)
     baseline = _run_feeder(path, 200)
 
-    # A reconnect redelivers the last stretch verbatim.
-    with_dupes = rows + rows[-60:]
-    dup_path = _write_day(tmp_path, with_dupes, name="dupes.jsonl")
+    # A reconnect redelivers the last stretch verbatim — written by the new
+    # connection, so a later ts_pull_utc than the originals.
+    again = [{**r, "ts_pull_utc": "2026-07-31T13:34:10+00:00"} for r in rows[-60:]]
+    dup_path = _write_day(tmp_path, rows + again, name="dupes.jsonl")
     assert _run_feeder(dup_path, 200) == baseline
+
+
+def test_fills_of_one_match_event_are_all_kept(tmp_path):
+    """One aggressor filling several resting orders writes several rows that
+    share (sequence, ts_event), in one batch. They are distinct prints; the
+    feeder dropped them until 2026-10-01 (st-exmw)."""
+    rows = _synthetic_rows(400)
+    twin = dict(rows[200])
+    twin["data"] = {**twin["data"], "size": 9}            # same key, another fill
+
+    def volume(rs, name):
+        p = _write_day(tmp_path, rs, name=name)
+        return sum(t.size for t in feed.ordered_trades(feed.tail_rows(p, follow=False),
+                                                         reorder_lag_s=2.0))
+    assert volume(rows[:201] + [twin] + rows[201:], "fill.jsonl") == volume(rows, "base.jsonl") + 9
 
 
 def test_partial_trailing_line_is_not_parsed_until_complete(tmp_path):

@@ -16,7 +16,7 @@ WHY TAIL A FILE INSTEAD OF SHARING THE FEED
 
 PARITY IS PRESERVED BY CONSTRUCTION
     Rows are parsed with ``replay.trade_from_row`` and deduped with
-    ``replay.dedup_key`` — the same helpers ``read_corpus_day`` uses — then fed
+    ``replay.TradeDeduper`` — the same helpers ``read_corpus_day`` uses — then fed
     to the same ``build_bars``. A live bar is therefore the bar the replay would
     produce from the same rows, which is the spec §5 guarantee the parity
     harness (st-bw9) pins in CI. Nothing here reimplements the engine.
@@ -81,7 +81,7 @@ from market.orderflow.bars import build_bars                    # noqa: E402
 from market.orderflow.fill import bar_fill_steps                # noqa: E402
 from market.orderflow.parity import StackDriver, live_drive     # noqa: E402
 from market.orderflow.replay import (                           # noqa: E402
-    dedup_key, es_day_path, trade_from_row,
+    TradeDeduper, es_day_path, trade_from_row,
 )
 from market.orderflow.run_log import RunLogWriter, run_log_path  # noqa: E402
 from market.signals.orderflow_config import TICK, VOLUME_BAR_N  # noqa: E402
@@ -223,8 +223,9 @@ def ordered_trades(rows, *, reorder_lag_s: float, flush_at_end: bool = True):
 
     Holds a buffer of parsed trades and releases those whose event time is
     older than ``reorder_lag_s`` behind the newest seen, sorted by (ts,
-    sequence). Duplicates — which a reconnect will redeliver — are dropped on
-    ``dedup_key``. This is what keeps ``build_bars`` from raising mid-session.
+    sequence). Re-delivered copies — which a reconnect writes later — are dropped
+    by ``replay.TradeDeduper``; every fill of one match event is kept
+    (st-exmw). This is what keeps ``build_bars`` from raising mid-session.
 
     Two rules added on st-owq1, after a reconnect storm scrambled a day's file
     by up to 23.6 s and the feeder died on the same line 73 times:
@@ -238,7 +239,7 @@ def ordered_trades(rows, *, reorder_lag_s: float, flush_at_end: bool = True):
       to ``build_bars`` to raise on.
     """
     pending: list[tuple[datetime, int, object]] = []
-    seen: set[tuple] = set()
+    dedup = TradeDeduper()      # re-delivered copies only (st-exmw)
     newest: datetime | None = None
     last_out: tuple[datetime, int] | None = None
     holding = True
@@ -273,11 +274,9 @@ def ordered_trades(rows, *, reorder_lag_s: float, flush_at_end: bool = True):
                 yield from _drain(newest - _timedelta_seconds(reorder_lag_s))
             continue
         try:
-            key = dedup_key(row)
-            if key in seen:
+            if not dedup.admit(row):
                 dupes += 1
                 continue
-            seen.add(key)
             parsed = trade_from_row(row)
         except (KeyError, TypeError, ValueError) as e:
             bad += 1

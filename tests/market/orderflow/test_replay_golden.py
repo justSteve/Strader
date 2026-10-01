@@ -2,8 +2,12 @@
 
 The fixture is a deliberately messy slice of the real 2026-07-02 corpus file:
 900 afternoon-pull rows first, 700 morning-pull rows after (mirroring the real
-append order), plus 10 injected exact-duplicate rows — and the slice carries
-17 natural duplicates of its own. The pinned values below assert the full
+append order), plus 10 injected re-delivered copies (written by a later pull,
+11:45 vs 11:30) — and 17 rows that share a (sequence, ts_event) with a
+neighbour. Those 17 are NOT duplicates: they are the other fills of one match
+event, written together — one key carries 22 at 7481.00, 25 at 7481.25 and 19
+at 7481.50, a sweep. Until 2026-10-01 this test pinned them as dropped
+(st-exmw); the reader now keeps them and drops only the later-pulled copies. The pinned values below assert the full
 reader + builder pipeline: dedup, canonical (ts_event, sequence) sort, and
 deterministic bar construction. If an intentional engine change moves these
 numbers, regenerate them deliberately and say why in the commit (the st-bw9
@@ -21,14 +25,16 @@ FIXTURE = Path(__file__).parent.parent / "fixtures" / "es_ticks_golden_20260702.
 
 # Pinned 2026-07-04 from the fixture's first build (st-uqf).
 GOLDEN = {
-    "trades": 1583,             # 1610 rows − 10 injected dupes − 17 natural dupes
-    "contracts": 3995,
+    # Repinned 2026-10-01 [st-exmw]: 1610 rows − 10 re-delivered copies. The
+    # 17 match-event fills the old key dropped are kept (+176 contracts).
+    "trades": 1600,
+    "contracts": 4171,
     "first_ts": "2026-07-02T08:30:00.000083-05:00",  # morning row sorts first
     "last_ts": "2026-07-02T13:00:45.976479-05:00",
-    "bars": 8,                  # n=500, include_partial=True
-    "bar0": dict(open=7555.25, high=7556.25, low=7553.5, close=7554.0,
-                 volume=506, delta=-22, none_vol=0, n_cells=12, poc=7555.0),
-    "sha256": "8e19f2f5fbba989252ffe767461b46504496752789df0af2d7a7cd2570c23ff0",
+    "bars": 9,                  # n=500, include_partial=True
+    "bar0": dict(open=7555.25, high=7556.25, low=7554.0, close=7554.0,
+                 volume=509, delta=35, none_vol=0, n_cells=10, poc=7555.0),
+    "sha256": "79182e421a966be6493d9910fdf893fcbd8040fa4c680d8367af88bc894d3293",
 }
 
 
@@ -83,7 +89,7 @@ def test_engine_golden_default_config(trades):
     e = eng.OrderflowEngine()
     sigs = e.run(trades)
     assert sigs == []
-    assert (e.cvd, e.none_vol, e.large_lot_count) == (93, 0, 0)
+    assert (e.cvd, e.none_vol, e.large_lot_count) == (163, 0, 0)
 
 
 def test_engine_golden_sensitized(trades, monkeypatch):
@@ -100,11 +106,14 @@ def test_engine_golden_sensitized(trades, monkeypatch):
     monkeypatch.setattr(eng, "LARGE_LOT_MIN_SIZE", 20)
     e = eng.OrderflowEngine()
     sigs = e.run(trades)
-    assert len(sigs) == 5
-    assert sum(isinstance(s, SweepPrint) for s in sigs) == 5
-    assert e.large_lot_count == 3
+    assert len(sigs) == 8
+    assert sum(isinstance(s, SweepPrint) for s in sigs) == 8
+    assert e.large_lot_count == 4
     first = next(s for s in sigs if isinstance(s, SweepPrint))
     assert (first.direction, first.levels_swept, first.total_size) == ("buy", 3, 49)
+    # the sweep the old dedup erased: one match event's fills at three prices
+    assert any(s.level_sizes == ((7481.0, 25), (7481.25, 25), (7481.5, 19))
+               for s in sigs if isinstance(s, SweepPrint))
     h = hashlib.sha256()
     for s in sigs:
         h.update(repr(s).encode())
@@ -131,7 +140,12 @@ def test_engine_golden_sensitized(trades, monkeypatch):
     # not 4 — confidence 0.67 -> 0.50, reason "4" -> "3 tick-levels". The
     # other three are unchanged but for the rename and the new field. All five
     # still fire; the behavioural assertions above hold.
-    assert h.hexdigest() == "650336fa1255c8b05c67b400f5ac934c82be284fd34c7721acb334a23b5b22ad"
+    #
+    # Repinned 2026-10-01 [st-exmw]: the reader keeps every fill of a match
+    # event (the old (sequence, ts_event) dedup dropped them). Three sweeps
+    # appear that the short tape hid, asserted by name above; the five before
+    # are unchanged.
+    assert h.hexdigest() == "5a50c2f19b40cc90645d8fe185ab4338ab96d21453eccef4cf3bf5ab6f8c246c"
 
 
 # ── imbalance golden (st-su4) ────────────────────────────────────────────────
@@ -139,7 +153,10 @@ def test_imbalance_golden(trades):
     from market.orderflow.imbalance import find_imbalances, find_stacks
     bars = list(build_bars(trades, n=500, include_partial=True))
     singles = [(round(p, 2), d, round(r, 2)) for b in bars for p, d, r in find_imbalances(b)]
-    assert singles == [(7482.75, "buy", 3.88)]
+    # 2026-10-01 [st-exmw]: the one imbalance pinned here (7482.75 buy 3.88)
+    # was an artifact of the short tape; with the match-event fills kept the
+    # ask side there is no longer >= 3x the diagonal bid.
+    assert singles == []
     assert [s for b in bars for s in find_stacks(b)] == []
 
 
@@ -147,9 +164,29 @@ def test_imbalance_golden(trades):
 def test_profile_golden(trades):
     from market.orderflow.profile import build_profile, profile_levels
     prof = build_profile(trades)
-    assert (len(prof.prices), prof.total, prof.poc_price) == (78, 3995, 7482.0)
+    assert (len(prof.prices), prof.total, prof.poc_price) == (78, 4171, 7482.0)
     levels = [(l.reason.split(" @ ")[0], l.price, l.level_type)
               for l in profile_levels(prof, reference_price=7500.0)]
     assert levels == [("POC", 7482.0, "support"),
                       ("HVN", 7555.0, "resistance"),
                       ("LVN", 7556.0, "resistance")]
+
+
+def test_match_event_fills_are_kept_and_later_copies_dropped(tmp_path):
+    """The identity rule itself [st-exmw]: rows sharing (sequence, ts_event)
+    written in one pull are distinct fills; the same key written by a later
+    pull is a re-delivered copy."""
+    import json
+    def row(price, size, pulled):
+        return {"ts_pull_utc": pulled, "stream": "databento_glbx_es",
+                "provenance": {"ts_event": "2026-08-21T14:05:01.900000+00:00",
+                               "source": "live"},
+                "data": {"symbol": "ESU6", "instrument_id": 1, "price": price,
+                         "size": size, "side": "B", "action": "T", "sequence": 7}}
+    rows = [row(7685.0, 5, "2026-08-21T14:05:02Z"), row(7685.25, 5, "2026-08-21T14:05:02Z"),
+            row(7685.25, 2, "2026-08-21T14:05:02Z"),
+            row(7685.0, 5, "2026-08-21T14:09:40Z")]     # a reconnect's replay
+    p = tmp_path / "es.jsonl"
+    p.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    got = read_corpus_day(p)
+    assert [(t.price, t.size) for t in got] == [(7685.0, 5), (7685.25, 5), (7685.25, 2)]

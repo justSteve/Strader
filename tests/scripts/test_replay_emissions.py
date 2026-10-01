@@ -58,7 +58,7 @@ def test_two_runs_of_one_region_are_identical(knobs):
 
 @corpus
 @live_log
-def test_replay_reproduces_the_live_emitter_log(knobs):
+def test_replay_reproduces_the_live_emitter_log(knobs, monkeypatch):
     """THE OTHER load-bearing property, and the one st-v3wj was opened to
     doubt: a replay says what the live emitter actually said.
 
@@ -76,6 +76,14 @@ def test_replay_reproduces_the_live_emitter_log(knobs):
     baseline was a partial-day count read at lunchtime, so make sure any new
     baseline carries the clock time it was taken at.
     """
+    # The 08-25 emitter read the tape under the dedup rule of its day, which
+    # dropped every repeat of (sequence, ts_event) — the other fills of a
+    # match event (st-exmw, fixed 2026-10-01). To say what THAT emitter said,
+    # replay under that rule; -1 reproduces it exactly.
+    import market.orderflow.replay as replay_mod
+    monkeypatch.setattr(replay_mod, "REDELIVERY_GAP_S", -1.0)
+    from market.orderflow import region_replay as _rr
+    _rr.clear_cache()
     live = [ln.rstrip() for ln in LIVE_LOG.read_text(errors="replace").splitlines()
             if EVENT_LINE.match(ln)]
     # The scorer's log is the TAPE path; the engine path (sweeps, stacks) is

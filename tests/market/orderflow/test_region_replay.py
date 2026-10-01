@@ -111,10 +111,19 @@ def knobs():
 
 
 @corpus
-def test_tape_path_reproduces_the_harness_count(knobs):
+def test_tape_path_reproduces_the_harness_count(knobs, monkeypatch):
     """102 is the 2026-08-25 live scorer log, line for line (st-v3wj). The
-    tape path here IS scripts/replay_emissions.py's, so the count must hold."""
-    assert len(rr.tape_path(DAY, knobs)) == 102
+    tape path here IS scripts/replay_emissions.py's, so the count must hold —
+    under the dedup rule that scorer ran with, which dropped every repeat of
+    (sequence, ts_event) (st-exmw; -1 reproduces it). On the full tape the
+    same day gives 99."""
+    import market.orderflow.replay as replay_mod
+    monkeypatch.setattr(replay_mod, "REDELIVERY_GAP_S", -1.0)
+    rr.clear_cache()
+    try:
+        assert len(rr.tape_path(DAY, knobs)) == 102
+    finally:
+        rr.clear_cache()
 
 
 @corpus
