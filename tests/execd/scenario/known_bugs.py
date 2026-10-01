@@ -20,12 +20,6 @@ _S = "test_sequences.py::"
 
 KNOWN: dict[str, dict[str, str]] = {
     # ── the audit (2026-10-01) ───────────────────────────────────────────
-    "D2": {"invariant": "two_stops", "pinned_by": _T + "test_d2_a_triggered_send_whose_answer_was_lost",
-           "title": "a triggered send whose answer was lost is found by the orphan sweep as an "
-                    "untriggered entry, and a second bracket goes on",
-           "detail": "UnconfirmedSend has no triggered flag; the WorkingEntry the sweep makes "
-                     "defaults triggered=False, so _promote places its own pair beside the "
-                     "children the broker already rests."},
     "D3": {"invariant": "two_stops", "pinned_by": _T + "test_d3_the_childrens_read_fails",
            "title": "children_of raising, or a fallback cancel answered PENDING_CANCEL, puts a "
                     "second bracket beside the one the entry carried",

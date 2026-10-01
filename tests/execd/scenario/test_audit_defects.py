@@ -76,7 +76,6 @@ def test_d1_restart_after_a_replace(make, move):
 
 # ── D2 ───────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D2"))
 def test_d2_a_triggered_send_whose_answer_was_lost(make):
     """The book takes the entry with its bracket and fills it; the answer
     never comes back. The orphan sweep finds the order — and must not put a

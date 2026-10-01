@@ -267,13 +267,17 @@ class UnconfirmedSend:
     at: datetime
     page_query: dict[str, str] | None = None
     exit_spx: float | None = None
+    #: sent with its bracket attached (place_triggered). Found by the orphan
+    #: sweep, the working entry it becomes must say so, or _promote puts a
+    #: second pair beside the children the broker already rests (st-rzia).
+    triggered: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {"intent_id": self.intent_id, "symbol": self.symbol, "qty": self.qty,
                 "limit": self.limit, "right": self.right, "stop_spx": self.stop_spx,
                 "delta": self.delta, "at": self.at.isoformat(),
                 "page_query": dict(self.page_query) if self.page_query else None,
-                "exit_spx": self.exit_spx}
+                "exit_spx": self.exit_spx, "triggered": self.triggered}
 
     def matches(self, order: OrderResult) -> bool:
         """The broker order this send would have become: same contract, same
@@ -1353,13 +1357,15 @@ class ExecService:
             work = WorkingEntry(
                 order_id=match.order_id, symbol=send.symbol, qty=send.qty,
                 intent_id=intent_id, right=send.right, limit=send.limit,
-                stop_spx=send.stop_spx, delta=send.delta, page_query=send.page_query)
+                stop_spx=send.stop_spx, delta=send.delta, page_query=send.page_query,
+                triggered=send.triggered)
             self._working[work.order_id] = work
             self.journal.record("working", kind="entry", intent_id=intent_id,
                                 symbol=work.symbol, qty=work.qty, order_id=work.order_id,
                                 status=match.status.value, limit=work.limit,
                                 stop_spx=work.stop_spx, delta=work.delta,
-                                page_query=work.page_query, found_by="reconcile")
+                                page_query=work.page_query, triggered=work.triggered,
+                                found_by="reconcile")
             found.append({"intent_id": intent_id, "outcome": "found",
                           "order_id": match.order_id, "status": match.status.value})
             # _reconcile_working, next, promotes it if it already filled.
@@ -2080,17 +2086,16 @@ class ExecService:
         # same intent went out again, and reconcile — which only looks up ids
         # it already holds — never found the first (finding 25, st-xlz9).
         # Now the intent is unconfirmed until the broker's listing is swept.
+        bracket = self._triggered_bracket(intent, spx)
         send = UnconfirmedSend(
             intent_id=intent.intent_id, symbol=intent.symbol, qty=intent.qty,
             limit=intent.limit, right=intent.occ.right, stop_spx=intent.stop_spx,
             delta=intent.delta, at=self.clock(),
             page_query=dict(page_query) if page_query else None,
-            exit_spx=intent.exit_spx)
+            exit_spx=intent.exit_spx, triggered=bracket is not None)
         if intent.exit_spx is not None:
             self._exit_levels[intent.intent_id] = float(intent.exit_spx)
-        bracket = self._triggered_bracket(intent, spx)
         self.journal.record("sending", kind="entry", spx=spx, **send.to_dict(),
-                            triggered=bracket is not None,
                             **({"stop_price": bracket[0].stop_price,
                                 "target_price": bracket[1].limit} if bracket else {}))
         try:
@@ -3901,7 +3906,8 @@ class ExecService:
                         delta=sending.get("delta"),
                         at=_ts_of(sending) or self.clock(),
                         page_query={str(k): str(v) for k, v in query.items()}
-                        if isinstance(query, dict) else None)
+                        if isinstance(query, dict) else None,
+                        triggered=bool(sending.get("triggered")))
             elif e.get("event") in ("send_resolved", "placed"):
                 self._unconfirmed.pop(str(e.get("intent_id", "")), None)
             elif e.get("event") == "exit_unfilled":
