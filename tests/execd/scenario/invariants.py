@@ -45,9 +45,9 @@ brackets):
     or a close booked ``external`` for an order the service sent. [st-0f5q]
 ``pnl_mismatch``
     A ``closed`` line's exit price is not the book's fill, its P&L is not
-    (exit − entry) × 100 × qty, an entry's ``filled`` price is not the
-    book's, or the status body's realized P&L is not the journal's sum.
-    [the 'today' total, 13e43dd, at the service level]
+    (exit − entry) × 100 × qty, or an entry's ``filled`` price is not the
+    book's. (The status body's and the page's totals against the journal
+    are checked where the page is driven, ``test_page_flow.py``.)
 ``trail_moved_down``
     Once the trailing stop has armed, the resting stop's price fell without
     Steve moving it.
@@ -136,7 +136,7 @@ def _parent_of(book) -> dict[str, str]:
 def check(scn: "Scenario") -> list[Violation]:
     book, svc, mem = scn.paper, scn.service, scn.memory
     out: list[Violation] = []
-    journal = svc.journal.read()
+    journal = scn.journal()
 
     # ── long premium only ────────────────────────────────────────────────
     for sym, p in book._positions.items():
@@ -239,7 +239,6 @@ def check(scn: "Scenario") -> list[Violation]:
 
     # ── every close is one the service knows how to name ────────────────
     own = _own_order_ids(book, mem)
-    realized = 0.0
     for e in journal:
         ev = e.get("event")
         if ev == "closed":
@@ -262,7 +261,6 @@ def check(scn: "Scenario") -> list[Violation]:
             if abs(want - float(e.get("pnl_usd", 0))) > 0.005:
                 out.append(Violation("pnl_mismatch", f"closed line pnl {e.get('pnl_usd')} but "
                                                      f"(exit − entry) × 100 × qty is {want}"))
-            realized += float(e.get("pnl_usd") or 0)
         elif ev == "filled" and e.get("kind") == "entry":
             order = book._orders.get(str(e.get("order_id")))
             if order is not None and order.fill_price is not None and \
@@ -270,15 +268,11 @@ def check(scn: "Scenario") -> list[Violation]:
                 out.append(Violation("pnl_mismatch",
                                      f"filled line price {e.get('price')} but the book filled "
                                      f"{order.order_id} at {order.fill_price}"))
-    pnl = scn.status_pnl()
-    if pnl is not None and abs(pnl - round(realized, 2)) > 0.005:
-        out.append(Violation("pnl_mismatch", f"status realized {pnl} but the journal's closed "
-                                             f"lines sum to {round(realized, 2)}"))
 
     # ── the trailing stop only rises ─────────────────────────────────────
     for sym, pos in svc._open.items():
         stops = [o for o in _working_sells(book, sym) if o.order_type is OrderType.STOP]
-        if pos.trail_tier >= 0 and sym not in mem.trail_stop and stops:
+        if getattr(pos, "trail_tier", -1) >= 0 and sym not in mem.trail_stop and stops:
             mem.trail_stop[sym] = max(o.price for o in stops)
     for sym in list(mem.trail_stop):
         if sym not in held:
@@ -299,7 +293,7 @@ def check(scn: "Scenario") -> list[Violation]:
 
     # ── once the trail has armed, the stop locks a profit, not a loss ────
     for sym, pos in svc._open.items():
-        if pos.trail_tier < 0 or sym in mem.hand_adjusted:
+        if getattr(pos, "trail_tier", -1) < 0 or sym in mem.hand_adjusted:
             continue
         stops = [o for o in _working_sells(book, sym) if o.order_type is OrderType.STOP]
         if len(stops) != 1:
@@ -320,7 +314,7 @@ def check(scn: "Scenario") -> list[Violation]:
         intent = tickets.get(pos.intent_id) or {}
         if intent.get("stop_price") is None or intent.get("limit") is None:
             continue
-        if sym in mem.hand_adjusted or pos.intent_id in trailed or pos.trail_tier >= 0:
+        if sym in mem.hand_adjusted or pos.intent_id in trailed or getattr(pos, "trail_tier", -1) >= 0:
             continue
         if pos.qty != intent.get("qty") or not held.get(sym):
             continue

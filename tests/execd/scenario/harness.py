@@ -78,6 +78,9 @@ class Scenario:
         self._page = None
         self._seq = 0
         self._journal_seen = 0
+        self._jpath: Path | None = None
+        self._jpos = 0
+        self._jlines: list[dict[str, Any]] = []
         self._build()
         if unlock:
             self.unlock()
@@ -91,7 +94,7 @@ class Scenario:
         self.service = ExecService(self.broker, config, clock=self.clock)
         self.watcher = Watcher(self.service, sleep=lambda _s: None)
         self._page = None
-        self._journal_seen = len(self.service.journal.read())
+        self._journal_seen = len(self.journal())
 
     # ── reading the scene ────────────────────────────────────────────────
     @property
@@ -120,8 +123,28 @@ class Scenario:
     def held(self) -> dict[str, int]:
         return {s: p.qty for s, p in self.paper._positions.items() if p.qty}
 
+    def journal(self) -> list[dict[str, Any]]:
+        """Today's journal, parsed — read incrementally (the harness asks
+        after every step; the service's own reads are the service's)."""
+        path = self.service.journal.path_for()
+        if path != self._jpath:
+            self._jpath, self._jpos, self._jlines = path, 0, []
+        try:
+            with path.open("rb") as fh:
+                fh.seek(self._jpos)
+                chunk = fh.read()
+        except FileNotFoundError:
+            return self._jlines
+        end = chunk.rfind(b"\n") + 1
+        for raw in chunk[:end].decode("utf-8").splitlines():
+            if raw.strip():
+                self._jlines.append(json.loads(raw))
+        self._jpos += end
+        return self._jlines
+
     def events(self, *names: str) -> list[dict[str, Any]]:
-        return self.service.journal.events(*names)
+        wanted = set(names)
+        return [e for e in self.journal() if e.get("event") in wanted]
 
     def closes(self) -> list[dict[str, Any]]:
         return self.events("closed")
@@ -258,7 +281,7 @@ class Scenario:
 
     def _record(self, label: str, out: Any) -> None:
         now = self.clock()
-        new = self.service.journal.read()[self._journal_seen:]
+        new = self.journal()[self._journal_seen:]
         self._journal_seen += len(new)
         events = [e.get("event") for e in new if e.get("event") not in (
             "order_raw", "request", "preview", "preview_raw")]

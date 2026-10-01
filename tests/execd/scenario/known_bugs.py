@@ -99,14 +99,17 @@ KNOWN: dict[str, dict[str, str]] = {
             "detail": "protective_stop_price caps one 0.10 tick under a 3.00 limit; level_for "
                       "divides by a signed delta."},
     # ── found by the harness ─────────────────────────────────────────────
-    "H1": {"invariant": "stop_not_below_bid_when_placed",
+    "H1": {"invariant": "stop_not_below_bid_when_placed, stop_dollars_off_ticket",
            "pinned_by": _S + "TestFills::test_fill_much_better_than_the_limit",
            "title": "the stop sent with the entry is struck under the LIMIT, not the market — a "
                     "market already under the limit by the stop distance fills the entry under "
                     "a stop above the bid, and it fires at once",
            "detail": "13:24 CT 09-30: 9.20 limit, market 8.70/8.80 → 9.00 stop over an 8.70 bid; "
                      "paper fires it on the first read (−$10). bracket_fired books it right; "
-                     "_stop_follows_fill never gets the chance."},
+                     "_stop_follows_fill never gets the chance. The same root from a resting "
+                     "entry filled in a wide or gapped market (generated wide seed 90): the "
+                     "follow is refused ('not below the bid') and the stop stays struck from "
+                     "the limit, 0.80 from a 15.20 fill on a 1.00 ticket."},
     "H2": {"invariant": "stop_not_below_bid_when_placed",
            "pinned_by": _S + "TestFills::test_spread_wider_than_the_stop_distance",
            "title": "the entry's stop is never judged against the bid — a spread as wide as the "

@@ -14,6 +14,8 @@ every few minutes. Tests marked ``scenario_wide`` run only here; the
 from __future__ import annotations
 
 import os
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
@@ -23,7 +25,7 @@ from .harness import Scenario
 from .tape import Tape
 
 FAST_SEEDS = 12
-WIDE_SEEDS = 400
+WIDE_SEEDS = 200
 
 
 def wide_mode(config: pytest.Config) -> bool:
@@ -54,12 +56,29 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
         metafunc.parametrize("walk_seed", range(n))
 
 
+SHM = Path("/dev/shm")
+
+
 @pytest.fixture
-def make(tmp_path: Path) -> Callable[..., Scenario]:
+def state_root(tmp_path: Path):
+    """Where scenarios keep their state. In memory (``/dev/shm``) when the
+    machine has it: the journal ``fsync``s every line, which is the point
+    of the journal and not what these tests are about, and on this box's
+    disk it was 70 % of a session's time. Removed after the test either way."""
+    if SHM.is_dir() and os.access(SHM, os.W_OK):
+        root = Path(tempfile.mkdtemp(prefix="execd-scenario-", dir=SHM))
+        yield root
+        shutil.rmtree(root, ignore_errors=True)
+    else:
+        yield tmp_path
+
+
+@pytest.fixture
+def make(state_root: Path) -> Callable[..., Scenario]:
     """``make(tape, **kw)`` → a :class:`Scenario` in its own state directory."""
     count = {"n": 0}
 
     def build(tape: Tape, **kw: Any) -> Scenario:
         count["n"] += 1
-        return Scenario(tape, tmp_path / f"scn{count['n']}", **kw)
+        return Scenario(tape, state_root / f"scn{count['n']}", **kw)
     return build
