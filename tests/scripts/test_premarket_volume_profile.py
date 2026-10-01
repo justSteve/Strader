@@ -228,9 +228,11 @@ class TestPackedCorpusDays:
     and the 2026-08-18 noon run drew Monday as empty (248k prints instead of
     470k) minutes after 08-17 was packed. [st-9olq]"""
 
-    def _rec(self, ts_utc: datetime, price: float, size: int, side: str) -> str:
+    def _rec(self, ts_utc: datetime, price: float, size: int, side: str,
+             pulled: str = "2026-08-17T14:00:05Z") -> str:
         import json
-        return json.dumps({"provenance": {"ts_event": ts_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ")},
+        return json.dumps({"ts_pull_utc": pulled,
+                           "provenance": {"ts_event": ts_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ")},
                            "data": {"symbol": "ESU6", "instrument_id": 1, "price": price,
                                     "size": size, "side": side}}) + "\n"
 
@@ -270,7 +272,9 @@ class TestPackedCorpusDays:
         with gzip.open(day / "databento_glbx_es.jsonl.gz", "wt", encoding="utf-8") as f:
             f.write(self._rec(t + timedelta(seconds=2), 7751.0, 4, "B"))
             f.write(self._rec(t, 7750.0, 3, "B"))                         # older, appended later
-            f.write(self._rec(t + timedelta(seconds=2), 7751.0, 4, "B"))  # duplicate
+            # a re-delivered copy, written by a later pull (st-exmw)
+            f.write(self._rec(t + timedelta(seconds=2), 7751.0, 4, "B",
+                              pulled="2026-08-17T14:06:00Z"))
         start = datetime(2026, 8, 17, 13, 30, tzinfo=timezone.utc)
         got = list(pvp.trades_from_corpus(start))
         assert [(x.price, x.size) for x in got] == [(7750.0, 3), (7751.0, 4)]

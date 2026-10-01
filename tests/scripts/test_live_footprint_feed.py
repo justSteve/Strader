@@ -664,7 +664,8 @@ def test_drop_counters_report_without_changing_what_is_dropped():
                  ts=datetime.fromisoformat(rows[250]["provenance"]["ts_event"])
                  - timedelta(seconds=10))
     broken = {"provenance": {"ts_event": "not a time"}, "data": {"sequence": 8888}}
-    stream = (rows[:100] + [rows[5], feed.CAUGHT_UP] + rows[100:250]
+    again = {**rows[5], "ts_pull_utc": "2026-07-31T13:36:00+00:00"}   # a later pull's copy
+    stream = (rows[:100] + [again, feed.CAUGHT_UP] + rows[100:250]
               + [stale, broken] + rows[250:])
 
     plain = list(feed.ordered_trades(iter(stream), reorder_lag_s=2.0))

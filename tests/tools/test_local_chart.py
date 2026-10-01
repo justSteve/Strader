@@ -13,8 +13,10 @@ import pytest
 from tools import local_chart
 
 
-def _row(ts: str, seq: int, price: float, size: int = 1, side: str = "B") -> str:
+def _row(ts: str, seq: int, price: float, size: int = 1, side: str = "B",
+         pulled: str = "2026-08-21T13:31:05Z") -> str:
     return json.dumps({
+        "ts_pull_utc": pulled,
         "provenance": {"ts_event": ts},
         "data": {"symbol": "ESU6", "instrument_id": 1, "price": price,
                  "size": size, "side": side, "sequence": seq},
@@ -33,7 +35,8 @@ def test_gz_only_day_sorted_and_deduped(tmp_path, monkeypatch):
     rows = [
         _row("2026-08-21T13:31:00+00:00", 2, 6402.0),
         _row("2026-08-21T13:30:00+00:00", 1, 6400.0),   # out of order
-        _row("2026-08-21T13:31:00+00:00", 2, 6402.0),   # duplicate pull
+        _row("2026-08-21T13:31:00+00:00", 2, 6402.0,   # re-delivered by a later pull
+             pulled="2026-08-21T13:40:00Z"),
     ]
     _write_gz_day(tmp_path, "2026-08-21", rows)
     ticks = local_chart._load_ticks("2026-08-21")
