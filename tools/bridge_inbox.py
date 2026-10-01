@@ -35,10 +35,17 @@ USAGE
     .venv/bin/python3 tools/bridge_inbox.py --json
     .venv/bin/python3 tools/bridge_inbox.py --ledger        # append MEMO rows
     .venv/bin/python3 tools/bridge_inbox.py --watch         # block; one line per arrival
+    .venv/bin/python3 tools/bridge_inbox.py --watch --until-event   # exit after the first
 
 ``--watch`` is the Monitor command: it prints ONLY on arrival, so a quiet
 bridge produces no output and wakes nobody. Same discipline as COO's
 ``effort_event_watch.sh`` (st-85dv) — every line it prints is a model wake.
+
+``--until-event`` is the in-session form [st-4cmi]: run it under Bash
+``run_in_background`` (2h cap) rather than Monitor (30-min cap), so a quiet
+bridge wakes the session only every two hours to re-arm instead of every
+thirty minutes. It exits after the tick that printed anything — an arrival or
+a channel break — and the completion notice carries those lines.
 
 ENV
     BRIDGE_DIR   default /mnt/c/Users/steve/zgent-bridge
@@ -428,7 +435,8 @@ def render(memos: list[Memo], state: str = "empty", why: str = "") -> str:
     return "\n".join(lines)
 
 
-def watch(interval: int, bridge: str | None = None, once: bool = False) -> int:
+def watch(interval: int, bridge: str | None = None, once: bool = False,
+          until_event: bool = False) -> int:
     """Block, reporting ONLY new arrivals. A quiet bridge prints nothing.
 
     Seeded with what is already there, so arming mid-session does not replay
@@ -440,6 +448,7 @@ def watch(interval: int, bridge: str | None = None, once: bool = False) -> int:
     last_state = None
     while True:
         time.sleep(max(interval, 1))
+        printed = False
         # A watch silently watching a directory that no longer exists is worse
         # than no watch: it produces the same silence as a quiet channel and is
         # indistinguishable from it. Report the TRANSITION, once — reporting
@@ -449,9 +458,11 @@ def watch(interval: int, bridge: str | None = None, once: bool = False) -> int:
             if state in ("missing", "unreachable"):
                 mark = "[ALERT] " if state == "missing" else ""
                 print(f"{mark}[BRIDGE] channel {state}: {why}", flush=True)
+                printed = True
             elif last_state in ("missing", "unreachable"):
                 print(f"[BRIDGE] channel back: {ME}/inbox readable again",
                       flush=True)
+                printed = True
             last_state = state
         # NOT `continue` here: that skips the `once` return below and spins
         # forever on a broken channel. The test for this behaviour caught it by
@@ -465,7 +476,8 @@ def watch(interval: int, bridge: str | None = None, once: bool = False) -> int:
                       flush=True)
                 if m.addressed_to != "?":
                     print(f"         for: {m.addressed_to}", flush=True)
-        if once:
+                printed = True
+        if once or (until_event and printed):
             return 0
 
 
@@ -478,11 +490,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="block and print one line per NEW arrival")
     ap.add_argument("--interval", type=int, default=60,
                     help="--watch poll seconds (default 60)")
+    ap.add_argument("--until-event", action="store_true",
+                    help="--watch exits after the first tick that prints "
+                         "(for Bash run_in_background) [st-4cmi]")
     ap.add_argument("--bridge", default=None)
     args = ap.parse_args(argv)
 
     if args.watch:
-        return watch(args.interval, args.bridge)
+        return watch(args.interval, args.bridge, until_event=args.until_event)
 
     state, why = channel_state(args.bridge)
     if state == "missing":

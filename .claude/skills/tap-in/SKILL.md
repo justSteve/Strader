@@ -143,7 +143,11 @@ old name in someone's notes costs nothing but is worth correcting when seen.
 .venv/bin/python3 tools/bridge_inbox.py --ledger   # log what is already waiting
 ```
 
-and put `tools/bridge_inbox.py --watch` under Monitor for the session.
+and run `.venv/bin/python3 tools/bridge_inbox.py --watch --until-event` as a
+Bash `run_in_background` job with `timeout: 7200000`, re-arming it after each
+exit. Not Monitor: Monitor caps at 30 minutes, so a quiet bridge woke the
+session every half hour just to re-arm (st-4cmi). The job exits on the first
+arrival or channel break, and its completion notice carries the line.
 
 The poll above runs ONCE, here, at start-up. That is the whole defect st-92m7
 records and it is worth stating plainly, because the shape is easy to mistake

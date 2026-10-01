@@ -178,6 +178,25 @@ def test_an_arrival_prints_exactly_one_wake(bridge, capsys, monkeypatch):
     assert "intent" in out and "Desk" in out
 
 
+def test_until_event_exits_on_arrival_not_on_a_quiet_tick(bridge, capsys,
+                                                          monkeypatch):
+    """[st-4cmi] The background-job form: quiet ticks keep it blocking, the
+    first arrival ends it, so the completion notice IS the wake."""
+    real_sleep = time.sleep
+    ticks = []
+
+    def sleep_then_maybe_deliver(_):
+        ticks.append(1)
+        if len(ticks) == 3:
+            drop(bridge, "20261001T115401__Desk__ruling.md", klass="ruling")
+        real_sleep(0)
+
+    monkeypatch.setattr(bi.time, "sleep", sleep_then_maybe_deliver)
+    assert bi.watch(interval=1, bridge=str(bridge), until_event=True) == 0
+    assert len(ticks) == 3
+    assert capsys.readouterr().out.count("[BRIDGE]") == 1
+
+
 def test_only_strader_inbox_is_read(bridge, capsys):
     """Deliberate scope. The superseded fix proposed scanning peer OUTBOX and
     _archive folders for a `for:` naming Strader — that addresses a failure
