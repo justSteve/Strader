@@ -16,7 +16,7 @@ replayed market, with every invariant checked after every step.**
 
 ```bash
 python3 -m pytest tests/execd/scenario -q            # fast: ~10 s, part of tests/execd
-python3 -m pytest tests/execd/scenario -q --scenario-wide   # wide: ~15 min
+python3 -m pytest tests/execd/scenario -q --scenario-wide   # wide: ~6 min
 python3 -m pytest 'tests/execd/scenario/test_generated.py::test_a_generated_session[17]'
 ```
 
