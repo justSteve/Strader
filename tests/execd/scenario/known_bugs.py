@@ -36,10 +36,6 @@ KNOWN: dict[str, dict[str, str]] = {
                     "the tracked size doubles",
            "detail": "_reconcile_working skips a WORKING order with filledQuantity; the "
                      "position sweep adopts the part, _promote adds the whole."},
-    "D6": {"invariant": "open_mismatch", "pinned_by": _T + "test_d6_the_watcher_sleeps_on_an_unconfirmed_send",
-           "title": "has_exposure ignores unconfirmed sends and loose legs, so the watcher "
-                    "sleeps while the broker holds an order (or a fill) the service has no id for",
-           "detail": "Watcher.once returns 'flat' before any reconcile; nothing finds the send."},
     "D7": {"invariant": "bracket_not_linked", "pinned_by": _T + "test_d7_a_close_deferred_by_a_pending_cancel",
            "title": "a close deferred by a PENDING_CANCEL target re-rests an unlinked stop "
                     "beside the target every pass",

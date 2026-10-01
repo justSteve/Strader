@@ -798,10 +798,15 @@ class ExecService:
                 "day_usd": None if unrealized is None else round(realized + unrealized, 2)}
 
     def has_exposure(self) -> bool:
-        """Anything the watcher should be watching: a position held, or an
-        entry the broker acknowledged and has not resolved. [st-k6gl]"""
+        """Anything the watcher should be watching: a position held, an
+        entry the broker acknowledged and has not resolved, [st-k6gl] a send
+        whose answer never came back, or a leg left resting under a closed
+        position. The last two are orders (or fills) the broker may hold
+        under no id this service tracks; only a reconcile finds them, and a
+        watcher that read them as flat slept on them (st-xxg3)."""
         with self._lock:
-            return bool(self._open or self._working)
+            return bool(self._open or self._working or self._unconfirmed
+                        or self._loose_legs)
 
     def has_working(self) -> bool:
         """Is an entry out at the broker, unresolved? The page asks before

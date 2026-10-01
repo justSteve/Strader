@@ -143,7 +143,6 @@ def test_d5_a_partly_filled_entry(make):
 
 # ── D6 ───────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D6"))
 def test_d6_the_watcher_sleeps_on_an_unconfirmed_send(make):
     """The send's answer is lost while the order rests; nothing else is
     happening, so only the watcher can find it — and it must."""
