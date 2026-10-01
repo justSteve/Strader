@@ -2777,6 +2777,10 @@ function producerDot(p) {
     // The feed drops trades that arrive behind a bar it already closed; the
     // drop stands (parity) but the dot shows it happened [st-epa3].
     if (p.late > 0) { cls += " warn"; why = `${p.age_s}s old · ${p.late} late trade(s) dropped`; }
+    // The detector code changed after the feeder started; it runs the old
+    // code until its midnight restart, so what this page shows is not what
+    // the tree now says [st-umeg].
+    else if (p.code_stale) { cls += " warn"; why = `${p.age_s}s old · running ${p.code_sha || "older"} code — the new detector goes live at the midnight restart`; }
     else { cls += " ok"; why = `${p.age_s}s old`; }
   }
   else if (p.age_s <= p.fresh_s * 3) { cls += " warn"; why = `${p.age_s}s old (budget ${p.fresh_s}s)`; }

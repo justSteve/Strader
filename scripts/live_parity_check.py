@@ -21,7 +21,14 @@ WHY BARS FIRST
     only meaningful once boundaries agree.
 
 WHAT A FAILURE MEANS
-    Not "the engine is wrong" — both sides ran the same engine. It means the
+    First read the CODE line [st-umeg]. The run log stamps the revision and a
+    hash of the emission path the live run executed; when this tree differs,
+    the report says [CODE CHANGED] and a failure exits 3, not 1 — the change
+    is the first suspect, not the tape. The live feeder restarts at midnight,
+    so a commit landed mid-session runs live only from the next day.
+
+    With the code unchanged it is not "the engine is wrong" — both sides ran
+    the same engine. It means the
     two sides did not see the same TRADES in the same ORDER. The live path
     holds rows for --reorder-lag seconds and releases them in order; the replay
     sorts the whole file by (ts, sequence). A reconnect redelivering rows
@@ -172,9 +179,18 @@ def main() -> int:
               file=sys.stderr)
         return 2
 
+    from market.orderflow.run_log import code_revision
+    ran, now_code = run.meta.get("code") or {}, code_revision()
+    code_changed = ran.get("hash") != now_code["hash"]
     mode = "catch-up" if run.meta.get("catch_up") else "live"
     print(f"day {day} · run {run.started} ({mode}) · "
           f"{'complete' if run.complete else 'INCOMPLETE — died mid-session'}")
+    if code_changed:
+        print(f"[CODE CHANGED] the live run executed {ran.get('sha') or 'unrecorded code'}"
+              f"{' (dirty)' if ran.get('dirty') else ''}; this replay runs "
+              f"{now_code['sha']}{' (dirty)' if now_code['dirty'] else ''}. A divergence "
+              f"below may be that change, not a fault — re-run at the live run's "
+              f"revision to tell. [st-umeg]")
     print(f"  live:   {len(run.bars)} bars, {len(run.events)} emissions "
           f"(N={run.bar_n}, {len(run.mancini)} mancini anchors)")
 
@@ -187,14 +203,14 @@ def main() -> int:
         print("\n[FAIL] bar sequence diverged:")
         for line in problems:
             print("  " + line)
-        return 1
+        return 3 if code_changed else 1
 
     problems = diff_events(run.events, events)
     if problems:
         print("\n[FAIL] bars agree, emissions diverged:")
         for line in problems:
             print("  " + line)
-        return 1
+        return 3 if code_changed else 1
 
     if not run.complete:
         print("\n[PASS-partial] everything the run recorded replays identically, "

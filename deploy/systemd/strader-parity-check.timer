@@ -1,0 +1,12 @@
+[Unit]
+# 00:40 CT Tuesday-Saturday: after the feeder's midnight restart has closed
+# the prior session's run log, so the check reads a complete run. [st-umeg]
+Description=Run the Strader live==replay parity check after each session
+
+[Timer]
+OnCalendar=Tue..Sat *-*-* 00:40:00 America/Chicago
+Persistent=true
+Unit=strader-parity-check.service
+
+[Install]
+WantedBy=timers.target

@@ -54,6 +54,44 @@ logger = logging.getLogger(__name__)
 _ROOT = Path(__file__).resolve().parent.parent.parent / "data" / "derived" / "live-parity"
 
 
+_REPO = Path(__file__).resolve().parents[2]
+#: The code a live run's emissions depend on. A change here between the live
+#: run and a parity replay is a code change, not a data divergence [st-umeg].
+_CODE_GLOBS = ("market/**/*" + ".py", "scripts/live_footprint_feed" + ".py")
+
+
+def code_revision(repo: Path = _REPO) -> dict:
+    """``{"sha", "dirty", "hash"}`` for the code a run is executing.
+
+    ``hash`` is over the emission path's own source, so it moves when that
+    code moves and not when a doc or an unrelated script does; ``sha`` and
+    ``dirty`` name the commit for a human. Best effort: no git, no sha."""
+    import hashlib
+    import subprocess
+    h = hashlib.sha256()
+    for pattern in _CODE_GLOBS:
+        for f in sorted(repo.glob(pattern)):
+            if "__pycache__" in f.parts:
+                continue
+            h.update(str(f.relative_to(repo)).encode())
+            try:
+                h.update(f.read_bytes())
+            except OSError:
+                pass
+    out = {"sha": None, "dirty": None, "hash": h.hexdigest()[:16]}
+    try:
+        out["sha"] = subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5).stdout.strip() or None
+        out["dirty"] = bool(subprocess.run(
+            ["git", "-C", str(repo), "status", "--porcelain", "--", "market",
+             "scripts/live_footprint_feed" + ".py"],
+            capture_output=True, text=True, timeout=5).stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return out
+
+
 def run_log_path(day: _date) -> Path:
     """The canonical live-run log for ``day``. A NAME, not a promise."""
     return _ROOT / f"{day.isoformat()}.jsonl"
@@ -101,7 +139,9 @@ class RunLogWriter:
                          "mancini_kinds": kinds_to_records(mancini_kinds),
                          "reorder_lag": reorder_lag,
                          "catch_up": bool(catch_up),
-                         "started": started.isoformat()})
+                         "started": started.isoformat(),
+                         # the code this run executes [st-umeg]
+                         "code": code_revision()})
         except OSError as e:  # noqa: BLE001 — logging must not kill capture
             logger.warning("run log unavailable at %s (%s) — continuing without it",
                            path, e)

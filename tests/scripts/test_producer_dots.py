@@ -74,3 +74,12 @@ def test_page_lists_the_live_producers_only():
     order = re.search(r"const PROD_ORDER = (\[.*?\]);", src).group(1)
     keys = [k for k, _ in json.loads(order)]
     assert keys == ["tape", "gexbot", "feed"]
+
+
+@pytest.mark.skipif(NODE is None, reason="node not on PATH")
+def test_a_feeder_running_older_code_is_amber():
+    """[st-umeg] the tree moved under a running feeder: amber, with the sha."""
+    v = _verdicts({"stale_code": _p(late=0, code_stale=True, code_sha="abc1234"),
+                   "current": _p(late=0, code_stale=False)})
+    assert "warn" in v["stale_code"][0] and "abc1234" in v["stale_code"][1]
+    assert "ok" in v["current"][0]

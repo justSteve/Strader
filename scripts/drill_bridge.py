@@ -484,6 +484,9 @@ def producers_health(now: datetime | None = None, corpus_root: Path | None = Non
                         # the page goes amber on late > 0
                         for k in ("dupes", "late", "bad"):
                             row[k] = body.get(k)
+                        # the feeder runs code older than the tree [st-umeg]
+                        row["code_stale"] = bool(body.get("code_stale"))
+                        row["code_sha"] = (body.get("code") or {}).get("sha")
                 except (ValueError, OSError):
                     row["status"] = "unreadable"
             except OSError:

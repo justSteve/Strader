@@ -708,8 +708,16 @@ def main() -> int:
     dev_on = args.developing_interval > 0 and not args.catch_up_only and not args.dry_run
     last_dev = 0.0
     health_path = CORPUS_ROOT / day.isoformat() / "_footprint_health.json"
+    # The code this process runs, and whether the tree has moved under it
+    # [st-umeg]: the feeder restarts at midnight, so a detector commit landed
+    # mid-session is NOT live until then — the page says so instead of
+    # leaving the screen to look current.
+    from market.orderflow.run_log import code_revision
+    running_code = code_revision()
+    code_check = {"at": 0.0, "stale": False}
     feed_health = {"day": day.isoformat(), "pid": os.getpid(), "sent": 0,
                    "last_bar_t1": None, "developing_t": None, "final": 0,
+                   "code": running_code, "code_stale": False,
                    **drop_counts}
 
     def _beat(**kw) -> None:
@@ -717,6 +725,10 @@ def main() -> int:
             return
         feed_health.update(kw)
         feed_health.update(drop_counts)   # dupes / late / bad as of this beat
+        if time.monotonic() - code_check["at"] > 60:
+            code_check["at"] = time.monotonic()
+            code_check["stale"] = code_revision()["hash"] != running_code["hash"]
+        feed_health["code_stale"] = code_check["stale"]
         feed_health["written_utc"] = datetime.now().astimezone().isoformat(timespec="seconds")
         write_feed_health(health_path, feed_health)
 

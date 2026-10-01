@@ -219,3 +219,15 @@ def test_the_report_stops_after_five_emission_differences():
         e["confidence"] = 0.01
     out = chk.diff_events(le, re_)
     assert any("stopping after 5" in line for line in out)
+
+
+def test_the_run_header_names_the_code_it_ran(tmp_path):
+    """[st-umeg] a parity failure must be told apart from a code change."""
+    import json
+    from datetime import date, datetime, timezone
+    from market.orderflow.run_log import RunLogWriter
+    log = RunLogWriter(tmp_path / "r.jsonl", day=date(2026, 9, 30), bar_n=2000, mancini=[],
+                 reorder_lag=2.0, catch_up=False, started=datetime.now(timezone.utc))
+    log.close(quiet=True)
+    head = json.loads((tmp_path / "r.jsonl").read_text().splitlines()[0])
+    assert head["k"] == "run" and len(head["code"]["hash"]) == 16

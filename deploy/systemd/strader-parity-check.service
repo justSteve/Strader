@@ -1,0 +1,28 @@
+[Unit]
+# Nightly live==replay check of the footprint feeder. [st-umeg]
+#
+# scripts/live_parity_check.py replays the day's corpus tape through the same
+# engine and compares it with the feeder's run log, bar for bar and emission
+# for emission. Until 2026-10-01 nothing ran it, and when it was run it could
+# not tell a code change from a data divergence; the run log now stamps the
+# code it executed and the check exits 3 (not 1) when the tree moved since.
+#
+# Exit 0 pass, 1 FAIL (same code — the two sides saw different trades), 2 skip
+# (no run log / no tape — a weekend), 3 FAIL with a code change since the live
+# run. 2 is a success here; 1 and 3 fail the unit so `systemctl --failed`
+# names it, and the journal carries the first divergent bar.
+Description=Strader footprint feeder live==replay parity check
+Documentation=https://github.com/justSteve/Strader
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/projects/Strader
+Environment=PYTHONPATH=/root/projects/Strader
+ExecStart=/root/projects/Strader/.venv/bin/python /root/projects/Strader/scripts/live_parity_check.py
+SuccessExitStatus=2
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strader-parity-check
+TimeoutStartSec=1800
+Nice=10
