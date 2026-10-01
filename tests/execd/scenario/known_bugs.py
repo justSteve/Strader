@@ -46,12 +46,6 @@ KNOWN: dict[str, dict[str, str]] = {
                     "recovered position carries entry commission 0",
            "detail": "the day total jumps by the fees at the close; _promote/_recover never "
                      "set entry_commission_usd."},
-    "D12": {"invariant": "false_short_alarm", "pinned_by": _T + "test_d12_rest_fill_and_fire_between_passes",
-            "title": "a resting triggered entry that fills and stops out between two reconciles "
-                     "raises 'unattributed_sell — the account is short; check the broker' for "
-                     "its own stop",
-            "detail": "_pick_up_fills runs before _reconcile_working promotes the entry; the "
-                      "close is then booked correctly as bracket_fired."},
     "D13": {"invariant": "(assertion)", "pinned_by": _T + "test_d13_what_a_restart_forgets",
             "title": "the fill watermark resets on restart and trail_tier is not recovered",
             "detail": "_last_fill_poll = clock() at construction; nothing journals or replays "

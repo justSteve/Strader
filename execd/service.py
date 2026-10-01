@@ -1275,7 +1275,15 @@ class ExecService:
                 return {"promoted": [], "released": [], "adopted": [],
                         "corrected": [], "error": str(exc)}
 
-            # Fills first. A stop that fired has to be booked against the day's
+            # Working entries before the fill sweep. A resting triggered
+            # entry that filled and whose stop fired between two passes
+            # leaves a sell on a symbol with no position yet; swept first, it
+            # was journaled 'unattributed_sell — the account is short' for its
+            # own stop. Promoted first, _attach_triggered books the fired leg
+            # as the bracket's and the sweep finds it already booked (st-dh65).
+            found = self._reconcile_orphans(broker_orders)
+            promoted, released = self._reconcile_working(broker_orders)
+            # Then fills. A stop that fired has to be booked against the day's
             # ceiling before the position sweep sees the position is gone.
             self._pick_up_fills()
             # The positions are read AFTER the fill sweep: a stop that fills
@@ -1290,8 +1298,6 @@ class ExecService:
                 self.journal.record("error", kind="reconcile", detail=str(exc))
                 return {"promoted": [], "released": [], "adopted": [],
                         "corrected": [], "error": str(exc)}
-            found = self._reconcile_orphans(broker_orders)
-            promoted, released = self._reconcile_working(broker_orders)
             exits = self._reconcile_exits(broker_orders)
             legs = self._reconcile_legs(broker_orders)
             loose = self._reconcile_loose_legs(broker_orders)

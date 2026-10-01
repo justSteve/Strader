@@ -228,7 +228,6 @@ def test_d11_a_sell_to_open_is_not_a_close(make, where):
 
 # ── D12 ──────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D12"))
 def test_d12_rest_fill_and_fire_between_passes(make):
     """A 9.20 limit rests under a 9.20/9.30 market; the market gaps to
     8.50/8.60 between two passes — the entry fills and its stop fires before
