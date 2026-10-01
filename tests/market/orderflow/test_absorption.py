@@ -1,7 +1,7 @@
 """AbsorptionTracker unit tests (st-9vl) — synthetic MBP-1 streams.
 
 Each test builds a small deterministic book-event sequence around the
-production floors (ABSORPTION_VOL_MIN=300, ABSORPTION_REFILL_MIN=2,
+production floors (ABSORPTION_VOL_MIN=100, ABSORPTION_REFILL_MIN=2,
 REFILL_DEPLETION_MIN=REFILL_RECOVERY_MIN=25). The canonical "defended bid"
 story: sellers hit the bid at P, resting size depletes and refills twice,
 then price lifts away — one AbsorptionRead, positive displacement.
