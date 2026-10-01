@@ -166,6 +166,10 @@ class WorkingEntry:
     #: the preview's commission for the whole order, so the position it
     #: becomes carries its entry fees like one filled at the send (st-ocnp)
     entry_commission_usd: float = 0.0
+    #: the stop price on his ticket when the stop was set in dollars, ``None``
+    #: for a stop set as an SPX level. A dollar stop's level is struck again
+    #: from the mark at the fill (st-d3va); a level stop keeps its level.
+    ticket_stop_price: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -175,6 +179,7 @@ class WorkingEntry:
             "page_query": dict(self.page_query) if self.page_query else None,
             "triggered": self.triggered,
             "entry_commission_usd": self.entry_commission_usd,
+            "ticket_stop_price": self.ticket_stop_price,
         }
 
 
@@ -277,6 +282,8 @@ class UnconfirmedSend:
     triggered: bool = False
     #: the preview's commission, carried to the working entry it becomes (st-ocnp)
     entry_commission_usd: float = 0.0
+    #: the ticket's dollar stop, carried likewise (st-d3va)
+    ticket_stop_price: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {"intent_id": self.intent_id, "symbol": self.symbol, "qty": self.qty,
@@ -284,7 +291,8 @@ class UnconfirmedSend:
                 "delta": self.delta, "at": self.at.isoformat(),
                 "page_query": dict(self.page_query) if self.page_query else None,
                 "exit_spx": self.exit_spx, "triggered": self.triggered,
-                "entry_commission_usd": self.entry_commission_usd}
+                "entry_commission_usd": self.entry_commission_usd,
+                "ticket_stop_price": self.ticket_stop_price}
 
     def matches(self, order: OrderResult) -> bool:
         """The broker order this send would have become: same contract, same
@@ -1393,7 +1401,8 @@ class ExecService:
                 order_id=match.order_id, symbol=send.symbol, qty=send.qty,
                 intent_id=intent_id, right=send.right, limit=send.limit,
                 stop_spx=send.stop_spx, delta=send.delta, page_query=send.page_query,
-                triggered=send.triggered, entry_commission_usd=send.entry_commission_usd)
+                triggered=send.triggered, entry_commission_usd=send.entry_commission_usd,
+                ticket_stop_price=send.ticket_stop_price)
             self._working[work.order_id] = work
             self.journal.record("working", kind="entry", intent_id=intent_id,
                                 symbol=work.symbol, qty=work.qty, order_id=work.order_id,
@@ -1401,6 +1410,7 @@ class ExecService:
                                 stop_spx=work.stop_spx, delta=work.delta,
                                 page_query=work.page_query, triggered=work.triggered,
                                 entry_commission_usd=work.entry_commission_usd,
+                                ticket_stop_price=work.ticket_stop_price,
                                 found_by="reconcile")
             found.append({"intent_id": intent_id, "outcome": "found",
                           "order_id": match.order_id, "status": match.status.value})
@@ -1479,6 +1489,7 @@ class ExecService:
                                     stop_spx=work.stop_spx, delta=work.delta,
                                     page_query=work.page_query, triggered=work.triggered,
                                     entry_commission_usd=work.entry_commission_usd,
+                                    ticket_stop_price=work.ticket_stop_price,
                                     found_by="replace")
                 if new.is_filled:
                     promoted.append(work.symbol)
@@ -1505,6 +1516,27 @@ class ExecService:
             spx = self.spx_mark()
         except BrokerError:
             spx = None
+        stop_spx = work.stop_spx
+        if (spx is not None and work.ticket_stop_price is not None
+                and work.limit is not None and work.delta):
+            # A dollar stop is dollars from the FILL. Its level was struck at
+            # the send's mark, and a resting limit fills where the market came
+            # down to it — a call 0.60 under the ask filled ~1.2 SPX points
+            # lower, past a level 0.4 under the send's mark, and the SPX loop
+            # sold it on the same pass. Struck again here from the mark at
+            # the fill: the same walk, so the level sits the ticket's dollars
+            # behind it whatever the stop that rests (the triggered one, moved
+            # down by a better fill; or the one derived below). A level stop
+            # — set as an SPX level, no ticket price — keeps its level
+            # (st-d3va).
+            restruck = level_for(work.right, spx, work.limit, work.ticket_stop_price,
+                                 work.delta)
+            if restruck != stop_spx:
+                self.journal.record("stop_restruck", intent_id=work.intent_id, spx=spx,
+                                    stop_price=work.ticket_stop_price,
+                                    stop_spx_priced=stop_spx, stop_spx=restruck,
+                                    at="fill", order_id=order.order_id)
+                stop_spx = restruck
         pos = self._open.get(work.symbol)
         if pos is not None:
             # The position grew. Its resting bracket is now smaller than what
@@ -1512,14 +1544,14 @@ class ExecService:
             # so the old legs come off before correctly sized ones go on.
             self._add_to_position(pos, qty, fill_px, intent_id=work.intent_id,
                                   order_id=order.order_id, spx=spx,
-                                  stop_spx=work.stop_spx, delta=work.delta,
+                                  stop_spx=stop_spx, delta=work.delta,
                                   commission_usd=commission, found_by="reconcile")
             self._resolve_working(order.order_id, outcome="filled")
             return
         pos = OpenPosition(
             symbol=work.symbol, qty=qty, entry_price=fill_px,
             intent_id=work.intent_id, right=work.right,
-            stop_spx=work.stop_spx, delta=work.delta, entry_spx=spx,
+            stop_spx=stop_spx, delta=work.delta, entry_spx=spx,
             entry_order_id=order.order_id, opened_at=self.clock(),
             entry_commission_usd=commission,
         )
@@ -1528,7 +1560,7 @@ class ExecService:
                             symbol=pos.symbol, qty=qty, price=fill_px,
                             cost_usd=round(fill_px * CONTRACT_MULTIPLIER * qty, 2),
                             commission_usd=commission,
-                            spx=spx, stop_spx=work.stop_spx, delta=work.delta,
+                            spx=spx, stop_spx=stop_spx, delta=work.delta,
                             order_id=order.order_id, found_by="reconcile")
         self._resolve_working(order.order_id, outcome="filled")
         if work.triggered and self._attach_triggered(pos, order.order_id, spx,
@@ -2154,7 +2186,8 @@ class ExecService:
             delta=intent.delta, at=self.clock(),
             page_query=dict(page_query) if page_query else None,
             exit_spx=intent.exit_spx, triggered=bracket is not None,
-            entry_commission_usd=float(prev.commission_usd or 0.0))
+            entry_commission_usd=float(prev.commission_usd or 0.0),
+            ticket_stop_price=intent.stop_price)
         if intent.exit_spx is not None:
             self._exit_levels[intent.intent_id] = float(intent.exit_spx)
         self.journal.record("sending", kind="entry", spx=spx, **send.to_dict(),
@@ -2195,6 +2228,7 @@ class ExecService:
                 page_query=dict(page_query) if page_query else None,
                 triggered=bracket is not None,
                 entry_commission_usd=float(prev.commission_usd or 0.0),
+                ticket_stop_price=intent.stop_price,
             )
             self._working[work.order_id] = work
             self.journal.record("working", kind="entry", intent_id=intent.intent_id,
@@ -2203,7 +2237,8 @@ class ExecService:
                                 limit=work.limit, stop_spx=work.stop_spx,
                                 delta=work.delta, spx=spx, page_query=work.page_query,
                                 triggered=work.triggered,
-                                entry_commission_usd=work.entry_commission_usd)
+                                entry_commission_usd=work.entry_commission_usd,
+                                ticket_stop_price=work.ticket_stop_price)
             out["working"] = work.to_dict()
             return out
 
@@ -3952,6 +3987,7 @@ class ExecService:
                     if isinstance(query, dict) else None,
                     triggered=bool(e.get("triggered")),
                     entry_commission_usd=float(e.get("entry_commission_usd") or 0.0),
+                    ticket_stop_price=e.get("ticket_stop_price"),
                 )
             elif e.get("event") == "entry_resolved":
                 self._working.pop(str(e.get("order_id", "")), None)
@@ -4002,7 +4038,8 @@ class ExecService:
                         page_query={str(k): str(v) for k, v in query.items()}
                         if isinstance(query, dict) else None,
                         triggered=bool(sending.get("triggered")),
-                        entry_commission_usd=float(sending.get("entry_commission_usd") or 0.0))
+                        entry_commission_usd=float(sending.get("entry_commission_usd") or 0.0),
+                        ticket_stop_price=sending.get("ticket_stop_price"))
             elif e.get("event") in ("send_resolved", "placed"):
                 self._unconfirmed.pop(str(e.get("intent_id", "")), None)
             elif e.get("event") == "exit_unfilled":

@@ -67,14 +67,6 @@ KNOWN: dict[str, dict[str, str]] = {
                      "is $10 a contract — 0.10 under the ask, which is the bid of an ordinary "
                      "0.10-wide market above $3 (seen first in the two-lot partial-exit "
                      "sequence)."},
-    "H4": {"invariant": "stop_level_crossed_at_fill",
-           "pinned_by": _S + "TestEntries::test_a_dip_buy_limit_is_not_sold_by_its_own_level, "
-                        + _T + "test_d15_the_restrike[three-dollar-boundary]",
-           "title": "a resting limit under the market fills with its SPX stop level already "
-                    "behind the index — the SPX loop market-sells it on the same pass",
-           "detail": "the level is struck at the SEND's mark; a call limit 0.60 under the ask "
-                     "fills ~1.2 SPX points lower, past a level 0.4 under the send's mark: "
-                     "filled at 8.60, sold at 8.50 by spx-stop in the same watcher pass."},
 }
 
 

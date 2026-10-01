@@ -23,9 +23,8 @@ when the defect is fixed:
 * D1 — no restart once a leg of the open position has been replaced
   (the trail, an adjust, a better fill);
 * D8 — at most three lots (the tier-0 rounding needs about six);
-* H4, H1 — resting entries (wide mode only) fill in gapped and wide
-  markets; their stop level and the stop that cannot follow the fill are
-  waived there.
+* H1 — resting entries (wide mode only) fill in gapped and wide
+  markets; the stop that cannot follow the fill is waived there.
 """
 
 from __future__ import annotations
@@ -95,8 +94,7 @@ def test_a_generated_session(make, walk_seed, request):
     wide = wide_mode(request.config)
     tape = random_walk(walk_seed, steps=600 if wide else 200, gap_prob=0.02, gap_pts=5.0,
                        stale_prob=0.02, stale_len=4, wide_prob=0.03, sigma_pts=0.9)
-    waive = {"stop_level_crossed_at_fill": "H4",
-             "stop_dollars_off_ticket": "H1"} if wide else None
+    waive = {"stop_dollars_off_ticket": "H1"} if wide else None
     scn = make(tape, waive=waive)
     done = session(scn, random.Random(walk_seed * 7919 + 1), resting=wide)
     # what was closed was booked once per contract sold

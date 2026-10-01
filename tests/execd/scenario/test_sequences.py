@@ -57,7 +57,7 @@ class TestEntries:
 
     def test_a_locked_limit_under_the_ask_rests_then_fills_as_the_offer_comes_down(self, make):
         """A limit 0.10 under the offer with a 0.50 stop: the dip that fills
-        it is shorter than the stop's distance (the deeper dip is H4)."""
+        it is shorter than the stop's distance (the deeper dip is the next test)."""
         scn = make(ramp((0, 6380), (30, 6380), (90, 6378), (150, 6378)))
         live = scn.ticket("call", strike=6380)
         locked = round(live.limit - 0.10, 2)
@@ -72,17 +72,24 @@ class TestEntries:
         assert len(scn.resting(sym)["stop"]) == 1 and len(scn.resting(sym)["target"]) == 1
         scn.run(30)
 
-    @pytest.mark.xfail(strict=True, reason=reason("H4"))
     def test_a_dip_buy_limit_is_not_sold_by_its_own_level(self, make):
         """60 cents under the offer with the default $20 stop: the dip that
-        fills it is longer than the stop's distance."""
+        fills it is longer than the stop's distance. The level is struck
+        again from the mark at the fill (st-d3va), so the pass that fills it
+        does not sell it; the dip going on another 2.8 points afterwards
+        takes the $20 stop, measured from the fill, as the market."""
         scn = make(ramp((0, 6380), (30, 6380), (90, 6376), (150, 6376)))
         live = scn.ticket("call", strike=6380)
         t = scn.ticket("call", strike=6380, limit=round(live.limit - 0.60, 2))
         scn.send(t)
         scn.run(150, until=lambda s: bool(s.held()))
+        assert scn.held() == {t.contract.symbol: 1}, "sold on the pass that filled it"
+        fill, = scn.events("filled")
+        # the ticket's $20 behind the mark at the fill, not the send's
+        assert abs(fill["spx"] - fill["stop_spx"] - 0.20 / abs(fill["delta"])) <= 0.011
         scn.run(9)
-        assert scn.closes() == []
+        assert all(c["kind"] != "spx-stop" or c["exit_price"] <= round(t.limit - 0.20, 2)
+                   for c in scn.closes())
 
     def test_the_unlocked_ticket_follows_the_ask(self, make):
         scn = make(ramp((0, 6380), (30, 6384)))

@@ -59,11 +59,10 @@ class TestSeed1TheBracketFiredFirst:
 
     def test_a_gap_through_entry_and_stop_between_two_passes(self, make):
         """The same race from a resting entry: the market gaps through the
-        limit and the stop between two watcher passes. (Its level is H4,
-        waived.)"""
+        limit and the stop between two watcher passes."""
         tape = scripted(frames(C7690, 0.60, 7696.0, (0, 9.20, 9.30), (2, 8.50, 8.60),
                                (60, 8.50, 8.60)), start=T1324)
-        scn = make(tape, waive={"stop_level_crossed_at_fill": "H4"})
+        scn = make(tape)
         scn.send(scn.ticket("call", strike=7690, limit=9.20))
         scn.run(30)
         close, = scn.closes()

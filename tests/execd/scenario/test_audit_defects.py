@@ -231,8 +231,7 @@ def test_d12_rest_fill_and_fire_between_passes(make):
     """A 9.20 limit rests under a 9.20/9.30 market; the market gaps to
     8.50/8.60 between two passes — the entry fills and its stop fires before
     the service looks. The close is right; there must be no false alarm."""
-    scn = make(pinned((0, 9.20, 9.30), (2, 8.50, 8.60), (60, 8.50, 8.60)),
-               waive={"stop_level_crossed_at_fill": "H4"})
+    scn = make(pinned((0, 9.20, 9.30), (2, 8.50, 8.60), (60, 8.50, 8.60)))
     scn.send(scn.ticket("call", strike=7690, limit=9.20))
     scn.run(9)
 
@@ -304,19 +303,13 @@ def json_refused() -> str:
 
 # ── D15 ──────────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("part", [
-    # the 2.95 stop rests at 2.95 now (D15); the fill 0.25 SPX points under
-    # the send's mark then leaves its level behind the index and the SPX
-    # loop sells it on the same pass — H4
-    pytest.param("three-dollar-boundary", marks=pytest.mark.xfail(strict=True, reason=reason("H4"))),
-    "negative-put-delta"])
+@pytest.mark.parametrize("part", ["three-dollar-boundary", "negative-put-delta"])
 def test_d15_the_restrike(make, part):
     if part == "three-dollar-boundary":
         # a 3.00 limit rests under 3.00/3.10, fills when the offer comes to
         # it; the stop he typed is 2.95
         scn = make(pinned((0, 3.00, 3.10), (3, 2.95, 3.00), (30, 2.95, 3.00),
-                          sym=C3, delta=0.30),
-                   waive={"stop_level_crossed_at_fill": "H4"})
+                          sym=C3, delta=0.30))
         t = scn.ticket("call", strike=7720, limit=3.00, stop="2.95")
         assert t.stop_price == 2.95
         scn.send(t)
