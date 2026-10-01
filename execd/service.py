@@ -381,6 +381,12 @@ class OpenPosition:
     #: a leg Steve cancelled in TOS (st-5n3s): left off — not re-rested, not
     #: watched on the SPX mark — until he sets it again on the form
     stop_off_by_hand: bool = False
+    #: the stop is off and held off because the take-profit it pairs with
+    #: would not come off (a cancel the broker only acknowledged): rested
+    #: alone beside it, the two were unlinked and both could fill. It goes
+    #: back on as a pair once the target is confirmed off; the SPX loop is
+    #: the stop meanwhile (st-hqz8)
+    stop_held_off: bool = False
     #: the trailing stop's last tier moved to (-1: not yet armed) and when a
     #: refused move may be tried again (st-s1y1)
     trail_tier: int = -1
@@ -459,6 +465,7 @@ class OpenPosition:
             "target_order_id": self.target_order_id, "target_price": self.target_price,
             "target_state": self.leg_state("target"),
             "stop_off_by_hand": self.stop_off_by_hand,
+            "stop_held_off": self.stop_held_off,
             "trail_tier": self.trail_tier,
             "exit_spx": self.exit_spx,
             "target_off_by_hand": self.target_off_by_hand,
@@ -1839,6 +1846,23 @@ class ExecService:
         out: list[dict[str, Any]] = []
         now = self.clock()
         for pos in list(self._open.values()):
+            if pos.stop_held_off and not pos.exit_in_flight:
+                tid = pos.target_order_id
+                t = broker_orders.get(tid) if tid else None
+                if tid is None or (t is not None and t.status in (OrderStatus.CANCELED,
+                                                                  OrderStatus.REJECTED)):
+                    # the target is off now — the cancel it only acknowledged
+                    # went through — so the pair goes back on (st-hqz8)
+                    if tid is not None:
+                        pos.target_order_id = None
+                        self.journal.record("canceled", kind="take-profit", symbol=pos.symbol,
+                                            order_id=tid, detail="its cancel is confirmed")
+                    pos.stop_held_off = False
+                    self._rest_bracket(pos)
+                    out.append({"symbol": pos.symbol, "leg": "protective-stop",
+                                "order_id": pos.stop_order_id, "outcome": "held-off-rested"})
+                    if pos.symbol not in self._open:
+                        continue
             # each leg's order as listed before this pass touches the ids, so
             # a leg can ask whether its sibling was moved in the same breath
             listed = {leg: broker_orders.get(getattr(pos, self._LEG_ATTR[leg]) or "")
@@ -3097,6 +3121,26 @@ class ExecService:
                 return self._rest_pair(pos, price, pos.target_price, spx=spx, kind=kind)["stop"]
             if pos.symbol not in self._open:
                 return None
+            if pos.target_order_id:
+                # The take-profit would not come off, so the pair cannot be
+                # rested. A stop rested alone beside it is unlinked — both
+                # can fill — and until 2026-10-01 a close deferred by the
+                # target's PENDING_CANCEL did exactly that, again every pass
+                # the close was retried. Held off, said so, and put back as
+                # a pair by the leg reconcile once the target is off
+                # (st-hqz8).
+                if not pos.stop_held_off:
+                    self.journal.record(
+                        "stop_unprotected", symbol=pos.symbol, intent_id=pos.intent_id,
+                        qty=pos.qty, stop_price=price, held_off=True,
+                        target_order_id=pos.target_order_id,
+                        detail=f"the take-profit {pos.target_order_id} would not come off, so "
+                               f"the stop is held off rather than rested alone beside it — it "
+                               f"goes back on with the target as a pair once the target is "
+                               f"off; the SPX loop is the stop meanwhile")
+                pos.stop_held_off = True
+                pos.stop_price = price
+                return None
         try:
             result = self.broker.place(self._stop_intent(pos, price))
         except BrokerError as exc:
@@ -3131,6 +3175,7 @@ class ExecService:
             return None
         pos.stop_order_id = result.order_id
         pos.stop_price = price
+        pos.stop_held_off = False
         self._sell_qty[result.order_id] = result.qty or pos.qty
         self.journal.record("stop_placed", symbol=pos.symbol, intent_id=pos.intent_id,
                             stop_price=price, stop_spx=pos.stop_spx, spx=spx,
@@ -4172,6 +4217,12 @@ class ExecService:
                     opened_at=_ts_of(e) or self.clock(),
                     entry_commission_usd=_entry_commission_of(e),
                 )
+            elif e.get("event") == "stop_unprotected" and e.get("held_off"):
+                pos = self._open.get(str(e.get("symbol", "")))
+                if pos is not None:
+                    pos.stop_held_off = True
+                    if e.get("stop_price") is not None:
+                        pos.stop_price = e.get("stop_price")
             elif e.get("event") == "bracket_unread":
                 pos = self._open.get(str(e.get("symbol", "")))
                 if pos is not None:

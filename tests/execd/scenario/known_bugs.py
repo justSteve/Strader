@@ -20,11 +20,6 @@ _S = "test_sequences.py::"
 
 KNOWN: dict[str, dict[str, str]] = {
     # ── the audit (2026-10-01) ───────────────────────────────────────────
-    "D7": {"invariant": "bracket_not_linked", "pinned_by": _T + "test_d7_a_close_deferred_by_a_pending_cancel",
-           "title": "a close deferred by a PENDING_CANCEL target re-rests an unlinked stop "
-                    "beside the target every pass",
-           "detail": "_take_bracket_off → DEFERRED → _rest_stop_at as a single order (the pair "
-                     "cannot be cleared), then observe fires again next pass and churns it."},
     "D13": {"invariant": "(assertion)", "pinned_by": _T + "test_d13_what_a_restart_forgets",
             "title": "the fill watermark resets on restart and trail_tier is not recovered",
             "detail": "_last_fill_poll = clock() at construction; nothing journals or replays "

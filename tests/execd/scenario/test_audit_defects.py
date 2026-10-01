@@ -153,7 +153,6 @@ def test_d6_the_watcher_sleeps_on_an_unconfirmed_send(make):
 
 # ── D7 ───────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D7"))
 def test_d7_a_close_deferred_by_a_pending_cancel(make):
     """FLATTEN; the target's cancel is only acknowledged. The close defers
     — and must not leave a stop resting unlinked beside the target."""
@@ -163,6 +162,14 @@ def test_d7_a_close_deferred_by_a_pending_cancel(make):
     out = scn.flatten()
     assert out["closed"][0]["status"] == "DEFERRED"
     scn.run(9)
+    assert stops(scn) == [] and scn.position(C).stop_held_off
+    # the target's cancel goes through: the pair goes back on, linked
+    tid = scn.position(C).target_order_id
+    scn.paper.pending_cancel_if = None
+    scn.paper.resolve_pending(tid)
+    scn.run(6)
+    assert len(stops(scn)) == 1 and len(scn.resting(C)["target"]) == 1
+    assert not scn.position(C).stop_held_off
 
 
 # ── D8 ───────────────────────────────────────────────────────────────────
