@@ -759,6 +759,12 @@ PANEL_SCRIPT = """
       cs.innerHTML = j.closed_html; cs.__html = j.closed_html;
       ds = cs.querySelectorAll('details'); for (var i2 = 0; i2 < ds.length; i2++) if (open[ds[i2].getAttribute('data-key')]) ds[i2].open = true; }
     var td = document.getElementById('today'); if (td && j.today_text) td.textContent = j.today_text;
+    // the SEND traffic buffer (st-qnbg): repainted only when it changed,
+    // scrolled to its newest line at the bottom
+    var tr = document.getElementById('traffic');
+    if (tr && j.traffic_html !== undefined && tr.__html !== j.traffic_html) {
+      tr.innerHTML = j.traffic_html; tr.__html = j.traffic_html;
+      var tl = document.getElementById('traffic-lines'); if (tl) tl.scrollTop = tl.scrollHeight; }
     var qd = document.getElementById('quote'); if (qd && j.quote_html) qd.innerHTML = j.quote_html;
     var pc = document.getElementById('position'); if (pc && j.position_html !== undefined && !editing()) { var keptp = keepTyped(pc); pc.innerHTML = j.position_html || ''; restoreTyped(pc, keptp); }
     var jn = document.getElementById('journal'); if (jn && j.journal_html) jn.innerHTML = j.journal_html;
@@ -836,6 +842,8 @@ PANEL_SCRIPT = """
         var el = sf.elements[n]; if (el) fd.set(n, el.value || ''); });
       var sk = sf.elements['strike']; if (sk && sk.value) { fd.set('strike', sk.value); fd.delete('delta'); } }
     if (b) { b.disabled = true; b.textContent = 'SENDING…'; }
+    // a SEND shows the traffic buffer, and it stays until he taps (st-qnbg)
+    if (window.__paneShow) window.__paneShow('send');
     fetch(f.getAttribute('action'), {method: 'POST', body: fd, headers: {'Accept': 'application/json'}})
       .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function(j){ apply(j); answerBox(j.bad || j.msg || '', !!j.bad, j.msg_stage || null);

@@ -173,3 +173,51 @@ class TestTheScreenAgreesWithTheService:
         state = screen.poll()
         net = state["positions"][0]["valuation"]["net_if_closed_usd"]
         assert screen.today(state) == state["pnl"]["day_usd"] == net
+
+
+class TestTheTrafficPane:
+    """The SEND traffic buffer (st-qnbg; Steve, 2026-10-01): one line a hop,
+    CT-stamped, a block per SEND, no JSON — on the paper book under the
+    real service, as the screen drives it."""
+
+    @staticmethod
+    def lines(state):
+        import html
+        import re
+        return [html.unescape(t) for t in
+                re.findall(r"<div class='tl [a-z-]+'>([^<]*)</div>", state["traffic_html"])]
+
+    def test_an_accepted_send_rests_then_fills_inside_its_block_and_a_refused_send_follows(self, make):
+        scn = make(ramp((0, 6380), (30, 6380), (90, 6378), (150, 6378)))
+        screen = OrderScreen(scn)
+        screen.pick("call", delta=0.5)
+        live = screen.shown["limit"]
+        screen.type_stop("0.50")
+        shown = screen.lock(round(live - 0.10, 2))           # rests under the offer
+        sym = shown["contract"]["symbol"]
+        answer = screen.send()
+        assert answer["msg_stage"] == "working", answer.get("bad")
+        lines = self.lines(answer)
+        strike = f"{shown['contract']['strike']:g}C"
+        assert lines[0].startswith("── ") and lines[0].endswith(f" BUY 1 SPX {strike} ──")
+        assert f"→ execd: BUY 1 SPX {strike} LMT {shown['limit']:.2f}, stop $50" in lines[1]
+        assert any("→ paper: preview" in ln for ln in lines)
+        assert any(f"→ paper: BUY 1 SPX {strike} LMT {shown['limit']:.2f} + STOP" in ln for ln in lines)
+        assert "WORKING" in lines[-1] and "← paper: accepted, order" in lines[-1]
+        assert "FILLED" not in " ".join(lines)
+        scn.run(150, until=lambda s: bool(s.held()))
+        state = screen.poll()
+        lines = self.lines(state)
+        fill = scn.position(sym).entry_price
+        assert lines[-1].endswith(f"← FILLED 1 @ {fill:.2f}")
+        assert sum(ln.startswith("── ") for ln in lines) == 1   # inside its own block
+        # a second SEND the page refuses: its own block, the refusal last
+        screen.sel.update(limit="", stopoff="", exitspx="6370")
+        screen.reprice()
+        answer = screen.send()
+        lines = self.lines(answer)
+        assert sum(ln.startswith("── ") for ln in lines) == 2
+        assert "→ SEND BUY 1 SPX " in lines[-2]
+        assert "← REFUSED at the page: the entry's stop is dollars only" in lines[-1]
+        assert "{" not in answer["traffic_html"]
+        assert all(ln[:2].isdigit() or ln.startswith("── ") for ln in lines)   # CT-stamped

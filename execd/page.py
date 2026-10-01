@@ -52,6 +52,7 @@ import os
 import secrets
 import threading
 import time
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -73,11 +74,14 @@ from .orderpage import (balances_html, journal_html, position_html, send_fields_
                         broker_badge)
 from .service import CONTRACT_MULTIPLIER, ExecService, Refused
 from .stops import _round_up_to_tick, tick_for
+from .traffic import TrafficBuffer, contract_words, lines_for_send, render_html as traffic_html
 from .vault import BadPassphrase, Vault, VaultError, VaultMissing
 
 #: The page's loopback port. ``tailscale serve --bg --set-path /exec
 #: http://127.0.0.1:8779/exec`` publishes it; nothing else should.
 PAGE_HOST = "127.0.0.1"
+
+log = logging.getLogger("execd.page")
 PAGE_PORT = 8779
 
 #: The public address, for the words on the page and in the install output.
@@ -559,7 +563,8 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         send_nonce = (nonces.issue("send", SEND_NONCE_TTL_S)
                       if priced is not None and priced.ready else None)
         return render_order(service, _actions(), sel, priced, today=_today(),
-                            embed=embed, fresh=fresh, send_nonce=send_nonce, **kw)
+                            embed=embed, fresh=fresh, send_nonce=send_nonce,
+                            traffic_html=traffic_html(traffic), **kw)
 
     @bp.get("/order")
     def order():
@@ -619,6 +624,17 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         elif service.has_exposure():
             service.reconcile_if_stale(2.5)
         st = service.status()
+        # a SEND still working gets its fill inside its own block of the
+        # traffic pane when it comes (st-qnbg): one journal read, and only
+        # while something it sent is still waiting
+        pend = traffic.pending
+        if pend:
+            try:
+                traffic.note_fills(service.journal.read())
+                live = {w.get("intent_id") for w in st["working"]}
+                traffic.forget(k for k in pend if k not in live)
+            except Exception:  # the pane is a view: it never breaks a poll
+                log.exception("traffic: the fills could not be read")
         quote = None
         error = None
         spx = None
@@ -680,6 +696,9 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 "balances_html": balances_html(st.get("balances")),
                 # the status panel (st-4ezg): the stage and the card's body
                 "panel_stage": stage, "panel_body_html": body,
+                # the SEND traffic buffer (st-qnbg), so a send made from
+                # another screen shows here too
+                "traffic_html": traffic_html(traffic),
                 # the ticket, the strikes and SEND's fields when the caller
                 # carried a selection to price (st-644f)
                 **extra}
@@ -689,6 +708,20 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
     #: after a lost response, seen 2026-09-15 14:07 CT on an adjust) is
     #: answered with what happened, never sent twice (st-igw0).
     sent_outcomes: dict[str, dict[str, Any]] = {}
+
+    #: Every SEND's traffic, one plain line a hop, the last ``TRAFFIC_CAP``
+    #: lines for the life of this process (st-qnbg; Steve, 2026-10-01: "I
+    #: don't want raw json ... something was sent - something was returned
+    #: that validated or errored").
+    traffic = TrafficBuffer()
+
+    def _send_title(sel: Selection, priced, intent) -> str:
+        if intent is not None:
+            return f"BUY {intent.get('qty')} {contract_words(str(intent.get('symbol', '')))}"
+        if priced is not None and priced.contract is not None:
+            return f"BUY {priced.lots} {contract_words(priced.contract.symbol)}"
+        right = "C" if sel.side == "call" else "P" if sel.side == "put" else ""
+        return f"BUY {sel.lots} SPX {f'{sel.strike:g}' if sel.strike else '?'}{right}"
 
     @bp.post("/order/send")
     def order_send():
@@ -724,10 +757,17 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
             return answer(None, f"That SEND was used already or is older than "
                                 f"{int(SEND_NONCE_TTL_S // 3600)} h — reload the page and send again.")
         msg = bad = None
+        priced = intent = None
+        sent_at = clock()
+        page_refusal = called = None
         try:
             priced = price(service, sel)
-            intent = intent_for(priced, intent_id=f"page-{stamp(clock())}-{token[:6]}",
-                                engine_sha=service.config.sha)
+            try:
+                intent = intent_for(priced, intent_id=f"page-{stamp(clock())}-{token[:6]}",
+                                    engine_sha=service.config.sha)
+            except ValueError as exc:
+                page_refusal = str(exc)
+                raise
             # SEND beside a working entry in the same contract re-prices it
             # (co-8mb1z, Steve 2026-09-25: "the form needs to be updated that
             # it's a working order with the form ready to take a new price"):
@@ -747,6 +787,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                     raise ValueError(f"the broker still holds {oid} "
                                      f"({(pulled.get('order') or {}).get('status', 'working')}) — "
                                      f"it can still fill; send again when it is off")
+            called = True
             out = service.place(OrderIntent.from_dict(intent), page_query=sel.as_query())
             if out.get("refused"):
                 # A refusal the service answered (a bound, or the broker's own
@@ -763,6 +804,24 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                    f"service knows of — check the orders before sending again.")
         except ValueError as exc:
             bad = f"Not sent: {exc}"
+        # the SEND's hops in plain words, for the traffic pane (st-qnbg)
+        try:
+            journal = service.journal.read() if intent is not None else []
+            iid = intent.get("intent_id") if intent is not None else None
+            filled = sum(int(e.get("qty") or 0) for e in journal
+                         if e.get("event") == "filled" and e.get("kind") == "entry"
+                         and e.get("intent_id") == iid) if iid else 0
+            working = iid is not None and any(w.get("intent_id") == iid
+                                              for w in service.status()["working"])
+            traffic.add(lines_for_send(
+                at=sent_at, title=_send_title(sel, priced, intent), intent=intent,
+                journal=journal, page_refusal=page_refusal if called is None else None,
+                error=bad if not (msg or page_refusal) else None),
+                key=iid, pending_qty=int(intent["qty"]) if working else None,
+                fills_said=sum(1 for e in journal if e.get("event") == "filled"
+                               and e.get("kind") == "entry" and e.get("intent_id") == iid))
+        except Exception:  # the pane is a view: it never breaks a SEND's answer
+            log.exception("traffic: the SEND's lines could not be built")
         sent_outcomes[token] = {"msg": msg, "bad": bad}
         if len(sent_outcomes) > 500:
             for k in list(sent_outcomes)[:-250]:

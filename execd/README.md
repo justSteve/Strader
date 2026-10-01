@@ -528,3 +528,5 @@ paper order is the first recording.
 | 5 | st-47i2 | FD0 tickets and promoted rules become intents; the paste line retires |
 
 Order is strict. Nothing sends before stage 4.
+
+**The SEND traffic pane** (st-qnbg; Steve, 2026-10-01: *"I don't want raw json - i want that payload (in both directions) reduced to just the essential info of the result"*): the strike table shares its card with a buffer of every SEND's hops, one CT-stamped line each — `→ execd` (the ticket in words), `→ Schwab`/`→ paper` (preview, the order with its stop and target), `←` answers (accepted, FILLED n @ px — a later fill lands inside its own SEND's block, a part as `1/2` — REFUSED, error). A rule-and-header line opens each SEND; sent lines are grey, good answers green, refusals and errors red, arrows kept. `execd/traffic.py` reads the hops from the service's journal under the intent id; the page keeps the last 200 lines for its process and says so. SEND switches the card to the buffer; it stays there until a tap inside it or the toggle — no auto-return.

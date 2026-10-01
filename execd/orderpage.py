@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Any, Mapping
 
 from .orderform import DEFAULT_DELTA, DEFAULT_STOP_LOSS_USD, POLL_S, Priced, Selection
+from .traffic import render_html as render_traffic, style as traffic_style
 from .panel import (COLORS, PANEL_SCRIPT, PANEL_STYLE, WORDS, closed_html, contract_name, panel_html,
                     short_pts, stage_of as panel_stage_of)
 from .service import CONTRACT_MULTIPLIER, CT, ExecService
@@ -239,8 +240,36 @@ _SCRIPT = """
   document.addEventListener('input', function(e){ if (ours2(e.target)) typedAt = Date.now(); }, true);
   function editing(){ return ours2(document.activeElement) && (Date.now() - typedAt) < TYPING_MS; }
   window.__lots = form && form.elements['lots'] ? (form.elements['lots'].value || '1') : '1';
+  // The pane (st-qnbg; Steve, 2026-10-01): the strikes or the SEND traffic
+  // buffer. The toggle flips it; a SEND shows the traffic and it stays
+  // there until a tap inside it, or the toggle, brings the strikes back.
+  // No timer returns it. The choice survives a reload in this tab.
+  var pane = document.getElementById('pane');
+  function paneShow(v){ if (!pane) return; pane.setAttribute('data-view', v);
+    var s = document.getElementById('strikes'), t = document.getElementById('traffic'),
+        b = document.getElementById('panetoggle');
+    if (s) s.hidden = (v === 'traffic'); if (t) t.hidden = (v !== 'traffic');
+    if (b) b.textContent = (v === 'traffic') ? 'show strikes' : 'show traffic';
+    if (v === 'traffic') { var l = document.getElementById('traffic-lines'); if (l) l.scrollTop = l.scrollHeight; }
+    try { sessionStorage.setItem('execd.pane', v); } catch (e) {} }
+  window.__paneShow = function(ev){ paneShow(window.__paneNext(pane ? pane.getAttribute('data-view') : 'strikes', ev)); };
+  document.addEventListener('click', function(e){ var t = e.target; if (!t || !t.closest) return;
+    if (t.closest('#panetoggle')) { e.preventDefault(); window.__paneShow('toggle'); return; }
+    if (t.closest('#traffic')) window.__paneShow('tap-traffic'); });
+  try { if (sessionStorage.getItem('execd.pane') === 'traffic') paneShow('traffic'); } catch (e) {}
 })();
 </script>
+"""
+
+#: The pane's one rule, pure so a test can run it under node (st-qnbg):
+#: what the pane shows after an event — ``send``, ``toggle``, or
+#: ``tap-traffic`` (a tap anywhere inside the traffic buffer).
+PANE_LOGIC = """
+window.__paneNext = function(view, ev){
+  if (ev === 'send') return 'traffic';
+  if (ev === 'toggle') return view === 'traffic' ? 'strikes' : 'traffic';
+  if (ev === 'tap-traffic') return 'strikes';
+  return view === 'traffic' ? 'traffic' : 'strikes'; };
 """
 
 
@@ -478,6 +507,20 @@ def by_delta(contracts: list[Any]) -> list[Any]:
     return sorted(contracts, key=key, reverse=True)
 
 
+def pane_html(strikes: str, traffic: str | None) -> str:
+    """The strikes and the SEND traffic buffer in one pane, one shown at a
+    time (st-qnbg; Steve, 2026-10-01). The toggle flips it whenever he
+    wants; a SEND shows the traffic, and it stays there until he taps
+    inside it or the toggle. The buffer is the page process's and lives
+    through every repaint and toggle."""
+    return ("<div class=card id=pane data-view=strikes>"
+            "<div class=panehead><span class=k>strikes · traffic</span>"
+            "<button type=button class=toggle id=panetoggle aria-label='switch between the "
+            "strikes and the SEND traffic'>show traffic</button></div>"
+            f"<div id=strikes>{strikes}</div>"
+            f"<div id=traffic hidden>{traffic or render_traffic(())}</div></div>")
+
+
 def strikes_html(priced: Priced, order_path: str,
                  balances: dict[str, Any] | None = None) -> str:
     """The strikes around spot — only the ones the account can pay for.
@@ -595,7 +638,8 @@ def send_fields_html(sel: Selection, priced: Priced | None = None) -> str:
 def render_order(service: ExecService, actions: Mapping[str, str], sel: Selection,
                  priced: Priced | None, *, today, send_nonce: str | None = None,
                  msg: str | None = None, bad: str | None = None,
-                 embed: bool = False, fresh: bool = False) -> str:
+                 embed: bool = False, fresh: bool = False,
+                 traffic_html: str | None = None) -> str:
     from .page import _STYLE, esc as _esc  # noqa: F401 — the shell's style
     st = service.status()
     order = actions["order"]
@@ -730,10 +774,10 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
                 "<input type=hidden name=ajax value=''>"
                 f"<button class='big send'{'' if ok else ' disabled'}>SEND</button></form>")
         # strikes around spot — only the ones the account can pay for (st-644f)
-        parts.append("<div class=card><div id=strikes>"
-                     f"{strikes_html(priced, order, st.get('balances'))}</div></div>")
+        parts.append(pane_html(strikes_html(priced, order, st.get('balances')), traffic_html))
     elif not sel.side:
-        parts.append("<div class=k style='text-align:center'>pick a side to see the strikes</div>")
+        parts.append(pane_html("<div class=k style='text-align:center'>pick a side to see the "
+                               "strikes</div>", traffic_html))
 
     # the day, one line: the money and nothing else (st-644f — no attempts,
     # no headroom; see position_html)
@@ -749,7 +793,8 @@ def render_order(service: ExecService, actions: Mapping[str, str], sel: Selectio
 
     symbol = (priced.contract.symbol if priced is not None and priced.contract is not None
               else None)
-    script = (_SCRIPT % {"price": json.dumps(actions["order_price"]),
+    script = ("<script>" + PANE_LOGIC + "</script>"
+              + _SCRIPT % {"price": json.dumps(actions["order_price"]),
                          "symbol": json.dumps(symbol)}
               + PANEL_SCRIPT % {"state": json.dumps(actions["order_state"]), "poll": POLL_S,
                                 "words": json.dumps(WORDS), "colors": json.dumps(COLORS)})
@@ -762,7 +807,7 @@ def _order_page(title: str, body: str, *, embed: bool) -> str:
             f"<title>{esc(title)}</title>"
             "<meta name=apple-mobile-web-app-capable content=yes>"
             "<meta name=apple-mobile-web-app-status-bar-style content=black>"
-            f"{_STYLE}<style>{_ORDER_STYLE}{PANEL_STYLE}</style></head>")
+            f"{_STYLE}<style>{_ORDER_STYLE}{PANEL_STYLE}{traffic_style()}</style></head>")
     if embed:
         return head + f"<body class=embed>{body}</body></html>"
     return head + f"<body>{body}</body></html>"
