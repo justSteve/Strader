@@ -81,8 +81,10 @@ def test_feeder_bars_equal_replay_bars(tmp_path):
     ref_trades = read_corpus_day(path)
     ref_bars = list(build_bars(ref_trades, n=bar_n))
     ref_fill = bar_fill_steps(ref_trades, ref_bars)
-    reference = [feed.bar_payload(b, None) | {"steps": s}
-                 for b, s in zip(ref_bars, ref_fill)]
+    from market.orderflow.fill import bar_trade_slices, session_delta
+    ref_sd = [session_delta(sl) for sl in bar_trade_slices(ref_trades, ref_bars)]
+    reference = [feed.bar_payload(b, None) | {"steps": s, "sd": sd}
+                 for b, s, sd in zip(ref_bars, ref_fill, ref_sd)]
 
     # Live: through the tail + reorder buffer.
     live = _run_feeder(path, bar_n)
@@ -315,7 +317,7 @@ def test_bar_payload_shape_matches_the_drill_column(tmp_path):
     # this assertion exists to catch.
     assert set(live[0]) == {
         "t0", "t1", "o", "h", "l", "c", "v", "d", "nv", "dur", "poc",
-        "cells", "steps", "ev",
+        "cells", "steps", "ev", "sd",   # sd: session delta, both surfaces (st-v69l)
     }
     assert len(live[0]["steps"]) == 16         # FILL_STEPS [st-9olq]
     assert all(len(c) == 3 for c in live[0]["cells"])

@@ -859,6 +859,11 @@ def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
     batch: list[dict] = []
     last_push = time.monotonic()
     first = True
+    # the session's date, for each bar's session delta (st-v69l)
+    try:
+        day = _date.fromisoformat(str((meta or {}).get("day")))
+    except ValueError:
+        day = None              # each bar's first trade names it instead
     n_ev = 0
     stopped_by = "end-of-stream"
     final: list = []
