@@ -58,7 +58,8 @@ TimeoutStopSec=15
 
 # Hardening: the process can read its code and config and write its own state.
 ProtectSystem=strict
-ReadWritePaths=/var/lib/execd
+# and the view log Desk reads (st-6pfc); '-' so a missing dir never stops the unit
+ReadWritePaths=/var/lib/execd -/var/moo/surface/execd
 ProtectHome=true
 PrivateTmp=true
 NoNewPrivileges=true

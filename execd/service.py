@@ -497,6 +497,8 @@ class ExecService:
         #: the ACCT_ACTIVITY doorbell and the transport it logs in through,
         #: set by ``__main__`` for the Schwab broker only (st-8bls).
         self.stream: Any = None
+        #: the view log (st-6pfc), set by __main__; its counts ride /status
+        self.view_log: Any = None
         self.stream_transport: Any = None
         self._open: dict[str, OpenPosition] = {}
         self._working: dict[str, WorkingEntry] = {}
@@ -700,6 +702,8 @@ class ExecService:
             "broker": self.config.broker,
             "arming": self.arming.status(),
             "stream": self.stream.status() if self.stream is not None else None,
+            # the view log's health: lines, drops, write errors (st-6pfc)
+            "view_log": self.view_log.health() if self.view_log is not None else None,
             "day": {
                 "open_positions": day.open_positions,
                 "realized_loss_usd": day.realized_loss_usd,

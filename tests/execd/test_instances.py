@@ -198,8 +198,11 @@ class TestUnits:
     def test_only_the_schwab_unit_can_write_the_grants(self):
         s, a = unit("strader-execd.service"), unit("strader-execd-alpaca.service")
         assert s["ProtectSystem"] == a["ProtectSystem"] == "strict"
-        assert s["ReadWritePaths"].split() == ["/var/lib/execd"]
-        assert a["ReadWritePaths"].split() == ["/var/lib/execd-alpaca"]
+        # its own state, and its own view log (st-6pfc) — never the other's state
+        assert s["ReadWritePaths"].split() == ["/var/lib/execd", "-/var/moo/surface/execd"]
+        assert a["ReadWritePaths"].split() == ["/var/lib/execd-alpaca",
+                                               "-/var/moo/surface/execd-alpaca"]
+        assert flag(a["ExecStart"], "--view-log", "") == "/var/moo/surface/execd-alpaca"
         # the Alpaca unit reads both from the Schwab state dir, read-only
         assert flag(a["ExecStart"], "--vault", "") == "/var/lib/execd/vault.json"
         assert flag(a["ExecStart"], "--market-credential", "") == "/var/lib/execd/market.json"

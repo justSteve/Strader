@@ -74,6 +74,7 @@ from .orderpage import (balances_html, journal_html, position_html, send_fields_
                         broker_badge)
 from .service import CONTRACT_MULTIPLIER, ExecService, Refused
 from .stops import _round_up_to_tick, tick_for
+from .viewlog import ViewLog, order_record, viewer_tag
 from .traffic import TrafficBuffer, contract_words, lines_for_send, render_html as traffic_html
 from .vault import BadPassphrase, Vault, VaultError, VaultMissing
 
@@ -248,7 +249,8 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 monotonic: Callable[[], float] = time.monotonic,
                 unlock_payload: Callable[[Mapping[str, Any]], Any] | None = None,
                 prefix: str = "/exec", grants: bool = True,
-                mode_credential: Callable[[Mapping[str, Any], str], Any] | None = None) -> Flask:
+                mode_credential: Callable[[Mapping[str, Any], str], Any] | None = None,
+                view_log: ViewLog | None = None) -> Flask:
     """Build the page app. ``vault`` is the path (or a :class:`Vault`) the
     trading credential lives in; ``market`` the market credential file, if
     the service holds one; ``http_client`` is for tests (an ``httpx.Client``
@@ -562,6 +564,9 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         # the SEND token rides with the ticket, single use (st-igw0)
         send_nonce = (nonces.issue("send", SEND_NONCE_TTL_S)
                       if priced is not None and priced.ready else None)
+        if view_log is not None and view_log.enabled and priced is not None:
+            st = service.status()
+            _view(sel, priced, st, sendable(priced, st.get("balances"), st), None, None)
         return render_order(service, _actions(), sel, priced, today=_today(),
                             embed=embed, fresh=fresh, send_nonce=send_nonce,
                             traffic_html=traffic_html(traffic), **kw)
@@ -590,6 +595,18 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         sel = _selection(request.args)
         return _state_payload(request.args.get("symbol") or "", request.args.get("lots"),
                               sel=sel if sel.side else None)
+
+    def _view(sel, priced, st, sendable_now, closes, today_text) -> None:
+        """What this request showed, to the view log (st-6pfc) — enqueued
+        only; the log's own thread writes. Never fails the request."""
+        if view_log is None or not view_log.enabled:
+            return
+        try:
+            rec, disp = order_record(sel=sel, priced=priced, st=st, sendable=sendable_now,
+                                     closes=closes, today_text=today_text)
+            view_log.offer(viewer_tag(request.headers.get("User-Agent")), rec, disp, priced)
+        except Exception:  # noqa: BLE001
+            log.exception("view log: the record could not be built")
 
     def _state_payload(symbol: str, lots_arg: Any, *, refused: str | None = None,
                        sel: Selection | None = None) -> dict[str, Any]:
@@ -679,12 +696,15 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         from .panel import closed_html, journal_facts, money, panel_body
         stage, body = panel_body(service, st, _actions(), now=clock(),
                                  order_path=url_for("exec.order"), refused=refused)
+        facts = journal_facts(service)
+        today_text = f"today {money((st.get('pnl') or {}).get('day_usd'))}"
+        _view(sel, priced, st, extra.get("sendable"), facts.get("closes"), today_text)
         return {"mode": st["mode"], "arming": st["arming"], "day": st["day"],
                 # the day's closed positions, a folded card each (st-qqxj)
-                "closed_html": closed_html(journal_facts(service), clock()),
+                "closed_html": closed_html(facts, clock()),
                 # the day's total under the closed cards, repainted with them —
                 # a close changed the cards and left this line stale until a reload
-                "today_text": f"today {money((st.get('pnl') or {}).get('day_usd'))}",
+                "today_text": today_text,
                 "pnl": st.get("pnl"), "positions": st["positions"],
                 "working": st["working"],
                 "quote": quote, "spx": spx,

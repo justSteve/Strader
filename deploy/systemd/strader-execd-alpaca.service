@@ -47,6 +47,7 @@ ExecStart=/opt/execd/venv/bin/python -m execd --alpaca \
     --mode-file /etc/execd-alpaca/mode \
     --port 8780 \
     --page-port 8781 \
+    --view-log /var/moo/surface/execd-alpaca \
     --page-prefix /exec-alpaca \
     --callback-url https://127.0.0.1:8182
 Restart=always
@@ -59,7 +60,8 @@ TimeoutStopSec=15
 
 # Hardening: the Schwab unit's, with its own state as the only writable path.
 ProtectSystem=strict
-ReadWritePaths=/var/lib/execd-alpaca
+# and the view log Desk reads (st-6pfc); '-' so a missing dir never stops the unit
+ReadWritePaths=/var/lib/execd-alpaca -/var/moo/surface/execd-alpaca
 ProtectHome=true
 PrivateTmp=true
 NoNewPrivileges=true

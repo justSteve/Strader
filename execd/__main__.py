@@ -68,6 +68,7 @@ from .api import BIND_HOST, BIND_PORT, create_app
 from .bounds import load_bounds
 from .broker import MockBroker
 from .page import DEFAULT_CALLBACK_URL, PAGE_HOST, PAGE_PORT, CredentialFile, create_page
+from .viewlog import DEFAULT_VIEW_LOG_DIR, ViewLog
 from .schwab import AccountStream, Credential, SchwabBroker, trading_payload
 from .alpaca import AlpacaBroker, alpaca_payloads
 from .service import ExecService, ServiceConfig
@@ -227,6 +228,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--page-prefix", default="/exec",
                    help="the path the page lives under (default: %(default)s; the Alpaca "
                         "instance uses /exec-alpaca). Every link and form stays inside it")
+    p.add_argument("--view-log", default=str(DEFAULT_VIEW_LOG_DIR),
+                   help="directory for the view log, one JSON line per displayed change "
+                        "of the order page (st-6pfc); the Alpaca unit passes its own")
+    p.add_argument("--no-view-log", action="store_true",
+                   help="turn the view log off")
     p.add_argument("--no-page", action="store_true",
                    help="do not serve the page (console trials; --unlock-stdin still works)")
     p.add_argument("--callback-url", default=DEFAULT_CALLBACK_URL,
@@ -403,11 +409,15 @@ def _serve(args: argparse.Namespace, service: ExecService, market: CredentialFil
     else:
         print("execd watch: OFF — no SPX-mark exit loop, no fill sweep", file=sys.stderr)
     if not args.no_page:
+        view_log = ViewLog(args.view_log, enabled=not args.no_view_log, clock=service.clock)
+        service.view_log = view_log
+        print(f"execd view log: {'OFF' if not view_log.enabled else args.view_log}",
+              file=sys.stderr)
         page = create_page(service, vault=args.vault, market=market,
                            callback_url=args.callback_url,
                            state_dir=args.state_dir, unlock_payload=unlock_payload,
                            prefix=args.page_prefix, grants=grants,
-                           mode_credential=mode_credential)
+                           mode_credential=mode_credential, view_log=view_log)
         threading.Thread(
             target=lambda: page.run(host=PAGE_HOST, port=args.page_port, threaded=True),
             name="execd-page", daemon=True).start()

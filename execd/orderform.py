@@ -303,18 +303,27 @@ def choose(contracts: list[Contract], spx: float, *, strike: float | None,
     cap = delta if delta is not None else DEFAULT_DELTA
     lots = max(1, lots)
     off = stop_off if stop_off is not None else DEFAULT_STOP_LOSS_USD / (CONTRACT_MULTIPLIER * lots)
-
-    def legal(c: Contract) -> bool:
-        if not (0 < c.abs_delta <= cap + 1e-9) or c.ask_pts <= 0:
-            return False
-        lim = limit_at(c.ask_pts)
-        if funds is not None and lim * CONTRACT_MULTIPLIER * lots > funds:
-            return False
-        return lim - off >= tick_for(0.0)
-    ok = [c for c in contracts if legal(c)]
+    ok = [c for c in contracts if why_not(c, cap=cap, funds=funds, lots=lots, off=off) is None]
     if ok:
         return max(ok, key=lambda c: (c.abs_delta, -c.spread_pts))
     return min(contracts, key=lambda c: (abs(c.abs_delta - cap), c.spread_pts))
+
+
+def why_not(c: Contract, *, cap: float, funds: float | None, lots: int,
+            off: float) -> str | None:
+    """Why ``choose`` passes a strike over, in words, or ``None`` when it is a
+    legal order — the one rule the chooser and the view log share (st-6pfc:
+    "the runners-up with the reason each lost")."""
+    if c.ask_pts <= 0:
+        return "no two-sided market"
+    if not (0 < c.abs_delta <= cap + 1e-9):
+        return "over the cap" if c.abs_delta > cap else "no delta"
+    lim = limit_at(c.ask_pts)
+    if funds is not None and lim * CONTRACT_MULTIPLIER * max(1, lots) > funds:
+        return "can't afford"
+    if lim - off < tick_for(0.0):
+        return "no room for the stop"
+    return None
 
 
 # ── the priced ticket ────────────────────────────────────────────────────
@@ -355,6 +364,11 @@ class Priced:
     selection: Selection
     spx: float = 0.0
     contracts: list[Contract] = field(default_factory=list)   # the window shown
+    #: what the chooser saw (st-6pfc, the view log): the whole chain read,
+    #: the delta cap and the funds it judged against — never sent anywhere
+    chain: list[Contract] = field(default_factory=list, repr=False)
+    cap: float | None = None
+    funds: float | None = None
     contract: Contract | None = None
     limit: float | None = None
     #: the SPX level the intent carries — the service walks it into the
@@ -445,9 +459,12 @@ def price(service: ExecService, sel: Selection) -> Priced:
         out.error = f"no {sel.right.lower()}s expiring {sel.expiry.isoformat()} in the chain"
         return out
     out.contracts = window(contracts, spx)
+    out.chain = contracts
+    out.cap = sel.delta if sel.delta is not None else DEFAULT_DELTA
+    out.funds = _funds(service)
     try:
         c = choose(contracts, spx, strike=sel.strike, delta=sel.delta,
-                   funds=_funds(service), lots=sel.lots, stop_off=sel.stopoff)
+                   funds=out.funds, lots=sel.lots, stop_off=sel.stopoff)
     except ValueError as exc:
         out.error = str(exc)
         return out

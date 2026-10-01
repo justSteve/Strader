@@ -94,6 +94,9 @@ install_execd() {
     #    /var/lib/execd execd:execd 0700  vault, market credential, journal, STOP
     run install -d -o root -g "$EXECD_USER" -m 0750 "$EXECD_OPT" "$EXECD_ETC"
     run install -d -o "$EXECD_USER" -g "$EXECD_USER" -m 0700 "$EXECD_STATE" "$EXECD_STATE/journal"
+    #    /var/moo/surface/execd{,-alpaca} execd:execd 0755  the view log, one JSON
+    #    line per displayed change of the order page, for Desk to read (st-6pfc)
+    run install -d -o "$EXECD_USER" -g "$EXECD_USER" -m 0755 /var/moo/surface/execd /var/moo/surface/execd-alpaca
 
     # 3. the code: the execd/ package only, nothing else from the tree. rsync
     #    --delete keeps the copy exactly the package, so a module removed from

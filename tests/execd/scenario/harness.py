@@ -335,6 +335,7 @@ def _page_client(scn: Scenario):
     app = create_page(scn.service, vault=vault, market=market, callback_url=CALLBACK,
                       http_client=httpx.Client(base_url="https://api.schwabapi.com",
                                                transport=httpx.MockTransport(Schwab())),
-                      clock=scn.clock, monotonic=Mono())
+                      clock=scn.clock, monotonic=Mono(),
+                      view_log=getattr(scn, "view_log", None))
     app.config["TESTING"] = True
     return same_origin(app.test_client())
