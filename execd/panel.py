@@ -517,11 +517,17 @@ def closed_positions(facts: Mapping[str, Any]) -> list[dict[str, Any]]:
         key = str(c.get("intent_id") or c.get("order_id") or c.get("ts"))
         g = groups.setdefault(key, {"key": key, "symbol": c.get("symbol"),
                                     "intent_id": c.get("intent_id"), "qty": 0,
-                                    "pnl_usd": 0.0, "value_out": 0.0, "parts": []})
+                                    "pnl_usd": 0.0, "net_pnl_usd": 0.0,
+                                    "value_out": 0.0, "parts": []})
         qty = int(c.get("qty") or 0)
         g["qty"] += qty
         if isinstance(c.get("pnl_usd"), (int, float)):
             g["pnl_usd"] = round(g["pnl_usd"] + float(c["pnl_usd"]), 2)
+            # net of fees beside the gross (st-ocnp); a line from before it
+            # carried one counts gross
+            net = c.get("net_pnl_usd")
+            g["net_pnl_usd"] = round(g["net_pnl_usd"] + float(
+                net if isinstance(net, (int, float)) else c["pnl_usd"]), 2)
         if isinstance(c.get("exit_price"), (int, float)):
             g["value_out"] += float(c["exit_price"]) * qty
         g["parts"].append(c)
@@ -553,7 +559,10 @@ def closed_card(g: Mapping[str, Any], facts: Mapping[str, Any], now: datetime) -
     name = contract_name(str(g.get("symbol") or ""))
     closed_at = g.get("closed_at")
     when = closed_at.astimezone(CT).strftime("%H:%M:%S") if closed_at else "—"
-    pnl = g.get("pnl_usd")
+    # net of both commissions, the card's own arithmetic: the open card's
+    # "at stop" is net, and the closed one said the gross — the same trade
+    # two numbers apart by the fees (st-ocnp)
+    pnl = g.get("net_pnl_usd", g.get("pnl_usd"))
     why = reason_words(last, facts.get("order_types") or {})
     head = (f"<summary><span class=cname>{esc(name)} × {g['qty']}</span>"
             f"<span class='k cwhen'>{when}</span>"
@@ -570,6 +579,9 @@ def closed_card(g: Mapping[str, Any], facts: Mapping[str, Any], now: datetime) -
         io += f" · held {ago((closed_at - opened).total_seconds())}"
     if io:
         rows.append(("in → out", io))
+    gross = g.get("pnl_usd")
+    if isinstance(gross, (int, float)) and isinstance(pnl, (int, float)) and gross != pnl:
+        rows.append(("before fees", f"{money(gross)} (${gross - pnl:,.2f} in commissions)"))
     # the stop it last rested at, and how far under the entry's limit —
     # "I had changed the SL to .3 — did that change register?" (st-qqxj)
     stop = (facts.get("stops") or {}).get(iid)

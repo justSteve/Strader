@@ -180,7 +180,6 @@ def test_d8_tier_zero_locks_a_loss(make):
 
 # ── D9 ───────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D9"))
 @pytest.mark.parametrize("part", ["close-is-net", "promoted-commission"])
 def test_d9_the_day_is_continuous_through_a_close(make, part):
     if part == "close-is-net":

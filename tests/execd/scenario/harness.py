@@ -150,7 +150,9 @@ class Scenario:
         return self.events("closed")
 
     def realized(self) -> float:
-        return round(sum(float(e.get("pnl_usd") or 0) for e in self.closes()), 2)
+        """The day's closes net of fees — what the day total sums (st-ocnp)."""
+        return round(sum(float(e.get("net_pnl_usd", e.get("pnl_usd")) or 0)
+                         for e in self.closes()), 2)
 
     def status_pnl(self) -> float | None:
         return self.service._day_pnl([])["realized_usd"]

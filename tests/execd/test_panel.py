@@ -219,7 +219,9 @@ class TestTheCard:
         assert body.index("class=side") < body.index("<div id=closed>") < body.index("class=foot")
         assert "<details class='card closedcard' data-key='br-1'>" in stack   # folded: no open
         head = stack.split("<summary>")[1].split("</summary>")[0]
-        assert "C6400 × 1" in head and "10:01:39" in head and "+$20.00" in head and "FLATTEN" in head
+        # the money net of both commissions, as the open card's is (st-ocnp)
+        assert "C6400 × 1" in head and "10:01:39" in head and "+$18.70" in head and "FLATTEN" in head
+        assert "<tr><td>before fees</td><td>+$20.00 ($1.30 in commissions)</td></tr>" in stack
         assert "2.10 → 2.30 · held 1 m 39 s" in stack
         assert "<tr><td>reason</td><td>FLATTEN</td></tr>" in stack
 

@@ -120,5 +120,5 @@ class TestSeed4TheDaysTotal:
         scn.run(12, until=lambda s: not s.held())
         after = screen.poll()
         close, = scn.closes()
-        assert screen.closed_cards(after) == [close["pnl_usd"]]
-        assert screen.today(after) == close["pnl_usd"] != screen.today(before)
+        assert screen.closed_cards(after) == [close["net_pnl_usd"]]
+        assert screen.today(after) == close["net_pnl_usd"] != screen.today(before)

@@ -41,11 +41,6 @@ KNOWN: dict[str, dict[str, str]] = {
                     "beside the target every pass",
            "detail": "_take_bracket_off → DEFERRED → _rest_stop_at as a single order (the pair "
                      "cannot be cleared), then observe fires again next pass and churns it."},
-    "D9": {"invariant": "(assertion)", "pinned_by": _T + "test_d9_the_day_is_continuous_through_a_close",
-           "title": "closed lines are gross while the card is net of fees; a promoted or "
-                    "recovered position carries entry commission 0",
-           "detail": "the day total jumps by the fees at the close; _promote/_recover never "
-                     "set entry_commission_usd."},
     "D13": {"invariant": "(assertion)", "pinned_by": _T + "test_d13_what_a_restart_forgets",
             "title": "the fill watermark resets on restart and trail_tier is not recovered",
             "detail": "_last_fill_poll = clock() at construction; nothing journals or replays "

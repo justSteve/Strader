@@ -34,7 +34,7 @@ def test_valuation_counts_every_part_of_the_order(armed: ExecService, broker):
     assert v["error"] is None
 
     # the day: nothing realized yet, unrealized net carried up
-    assert st["pnl"] == {"realized_usd": 0.0, "closes": 0,
+    assert st["pnl"] == {"realized_usd": 0.0, "realized_gross_usd": 0.0, "closes": 0,
                          "unrealized_net_usd": -11.30, "day_usd": -11.30}
 
 
@@ -72,7 +72,13 @@ def test_realized_comes_from_the_journal_and_gains_are_positive(armed: ExecServi
     broker.set_quote(CALL, bid=2.60, ask=2.70)
     armed.flatten(reason="page")                                  # sells at the bid, 2.60
     pnl = armed.status()["pnl"]
-    assert pnl == {"realized_usd": 50.0, "closes": 1, "unrealized_net_usd": 0.0, "day_usd": 50.0}
+    # realized net of both commissions (0.65 in, 0.65 out), as the
+    # unrealized it replaces was — the day does not jump at the close (st-ocnp)
+    assert pnl == {"realized_usd": 48.70, "realized_gross_usd": 50.0, "closes": 1,
+                   "unrealized_net_usd": 0.0, "day_usd": 48.70}
+    close, = armed.journal.events("closed")
+    assert (close["pnl_usd"], close["net_pnl_usd"]) == (50.0, 48.70)
+    assert (close["entry_fees_usd"], close["exit_fees_usd"]) == (0.65, 0.65)
 
 
 def test_the_page_shows_the_position_and_refreshes_only_while_it_is_open(armed: ExecService, broker, tmp_path):
@@ -135,7 +141,7 @@ def test_a_realized_loss_renders_signed_and_red(armed: ExecService, broker, tmp_
 
     armed.place(entry("v-6"))
     broker.set_quote(CALL, bid=1.70, ask=1.80)
-    armed.flatten(reason="page")                                  # -$40 realized
+    armed.flatten(reason="page")                  # -$40 realized, -$41.30 after fees
     body = client.get("/exec/account").get_data(as_text=True)
-    assert "<td class=neg>-$40.00</td>" in body
-    assert "<td class=neg>-$40.00</td>" in body and "$40.00</td>" not in body.replace("-$40.00", "")
+    assert "<td class=neg>-$41.30</td>" in body
+    assert "<td class=neg>-$41.30</td>" in body and "$41.30</td>" not in body.replace("-$41.30", "")

@@ -122,7 +122,8 @@ class TestTheScreenAgreesWithTheService:
         scn.run(120, until=lambda s: not s.held())
         state = screen.poll()
         assert state["panel_stage"] == "none"               # the caption goes with the card
-        assert screen.closed_cards(state) == [c["pnl_usd"] for c in scn.closes()]
+        # each card net of both commissions, as the open card's figures are
+        assert screen.closed_cards(state) == [c["net_pnl_usd"] for c in scn.closes()]
         assert screen.today(state) == scn.service.status()["pnl"]["day_usd"] == scn.realized()
 
         # a second trade, closed the same way: two cards, newest on top
@@ -133,7 +134,7 @@ class TestTheScreenAgreesWithTheService:
         state = screen.poll()
         closes = scn.closes()
         assert len(closes) == 2
-        assert screen.closed_cards(state) == [c["pnl_usd"] for c in reversed(closes)]
+        assert screen.closed_cards(state) == [c["net_pnl_usd"] for c in reversed(closes)]
         assert screen.today(state) == scn.realized()
 
     def test_an_open_position_is_on_the_day_at_its_net(self, make):

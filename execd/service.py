@@ -163,6 +163,9 @@ class WorkingEntry:
     #: sent with its bracket attached (a triggered order, co-8mb1z): on the
     #: fill the broker already holds the stop and the target
     triggered: bool = False
+    #: the preview's commission for the whole order, so the position it
+    #: becomes carries its entry fees like one filled at the send (st-ocnp)
+    entry_commission_usd: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -171,6 +174,7 @@ class WorkingEntry:
             "stop_spx": self.stop_spx, "delta": self.delta,
             "page_query": dict(self.page_query) if self.page_query else None,
             "triggered": self.triggered,
+            "entry_commission_usd": self.entry_commission_usd,
         }
 
 
@@ -271,13 +275,16 @@ class UnconfirmedSend:
     #: sweep, the working entry it becomes must say so, or _promote puts a
     #: second pair beside the children the broker already rests (st-rzia).
     triggered: bool = False
+    #: the preview's commission, carried to the working entry it becomes (st-ocnp)
+    entry_commission_usd: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {"intent_id": self.intent_id, "symbol": self.symbol, "qty": self.qty,
                 "limit": self.limit, "right": self.right, "stop_spx": self.stop_spx,
                 "delta": self.delta, "at": self.at.isoformat(),
                 "page_query": dict(self.page_query) if self.page_query else None,
-                "exit_spx": self.exit_spx, "triggered": self.triggered}
+                "exit_spx": self.exit_spx, "triggered": self.triggered,
+                "entry_commission_usd": self.entry_commission_usd}
 
     def matches(self, order: OrderResult) -> bool:
         """The broker order this send would have become: same contract, same
@@ -291,6 +298,16 @@ class UnconfirmedSend:
         if self.limit is not None and abs(float(order.price or 0.0) - self.limit) > 1e-6:
             return False
         return order.submitted_at >= self.at - timedelta(seconds=5)
+
+
+def _entry_commission_of(e: dict[str, Any]) -> float:
+    """What an entry's ``filled`` line says it cost in commission; the
+    published per-contract rate for a line written before it said
+    (st-ocnp) — a recovered position carried 0."""
+    c = e.get("commission_usd")
+    if isinstance(c, (int, float)):
+        return round(float(c), 2)
+    return round(COMMISSION_PER_CONTRACT_USD * int(e.get("qty", 0) or 0), 2)
 
 
 def _filled_qty_of(order: OrderResult) -> int:
@@ -776,11 +793,17 @@ class ExecService:
         lines (gains positive, as they are written), unrealized from the
         valuations handed in (struck once, shared with the position rows),
         and the two together."""
-        realized = 0.0
+        realized = gross = 0.0
         closes = 0
         for e in self.journal.read():
             if e.get("event") == "closed" and isinstance(e.get("pnl_usd"), (int, float)):
-                realized += float(e["pnl_usd"])
+                gross += float(e["pnl_usd"])
+                # net of fees, as the unrealized beside it is — summed gross,
+                # the day jumped down by the fees the moment a position
+                # closed (st-ocnp); a line from before it carried the net
+                # counts gross
+                net = e.get("net_pnl_usd")
+                realized += float(net) if isinstance(net, (int, float)) else float(e["pnl_usd"])
                 closes += 1
         realized = round(realized, 2)
         if valuations is None:
@@ -793,7 +816,8 @@ class ExecService:
             unrealized += v["net_if_closed_usd"]
         if unrealized is not None:
             unrealized = round(unrealized, 2)
-        return {"realized_usd": realized, "closes": closes,
+        return {"realized_usd": realized, "realized_gross_usd": round(gross, 2),
+                "closes": closes,
                 "unrealized_net_usd": unrealized,
                 "day_usd": None if unrealized is None else round(realized + unrealized, 2)}
 
@@ -1369,13 +1393,14 @@ class ExecService:
                 order_id=match.order_id, symbol=send.symbol, qty=send.qty,
                 intent_id=intent_id, right=send.right, limit=send.limit,
                 stop_spx=send.stop_spx, delta=send.delta, page_query=send.page_query,
-                triggered=send.triggered)
+                triggered=send.triggered, entry_commission_usd=send.entry_commission_usd)
             self._working[work.order_id] = work
             self.journal.record("working", kind="entry", intent_id=intent_id,
                                 symbol=work.symbol, qty=work.qty, order_id=work.order_id,
                                 status=match.status.value, limit=work.limit,
                                 stop_spx=work.stop_spx, delta=work.delta,
                                 page_query=work.page_query, triggered=work.triggered,
+                                entry_commission_usd=work.entry_commission_usd,
                                 found_by="reconcile")
             found.append({"intent_id": intent_id, "outcome": "found",
                           "order_id": match.order_id, "status": match.status.value})
@@ -1453,6 +1478,7 @@ class ExecService:
                                     status=new.status.value, limit=work.limit,
                                     stop_spx=work.stop_spx, delta=work.delta,
                                     page_query=work.page_query, triggered=work.triggered,
+                                    entry_commission_usd=work.entry_commission_usd,
                                     found_by="replace")
                 if new.is_filled:
                     promoted.append(work.symbol)
@@ -1471,6 +1497,10 @@ class ExecService:
         it the same protective stop a synchronous fill would have got."""
         fill_px = order.fill_price if order.fill_price is not None else (work.limit or 0.0)
         qty = min(_filled_qty_of(order), work.qty)
+        # its share of the preview's commission: a promoted position carried
+        # 0 and the card's net and the closed line's overstated it (st-ocnp)
+        commission = (round(work.entry_commission_usd * qty / work.qty, 2)
+                      if work.qty > 0 else 0.0)
         try:
             spx = self.spx_mark()
         except BrokerError:
@@ -1483,7 +1513,7 @@ class ExecService:
             self._add_to_position(pos, qty, fill_px, intent_id=work.intent_id,
                                   order_id=order.order_id, spx=spx,
                                   stop_spx=work.stop_spx, delta=work.delta,
-                                  found_by="reconcile")
+                                  commission_usd=commission, found_by="reconcile")
             self._resolve_working(order.order_id, outcome="filled")
             return
         pos = OpenPosition(
@@ -1491,11 +1521,13 @@ class ExecService:
             intent_id=work.intent_id, right=work.right,
             stop_spx=work.stop_spx, delta=work.delta, entry_spx=spx,
             entry_order_id=order.order_id, opened_at=self.clock(),
+            entry_commission_usd=commission,
         )
         self._open[pos.symbol] = pos
         self.journal.record("filled", kind="entry", intent_id=work.intent_id,
                             symbol=pos.symbol, qty=qty, price=fill_px,
                             cost_usd=round(fill_px * CONTRACT_MULTIPLIER * qty, 2),
+                            commission_usd=commission,
                             spx=spx, stop_spx=work.stop_spx, delta=work.delta,
                             order_id=order.order_id, found_by="reconcile")
         self._resolve_working(order.order_id, outcome="filled")
@@ -1864,6 +1896,7 @@ class ExecService:
                 pos = OpenPosition(
                     symbol=symbol, qty=held.qty, entry_price=held.avg_price,
                     intent_id=f"adopted:{symbol}", right=right, opened_at=now,
+                    entry_commission_usd=round(COMMISSION_PER_CONTRACT_USD * held.qty, 2),
                 )
                 self._open[symbol] = pos
                 adopted.append(symbol)
@@ -2120,7 +2153,8 @@ class ExecService:
             limit=intent.limit, right=intent.occ.right, stop_spx=intent.stop_spx,
             delta=intent.delta, at=self.clock(),
             page_query=dict(page_query) if page_query else None,
-            exit_spx=intent.exit_spx, triggered=bracket is not None)
+            exit_spx=intent.exit_spx, triggered=bracket is not None,
+            entry_commission_usd=float(prev.commission_usd or 0.0))
         if intent.exit_spx is not None:
             self._exit_levels[intent.intent_id] = float(intent.exit_spx)
         self.journal.record("sending", kind="entry", spx=spx, **send.to_dict(),
@@ -2160,6 +2194,7 @@ class ExecService:
                 limit=intent.limit, stop_spx=intent.stop_spx, delta=intent.delta,
                 page_query=dict(page_query) if page_query else None,
                 triggered=bracket is not None,
+                entry_commission_usd=float(prev.commission_usd or 0.0),
             )
             self._working[work.order_id] = work
             self.journal.record("working", kind="entry", intent_id=intent.intent_id,
@@ -2167,7 +2202,8 @@ class ExecService:
                                 order_id=work.order_id, status=order.status.value,
                                 limit=work.limit, stop_spx=work.stop_spx,
                                 delta=work.delta, spx=spx, page_query=work.page_query,
-                                triggered=work.triggered)
+                                triggered=work.triggered,
+                                entry_commission_usd=work.entry_commission_usd)
             out["working"] = work.to_dict()
             return out
 
@@ -2199,6 +2235,7 @@ class ExecService:
         self.journal.record("filled", kind="entry", intent_id=intent.intent_id,
                             symbol=pos.symbol, qty=pos.qty, price=fill_px,
                             cost_usd=round(fill_px * CONTRACT_MULTIPLIER * pos.qty, 2),
+                            commission_usd=pos.entry_commission_usd,
                             spx=spx, stop_spx=intent.stop_spx, delta=intent.delta,
                             order_id=order.order_id)
         if bracket is not None:
@@ -2245,6 +2282,7 @@ class ExecService:
             self.journal.record("filled", kind="entry", intent_id=intent_id,
                                 symbol=fresh.symbol, qty=qty, price=fill_px,
                                 cost_usd=round(fill_px * CONTRACT_MULTIPLIER * qty, 2),
+                                commission_usd=round(commission_usd, 2),
                                 spx=spx, stop_spx=stop_spx, delta=delta,
                                 order_id=order_id, found_by=found_by)
             out: dict[str, Any] = {"added_to": None}
@@ -2263,6 +2301,7 @@ class ExecService:
         self.journal.record("filled", kind="entry", intent_id=intent_id,
                             symbol=pos.symbol, qty=qty, price=fill_px,
                             cost_usd=round(fill_px * CONTRACT_MULTIPLIER * qty, 2),
+                            commission_usd=round(commission_usd, 2),
                             spx=spx, stop_spx=stop_spx, delta=delta,
                             order_id=order_id, found_by=found_by, added_to=pos.intent_id)
         self.journal.record("position_added", symbol=pos.symbol, intent_id=pos.intent_id,
@@ -2549,10 +2588,11 @@ class ExecService:
 
         remaining = pos.qty - closed_qty
         pnl = self._pnl_usd(pos, exit_px, closed_qty)
+        fees = self._close_fees(pos, closed_qty, held=pos.qty)
         self.journal.record("closed", symbol=pos.symbol, qty=closed_qty,
                             remaining_qty=remaining, intent_id=pos.intent_id,
                             kind=reason, entry_price=pos.entry_price,
-                            exit_price=exit_px, pnl_usd=pnl,
+                            exit_price=exit_px, pnl_usd=pnl, **fees(pnl),
                             order_id=order_id, reason=why, **pos.water_dict())
         also_filled: list[dict[str, Any]] = []
         for other_reason, other in (("protective-stop", stop_fill), ("target", target_fill)):
@@ -2576,7 +2616,8 @@ class ExecService:
 
         return {"symbol": pos.symbol, "qty": closed_qty, "remaining_qty": remaining,
                 "entry_price": pos.entry_price, "exit_price": exit_px,
-                "pnl_usd": pnl, "reason": reason, "order_id": order_id,
+                "pnl_usd": pnl, "net_pnl_usd": fees(pnl)["net_pnl_usd"],
+                "reason": reason, "order_id": order_id,
                 "closed": remaining == 0,
                 "stop_canceled": stop_canceled, "stop_replaced": restopped,
                 "target_canceled": target_canceled, "target_replaced": retargeted,
@@ -2593,11 +2634,13 @@ class ExecService:
         px = order.fill_price if order.fill_price is not None else 0.0
         if qty > 0:
             pnl = self._pnl_usd(pos, px, qty)
+            fees = self._close_fees(pos, qty, held=held)
             self._booked_exits.add(order.order_id)
             self.journal.record("closed", symbol=pos.symbol, qty=qty,
                                 remaining_qty=held - qty, intent_id=pos.intent_id,
                                 kind=reason, entry_price=pos.entry_price,
-                                exit_price=px, pnl_usd=pnl, order_id=order.order_id,
+                                exit_price=px, pnl_usd=pnl, **fees(pnl),
+                                order_id=order.order_id,
                                 reason=reason, detail="found filled by the cancel")
         excess = _filled_qty_of(order) - qty
         if excess > 0:
@@ -3703,6 +3746,23 @@ class ExecService:
             return round(float(pos.entry_spx) - distance, 2)
         return round(float(pos.entry_spx) + distance, 2)
 
+    @staticmethod
+    def _close_fees(pos: OpenPosition, qty: int, *, held: int
+                    ) -> Callable[[float], dict[str, float]]:
+        """The fees a close of ``qty`` out of ``held`` carries: its share of
+        the entry's commission (taken off the position, so what is still
+        held keeps the rest) and the exit's at the published rate — the
+        card's own arithmetic (``valuation``). Returns the closed line's
+        fields for a gross P&L: ``pnl_usd`` stays gross, ``net_pnl_usd``
+        sits beside it. The day total sums the net, so it no longer jumps
+        by the fees at the close (st-ocnp)."""
+        share = (round(pos.entry_commission_usd * min(qty, held) / held, 2)
+                 if held > 0 else 0.0)
+        pos.entry_commission_usd = round(pos.entry_commission_usd - share, 2)
+        exit_fee = round(COMMISSION_PER_CONTRACT_USD * qty, 2)
+        return lambda pnl: {"entry_fees_usd": share, "exit_fees_usd": exit_fee,
+                            "net_pnl_usd": round(pnl - share - exit_fee, 2)}
+
     def _pnl_usd(self, pos: OpenPosition, exit_price: float,
                  qty: int | None = None) -> float:
         n = pos.qty if qty is None else qty
@@ -3785,6 +3845,8 @@ class ExecService:
                         held.entry_price = round((held.entry_price * held.qty + px * q)
                                                  / (held.qty + q), 4)
                         held.qty += q
+                        held.entry_commission_usd = round(
+                            held.entry_commission_usd + _entry_commission_of(e), 2)
                     continue
                 self._open[symbol] = OpenPosition(
                     symbol=symbol, qty=int(e.get("qty", 0) or 0),
@@ -3794,6 +3856,7 @@ class ExecService:
                     entry_spx=e.get("spx"),
                     entry_order_id=str(e.get("order_id", "")),
                     opened_at=_ts_of(e) or self.clock(),
+                    entry_commission_usd=_entry_commission_of(e),
                 )
             elif e.get("event") == "stop_placed":
                 pos = self._open.get(str(e.get("symbol", "")))
@@ -3888,6 +3951,7 @@ class ExecService:
                     page_query={str(k): str(v) for k, v in query.items()}
                     if isinstance(query, dict) else None,
                     triggered=bool(e.get("triggered")),
+                    entry_commission_usd=float(e.get("entry_commission_usd") or 0.0),
                 )
             elif e.get("event") == "entry_resolved":
                 self._working.pop(str(e.get("order_id", "")), None)
@@ -3904,6 +3968,8 @@ class ExecService:
                     entry_price=float(e.get("entry_price", 0.0) or 0.0),
                     intent_id=f"adopted:{symbol}", right=right,
                     opened_at=_ts_of(e) or self.clock(),
+                    entry_commission_usd=round(
+                        COMMISSION_PER_CONTRACT_USD * int(e.get("qty", 0) or 0), 2),
                 )
             elif e.get("event") == "position_gone":
                 self._open.pop(str(e.get("symbol", "")), None)
@@ -3935,7 +4001,8 @@ class ExecService:
                         at=_ts_of(sending) or self.clock(),
                         page_query={str(k): str(v) for k, v in query.items()}
                         if isinstance(query, dict) else None,
-                        triggered=bool(sending.get("triggered")))
+                        triggered=bool(sending.get("triggered")),
+                        entry_commission_usd=float(sending.get("entry_commission_usd") or 0.0))
             elif e.get("event") in ("send_resolved", "placed"):
                 self._unconfirmed.pop(str(e.get("intent_id", "")), None)
             elif e.get("event") == "exit_unfilled":
@@ -3957,6 +4024,9 @@ class ExecService:
                     self._booked_exits.add(str(e["order_id"]))
                 pos = self._open.get(symbol)
                 if remaining and pos is not None:
+                    if isinstance(e.get("entry_fees_usd"), (int, float)):
+                        pos.entry_commission_usd = round(
+                            pos.entry_commission_usd - float(e["entry_fees_usd"]), 2)
                     pos.qty = int(remaining)
                     pos.exit_order_id = None
                     pos.exit_reason = None
