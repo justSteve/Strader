@@ -647,6 +647,26 @@ class TestTheLegsAreReconciled:
         assert closed["exit_price"] == broker._orders[sid].fill_price
         assert broker._orders[tid].status is OrderStatus.CANCELED   # the other leg came off
 
+    def test_a_filled_leg_is_taken_before_its_cancelled_sibling(self, armed, broker):
+        """The OCO's other half reads CANCELED by the same fill. Taken first,
+        it was journaled lost and re-rested under a position the filled leg
+        had already closed (st-4hhd)."""
+        from dataclasses import replace as dc_replace
+        from execd.broker import OrderStatus
+        armed.place(entry(stop_spx=SPX_NOW - 2.0, delta=0.30))
+        p = self.pos(armed)
+        sid, tid = p["stop_order_id"], p["target_order_id"]
+        stops_before = len(armed.journal.events("stop_placed"))
+        broker.fill_resting(tid)
+        broker._orders[sid] = dc_replace(broker._orders[sid], status=OrderStatus.CANCELED)
+        broker._fills.clear()                          # the sweep's window will not see it
+        armed.reconcile()
+        assert armed.status()["positions"] == []
+        assert armed.journal.events("leg_lost") == []
+        assert len(armed.journal.events("stop_placed")) == stops_before
+        closed = armed.journal.events("closed")[-1]
+        assert closed["order_id"] == tid and closed["kind"] == "target"
+
     def test_a_leg_missing_from_the_listing_is_kept_and_said_after_the_window(
             self, armed, broker, clock):
         from execd.service import LEG_SETTLE_S

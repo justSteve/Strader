@@ -255,7 +255,7 @@ _CARRIED_EVENTS = frozenset((
     "filled", "stop_placed", "target_placed", "stop_adjusted", "target_adjusted",
     "canceled", "position_adopted", "position_gone", "position_corrected",
     "leg_unconfirmed", "leg_resolved", "exit_unfilled", "exit_resolved", "closed",
-    "leg_replaced", "leg_cancelled_outside", "bracket_unread",
+    "leg_replaced", "leg_cancelled_outside", "bracket_unread", "trail_moved",
 ))
 #: ``_attach_triggered``'s answer when the bracket a triggered entry carried
 #: could not be read whole, or what it carried is not yet confirmed off: the
@@ -1867,7 +1867,11 @@ class ExecService:
             # a leg can ask whether its sibling was moved in the same breath
             listed = {leg: broker_orders.get(getattr(pos, self._LEG_ATTR[leg]) or "")
                       for leg in ("stop", "target")}
-            for leg in ("stop", "target"):
+            # A leg that FILLED first: its OCO sibling reads CANCELED by the
+            # same fill, and taken first it was journaled lost and re-rested
+            # under a position the filled leg had already closed (st-4hhd).
+            for leg in sorted(("stop", "target"),
+                              key=lambda lg: not (listed[lg] is not None and listed[lg].is_filled)):
                 id_attr = self._LEG_ATTR[leg]
                 order_id = getattr(pos, id_attr)
                 if not order_id:
@@ -3543,6 +3547,10 @@ class ExecService:
         if res.get("refused") is None:
             pos.trail_tier = tier
             pos.trail_retry_at = None
+            # the tier reached, on its own line: a restart that forgot it
+            # walked the trail from tier 0 again (st-4hhd)
+            self.journal.record("trail_moved", symbol=pos.symbol, intent_id=pos.intent_id,
+                                tier=tier, stop_price=price)
         else:
             pos.trail_retry_at = now + timedelta(seconds=TRAIL_RETRY_S)
         return {**line, "result": res}
@@ -4223,6 +4231,12 @@ class ExecService:
                     pos.stop_held_off = True
                     if e.get("stop_price") is not None:
                         pos.stop_price = e.get("stop_price")
+            elif e.get("event") == "trail_moved":
+                pos = self._open.get(str(e.get("symbol", "")))
+                if pos is not None and isinstance(e.get("tier"), int):
+                    pos.trail_tier = max(pos.trail_tier, int(e["tier"]))
+            elif e.get("event") == "unattributed_sell":
+                self._unattributed.add(str(e.get("order_id", "")))
             elif e.get("event") == "bracket_unread":
                 pos = self._open.get(str(e.get("symbol", "")))
                 if pos is not None:
@@ -4416,6 +4430,15 @@ class ExecService:
                     pos.exit_reason = None
                 else:
                     self._open.pop(symbol, None)
+        # The fill sweep's watermark is where the service last was, not the
+        # moment it came back: from clock() at construction, a fill made
+        # while it was down — more than FILL_OVERLAP_S before the restart —
+        # was never in any window (st-4hhd). The last line it wrote is no
+        # later than its last sweep; the repeats the earlier window returns
+        # are booked already (the closed lines' quantities, rebuilt above).
+        last = next((t for t in (_ts_of(e) for e in reversed(entries)) if t is not None), None)
+        if last is not None and last < self._last_fill_poll:
+            self._last_fill_poll = last
         for pos in self._open.values():
             opened = pos.opened_at.astimezone(CT).date() if pos.opened_at else None
             if opened is not None and opened < today:

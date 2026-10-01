@@ -242,22 +242,28 @@ def test_d12_rest_fill_and_fire_between_passes(make):
 
 # ── D13 ──────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D13"))
 @pytest.mark.parametrize("forgets", ["trail-tier", "fill-watermark"])
-def test_d13_what_a_restart_forgets(make, forgets):
+def test_d13_what_a_restart_forgets(make, forgets, monkeypatch):
     scn = make(pinned((0, 9.10, 9.20), (3, 9.80, 9.90), (60, 9.80, 9.90)), strict=False)
     scn.send(scn.ticket("call", strike=7690))
     scn.run(9)
     tier = scn.position(C).trail_tier
     assert tier >= 0
     died_at = scn.clock()
-    last_poll = scn.service._last_fill_poll
     scn.wait_until(300)                             # five minutes down
-    scn.restart()
     if forgets == "trail-tier":
+        scn.restart()
         assert scn.position(C).trail_tier == tier
     else:
-        assert scn.service._last_fill_poll <= died_at and last_poll <= died_at
+        # the first sweep after the restart asks for fills from where the
+        # service was when it died, not from where it came back
+        asked: list = []
+        book = type(scn.paper)
+        real = book.fills_since
+        monkeypatch.setattr(book, "fills_since",
+                            lambda self, since: asked.append(since) or real(self, since))
+        scn.restart()
+        assert asked and asked[0] <= died_at, (asked, died_at)
 
 
 # ── D14 ──────────────────────────────────────────────────────────────────

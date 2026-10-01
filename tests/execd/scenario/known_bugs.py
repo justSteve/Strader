@@ -20,10 +20,6 @@ _S = "test_sequences.py::"
 
 KNOWN: dict[str, dict[str, str]] = {
     # ── the audit (2026-10-01) ───────────────────────────────────────────
-    "D13": {"invariant": "(assertion)", "pinned_by": _T + "test_d13_what_a_restart_forgets",
-            "title": "the fill watermark resets on restart and trail_tier is not recovered",
-            "detail": "_last_fill_poll = clock() at construction; nothing journals or replays "
-                      "the tier."},
     # ── found by the harness ─────────────────────────────────────────────
     "H1": {"invariant": "stop_not_below_bid_when_placed, stop_dollars_off_ticket",
            "pinned_by": _S + "TestFills::test_fill_much_better_than_the_limit",
