@@ -305,8 +305,12 @@ def json_refused() -> str:
 
 # ── D15 ──────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D15"))
-@pytest.mark.parametrize("part", ["three-dollar-boundary", "negative-put-delta"])
+@pytest.mark.parametrize("part", [
+    # the 2.95 stop rests at 2.95 now (D15); the fill 0.25 SPX points under
+    # the send's mark then leaves its level behind the index and the SPX
+    # loop sells it on the same pass — H4
+    pytest.param("three-dollar-boundary", marks=pytest.mark.xfail(strict=True, reason=reason("H4"))),
+    "negative-put-delta"])
 def test_d15_the_restrike(make, part):
     if part == "three-dollar-boundary":
         # a 3.00 limit rests under 3.00/3.10, fills when the offer comes to

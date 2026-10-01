@@ -50,11 +50,6 @@ KNOWN: dict[str, dict[str, str]] = {
             "title": "the fill watermark resets on restart and trail_tier is not recovered",
             "detail": "_last_fill_poll = clock() at construction; nothing journals or replays "
                       "the tier."},
-    "D15": {"invariant": "(assertion)", "pinned_by": _T + "test_d15_the_restrike",
-            "title": "the re-strike at the $3.00 boundary rests a 2.95 stop at 2.90; a "
-                     "negative-delta put intent is flipped",
-            "detail": "protective_stop_price caps one 0.10 tick under a 3.00 limit; level_for "
-                      "divides by a signed delta."},
     # ── found by the harness ─────────────────────────────────────────────
     "H1": {"invariant": "stop_not_below_bid_when_placed, stop_dollars_off_ticket",
            "pinned_by": _S + "TestFills::test_fill_much_better_than_the_limit",
@@ -78,7 +73,8 @@ KNOWN: dict[str, dict[str, str]] = {
                      "0.10-wide market above $3 (seen first in the two-lot partial-exit "
                      "sequence)."},
     "H4": {"invariant": "stop_level_crossed_at_fill",
-           "pinned_by": _S + "TestEntries::test_a_dip_buy_limit_is_not_sold_by_its_own_level",
+           "pinned_by": _S + "TestEntries::test_a_dip_buy_limit_is_not_sold_by_its_own_level, "
+                        + _T + "test_d15_the_restrike[three-dollar-boundary]",
            "title": "a resting limit under the market fills with its SPX stop level already "
                     "behind the index — the SPX loop market-sells it on the same pass",
            "detail": "the level is struck at the SEND's mark; a call limit 0.60 under the ask "

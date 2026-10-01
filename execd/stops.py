@@ -111,9 +111,12 @@ def protective_stop_price(fill_px: float, delta_abs: float, spx_now: float,
     # option to zero is a stop that would never trigger, so it rests one tick
     # above nothing and the position runs to expiry or the live loop instead.
     # A stop at or above the fill would fire on the first tick of spread noise;
-    # the cap is one tick below the fill, on the grid in force there.
+    # the cap is one tick below the fill, on the grid in force just under
+    # it: at exactly 3.00 that is the 0.05 grid, so the cap is 2.95. Taking
+    # the 0.10 tick in force AT 3.00 rested the 2.95 stop he typed under a
+    # 3.00 limit at 2.90 (st-792e).
     price = max(price, tick)
-    fill_tick = max(tick, tick_for(fill_px))
+    fill_tick = max(tick, tick_for(fill_px - 0.001))
     cap = round(fill_px - fill_tick, 2)
     cap = _floor_to(cap, max(tick, tick_for(cap))) if cap > 0 else cap
     price = min(price, cap)
@@ -193,8 +196,13 @@ def level_for(right: str, spx: float, base_px: float, stop_price: float,
     ``spx`` — the inverse of :func:`protective_stop_price` — rounded to the
     cent **away from spot**. That function rounds the walked price *up* to
     the tick, so a level a hair nearer spot than exact would rest the stop one
-    tick higher than asked; a hair farther lands on it. [st-7p5u]"""
-    distance = (base_px - stop_price) / delta
+    tick higher than asked; a hair farther lands on it. [st-7p5u]
+
+    The delta's size only — the side comes from ``right``. A put's delta is
+    negative as quoted, and divided by it the walk went the wrong way: the
+    level landed on the winning side and the entry was refused as
+    transposed (st-792e)."""
+    distance = (base_px - stop_price) / abs(float(delta))
     if _sign_for(right) > 0:
         return math.floor(round((spx - distance) * 100, 6)) / 100
     return math.ceil(round((spx + distance) * 100, 6)) / 100
