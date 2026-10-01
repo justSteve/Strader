@@ -9,6 +9,7 @@
 - Install: the execd changes need `bash deploy/install.sh --execd` while flat (pulls websockets); the parity timer needs a deploy/install.sh run; the footprint feeder picks up market/ changes at its midnight restart.
 - Research, not started: st-peqp (large-lot definition vs match events); divergence calibration (PIVOT_FILTER_TICKS is an uncalibrated seed).
 - Push held behind the st-5n3s review group.
+- Carried in_progress from earlier sessions (untouched this session): st-8l4k, st-8qqw, st-92m7, st-9r51, st-c6ii, st-fsf3, st-gnv5, st-x3tx, st-znw6, st-2nyb.
 
 **Tried**:
 - Piping pytest through tail inside an `&&` chain hid a red suite, and a commit landed with an unbound `day` in the feeder; fixed in 50e43e2. Check `${PIPESTATUS[0]}` before committing.
