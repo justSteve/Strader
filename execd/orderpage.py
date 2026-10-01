@@ -68,6 +68,9 @@ _ORDER_STYLE = """
  .trow.tcenter{justify-content:center}
  button.send:disabled{opacity:.35;cursor:not-allowed}
  .stepper{display:inline-flex;align-items:center;gap:4px}
+ .pin{font-size:.55em;font-weight:600;letter-spacing:.04em;padding:1px 5px;border-radius:5px;
+   vertical-align:middle;margin-left:3px}
+ .pin.manual{background:#fbbf24;color:#111}.pin.auto{color:#9ca3af;border:1px solid #4b5563}
  input.numbox{width:3.6em;height:44px;box-sizing:border-box;font-size:1em;font-weight:700;text-align:center;
    border:2px solid #9ca3af;border-radius:8px;background:#111827;color:#f9fafb}
  #lotsbox{width:2.2em}
@@ -193,6 +196,11 @@ _SCRIPT = """
   function setField(n, v){ var el = form ? form.elements[n] : null; if (el) el.value = v; }
   function strikeTo(v){ if (isNaN(v) || v <= 0) return; setField('strike', String(v)); setField('delta', '');
     var lf = lockField(); if (lf) lf.value = ''; }
+  // the strike back to following the market (st-6ogv): the box cleared,
+  // or a fill — a new position resets the form. The lock goes with it.
+  function strikeAuto(){ setField('strike', ''); setField('delta', '');
+    var lf = lockField(); if (lf) lf.value = ''; }
+  window.__onFilled = function(){ if (!form) return; strikeAuto(); reprice(); };
   function lotsTo(v){ if (isNaN(v)) return; v = Math.max(1, Math.min(99, Math.round(v)));
     setField('lots', String(v)); window.__lots = String(v); return v; }
   document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('button.step') : null;
@@ -203,7 +211,8 @@ _SCRIPT = """
     else { v = lotsTo((isNaN(v) ? 1 : v) + d); box.value = String(v); }
     soon(300); });
   document.addEventListener('input', function(e){ var t = e.target; if (!t || (t.id !== 'strikebox' && t.id !== 'lotsbox')) return;
-    var v = parseFloat(t.value); if (t.id === 'strikebox') strikeTo(v); else lotsTo(v); soon(700); });
+    var v = parseFloat(t.value);
+    if (t.id === 'strikebox') { if (!t.value.trim()) strikeAuto(); else strikeTo(v); } else lotsTo(v); soon(700); });
   document.addEventListener('keydown', function(e){ var t = e.target; if (!t || (t.id !== 'strikebox' && t.id !== 'lotsbox') || e.key !== 'Enter') return;
     e.preventDefault(); soon(0); t.blur(); });
   // the padlock (st-2s4u): the lock is the hidden limit on the form, the
@@ -261,10 +270,14 @@ _SCRIPT = """
 </script>
 """
 
-#: The pane's one rule, pure so a test can run it under node (st-qnbg):
-#: what the pane shows after an event — ``send``, ``toggle``, or
-#: ``tap-traffic`` (a tap anywhere inside the traffic buffer).
+#: Two rules, pure so a test can run them under node. The pane's (st-qnbg):
+#: what it shows after an event — ``send``, ``toggle``, or ``tap-traffic``
+#: (a tap anywhere inside the traffic buffer). The strike's (st-6ogv): a
+#: card arriving at FILLED from any other stage hands the strike back to
+#: the market.
 PANE_LOGIC = """
+window.__strikeResets = function(before, now){
+  return now === 'filled' && before !== 'filled'; };
 window.__paneNext = function(view, ev){
   if (ev === 'send') return 'traffic';
   if (ev === 'toggle') return view === 'traffic' ? 'strikes' : 'traffic';
@@ -437,7 +450,7 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
                 f"<button type=button class=step data-for={field} data-step=-1 "
                 f"aria-label='{label} down'>&minus;</button></span>")
     head = (f"<div class='trow tcenter'><div class=tbig>"
-            f"{stepper('strike', f'{c.strike:g}', 'numeric', 'strike')} × "
+            f"{stepper('strike', f'{c.strike:g}', 'numeric', 'strike')}{strike_pin(priced)} × "
             f"{stepper('lots', str(priced.lots), 'numeric', 'contracts')} "
             # the entry price is a box (co-8mb1z, Steve 2026-09-25: "i want to
             # be able to set the price of my entry"): it shows the limit that
@@ -494,6 +507,19 @@ def affordable(c: Any, lots: int, funds: float | None) -> bool:
     if funds is None:
         return True
     return c.ask_pts * CONTRACT_MULTIPLIER * max(1, lots) <= funds
+
+
+def strike_pin(priced: Priced) -> str:
+    """The cue on the strike box (st-6ogv; Steve, 2026-10-01): ``manual``
+    when he set the strike — typed, stepped or tapped — and it no longer
+    follows the market; ``auto`` while the form picks the highest delta the
+    account can pay for. A manual strike holds through every repaint until a
+    fill resets the form, or until he clears the box."""
+    if priced.selection.strike is not None:
+        return ("<span class='pin manual' id=strikepin title='your strike — it stays put "
+                "until a fill, or clear the box to follow the market again'>manual</span>")
+    return ("<span class='pin auto' id=strikepin title='following the market: the highest "
+            "delta the account can pay for'>auto</span>")
 
 
 def by_delta(contracts: list[Any]) -> list[Any]:

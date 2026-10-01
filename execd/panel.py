@@ -736,6 +736,9 @@ PANEL_SCRIPT = """
   function requestScoped(){ return stageNow() === 'refused'; }
   function apply(j){ var body = document.getElementById('panelbody');
     var changed = !!(j.panel_stage && stageNow() && j.panel_stage !== stageNow());
+    // a fill resets the order form's strike to follow the market (st-6ogv)
+    if (j.panel_stage && window.__strikeResets && window.__onFilled
+        && window.__strikeResets(stageNow() || 'none', j.panel_stage)) { try { window.__onFilled(); } catch (e) {} }
     // the card is on the page hidden while there is nothing to show; a stage
     // arriving from the poll or from a SEND answered in place unhides it
     // (st-igw0), and a position closing hides it again — the close is a card
