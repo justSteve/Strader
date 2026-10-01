@@ -78,12 +78,13 @@ far from the FILL, within one tick). Details in `invariants.py`'s docstring;
 * `test_generated.py` — seeded sessions on seeded tapes (entries, adjusts,
   FLATTEN, restarts), every invariant every step.
 * `test_recorded.py` — the 09-30 half hour, entries at 13:24 and 13:38.
-* `test_audit_defects.py` — the 2026-10-01 audit's D1–D15, strict xfails.
+* `test_audit_defects.py` — the 2026-10-01 audit's D1–D15, each a scenario
+  that failed before its fix (all fifteen fixed; none is an xfail now).
 
 ## Open defects, xfail, and waivers
 
 `known_bugs.py` lists every open defect a scenario pins — D1–D15 from the
-audit, H1–H4 found by the harness — each with the invariant it breaks and
+audit, H1–H6 found by the harness — each with the invariant it breaks and
 the test that pins it as `xfail(strict=True)`. When a defect is fixed its
 test passes, the strict xfail turns red, and the fix's commit deletes the
 marker and the entry together. A scenario that must run past an open defect

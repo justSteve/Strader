@@ -1,7 +1,7 @@
 """Open defects the scenarios pin — one place. [st-ug1h]
 
 ``D1``–``D15`` are the 2026-10-01 audit's findings (handed to this harness
-to pin, each as a scenario); ``H1``–``H4`` are what the harness itself found
+to pin, each as a scenario); ``H1``–``H6`` are what the harness itself found
 running its own sequences. Each entry names the invariant (or the assertion)
 it breaks and the test that pins it — an ``xfail(strict=True)``: when the
 defect is fixed that test passes, the strict xfail turns red, and whoever
@@ -19,7 +19,7 @@ _T = "test_audit_defects.py::"
 _S = "test_sequences.py::"
 
 KNOWN: dict[str, dict[str, str]] = {
-    # ── the audit (2026-10-01) ───────────────────────────────────────────
+    # ── the audit (2026-10-01): all fifteen fixed ───────────────────────
     # ── found by the harness ─────────────────────────────────────────────
     "H2": {"invariant": "stop_not_below_bid_when_placed",
            "pinned_by": _S + "TestFills::test_spread_wider_than_the_stop_distance",
