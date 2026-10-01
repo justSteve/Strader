@@ -131,3 +131,64 @@ def test_the_re_arm_is_its_own_sides_only(make):
     assert scn.service.status()["rearm"] is None
     scn.service.set_mode("paper")
     assert scn.service.status()["rearm"] is None        # a switch spends it
+
+
+# ── the stop from the mark, no preview, the room (st-qbh6) ────────────────
+
+from .tape import CT, Frame, occ, scripted  # noqa: E402
+from datetime import datetime, timezone      # noqa: E402
+
+T1432 = datetime(2026, 10, 1, 14, 31, 50, tzinfo=CT).astimezone(timezone.utc)
+P7680 = occ(T1432.astimezone(CT).date(), "P", 7680)
+
+
+def test_the_1432_shape_rests_the_stop_at_mid_less_point_four_not_fill_less(make):
+    """14:32 CT 2026-10-01, P7680: filled 7.70 at the ask, a 0.40 stop, the
+    best mark after the fill 7.40 — the stop at 7.30 had 0.10 of room and
+    went 5 s later. Struck from the mid at the fill it rests at 7.20."""
+    tape = scripted([Frame(0, 7690.0, quotes={P7680: (7.50, 7.70)}, deltas={P7680: 0.45}),
+                     Frame(5, 7690.2, quotes={P7680: (7.30, 7.50)}, deltas={P7680: 0.45}),
+                     Frame(60, 7690.2, quotes={P7680: (7.30, 7.50)}, deltas={P7680: 0.45})],
+                    start=T1432)
+    scn = make(tape)
+    t = scn.ticket("put", strike=7680, limit=7.70, stopoff=0.40)
+    assert t.stop_price == 7.30                       # struck under the limit at the send
+    out = scn.send(t)
+    assert out["order"]["fill_price"] == 7.70
+    line, = scn.events("stop_from_mark")
+    assert (line["mark_at_fill"], line["stop_was"], line["stop_to"]) == (7.6, 7.3, 7.2)
+    assert scn.resting(P7680)["stop"] == [7.20]
+    scn.run(9)
+    assert scn.held() == {P7680: 1}                   # the 7.40 mark no longer takes it
+
+
+def test_a_typed_stop_price_stays_as_typed(make):
+    tape = scripted([Frame(0, 7690.0, quotes={P7680: (7.50, 7.70)}, deltas={P7680: 0.45}),
+                     Frame(60, 7690.0, quotes={P7680: (7.50, 7.70)}, deltas={P7680: 0.45})],
+                    start=T1432)
+    scn = make(tape)
+    scn.send(scn.ticket("put", strike=7680, limit=7.70, stop="7.30"))
+    assert scn.events("stop_from_mark") == [] and scn.resting(P7680)["stop"] == [7.30]
+
+
+def test_no_preview_call_on_send(make):
+    scn = make(ramp((0, 6380), (60, 6380)))
+    calls = []
+    real = scn.paper.live.preview
+    scn.paper.live.preview = lambda i: (calls.append(i), real(i))[1]
+    scn.send(scn.ticket("call", delta=0.5))
+    assert calls == [] and scn.events("preview") == [] and scn.held()
+    assert isinstance(scn.events("placed")[0]["latency_ms"], float)
+
+
+def test_the_room_in_a_wide_and_a_tight_market(make):
+    wide = make(ramp((0, 6380), (60, 6380), spread=0.40)).ticket("call", delta=0.5)
+    c = wide.contract
+    r = wide.room()
+    mid = (c.bid_pts + c.ask_pts) / 2
+    assert r["room"] == round(mid - r["stop"], 2) and 0.30 <= r["room"] < 0.40
+    assert r["room_spx"] == round(r["room"] / c.abs_delta, 2)
+    assert r["loss_usd"] == round((r["room"] + 0.20) * 100, 2)          # + half the 0.40 spread
+    tight = make(ramp((0, 6380), (60, 6380), spread=0.10)).ticket("call", delta=0.5, lots=2)
+    rt = tight.room()
+    assert 0.30 <= rt["room"] < 0.40 and rt["loss_usd"] == round((rt["room"] + 0.05) * 200, 2)

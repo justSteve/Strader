@@ -132,20 +132,26 @@ class TestStopHasTheLastLook:
     during the pricing must win — it is re-checked immediately before the
     send, and nothing is transmitted."""
 
-    def test_a_stop_touched_during_pricing_blocks_the_send(self, armed, broker):
-        real_preview = broker.preview
+    def test_a_stop_touched_during_pricing_blocks_the_send(self, armed, broker, monkeypatch):
+        # the touch lands on the send's own mark read, after the bounds ran
+        # (there is no broker preview to land in since st-qbh6)
+        real_mark = armed.spx_mark
+        calls = {"n": 0}
 
-        def touch_and_preview(intent):
-            armed.arming.stop()          # the phone touch, mid-pricing
-            return real_preview(intent)
+        def touch_and_mark():
+            calls["n"] += 1
+            if calls["n"] == 2:
+                armed.arming.stop()      # the phone touch, mid-pricing
+            return real_mark()
 
-        broker.preview = touch_and_preview
+        monkeypatch.setattr(armed, "spx_mark", touch_and_mark)
         out = armed.place(entry(intent_id="lastlook-1"))
         assert out["refused"]["bound"] == "stop"
         assert "while this entry was being priced" in out["refused"]["reason"]
         assert [kw for kw in broker.calls_to("place")] == []
 
-    def test_a_stop_from_the_page_during_a_slow_preview_blocks_the_send(self, armed, broker):
+    def test_a_stop_from_the_page_during_a_slow_preview_blocks_the_send(self, armed, broker,
+                                                                       monkeypatch):
         """Finding 35 of the 2026-09-15 audit (st-jm6u): the first fix only
         saw a STOP file touched from a shell. ``service.stop()`` — what the
         page, the iPad and the API call — took the service lock, and ``place``
@@ -157,14 +163,17 @@ class TestStopHasTheLastLook:
 
         in_preview = threading.Event()
         release = threading.Event()
-        real_preview = broker.preview
+        real_mark = armed.spx_mark
+        calls = {"n": 0}
 
-        def slow_preview(intent):
-            in_preview.set()
-            assert release.wait(5), "the STOP thread never released the preview"
-            return real_preview(intent)
+        def slow_mark():        # the send's mark read, slow (no preview since st-qbh6)
+            calls["n"] += 1
+            if calls["n"] == 2:
+                in_preview.set()
+                assert release.wait(5), "the STOP thread never released the read"
+            return real_mark()
 
-        broker.preview = slow_preview
+        monkeypatch.setattr(armed, "spx_mark", slow_mark)
         result: dict = {}
         placer = threading.Thread(
             target=lambda: result.update(armed.place(entry(intent_id="lastlook-2"))))

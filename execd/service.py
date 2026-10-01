@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import math
 import threading
+import time
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -63,15 +64,15 @@ from typing import Any, Callable
 from .arming import Arming, ArmState
 from .bounds import (
     CT, Bounds, DayState, QuoteView, Refusal, check_entry, check_exit,
-    check_preview_cost,
 )
 from .broker import (
-    COMMISSION_PER_CONTRACT_USD, Broker, BrokerError, OrderResult, OrderStatus, Position, Quote,
+    COMMISSION_PER_CONTRACT_USD, Broker, BrokerError, OrderResult, OrderStatus, Position, Preview,
+    Quote,
 )
 from .intent import OrderIntent, OrderType, Side, parse_occ
 from .journal import Journal
 from .stops import (
-    CONTRACT_MULTIPLIER, entry_stop_base, entry_stop_over_bid, exit_triggered, level_for, on_tick,
+    stop_from_mid, CONTRACT_MULTIPLIER, entry_stop_base, entry_stop_over_bid, exit_triggered, level_for, on_tick,
     premium_at_level, protective_stop_price, risk_usd, stop_is_consistent, take_profit_price,
     target_reached, tick_for,
 )
@@ -559,6 +560,11 @@ class ExecService:
         #: the order form's re-arm after a stop fill, until the next entry
         #: fills (st-d7nt)
         self._rearm: dict[str, Any] | None = None
+        #: when each entry's place() began, for the send latency (st-qbh6)
+        self._place_started: dict[str, float] = {}
+        #: the stop's distance under the mid at the fill, by intent, for a
+        #: stop set as a distance (st-qbh6); rebuilt from ``sending`` lines
+        self._stop_off: dict[str, float] = {}
         self._last_fill_poll = clock()
         self._recover()
 
@@ -706,6 +712,7 @@ class ExecService:
         self._booked_exits.clear()
         self._pair_results.clear()
         self._rearm = None
+        self._stop_off.clear()
         self._balances_cache = None
 
     def _needs_credential(self) -> bool:
@@ -1018,6 +1025,7 @@ class ExecService:
         """``page_query`` is the order page's selection the intent was priced
         from; it rides on the working entry so a cancel can re-price it. It
         is never part of the intent and never reaches the broker."""
+        started = time.monotonic()          # the click's arrival, for the latency
         with self._lock:
             intent = intent.validated()
 
@@ -1043,7 +1051,11 @@ class ExecService:
             self.journal.record("request", kind="place", intent_id=intent.intent_id,
                                 intent=intent.to_dict())
             if intent.is_entry:
-                return self._place_entry(intent, page_query=page_query)
+                self._place_started[intent.intent_id] = started
+                try:
+                    return self._place_entry(intent, page_query=page_query)
+                finally:
+                    self._place_started.pop(intent.intent_id, None)
             return self._place_exit(intent)
 
     def cancel(self, order_id: str) -> dict[str, Any]:
@@ -2450,25 +2462,17 @@ class ExecService:
         if (refusal := self._entry_refusal(intent)) is not None:
             return self._refuse(intent, refusal, kind="place")
 
-        try:
-            prev = self.broker.preview(intent)
-        except BrokerError as exc:
-            self.journal.record("error", kind="preview", intent_id=intent.intent_id,
-                                detail=str(exc))
-            raise
-        self._journal_preview(intent, prev)
-        if not prev.accepted:
-            return self._refuse(
-                intent,
-                Refusal("preview_cost", "the broker would not accept this order: "
-                                        + "; ".join(prev.messages or ("no reason given",))),
-                kind="place")
-        # The premium against the premium: max_cost_usd is limit × 100 × qty,
-        # no fees in it. Measured against the total WITH commission, 0.65 a
-        # contract passed the $5 tolerance at eight lots and every eight-lot
-        # entry at the ask was refused (st-s6x0).
-        if (r := check_preview_cost(intent, prev.cost_usd, self.bounds)) is not None:
-            return self._refuse(intent, r, kind="place")
+        # No broker preview on SEND (Steve, 2026-10-01, st-qbh6): a round
+        # trip to Schwab before every send, for a check the service's own
+        # pricing, price band, quote age and bid check already make. The
+        # cost is the service's arithmetic; a broker that rejects the order
+        # says so on the place, and the traffic pane shows it. ``preview()``
+        # (the desk's rehearsal) still asks the broker.
+        prev = Preview(symbol=intent.symbol, side=intent.side, qty=intent.qty,
+                       order_type=intent.order_type, price=intent.limit,
+                       cost_usd=intent.max_cost_usd or 0.0,
+                       commission_usd=round(COMMISSION_PER_CONTRACT_USD * intent.qty, 2),
+                       accepted=True, messages=("priced by the service; no broker preview",))
 
         try:
             spx = self.spx_mark()
@@ -2552,7 +2556,10 @@ class ExecService:
         if intent.exit_spx is not None:
             self._exit_levels[intent.intent_id] = float(intent.exit_spx)
         self._rearm = None          # a new entry is going out: the re-arm is spent (st-d7nt)
+        if intent.stop_off is not None:
+            self._stop_off[intent.intent_id] = float(intent.stop_off)
         self.journal.record("sending", kind="entry", spx=spx, **send.to_dict(),
+                            stop_off=intent.stop_off,
                             **({"stop_price": bracket[0].stop_price,
                                 "target_price": bracket[1].limit} if bracket else {}))
         try:
@@ -2569,8 +2576,11 @@ class ExecService:
                                 note="the broker may hold this order — no entry goes out "
                                      "until reconcile has swept the listing for it")
             raise
+        # the send's latency, the request to the broker's answer (st-qbh6)
+        latency_ms = (round((time.monotonic() - t0) * 1000, 1)
+                      if (t0 := self._place_started.get(intent.intent_id)) is not None else None)
         self.journal.record("placed", intent_id=intent.intent_id, kind="entry",
-                            spx=spx, order=order.to_dict())
+                            spx=spx, order=order.to_dict(), latency_ms=latency_ms)
 
         out: dict[str, Any] = {"refused": None, "order": order.to_dict(),
                                "preview": prev.to_dict(), "stop_order": None,
@@ -3721,26 +3731,39 @@ class ExecService:
         return {**line, "result": res}
 
     def _stop_follows_fill(self, pos: OpenPosition, limit: float | None) -> None:
-        """A triggered stop was struck under the LIMIT, the one price known
-        at the send. A fill better than the limit leaves it nearer the fill
-        than the ticket said — 13:24 CT 2026-09-30, a 9.20 limit filled at
-        8.80 put the 9.00 stop above the fill. Move it down by the
-        improvement, so the stop's dollars are measured from the fill
-        (st-0f5q, st-7p5u "dollars"). Through ``_adjust``: its refusals
-        (a stop not below the bid, off the grid) apply, and a refusal leaves
-        the stop where it was, journaled."""
-        if limit is None or pos.stop_price is None or pos.entry_price >= limit - 1e-9:
+        """The stop struck from the MARK at the fill (Steve, 2026-10-01,
+        st-qbh6). The resting stop is a MARK stop (``schwab.STOP_TRIGGER``),
+        but it was struck at the fill less his distance — and the entry paid
+        the ask, so the real room from the mark was the distance less half
+        the spread less drift: 14:32 CT that day a 7.70 fill with a 0.40
+        stop rested at 7.30 with the mark at 7.40, and went 5 s later.
+
+        For a stop he set as a distance (the default 0.30, or the steppers)
+        the resting stop becomes the mid at the fill less that distance, up
+        DOWN to the tick grid — a mid on the half tick would otherwise lose
+        a tick of the room this exists to give. A price he typed stays as
+        typed. The move goes
+        through ``_adjust`` — the replace path, so a stop rests throughout —
+        and meets its refusals: one at or above the bid is refused and the
+        stop already resting stays, journaled. ``limit`` is kept for the
+        callers; the mid, not the limit, is the reference now."""
+        off = self._stop_off.get(pos.intent_id)
+        if off is None or pos.stop_price is None:
             return
-        improvement = limit - pos.entry_price
-        want = pos.stop_price - improvement
-        tick = tick_for(want)
-        want = round(math.floor(round(want / tick, 6)) * tick, 2)
-        if want <= 0 or want >= pos.stop_price:
+        q = self._quote_view(pos.symbol)
+        if q is None or q.bid <= 0 or q.ask < q.bid:
+            self.journal.record("stop_from_mark", symbol=pos.symbol, intent_id=pos.intent_id,
+                                moved=False, detail="no two-sided quote at the fill — the "
+                                                    "stop stays where it was struck")
             return
-        self.journal.record("stop_follows_fill", symbol=pos.symbol, intent_id=pos.intent_id,
-                            limit=limit, fill=pos.entry_price, stop_was=pos.stop_price,
-                            stop_to=want)
-        self._adjust(pos.symbol, stop_price=want, target_price=None)
+        mid = round((q.bid + q.ask) / 2, 4)
+        want = stop_from_mid(mid, off)
+        self.journal.record("stop_from_mark", symbol=pos.symbol, intent_id=pos.intent_id,
+                            mark_at_fill=mid, bid=q.bid, ask=q.ask, fill=pos.entry_price,
+                            stop_off=off, stop_was=pos.stop_price, stop_to=want,
+                            moved=want != pos.stop_price)
+        if want != pos.stop_price:
+            self._adjust(pos.symbol, stop_price=want, target_price=None)
 
     def _journal_raw(self, order_id: str | None, why: str) -> None:
         """The broker's own body for an order, on its own journal line, so
@@ -4350,9 +4373,12 @@ class ExecService:
                 continue
             entries.extend(e for e in self.journal.read(day)
                            if e.get("event") in _CARRIED_EVENTS
-                           or (e.get("event") == "sending" and e.get("exit_spx") is not None))
+                           or (e.get("event") == "sending" and (e.get("exit_spx") is not None
+                                                                or e.get("stop_off") is not None)))
         entries.extend(self.journal.read())
         for e in entries:
+            if e.get("event") == "sending" and e.get("stop_off") is not None:
+                self._stop_off[str(e.get("intent_id", ""))] = float(e["stop_off"])
             if e.get("event") == "sending" and e.get("exit_spx") is not None:
                 self._exit_levels[str(e.get("intent_id", ""))] = float(e["exit_spx"])
                 continue

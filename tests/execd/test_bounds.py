@@ -19,7 +19,7 @@ import pytest
 
 from execd.bounds import (
     Bounds, DayState, QuoteView, check_entry, check_exit, check_instrument,
-    check_preview_cost, check_price_band,
+    check_price_band,
     load_bounds,
 )
 from execd.intent import OrderIntent, OrderType, Side
@@ -123,12 +123,16 @@ class TestEachBoundRefusesByName:
         r = refusal(entry(), quote=None)
         assert r.bound == "price_band" and "blind" in r.reason
 
-    def test_preview_cost_refuses_when_the_broker_disagrees_with_the_intent(self):
-        r = check_preview_cost(entry(limit=2.10), previewed_usd=260.0, bounds=Bounds())
-        assert r.bound == "preview_cost" and "$260.00" in r.reason
-
-    def test_preview_cost_tolerates_the_commission(self):
-        assert check_preview_cost(entry(limit=2.10), 210.65, Bounds()) is None
+    def test_the_preview_tolerance_is_retired_and_steves_file_still_loads(self, tmp_path):
+        """st-qbh6: no broker preview on SEND. His /etc file carries the
+        key (preview_cost_tolerance_usd: 5.00); it loads, ignored."""
+        import yaml
+        from execd.bounds import RETIRED_KEYS, load_bounds
+        assert "preview_cost_tolerance_usd" in RETIRED_KEYS
+        f = tmp_path / "bounds.yaml"
+        f.write_text(yaml.safe_dump({"instruments": ["SPX", "SPXW"], "price_band_pct": 0.10,
+                                     "preview_cost_tolerance_usd": 5.0}))
+        assert load_bounds(f) == Bounds()
 
 
 class TestOrderOfChecks:
@@ -286,7 +290,7 @@ class TestConfiguration:
     def test_to_dict_names_every_bound_the_service_enforces(self):
         assert set(Bounds().to_dict()) == {
             "instruments",
-            "price_band_pct", "max_quote_age_s", "preview_cost_tolerance_usd",
+            "price_band_pct", "max_quote_age_s",
             "require_protective_stop",
             "take_profit_multiple", "take_profit_basis",
             "trail_arm_usd", "trail_arm_lock_usd", "trail_step_usd", "trail_gap_usd",
@@ -364,7 +368,7 @@ class TestTheBoundsAreAllCovered:
         assert {"instrument", "stop", "price_band"} <= declared
         assert not {"ceiling", "positions"} & declared   # co-8mb1z
         assert "window" not in declared          # no clock bound (co-8mb1z)
-        assert len(declared) >= 10
+        assert len(declared) >= 9       # preview_cost retired, st-qbh6
 
     def test_every_bound_the_service_can_emit_has_a_refusing_test(self):
         missing = self._declared() - self._asserted()

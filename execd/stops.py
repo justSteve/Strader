@@ -152,6 +152,15 @@ def entry_stop_over_bid(stop_price: float, bid: float | None) -> str | None:
     return None
 
 
+def stop_from_mid(mid: float, off: float) -> float:
+    """The stop his distance under the mid, DOWN to the tick grid in force
+    there (st-qbh6): the room from the mark is the point, so a mid on the
+    half tick does not round a tick of it away. Never under one tick."""
+    raw = float(mid) - float(off)
+    t = tick_for(raw)
+    return round(max(PREMIUM_TICK_PTS, _floor_to(raw, t)), 2)
+
+
 def risk_usd(fill_px: float, stop_price: float, qty: int = 1) -> float:
     """What the resting stop caps the loss at, before fees, in dollars."""
     return round((float(fill_px) - float(stop_price)) * CONTRACT_MULTIPLIER * int(qty), 2)

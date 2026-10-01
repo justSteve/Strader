@@ -55,9 +55,10 @@ brackets):
     The trailing stop has armed (its first tier promises +$30) and rests
     where a fill would net a loss after fees.
 ``stop_dollars_off_ticket``
-    An entry whose stop was set in dollars rests its stop further from the
-    FILL than the ticket's distance from the limit, by more than one tick.
-    [st-0f5q: 9.20 limit, 8.80 fill; st-7p5u]
+    An entry whose stop was set as a distance rests its stop further from
+    the MID at the fill than that distance, by more than one tick (st-qbh6;
+    before it, from the fill: st-0f5q, st-7p5u); a stop price he typed rests
+    away from what he typed.
 
 Nothing here mutates the service or the book: no reconcile, no sweep (it
 reads the book's dictionaries, not its sweeping methods).
@@ -321,16 +322,27 @@ def check(scn: "Scenario") -> list[Violation]:
         stops = [o for o in _working_sells(book, sym) if o.order_type is OrderType.STOP]
         if len(stops) != 1:
             continue
-        entry = book._orders.get(pos.entry_order_id)
-        fill = float(entry.fill_price) if entry is not None and entry.fill_price else pos.entry_price
-        want = round(float(intent["limit"]) - float(intent["stop_price"]), 2)
-        got = round(fill - float(stops[0].price), 2)
         tick = tick_for(float(stops[0].price))
+        if intent.get("stop_off") is not None:
+            # a distance: struck from the MID at the fill (st-qbh6)
+            marks = [e for e in journal if e.get("event") == "stop_from_mark"
+                     and e.get("intent_id") == pos.intent_id and e.get("mark_at_fill") is not None]
+            refused = any(e.get("event") == "refused" and e.get("kind") == "adjust"
+                          and e.get("symbol") == sym for e in journal)
+            if not marks or refused:
+                continue            # no quote at the fill, or the move was refused (journaled)
+            ref, ref_word = float(marks[-1]["mark_at_fill"]), "mid at the fill"
+            want = float(intent["stop_off"])
+        else:
+            # a price he typed: it stays as typed
+            ref, ref_word = float(intent["limit"]), "limit"
+            want = round(float(intent["limit"]) - float(intent["stop_price"]), 2)
+        got = round(ref - float(stops[0].price), 2)
         if abs(got - want) > tick + 1e-9:
             out.append(Violation("stop_dollars_off_ticket",
                                  f"{sym.strip()}: the ticket's stop was {want:.2f} under the "
-                                 f"{float(intent['limit']):.2f} limit; the fill was {fill:.2f} "
-                                 f"and the stop rests at {stops[0].price:.2f}, {got:.2f} under it"))
+                                 f"{ref_word} {ref:.2f}; the stop rests at "
+                                 f"{stops[0].price:.2f}, {got:.2f} under it"))
     # a standing violation is reported at the step it appears, once
     fresh: list[Violation] = []
     for v in out:

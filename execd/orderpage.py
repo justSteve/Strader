@@ -468,6 +468,12 @@ def ticket_html(priced: Priced, bounds: Any, balances: dict[str, Any] | None = N
     if priced.error:
         return f"<div class=card>{head}<div class=bad>{esc(priced.error)}</div></div>"
     line2 = "".join(f"<div class=warn>{esc(w)}</div>" for w in priced.warnings)
+    # the stop's room from the mark, in his units (Steve, 2026-10-01, st-qbh6)
+    r = priced.room()
+    if r is not None:
+        spx = f" · ≈{r['room_spx']:.2f} SPX" if r["room_spx"] is not None else ""
+        line2 = (f"<div class='k room' id=room>stop {r['stop']:.2f} · room {r['room']:.2f}{spx}"
+                 f" · if hit, loses {usd(r['loss_usd'])}</div>") + line2
     # Said only when the account cannot pay for it — the refusal of
     # 2026-09-15 09:54 CT was exactly this arithmetic. SEND is off with it.
     short = ""

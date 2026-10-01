@@ -78,6 +78,7 @@ from .compose import Contract, parse_chain
 from .intent import OrderIntent
 from .service import ExecService
 from .stops import (_floor_to, _round_up_to_tick, entry_stop_base, entry_stop_over_bid, level_for,
+                    stop_from_mid,
                     on_tick, protective_stop_price, risk_usd, tick_for)
 
 log = logging.getLogger("execd.orderform")
@@ -442,6 +443,29 @@ class Priced:
             return None
         return risk_usd(self.limit, self.stop_price, self.lots)
 
+    def room(self) -> dict[str, float] | None:
+        """The stop's room from the mark, in his units (Steve, 2026-10-01,
+        st-qbh6): the stop as it will rest — his distance under the mid at
+        the fill for a stop set as a distance, his price for one he typed —
+        its distance from the mid now in dollars a contract and in SPX
+        points at the contract's delta, and what it loses if hit, from the
+        expected fill (the mid plus half the spread: the room plus half the
+        spread, for the whole ticket)."""
+        c = self.contract
+        if c is None or self.stop_price is None or self.limit is None or c.bid_pts <= 0:
+            return None
+        mid = (c.bid_pts + c.ask_pts) / 2
+        half = (c.ask_pts - c.bid_pts) / 2
+        if self.stop_set_by is None:
+            off = self.limit - self.stop_price
+            rests = stop_from_mid(mid, off)
+        else:
+            rests = self.stop_price
+        room = round(mid - rests, 2)
+        spx = round(room / c.abs_delta, 2) if c.abs_delta > 0 else None
+        loss = round((room + half) * CONTRACT_MULTIPLIER * self.lots, 2)
+        return {"stop": rests, "room": room, "room_spx": spx, "loss_usd": loss}
+
     @property
     def net_at_stop_usd(self) -> float | None:
         loss = self.stop_loss_usd
@@ -459,6 +483,7 @@ class Priced:
             "stop_spx": self.stop_spx, "stop_price": self.stop_price,
             "stop_set_by": self.stop_set_by, "stop_text": self.selection.stop,
             "stop_loss_usd": self.stop_loss_usd,
+            "room": self.room(),
             "net_at_stop_usd": self.net_at_stop_usd,
             "warnings": list(self.warnings),
             "error": self.error,
@@ -677,6 +702,10 @@ def intent_for(priced: Priced, *, intent_id: str, engine_sha: str) -> dict[str, 
     # carries no SPX stop level of its own and no close-at-SPX level
     # (st-a54y); both are the position card's after the fill.
     d["stop_price"] = float(priced.stop_price)
+    if priced.stop_set_by is None:
+        # a distance (the default or the steppers): struck from the mid at
+        # the fill (st-qbh6); a price he typed stays as typed
+        d["stop_off"] = round(priced.limit - priced.stop_price, 2)
     OrderIntent.from_dict(d).validated()
     return d
 

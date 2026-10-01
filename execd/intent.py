@@ -96,6 +96,11 @@ class OrderIntent:
     #: 2026-09-30: "add an input to hold the strike that triggers a closing
     #: market order"); ``None`` sets none. Independent of the resting stop.
     exit_spx: float | None = None
+    #: the stop as a distance under the limit, per contract, when he set it
+    #: that way (the default, or the steppers): at the fill the service
+    #: strikes the resting stop this far under the MID, not the fill (Steve,
+    #: 2026-10-01, st-qbh6). ``None`` for a price he typed — it stays.
+    stop_off: float | None = None
     source: str = ""                    # "intent-desk" | "rule:<id>" | "flatten" | "protective-stop"
     engine_sha: str = ""
 
@@ -137,6 +142,8 @@ class OrderIntent:
             out.append("a STOP order needs a positive stop_price")
         if self.order_type == OrderType.MARKET and self.limit is not None:
             out.append("a MARKET order carries no limit")
+        if self.stop_off is not None and self.stop_off <= 0:
+            out.append(f"stop_off must be a positive distance, not {self.stop_off!r}")
         if self.exit_spx is not None and self.exit_spx <= 0:
             out.append(f"exit_spx must be a positive SPX level, not {self.exit_spx!r}")
         if self.delta is not None and not (0 < abs(self.delta) <= 1):
@@ -174,6 +181,7 @@ class OrderIntent:
             stop_spx=_as_float(d.get("stop_spx")),
             delta=_as_float(d.get("delta")),
             exit_spx=_as_float(d.get("exit_spx")),
+            stop_off=_as_float(d.get("stop_off")),
             source=str(d.get("source", "")),
             engine_sha=str(d.get("engine_sha", "")),
         )

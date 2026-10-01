@@ -81,8 +81,8 @@ class TestSeed1TheBracketFiredFirst:
 class TestSeed2TheStopFollowsTheFill:
     def test_a_fill_under_the_limit_keeps_the_tickets_dollars(self, make):
         """A 2.10 limit (locked) into a 1.95/2.00 market fills at 2.00; the
-        1.80 stop it carried moves to 1.70 — $30 (the 0.30 default, st-d7nt)
-        from the fill."""
+        1.80 stop it carried moves to 1.65 — the 0.30 default (st-d7nt) under
+        the 1.975 mid at the fill, down to the grid (st-qbh6)."""
         tape = scripted(frames(C7720, 0.30, 7696.0, (0, 1.95, 2.00), (60, 1.95, 2.00)),
                         start=T1324)
         scn = make(tape)
@@ -90,7 +90,7 @@ class TestSeed2TheStopFollowsTheFill:
         assert t.stop_price == 1.80
         scn.send(t)
         assert scn.position(C7720).entry_price == 2.00
-        assert scn.resting(C7720)["stop"] == [1.70]
+        assert scn.resting(C7720)["stop"] == [1.65]
         scn.run(30)
 
 
@@ -98,7 +98,8 @@ class TestSeed3TwentyMeansTwenty:
     def test_1338_the_stop_box_reads_point_three_and_point_three_rests(self, make):
         """13:38 CT: the page priced the ticket from the chain (SPX 7693.71)
         and the service sent on the $SPX quote (7693.68). The stop box said
-        .3 under an 11.80 limit; 11.50 must rest — not 11.60."""
+        .3 under an 11.80 limit; 11.50 had to rest — not 11.60. Since st-qbh6
+        the stop is struck from the 11.75 mid at the fill: 11.40."""
         tape = scripted([Frame(0, 7693.68, chain_spx=7693.71,
                                quotes={C7685: (11.70, 11.80)}, deltas={C7685: 0.70}),
                          Frame(60, 7693.68, chain_spx=7693.71,
@@ -112,13 +113,13 @@ class TestSeed3TwentyMeansTwenty:
         assert (shown["limit"], shown["stop_price"]) == (11.80, 11.50)
         answer = screen.send()
         assert answer["ok"] is True, answer.get("bad")
-        assert scn.resting(C7685)["stop"] == [11.50]
+        assert scn.resting(C7685)["stop"] == [11.40]
 
 
 class TestSeed4TheDaysTotal:
     def test_the_poll_repaints_today_with_the_closed_cards(self, make):
-        tape = scripted(frames(C7690, 0.60, 7696.0, (0, 9.10, 9.20), (6, 8.80, 8.90),
-                               (60, 8.80, 8.90)), start=T1324)
+        tape = scripted(frames(C7690, 0.60, 7696.0, (0, 9.10, 9.20), (6, 8.60, 8.70),
+                               (60, 8.60, 8.70)), start=T1324)
         scn = make(tape)
         screen = OrderScreen(scn)
         screen.pick("call")

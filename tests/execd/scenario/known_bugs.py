@@ -27,20 +27,10 @@ KNOWN: dict[str, dict[str, str]] = {
     # is_refused_at_the_ticket). H5 (st-a54y) closed by his ruling the same
     # day, "At entry, only permit a $$ SL": no entry carries an SPX stop
     # level (TestEntries::test_an_entry_carrying_an_spx_stop_is_refused).
-    "H6": {"invariant": "stop_dollars_off_ticket",
-           "pinned_by": _S + "TestFills::test_a_resting_entry_filled_in_a_market_wider_than_its_stop",
-           "title": "a resting entry filled in a market wider than its stop: the stop cannot "
-                    "follow the fill — measured from the fill it would sit over the bid — and "
-                    "stays struck from the limit, nearer the fill than the ticket said",
-           "detail": "what H1 left (st-n3e8): the stop sent with the entry is now struck from "
-                     "the ask when the market is under the limit at the send, but a resting "
-                     "limit that fills later in a gapped, wide market (generated wide seed 90: "
-                     "15.40 limit, filled 15.20 with the bid 14.00, a 1.00 ticket) still has "
-                     "_stop_follows_fill refused 'not below the bid'. The same root as H2 — a "
-                     "spread wider than the stop distance. Steve's H2 ruling (st-yeph, "
-                     "2026-10-01) refuses it at the entry ticket's send; a limit that rests "
-                     "and fills later in a wider market is past that check, and what the "
-                     "stop does then is st-91yu, open."},
+    # H6 (st-91yu) fixed 2026-10-01 by st-qbh6: the stop is struck from the
+    # MID at the fill, so a resting limit filled later in a wide market rests
+    # its stop the ticket's distance under the mid, under the bid
+    # (TestFills::test_a_resting_entry_filled_in_a_market_wider_than_its_stop).
 }
 
 

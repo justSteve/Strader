@@ -37,7 +37,7 @@ class TestTheEntryPath:
         assert out["order"]["status"] == "FILLED"
         assert out["order"]["fill_price"] == 2.10
         events = [e["event"] for e in armed.journal.read() if e["event"] != "order_raw"]
-        assert events == ["unlock", "request", "preview", "sending", "placed", "filled",
+        assert events == ["unlock", "request", "sending", "placed", "filled",
                           "stop_placed", "target_placed"]
 
     def test_the_fill_becomes_a_tracked_position(self, armed):
@@ -89,44 +89,37 @@ class TestTheEntryPath:
         assert armed.status()["positions"] == []
 
 
-class TestThePreviewGate:
-    def test_a_preview_that_costs_more_than_the_intent_stops_the_send(self, armed, broker, monkeypatch):
-        from execd.broker import Preview
+class TestNoPreviewOnSend:
+    """Steve, 2026-10-01 (st-qbh6): SEND no longer asks the broker for a
+    preview — the service's own pricing, price band, quote age and bid check
+    stand; a broker that rejects the order says so on the place."""
 
-        def dear(intent):
-            return Preview(intent.symbol, intent.side, intent.qty, intent.order_type,
-                           price=3.50, cost_usd=350.0, commission_usd=0.65)
+    def test_a_send_makes_no_preview_call(self, armed, broker):
+        out = armed.place(entry(stop_spx=SPX_NOW - 2.0))
+        assert out["refused"] is None and out["order"]["status"] == "FILLED"
+        assert broker.calls_to("preview") == [] and sent_orders(broker)
+        assert armed.journal.events("preview") == []
+        placed = armed.journal.events("placed")[0]
+        assert isinstance(placed["latency_ms"], float) and placed["latency_ms"] >= 0
 
-        monkeypatch.setattr(broker, "preview", dear)
-        out = armed.place(entry(limit=2.10))
-        assert out["refused"]["bound"] == "preview_cost"
-        assert sent_orders(broker) == []
+    def test_the_rehearsal_still_previews(self, armed, broker):
+        out = armed.preview(entry(intent_id="pv-1", stop_spx=SPX_NOW - 2.0))
+        assert out["refused"] is None and broker.calls_to("preview")
 
-    def test_a_preview_the_broker_will_not_accept_stops_the_send(self, armed, broker, monkeypatch):
-        from execd.broker import Preview
+    def test_a_broker_rejection_on_place_is_the_answer(self, armed, broker, monkeypatch):
+        from execd.broker import OrderResult, OrderStatus
+        real = broker.place
 
-        def refused(intent):
-            return Preview(intent.symbol, intent.side, intent.qty, intent.order_type,
-                           price=2.10, cost_usd=210.0, accepted=False,
-                           messages=("market closed",))
-
-        monkeypatch.setattr(broker, "preview", refused)
-        out = armed.place(entry())
-        assert out["refused"]["bound"] == "preview_cost"
-        assert "market closed" in out["refused"]["reason"]
-        assert sent_orders(broker) == []
-
-    def test_preview_prices_without_transmitting(self, armed, broker):
-        out = armed.preview(entry())
-        assert out["refused"] is None
-        assert out["preview"]["cost_usd"] == 210.0
-        assert sent_orders(broker) == []
-
-    def test_preview_reports_a_refusal_without_pricing_it(self, armed, broker):
-        out = armed.preview(entry(symbol="AAPL  260826C00190000"))
-        assert out["refused"]["bound"] == "instrument"
-        assert broker.calls_to("preview") == []
-
+        def reject(intent):
+            o = real(intent)
+            return OrderResult(order_id=o.order_id, status=OrderStatus.REJECTED,
+                               symbol=o.symbol, side=o.side, qty=o.qty,
+                               order_type=o.order_type, price=o.price,
+                               submitted_at=o.submitted_at, message="market closed")
+        monkeypatch.setattr(broker, "place", reject)
+        monkeypatch.setattr(broker, "place_triggered", lambda i, *_: reject(i), raising=False)
+        out = armed.place(entry(stop_spx=SPX_NOW - 2.0))
+        assert out["order"]["status"] == "REJECTED" and armed.status()["positions"] == []
 
 class TestIdempotency:
     def test_a_repeated_intent_id_is_answered_from_the_journal(self, armed, broker):
@@ -224,16 +217,18 @@ class TestTheProtectiveStop:
         entry's stop is dollars now (st-a54y), struck again from the mark
         the send goes out on (st-7p5u), so the priced level being crossed
         moves the level with the index and the ticket's stop rests."""
-        real_preview = broker.preview
+        real_mark = armed.spx_mark
+        calls = {"n": 0}
 
-        def preview(intent):
-            out = real_preview(intent)
-            # the index moves through the cut during the preview round trip
-            broker.set_quote("$SPX", bid=SPX_NOW - 12.75, ask=SPX_NOW - 12.25,
-                             last=SPX_NOW - 12.5)
-            return out
+        def mark():
+            calls["n"] += 1
+            if calls["n"] == 2:
+                # the index moves through the cut between the checks and the send
+                broker.set_quote("$SPX", bid=SPX_NOW - 12.75, ask=SPX_NOW - 12.25,
+                                 last=SPX_NOW - 12.5)
+            return real_mark()
 
-        monkeypatch.setattr(broker, "preview", preview)
+        monkeypatch.setattr(armed, "spx_mark", mark)
         out = armed.place(entry(stop_spx=SPX_NOW - 2.0))
         assert out["refused"] is None
         line, = armed.journal.events("stop_restruck")
@@ -241,15 +236,17 @@ class TestTheProtectiveStop:
         assert line["stop_spx"] < SPX_NOW - 12.5           # behind the send's mark
         assert out["stop_order"]["price"] == 1.50          # the ticket's price
 
-    def test_a_mark_lost_during_the_preview_refuses_the_send(self, armed, broker, monkeypatch):
-        real_preview = broker.preview
+    def test_a_mark_lost_before_the_send_refuses_it(self, armed, broker, monkeypatch):
+        real_mark = armed.spx_mark
+        calls = {"n": 0}
 
-        def preview(intent):
-            out = real_preview(intent)
-            broker._quotes.pop("$SPX")
-            return out
+        def mark():
+            calls["n"] += 1
+            if calls["n"] == 2:
+                broker._quotes.pop("$SPX", None)
+            return real_mark()
 
-        monkeypatch.setattr(broker, "preview", preview)
+        monkeypatch.setattr(armed, "spx_mark", mark)
         out = armed.place(entry())
         assert out["refused"]["bound"] == "protective_stop"
         assert "at the send" in out["refused"]["reason"]
@@ -705,7 +702,7 @@ class TestTheJournalReproducesTheDay:
         # fire at the same prices the close is sent at, so none may be live at
         # the broker beside it.
         assert events == [
-            "unlock", "request", "preview", "sending", "placed", "filled", "stop_placed",
+            "unlock", "request", "sending", "placed", "filled", "stop_placed",
             "target_placed", "exit_triggered", "canceled", "canceled", "placed",
             "closed", "form_rearmed", "stand_down",       # a stop-out re-arms the form (st-d7nt)
         ]

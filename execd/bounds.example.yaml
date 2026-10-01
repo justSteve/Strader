@@ -39,9 +39,9 @@ instruments: [SPX, SPXW]
 price_band_pct: 0.10
 max_quote_age_s: 30.0
 
-# The last gate before a send: if the broker's own preview prices the order
-# more than this above what the intent allows, it is not transmitted.
-preview_cost_tolerance_usd: 5.00
+# preview_cost_tolerance_usd is retired (Steve, 2026-10-01, st-qbh6): SEND no
+# longer asks the broker for a preview. A file that still carries it loads, and
+# the key is ignored.
 
 # Every entry must carry the stop_spx and delta the broker-resident protective
 # stop is derived from. This key exists only so the refusal has something to

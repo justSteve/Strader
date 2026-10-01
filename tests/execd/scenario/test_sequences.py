@@ -19,9 +19,8 @@ from datetime import datetime, timezone
 import pytest
 
 from execd.bounds import Bounds
-from execd.stops import take_profit_price
+from execd.stops import stop_from_mid, take_profit_price
 
-from .known_bugs import reason
 from .tape import CT, Frame, occ, ramp, scripted
 
 #: 13:23:50 CT on 2026-09-30, for the tickets with that day's numbers
@@ -49,7 +48,8 @@ class TestEntries:
         out = scn.send(t)
         sym = t.contract.symbol
         assert out["order"]["status"] == "FILLED" and out["order"]["fill_price"] == t.limit
-        assert scn.resting(sym) == {"stop": [t.stop_price],
+        mark = scn.events("stop_from_mark")[-1]              # from the mid (st-qbh6)
+        assert scn.resting(sym) == {"stop": [stop_from_mid(mark["mark_at_fill"], 0.30)],
                                     "target": [take_profit_price(t.limit, 5.0)]}
         assert round(t.limit - t.stop_price, 2) == 0.30            # 0.30 a contract (st-d7nt)
         scn.run(30)
@@ -133,12 +133,15 @@ class TestFills:
         scn = make(flat())
         t = scn.ticket("put", delta=0.4, stopoff=0.5)
         scn.send(t)
-        assert sole_stop(scn, t.contract.symbol) == t.stop_price == round(t.limit - 0.5, 2)
+        assert t.stop_price == round(t.limit - 0.5, 2)       # struck under the limit at the send
+        mark = scn.events("stop_from_mark")[-1]              # and from the mid at the fill
+        assert sole_stop(scn, t.contract.symbol) == stop_from_mid(mark["mark_at_fill"], 0.5)
 
     def test_fill_a_little_better_than_the_limit_moves_the_stop_down(self, make):
         """The improvement is under the stop distance, so the stop sent with
-        the entry is still under the market when it lands; then it follows
-        the fill (``_stop_follows_fill``, st-0f5q)."""
+        the entry is still under the market when it lands; then it is struck
+        from the mid at the fill — 1.975 less 0.20, down to the grid (st-qbh6;
+        it followed the fill before, st-0f5q)."""
         sym = occ(T1324.astimezone(CT).date(), "C", 7720)
         tape = scripted([Frame(0, 7696.0, quotes={sym: (2.05, 2.10)}),
                          Frame(2, 7696.0, quotes={sym: (1.95, 2.00)}),
@@ -149,7 +152,7 @@ class TestFills:
         scn.wait_until(2)
         scn.send(t)
         assert scn.position(sym).entry_price == 2.00
-        assert sole_stop(scn, sym) == 1.80
+        assert sole_stop(scn, sym) == 1.75
         scn.run(30)
 
     def test_fill_much_better_than_the_limit(self, make):
@@ -165,12 +168,11 @@ class TestFills:
         scn.run(30)
         assert scn.held() == {C7690: 1}             # not stopped out by its own stop
 
-    @pytest.mark.xfail(strict=True, reason=reason("H6"))
     def test_a_resting_entry_filled_in_a_market_wider_than_its_stop(self, make):
-        """A 9.20 limit with a 0.50 stop rests under 9.30/9.40; the market
-        drops to 8.50/9.00 and fills it at 9.00. Measured from the fill the
-        stop is 8.50 — at the 8.50 bid, so the follow is refused and the
-        stop stays 8.70, 0.30 from the fill on a 0.50 ticket."""
+        """H6 (st-91yu): a 9.20 limit with a 0.50 stop rests under 9.30/9.40;
+        the market drops to 8.50/9.00 and fills it at 9.00. Measured from the
+        fill the stop would be 8.50 — at the bid. Struck from the 8.75 mid at
+        the fill (st-qbh6) it rests at 8.20, under the bid."""
         tape = scripted([Frame(0, 7696.0, quotes={C7690: (9.30, 9.40)}, deltas={C7690: 0.60}),
                          Frame(3, 7695.0, quotes={C7690: (8.50, 9.00)}, deltas={C7690: 0.60}),
                          Frame(60, 7695.0, quotes={C7690: (8.50, 9.00)}, deltas={C7690: 0.60})],
@@ -179,6 +181,7 @@ class TestFills:
         t = scn.ticket("call", strike=7690, limit=9.20, stopoff=0.50)
         scn.send(t)
         scn.run(9)
+        assert scn.held() == {C7690: 1} and scn.resting(C7690)["stop"] == [8.20]
 
     @pytest.mark.parametrize("spread, lots, tight", [(0.30, 1, 0.20), (0.10, 2, 0.10)],
                              ids=["wide", "two-lots"])
@@ -375,9 +378,10 @@ class TestAdjust:
         scn.send(t)
         sym = t.contract.symbol
         bid = scn.quote(sym).bid
+        before = scn.resting(sym)["stop"]
         out = scn.adjust(sym, stop_price=bid)
         assert out["refused"]["bound"] == "bracket"
-        assert scn.resting(sym)["stop"] == [t.stop_price]
+        assert scn.resting(sym)["stop"] == before
 
     def test_a_level_target_reached_closes_through_the_loop(self, make):
         scn = make(ramp((0, 6380), (15, 6380), (60, 6386), (90, 6386)),

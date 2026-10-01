@@ -188,7 +188,7 @@ def test_a_waiver_must_cite_an_open_defect_for_that_invariant(make):
     tape = ramp((0, 6380), (30, 6380))
     with pytest.raises(KeyError):
         make(tape, waive={"two_stops": "D99"})
-    with pytest.raises(ValueError):
-        make(tape, waive={"short_position": "H6"})
-    scn = make(tape, waive={"stop_dollars_off_ticket": "H6"})
-    assert scn.waived == {"stop_dollars_off_ticket": "H6"}
+    # every defect the harness pinned is fixed (2026-10-01): no key is open,
+    # so every waiver is refused — H6 included, fixed by st-qbh6
+    with pytest.raises(KeyError):
+        make(tape, waive={"stop_dollars_off_ticket": "H6"})

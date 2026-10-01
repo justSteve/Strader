@@ -323,15 +323,12 @@ class TestNewOrderClearsTheCard:
             assert "data-stage=closed" not in body and "data-key='br-1'" in body, url
 
     def test_refused_clears_the_same_way(self, page, service, broker):
-        from execd.broker import Preview
+        from datetime import timedelta
+        from .conftest import CALL
         service.unlock({"t": 1})
-        real = broker.preview
-        broker.preview = lambda intent: Preview(symbol=intent.symbol, side=intent.side, qty=intent.qty,
-                                                order_type=intent.order_type, price=2.10, cost_usd=210.0,
-                                                commission_usd=0.65, accepted=False,
-                                                messages=("reject: not enough buying power",))
-        page_send(page, {"side": "call", "delta": "0.3"})       # refused by the broker's preview
-        broker.preview = real
+        broker.set_quote(CALL, bid=2.00, ask=2.10, as_of=service.clock() - timedelta(seconds=120))
+        page_send(page, {"side": "call", "delta": "0.3"})       # refused: a stale quote
+        broker.set_quote(CALL, bid=2.00, ask=2.10)
         assert "data-stage=refused" in text(page.get("/exec/order"))
         assert "data-stage=refused" not in text(page.get("/exec/order?new=1"))
         assert "data-stage=refused" not in text(page.get("/exec/order?side=put"))

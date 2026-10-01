@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import pytest
 
+from execd.stops import stop_from_mid
+
 from .screen import OrderScreen
 from .tape import ramp
 
@@ -46,7 +48,9 @@ class TestTheTicketIsWhatIsSent:
         assert answer["ok"] is True and answer["msg_stage"] == "filled", answer.get("bad")
         received_matches_shown(answer, shown)
         sym = shown["contract"]["symbol"]
-        assert scn.resting(sym)["stop"] == [shown["stop_price"]]     # filled at the limit
+        # struck from the mid at the fill, the 0.40 under it (st-qbh6)
+        mark = scn.events("stop_from_mark")[-1]
+        assert scn.resting(sym)["stop"] == [mark["stop_to"]] == [stop_from_mid(mark["mark_at_fill"], 0.40)]
 
     def test_steppers_narrow_too(self, make):
         scn = make(flat())
@@ -203,7 +207,7 @@ class TestTheTrafficPane:
         strike = f"{shown['contract']['strike']:g}C"
         assert lines[0].startswith("── ") and lines[0].endswith(f" BUY 1 SPX {strike} ──")
         assert f"→ execd: BUY 1 SPX {strike} LMT {shown['limit']:.2f}, stop $50" in lines[1]
-        assert any("→ paper: preview" in ln for ln in lines)
+        assert not any("preview" in ln for ln in lines)          # none on SEND (st-qbh6)
         assert any(f"→ paper: BUY 1 SPX {strike} LMT {shown['limit']:.2f} + STOP" in ln for ln in lines)
         assert "WORKING" in lines[-1] and "← paper: accepted, order" in lines[-1]
         assert "FILLED" not in " ".join(lines)

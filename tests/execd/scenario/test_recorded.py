@@ -86,8 +86,11 @@ def test_1338_through_the_page_on_the_recorded_market(make):
     got = answer["_received"]
     assert got["symbol"] == shown["contract"]["symbol"] and got["stop_price"] == shown["stop_price"]
     sym = shown["contract"]["symbol"]
-    entry = scn.position(sym).entry_price
-    assert round(entry - scn.resting(sym)["stop"][0], 2) == round(shown["limit"] - shown["stop_price"], 2)
+    # the stop is struck from the mid at the fill, his distance under it (st-qbh6)
+    line, = scn.events("stop_from_mark")
+    off = round(shown["limit"] - shown["stop_price"], 2)
+    assert line["stop_off"] == off and scn.resting(sym)["stop"][0] == line["stop_to"]
+    assert 0 <= round(line["stop_to"] - (line["mark_at_fill"] - off), 4) < 0.10
     scn.run(280, until=lambda s: not s.held())
     state = screen.poll()
     assert screen.today(state) == scn.service.status()["pnl"]["day_usd"]

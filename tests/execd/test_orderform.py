@@ -204,7 +204,7 @@ class TestPrice:
                      "stop_spx": 6379.0, "delta": 0.3,
                      # the $30 stop rides as dollars; the service re-strikes
                      # the level at the send (st-7p5u)
-                     "stop_price": 1.80,
+                     "stop_price": 1.80, "stop_off": 0.3,
                      "source": "page", "engine_sha": "testsha"}
 
 
@@ -267,8 +267,8 @@ class TestPage:
         page_ids = [i for i in ids if str(i).startswith("page-")]
         assert len(page_ids) == 1 and page_ids[0].endswith("-" + nonce[:6])
         events = [e["event"] for e in armed.journal.find(page_ids[0])]
-        # the broker's own preview runs inside the place — no page step for it
-        assert events[:2] == ["request", "preview"] and "placed" in events and "filled" in events
+        # no broker preview on SEND since st-qbh6 — the request, then the send
+        assert events[:2] == ["request", "sending"] and "placed" in events and "filled" in events
         assert armed.journal.find(page_ids[0])[0]["kind"] == "place"
         assert armed.journal.find(page_ids[0])[0]["intent"]["source"] == "page"
         # the same token again is a replay: answered with what happened, never sent twice
@@ -779,22 +779,15 @@ class TestARefusedSendIsShown:
 
     def test_a_refused_send_lands_red_with_the_refused_stage_and_the_journal(
             self, order_page, armed, chain):
-        from execd.broker import Preview
-        real = chain.preview
-
-        def rejecting(intent):
-            p = real(intent)
-            return Preview(symbol=p.symbol, side=p.side, qty=p.qty, order_type=p.order_type,
-                           price=p.price, cost_usd=p.cost_usd, commission_usd=p.commission_usd,
-                           accepted=False,
-                           messages=("reject: You do not have enough available cash/buying "
-                                     "power for this order.",))
-        chain.preview = rejecting
+        # the service refuses (a quote too old to trust — no broker preview
+        # on SEND since st-qbh6, so a service bound is what refuses here)
+        from datetime import timedelta
+        chain.set_quote(CALL, bid=2.00, ask=2.10, as_of=armed.clock() - timedelta(seconds=120))
         r = page_send(order_page, {"side": "call", "delta": "0.3"})
         assert r.status_code == 303 and "bad=" in r.headers["Location"], r.headers["Location"]
         landing = text(order_page.get(r.headers["Location"]))
         assert "<div class=bad>" in landing or "data-stage=refused" in landing
-        assert "buying" in landing and "Nothing sent" in landing
+        assert "price_band" in landing and "Nothing sent" in landing
         assert "data-stage=refused" in landing
         assert not any(c[0] == "place" for c in chain.calls)
         # the journal is on the trading page, latest first, behind one tap
@@ -807,17 +800,13 @@ class TestARefusedSendIsShown:
         """The redirect's query can be lost on the way (it was, 09:54 CT).
         The page reads its own record: a refusal that is the latest thing the
         service did, and recent, IS the REFUSED stage."""
-        from execd.broker import Preview
-        real = chain.preview
-        chain.preview = lambda intent: Preview(symbol=intent.symbol, side=intent.side, qty=intent.qty,
-                                               order_type=intent.order_type, price=2.10, cost_usd=210.0,
-                                               commission_usd=0.65, accepted=False,
-                                               messages=("reject: not enough buying power",))
-        page_send(order_page, {"side": "call", "delta": "0.3"})   # refused by the broker's preview
-        chain.preview = real
+        from datetime import timedelta
+        chain.set_quote(CALL, bid=2.00, ask=2.10, as_of=armed.clock() - timedelta(seconds=120))
+        page_send(order_page, {"side": "call", "delta": "0.3"})   # refused: a stale quote
+        chain.set_quote(CALL, bid=2.00, ask=2.10)
         assert armed.journal.tail(1)[-1]["event"] == "refused"
         plain = text(order_page.get("/exec/order"))          # no msg, no bad on the query
-        assert "data-stage=refused" in plain and "buying power" in plain
+        assert "data-stage=refused" in plain and "price_band" in plain
         clock.advance(minutes=11)
         later = text(order_page.get("/exec/order"))
         assert "data-stage=refused" not in later               # an old refusal is history

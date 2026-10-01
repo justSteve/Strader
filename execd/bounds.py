@@ -97,7 +97,11 @@ RETIRED_KEYS = frozenset({"open_ct", "close_ct", "no_open_after_ct",
                           "max_attempts",
                           # Steve, 2026-09-30: "we can remove the 'only 1
                           # contract permitted' rule" (st-5n3s)
-                          "qty_cap"})
+                          "qty_cap",
+                          # Steve, 2026-10-01 (st-qbh6): no broker preview on
+                          # SEND, so nothing for a preview tolerance to judge.
+                          # His /etc file carries it; it loads, ignored.
+                          "preview_cost_tolerance_usd"})
 
 
 @dataclass(frozen=True)
@@ -137,7 +141,6 @@ class Bounds:
     instruments: tuple[str, ...] = ("SPX", "SPXW")
     price_band_pct: float = 0.10      # a BUY limit may sit this far above the ask
     max_quote_age_s: float = 30.0     # older than this is not a live quote
-    preview_cost_tolerance_usd: float = 5.00
     require_protective_stop: bool = True
     #: The take-profit half of the bracket (Steve, 2026-09-14, st-fn5y: "upon
     #: fill, api should create a resting order at a 10x profit target"). The
@@ -245,7 +248,6 @@ class Bounds:
             "instruments": list(self.instruments),
             "price_band_pct": self.price_band_pct,
             "max_quote_age_s": self.max_quote_age_s,
-            "preview_cost_tolerance_usd": self.preview_cost_tolerance_usd,
             "require_protective_stop": self.require_protective_stop,
             "take_profit_multiple": self.take_profit_multiple,
             "take_profit_basis": self.take_profit_basis,
@@ -407,24 +409,6 @@ def check_exit(intent: OrderIntent, bounds: Bounds,
     # will not take is no protection at all.
     if (r := check_tick(intent)) is not None:
         return r
-    return None
-
-
-def check_preview_cost(
-    intent: OrderIntent, previewed_usd: float, bounds: Bounds
-) -> Refusal | None:
-    """The last gate before a send: the broker's own arithmetic must agree with
-    the intent's. A preview that costs more than the intent said is either a
-    stale price or a misunderstanding, and both are reasons not to transmit."""
-    expected = intent.max_cost_usd
-    if expected is None:
-        return None
-    if previewed_usd > expected + bounds.preview_cost_tolerance_usd:
-        return Refusal(
-            "preview_cost",
-            f"the broker prices this at ${previewed_usd:.2f} but the intent "
-            f"allows ${expected:.2f} (+${bounds.preview_cost_tolerance_usd:.2f}) — not sending",
-        )
     return None
 
 
