@@ -91,6 +91,20 @@ class TestEntries:
         assert all(c["kind"] != "spx-stop" or c["exit_price"] <= round(t.limit - 0.20, 2)
                    for c in scn.closes())
 
+    @pytest.mark.xfail(strict=True, reason=reason("H5"))
+    def test_a_dip_buy_with_a_level_stop_fills_past_its_level(self, make):
+        """The same dip with his close-at-SPX level 0.5 under the send's
+        mark: the limit fills past the level, and the level — his, kept as
+        typed (st-d3va) — sells it on the pass that fills it."""
+        scn = make(ramp((0, 6380), (30, 6380), (90, 6376), (150, 6376)))
+        live = scn.ticket("call", strike=6380)
+        t = scn.ticket("call", strike=6380, limit=round(live.limit - 0.60, 2),
+                       exitspx=6379.5)
+        assert t.stop_set_by == "spx"
+        scn.send(t)
+        scn.run(150, until=lambda s: bool(s.held()))
+        assert scn.held() == {t.contract.symbol: 1}, "sold on the pass that filled it"
+
     def test_the_unlocked_ticket_follows_the_ask(self, make):
         scn = make(ramp((0, 6380), (30, 6384)))
         before = scn.ticket("call", strike=6380)
