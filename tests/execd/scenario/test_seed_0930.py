@@ -44,11 +44,14 @@ class TestSeed1TheBracketFiredFirst:
     def test_1324_the_stop_that_filled_first_is_booked_as_the_stop(self, make):
         """13:24 CT: the 9.20 limit (locked) went out into a 8.70/8.80
         market, filled 8.80 under its 9.00 stop, and the stop fired on the
-        first read. That it was struck above the market at all is H1, open
-        and pinned elsewhere — waived here so this case tests the booking."""
-        tape = scripted(frames(C7690, 0.60, 7696.0, (0, 9.10, 9.20), (2, 8.70, 8.80),
-                               (60, 8.70, 8.80)), start=T1324)
-        scn = make(tape, waive={"stop_not_below_bid_when_placed": "H1"})
+        first read. Since H1 (st-n3e8) that stop is struck from the 8.80 ask
+        and rests under the bid, so the race is reached here the other way
+        it still can be: a market wider than the stop's distance at the
+        limit — 8.70/9.20 — puts the 9.00 stop over the bid (H2, waived)
+        and it fires before the bracket is first read."""
+        tape = scripted(frames(C7690, 0.60, 7696.0, (0, 9.10, 9.20), (2, 8.70, 9.20),
+                               (60, 8.70, 9.20)), start=T1324)
+        scn = make(tape, waive={"stop_not_below_bid_when_placed": "H2"})
         scn.wait_until(2)
         scn.send(scn.ticket("call", strike=7690, limit=9.20))
         scn.run(30)

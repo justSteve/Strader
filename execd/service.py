@@ -2388,7 +2388,18 @@ class ExecService:
         # same intent went out again, and reconcile — which only looks up ids
         # it already holds — never found the first (finding 25, st-xlz9).
         # Now the intent is unconfirmed until the broker's listing is swept.
-        bracket = self._triggered_bracket(intent, spx)
+        # The price the stop sent with the entry is struck from: the limit,
+        # or the ask when the market is already under it — a marketable
+        # limit fills at the offer, and a stop struck under the limit sat
+        # above the bid and fired on the first read (13:24 CT 2026-09-30: a
+        # 9.20 limit into 8.70/8.80, a 9.00 stop over an 8.70 bid). The same
+        # dollars under the price it fills at; the SPX level is unchanged —
+        # it is the ticket's distance from the mark (st-n3e8).
+        q = self._quote_view(intent.symbol)
+        base = intent.limit
+        if base is not None and q is not None and 0 < q.ask < base:
+            base = round(q.ask, 2)
+        bracket = self._triggered_bracket(intent, spx, base=base)
         send = UnconfirmedSend(
             intent_id=intent.intent_id, symbol=intent.symbol, qty=intent.qty,
             limit=intent.limit, right=intent.occ.right, stop_spx=intent.stop_spx,
@@ -2483,7 +2494,7 @@ class ExecService:
                             spx=spx, stop_spx=intent.stop_spx, delta=intent.delta,
                             order_id=order.order_id)
         if bracket is not None:
-            attached = self._attach_triggered(pos, order.order_id, spx, limit=intent.limit)
+            attached = self._attach_triggered(pos, order.order_id, spx, limit=base)
             if attached == BRACKET_UNREAD:
                 out["bracket_unread"] = True       # the next reconcile reads it again
                 return out
@@ -3313,18 +3324,19 @@ class ExecService:
                 self._pair_results.pop(k, None)
         return out
 
-    def _triggered_bracket(self, intent: OrderIntent,
-                           spx: float) -> tuple[OrderIntent, OrderIntent] | None:
+    def _triggered_bracket(self, intent: OrderIntent, spx: float, *,
+                           base: float | None = None) -> tuple[OrderIntent, OrderIntent] | None:
         """The stop and target to send WITH the entry, or ``None`` to send the
         entry alone (co-8mb1z; Steve, 2026-09-25: "My intent is to ensure
         that Stop Loss is in place as soon as the order is filled -- confirm
         yes to create all 3 at once").
 
-        The stop is struck from the entry's LIMIT through the intent's own
-        SPX level and delta — the walk the order form used to put it $20
-        under the limit, or at the price or level he typed. A buy never
-        fills above its limit, so the risk to that stop is at most the $20
-        (or his number). The target is the multiple of the limit
+        The stop is struck from the entry's LIMIT — or ``base``, the ask
+        at the send when the market is already under the limit (st-n3e8) —
+        through the intent's own SPX level and delta: the walk the order
+        form used to put it $20 under the limit, or at the price or level he
+        typed. A buy never fills above its limit, so the risk to that stop
+        is at most the $20 (or his number). The target is the multiple of the limit
         (``take_profit_multiple``, 5× since the same day).
 
         Sent alone — the bracket placed after the fill as before — when the
@@ -3340,7 +3352,9 @@ class ExecService:
         if intent.limit is None or intent.delta is None or intent.stop_spx is None:
             return None
         try:
-            stop_price = protective_stop_price(intent.limit, intent.delta, spx, intent.stop_spx)
+            # struck from ``base`` — the ask when it is under the limit (st-n3e8)
+            stop_price = protective_stop_price(base if base is not None else intent.limit,
+                                               intent.delta, spx, intent.stop_spx)
             b = self.bounds
             target_price = take_profit_price(intent.limit, b.take_profit_multiple,
                                              b.take_profit_basis, stop_price=stop_price)

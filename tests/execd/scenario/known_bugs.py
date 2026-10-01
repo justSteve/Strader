@@ -21,17 +21,6 @@ _S = "test_sequences.py::"
 KNOWN: dict[str, dict[str, str]] = {
     # ── the audit (2026-10-01) ───────────────────────────────────────────
     # ── found by the harness ─────────────────────────────────────────────
-    "H1": {"invariant": "stop_not_below_bid_when_placed, stop_dollars_off_ticket",
-           "pinned_by": _S + "TestFills::test_fill_much_better_than_the_limit",
-           "title": "the stop sent with the entry is struck under the LIMIT, not the market — a "
-                    "market already under the limit by the stop distance fills the entry under "
-                    "a stop above the bid, and it fires at once",
-           "detail": "13:24 CT 09-30: 9.20 limit, market 8.70/8.80 → 9.00 stop over an 8.70 bid; "
-                     "paper fires it on the first read (−$10). bracket_fired books it right; "
-                     "_stop_follows_fill never gets the chance. The same root from a resting "
-                     "entry filled in a wide or gapped market (generated wide seed 90): the "
-                     "follow is refused ('not below the bid') and the stop stays struck from "
-                     "the limit, 0.80 from a 15.20 fill on a 1.00 ticket."},
     "H2": {"invariant": "stop_not_below_bid_when_placed",
            "pinned_by": _S + "TestFills::test_spread_wider_than_the_stop_distance",
            "title": "the entry's stop is never judged against the bid — a spread as wide as the "
@@ -42,6 +31,18 @@ KNOWN: dict[str, dict[str, str]] = {
                      "is $10 a contract — 0.10 under the ask, which is the bid of an ordinary "
                      "0.10-wide market above $3 (seen first in the two-lot partial-exit "
                      "sequence)."},
+    "H6": {"invariant": "stop_dollars_off_ticket",
+           "pinned_by": _S + "TestFills::test_a_resting_entry_filled_in_a_market_wider_than_its_stop",
+           "title": "a resting entry filled in a market wider than its stop: the stop cannot "
+                    "follow the fill — measured from the fill it would sit over the bid — and "
+                    "stays struck from the limit, nearer the fill than the ticket said",
+           "detail": "what H1 left (st-n3e8): the stop sent with the entry is now struck from "
+                     "the ask when the market is under the limit at the send, but a resting "
+                     "limit that fills later in a gapped, wide market (generated wide seed 90: "
+                     "15.40 limit, filled 15.20 with the bid 14.00, a 1.00 ticket) still has "
+                     "_stop_follows_fill refused 'not below the bid'. The same root as H2 — a "
+                     "spread wider than the stop distance — so it waits on Steve's H2 decision "
+                     "(no refusal or warning is added here: tests/execd/test_no_hand_holding.py)."},
     "H5": {"invariant": "stop_level_crossed_at_fill",
            "pinned_by": _S + "TestEntries::test_a_dip_buy_with_a_level_stop_fills_past_its_level",
            "title": "a resting limit with a LEVEL stop (his close-at-SPX box) fills with the "

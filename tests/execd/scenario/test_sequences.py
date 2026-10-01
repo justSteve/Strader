@@ -140,7 +140,6 @@ class TestFills:
         assert sole_stop(scn, sym) == 1.80
         scn.run(30)
 
-    @pytest.mark.xfail(strict=True, reason=reason("H1"))
     def test_fill_much_better_than_the_limit(self, make):
         """13:24 CT 2026-09-30, the numbers of the day: a 9.20 limit, the
         market 8.70/8.80 when it went — filled at 8.80 under a 9.00 stop."""
@@ -153,6 +152,21 @@ class TestFills:
         scn.send(t)
         scn.run(30)
         assert scn.held() == {C7690: 1}             # not stopped out by its own stop
+
+    @pytest.mark.xfail(strict=True, reason=reason("H6"))
+    def test_a_resting_entry_filled_in_a_market_wider_than_its_stop(self, make):
+        """A 9.20 limit with a 0.50 stop rests under 9.30/9.40; the market
+        drops to 8.50/9.00 and fills it at 9.00. Measured from the fill the
+        stop is 8.50 — at the 8.50 bid, so the follow is refused and the
+        stop stays 8.70, 0.30 from the fill on a 0.50 ticket."""
+        tape = scripted([Frame(0, 7696.0, quotes={C7690: (9.30, 9.40)}, deltas={C7690: 0.60}),
+                         Frame(3, 7695.0, quotes={C7690: (8.50, 9.00)}, deltas={C7690: 0.60}),
+                         Frame(60, 7695.0, quotes={C7690: (8.50, 9.00)}, deltas={C7690: 0.60})],
+                        start=T1324)
+        scn = make(tape)
+        t = scn.ticket("call", strike=7690, limit=9.20, stopoff=0.50)
+        scn.send(t)
+        scn.run(9)
 
     @pytest.mark.xfail(strict=True, reason=reason("H2"))
     @pytest.mark.parametrize("spread, lots", [(0.30, 1), (0.10, 2)], ids=["wide", "two-lots"])
@@ -167,13 +181,11 @@ class TestFills:
 
     def test_a_dollar_stop_survives_spx_moving_before_the_send(self, make):
         """Priced at 7696.00, sent with SPX at 7695.60: the ticket's level
-        (0.20 at delta ~0.7 is 0.29 points) is behind the mark. (The market
-        under the limit puts the stop struck from it over the bid — H1,
-        waived here so this case tests the refusal.)"""
+        (0.20 at delta ~0.7 is 0.29 points) is behind the mark."""
         tape = scripted([Frame(0, 7696.0, quotes={C7690: (9.10, 9.20)}, deltas={C7690: 0.70}),
                          Frame(2, 7695.6, quotes={C7690: (8.85, 8.95)}, deltas={C7690: 0.70})],
                         start=T1324)
-        scn = make(tape, waive={"stop_not_below_bid_when_placed": "H1"})
+        scn = make(tape)
         t = scn.ticket("call", strike=7690, limit=9.20)
         scn.wait_until(2)
         out = scn.send(t)

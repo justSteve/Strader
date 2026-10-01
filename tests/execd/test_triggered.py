@@ -359,18 +359,21 @@ class TestTheBracketFiredFirst:
 
 
 class TestTheStopFollowsABetterFill:
-    """The triggered stop is struck under the LIMIT. A fill better than the
-    limit moves it down by the improvement — the ticket's dollars measured
-    from the fill (st-0f5q; 13:24 CT: 9.20 limit, 8.80 fill, 9.00 stop)."""
+    """The triggered stop is struck under the LIMIT — or under the ask when
+    the market is already under the limit at the send (st-n3e8). A fill
+    better than that moves it down by the improvement — the ticket's
+    dollars measured from the fill (st-0f5q; 13:24 CT: 9.20 limit, 8.80
+    fill, 9.00 stop)."""
 
-    def test_a_fill_under_the_limit_moves_the_stop_down_by_the_difference(self, svc, mb):
+    def test_a_market_under_the_limit_strikes_the_stop_from_the_ask(self, svc, mb):
         mb.set_quote(CALL, bid=1.90, ask=2.00)           # fills at 2.00 on a 2.10 limit
         svc.place(entry(intent_id="b-1", stop_price=1.90))
         pos = svc._open[CALL]
         assert pos.entry_price == 2.00
         assert pos.stop_price == 1.80                    # $20 under the fill, not $10
-        line, = svc.journal.events("stop_follows_fill")
-        assert (line["stop_was"], line["stop_to"]) == (1.90, 1.80)
+        sending, = svc.journal.events("sending")
+        assert sending["stop_price"] == 1.80             # sent so: never over the 1.90 bid
+        assert svc.journal.events("stop_follows_fill") == []
         assert legs(mb) == [("LIMIT", 1, 10.50), ("STOP", 1, 1.80)]
 
     def test_a_fill_at_the_limit_leaves_the_stop(self, svc, mb):
