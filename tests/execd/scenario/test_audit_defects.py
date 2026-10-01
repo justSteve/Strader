@@ -52,7 +52,6 @@ def stops(scn, sym=C):
 
 # ── D1 ───────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D1"))
 @pytest.mark.parametrize("move", ["follows-fill-then-trail", "hand"])
 def test_d1_restart_after_a_replace(make, move):
     """A better fill moves the stop (a replace), the trail moves it again (a
@@ -173,7 +172,6 @@ def test_d7_a_close_deferred_by_a_pending_cancel(make):
 
 # ── D8 ───────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D8"))
 def test_d8_tier_zero_locks_a_loss(make):
     """Seven lots in at 3.00; the bid 3.10 nets +$60.90, so the trail arms
     and promises +$30 — and rests the stop at 3.00, −$9.10 after fees."""

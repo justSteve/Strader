@@ -154,7 +154,7 @@ def test_a_close_booked_at_a_price_the_book_did_not_fill(make):
 def test_a_trailing_stop_that_falls(make):
     scn, sym = _holding(make)
     scn.position(sym).trail_tier = 0            # armed by hand, the stop not yet raised:
-    scn.waived["trail_locked_a_loss"] = "D8"    # (that state is its own invariant)
+    scn.waived["trail_locked_a_loss"] = "setup"  # (that state is its own invariant)
     scn.check("armed")
     stop = next(o for o in scn.working(sym) if o.order_type is OrderType.STOP)
     scn.paper._orders[stop.order_id] = replace(stop, price=round(stop.price - 0.5, 2))

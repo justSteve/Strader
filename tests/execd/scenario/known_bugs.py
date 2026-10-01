@@ -20,13 +20,6 @@ _S = "test_sequences.py::"
 
 KNOWN: dict[str, dict[str, str]] = {
     # ── the audit (2026-10-01) ───────────────────────────────────────────
-    "D1": {"invariant": "two_stops, resting_sell_exceeds_held, short_position", "pinned_by": _T + "test_d1_restart_after_a_replace",
-           "title": "a restart after a replaced leg (adjust, the trail, _stop_follows_fill) "
-                    "restores the old stop id and price; on paper it is re-rested beside the "
-                    "moved one — two stops, a short if both fire",
-           "detail": "_replace_leg journals only stop_adjusted/target_adjusted replaced=True; "
-                     "_recover applies level_only adjust lines alone. Paper's REPLACED leg has "
-                     "no raw_status, so _reconcile_legs reads it as leg_lost and re-rests."},
     "D2": {"invariant": "two_stops", "pinned_by": _T + "test_d2_a_triggered_send_whose_answer_was_lost",
            "title": "a triggered send whose answer was lost is found by the orphan sweep as an "
                     "untriggered entry, and a second bracket goes on",
@@ -58,11 +51,6 @@ KNOWN: dict[str, dict[str, str]] = {
                     "beside the target every pass",
            "detail": "_take_bracket_off → DEFERRED → _rest_stop_at as a single order (the pair "
                      "cannot be cleared), then observe fires again next pass and churns it."},
-    "D8": {"invariant": "trail_locked_a_loss", "pinned_by": _T + "test_d8_tier_zero_locks_a_loss",
-           "title": "the trail's tier 0 rounds down onto the grid and can lock a net loss "
-                    "(7 lots in at 3.00, bid 3.10 → stop 3.00, −$9.10)",
-           "detail": "_trail_one floors when the ceiling sits on the bid; on the 0.10 grid with "
-                     "fees of 7 lots that is at or under the entry."},
     "D9": {"invariant": "(assertion)", "pinned_by": _T + "test_d9_the_day_is_continuous_through_a_close",
            "title": "closed lines are gross while the card is net of fees; a promoted or "
                     "recovered position carries entry commission 0",
