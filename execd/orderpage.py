@@ -467,6 +467,17 @@ def affordable(c: Any, lots: int, funds: float | None) -> bool:
     return c.ask_pts * CONTRACT_MULTIPLIER * max(1, lots) <= funds
 
 
+def by_delta(contracts: list[Any]) -> list[Any]:
+    """The strike table's order (st-rr9o; Steve, 2026-10-01): the most
+    expensive strike — the highest |delta| — on top, calls and puts alike,
+    on every paint. The mark breaks a tie; a strike the chain gave no delta
+    sorts by its mark, after those with one."""
+    def key(c: Any) -> tuple[int, float, float]:
+        d = abs(c.delta) if c.delta else 0.0
+        return (1 if d > 0 else 0, d, c.mid_pts)
+    return sorted(contracts, key=key, reverse=True)
+
+
 def strikes_html(priced: Priced, order_path: str,
                  balances: dict[str, Any] | None = None) -> str:
     """The strikes around spot — only the ones the account can pay for.
@@ -484,8 +495,8 @@ def strikes_html(priced: Priced, order_path: str,
         return "<div class=k>no strikes to show</div>"
     funds = spendable(balances)
     chosen_sym = priced.contract.symbol if priced.contract is not None else None
-    shown = [c for c in priced.contracts
-             if affordable(c, priced.lots, funds) or c.symbol == chosen_sym]
+    shown = by_delta([c for c in priced.contracts
+                      if affordable(c, priced.lots, funds) or c.symbol == chosen_sym])
     head = f"<div class=k>SPX {priced.spx:.2f} · tap a strike</div>"
     if not shown:
         return (head + f"<div class=k>no strike here costs less than the "

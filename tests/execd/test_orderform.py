@@ -946,3 +946,34 @@ class TestAStopOfHisOwn:
         r = page_send(order_page, {"side": "call", "strike": "6400", "stop": "6385"})
         assert r.status_code == 303 and "bad=Not+sent:+your+stop" in r.headers["Location"]
         assert armed.status()["positions"] == [] and armed.status()["working"] == []
+
+
+class TestTheStrikeTableOrder:
+    """Steve, 2026-10-01 (st-rr9o): the most expensive strike — the highest
+    |delta| — on top, calls and puts, through every repaint."""
+
+    @staticmethod
+    def _strikes(html: str) -> list[str]:
+        import re
+        table = html.split("<table class=strikes>")[1].split("</table>")[0]
+        return re.findall(r"<tr[^>]*><td><a [^>]*>([0-9.]+)</a>", table)
+
+    @pytest.mark.parametrize("side", ["call", "put"])
+    def test_highest_delta_on_top_on_the_page_the_price_and_the_poll(self, order_page, side):
+        page = self._strikes(text(order_page.get(f"/exec/order?side={side}")))
+        price_j = self._strikes(order_page.get(f"/exec/order/price?side={side}").json["strikes_html"])
+        poll = self._strikes(order_page.get(f"/exec/order/state?side={side}").json["strikes_html"])
+        want = (["6350", "6360", "6370", "6380", "6390", "6400", "6410", "6420"] if side == "call"
+                else ["6400", "6380", "6360", "6340", "6320", "6300"])
+        assert page == price_j == poll
+        assert page == [s for s in want if s in page] and len(page) >= 4
+
+    def test_the_mark_breaks_a_tie_and_a_missing_delta_goes_last(self):
+        from execd.compose import Contract
+        from execd.orderpage import by_delta
+        def c(strike, bid, ask, delta):
+            return Contract(symbol=f"S{strike}", strike=strike, bid_pts=bid, ask_pts=ask,
+                            delta=delta, expiration="2026-08-26", dte=0, right="CALL")
+        rows = by_delta([c(1, 1.0, 1.2, 0.5), c(2, 3.0, 3.2, 0.5), c(3, 9.0, 9.4, 0.0),
+                         c(4, 0.5, 0.6, -0.7)])
+        assert [r.strike for r in rows] == [4, 2, 1, 3]
