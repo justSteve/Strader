@@ -46,10 +46,6 @@ KNOWN: dict[str, dict[str, str]] = {
                     "recovered position carries entry commission 0",
            "detail": "the day total jumps by the fees at the close; _promote/_recover never "
                      "set entry_commission_usd."},
-    "D10": {"invariant": "(refusal)", "pinned_by": _T + "test_d10_eight_lots_are_not_refused_by_the_preview",
-            "title": "check_preview_cost compares the preview total WITH commission to the cap "
-                     "WITHOUT it — eight lots or more at the ask are always refused",
-            "detail": "0.65 × qty passes the $5 tolerance at 8 contracts."},
     "D12": {"invariant": "false_short_alarm", "pinned_by": _T + "test_d12_rest_fill_and_fire_between_passes",
             "title": "a resting triggered entry that fills and stops out between two reconciles "
                      "raises 'unattributed_sell — the account is short; check the broker' for "

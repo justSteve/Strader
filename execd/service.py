@@ -2032,7 +2032,11 @@ class ExecService:
                 Refusal("preview_cost", "the broker would not accept this order: "
                                         + "; ".join(prev.messages or ("no reason given",))),
                 kind="place")
-        if (r := check_preview_cost(intent, prev.total_usd, self.bounds)) is not None:
+        # The premium against the premium: max_cost_usd is limit × 100 × qty,
+        # no fees in it. Measured against the total WITH commission, 0.65 a
+        # contract passed the $5 tolerance at eight lots and every eight-lot
+        # entry at the ask was refused (st-s6x0).
+        if (r := check_preview_cost(intent, prev.cost_usd, self.bounds)) is not None:
             return self._refuse(intent, r, kind="place")
 
         try:

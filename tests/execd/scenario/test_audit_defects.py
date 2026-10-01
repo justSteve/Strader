@@ -203,7 +203,6 @@ def test_d9_the_day_is_continuous_through_a_close(make, part):
 
 # ── D10 ──────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D10"))
 def test_d10_eight_lots_are_not_refused_by_the_preview(make):
     scn = make(pinned((0, 9.10, 9.20), (60, 9.10, 9.20)))
     out = scn.send(scn.ticket("call", strike=7690, lots=8, stopoff=0.50))
