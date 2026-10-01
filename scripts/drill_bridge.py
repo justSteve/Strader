@@ -16,8 +16,8 @@ Endpoints (all JSON; POST bodies are sent as text/plain so file:// pages make
   POST /bars                       <- {bars: [...], meta: {...}, final: [...]} from the feeder
   GET  /bars?since=<n>             -> {bars: [...], total, meta, final, developing, profile}
   GET  /                           -> the LIVE page itself (text/html) [st-n0qm.3]
-  GET  /health/producers           -> ages of the producer health files (tape,
-                                      1 Hz feed, sentinel, footprint feed) for the HUD dots
+  GET  /health/producers           -> ages + status of the producer health files (tape,
+                                      GexBot 60 s poll, footprint feed) for the HUD dots
   GET  /days                       -> corpus days with an ES tape, newest first [st-v7a0]
   GET  /drill-<YYYY-MM-DD>.html    -> that day's DRILL page, rendered on demand and cached
   GET  /desk-candles-<day>.html    -> the drill's minute-candle companion window
@@ -92,10 +92,13 @@ PATH_PREFIXES = ("/footprint",)
 # Producer health files the HUD dots read [st-n0qm.3]. Per-day files live under
 # data/corpus/<CT day>/; the collector assessors write day-independent files at
 # the corpus root. `fresh_s` is the age past which the dot goes red.
+# The 1 Hz GexBot leg (`gex_1s`) and the orderflow sentinel were retired with
+# Quant (st-x3tx, 2026-09-08/10): their files are no longer written, so listing
+# them only served two permanently stale rows. `gexbot` is the 60 s poll that
+# replaced them, assessed every 2 min like the tape (health_assessors.sh). [st-epa3]
 PRODUCERS = {
     "tape":     {"file": "_capture_health.json",     "per_day": False, "fresh_s": 180},
-    "gex_1s":   {"file": "_gexbot_of1s_health.json", "per_day": False, "fresh_s": 180},
-    "sentinel": {"file": "_sentinel_health.json",    "per_day": True,  "fresh_s": 90},
+    "gexbot":   {"file": "_gexbot_health.json",      "per_day": False, "fresh_s": 180},
     "feed":     {"file": "_footprint_health.json",   "per_day": True,  "fresh_s": 90},
 }
 
@@ -474,12 +477,13 @@ def producers_health(now: datetime | None = None, corpus_root: Path | None = Non
                 try:
                     body = json.loads(path.read_text(encoding="utf-8"))
                     row["status"] = body.get("status")
-                    if name == "sentinel":
-                        row["rows_today"] = body.get("rows_today")
-                        row["last_row_pull_utc"] = body.get("last_row_pull_utc")
                     if name == "feed":
                         row["sent"] = body.get("sent")
                         row["last_bar_t1"] = body.get("last_bar_t1")
+                        # trade-drop counters the feeder reports [st-epa3];
+                        # the page goes amber on late > 0
+                        for k in ("dupes", "late", "bad"):
+                            row[k] = body.get(k)
                 except (ValueError, OSError):
                     row["status"] = "unreadable"
             except OSError:

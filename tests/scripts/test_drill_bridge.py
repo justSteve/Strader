@@ -194,18 +194,21 @@ def test_producers_health_reports_age_and_freshness(monkeypatch, tmp_path):
     monkeypatch.setattr(db, "_central_day", lambda: "2026-08-17")
     day = corpus / "2026-08-17"
     day.mkdir(parents=True)
-    (day / "_sentinel_health.json").write_text(json.dumps({"rows_today": 5, "last_row_pull_utc": "x"}))
     (corpus / "_capture_health.json").write_text(json.dumps({"status": "ok"}))
+    (corpus / "_gexbot_health.json").write_text(json.dumps({"status": "dead"}))
     old = day / "_footprint_health.json"
-    old.write_text(json.dumps({"sent": 12}))
+    old.write_text(json.dumps({"sent": 12, "dupes": 3, "late": 2, "bad": 0}))
     stale = time.time() - 1000
     os.utime(old, (stale, stale))
     h = db.producers_health(now=datetime.now(timezone.utc))
     p = h["producers"]
-    assert p["sentinel"]["present"] and p["sentinel"]["fresh"] and p["sentinel"]["rows_today"] == 5
     assert p["tape"]["present"] and p["tape"]["status"] == "ok"
+    # the GexBot 60 s poll is a producer; its verdict is passed through [st-epa3]
+    assert p["gexbot"]["present"] and p["gexbot"]["fresh"] and p["gexbot"]["status"] == "dead"
     assert p["feed"]["present"] and not p["feed"]["fresh"] and p["feed"]["age_s"] > 900
-    assert p["gex_1s"]["present"] is False and p["gex_1s"]["fresh"] is False
+    assert (p["feed"]["dupes"], p["feed"]["late"], p["feed"]["bad"]) == (3, 2, 0)
+    # retired with Quant (st-x3tx): no longer listed, so never a permanent red row
+    assert set(p) == {"tape", "gexbot", "feed"}
     assert h["day"] == "2026-08-17"
 
 

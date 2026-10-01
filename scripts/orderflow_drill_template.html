@@ -541,7 +541,7 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
 Jump to: <button id="hl-fast">fastest tape</button> <button id="hl-delta">biggest Δ bar</button> <button id="hl-flip">sharpest Δ flip</button>
 · <button id="candles" title="Open the same tape as 1-minute candles in a second window, synced to this minute">Candles ↗</button>
 · coach: <span id="bridge-dot">—</span>
-· <span id="prod-dots" title="producers: tape · footprint feed"></span>
+· <span id="prod-dots" title="producers: tape · gexbot 60s poll · footprint feed"></span>
 · <span id="cue-chip" title="Cell cues: cells the stack spoke about flash, then keep an edge mark. Press x or click to toggle.">cues ⚑</span>
 · <span id="sen-strip" title="Sentinel: GexBot level alerts drawn on the ES axis at strike + live basis. Press s or click to toggle."><span class="sen-lbl">Sentinel</span><span class="sen-txt">—</span></span></p>
 <div id="help"><div class="card">
@@ -2745,31 +2745,50 @@ async function pollBars() {
   setTimeout(pollBars, POLL_MS);
 }
 // ── producer health dots [st-n0qm.3] ─────────────────────────────────────
-// Two dots from GET /health/producers: tape capture and the footprint feed.
-// Colour is the AGE of each producer's own health file against its freshness
-// budget — the bridge reports what is on disk and draws no verdict of its own.
+// Dots from GET /health/producers: tape capture, the GexBot 60 s poll and the
+// footprint feed. The bridge reports what is on disk; the verdict is drawn here.
 // Polled every 15 s; a dead bridge greys them all. The 1 Hz GexBot leg and the
 // sentinel dots came out 2026-09-10 (Steve): both producers were retired with
 // Quant (st-x3tx) and read permanently red.
-const PROD_ORDER = [["tape", "tape"], ["feed", "feed"]];
+//
+// ORDER OF THE TESTS MATTERS [st-s6qj]. The collector assessors rewrite their
+// health file every 2 minutes WHATEVER the verdict, so a DEAD/STALE/DUPLICATE
+// capture still has a fresh file — testing age first painted it green and the
+// verdict lived only in the tooltip. The file's own bad status wins over age.
+const PROD_ORDER = [["tape", "tape"], ["gexbot", "gex"], ["feed", "feed"]];
 const PROD_POLL_MS = 15000;
+const PROD_BAD_STATUS = new Set(["dead", "stale", "duplicate"]);
+// PRODUCER_DOT_BEGIN — pure verdict, run under node by
+// tests/scripts/test_producer_dots.py
+function producerDot(p) {
+  if (!p) return ["pd", "no data"];
+  let cls = "pd", why;
+  const st = String(p.status || "").toLowerCase();
+  if (!p.present) { cls += " bad"; why = `no health file (${p.path})`; }
+  else if (PROD_BAD_STATUS.has(st)) { cls += " bad"; why = `${st.toUpperCase()} — health file ${p.age_s}s old`; }
+  // A collector that says idle/quiet is CORRECT outside its window (weekend,
+  // pre-open): neutral, not red — red is for a producer that should be moving.
+  else if (st === "idle" || st === "quiet") { why = `${st} — venue closed / outside window`; }
+  else if (p.fresh) {
+    // The feed drops trades that arrive behind a bar it already closed; the
+    // drop stands (parity) but the dot shows it happened [st-epa3].
+    if (p.late > 0) { cls += " warn"; why = `${p.age_s}s old · ${p.late} late trade(s) dropped`; }
+    else { cls += " ok"; why = `${p.age_s}s old`; }
+  }
+  else if (p.age_s <= p.fresh_s * 3) { cls += " warn"; why = `${p.age_s}s old (budget ${p.fresh_s}s)`; }
+  else { cls += " bad"; why = `${p.age_s}s old — stale (budget ${p.fresh_s}s)`; }
+  if (p.status) why += ` · status ${p.status}`;
+  if (p.late != null || p.dupes != null || p.bad != null)
+    why += ` · dupes ${p.dupes ?? "?"} late ${p.late ?? "?"} bad ${p.bad ?? "?"}`;
+  return [cls, why];
+}
+// PRODUCER_DOT_END
 function renderProducerDots(h) {
   const el = $("prod-dots"); if (!el) return;
   el.innerHTML = "";
   for (const [key, label] of PROD_ORDER) {
-    const p = h && h.producers && h.producers[key];
+    const [cls, why] = producerDot(h && h.producers && h.producers[key]);
     const dot = document.createElement("span");
-    let cls = "pd", why = "no data";
-    if (p) {
-      if (!p.present) { cls += " bad"; why = `no health file (${p.path})`; }
-      // A collector that says idle/quiet is CORRECT outside its window (weekend,
-      // pre-open): neutral, not red — red is for a producer that should be moving.
-      else if (p.status === "idle" || p.status === "quiet") { why = `${p.status} — venue closed / outside window`; }
-      else if (p.fresh) { cls += " ok"; why = `${p.age_s}s old`; }
-      else if (p.age_s <= p.fresh_s * 3) { cls += " warn"; why = `${p.age_s}s old (budget ${p.fresh_s}s)`; }
-      else { cls += " bad"; why = `${p.age_s}s old — stale (budget ${p.fresh_s}s)`; }
-      if (p.status) why += ` · status ${p.status}`;
-    }
     dot.className = cls;
     dot.title = `${key}: ${why}`;
     const l = document.createElement("span"); l.className = "pd-l"; l.textContent = label;

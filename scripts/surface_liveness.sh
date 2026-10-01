@@ -212,7 +212,11 @@ hstat() {           # hstat <label> <path> <fresh_s> [why-absent-is-normal]
     status="$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('status') or d.get('state') or '-')" "$path" 2>/dev/null || echo '-')"
     # idle/quiet is a collector saying "outside my window" — neutral, like the
     # page's dots, not stale: stale is a producer that should be moving and is not.
-    if   [[ "$status" == idle || "$status" == quiet ]]; then state="IDLE"
+    # A bad verdict wins over age [st-s6qj]: the assessors rewrite the file
+    # every 2 min whatever they find, so a DEAD capture's file is always fresh.
+    if   [[ "$status" == dead || "$status" == stale || "$status" == duplicate ]]; then
+                                      state="${status^^}"
+    elif [[ "$status" == idle || "$status" == quiet ]]; then state="IDLE"
     elif (( age <= fresh ));     then state="FRESH"
     elif (( age <= fresh * 3 )); then state="AGING"
     else                              state="STALE"; fi

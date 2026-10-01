@@ -187,3 +187,24 @@ def test_widening_the_launcher_pattern_is_not_the_fix(tmp_path):
     assert "grep" not in SEARCHER
     for pat in ("tmux", "new-session", "send-keys", "surface_liveness.sh"):
         assert pat not in SEARCHER
+
+
+@pytest.mark.parametrize("status", ["dead", "stale", "duplicate"])
+def test_health_row_bad_verdict_wins_over_a_fresh_file(tmp_path, status):
+    """[st-s6qj] The assessors rewrite the file every 2 min whatever they
+    find, so a DEAD capture's health file is always fresh; the row must say
+    the verdict, not FRESH."""
+    repo = tmp_path / "repo"
+    corpus = repo / "data" / "corpus"
+    corpus.mkdir(parents=True)
+    (corpus / "_capture_health.json").write_text(f'{{"status": "{status}"}}')
+    (corpus / "_gexbot_health.json").write_text('{"status": "ok"}')
+    fixture = tmp_path / "ps.txt"
+    fixture.write_text(REAL + "\n")
+    out = subprocess.run(
+        ["bash", str(SCRIPT)], capture_output=True, text=True, cwd=str(REPO),
+        env={"PATH": "/usr/bin:/bin", "HOME": "/root", "STRADER_REPO": str(repo),
+             "LIVENESS_PS_FIXTURE": str(fixture), "LIVENESS_NO_SYSTEMD": "1"},
+    ).stdout
+    assert f" {status.upper()} " in _row(out, "tape health")
+    assert " FRESH " in _row(out, "gex health")
