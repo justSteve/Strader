@@ -257,3 +257,33 @@ class TestPackedCorpusDays:
             f.write(self._rec(t, 7750.0, 3, "B"))
         bars = pvp.bars_from_corpus(datetime(2026, 8, 17, 13, 30, tzinfo=timezone.utc))
         assert len(bars) == 1 and bars[0]["volume"] == 3
+
+    def test_corpus_reads_go_through_the_shared_seam(self, tmp_path, monkeypatch):
+        # Out-of-order append + a doubled row: the page used to read file
+        # order with no dedup, so `last` was the last ROW, not the last print,
+        # and the doubled print counted twice. [st-epa3]
+        import gzip
+        import market.corpus.paths as paths
+        monkeypatch.setattr(paths, "CORPUS_ROOT", tmp_path)
+        day = tmp_path / "2026-08-17"; day.mkdir()
+        t = datetime(2026, 8, 17, 14, 0, tzinfo=timezone.utc)
+        with gzip.open(day / "databento_glbx_es.jsonl.gz", "wt", encoding="utf-8") as f:
+            f.write(self._rec(t + timedelta(seconds=2), 7751.0, 4, "B"))
+            f.write(self._rec(t, 7750.0, 3, "B"))                         # older, appended later
+            f.write(self._rec(t + timedelta(seconds=2), 7751.0, 4, "B"))  # duplicate
+        start = datetime(2026, 8, 17, 13, 30, tzinfo=timezone.utc)
+        got = list(pvp.trades_from_corpus(start))
+        assert [(x.price, x.size) for x in got] == [(7750.0, 3), (7751.0, 4)]
+        bars = pvp.bars_from_corpus(start)
+        assert (bars[0]["open"], bars[0]["close"], bars[0]["volume"]) == (7750.0, 7751.0, 7)
+
+    def test_corpus_window_honours_the_anchor(self, tmp_path, monkeypatch):
+        import gzip
+        import market.corpus.paths as paths
+        monkeypatch.setattr(paths, "CORPUS_ROOT", tmp_path)
+        day = tmp_path / "2026-08-17"; day.mkdir()
+        with gzip.open(day / "databento_glbx_es.jsonl.gz", "wt", encoding="utf-8") as f:
+            f.write(self._rec(datetime(2026, 8, 17, 13, 0, tzinfo=timezone.utc), 7740.0, 9, "A"))
+            f.write(self._rec(datetime(2026, 8, 17, 13, 31, tzinfo=timezone.utc), 7745.0, 1, "B"))
+        got = list(pvp.trades_from_corpus(datetime(2026, 8, 17, 13, 30, tzinfo=timezone.utc)))
+        assert [x.price for x in got] == [7745.0]

@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import argparse
 import html
-import json
 import logging
 import subprocess
 import sys
@@ -81,6 +80,34 @@ def fetch_bars(start_utc: datetime, end_utc: datetime | None = None) -> list[dic
     return candles
 
 
+def _corpus_trades(start_utc: datetime):
+    """Every ES print from the anchor through today, day by day, through the
+    shared trade seam (``tradesource.iter_trades``): a packed ``.jsonl.gz``
+    day opens, each day comes sorted, and duplicate rows drop by the
+    canonical key — the same prints replay and the feeder see. This module
+    used to parse rows itself in file order with no dedup, so the "last"
+    price and the hole banner followed whatever order a multi-pull append
+    left on disk. [st-epa3]
+
+    A day with no ES file is skipped (a weekend, a box that was off); the
+    widest silence then shows as the tape-hole banner rather than an error.
+    """
+    from market.corpus import paths
+    from market.orderflow.tradesource import iter_trades
+
+    day = start_utc.astimezone(CENTRAL).date()
+    today = datetime.now(tz=CENTRAL).date()
+    while day <= today:
+        # paths.CORPUS_ROOT is read at call time (STRADER_CORPUS_ROOT, test
+        # fixtures). A T+1-packed day is .jsonl.gz: resolve_existing finds it
+        # and iter_trades opens it — testing the raw path skipped it in
+        # silence on 2026-08-18. [st-9olq]
+        path = paths.CORPUS_ROOT / day.isoformat() / "databento_glbx_es.jsonl"
+        if paths.resolve_existing(path) is not None:
+            yield from iter_trades(path, start_ts=start_utc)
+        day += timedelta(days=1)
+
+
 def bars_from_corpus(start_utc: datetime) -> list[dict]:
     """Five-minute bars aggregated from the ES tick corpus. Offline fallback.
 
@@ -89,40 +116,19 @@ def bars_from_corpus(start_utc: datetime) -> list[dict]:
     Globex day is captured [st-9olq]. Used when Schwab is unavailable (dead
     token), which otherwise leaves this job with no source at all.
     """
-    from market.corpus.paths import CORPUS_ROOT, open_corpus_text, resolve_existing
-
     bars: dict[int, dict] = {}
-    day = start_utc.astimezone(CENTRAL).date()
-    today = datetime.now(tz=CENTRAL).date()
-    while day <= today:
-        # resolve_existing / open_corpus_text: a T+1-packed day is .jsonl.gz, and
-        # testing the raw path skipped it in silence — the exact reader defect
-        # scripts/cron/corpus-compact-wrapper.sh warns about. Bit 2026-08-18:
-        # 08-17 packed at noon, the next run drew Monday as empty. [st-9olq]
-        path = CORPUS_ROOT / day.isoformat() / "databento_glbx_es.jsonl"
-        if resolve_existing(path) is not None:
-            with open_corpus_text(path) as f:
-                for line in f:
-                    try:
-                        rec = json.loads(line)
-                        ts = datetime.fromisoformat(
-                            rec["provenance"]["ts_event"].replace("Z", "+00:00"))
-                    except (ValueError, KeyError):
-                        continue
-                    if ts < start_utc:
-                        continue
-                    price, size = rec["data"]["price"], rec["data"]["size"]
-                    k = int(ts.timestamp()) // 300 * 300
-                    b = bars.get(k)
-                    if b is None:
-                        bars[k] = {"datetime": k * 1000, "open": price, "high": price,
-                                   "low": price, "close": price, "volume": size}
-                    else:
-                        b["high"] = max(b["high"], price)
-                        b["low"] = min(b["low"], price)
-                        b["close"] = price
-                        b["volume"] += size
-        day += timedelta(days=1)
+    for t in _corpus_trades(start_utc):
+        price, size = t.price, t.size
+        k = int(t.ts.timestamp()) // 300 * 300
+        b = bars.get(k)
+        if b is None:
+            bars[k] = {"datetime": k * 1000, "open": price, "high": price,
+                       "low": price, "close": price, "volume": size}
+        else:
+            b["high"] = max(b["high"], price)
+            b["low"] = min(b["low"], price)
+            b["close"] = price
+            b["volume"] += size
     if not bars:
         raise RuntimeError("tick corpus holds no ES trades in the anchor window")
     return [bars[k] for k in sorted(bars)]
@@ -133,35 +139,13 @@ def trades_from_corpus(start_utc: datetime):
 
     The high-resolution path. Bars cannot support tick buckets honestly — a
     bar's volume has to be smeared across the prices it touched — and they
-    carry no aggressor at all. Prints carry both.
+    carry no aggressor at all. Prints carry both. Canonical order and dedup
+    via ``_corpus_trades``. [st-epa3]
     """
-    from market.corpus.paths import CORPUS_ROOT, open_corpus_text, resolve_existing
-    from market.entities.trade import Trade
-
-    day = start_utc.astimezone(CENTRAL).date()
-    today = datetime.now(tz=CENTRAL).date()
     n = 0
-    while day <= today:
-        # Packed-day aware, same as bars_from_corpus above. [st-9olq]
-        path = CORPUS_ROOT / day.isoformat() / "databento_glbx_es.jsonl"
-        if resolve_existing(path) is not None:
-            with open_corpus_text(path) as f:
-                for line in f:
-                    try:
-                        rec = json.loads(line)
-                        ts = datetime.fromisoformat(
-                            rec["provenance"]["ts_event"].replace("Z", "+00:00"))
-                    except (ValueError, KeyError):
-                        continue
-                    if ts < start_utc:
-                        continue
-                    d = rec["data"]
-                    n += 1
-                    yield Trade(ts=ts.astimezone(CENTRAL), symbol=d["symbol"],
-                                instrument_id=d.get("instrument_id") or 0,
-                                price=d["price"], size=d["size"],
-                                side=d.get("side") or "N")
-        day += timedelta(days=1)
+    for t in _corpus_trades(start_utc):
+        n += 1
+        yield t
     if not n:
         raise RuntimeError("tick corpus holds no ES trades in the anchor window")
 
