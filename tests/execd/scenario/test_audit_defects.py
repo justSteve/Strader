@@ -260,7 +260,6 @@ def test_d13_what_a_restart_forgets(make, forgets):
 
 # ── D14 ──────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D14"))
 @pytest.mark.parametrize("part", ["backoff-resets", "ring-during-reconcile"])
 def test_d14_the_doorbell(make, part):
     if part == "backoff-resets":

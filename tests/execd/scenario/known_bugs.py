@@ -50,12 +50,6 @@ KNOWN: dict[str, dict[str, str]] = {
             "title": "the fill watermark resets on restart and trail_tier is not recovered",
             "detail": "_last_fill_poll = clock() at construction; nothing journals or replays "
                       "the tier."},
-    "D14": {"invariant": "(assertion)", "pinned_by": _T + "test_d14_the_doorbell",
-            "title": "the stream's backoff never resets after a session that came up; a ring "
-                     "during a reconcile is skipped",
-            "detail": "AccountStream.run resets attempt only when session() returns; "
-                      "Watcher.once clears the ring before its reconcile and the next pass "
-                      "finds the reconcile fresh."},
     "D15": {"invariant": "(assertion)", "pinned_by": _T + "test_d15_the_restrike",
             "title": "the re-strike at the $3.00 boundary rests a 2.95 stop at 2.90; a "
                      "negative-delta put intent is flipped",

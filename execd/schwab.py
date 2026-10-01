@@ -1513,6 +1513,7 @@ class AccountStream:
         self.last_event_at: str | None = None
         self.last_error: str | None = None
         self._down_journaled = False
+        self._attempt = 0
 
     # ── status, for the status page ──────────────────────────────────────
     def status(self) -> dict[str, Any]:
@@ -1588,6 +1589,11 @@ class AccountStream:
     def _up(self) -> None:
         self.state = "up"
         self.last_error = None
+        # A session that came up starts the backoff again. Reset only when
+        # session() returned, it never was — a session ends by raising — so
+        # every drop after an hour up waited as if the stream had never
+        # worked (st-pn8u).
+        self._attempt = 0
         self._record("stream", detail="account-activity stream up")
         self._down_journaled = False
 
@@ -1604,11 +1610,11 @@ class AccountStream:
 
     # ── the loop ─────────────────────────────────────────────────────────
     def run(self) -> None:
-        attempt = 0
+        self._attempt = 0
         while not self._stop.is_set():
             try:
                 self.session()
-                attempt = 0
+                self._attempt = 0
             except BrokerError as exc:
                 # LOCKED is not an outage; it is the state the service rests in.
                 if "locked" in str(exc):
@@ -1621,8 +1627,8 @@ class AccountStream:
                 self._down(f"{type(exc).__name__}: {exc}")
             if self._stop.is_set():
                 break
-            self._sleep(STREAM_BACKOFF_S[min(attempt, len(STREAM_BACKOFF_S) - 1)])
-            attempt += 1
+            self._sleep(STREAM_BACKOFF_S[min(self._attempt, len(STREAM_BACKOFF_S) - 1)])
+            self._attempt += 1
 
     def start(self) -> threading.Thread:
         t = threading.Thread(target=self.run, name="execd-stream", daemon=True)

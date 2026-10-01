@@ -69,13 +69,18 @@ class Watcher:
         #: broker ends the wait early. Tests inject ``sleep`` and ring by hand.
         self._wake = threading.Event()
         self._sleep = sleep or self._wait
+        #: when the doorbell last rang, on the service's clock (st-pn8u)
+        self._rung_at: Any = None
         self._broker_down = False
         self.passes = 0
 
     # ── the doorbell ─────────────────────────────────────────────────────
     def ring(self, types: Any = None) -> None:
         """Something happened at the broker — look now, not at the next beat.
-        Called from the stream's thread; only sets an Event. [st-8bls]"""
+        Called from the stream's thread; only sets an Event (and notes when,
+        so a ring during a reconcile is not taken as covered by it). [st-8bls]"""
+        clock = getattr(self.service, "clock", None)
+        self._rung_at = clock() if callable(clock) else None
         self._wake.set()
 
     def _wait(self, timeout: float) -> None:
@@ -86,6 +91,7 @@ class Watcher:
         """One pass. Returns what it did, for the tests and the log."""
         self.passes += 1
         rung = self._wake.is_set()
+        rung_at = self._rung_at
         self._wake.clear()
         svc = self.service
         if svc.arming.state is ArmState.LOCKED:
@@ -94,8 +100,16 @@ class Watcher:
         if not svc.has_exposure():
             return {**out, "skipped": "flat"}
         try:
-            rec = svc.reconcile_if_stale(RING_RECONCILE_GAP_S if rung
-                                         else RECONCILE_MIN_GAP_S) or {}
+            # A ring that arrived after the last reconcile began is news that
+            # reconcile may not have seen — an account event landing while
+            # it ran was skipped as "fresh" by the next pass (st-pn8u). It
+            # always reconciles; a ring from before it is covered by it.
+            last = getattr(svc, "_last_reconcile_at", None)
+            if rung and rung_at is not None and last is not None and rung_at >= last:
+                rec = svc.reconcile() or {}
+            else:
+                rec = svc.reconcile_if_stale(RING_RECONCILE_GAP_S if rung
+                                             else RECONCILE_MIN_GAP_S) or {}
             if rung:
                 out["rung"] = True
             out["reconcile"] = rec
