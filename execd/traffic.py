@@ -205,7 +205,7 @@ def _with_fill_counts(hops: list[Mapping[str, Any]], total: Any) -> list[dict[st
 
 def lines_for_send(*, at: datetime, title: str, intent: Mapping[str, Any] | None,
                    journal: Iterable[Mapping[str, Any]] = (), page_refusal: str | None = None,
-                   error: str | None = None) -> list[Line]:
+                   error: str | None = None, mode: str | None = None) -> list[Line]:
     """One SEND as the pane's lines: its header, the page's hop to execd,
     the service's hops under the intent's id, and — when the page itself
     refused it or the call raised — that answer.
@@ -214,7 +214,8 @@ def lines_for_send(*, at: datetime, title: str, intent: Mapping[str, Any] | None
     and for a SEND the page refused before an intent existed; ``journal``
     is the service's journal lines written during the call."""
     when = hhmmss(at)
-    out = [Line(when, "head", title)]
+    # the header names the side the SEND went to (st-n4tr)
+    out = [Line(when, "head", f"{mode.upper()} {title}" if mode else title)]
     if intent is None:
         out.append(Line(when, "out", f"SEND {title}"))
         out.append(Line(when, "in", f"REFUSED at the page: {_cut(page_refusal or error)}", ok=False))
@@ -245,6 +246,8 @@ class TrafficBuffer:
 
     def __init__(self, cap: int = TRAFFIC_CAP) -> None:
         self.cap = cap
+        #: the side these lines belong to; a switch clears them (st-n4tr)
+        self.mode: str | None = None
         self._tx: list[tuple[str, list[Line]]] = []
         #: intent id -> (the order's size, the ``filled`` events already said)
         self._pending: dict[str, tuple[int, int]] = {}
@@ -308,6 +311,19 @@ class TrafficBuffer:
                     self._pending[key] = (total, len(counted))
             self._trim()
             return added
+
+    def for_mode(self, mode: str) -> bool:
+        """Hold only ``mode``'s lines: a switch of side clears the buffer
+        (Steve, 2026-10-01, st-n4tr: "Live should never see paper's trades
+        and vice versa"). Returns True when it cleared."""
+        with self._lock:
+            if self.mode == mode:
+                return False
+            cleared = self.mode is not None
+            self.mode = mode
+            self._tx.clear()
+            self._pending.clear()
+            return cleared
 
     def forget(self, keys: Iterable[str]) -> None:
         """Stop waiting on SENDs that are no longer working and never

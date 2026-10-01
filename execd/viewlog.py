@@ -104,8 +104,10 @@ def order_record(*, sel: Any, priced: Any, st: Mapping[str, Any], sendable: bool
                                    "stop", "limit", "exitspx") if q.get(k) is not None}
     if sel is not None and "limit" in query:
         query["padlock"] = True
-    rec: dict[str, Any] = {"page": "order", "query": query}
-    disp: list[Any] = [tuple(sorted(query.items()))]
+    # the side on every line, and in the display tuple so a switch is a line
+    # (st-n4tr)
+    rec: dict[str, Any] = {"page": "order", "mode": st.get("mode"), "query": query}
+    disp: list[Any] = [st.get("mode"), tuple(sorted(query.items()))]
     if priced is not None:
         c = priced.contract
         rec["spx"] = round(priced.spx, 2) if priced.spx else None

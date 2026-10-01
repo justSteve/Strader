@@ -564,6 +564,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         # the SEND token rides with the ticket, single use (st-igw0)
         send_nonce = (nonces.issue("send", SEND_NONCE_TTL_S)
                       if priced is not None and priced.ready else None)
+        traffic.for_mode(service.config.mode)
         if view_log is not None and view_log.enabled and priced is not None:
             st = service.status()
             _view(sel, priced, st, sendable(priced, st.get("balances"), st), None, None)
@@ -641,6 +642,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         elif service.has_exposure():
             service.reconcile_if_stale(2.5)
         st = service.status()
+        traffic.for_mode(st["mode"])        # a switch of side clears it (st-n4tr)
         # a SEND still working gets its fill inside its own block of the
         # traffic pane when it comes (st-qnbg): one journal read, and only
         # while something it sent is still waiting
@@ -833,8 +835,10 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                          and e.get("intent_id") == iid) if iid else 0
             working = iid is not None and any(w.get("intent_id") == iid
                                               for w in service.status()["working"])
+            traffic.for_mode(service.config.mode)
             traffic.add(lines_for_send(
                 at=sent_at, title=_send_title(sel, priced, intent), intent=intent,
+                mode=service.config.mode,
                 journal=journal, page_refusal=page_refusal if called is None else None,
                 error=bad if not (msg or page_refusal) else None),
                 key=iid, pending_qty=int(intent["qty"]) if working else None,

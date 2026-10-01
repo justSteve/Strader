@@ -37,14 +37,30 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+#: where the paper side's journal lives, under the journal root; the live
+#: journal is the root itself, where it always was (st-n4tr)
+PAPER_SUBDIR = "paper"
+#: where a paper journal goes when a mode switch resets the paper side
+PAPER_ARCHIVE_SUBDIR = "paper-archive"
+
+
 class Journal:
-    """One directory of ``YYYY-MM-DD.jsonl`` files, named by Central date."""
+    """One directory of ``YYYY-MM-DD.jsonl`` files, named by Central date.
+
+    **Paper and live never share a file** (Steve, 2026-10-01, st-n4tr: "Live
+    should never see paper's trades and vice versa"). The live journal is
+    the root directory; the paper journal is ``<root>/paper``. ``mode``
+    picks which one every read and write uses, and a read keeps only lines
+    stamped with that mode (or unstamped) — so the lines paper wrote into
+    the shared file before the split are never read back as live.
+    :meth:`archive_paper` moves the paper journal aside, whole, when a
+    switch resets the paper side; nothing is deleted."""
 
     def __init__(self, directory: str | Path, sha: str = "unknown",
                  clock: Callable[[], datetime] = _utcnow, mode: str = "live",
                  broker: str = "") -> None:
-        self.dir = Path(directory)
-        self.dir.mkdir(parents=True, exist_ok=True)
+        self.root = Path(directory)
+        self.root.mkdir(parents=True, exist_ok=True)
         self.sha = sha or "unknown"
         #: ``paper`` or ``live`` — on every line, so a simulated fill can
         #: never be read back as a real one (st-k6gl).
@@ -55,6 +71,36 @@ class Journal:
         self.broker = broker
         self.clock = clock
         self._lock = threading.Lock()
+
+    @property
+    def dir(self) -> Path:
+        """This mode's directory: the root for live, ``paper/`` for paper."""
+        return self.dir_for(self.mode)
+
+    def dir_for(self, mode: str) -> Path:
+        d = self.root / PAPER_SUBDIR if mode == "paper" else self.root
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def archive_paper(self, stamp: str) -> Path | None:
+        """Move the paper journal — every day of it — to
+        ``paper-archive/<stamp>/``, so the paper side starts fresh with
+        nothing lost. Returns where it went, or ``None`` when there was
+        nothing to move. The live journal is never touched."""
+        src = self.root / PAPER_SUBDIR
+        files = sorted(src.glob("*.jsonl")) if src.is_dir() else []
+        if not files:
+            return None
+        dest = self.root / PAPER_ARCHIVE_SUBDIR / stamp
+        n = 1
+        while dest.exists():
+            n += 1
+            dest = self.root / PAPER_ARCHIVE_SUBDIR / f"{stamp}-{n}"
+        dest.mkdir(parents=True)
+        with self._lock:
+            for f in files:
+                f.rename(dest / f.name)
+        return dest
 
     # ── writing ──────────────────────────────────────────────────────────
     def path_for(self, day: date | None = None) -> Path:
@@ -87,8 +133,14 @@ class Journal:
         return line
 
     # ── reading ──────────────────────────────────────────────────────────
-    def read(self, day: date | None = None) -> list[dict[str, Any]]:
-        path = self.path_for(day)
+    def read(self, day: date | None = None, *, mode: str | None = None) -> list[dict[str, Any]]:
+        """The day's lines of this mode (or of ``mode``): from that mode's
+        file, and only the lines stamped with it or with no mode at all."""
+        mode = mode or self.mode
+        path = self.dir_for(mode) / f"{(day or self.today()).isoformat()}.jsonl"
+        return [e for e in self._read_path(path) if e.get("mode", mode) == mode]
+
+    def _read_path(self, path: Path) -> list[dict[str, Any]]:
         if not path.exists():
             return []
         out: list[dict[str, Any]] = []
@@ -106,9 +158,9 @@ class Journal:
                 out.append({"event": "unreadable", "line_no": n, "raw": raw})
         return out
 
-    def days(self) -> list[date]:
+    def days(self, *, mode: str | None = None) -> list[date]:
         out: list[date] = []
-        for p in sorted(self.dir.glob("*.jsonl")):
+        for p in sorted(self.dir_for(mode or self.mode).glob("*.jsonl")):
             try:
                 out.append(date.fromisoformat(p.stem))
             except ValueError:

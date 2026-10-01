@@ -489,3 +489,42 @@ class TestTheSpxLoop:
         scn.run(100, until=lambda s: not s.held())
         close, = scn.closes()
         assert close["kind"] in ("spx-stop", "protective-stop") and close["pnl_usd"] < 0
+
+
+# ── paper and live never mix (st-n4tr) ───────────────────────────────────
+
+class TestTheSwitch:
+    def test_paper_trades_then_live_sees_none_then_paper_is_fresh(self, make):
+        """Steve, 2026-10-01: "Live should never see paper's trades and vice
+        versa." A paper round trip on the replayed market; the switch to live
+        shows no position, no close, no P&L, and the poll's closed cards are
+        empty; back to paper starts at $0 with the old paper journal and book
+        archived, not deleted."""
+        from .screen import OrderScreen
+        scn = make(flat())
+        t = scn.ticket("call", delta=0.5)
+        scn.send(t)
+        scn.run(9)
+        scn.flatten()
+        assert scn.closes() and scn.service.status()["pnl"]["realized_gross_usd"] != 0
+        screen = OrderScreen(scn)
+        screen.pick("call", delta=0.5)
+        assert screen.closed_cards(screen.poll())
+        scn.lock()           # the replay has no live side to read: switch while LOCKED
+        scn.step("switch to live", lambda: scn.service.set_mode("live"))
+        st = scn.service.status()
+        assert st["mode"] == "live" and st["positions"] == [] and st["pnl"]["realized_usd"] == 0
+        state = screen.poll()
+        assert screen.closed_cards(state) == [] and screen.today(state) == 0.0
+        scn.run(9)
+        scn.step("switch to paper", lambda: scn.service.set_mode("paper"))
+        scn.unlock()
+        assert [e["event"] for e in scn.service.journal.read()][:1] == ["mode_changed"]
+        assert not scn.events("closed") and not scn.events("filled")
+        assert scn.paper._orders == {} and scn.held() == {}
+        root = scn.service.journal.root / "paper-archive"
+        assert any(t.contract.symbol in f.read_text() for f in root.rglob("*.jsonl"))
+        assert list(root.rglob("paper-book.json"))
+        assert screen.closed_cards(screen.poll()) == []
+        scn.send(scn.ticket("call", delta=0.5))               # paper trades again, fresh
+        assert len(scn.held()) == 1

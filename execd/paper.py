@@ -411,6 +411,35 @@ class PaperBroker:
         self._save()
         return filled
 
+    # ── the reset a mode switch makes (st-n4tr) ─────────────────────────
+    def held(self) -> list[str]:
+        """What the book still holds or has working — a reset waits on it."""
+        with self._lock:
+            out = [f"{p.symbol.strip()} x{p.qty}" for p in self._positions.values() if p.qty]
+            out += [f"working {o.symbol.strip()}" for o in self._orders.values() if o.is_working]
+            return out
+
+    def reset(self, archive_dir: Path | None = None) -> Path | None:
+        """A fresh book: the saved one moved to ``archive_dir`` (never
+        deleted), everything in memory dropped. Refused while it holds a
+        position or a working order — that is a paper trade, and it is not
+        silently forgotten."""
+        with self._lock:
+            if self.held():
+                raise BrokerError("paper: the book still holds " + ", ".join(self.held()))
+            moved = None
+            if self.book_path is not None and self.book_path.is_file() and archive_dir is not None:
+                archive_dir.mkdir(parents=True, exist_ok=True)
+                moved = archive_dir / self.book_path.name
+                self.book_path.rename(moved)
+            self._orders.clear()
+            self._positions.clear()
+            self._fills.clear()
+            self._oco.clear()
+            self._children.clear()
+            self._pending_children.clear()
+            return moved
+
     # ── persistence ──────────────────────────────────────────────────────
     def _save(self) -> None:
         if self.book_path is None:

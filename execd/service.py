@@ -621,6 +621,12 @@ class ExecService:
             held += [f"working {w.symbol.strip()}" for w in self._working.values()]
             held += [f"unanswered send {i}" for i in self._unconfirmed]
             held += [f"loose leg {o}" for o in self._loose_legs]
+            # the paper book itself, too: a position the service is not
+            # tracking is still a paper trade, and it must not be wiped or
+            # carried (st-n4tr)
+            book = self.broker.brokers.get("paper")
+            if callable(getattr(book, "held", None)):
+                held += [f"paper book {h}" for h in book.held() if h.split(" x")[0] not in held]
             if held:
                 r = Refusal("mode", f"still {old}: {', '.join(held)} — a {old} position or "
                                     f"order cannot move to {mode}; FLATTEN or cancel first")
@@ -628,19 +634,55 @@ class ExecService:
                 raise Refused(r)
             if credential is not None and self.arming.state is not ArmState.LOCKED:
                 self.arming.replace_credential(credential)
+            # The paper side resets on every switch (Steve, 2026-10-01,
+            # st-n4tr): its journal — the day's P&L, closed cards and fills —
+            # is archived whole, never deleted, and the next paper session
+            # starts at $0. The live journal is never written or moved by a
+            # switch: the switch is recorded in the paper journal only.
+            stamp = self.clock().astimezone(CT).strftime("%Y%m%dT%H%M%S")
+            if old == "paper":
+                self.journal.record("mode_changed", old=old, new=mode)
+            archived = self.journal.archive_paper(stamp)
+            if callable(getattr(book, "reset", None)):
+                book.reset(archived or (self.journal.root / "paper-archive" / stamp))
             write_mode(self.config.state_dir, mode)
             self.broker.mode = mode
             self.config.mode = mode
             self.journal.mode = mode
-            # what the old side's listing said belongs to the old side
-            self._foreign_positions.clear()
-            self._foreign_orders.clear()
-            self._shorts.clear()
-            self._balances_cache = None
-            self.journal.record("mode_changed", old=old, new=mode)
+            self._reset_mode_state()
+            if mode == "paper":
+                self.journal.record("mode_changed", old=old, new=mode,
+                                    paper_archived=str(archived) if archived else None)
+            # the new side's own record: what its journal says is open (the
+            # reconcile below asks the broker, and only while unlocked)
+            self._recover(reconcile=False)
             if self.arming.state is not ArmState.LOCKED:
                 self.reconcile()
             return self.status()
+
+    def _reset_mode_state(self) -> None:
+        """Everything held in memory that belongs to one side (st-n4tr).
+        The switch is refused while anything is open, working, unanswered
+        or loose, so what is left is bookkeeping: drop it all, and let the
+        new side's journal rebuild its own."""
+        self._open.clear()
+        self._working.clear()
+        self._loose_legs.clear()
+        self._unconfirmed.clear()
+        self._last_adjust = None
+        self._shorts.clear()
+        self._unattributed.clear()
+        self._last_mark = None
+        self._swept_fills.clear()
+        self._printed_qty.clear()
+        self._booked_qty.clear()
+        self._sell_qty.clear()
+        self._exit_levels.clear()
+        self._foreign_orders.clear()
+        self._foreign_positions.clear()
+        self._booked_exits.clear()
+        self._pair_results.clear()
+        self._balances_cache = None
 
     def _needs_credential(self) -> bool:
         """Does this broker need the arming state's credential to answer?
@@ -776,10 +818,11 @@ class ExecService:
         return out
 
     def _last_known_trading_wall(self) -> str | None:
-        days = self.journal.days()
+        # the account's grant, not a side's trades: read from both journals
+        days = sorted(set(self.journal.days(mode="live")) | set(self.journal.days(mode="paper")))
         for day in reversed(days[-10:]):
             latest: str | None = None
-            for e in self.journal.read(day):
+            for e in self.journal.read(day, mode="live") + self.journal.read(day, mode="paper"):
                 if e.get("event") == "unlock" and e.get("refresh_wall"):
                     latest = e["refresh_wall"]
                 elif (e.get("event") == "reauth" and e.get("app") == "trading"
@@ -4249,7 +4292,7 @@ class ExecService:
                         "replayed_from": entry.get("ts")}
         return None
 
-    def _recover(self) -> None:
+    def _recover(self, *, reconcile: bool = True) -> None:
         """Rebuild open positions from the journal after a restart.
 
         The service comes back LOCKED, so it cannot open anything; what it must
@@ -4546,5 +4589,5 @@ class ExecService:
         # there is nothing to ask the broker with; the reconcile runs at the
         # unlock instead, which is the first moment it can. The mock needs no
         # credential and keeps reconciling here, so the recovery tests hold.
-        if self.arming.permits_exit() is None or not self._needs_credential():
+        if reconcile and (self.arming.permits_exit() is None or not self._needs_credential()):
             self.reconcile()
