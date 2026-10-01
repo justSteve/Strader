@@ -91,7 +91,6 @@ def test_d2_a_triggered_send_whose_answer_was_lost(make):
 
 # ── D3 ───────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D3"))
 @pytest.mark.parametrize("fault", ["children-read-fails", "fallback-cancel-pending"])
 def test_d3_the_childrens_read_fails(make, fault):
     scn = make(pinned((0, 9.10, 9.20), (60, 9.10, 9.20)), book=FaultBook)

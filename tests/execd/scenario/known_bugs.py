@@ -20,11 +20,6 @@ _S = "test_sequences.py::"
 
 KNOWN: dict[str, dict[str, str]] = {
     # ── the audit (2026-10-01) ───────────────────────────────────────────
-    "D3": {"invariant": "two_stops", "pinned_by": _T + "test_d3_the_childrens_read_fails",
-           "title": "children_of raising, or a fallback cancel answered PENDING_CANCEL, puts a "
-                    "second bracket beside the one the entry carried",
-           "detail": "_attach_triggered falls back and places a pair whatever the cancel of "
-                     "the carried children answered (or with no ids to cancel at all)."},
     "D4": {"invariant": "resting_sell_without_position, short_position",
            "pinned_by": _T + "test_d4_a_close_in_two_prints",
            "title": "a close in two prints books only the first; the stop and target are "

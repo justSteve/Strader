@@ -114,9 +114,21 @@ class TestAllThreeAtOnce:
         want = protective_stop_price(2.10, 0.30, SPX_NOW, level)
         assert out["stop_order"]["price"] == want and want < 1.90
 
-    def test_a_missing_child_falls_back_and_says_so(self, svc, mb, monkeypatch):
+    def test_a_missing_child_falls_back_and_says_so(self, svc, mb, monkeypatch, clock):
+        """A child not listed is read again for the grace a missing leg gets
+        (a listing that has not caught up), with nothing of the service's
+        own beside it; past that it is taken as never made (st-yt25)."""
+        from execd.service import LEG_SETTLE_S
         monkeypatch.setattr(mb, "children_of", lambda oid: (None, None))
-        svc.place(entry(intent_id="a-4"))
+        out = svc.place(entry(intent_id="a-4"))
+        assert out["bracket_unread"] is True and svc.journal.events("bracket_unread")
+        placed = len(mb.calls_to("place_oco"))
+        assert svc.journal.events("bracket_fallback") == []
+        svc.reconcile()
+        assert len(mb.calls_to("place_oco")) == placed            # nothing of its own yet
+        assert svc.status()["positions"][0]["stop_order_id"] is None
+        clock.advance(seconds=LEG_SETTLE_S + 1)
+        svc.reconcile()
         assert svc.journal.events("bracket_fallback")
         pos = svc.status()["positions"][0]
         assert pos["stop_order_id"] and pos["target_order_id"]

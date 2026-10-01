@@ -251,8 +251,12 @@ _CARRIED_EVENTS = frozenset((
     "filled", "stop_placed", "target_placed", "stop_adjusted", "target_adjusted",
     "canceled", "position_adopted", "position_gone", "position_corrected",
     "leg_unconfirmed", "leg_resolved", "exit_unfilled", "exit_resolved", "closed",
-    "leg_replaced", "leg_cancelled_outside",
+    "leg_replaced", "leg_cancelled_outside", "bracket_unread",
 ))
+#: ``_attach_triggered``'s answer when the bracket a triggered entry carried
+#: could not be read whole, or what it carried is not yet confirmed off: the
+#: caller rests NOTHING of its own, and reconcile reads it again (st-yt25).
+BRACKET_UNREAD = "unread"
 #: An adjust identical to the last completed one, arriving inside this many
 #: seconds of its answer, is a replay (browser or proxy re-sending after a
 #: lost response) and is answered from that answer (st-gw5m).
@@ -404,6 +408,14 @@ class OpenPosition:
     best_at: datetime | None = None
     worst_net_usd: float | None = None
     worst_at: datetime | None = None
+    #: the triggered entry whose bracket has not yet been read whole, the
+    #: limit it was struck from, and when it was first found unread — the
+    #: children are at the broker under ids this service does not hold, so
+    #: nothing of its own goes on until they are read or confirmed off
+    #: (st-yt25)
+    bracket_unread: str | None = None
+    bracket_limit: float | None = None
+    bracket_unread_since: datetime | None = None
 
     @property
     def exit_in_flight(self) -> bool:
@@ -452,6 +464,7 @@ class OpenPosition:
             "opened_at": self.opened_at.isoformat() if self.opened_at else None,
             "exit_order_id": self.exit_order_id, "exit_reason": self.exit_reason,
             "entry_commission_usd": self.entry_commission_usd,
+            "bracket_unread": self.bracket_unread,
             **self.water_dict(),
         }
 
@@ -1315,6 +1328,7 @@ class ExecService:
             # as the bracket's and the sweep finds it already booked (st-dh65).
             found = self._reconcile_orphans(broker_orders)
             promoted, released = self._reconcile_working(broker_orders)
+            self._reread_brackets()
             # Then fills. A stop that fired has to be booked against the day's
             # ceiling before the position sweep sees the position is gone.
             self._pick_up_fills()
@@ -1565,7 +1579,7 @@ class ExecService:
         self._resolve_working(order.order_id, outcome="filled")
         if work.triggered and self._attach_triggered(pos, order.order_id, spx,
                                                         limit=work.limit) is not None:
-            return
+            return          # booked, fired, or unread (read again next reconcile)
         if spx is None:
             self.journal.record("stop_unprotected", symbol=pos.symbol,
                                 intent_id=pos.intent_id, qty=pos.qty,
@@ -1574,6 +1588,29 @@ class ExecService:
             return
         self._place_protective_stop(pos, spx)
         self._place_take_profit(pos)
+
+    def _reread_brackets(self) -> None:
+        """Each position whose triggered bracket was not read whole: read it
+        again. Booked when it is there; the service's own pair only once
+        every child the entry carried is confirmed off (st-yt25)."""
+        for pos in list(self._open.values()):
+            if not pos.bracket_unread or pos.exit_in_flight:
+                continue
+            try:
+                spx: float | None = self.spx_mark()
+            except BrokerError:
+                spx = None
+            got = self._attach_triggered(pos, pos.bracket_unread, spx, limit=pos.bracket_limit)
+            if got == BRACKET_UNREAD or got is not None or pos.symbol not in self._open:
+                continue
+            if spx is None:
+                self.journal.record("stop_unprotected", symbol=pos.symbol,
+                                    intent_id=pos.intent_id, qty=pos.qty,
+                                    detail="no index mark at reconcile — cannot derive a stop")
+                self._place_take_profit(pos)
+                continue
+            self._place_protective_stop(pos, spx)
+            self._place_take_profit(pos)
 
     def _reconcile_exits(self, broker_orders: dict[str, OrderResult]) -> list[dict[str, Any]]:
         """What became of the closes this service sent. [st-97z1]
@@ -2275,6 +2312,9 @@ class ExecService:
                             order_id=order.order_id)
         if bracket is not None:
             attached = self._attach_triggered(pos, order.order_id, spx, limit=intent.limit)
+            if attached == BRACKET_UNREAD:
+                out["bracket_unread"] = True       # the next reconcile reads it again
+                return out
             if attached is not None:
                 out["stop_order"], out["target_order"] = attached
                 return out
@@ -3088,21 +3128,29 @@ class ExecService:
 
     def _attach_triggered(self, pos: OpenPosition, entry_order_id: str,
                           spx: float | None, *, limit: float | None = None,
-                          ) -> tuple[dict[str, Any] | None, dict[str, Any] | None] | None:
+                          ) -> tuple[dict[str, Any] | None, dict[str, Any] | None] | str | None:
         """The bracket a triggered entry brought to life, booked as the
         position's legs. ``None`` — after taking off whatever part of it the
-        broker does hold — when it is not there whole: the broker refused the
-        child, it is sized for more than filled (a partial fill), or it
-        cannot be read. The caller then places the pair itself, and the
-        journal says so (``bracket_fallback``)."""
+        broker does hold, and only once each part is confirmed off — when it
+        is not there whole: the broker refused the child, or it is sized for
+        more than filled (a partial fill). The caller then places the pair
+        itself, and the journal says so (``bracket_fallback``).
+
+        ``BRACKET_UNREAD`` when it cannot be known: the children's read
+        failed, a child is not listed yet, or a cancel of one is not
+        confirmed. The broker may be holding the carried pair, so the caller
+        rests nothing; the position is marked and the next reconcile reads
+        it again (st-yt25). Until 2026-10-01 each of those placed a second
+        bracket beside the first."""
         kids = getattr(self.broker, "children_of", None)
         stop = target = None
-        detail = ""
-        if callable(kids):
-            try:
-                stop, target = kids(entry_order_id)
-            except BrokerError as exc:
-                detail = str(exc)
+        if not callable(kids):
+            return None                     # no triggered children to read: rest our own
+        try:
+            stop, target = kids(entry_order_id)
+        except BrokerError as exc:
+            return self._bracket_unread(pos, entry_order_id, limit,
+                                        f"the children's read failed: {exc}")
         # The bracket already did its work (st-0f5q). 2026-09-30 13:24 and
         # 13:38 CT, paper: the triggered stop filled within a second of the
         # entry, before anything here looked. "Stop FILLED, target CANCELED"
@@ -3114,6 +3162,7 @@ class ExecService:
         fired = next((o for o in (stop, target)
                       if o is not None and o.is_filled and o.qty == pos.qty), None)
         if fired is not None:
+            self._bracket_read(pos)
             leg = "stop" if fired is stop else "target"
             # The sibling is held as a leg so the close takes it off; the leg
             # that filled is not — held, the close would "cancel" it, find it
@@ -3143,6 +3192,7 @@ class ExecService:
         whole = (stop is not None and target is not None and stop.is_working
                  and target.is_working and stop.qty == pos.qty and target.qty == pos.qty)
         if whole:
+            self._bracket_read(pos)
             out = (self._book_stop(pos, float(stop.price or 0.0), stop, spx=spx,
                                    kind="triggered", oco=True),
                    self._book_target(pos, float(target.price or 0.0), target,
@@ -3151,18 +3201,62 @@ class ExecService:
             return out
         seen = {leg: (o.status.value if o is not None else None, o.qty if o is not None else None)
                 for leg, o in (("stop", stop), ("target", target))}
+        # A child not listed is not known to be off — a child listing that
+        # has not caught up is the ordinary case. Read again, within the
+        # grace a missing leg gets; past it, a child the broker still does
+        # not list is taken as never made (st-yt25).
+        since = pos.bracket_unread_since or self.clock()
+        missing = [leg for leg, o in (("stop", stop), ("target", target)) if o is None]
+        if missing and (self.clock() - since).total_seconds() < LEG_SETTLE_S:
+            return self._bracket_unread(pos, entry_order_id, limit,
+                                        f"the {' and '.join(missing)} the entry carried is "
+                                        f"not listed yet", seen=seen)
+        off = True
+        for o in (stop, target):
+            if o is None or o.status in (OrderStatus.CANCELED, OrderStatus.REJECTED):
+                continue
+            if not o.is_working:
+                off = False          # filled for another size: not ours to cover
+                continue
+            try:
+                r = self.broker.cancel(o.order_id)
+            except BrokerError as exc:
+                self.journal.record("error", kind="bracket_fallback", order_id=o.order_id,
+                                    detail=str(exc))
+                off = False
+                continue
+            if r.status not in (OrderStatus.CANCELED, OrderStatus.REJECTED):
+                off = False          # acknowledged, not done: still at the exchange
+        if not off:
+            return self._bracket_unread(pos, entry_order_id, limit,
+                                        "the bracket the entry carried is not whole and is not "
+                                        "confirmed off — nothing rested beside it", seen=seen)
+        self._bracket_read(pos)
         self.journal.record("bracket_fallback", symbol=pos.symbol, intent_id=pos.intent_id,
                             entry_order_id=entry_order_id, qty=pos.qty, seen=seen,
-                            detail=detail or "the bracket sent with the entry is not resting "
-                                             "whole — placing it here")
-        for o in (stop, target):
-            if o is not None and o.is_working:
-                try:
-                    self.broker.cancel(o.order_id)
-                except BrokerError as exc:
-                    self.journal.record("error", kind="bracket_fallback", order_id=o.order_id,
-                                        detail=str(exc))
+                            detail="the bracket sent with the entry is not resting whole and "
+                                   "what it carried is off — placing it here")
         return None
+
+    def _bracket_unread(self, pos: OpenPosition, entry_order_id: str, limit: float | None,
+                        detail: str, *, seen: dict[str, Any] | None = None) -> str:
+        """Mark the bracket unread (st-yt25), journaled when it first is."""
+        if pos.bracket_unread != entry_order_id:
+            pos.bracket_unread = entry_order_id
+            pos.bracket_limit = limit
+            pos.bracket_unread_since = self.clock()
+            self.journal.record("bracket_unread", symbol=pos.symbol, intent_id=pos.intent_id,
+                                entry_order_id=entry_order_id, limit=limit, qty=pos.qty,
+                                seen=seen, detail=f"{detail} — read again at the next "
+                                                  f"reconcile; nothing of this service's "
+                                                  f"own rests until it is")
+        return BRACKET_UNREAD
+
+    @staticmethod
+    def _bracket_read(pos: OpenPosition) -> None:
+        pos.bracket_unread = None
+        pos.bracket_limit = None
+        pos.bracket_unread_since = None
 
     # ── the trailing stop (st-s1y1) ──────────────────────────────────────
     def trail(self) -> list[dict[str, Any]]:
@@ -3893,9 +3987,20 @@ class ExecService:
                     opened_at=_ts_of(e) or self.clock(),
                     entry_commission_usd=_entry_commission_of(e),
                 )
+            elif e.get("event") == "bracket_unread":
+                pos = self._open.get(str(e.get("symbol", "")))
+                if pos is not None:
+                    pos.bracket_unread = str(e.get("entry_order_id") or "") or None
+                    pos.bracket_limit = e.get("limit")
+                    pos.bracket_unread_since = _ts_of(e) or self.clock()
+            elif e.get("event") in ("bracket_fallback", "bracket_fired"):
+                pos = self._open.get(str(e.get("symbol", "")))
+                if pos is not None:
+                    self._bracket_read(pos)
             elif e.get("event") == "stop_placed":
                 pos = self._open.get(str(e.get("symbol", "")))
                 if pos is not None:
+                    self._bracket_read(pos)
                     pos.stop_order_id = e.get("order_id")
                     pos.stop_price = e.get("stop_price")
                     pos.stop_off_by_hand = False
