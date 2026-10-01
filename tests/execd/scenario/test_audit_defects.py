@@ -127,7 +127,6 @@ def test_d4_a_close_in_two_prints(make, prints):
 
 # ── D5 ───────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=reason("D5"))
 def test_d5_a_partly_filled_entry(make):
     """A two-lot limit fills one, rests the other a few seconds, then fills
     it: one position of two with one bracket of two."""

@@ -20,11 +20,6 @@ _S = "test_sequences.py::"
 
 KNOWN: dict[str, dict[str, str]] = {
     # ── the audit (2026-10-01) ───────────────────────────────────────────
-    "D5": {"invariant": "two_stops", "pinned_by": _T + "test_d5_a_partly_filled_entry",
-           "title": "a partly filled working entry is adopted, then added to when it completes: "
-                    "the tracked size doubles",
-           "detail": "_reconcile_working skips a WORKING order with filledQuantity; the "
-                     "position sweep adopts the part, _promote adds the whole."},
     "D7": {"invariant": "bracket_not_linked", "pinned_by": _T + "test_d7_a_close_deferred_by_a_pending_cancel",
            "title": "a close deferred by a PENDING_CANCEL target re-rests an unlinked stop "
                     "beside the target every pass",

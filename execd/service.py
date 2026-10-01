@@ -170,10 +170,14 @@ class WorkingEntry:
     #: for a stop set as an SPX level. A dollar stop's level is struck again
     #: from the mark at the fill (st-d3va); a level stop keeps its level.
     ticket_stop_price: float | None = None
+    #: contracts of it already promoted to the position — a limit the
+    #: broker fills in parts is promoted part by part (st-mlhh)
+    filled_qty: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "order_id": self.order_id, "symbol": self.symbol, "qty": self.qty,
+            "filled_qty": self.filled_qty,
             "intent_id": self.intent_id, "right": self.right, "limit": self.limit,
             "stop_spx": self.stop_spx, "delta": self.delta,
             "page_query": dict(self.page_query) if self.page_query else None,
@@ -1531,6 +1535,14 @@ class ExecService:
                                                "its slot is held until it can be accounted for")
                 continue
             if order.is_working:
+                if order.filled_qty > work.filled_qty:
+                    # Part of it filled and the rest is still working. Until
+                    # 2026-10-01 nothing was promoted until the whole filled:
+                    # the position sweep adopted the part, and the fill of the
+                    # rest then added the whole — the tracked size doubled
+                    # (st-mlhh).
+                    promoted.append(work.symbol)
+                    self._promote(work, order)
                 continue
             if order.is_filled:
                 promoted.append(work.symbol)
@@ -1562,16 +1574,50 @@ class ExecService:
                                         ).total_seconds() < LEG_SETTLE_S:
                 continue        # its replacement is not listed yet
             else:
+                if order.filled_qty > work.filled_qty:
+                    self._promote(work, order)          # the part that filled first
                 released.append(order_id)
                 self._resolve_working(order_id, outcome=order.status.value.lower(),
                                       detail=order.message)
+                if work.filled_qty and work.triggered:
+                    self._bracket_for_part(work, order)
         return promoted, released
+
+    def _bracket_for_part(self, work: WorkingEntry, order: OrderResult) -> None:
+        """A triggered entry that filled in part and was then cancelled (or
+        expired): the part is held, and the bracket it carried may or may not
+        have come alive for it. Read it; rest the service's own only when
+        what it carried is not there (st-mlhh)."""
+        pos = self._open.get(work.symbol)
+        if pos is None or pos.intent_id != work.intent_id or pos.stop_order_id \
+                or pos.target_order_id or pos.bracket_unread or pos.exit_in_flight:
+            return
+        try:
+            spx: float | None = self.spx_mark()
+        except BrokerError:
+            spx = None
+        if self._attach_triggered(pos, order.order_id, spx, limit=work.limit) is not None:
+            return
+        if spx is not None:
+            self._place_protective_stop(pos, spx)
+        self._place_take_profit(pos)
 
     def _promote(self, work: WorkingEntry, order: OrderResult) -> None:
         """A working entry filled while nothing was watching. Book it, then owe
-        it the same protective stop a synchronous fill would have got."""
+        it the same protective stop a synchronous fill would have got.
+
+        A part (the order still working, or cancelled after a part) books
+        what filled since the last promotion, never the whole again; the
+        working entry stays until the order is done (st-mlhh)."""
         fill_px = order.fill_price if order.fill_price is not None else (work.limit or 0.0)
-        qty = min(_filled_qty_of(order), work.qty)
+        done = order.is_filled
+        total = min(_filled_qty_of(order) if done else order.filled_qty, work.qty)
+        qty = total - work.filled_qty
+        if qty <= 0:
+            if done:
+                self._resolve_working(order.order_id, outcome="filled")
+            return
+        work.filled_qty = total
         # its share of the preview's commission: a promoted position carried
         # 0 and the card's net and the closed line's overstated it (st-ocnp)
         commission = (round(work.entry_commission_usd * qty / work.qty, 2)
@@ -1602,6 +1648,36 @@ class ExecService:
                                     at="fill", order_id=order.order_id)
                 stop_spx = restruck
         pos = self._open.get(work.symbol)
+        if pos is not None and work.triggered and pos.intent_id == work.intent_id:
+            # The rest of a triggered entry that filled in parts. The bracket
+            # it carried is the whole order's and comes alive with it; the
+            # position grows to meet it, and nothing of the service's own
+            # goes on beside it — through the add path it did (st-mlhh).
+            before_qty, before_px = pos.qty, pos.entry_price
+            pos.entry_price = round((pos.entry_price * pos.qty + fill_px * qty)
+                                    / (pos.qty + qty), 4)
+            pos.qty += qty
+            pos.entry_commission_usd = round(pos.entry_commission_usd + commission, 2)
+            self.journal.record("filled", kind="entry", intent_id=work.intent_id,
+                                symbol=pos.symbol, qty=qty, price=fill_px,
+                                cost_usd=round(fill_px * CONTRACT_MULTIPLIER * qty, 2),
+                                commission_usd=commission, spx=spx, stop_spx=pos.stop_spx,
+                                delta=work.delta, order_id=order.order_id,
+                                found_by="reconcile", added_to=pos.intent_id)
+            self.journal.record("position_added", symbol=pos.symbol, intent_id=pos.intent_id,
+                                added_intent_id=work.intent_id, added_qty=qty,
+                                added_price=fill_px, qty_before=before_qty, qty=pos.qty,
+                                entry_price_before=before_px, entry_price=pos.entry_price)
+            if not done:
+                return
+            self._resolve_working(order.order_id, outcome="filled")
+            if self._attach_triggered(pos, order.order_id, spx, limit=work.limit) is None \
+                    and pos.symbol in self._open:
+                self._cancel_bracket(pos)
+                if spx is not None:
+                    self._place_protective_stop(pos, spx)
+                self._place_take_profit(pos)
+            return
         if pos is not None:
             # The position grew. Its resting bracket is now smaller than what
             # is held, which is the same silent hole in the other direction,
@@ -1610,7 +1686,8 @@ class ExecService:
                                   order_id=order.order_id, spx=spx,
                                   stop_spx=stop_spx, delta=work.delta,
                                   commission_usd=commission, found_by="reconcile")
-            self._resolve_working(order.order_id, outcome="filled")
+            if done:
+                self._resolve_working(order.order_id, outcome="filled")
             return
         pos = OpenPosition(
             symbol=work.symbol, qty=qty, entry_price=fill_px,
@@ -1626,7 +1703,18 @@ class ExecService:
                             commission_usd=commission,
                             spx=spx, stop_spx=stop_spx, delta=work.delta,
                             order_id=order.order_id, found_by="reconcile")
-        self._resolve_working(order.order_id, outcome="filled")
+        if done:
+            self._resolve_working(order.order_id, outcome="filled")
+        elif work.triggered:
+            # A part of a triggered entry: its bracket is the whole order's
+            # and comes alive with the rest (or is read when the rest is
+            # cancelled). Watched by the SPX loop meanwhile, and said so.
+            self.journal.record("stop_unprotected", symbol=pos.symbol,
+                                intent_id=pos.intent_id, qty=pos.qty,
+                                detail="a part of a triggered entry filled; the bracket it "
+                                       "carried rests when the rest fills — the SPX loop "
+                                       "watches the part until then")
+            return
         if work.triggered and self._attach_triggered(pos, order.order_id, spx,
                                                         limit=work.limit) is not None:
             return          # booked, fired, or unread (read again next reconcile)
@@ -1989,6 +2077,12 @@ class ExecService:
                                                "service cannot buy to close — by hand")
                 continue
             if held.qty == 0:
+                continue
+            if any(w.symbol == symbol for w in self._working.values()):
+                # An entry still working on this contract: what it fills is
+                # promoted from the order listing, part by part. Adopted (or
+                # resized) from the positions read as well, its fill was held
+                # twice — a part adopted, then the whole added (st-mlhh).
                 continue
             pos = self._open.get(symbol)
             if pos is None:
@@ -4048,6 +4142,10 @@ class ExecService:
                 symbol = str(e.get("symbol", ""))
                 if not symbol:
                     continue
+                part_of = self._working.get(str(e.get("order_id", "")))
+                if part_of is not None:
+                    # a part of an entry still working when the service died
+                    part_of.filled_qty += int(e.get("qty", 0) or 0)
                 try:
                     right = parse_occ(symbol).right
                 except ValueError:
