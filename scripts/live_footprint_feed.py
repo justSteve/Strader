@@ -218,7 +218,8 @@ def tail_rows(path: Path, *, follow: bool, poll_s: float = 0.5,
             fh.close()
 
 
-def ordered_trades(rows, *, reorder_lag_s: float, flush_at_end: bool = True):
+def ordered_trades(rows, *, reorder_lag_s: float, flush_at_end: bool = True,
+                   counters: dict | None = None):
     """Parse rows and release trades in canonical order. [st-re1o]
 
     Holds a buffer of parsed trades and releases those whose event time is
@@ -237,6 +238,11 @@ def ordered_trades(rows, *, reorder_lag_s: float, flush_at_end: bool = True):
     * A trade that would still land behind something already released is
       dropped and counted (``late``), with a warning, instead of being handed
       to ``build_bars`` to raise on.
+
+    ``counters``, when given, is kept current with the running ``dupes`` /
+    ``late`` / ``bad`` counts so the health file can report them while the
+    feed runs. Reporting only — it changes nothing about what is dropped.
+    [st-epa3]
     """
     pending: list[tuple[datetime, int, object]] = []
     dedup = TradeDeduper()      # re-delivered copies only (st-exmw)
@@ -255,6 +261,8 @@ def ordered_trades(rows, *, reorder_lag_s: float, flush_at_end: bool = True):
                 continue
             if last_out is not None and (item[0], item[1]) < last_out:
                 late += 1
+                if counters is not None:
+                    counters["late"] = late
                 if late == 1 or late % 500 == 0:
                     logger.warning(
                         "late trade dropped: %s arrived after %s was released "
@@ -276,10 +284,14 @@ def ordered_trades(rows, *, reorder_lag_s: float, flush_at_end: bool = True):
         try:
             if not dedup.admit(row):
                 dupes += 1
+                if counters is not None:
+                    counters["dupes"] = dupes
                 continue
             parsed = trade_from_row(row)
         except (KeyError, TypeError, ValueError) as e:
             bad += 1
+            if counters is not None:
+                counters["bad"] = bad
             logger.warning("unparseable row (%s) — skipped", e)
             continue
 
@@ -671,7 +683,11 @@ def main() -> int:
     rows = tail_rows(path, follow=not args.catch_up_only,
                      stop_after_idle_s=args.idle_stop,
                      pinned_day=None if args.date else day)
-    trades = ordered_trades(rows, reorder_lag_s=args.reorder_lag)
+    # The drop counters ride the health file so the page can show them — the
+    # count of LATE drops used to reach only the log. Reporting only: which
+    # trades are dropped is ordered_trades' business, unchanged. [st-epa3]
+    drop_counts = {"dupes": 0, "late": 0, "bad": 0}
+    trades = ordered_trades(rows, reorder_lag_s=args.reorder_lag, counters=drop_counts)
 
     # Tee every trade so each closed bar can reclaim its own slice for the
     # intra-bar fill steps; build_bars otherwise swallows them.
@@ -691,12 +707,14 @@ def main() -> int:
     last_dev = 0.0
     health_path = CORPUS_ROOT / day.isoformat() / "_footprint_health.json"
     feed_health = {"day": day.isoformat(), "pid": os.getpid(), "sent": 0,
-                   "last_bar_t1": None, "developing_t": None, "final": 0}
+                   "last_bar_t1": None, "developing_t": None, "final": 0,
+                   **drop_counts}
 
     def _beat(**kw) -> None:
         if args.dry_run:
             return
         feed_health.update(kw)
+        feed_health.update(drop_counts)   # dupes / late / bad as of this beat
         feed_health["written_utc"] = datetime.now().astimezone().isoformat(timespec="seconds")
         write_feed_health(health_path, feed_health)
 

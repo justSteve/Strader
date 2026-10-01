@@ -654,3 +654,22 @@ def test_bridge_state_accepts_a_meta_only_push_as_a_day_reset(tmp_path):
     r = st.bars_since(0)
     assert r["total"] == 0 and r["meta"]["day"] == "2026-08-18"
     assert r["developing"] is None
+
+
+def test_drop_counters_report_without_changing_what_is_dropped():
+    """[st-epa3] dupes / late / bad ride a caller's dict for the health file;
+    the trades released are exactly those of a run without it."""
+    rows = _synthetic_rows(300)
+    stale = _row(9999, 7500.0, 3, "B",
+                 ts=datetime.fromisoformat(rows[250]["provenance"]["ts_event"])
+                 - timedelta(seconds=10))
+    broken = {"provenance": {"ts_event": "not a time"}, "data": {"sequence": 8888}}
+    stream = (rows[:100] + [rows[5], feed.CAUGHT_UP] + rows[100:250]
+              + [stale, broken] + rows[250:])
+
+    plain = list(feed.ordered_trades(iter(stream), reorder_lag_s=2.0))
+    counts = {"dupes": 0, "late": 0, "bad": 0}
+    counted = list(feed.ordered_trades(iter(stream), reorder_lag_s=2.0, counters=counts))
+
+    assert [t.sequence for t in counted] == [t.sequence for t in plain]
+    assert counts == {"dupes": 1, "late": 1, "bad": 1}
