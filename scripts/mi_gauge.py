@@ -105,6 +105,100 @@ def render(r, b: dict | None = None) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Poll health [st-epa3].
+#
+# Before this, a 401 or a 5xx from the quote endpoint became `prices = {}` and
+# printed nothing: the pane kept showing its last band as if the tape were
+# still being read. A failed poll is now loud and timestamped, and once two
+# minutes pass with no good $TICK the read is marked STALE — on the pane and in
+# `_mi_gauge_health.json` beside the capture file.
+# ---------------------------------------------------------------------------
+
+#: No good $TICK for this long = two missed synthetic minutes = STALE.
+STALE_AFTER_S = 120
+#: While a failure persists, repeat the [ALERT] line at most this often.
+ALERT_REPEAT_S = 60
+HEALTH_NAME = "_mi_gauge_health.json"
+
+
+def _now() -> datetime:
+    """The loop's clock — one seam so a test can drive minutes without waiting."""
+    return datetime.now(tz=CENTRAL)
+
+
+class PollHealth:
+    """Tracks good/bad $TICK polls and says what the pane must print.
+
+    ``observe`` returns the lines to print for this poll (often none); a bad
+    poll is ``error`` = 'HTTP 401', 'no $TICK in quote', or an exception text.
+    """
+
+    def __init__(self, started: datetime):
+        self.started = started
+        self.last_good: datetime | None = None
+        self.last_error: str | None = None
+        self.last_error_ts: datetime | None = None
+        self.misses = 0                    # consecutive bad polls
+        self._last_alert: datetime | None = None
+        self._stale_announced = False
+
+    def stale(self, now: datetime) -> bool:
+        ref = self.last_good or self.started
+        return (now - ref).total_seconds() >= STALE_AFTER_S
+
+    def observe(self, now: datetime, error: str | None) -> list[str]:
+        stamp = now.astimezone(CENTRAL).strftime("%H:%M:%S CT")
+        lines: list[str] = []
+        if error is None:
+            if self.misses and self.last_error:
+                was = " — read was STALE" if self._stale_announced else ""
+                lines.append(f"# {stamp} $TICK poll recovered after {self.misses} "
+                             f"failed poll(s) ({self.last_error}){was}")
+            self.last_good = now
+            self.misses = 0
+            self._last_alert = None
+            self._stale_announced = False
+            return lines
+        self.misses += 1
+        self.last_error, self.last_error_ts = error, now
+        if self._last_alert is None or \
+                (now - self._last_alert).total_seconds() >= ALERT_REPEAT_S:
+            lines.append(f"[ALERT] {stamp} $TICK poll {error} "
+                         f"({self.misses} in a row)")
+            self._last_alert = now
+        if self.stale(now) and not self._stale_announced:
+            since = (self.last_good or self.started).astimezone(CENTRAL)
+            lines.append(f"[ALERT] {stamp} MI gauge read STALE — no good $TICK since "
+                         f"{since:%H:%M:%S} CT; the last band above is NOT current")
+            self._stale_announced = True
+        return lines
+
+    def snapshot(self, now: datetime) -> dict:
+        def iso(t):
+            return t.astimezone(CENTRAL).isoformat() if t else None
+        return {
+            "status": "stale" if self.stale(now) else ("degraded" if self.misses else "ok"),
+            "updated": iso(now),
+            "last_good": iso(self.last_good),
+            "last_error": self.last_error,
+            "last_error_ts": iso(self.last_error_ts),
+            "consecutive_misses": self.misses,
+            "stale_after_s": STALE_AFTER_S,
+        }
+
+
+def write_health(path: Path, snap: dict) -> None:
+    """Atomic replace so a reader never sees half a file. Never raises — a
+    health write failing must not take the gauge down."""
+    try:
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(snap) + "\n")
+        os.replace(tmp, path)
+    except OSError as e:
+        print(f"  health write failed: {e}", file=sys.stderr, flush=True)
+
+
+# ---------------------------------------------------------------------------
 # Live-capture / state-restore.
 #
 # The gauge is a deterministic pure function of its tick stream, so we do NOT
@@ -341,8 +435,11 @@ def live(poll_s: int, capture: Path | None,
         if read is not None:
             print(render(read, b), flush=True)
 
+    health = PollHealth(_now())
+    health_path = capture.parent / HEALTH_NAME if capture is not None else None
+
     while True:
-        now = datetime.now(tz=CENTRAL)
+        now = _now()
 
         # --- stop conditions, checked every tick of the loop ---------------
         reason = stop_reason(now, capture_day, session_end)
@@ -362,14 +459,25 @@ def live(poll_s: int, capture: Path | None,
                       f"cum {g.cum_tick:+d}).", flush=True)
             return 0
 
+        error: str | None = None
         try:
             r = c.get_quotes(POLL_SYMBOLS)
-            prices = quote_prices(r.json()) if r.status_code == 200 else {}
+            if r.status_code == 200:
+                prices = quote_prices(r.json())
+            else:
+                prices, error = {}, f"HTTP {r.status_code}"
             px = prices.get("$TICK")
             b = breadth(prices)
+            if error is None and px is None:
+                error = "no $TICK in quote"
         except Exception as e:  # noqa: BLE001 — keep the pane alive
-            print(f"  poll error: {e}", file=sys.stderr)
-            px, b = None, {}
+            px, b, error = None, {}, f"error: {e}"
+        # Loud on the pane, and the health file says stale once two minutes
+        # pass without a good $TICK [st-epa3].
+        for line in health.observe(now, error):
+            print(line, flush=True)
+        if health_path is not None:
+            write_health(health_path, health.snapshot(now))
         # Breadth is carried independently of $TICK: one poll can return breadth
         # and no tick or the reverse, and the last good breadth of the minute is
         # the minute's value. Never overwrite a good reading with an empty one.
