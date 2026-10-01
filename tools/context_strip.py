@@ -10,60 +10,64 @@ Usage: .venv/bin/python /path/to/context_strip.py  (cwd = Strader repo)
 """
 from __future__ import annotations
 import json, sys
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, time, timezone, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 CT = ZoneInfo("America/Chicago")
 REPO = Path("/root/projects/Strader")
 
+def rth_open(day: date) -> datetime:
+    """08:30 America/Chicago on ``day`` — the cash open in either DST regime.
+    Was a hardcoded 13:30 UTC, which from 2026-11-01 (CST) is 07:30 CT —
+    an hour of premarket counted into RTH VWAP and delta. [st-epa3]"""
+    return datetime.combine(day, time(8, 30), tzinfo=CT)
+
+
+def tape_summary(trades, rth_start: datetime) -> dict:
+    """Day range, RTH VWAP inputs, cum RTH delta and its minute track from
+    canonical-order trades (``tradesource.iter_trades``)."""
+    out = {"day_hi": None, "day_lo": None, "last_px": None, "last_ts": None,
+           "pv": 0.0, "vol": 0.0, "cum_delta": 0.0, "n_rth": 0,
+           "delta_track": []}
+    track: list[tuple[datetime, float]] = out["delta_track"]
+    for t in trades:
+        px, sz, ts = t.price, t.size, t.ts
+        out["day_hi"] = px if out["day_hi"] is None else max(out["day_hi"], px)
+        out["day_lo"] = px if out["day_lo"] is None else min(out["day_lo"], px)
+        out["last_px"] = px
+        out["last_ts"] = ts
+        if ts >= rth_start:
+            out["n_rth"] += 1
+            out["pv"] += px * sz
+            out["vol"] += sz
+            if t.side == "B":
+                out["cum_delta"] += sz
+            elif t.side == "A":
+                out["cum_delta"] -= sz
+            if not track or (ts - track[-1][0]) >= timedelta(minutes=1):
+                track.append((ts, out["cum_delta"]))
+    return out
+
+
 def main() -> None:
     now = datetime.now(tz=CT)
     day = now.strftime("%Y-%m-%d")
     corpus = REPO / "data" / "corpus" / day
-    rth_open_utc = datetime.now(tz=timezone.utc).replace(hour=13, minute=30, second=0, microsecond=0)
-    rth_prefix = day + "T"
 
     # --- ES tape: day high/low, RTH VWAP, cum RTH delta + 15-min slope ---
-    tape = corpus / "databento_glbx_es.jsonl"
-    day_hi = day_lo = last_px = None
-    pv = vol = 0.0
-    cum_delta = 0.0
-    last_ts = None
-    # (ts, cum_delta) samples each minute for the slope
-    delta_track: list[tuple[datetime, float]] = []
-    n_rth = 0
-    with open(tape) as f:
-        for line in f:
-            # cheap prefilter: price for day range without full parse cost is
-            # not worth separate handling — parse everything, file is one day
-            try:
-                r = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            d = r.get("data") or {}
-            px = d.get("price"); sz = d.get("size") or 0
-            if px is None:
-                continue
-            day_hi = px if day_hi is None else max(day_hi, px)
-            day_lo = px if day_lo is None else min(day_lo, px)
-            last_px = px
-            ts_s = (r.get("provenance") or {}).get("ts_event") or ""
-            try:
-                ts = datetime.fromisoformat(ts_s)
-            except ValueError:
-                continue
-            last_ts = ts
-            if ts >= rth_open_utc:
-                n_rth += 1
-                pv += px * sz; vol += sz
-                side = d.get("side")
-                if side == "B":
-                    cum_delta += sz
-                elif side == "A":
-                    cum_delta -= sz
-                if not delta_track or (ts - delta_track[-1][0]) >= timedelta(minutes=1):
-                    delta_track.append((ts, cum_delta))
+    # through the shared seam: .gz days, canonical order and dedup [st-epa3]
+    sys.path.insert(0, str(REPO))
+    from market.orderflow.tradesource import iter_trades
+    try:
+        s = tape_summary(iter_trades(corpus / "databento_glbx_es.jsonl"),
+                         rth_open(now.date()))
+    except FileNotFoundError as e:
+        print(f"[ALERT] context strip: no ES tape for {day} ({e})")
+        return
+    day_hi, day_lo, last_px, last_ts = s["day_hi"], s["day_lo"], s["last_px"], s["last_ts"]
+    pv, vol, cum_delta, n_rth = s["pv"], s["vol"], s["cum_delta"], s["n_rth"]
+    delta_track = s["delta_track"]
 
     print(f"context strip — {now:%H:%M:%S} CT  (tape thru "
           f"{last_ts.astimezone(CT):%H:%M:%S} CT)" if last_ts else "no tape")
@@ -104,7 +108,6 @@ def main() -> None:
         print("  gauge: no rows yet")
 
     # --- gex: flip side, majors, net_dex now vs 15 min ago ---
-    sys.path.insert(0, str(REPO))
     rec = None
     if not (corpus / "gexbot.jsonl").exists():
         print("  gex 60s: no file yet (normal before 08:30)")
