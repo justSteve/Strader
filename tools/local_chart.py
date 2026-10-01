@@ -34,6 +34,8 @@ from zoneinfo import ZoneInfo
 CENTRAL = ZoneInfo("America/Chicago")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:  # CLI run from tools/ — market must import
+    sys.path.insert(0, str(REPO_ROOT))
 CORPUS_ROOT = REPO_ROOT / "data" / "corpus"
 DEFAULT_OUT_DIR = REPO_ROOT / "data" / "measurement" / "charts"
 LWC_VERSION = "4.1.3"  # pinned — v5 changed API
@@ -45,27 +47,21 @@ def _ct_time(s: str) -> _time:
 
 
 def _load_ticks(date_str: str) -> list[tuple[datetime, float]]:
+    """The day's ES prints as ``(ts_ct, price)`` in canonical order.
+
+    Reads through the shared trade seam (``tradesource.iter_trades``), which
+    opens a compacted ``.jsonl.gz`` day, sorts multi-pull appends and drops
+    duplicate rows by the canonical key — this used to ``path.exists()`` the
+    raw ``.jsonl`` and read file order, so every packed day raised and a
+    doubled pull drew its prints twice. [st-epa3]
+    """
+    from market.orderflow.tradesource import iter_trades
+
     path = CORPUS_ROOT / date_str / "databento_glbx_es.jsonl"
-    if not path.exists():
-        raise FileNotFoundError(f"No ES corpus file for {date_str}: {path}")
-    ticks: list[tuple[datetime, float]] = []
-    with path.open() as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rec = json.loads(line)
-                ts_event = rec["provenance"]["ts_event"]
-                price = rec["data"]["price"]
-                if price is None:
-                    continue
-                ts_utc = datetime.fromisoformat(ts_event)
-                ts_ct = ts_utc.astimezone(CENTRAL)
-                ticks.append((ts_ct, float(price)))
-            except (KeyError, ValueError, TypeError):
-                continue
-    return ticks
+    try:
+        return [(t.ts, t.price) for t in iter_trades(path)]
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"No ES corpus file for {date_str}: {e}") from e
 
 
 def _aggregate_ohlc(ticks: list[tuple[datetime, float]], interval_min: int,
