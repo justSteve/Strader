@@ -522,7 +522,7 @@ body.hud > .hint { padding:2px 12px; font-size:11px; }
   <span>Time <b id="ro-time">–</b></span>
   <span>Last <b id="ro-price">–</b></span>
   <span>Bar Δ <b id="ro-delta">–</b></span>
-  <span>Session Δ (sum of bars) <b id="ro-cvd">–</b></span>
+  <span>Session Δ <b id="ro-cvd">–</b></span>
   <span class="drill-only">Score <b id="ro-score">0/0</b></span>
 </div>
 <div id="emrow"></div>
@@ -1374,6 +1374,10 @@ const fmtUtcAsCT = iso => {
 // straddles the open is pre-open. Pre-open bars stay on the tape, dimmed.
 const RTH_OPEN_CT = (DATA.meta && DATA.meta.rth_open_ct) || "08:30:00";
 const isRth = b => !!b && !!b.t0 && fmtClock(b.t0) >= RTH_OPEN_CT;
+// Session Δ per bar: the bar's trades at or after 08:30 CT, as the engine's CVD
+// counts them (st-v69l). A bar from before the field existed falls back to the
+// old whole-bar rule.
+const sessD = b => (b && typeof b.sd === "number") ? b.sd : (isRth(b) ? b.d : 0);
 function firstRthIdx() {              // index of the first RTH bar, or null if none yet
   if (!LIVE && DATA.meta && Number.isInteger(DATA.meta.first_rth_bar)) return DATA.meta.first_rth_bar;
   const i = bars.findIndex(isRth);
@@ -1454,7 +1458,7 @@ function finishBar(i) {
   const b = bars[i];
   if (!LIVE && playing) markCuesFresh(i);   // replay flashes only while playing [st-n0qm.2]
   setCol(i, renderColumn(b, i));
-  if (isRth(b)) cvd += b.d;          // Session Δ is the cash session's [st-fgno]
+  cvd += sessD(b);                   // the engine's session rule [st-v69l]
   if (!LIVE) PROFILE = drillProfile();
   repaintReadouts(); appendBarRow(b, i);
   gradeMidFlight(b);
@@ -1548,7 +1552,7 @@ function seekTo(target) {
   // bites live. [st-re1o]
   if (!bars.length) { repaintAll(); repaintReadouts(); return; }
   const t = Math.max(0, Math.min(target, bars.length - 1));
-  for (let i = 0; i <= t; i++) { idx = i; if (isRth(bars[i])) cvd += bars[i].d; appendBarRow(bars[i], i); }
+  for (let i = 0; i <= t; i++) { idx = i; cvd += sessD(bars[i]); appendBarRow(bars[i], i); }
   if (!LIVE) PROFILE = drillProfile();
   repaintAll(); repaintReadouts();
   if (LIVE) noteSeek();

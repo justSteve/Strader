@@ -78,7 +78,7 @@ from strader.market_calendar import prior_trading_day  # noqa: E402
 from market.orderflow.fuel import FuelTracker, load_level_history  # noqa: E402
 from market.orderflow.gex_context import GexContext                # noqa: E402
 from market.orderflow.bars import build_bars                    # noqa: E402
-from market.orderflow.fill import bar_fill_steps                # noqa: E402
+from market.orderflow.fill import bar_fill_steps, session_delta  # noqa: E402
 from market.orderflow.parity import StackDriver, live_drive     # noqa: E402
 from market.orderflow.replay import (                           # noqa: E402
     TradeDeduper, es_day_path, trade_from_row,
@@ -336,7 +336,7 @@ def take_bar_trades(bar, buf: list) -> list:
 
 def bar_payload(bar, trades: list, events: list[dict] | None = None,
                 *, include_steps: bool = True, gex: dict | None = None,
-                bs: dict | None = None) -> dict:
+                bs: dict | None = None, day: _date | None = None) -> dict:
     """Serialise a FootprintBar into the exact column shape the page renders.
 
     Key-for-key identical to orderflow_drill.bars_payload's per-bar dict —
@@ -376,6 +376,8 @@ def bar_payload(bar, trades: list, events: list[dict] | None = None,
                   if include_steps and trades else []),
         "ev": events or [],
     }
+    if trades:
+        payload["sd"] = session_delta(trades, day)   # the engine's session rule (st-v69l)
     if gex:
         payload["gex"] = gex
     if bs and bs.get("pts") is not None:
@@ -885,7 +887,7 @@ def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
                 fuel_ev = fuel.on_bar(bar)
                 if fuel_ev is not None:
                     ev_out = [*events, fuel_ev | {"bar_i": bar_i}]
-            batch.append(bar_payload(bar, bar_trades, ev_out, gex=gex_ctx, bs=bs))
+            batch.append(bar_payload(bar, bar_trades, ev_out, gex=gex_ctx, bs=bs, day=day))
             now = time.monotonic()
             # Push promptly — a bar the page has not seen is a bar Steve is not
             # watching — but coalesce the catch-up burst so a full day does not

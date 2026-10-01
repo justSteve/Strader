@@ -31,7 +31,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from market.orderflow.bars import build_bars          # noqa: E402
-from market.orderflow.fill import bar_fill_steps      # noqa: E402
+from market.orderflow.fill import bar_fill_steps, bar_trade_slices, session_delta  # noqa: E402
 from market.orderflow.replay import read_corpus_day   # noqa: E402
 from market.orderflow.recognizer import SetupRecognizer  # noqa: E402
 from market.orderflow.anatomy import anatomy_payload, build_instances  # noqa: E402
@@ -133,8 +133,9 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
     logger.info("%s: %d trades -> %d bars (N=%d)", day, len(trades), len(bars), bar_n)
 
     fill = bar_fill_steps(trades, bars)
+    sds = [session_delta(sl, day) for sl in bar_trade_slices(trades, bars)]
     out_bars = []
-    for b, steps in zip(bars, fill):
+    for b, steps, sd in zip(bars, fill, sds):
         out_bars.append({
             "t0": b.start_ts.isoformat(), "t1": b.end_ts.isoformat(),
             "o": b.open, "h": b.high, "l": b.low, "c": b.close,
@@ -144,6 +145,7 @@ def bars_payload(day: _date, bar_n: int, mancini_levels: list[float] | None = No
             "cells": [[c.price, c.bid_vol, c.ask_vol] for c in b.cells],
             "steps": steps,
             "ev": [],
+            "sd": sd,           # session delta, the engine's rule (st-v69l)
         })
 
     # level chips the drill offers out of the box (session-derived; the UI

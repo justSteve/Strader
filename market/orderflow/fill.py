@@ -59,3 +59,51 @@ def bar_fill_steps(trades, bars, n_steps: int = FILL_STEPS) -> list[list]:
                     k += 1
         out.append(steps)
     return out
+
+
+_RTH_OPEN_CT = (8, 30)
+
+
+def session_delta(bar_trades, day=None) -> int:
+    """The bar's contribution to the cash session's delta: buy minus sell
+    size over its trades at or after 08:30 CT. [st-v69l]
+
+    The engine's CVD resets at the first trade at or after 08:30
+    (``OrderflowEngine._roll_session``), so a bar straddling the open carries
+    its post-open trades into the session. The page summed whole bars that
+    START at or after 08:30 instead — the straddle bar alone was -352 on
+    09-30, and "Session Δ" read 108-451 contracts away from the CVD the
+    divergence lines quote. Carrying this per bar makes them one number.
+
+    ``day`` is the session's date; trades from its 08:30 CT onward count,
+    past midnight too, as the engine's CVD does until the next open.
+    Without it the bar's own first trade names the day.
+    """
+    from datetime import datetime, time
+    from zoneinfo import ZoneInfo
+    ct = ZoneInfo("America/Chicago")
+    out = 0
+    opened = None
+    for t in bar_trades:
+        lt = t.ts.astimezone(ct)
+        if opened is None:
+            opened = datetime.combine(day or lt.date(), time(*_RTH_OPEN_CT), ct)
+        if lt < opened:
+            continue
+        if t.side == "B":
+            out += t.size
+        elif t.side == "A":
+            out -= t.size
+    return out
+
+
+def bar_trade_slices(trades, bars):
+    """Each bar's own trades — the positional walk ``bar_fill_steps`` and the
+    live feeder's ``take_bar_trades`` use, so the slices agree."""
+    ti = 0
+    for b in bars:
+        vol, start = 0, ti
+        while ti < len(trades) and vol < b.volume:
+            vol += trades[ti].size
+            ti += 1
+        yield trades[start:ti]
