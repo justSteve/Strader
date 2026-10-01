@@ -1982,6 +1982,12 @@ class ExecService:
                 "an entry must carry stop_spx and delta — the broker-resident "
                 "stop is derived from them and is not optional",
             )
+        # Judge the level that will be sent: a dollar stop's level is struck
+        # again from this mark at the send (_restruck), so the priced one is
+        # not what rests. Checked as priced, SPX moving 0.29 points past it
+        # between the ticket and SEND refused "the sign is transposed" an
+        # entry the re-strike would have rested (st-91n2).
+        intent = self._restruck(intent, spx)
         if not stop_is_consistent(intent.occ.right, spx, intent.stop_spx):
             return Refusal(
                 "protective_stop",
@@ -2013,6 +2019,16 @@ class ExecService:
         # No daily loss ceiling, no headroom, no count of positions or losses
         # (Steve, 2026-09-24; see ``execd.bounds.Bounds``). [co-8mb1z]
         return None
+
+    @staticmethod
+    def _restruck(intent: OrderIntent, spx: float) -> OrderIntent:
+        """A dollar stop's SPX level struck from ``spx`` — the walk from the
+        limit down to the ticket's stop price (st-7p5u). An entry with no
+        stop price (a level stop, set as an SPX level) keeps its level."""
+        if intent.stop_price is None or intent.limit is None or not intent.delta:
+            return intent
+        level = level_for(intent.occ.right, spx, intent.limit, intent.stop_price, intent.delta)
+        return intent if level == intent.stop_spx else replace(intent, stop_spx=level)
 
     def _place_entry(self, intent: OrderIntent, *,
                      page_query: dict[str, str] | None = None) -> dict[str, Any]:
@@ -2055,15 +2071,12 @@ class ExecService:
         # 0.38 before the fill and a $20 stop rested $40 under it. So the
         # level is struck again here, from the mark the send goes out on, and
         # the triggered bracket below walks it back to exactly that price.
-        if (intent.stop_price is not None and intent.limit is not None
-                and intent.delta):
-            restruck = level_for(intent.occ.right, spx, intent.limit,
-                                 intent.stop_price, intent.delta)
-            if restruck != intent.stop_spx:
-                self.journal.record("stop_restruck", intent_id=intent.intent_id,
-                                    spx=spx, stop_price=intent.stop_price,
-                                    stop_spx_priced=intent.stop_spx, stop_spx=restruck)
-                intent = replace(intent, stop_spx=restruck)
+        restruck = self._restruck(intent, spx)
+        if restruck.stop_spx != intent.stop_spx:
+            self.journal.record("stop_restruck", intent_id=intent.intent_id,
+                                spx=spx, stop_price=intent.stop_price,
+                                stop_spx_priced=intent.stop_spx, stop_spx=restruck.stop_spx)
+            intent = restruck
         # The cut was checked against a mark read before the preview, a broker
         # round trip ago. Cycle 1 on 2026-09-14 was sent with the index already
         # through its cut — 7630.88 against a call stop at 7631.13 — and was

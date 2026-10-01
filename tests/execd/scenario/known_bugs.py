@@ -89,13 +89,6 @@ KNOWN: dict[str, dict[str, str]] = {
                      "is $10 a contract — 0.10 under the ask, which is the bid of an ordinary "
                      "0.10-wide market above $3 (seen first in the two-lot partial-exit "
                      "sequence)."},
-    "H3": {"invariant": "(refusal)",
-           "pinned_by": _S + "TestFills::test_a_dollar_stop_survives_spx_moving_before_the_send",
-           "title": "a dollar-stop entry is refused 'the sign is transposed' when SPX moves past "
-                    "the priced level before the send, though the re-strike would rest it",
-           "detail": "_protective_stop_refusal checks the priced stop_spx before _place_entry "
-                     "re-strikes it (87ced9c). At delta 0.70 a 0.20 stop is 0.29 SPX points: "
-                     "the page's own SEND (chain read, then $SPX) can lose it by a tick."},
     "H4": {"invariant": "stop_level_crossed_at_fill",
            "pinned_by": _S + "TestEntries::test_a_dip_buy_limit_is_not_sold_by_its_own_level",
            "title": "a resting limit under the market fills with its SPX stop level already "

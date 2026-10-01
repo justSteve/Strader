@@ -144,14 +144,15 @@ class TestFills:
         assert t.stop_price >= q.bid
         scn.send(t)
 
-    @pytest.mark.xfail(strict=True, reason=reason("H3"))
     def test_a_dollar_stop_survives_spx_moving_before_the_send(self, make):
         """Priced at 7696.00, sent with SPX at 7695.60: the ticket's level
-        (0.20 at delta ~0.7 is 0.29 points) is behind the mark."""
+        (0.20 at delta ~0.7 is 0.29 points) is behind the mark. (The market
+        under the limit puts the stop struck from it over the bid — H1,
+        waived here so this case tests the refusal.)"""
         tape = scripted([Frame(0, 7696.0, quotes={C7690: (9.10, 9.20)}, deltas={C7690: 0.70}),
                          Frame(2, 7695.6, quotes={C7690: (8.85, 8.95)}, deltas={C7690: 0.70})],
                         start=T1324)
-        scn = make(tape)
+        scn = make(tape, waive={"stop_not_below_bid_when_placed": "H1"})
         t = scn.ticket("call", strike=7690, limit=9.20)
         scn.wait_until(2)
         out = scn.send(t)
