@@ -94,6 +94,11 @@ def _mid(q: Quote) -> float:
 
 
 class PaperBroker:
+    #: the paper book's own state moves inside fills_since; its reads run
+    #: one after another, never beside each other (st-840g). Declared here
+    #: so ``__getattr__`` does not answer with the live broker's True.
+    concurrent_reads = False
+
     def __init__(self, live: Broker, *, book_path: str | Path | None = None,
                  clock: Callable[[], datetime] = _utcnow) -> None:
         self.live = live

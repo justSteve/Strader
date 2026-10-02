@@ -56,6 +56,7 @@ from __future__ import annotations
 import math
 import threading
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
@@ -498,6 +499,8 @@ class ExecService:
         self._lock = threading.RLock()
         #: the SEND's one quote read, per thread (st-ikqb): see :meth:`_quote_snapshot`
         self._snap = threading.local()
+        #: the reconcile's positions read, run beside its orders read (st-840g)
+        self._reads = ThreadPoolExecutor(max_workers=1, thread_name_prefix="execd-read")
         #: the ACCT_ACTIVITY doorbell and the transport it logs in through,
         #: set by ``__main__`` for the Schwab broker only (st-8bls).
         self.stream: Any = None
@@ -1467,6 +1470,13 @@ class ExecService:
         with self._lock, (listing() if callable(listing) else nullcontext()):
             # one orders listing for orders() and the fill sweep (st-ikqb)
             self._last_reconcile_at = self.clock()
+            # The positions read goes out beside the orders read (st-840g) on
+            # a broker that says it may. It is used only when the pass below
+            # turns out quiet; see the positions read further down.
+            early: Future | None = None
+            if getattr(self.broker, "concurrent_reads", False) is True:
+                early = self._reads.submit(self.broker.positions)
+            swept_before = dict(self._swept_fills)
             try:
                 broker_orders = {o.order_id: o for o in self.broker.orders()}
             except BrokerError as exc:
@@ -1492,8 +1502,19 @@ class ExecService:
             # position this service just closed (2026-09-16 10:19:29 CT —
             # the paper book's sweep inside fills_since crossed the stop a
             # second after positions() had been read).
+            # A positions read taken beside the orders read may predate a fill
+            # that listing shows — the 09-16 race, by a few milliseconds
+            # instead of a second. So it stands only for a quiet pass: no new
+            # print swept, nothing promoted, released or found. Anything that
+            # moved, and positions are read again, after the sweep, as above.
+            quiet = (not found and not promoted and not released
+                     and self._swept_fills == swept_before)
             try:
-                broker_positions = {p.symbol: p for p in self.broker.positions()}
+                if early is not None and quiet:
+                    held = early.result()
+                else:
+                    held = self.broker.positions()
+                broker_positions = {p.symbol: p for p in held}
             except BrokerError as exc:
                 self.journal.record("error", kind="reconcile", detail=str(exc))
                 return {"promoted": [], "released": [], "adopted": [],

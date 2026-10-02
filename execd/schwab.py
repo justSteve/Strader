@@ -596,6 +596,9 @@ class SchwabBroker:
         self._sleep = sleep
         self._client = httpx.Client(base_url=API, timeout=timeout_s, transport=transport)
         self._lock = threading.RLock()
+        #: reads may run on two threads at once: the token and account-hash
+        #: caches are under ``_lock``, httpx's client is thread-safe (st-840g)
+        self.concurrent_reads = True
         #: the orders listing pinned by :meth:`listing`, per thread (st-ikqb)
         self._pin = threading.local()
         # in-memory only, per app, keyed on the refresh token they were derived

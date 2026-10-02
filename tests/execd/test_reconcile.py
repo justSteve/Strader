@@ -859,3 +859,47 @@ class TestARestartReadsBackForAPositionHeldPastTheClose:
         assert not second.journal.events("position_carried")
         assert second.status()["positions"] == []
         assert [p["symbol"] for p in second.status()["foreign_positions"]] == [CALL]
+
+
+class TestThePositionsReadRunsBesideTheOrdersRead:
+    """st-840g: on a broker that may, positions are read beside orders, and
+    that read stands only for a quiet pass; anything that moved and they are
+    read again after the fill sweep, which is what closes the 09-16 race."""
+
+    @staticmethod
+    def counting(broker, monkeypatch, *, stale: list | None = None) -> list[int]:
+        n = [0]
+        real = broker.positions
+
+        def positions():
+            n[0] += 1
+            return list(stale) if (stale is not None and n[0] == 1) else real()
+
+        broker.concurrent_reads = True
+        monkeypatch.setattr(broker, "positions", positions)
+        return n
+
+    def test_a_quiet_pass_reads_positions_once(self, armed, broker, monkeypatch):
+        broker.set_position(CALL, qty=1, avg_price=2.10)
+        armed.reconcile()                                  # adopts it; not quiet
+        n = self.counting(broker, monkeypatch)
+        out = armed.reconcile()
+        assert n[0] == 1 and out["error"] is None
+        assert out["adopted"] == [] and out["gone"] == []
+
+    def test_a_pass_that_promotes_reads_positions_again(self, armed, broker, monkeypatch):
+        """The early read predates the fill the listing shows: taken at its
+        word, the new position would read as gone."""
+        broker.rest_limits = True
+        out = armed.place(entry())
+        broker.fill_resting(out["order"]["order_id"])
+        n = self.counting(broker, monkeypatch, stale=[])  # the early read: nothing held
+        result = armed.reconcile()
+        assert result["promoted"] == [CALL]
+        assert n[0] == 2
+        assert result["gone"] == []
+        assert armed.status()["positions"][0]["symbol"] == CALL
+
+    def test_the_paper_book_never_reads_beside(self):
+        from execd.paper import PaperBroker
+        assert PaperBroker.concurrent_reads is False
