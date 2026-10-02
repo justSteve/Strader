@@ -188,3 +188,54 @@ def test_the_newest_transaction_renders_at_the_top_with_its_hops_in_order():
     # a block the cap cut below its header stays together, oldest last
     assert [ln.text for ln in newest_first([Line("1", "in", "tail"), Line("2", "head", "h"),
                                             Line("2", "out", "x")])] == ["h", "x", "tail"]
+
+
+class TestEveryStopMoveIsALine:
+    """Steve, 2026-10-02 (st-yot3): "the traffic log is not rendering a SL
+    fill. Also make sure that shows anytime a SL is updated." The 12:08 CT
+    7720C: rested 9.30, moved to 9.40 from the mark, trailed to 10.10."""
+
+    from datetime import datetime as _dt, timezone as _tz
+    START = _dt(2026, 10, 2, 17, 8, 50, tzinfo=_tz.utc)
+
+    def journal(self):
+        k = dict(intent_id="page-1", symbol="SPXW  261002C07720000")
+        return [
+            {"event": "stop_placed", "ts": "2026-10-02T17:08:54+00:00", "order_id": "58",
+             "stop_price": 9.3, "stop_spx": 7721.83, **k},
+            {"event": "stop_adjusted", "ts": "2026-10-02T17:08:56+00:00", "old_price": 9.3,
+             "new_price": 9.4, "new_order_id": "66", "new_stop_spx": 7722.02, **k},
+            {"event": "stop_adjusted", "ts": "2026-10-02T17:09:27+00:00", "old_price": 9.4,
+             "new_price": 10.1, "new_order_id": "46", **k},
+            {"event": "closed", "ts": "2026-10-02T17:09:31+00:00", "kind": "protective-stop",
+             "qty": 1, "exit_price": 10.1, "net_pnl_usd": 38.7, "order_id": "46", **k},
+            {"event": "stop_placed", "ts": "2026-10-02T17:00:00+00:00", "order_id": "old",
+             "stop_price": 1.0, **k},                       # before the page started
+        ]
+
+    def test_each_rest_move_and_fill_is_a_line_inside_its_block(self):
+        buf = TrafficBuffer(clock=lambda: self.START)
+        buf.add([Line("12:08:51", "head", "LIVE BUY 1 SPX 7720C")], key="page-1")
+        assert buf.note_stops(self.journal()) == 4
+        plain = [ln.plain() for ln in buf.lines()]
+        assert plain[1:] == [
+            "12:08:54 ← STOP resting @ 9.30 (SPX 7721.83), order 58",
+            "12:08:56 ← STOP moved 9.30 → 9.40 (SPX 7722.02)",
+            "12:09:27 ← STOP moved 9.40 → 10.10",
+            "12:09:31 ← STOP FILLED 1 @ 10.10, +$38.70 net"]
+        assert buf.note_stops(self.journal()) == 0                    # once each
+
+    def test_a_stop_the_page_did_not_send_gets_a_block_of_its_own(self):
+        buf = TrafficBuffer(clock=lambda: self.START)
+        buf.mode = "live"
+        buf.note_stops(self.journal()[:1])
+        assert [ln.plain() for ln in buf.lines()] == [
+            "── 12:08:54 LIVE SPX 7720C ──",
+            "12:08:54 ← STOP resting @ 9.30 (SPX 7721.83), order 58"]
+
+    def test_a_stop_that_could_not_rest_is_the_failure_colour(self):
+        buf = TrafficBuffer(clock=lambda: self.START)
+        buf.note_stops([{"event": "stop_unprotected", "ts": "2026-10-02T17:09:00+00:00",
+                         "intent_id": "x", "symbol": "SPXW  261002C07720000",
+                         "detail": "broker refused the entry stop"}])
+        assert "tl-fail" in render_html(buf) and "STOP NOT RESTING" in render_html(buf)

@@ -28,8 +28,8 @@ import html
 import threading
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Iterable, Mapping
+from datetime import datetime, timezone
+from typing import Any, Callable, Iterable, Mapping
 
 from .bounds import CT
 from .intent import parse_occ
@@ -183,6 +183,57 @@ def _hop(e: Mapping[str, Any]) -> list[Line]:
     return []
 
 
+#: why a position closed, in the pane's words (the closed card's, panel.py)
+_CLOSE_WORDS = {"protective-stop": "STOP FILLED", "resting-stop": "STOP FILLED",
+                "spx-stop": "STOP at its SPX level", "target": "TARGET FILLED",
+                "take-profit": "TARGET FILLED", "spx-target": "TARGET at its SPX level",
+                "spx-exit": "CLOSED at the SPX level", "flatten": "FLATTENED",
+                "external": "CLOSED outside this form", "page": "CLOSED from the form"}
+
+
+def _usd(v: Any) -> str:
+    v = float(v)
+    return f"{'-' if v < 0 else '+'}${abs(v):,.2f}"
+
+
+def stop_line(e: Mapping[str, Any]) -> Line | None:
+    """One journal line about a protective stop as the pane's line, or
+    ``None`` when it is not one (st-yot3)."""
+    ev = e.get("event")
+    at = hhmmss(e.get("ts"))
+    if ev == "stop_placed":
+        px = e.get("stop_price")
+        words = "STOP resting" + (f" @ {float(px):.2f}" if px is not None else "")
+        if e.get("stop_spx") is not None:
+            words += f" (SPX {float(e['stop_spx']):.2f})"
+        return Line(at, "in", words + f", order {e.get('order_id')}")
+    if ev == "stop_adjusted":
+        old, new = e.get("old_price"), e.get("new_price")
+        words = "STOP moved"
+        if old is not None and new is not None:
+            words += f" {float(old):.2f} → {float(new):.2f}"
+        elif new is not None:
+            words += f" to {float(new):.2f}"
+        if e.get("new_stop_spx") is not None:
+            words += f" (SPX {float(e['new_stop_spx']):.2f})"
+        return Line(at, "in", words)
+    if ev == "stop_under_bid":
+        return Line(at, "in", f"STOP {float(e['stop_was']):.2f} was at or over the "
+                              f"{float(e['bid']):.2f} bid — rests at {float(e['stop_to']):.2f}")
+    if ev == "stop_unprotected":
+        return Line(at, "in", f"STOP NOT RESTING: {_cut(e.get('detail'))}", ok=False)
+    if ev == "closed":
+        kind = str(e.get("kind") or e.get("reason") or "")
+        words = _CLOSE_WORDS.get(kind, f"CLOSED ({kind})" if kind else "CLOSED")
+        px = e.get("exit_price")
+        words += f" {e.get('qty')}" + (f" @ {float(px):.2f}" if px is not None else "")
+        net = e.get("net_pnl_usd", e.get("pnl_usd"))
+        if isinstance(net, (int, float)):
+            words += f", {_usd(net)} net"
+        return Line(at, "in", words)
+    return None
+
+
 def fill_line(e: Mapping[str, Any], qty: Any, of: Any) -> Line:
     """``← FILLED 2 @ 10.35``, or ``← FILLED 1/2 @ 10.35`` for a part
     (Steve, 2026-10-01): the count filled so far over the order's size."""
@@ -245,7 +296,11 @@ class TrafficBuffer:
     account stream, a poll), is added inside its own block by
     :meth:`note_fills`. Thread-safe — the page serves on several threads."""
 
-    def __init__(self, cap: int = TRAFFIC_CAP) -> None:
+    def __init__(self, cap: int = TRAFFIC_CAP, *,
+                 clock: Callable[[], datetime] | None = None) -> None:
+        #: the service's clock, so "since this page started" is the same time
+        #: the journal is stamped in (st-yot3)
+        self._clock = clock or (lambda: datetime.now(timezone.utc))
         self.cap = cap
         #: the side these lines belong to; a switch clears them (st-n4tr)
         self.mode: str | None = None
@@ -254,6 +309,11 @@ class TrafficBuffer:
         self._pending: dict[str, tuple[int, int]] = {}
         #: re-arms already said (st-d7nt)
         self._rearms: set[str] = set()
+        #: stop lines already said, and the time before which the journal is
+        #: not this page's to narrate — its start, or the last switch of side
+        #: (st-yot3)
+        self._stops_said: set[tuple[Any, ...]] = set()
+        self._since = self._clock()
         self._lock = threading.Lock()
         self.dropped = 0
 
@@ -326,7 +386,52 @@ class TrafficBuffer:
             self.mode = mode
             self._tx.clear()
             self._pending.clear()
+            if cleared:
+                self._since = self._clock()
             return cleared
+
+    def note_stops(self, journal: Iterable[Mapping[str, Any]], *,
+                   since: datetime | None = None) -> int:
+        """Every move of a protective stop as a line, inside its SEND's block
+        when this page sent it, else a block of its own (Steve, 2026-10-02,
+        st-yot3: "the traffic log is not rendering a SL fill. Also make sure
+        that shows anytime a SL is updated"). The stop resting, each move of
+        it (by hand, by the trail, from the mark), one refused or rested a
+        tick under the bid, a stop that could not rest, and the close that
+        ended the position — a stop fill most of all. Once per journal line,
+        and only lines from after this page started (or last switched side).
+        Returns how many lines were added."""
+        cut = since or self._since
+        added = 0
+        with self._lock:
+            for e in journal:
+                line = stop_line(e)
+                if line is None:
+                    continue
+                ts = e.get("ts")
+                try:
+                    when = datetime.fromisoformat(str(ts))
+                except ValueError:
+                    continue
+                if when < cut:
+                    continue
+                ident = (ts, e.get("event"), e.get("order_id") or e.get("new_order_id"))
+                if ident in self._stops_said:
+                    continue
+                self._stops_said.add(ident)
+                key = e.get("intent_id")
+                block = next((ls for k, ls in self._tx if k == key), None) if key else None
+                if block is not None:
+                    block.append(line)
+                else:
+                    head = Line(line.at, "head", f"{(self.mode or '').upper()} "
+                                                 f"{contract_words(str(e.get('symbol') or ''))}"
+                                                 .strip())
+                    self._tx.append((str(key or f"stop-{len(self._tx)}"), [head, line]))
+                added += 1
+            if added:
+                self._trim()
+        return added
 
     def note_rearm(self, rearm: Mapping[str, Any]) -> bool:
         """The stop-out that re-armed the form, inside its SEND's block when
@@ -338,12 +443,11 @@ class TrafficBuffer:
             if rid in self._rearms:
                 return False
             self._rearms.add(rid)
-            px = rearm.get("fill_price")
+            # the stop's fill is its own line, from the ``closed`` event
+            # (note_stops, st-yot3); this one says what the form did
             line = Line(hhmmss(rearm.get("at")), "in",
-                        f"STOP FILLED {rearm.get('lots')}"
-                        + (f" @ {float(px):.2f}" if px is not None else "")
-                        + f" — form re-armed: {str(rearm.get('side', '')).upper()} "
-                          f"{float(rearm.get('strike') or 0):g} @ mid")
+                        f"form re-armed: {str(rearm.get('side', '')).upper()} "
+                        f"{float(rearm.get('strike') or 0):g} @ mid")
             key = rearm.get("intent_id")
             block = next((ls for k, ls in self._tx if k == key), None) if key else None
             if block is not None:

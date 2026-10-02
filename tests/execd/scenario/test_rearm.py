@@ -64,8 +64,13 @@ def test_a_stop_fill_re_arms_the_form_and_never_sends(make):
     # the traffic pane says it, inside the SEND's block
     lines = re.findall(r"<div class='tl [a-z-]+'>([^<]*)</div>", state["traffic_html"])
     assert sum(ln.startswith("── ") for ln in lines) == 1
-    assert re.search(rf"← STOP FILLED 2 @ {close['exit_price']:.2f} — form re-armed: CALL "
-                     rf"{strike:g} @ mid", lines[-1].replace("&amp;", "&")), lines[-1]
+    # the stop as it rested, the fill itself, then what the form did (st-yot3)
+    assert any("← STOP resting @ " in ln for ln in lines), lines
+    filled = (rf"← (STOP FILLED|STOP at its SPX level) 2 @ {close['exit_price']:.2f}, "
+              rf"-\$[\d,.]+ net")
+    assert re.search(filled, lines[-2]), lines[-2]
+    assert re.search(rf"← form re-armed: CALL {strike:g} @ mid",
+                     lines[-1].replace("&amp;", "&")), lines[-1]
     # the page loads the prepopulated ticket: same strike, pinned, at the mid
     page = screen.client.get(r["url"]).get_data(as_text=True)
     assert "class='pin manual' id=strikepin" in page and f"value='{strike:g}'" in page

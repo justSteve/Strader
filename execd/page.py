@@ -654,6 +654,11 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 traffic.forget(k for k in pend if k not in live)
             except Exception:  # the pane is a view: it never breaks a poll
                 log.exception("traffic: the fills could not be read")
+        # every stop rest, move and fill, inside its SEND's block (st-yot3)
+        try:
+            traffic.note_stops(service.journal.read())
+        except Exception:  # the pane is a view: it never breaks a poll
+            log.exception("traffic: the stop lines could not be read")
         # the form re-armed after a stop fill (st-d7nt): its line in the
         # traffic pane, and the selection the page loads — prepopulated only;
         # SEND is never pressed for him
@@ -753,7 +758,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
     #: lines for the life of this process (st-qnbg; Steve, 2026-10-01: "I
     #: don't want raw json ... something was sent - something was returned
     #: that validated or errored").
-    traffic = TrafficBuffer()
+    traffic = TrafficBuffer(clock=service.clock)
 
     def _send_title(sel: Selection, priced, intent) -> str:
         if intent is not None:
