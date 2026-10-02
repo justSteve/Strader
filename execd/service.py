@@ -556,6 +556,12 @@ class ExecService:
         #: send and cannot match to a send — order_id → OrderResult dict,
         #: journaled once, shown, never adopted
         self._foreign_orders: dict[str, dict[str, Any]] = {}
+        #: every order of today's at the broker that this service did not send
+        #: (TOS) → the broker status last journaled as ``outside_order``, and
+        #: the order ids this service's own journal names; both rebuilt from
+        #: the journal on first use (st-rg8k)
+        self._outside_seen: dict[str, str] = {}
+        self._own_ids: set[str] | None = None
         #: long positions the broker holds on this service's instruments that
         #: this service never opened — Steve's own legs. symbol → Position.
         #: Shown on the page, never slotted, never flattened (finding 30,
@@ -723,6 +729,8 @@ class ExecService:
         self._sell_qty.clear()
         self._exit_levels.clear()
         self._foreign_orders.clear()
+        self._outside_seen.clear()
+        self._own_ids = None
         self._foreign_positions.clear()
         self._booked_exits.clear()
         self._pair_results.clear()
@@ -1532,7 +1540,8 @@ class ExecService:
             legs = self._reconcile_legs(broker_orders)
             loose = self._reconcile_loose_legs(broker_orders)
             adopted, corrected, gone = self._reconcile_positions(broker_positions)
-            return {"promoted": promoted, "released": released, "exits": exits,
+            outside = self._journal_outside_orders(broker_orders)
+            return {"outside": outside, "promoted": promoted, "released": released, "exits": exits,
                     "legs": legs, "loose": loose, "found": found,
                     "adopted": adopted, "corrected": corrected, "gone": gone,
                     "error": None}
@@ -1545,6 +1554,77 @@ class ExecService:
         if last is not None and (self.clock() - last).total_seconds() < max_age_s:
             return None
         return self.reconcile()
+
+    #: journal lines that name an order this service did NOT send — they are
+    #: not evidence an order is its own
+    _OUTSIDE_EVENTS = frozenset({"outside_order", "foreign_order", "unattributed_sell",
+                                 "position_foreign"})
+
+    def _read_own_ids(self) -> None:
+        """Every order id the day's journal names on a line of this service's
+        own, at any depth (``order_id``, ``stop_order_id``, ``order.order_id``
+        …), and the status each ``outside_order`` was last journaled at."""
+        own: set[str] = set()
+
+        def walk(v: Any) -> None:
+            if isinstance(v, dict):
+                for k, x in v.items():
+                    if (k == "order_id" or k.endswith("_order_id")) and isinstance(x, (str, int)):
+                        own.add(str(x))
+                    else:
+                        walk(x)
+            elif isinstance(v, list):
+                for x in v:
+                    walk(x)
+        for e in self.journal.read():
+            if e.get("event") == "outside_order":
+                self._outside_seen[str(e.get("order_id"))] = str(e.get("status"))
+            elif e.get("event") not in self._OUTSIDE_EVENTS:
+                walk(e)
+        self._own_ids = own
+
+    def _journal_outside_orders(self, broker_orders: dict[str, OrderResult]) -> list[str]:
+        """Steve, 2026-10-02 (st-rg8k): "I've entered a couple orders via the
+        TOS platform that are not reflected in the journal. We should add
+        those even if the shape of the info doesn't match our code's log."
+
+        Every order of today's in the broker's listing that this service did
+        not send is journaled as ``outside_order`` — in the broker's terms,
+        whatever its side, status or shape — when first seen and again each
+        time its status changes (WORKING → FILLED). It is a record, not a
+        position: nothing here books it, adopts it or counts it in the day's
+        P&L. Until 2026-10-02 only a WORKING buy on SPX/SPXW was journaled
+        (``foreign_order``); a TOS buy that filled at once left no line at
+        all (12:13 CT, 7720C at 9.90)."""
+        today = self.clock().astimezone(CT).date()
+        known = self._known_order_ids()
+        fresh = [o for oid, o in broker_orders.items()
+                 if oid not in known and o.submitted_at.astimezone(CT).date() == today
+                 and self._outside_seen.get(oid) != (o.raw_status or o.status.value)]
+        if not fresh:
+            return []
+        if self._own_ids is None or any(o.order_id not in self._own_ids
+                                        and o.order_id not in self._outside_seen for o in fresh):
+            self._read_own_ids()             # a new id: the journal may name it since
+        out: list[str] = []
+        for o in fresh:
+            status = o.raw_status or o.status.value
+            if o.order_id in (self._own_ids or ()) or self._outside_seen.get(o.order_id) == status:
+                continue
+            first = o.order_id not in self._outside_seen
+            self._outside_seen[o.order_id] = status
+            self.journal.record(
+                "outside_order", order_id=o.order_id, status=status,
+                side=o.legs[0].instruction if len(o.legs) == 1 else o.side.value,
+                symbol=o.symbol, qty=o.qty, order_type=o.order_type.value, price=o.price,
+                filled_qty=o.filled_qty, fill_price=o.fill_price,
+                entered_at=o.submitted_at.isoformat(), strategy=o.strategy or None,
+                legs=[leg.to_dict() for leg in o.legs] if o.legs else None,
+                detail=("an order at the broker this service did not send (TOS) — recorded "
+                        "as the broker shows it; not booked, not adopted"
+                        if first else "its status changed at the broker"))
+            out.append(o.order_id)
+        return out
 
     def _known_order_ids(self) -> set[str]:
         ids: set[str] = set(self._working) | set(self._loose_legs)

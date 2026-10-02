@@ -107,9 +107,10 @@ class TestEachBoundRefusesByName:
         r = refusal(entry(limit=4.00))
         assert r.bound == "price_band" and "above" in r.reason
 
-    def test_price_band_refuses_a_limit_far_below_the_bid(self):
+    def test_a_limit_far_below_the_bid_is_not_refused_it_rests(self):
+        """Steve, 2026-10-02 (st-rg8k): the floor is gone; a low bid rests."""
         r = refusal(entry(limit=0.50))
-        assert r.bound == "price_band" and "below" in r.reason
+        assert r is None or r.bound != "price_band"
 
     def test_price_band_refuses_a_stale_quote(self):
         r = refusal(entry(), quote=QuoteView(2.00, 2.10, age_s=120))
@@ -383,8 +384,9 @@ class TestPriceBandArithmetic:
         q = QuoteView(2.00, 2.10, 1.0)
         assert check_price_band(entry(limit=2.31), b, q) is None       # 2.10 × 1.10
         assert check_price_band(entry(limit=2.32), b, q).bound == "price_band"
-        assert check_price_band(entry(limit=1.80), b, q) is None       # 2.00 × 0.90
-        assert check_price_band(entry(limit=1.79), b, q).bound == "price_band"
+        # no floor (st-rg8k): a buy under the bid rests
+        assert check_price_band(entry(limit=1.79), b, q) is None
+        assert check_price_band(entry(limit=0.05), b, q) is None
 
     def test_a_market_exit_is_not_priced_against_the_band(self):
         assert check_price_band(exit_intent(), Bounds(), QuoteView(2.0, 2.1, 1.0)) is None

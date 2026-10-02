@@ -279,7 +279,12 @@ def check_instrument(intent: OrderIntent, bounds: Bounds) -> Refusal | None:
 def check_price_band(
     intent: OrderIntent, bounds: Bounds, quote: QuoteView | None
 ) -> Refusal | None:
-    """A limit that is nowhere near the book is a fat finger, not an order."""
+    """A limit that is nowhere near the book is a fat finger, not an order.
+
+    Only the ceiling: a BUY limit far over the ask overpays. A BUY limit
+    under the bid only rests — Steve, 2026-10-02 (st-rg8k), refused on an
+    8.00 limit into a 9.10 bid while looking at a working order: "i'd like
+    to remove that block"."""
     if quote is None:
         return Refusal("price_band", "no quote for the contract — refusing to price blind")
     if quote.age_s > bounds.max_quote_age_s:
@@ -293,18 +298,11 @@ def check_price_band(
     if intent.order_type != OrderType.LIMIT or intent.limit is None:
         return None
     ceiling = quote.ask * (1 + bounds.price_band_pct)
-    floor = quote.bid * (1 - bounds.price_band_pct)
     if intent.limit > ceiling:
         return Refusal(
             "price_band",
             f"limit {intent.limit:.2f} is more than "
             f"{bounds.price_band_pct:.0%} above the {quote.ask:.2f} ask",
-        )
-    if intent.limit < floor:
-        return Refusal(
-            "price_band",
-            f"limit {intent.limit:.2f} is more than "
-            f"{bounds.price_band_pct:.0%} below the {quote.bid:.2f} bid",
         )
     return None
 

@@ -903,3 +903,61 @@ class TestThePositionsReadRunsBesideTheOrdersRead:
     def test_the_paper_book_never_reads_beside(self):
         from execd.paper import PaperBroker
         assert PaperBroker.concurrent_reads is False
+
+
+class TestOrdersPlacedInTOSAreJournaled:
+    """Steve, 2026-10-02 (st-rg8k): "I've entered a couple orders via the TOS
+    platform that are not reflected in the journal. We should add those even
+    if the shape of the info doesn't match our code's log." 12:13 CT: a TOS
+    buy of the 7720C filled at 9.90 at once and left no line at all."""
+
+    @staticmethod
+    def tos(broker, clock, oid, side, status, *, fill=None, price=9.90):
+        from execd.broker import OrderResult
+        from execd.intent import OrderType, Side
+        broker._orders[oid] = OrderResult(
+            order_id=oid, status=status, symbol=CALL, side=Side[side], qty=1,
+            order_type=OrderType.LIMIT, price=price, filled_qty=1 if fill else 0,
+            fill_price=fill, submitted_at=clock())
+
+    def test_a_tos_buy_that_filled_at_once_and_its_sell_are_journaled_once(
+            self, armed, broker, clock):
+        self.tos(broker, clock, "tos-1", "BUY_TO_OPEN", OrderStatus.FILLED, fill=9.90)
+        self.tos(broker, clock, "tos-2", "SELL_TO_CLOSE", OrderStatus.FILLED, fill=9.30,
+                 price=9.00)
+        assert sorted(armed.reconcile()["outside"]) == ["tos-1", "tos-2"]
+        lines = {e["order_id"]: e for e in armed.journal.events("outside_order")}
+        assert lines["tos-1"]["status"] == "FILLED" and lines["tos-1"]["fill_price"] == 9.90
+        assert lines["tos-2"]["side"] == "SELL_TO_CLOSE"
+        assert armed.reconcile()["outside"] == []                  # once
+        assert armed.status()["pnl"]["closes"] == 0               # a record, not booked
+
+    def test_a_status_change_is_journaled_again(self, armed, broker, clock):
+        self.tos(broker, clock, "tos-3", "BUY_TO_OPEN", OrderStatus.WORKING)
+        armed.reconcile()
+        self.tos(broker, clock, "tos-3", "BUY_TO_OPEN", OrderStatus.CANCELED)
+        assert armed.reconcile()["outside"] == ["tos-3"]
+        assert [e["status"] for e in armed.journal.events("outside_order")] == \
+            ["WORKING", "CANCELED"]
+
+    def test_the_services_own_closed_orders_are_not_outside(self, armed, broker):
+        armed.place(entry())
+        armed.flatten()                                    # entry, stop, target, close: all its own
+        armed.reconcile()
+        assert armed.journal.events("outside_order") == []
+
+    def test_a_restart_does_not_journal_them_twice(self, armed, broker, clock, tmp_path):
+        self.tos(broker, clock, "tos-4", "BUY_TO_OPEN", OrderStatus.FILLED, fill=9.90)
+        armed.reconcile()
+        again = ExecService(broker, armed.config, clock=clock)
+        again.unlock({"token": "x"})
+        assert again.reconcile()["outside"] == []
+        assert len(again.journal.events("outside_order")) == 1
+
+    def test_an_order_from_an_earlier_day_is_not_todays(self, armed, broker, clock):
+        from datetime import timedelta
+        self.tos(broker, clock, "tos-5", "BUY_TO_OPEN", OrderStatus.FILLED, fill=9.90)
+        from dataclasses import replace as dc_replace
+        broker._orders["tos-5"] = dc_replace(broker._orders["tos-5"],
+                                             submitted_at=clock() - timedelta(days=1))
+        assert armed.reconcile()["outside"] == []
