@@ -946,14 +946,10 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
 
     @bp.post("/order/cancel")
     def order_cancel():
-        """CANCEL and CANCEL AND RE-PRICE on the working-entry card. Steve,
-        2026-09-14: "assume the canceled order will be re-priced and
-        re-armed" — so CANCEL AND RE-PRICE brings the form back with the
-        selection the entry was priced from. Plain CANCEL (Steve, 2026-10-02,
-        st-a566: "add a 'cancel' button to a working order") pulls the order
-        and leaves the form as it is: ``reprice=0``."""
+        """CANCEL AND RE-PRICE on the working-entry card. Steve, 2026-09-14:
+        "assume the canceled order will be re-priced and re-armed" — so the
+        form comes back with the selection the entry was priced from."""
         order_id = request.form.get("order_id", "")
-        reprice = request.form.get("reprice", "1") != "0"
         query: dict[str, str] = {}
         for w in service.status()["working"]:
             if w.get("order_id") == order_id and isinstance(w.get("page_query"), dict):
@@ -985,8 +981,6 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
                 f"Not confirmed — the broker took the cancel and still holds {order_id} "
                 f"({status}). It can still fill. Nothing was re-priced; watch the card "
                 f"and ask again if it is still there.")), code=303)
-        if not reprice:
-            return redirect(url_for("exec.order", msg=f"Cancelled {order_id}."), code=303)
         return redirect(url_for("exec.order", **query, msg=f"Cancelled {order_id}."), code=303)
 
     def _form_price(name: str) -> float | None:

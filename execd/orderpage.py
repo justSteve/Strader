@@ -640,10 +640,9 @@ def position_html(st: dict[str, Any], actions: Mapping[str, str] | None = None) 
 
 
 def working_html(w: dict[str, Any], cancel_action: str | None) -> str:
-    """One entry the broker holds and has not filled: what it is, and two
-    buttons — CANCEL, which pulls it (st-a566), and CANCEL AND RE-PRICE,
-    which pulls it and brings the form back priced fresh from the selection
-    it was sent from (st-fn5y)."""
+    """One entry the broker holds and has not filled: what it is, and one
+    button — CANCEL AND RE-PRICE — that pulls it and brings the form back
+    priced fresh from the selection it was sent from (st-fn5y)."""
     sym = str(w.get("symbol", "")).strip()
     rows = [("working entry", f"{sym} × {w.get('qty')}"),
             ("limit", f"{float(w['limit']):.2f}" if w.get("limit") is not None else "—"),
@@ -653,15 +652,9 @@ def working_html(w: dict[str, Any], cancel_action: str | None) -> str:
     html = ("<h2>Working entry</h2><div class=card><table>" + "".join(
         f"<tr><td>{esc(k)}</td><td>{esc(v)}</td></tr>" for k, v in rows) + "</table>")
     if cancel_action:
-        oid = esc(w.get("order_id", ""))
-        # plain CANCEL first: pull it, form left alone (st-a566)
         html += (f"<form method=post action='{cancel_action}'>"
-                 f"<input type=hidden name=order_id value='{oid}'>"
-                 "<input type=hidden name=reprice value='0'>"
-                 "<button class='big exit'>CANCEL</button></form>"
-                 f"<form method=post action='{cancel_action}'>"
-                 f"<input type=hidden name=order_id value='{oid}'>"
-                 "<button class='big quiet'>CANCEL AND RE-PRICE</button></form>")
+                 f"<input type=hidden name=order_id value='{esc(w.get('order_id', ''))}'>"
+                 "<button class='big exit'>CANCEL AND RE-PRICE</button></form>")
     return html + "</div>"
 
 

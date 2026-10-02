@@ -20,8 +20,7 @@ review hold in every stage:
 * one net number, commissions included (``NET NOW`` is what a market sell
   nets after both commissions, the same arithmetic as the position row);
 * the filled stage is the live editor for the stop and the take-profit;
-* a working entry has two controls, CANCEL and CANCEL AND RE-PRICE, and
-  no STOP (st-a566);
+* a working entry has one control, CANCEL AND RE-PRICE, and no STOP;
 * no footers — the card is as tall as its stage and no taller;
 * a closed position leaves this card for a folded card of its own in the
   stack at the foot of the page, newest on top (st-qqxj).
@@ -340,13 +339,9 @@ def body_working(service, st, facts, actions, now, bounds) -> str:
             rows.append(f"<tr><td>order</td><td>{esc(w['order_id'])}</td></tr>")
         rows.append(_today_row(st))
         html += "<table>" + "".join(rows) + "</table>"
-        oid = str(w.get("order_id", ""))
         html += ("<div class=actions>"
-                 # plain CANCEL first: pull it, form left alone (st-a566)
-                 + _big_button(actions["order_cancel"], "CANCEL", "exit",
-                               {"order_id": oid, "reprice": "0"})
                  + _big_button(actions["order_cancel"], "CANCEL AND RE-PRICE", "quiet",
-                               {"order_id": oid})
+                               {"order_id": str(w.get("order_id", ""))})
                  + "</div>")
     return html
 
