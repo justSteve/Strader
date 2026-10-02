@@ -16,7 +16,7 @@ import pytest
 
 from execd.orderpage import PANE_LOGIC
 from execd.traffic import (TRAFFIC_CAP, Line, TrafficBuffer, contract_words, lines_for_send,
-                           render_html, ticket_words)
+                           newest_first, render_html, ticket_words)
 
 from .conftest import CALL, page_send
 from .test_orderform import chain, mono, order_page, text  # noqa: F401 — fixtures
@@ -171,3 +171,20 @@ class TestThePage:
         assert "← REFUSED at the page: the stop 2.05 would rest at or above the 2.00 bid" in h
         assert h.count("tl-head") == 2
         assert armed.status()["positions"][0]["symbol"] == CALL
+
+
+def test_the_newest_transaction_renders_at_the_top_with_its_hops_in_order():
+    """Steve, 2026-10-02 (st-d7cm): newest at the top — the block, not the
+    line: a SEND's hops still read down in the order they happened."""
+    buf = TrafficBuffer()
+    buf.add([Line("11:00:00", "head", "old"), Line("11:00:00", "out", "o1"),
+             Line("11:00:01", "in", "o2")])
+    buf.add([Line("11:02:00", "head", "new"), Line("11:02:00", "out", "n1"),
+             Line("11:02:01", "in", "n2")])
+    h = render_html(buf)
+    order = [h.index(w) for w in ("── 11:02:00 new", "n1", "n2", "── 11:00:00 old", "o1", "o2")]
+    assert order == sorted(order)
+    assert "newest at the top" in h
+    # a block the cap cut below its header stays together, oldest last
+    assert [ln.text for ln in newest_first([Line("1", "in", "tail"), Line("2", "head", "h"),
+                                            Line("2", "out", "x")])] == ["h", "x", "tail"]

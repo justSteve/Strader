@@ -267,7 +267,7 @@ _SCRIPT = """
         b = document.getElementById('panetoggle');
     if (s) s.hidden = (v === 'traffic'); if (t) t.hidden = (v !== 'traffic');
     if (b) b.textContent = (v === 'traffic') ? 'show strikes' : 'show traffic';
-    if (v === 'traffic') { var l = document.getElementById('traffic-lines'); if (l) l.scrollTop = l.scrollHeight; }
+    if (v === 'traffic') { var l = document.getElementById('traffic-lines'); if (l) l.scrollTop = 0; }
     try { sessionStorage.setItem('execd.pane', v); } catch (e) {} }
   window.__paneShow = function(ev){ paneShow(window.__paneNext(pane ? pane.getAttribute('data-view') : 'strikes', ev)); };
   document.addEventListener('click', function(e){ var t = e.target; if (!t || !t.closest) return;

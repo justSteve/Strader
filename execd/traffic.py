@@ -15,8 +15,9 @@ happened — and reduces each to one line. Nothing here talks to a broker.
 Each SEND is one *transaction*: a header line, then its hops, the last one
 the answer that settled it (filled, working, refused or errored). The page
 keeps the transactions in a :class:`TrafficBuffer` of at most
-:data:`TRAFFIC_CAP` lines for the life of the page process, newest at the
-bottom, and renders it with :func:`render_html`. Lines carry their direction
+:data:`TRAFFIC_CAP` lines for the life of the page process, and renders it
+with :func:`render_html` newest transaction at the top (Steve, 2026-10-02,
+st-d7cm), each block's hops still reading down in the order they happened. Lines carry their direction
 as an arrow *and* a colour, and a received line that refused or errored is
 the failure colour, so the meaning never rests on colour alone.
 """
@@ -389,13 +390,25 @@ def style() -> str:
     return _STYLE
 
 
+def newest_first(lines: Iterable[Line]) -> list[Line]:
+    """The lines with the newest transaction at the top (st-d7cm): a block
+    starts at each header and keeps its hops in time order; a block cut by
+    the cap (no header left) stays with its remaining lines."""
+    blocks: list[list[Line]] = []
+    for ln in lines:
+        if ln.kind == "head" or not blocks:
+            blocks.append([])
+        blocks[-1].append(ln)
+    return [ln for b in reversed(blocks) for ln in b]
+
+
 def render_html(buf: TrafficBuffer | Iterable[Line]) -> str:
-    """The buffer as the pane's HTML, escaped, newest at the bottom, with
-    the cap said above it. No JSON anywhere: every line is words."""
-    lines = buf.lines() if isinstance(buf, TrafficBuffer) else list(buf)
+    """The buffer as the pane's HTML, escaped, newest transaction at the
+    top, with the cap said above it. No JSON anywhere: every line is words."""
+    lines = newest_first(buf.lines() if isinstance(buf, TrafficBuffer) else buf)
     cap = buf.cap if isinstance(buf, TrafficBuffer) else TRAFFIC_CAP
     head = (f"<div class=k id=traffic-cap>{len(lines)} of the last {cap} lines kept · newest at the "
-            f"bottom · tap here for the strikes</div>")
+            f"top · tap here for the strikes</div>")
     if not lines:
         return head + "<div class=traffic id=traffic-lines><div class='tl tl-out'>no SEND yet</div></div>"
     rows = []

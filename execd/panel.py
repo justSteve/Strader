@@ -766,11 +766,11 @@ PANEL_SCRIPT = """
     // prepopulated ticket once per re-arm. It never sends.
     if (j.rearm && window.__onRearm) { try { window.__onRearm(j.rearm); } catch (e) {} }
     // the SEND traffic buffer (st-qnbg): repainted only when it changed,
-    // scrolled to its newest line at the bottom
+    // scrolled to its newest transaction at the top (st-d7cm)
     var tr = document.getElementById('traffic');
     if (tr && j.traffic_html !== undefined && tr.__html !== j.traffic_html) {
       tr.innerHTML = j.traffic_html; tr.__html = j.traffic_html;
-      var tl = document.getElementById('traffic-lines'); if (tl) tl.scrollTop = tl.scrollHeight; }
+      var tl = document.getElementById('traffic-lines'); if (tl) tl.scrollTop = 0; }
     var qd = document.getElementById('quote'); if (qd && j.quote_html) qd.innerHTML = j.quote_html;
     var pc = document.getElementById('position'); if (pc && j.position_html !== undefined && !editing()) { var keptp = keepTyped(pc); pc.innerHTML = j.position_html || ''; restoreTyped(pc, keptp); }
     var jn = document.getElementById('journal'); if (jn && j.journal_html) jn.innerHTML = j.journal_html;

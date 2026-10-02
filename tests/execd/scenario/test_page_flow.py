@@ -217,13 +217,15 @@ class TestTheTrafficPane:
         fill = scn.position(sym).entry_price
         assert lines[-1].endswith(f"← FILLED 1 @ {fill:.2f}")
         assert sum(ln.startswith("── ") for ln in lines) == 1   # inside its own block
-        # a second SEND the page refuses: its own block, the refusal last
+        # a second SEND the page refuses: its own block, at the top (st-d7cm),
+        # the refusal last inside it
         screen.sel.update(limit="", stopoff="", exitspx="6370")
         screen.reprice()
         answer = screen.send()
         lines = self.lines(answer)
         assert sum(ln.startswith("── ") for ln in lines) == 2
-        assert "→ SEND BUY 1 SPX " in lines[-2]
-        assert "← REFUSED at the page: the entry's stop is dollars only" in lines[-1]
+        assert lines[0].startswith("── ") and "→ SEND BUY 1 SPX " in lines[1]
+        assert "← REFUSED at the page: the entry's stop is dollars only" in lines[2]
+        assert lines[-1].endswith(f"← FILLED 1 @ {fill:.2f}")       # the older block below
         assert "{" not in answer["traffic_html"]
         assert all(ln[:2].isdigit() or ln.startswith("── ") for ln in lines)   # CT-stamped
