@@ -188,7 +188,8 @@ _CLOSE_WORDS = {"protective-stop": "STOP FILLED", "resting-stop": "STOP FILLED",
                 "spx-stop": "STOP at its SPX level", "target": "TARGET FILLED",
                 "take-profit": "TARGET FILLED", "spx-target": "TARGET at its SPX level",
                 "spx-exit": "CLOSED at the SPX level", "flatten": "FLATTENED",
-                "external": "CLOSED outside this form", "page": "CLOSED from the form"}
+                "external": "CLOSED outside this form", "page": "FLATTENED from the form",
+                "close": "CLOSED from the form"}
 
 
 def _usd(v: Any) -> str:

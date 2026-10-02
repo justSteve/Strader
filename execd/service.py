@@ -1189,6 +1189,27 @@ class ExecService:
                                       detail="cancelled by request")
             return {"refused": None, "order": result.to_dict(), "confirmed": True}
 
+    def close_position(self, symbol: str, reason: str = "close") -> dict[str, Any]:
+        """Close ONE position at market — FLATTEN for a single contract
+        (Steve, 2026-10-02, st-t0o8: "when a position is open i need to add a
+        'close' button that effects only that position. Flatten would close
+        all positions, right?"). The same forced market close FLATTEN makes:
+        its bracket comes off first, and a close already in flight is
+        replaced rather than waited on. Exit-class: legal while STOPped or
+        stood down. ``ValueError`` when the service holds no such position —
+        a position opened in TOS is never this service's to close."""
+        with self._lock:
+            if (r := self.arming.permits_exit()) is not None:
+                self.journal.record("refused", kind="close", symbol=symbol, refused=r.to_dict())
+                raise Refused(r)
+            self.reconcile()
+            pos = self._open.get(symbol)
+            if pos is None:
+                raise ValueError(f"no position in {symbol.strip()} that this service holds")
+            self.journal.record("request", kind="close", symbol=symbol, reason=reason,
+                                intent_id=pos.intent_id, qty=pos.qty)
+            return self._market_close(pos, reason=reason, force=True)
+
     def flatten(self, reason: str = "flatten") -> dict[str, Any]:
         """Close everything at market, taking both halves of every bracket
         off first. Legal while STOPped, while stood down, and at any hour —

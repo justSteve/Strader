@@ -504,7 +504,7 @@ class TestSurface:
             "/exec/order", "/exec/order/price", "/exec/order/state",
             "/exec/order/send",
             # st-fn5y: the bracket's UPDATE and the working entry's CANCEL AND RE-PRICE
-            "/exec/order/adjust", "/exec/order/cancel",
+            "/exec/order/adjust", "/exec/order/cancel", "/exec/order/close",
         }
 
     def test_every_form_posts_to_an_absolute_exec_path(self, page):

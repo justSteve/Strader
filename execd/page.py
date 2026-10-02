@@ -467,6 +467,28 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
         return home("Locked with a position live. The SPX-mark exit is off until you "
                     "unlock; the stop resting at the broker is the protection.")
 
+    @bp.post("/order/close")
+    def order_close():
+        """CLOSE on one position's card: that contract at market, nothing
+        else (st-t0o8). One tap — it can only take risk off."""
+        symbol = request.form.get("symbol", "")
+        try:
+            out = service.close_position(symbol, reason="close")
+        except Refused as exc:
+            return redirect(url_for("exec.order", bad=f"Close refused: {exc.refusal.reason}. "
+                                    f"Nothing sent."), code=303)
+        except BrokerError as exc:
+            return redirect(url_for("exec.order", bad=f"Close could not reach the broker: "
+                                    f"{exc}. The stop is still resting."), code=303)
+        except ValueError as exc:
+            return redirect(url_for("exec.order", bad=f"Not closed: {exc}."), code=303)
+        name = symbol.strip()
+        if isinstance(out, dict) and out.get("exit_price") is not None:
+            return redirect(url_for("exec.order", msg=f"Closed {name} at "
+                                    f"{float(out['exit_price']):.2f}."), code=303)
+        return redirect(url_for("exec.order", msg=f"Close sent for {name}; "
+                                f"watch the card."), code=303)
+
     @bp.post("/flatten")
     def flatten():
         n = nonces.issue("flatten", CONFIRM_TTL_S)
@@ -1054,7 +1076,7 @@ def create_page(service: ExecService, *, vault: Vault | str | Path,
             "index", "account", "unlock", "stop", "resume", "stand_down", "mode", "lock", "lock_confirm",
             "flatten", "flatten_confirm", "reauth_link", "reauth_store",
             "order", "order_price", "order_state", "order_send",
-            "order_adjust", "order_cancel")}
+            "order_adjust", "order_cancel", "order_close")}
 
     app.register_blueprint(bp)
     return app

@@ -1704,3 +1704,31 @@ class TestSpxLevelOnThePage:
         for leg in ("stop", "target"):
             assert f"name={leg}off class=offbox inputmode=decimal" in card
             assert f"name={leg}spx class=spxbox inputmode=decimal" in card
+
+
+class TestCloseOnePosition:
+    """Steve, 2026-10-02 (st-t0o8): "when a position is open i need to add a
+    'close' button that effects only that position. Flatten would close all
+    positions, right?" — it would; CLOSE takes one."""
+
+    def test_close_takes_one_position_and_leaves_the_other(self, armed, broker):
+        from .conftest import PUT, SPX_NOW
+        armed.place(entry(intent_id="c-1", stop_spx=NEAR_STOP, delta=0.30))
+        armed.place(entry(intent_id="p-1", symbol=PUT, limit=1.90,
+                          stop_spx=SPX_NOW + 2.0, delta=0.28))
+        assert {p["symbol"] for p in armed.status()["positions"]} == {CALL, PUT}
+        armed.close_position(CALL)
+        assert [p["symbol"] for p in armed.status()["positions"]] == [PUT]
+        closed, = armed.journal.events("closed")
+        assert closed["symbol"] == CALL and closed["kind"] == "close"
+
+    def test_a_position_it_does_not_hold_is_not_closed(self, armed):
+        with pytest.raises(ValueError, match="no position"):
+            armed.close_position(CALL)
+
+    def test_the_card_carries_close_and_the_tap_closes_it(self, page, holding):
+        body = page.get("/exec/order").get_data(as_text=True)
+        assert "action='/exec/order/close'" in body and ">CLOSE C6400<" in body
+        r = page.post("/exec/order/close", data={"symbol": CALL})
+        assert r.status_code == 303 and "Closed" in r.headers["Location"]
+        assert holding.status()["positions"] == []

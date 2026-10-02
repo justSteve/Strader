@@ -499,6 +499,12 @@ def body_filled(service, st, facts, actions, now) -> str:
                  + leg_form("target", p.get("target_price"), p.get("target_spx"), target_note)
                  + "</div>")
         html += f"<table>{_today_row(st)}</table>"
+        # CLOSE: this position only, at market, one tap (st-t0o8)
+        if st["arming"]["state"] != "LOCKED" and actions.get("order_close"):
+            html += ("<div class=actions>"
+                     + _big_button(actions["order_close"], f"CLOSE {esc(name)}", "exit",
+                                   {"symbol": sym})
+                     + "</div>")
     html += "<div class=actions>"
     if st["arming"]["state"] != "LOCKED" and st["positions"]:
         html += _big_button(actions["flatten"], "FLATTEN", "exit", {"back": "order"})
@@ -539,7 +545,8 @@ def body_exiting(service, st, facts, actions, now) -> str:
 REASON_WORDS = {"protective-stop": "stop", "resting-stop": "stop", "target": "target",
                 "take-profit": "target", "spx-stop": "stop at its SPX level",
                 "spx-exit": "close-at SPX level", "spx-target": "target at its SPX level",
-                "flatten": "FLATTEN", "tos": "placed in TOS"}
+                "flatten": "FLATTEN", "tos": "placed in TOS", "close": "CLOSE",
+                "page": "FLATTEN"}
 
 
 def reason_words(c: Mapping[str, Any], order_types: Mapping[str, str]) -> str:
