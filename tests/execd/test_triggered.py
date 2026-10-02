@@ -45,6 +45,8 @@ def entry(**kw):
 
 
 def make(broker, clock, tmp_path, **cfg):
+    # the triggered path, off in production since 2026-10-02 (st-jdk7), on here
+    cfg.setdefault("triggered_bracket", True)
     s = ExecService(broker, ServiceConfig(state_dir=tmp_path / "execd", sha="t", **cfg),
                     clock=clock)
     s.unlock({"token": "x"})

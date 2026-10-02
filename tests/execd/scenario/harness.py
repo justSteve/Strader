@@ -50,8 +50,12 @@ class Scenario:
     def __init__(self, tape: Tape, state_dir: Path, *, bounds: Bounds | None = None,
                  funds: float = 250_000.0, unlock: bool = True, strict: bool = True,
                  waive: dict[str, str] | None = None,
-                 book: type[PaperBroker] = PaperBroker) -> None:
+                 book: type[PaperBroker] = PaperBroker,
+                 triggered_bracket: bool = False) -> None:
         self.tape = tape
+        #: the entry sent with its bracket as one triggered order — off in
+        #: production since 2026-10-02 (st-jdk7); on for a scenario of that path
+        self.triggered_bracket = triggered_bracket
         #: the paper book's class — ``PaperBroker``; ``faults.FaultBook`` only
         #: for a scenario that needs a broker behaviour the book does not model
         self.book_cls = book
@@ -90,7 +94,8 @@ class Scenario:
         self.paper = self.book_cls(self.market, book_path=self.book_path, clock=self.clock)
         self.broker = ModeSwitch(self.paper, self.market, "paper")
         config = ServiceConfig(state_dir=self.state_dir / "execd", bounds=self.bounds,
-                               sha="scenario", mode="paper", broker="schwab")
+                               sha="scenario", mode="paper", broker="schwab",
+                               triggered_bracket=self.triggered_bracket)
         self.service = ExecService(self.broker, config, clock=self.clock)
         self.watcher = Watcher(self.service, sleep=lambda _s: None)
         self._page = None

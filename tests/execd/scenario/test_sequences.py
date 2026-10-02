@@ -64,7 +64,7 @@ class TestEntries:
         t = scn.ticket("call", strike=6380, limit=locked, stopoff=0.50)
         out = scn.send(t)
         sym = t.contract.symbol
-        assert out["order"]["status"] == "WORKING" and out["working"]["triggered"] is True
+        assert out["order"]["status"] == "WORKING" and out["working"]["triggered"] is False
         assert scn.resting(sym) == {"stop": [], "target": []}       # nothing rests yet
         scn.run(150, until=lambda s: bool(s.held()))
         pos = scn.position(sym)

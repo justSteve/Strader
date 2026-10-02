@@ -324,7 +324,12 @@ def test_d15_the_restrike(make, part):
         assert t.stop_price == 2.95
         scn.send(t)
         scn.run(6, until=lambda s: bool(s.held()))
-        assert stops(scn, C3) == [2.95]
+        # struck on the grid just under 3.00 — 2.95, not 2.90 — then, since
+        # the stop rests at the fill (st-jdk7) and the bid there is 2.95, a
+        # tick under the bid: a stop at the bid is refused (st-yeph)
+        moved, = scn.events("stop_under_bid")
+        assert (moved["stop_was"], moved["stop_to"], moved["bid"]) == (2.95, 2.90, 2.95)
+        assert stops(scn, C3) == [2.90]
     else:
         scn = make(scripted([Frame(0, 7696.0, quotes={P: (9.10, 9.20)}, deltas={P: -0.45}),
                              Frame(60, 7696.0, quotes={P: (9.10, 9.20)}, deltas={P: -0.45})],

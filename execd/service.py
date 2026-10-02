@@ -132,6 +132,15 @@ class ServiceConfig:
     #: to. On every journal line, in ``/status``, and the badge on its page;
     #: two instances run side by side, one per broker (co-8mb1z).
     broker: str = ""
+    #: send the entry with its stop and target as ONE triggered order
+    #: (co-8mb1z), or the entry alone and the pair placed once it fills.
+    #: Off since 2026-10-02 (st-jdk7): at 11:02:21 CT Schwab filled the
+    #: triggered 7730C's STP 7.50 MARK child in the second it came to life,
+    #: the mark at 8.15 — Schwab's own Message Center shows the stop FILLED
+    #: at activation, the ES tape flat-to-up through it. The entry goes out
+    #: alone; the account stream rings the watcher on the fill and the pair
+    #: rests from the mark at the fill.
+    triggered_bracket: bool = False
 
     def __post_init__(self) -> None:
         self.state_dir = Path(self.state_dir)
@@ -2775,6 +2784,15 @@ class ExecService:
             self.journal.record("stop_unprotected", symbol=pos.symbol,
                                 intent_id=pos.intent_id, detail=str(exc))
             return None
+        walked, price = price, self._stop_from_mark_at_rest(pos, price)
+        if price != walked:
+            # the SPX loop watches the level of the stop that rests, not the
+            # walked one's — as an adjusted stop's level is re-derived
+            if (level := self._stop_spx_for(pos, price)) is not None:
+                self.journal.record("stop_level_restruck", symbol=pos.symbol,
+                                    intent_id=pos.intent_id, stop_price=price,
+                                    stop_spx_was=pos.stop_spx, stop_spx=level)
+                pos.stop_spx = level
         if self._oco() and pos.target_price is None:
             # the target is known before the stop rests, so the two go on
             # as one OCO order at once rather than stop-then-replace (co-8mb1z)
@@ -3532,6 +3550,8 @@ class ExecService:
         already held or working (an add; ``_add_to_position`` puts one
         bracket on for the whole size), or when either price cannot be
         derived."""
+        if not self.config.triggered_bracket:
+            return None             # the entry alone; the pair after the fill (st-jdk7)
         if not (self._oco() and callable(getattr(self.broker, "place_triggered", None))):
             return None
         if intent.symbol in self._open or any(
@@ -3791,6 +3811,56 @@ class ExecService:
                             moved=want != pos.stop_price)
         if want != pos.stop_price:
             self._adjust(pos.symbol, stop_price=want, target_price=None)
+
+    def _stop_from_mark_at_rest(self, pos: OpenPosition, walked: float) -> float:
+        """The first stop of an entry sent alone, struck from the mid at the
+        fill less his distance — :meth:`_stop_follows_fill`'s rule (Steve,
+        2026-10-01, st-qbh6) applied before the stop rests, so it goes on
+        once at that price rather than resting and being replaced (st-jdk7:
+        the entry goes out alone since 2026-10-02). ``walked`` — the walk
+        from the fill through the SPX level — stands for a price he typed,
+        when there is no two-sided quote, and when the mid less his distance
+        would rest at or over the bid (a stop there is a sale). Whatever
+        the source, a stop that would rest at or over the bid rests one tick
+        under it, said so: the triggered stop rested from the quote at the
+        SEND, this one from the quote at the fill, and a market that fell
+        between the two must not turn the protection into a sale."""
+        price = self._stop_price_at_rest(pos, walked)
+        q = self._quote_view(pos.symbol)
+        if q is not None and q.bid > 0 and price >= q.bid:
+            under = round(q.bid - tick_for(q.bid - 0.001), 2)
+            if under > 0:
+                self.journal.record("stop_under_bid", symbol=pos.symbol, intent_id=pos.intent_id,
+                                    stop_was=price, stop_to=under, bid=q.bid, ask=q.ask,
+                                    detail=f"the stop at {price:g} would rest at or over the "
+                                           f"{q.bid:g} bid at the fill — rested a tick under it")
+                return under
+        return price
+
+    def _stop_price_at_rest(self, pos: OpenPosition, walked: float) -> float:
+        off = self._stop_off.get(pos.intent_id)
+        if off is None:
+            return walked
+        q = self._quote_view(pos.symbol)
+        if q is None or q.bid <= 0 or q.ask < q.bid:
+            self.journal.record("stop_from_mark", symbol=pos.symbol, intent_id=pos.intent_id,
+                                moved=False, detail="no two-sided quote at the fill — the "
+                                                    "stop rests where the walk put it")
+            return walked
+        mid = round((q.bid + q.ask) / 2, 4)
+        want = stop_from_mid(mid, off)
+        if want >= q.bid:
+            self.journal.record("stop_from_mark", symbol=pos.symbol, intent_id=pos.intent_id,
+                                mark_at_fill=mid, bid=q.bid, ask=q.ask, fill=pos.entry_price,
+                                stop_off=off, stop_was=walked, stop_to=walked, moved=False,
+                                detail=f"the mid less {off:g} is {want:g}, at or over the "
+                                       f"{q.bid:g} bid — the walk's stop rests")
+            return walked
+        self.journal.record("stop_from_mark", symbol=pos.symbol, intent_id=pos.intent_id,
+                            mark_at_fill=mid, bid=q.bid, ask=q.ask, fill=pos.entry_price,
+                            stop_off=off, stop_was=walked, stop_to=want, moved=want != walked,
+                            at="rest")
+        return want
 
     def _journal_raw(self, order_id: str | None, why: str) -> None:
         """The broker's own body for an order, on its own journal line, so

@@ -208,7 +208,8 @@ class TestTheTrafficPane:
         assert lines[0].startswith("── ") and lines[0].endswith(f" BUY 1 SPX {strike} ──")
         assert f"→ execd: BUY 1 SPX {strike} LMT {shown['limit']:.2f}, stop $50" in lines[1]
         assert not any("preview" in ln for ln in lines)          # none on SEND (st-qbh6)
-        assert any(f"→ paper: BUY 1 SPX {strike} LMT {shown['limit']:.2f} + STOP" in ln for ln in lines)
+        # the entry goes out alone, its pair rests at the fill (st-jdk7)
+        assert any(ln.endswith(f"→ paper: BUY 1 SPX {strike} LMT {shown['limit']:.2f}") for ln in lines)
         assert "WORKING" in lines[-1] and "← paper: accepted, order" in lines[-1]
         assert "FILLED" not in " ".join(lines)
         scn.run(150, until=lambda s: bool(s.held()))

@@ -691,7 +691,8 @@ class TestAStageChangeAlwaysPaints:
         # the close leaves the card for a folded card of its own (st-qqxj):
         # the card goes back to no order on the first tick, the stack has it
         assert s["panel_stage"] == "none" and "data-stage=none" in s["panel_body_html"]
-        assert "-$30.00" in s["closed_html"] and ">stop<" in s["closed_html"]
+        closed, = armed.journal.events("closed")
+        assert f"-${abs(closed['pnl_usd']):.2f}" in s["closed_html"] and ">stop<" in s["closed_html"]
 
     def test_the_script_paints_a_stage_change_over_a_focused_input_and_drops_the_stale_message(self, order_page):
         body = text(order_page.get("/exec/order?side=call"))

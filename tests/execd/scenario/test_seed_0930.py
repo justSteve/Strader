@@ -70,7 +70,7 @@ class TestSeed1TheBracketFiredFirst:
         limit and the stop between two watcher passes."""
         tape = scripted(frames(C7690, 0.60, 7696.0, (0, 9.20, 9.30), (2, 8.50, 8.60),
                                (60, 8.50, 8.60)), start=T1324)
-        scn = make(tape)
+        scn = make(tape, triggered_bracket=True)        # the triggered path's race (st-jdk7)
         scn.send(scn.ticket("call", strike=7690, limit=9.20))
         scn.run(30)
         close, = scn.closes()
