@@ -961,7 +961,7 @@ class TestThePage:
         broker.rest_market = True
         holding.observe(TRIGGER)
         body = text(page.get("/exec/order"))
-        assert "SELLING" in body and "FLATTEN AGAIN" in body and ">SET<" not in body
+        assert "SELLING" in body and "FLATTEN SPX AGAIN" in body and ">SET<" not in body
 
     def test_cancel_and_re_price_brings_the_form_back_priced_from_the_selection(
             self, page, armed, broker):

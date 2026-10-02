@@ -506,8 +506,8 @@ def body_filled(service, st, facts, actions, now) -> str:
                                    {"symbol": sym})
                      + "</div>")
     html += "<div class=actions>"
-    if st["arming"]["state"] != "LOCKED" and st["positions"]:
-        html += _big_button(actions["flatten"], "FLATTEN", "exit", {"back": "order"})
+    if st["arming"]["state"] != "LOCKED" and (st["positions"] or st.get("foreign_positions")):
+        html += _big_button(actions["flatten"], "FLATTEN SPX", "exit", {"back": "order"})
     # no STOP on the card either (Steve, 2026-09-30: "i do not want a STOP
     # button to display on the trade screen"); lock is the one switch
     html += "</div>" + _arming_line(st, actions)
@@ -534,7 +534,7 @@ def body_exiting(service, st, facts, actions, now) -> str:
         html += "<table>" + "".join(rows) + "</table>"
     html += "<div class=actions>"
     if st["arming"]["state"] != "LOCKED" and st["positions"]:
-        html += _big_button(actions["flatten"], "FLATTEN AGAIN", "exit", {"back": "order"})
+        html += _big_button(actions["flatten"], "FLATTEN SPX AGAIN", "exit", {"back": "order"})
     html += "</div>"
     return html
 

@@ -1366,9 +1366,9 @@ def _render_index(service: ExecService, vault: Vault, market: CredentialFile | N
     if state != "LOCKED":
         # FLATTEN only while there is something to flatten; no STAND DOWN
         # button on any screen (Steve, 2026-09-25, co-8mb1z)
-        if st["positions"]:
+        if st["positions"] or st.get("foreign_positions"):
             parts.append(f"<form method=post action='{a['flatten']}'>"
-                         "<button class='big exit'>FLATTEN</button></form>")
+                         "<button class='big exit'>FLATTEN SPX</button></form>")
         parts.append(f"<form method=post action='{a['lock']}'>"
                      "<button class='big cancel'>lock</button></form>")
     parts.append(mode_switch_html(mode, a["mode"]))
@@ -1635,19 +1635,27 @@ def _render_confirm_flatten(service: ExecService, nonce: str, a: dict[str, str],
         listing = ("<div class=k>the service is tracking no position of its own; flatten "
                    "asks the broker first and closes what it finds under this service's "
                    "name</div>")
-    spared = [f"{esc(p['symbol'].strip())} × {p['qty']}" for p in st.get("foreign_positions") or []]
-    if spared:
-        listing += ("<div class=k>this will NOT sell — held in the account, not opened here: "
-                    + ", ".join(spared) + "</div>")
+    # FLATTEN SPX sells the longs opened in TOS too — unless a short is held,
+    # when selling them could leave a spread's short naked (st-ld7i)
+    tos = [p for p in st.get("foreign_positions") or [] if int(p.get("qty") or 0) > 0]
+    if tos and not st.get("shorts"):
+        listing += "".join(f"<div class=row><b>SELL {esc(p['symbol'].strip())} × {p['qty']}</b> "
+                           f"at market — opened in TOS</div>" for p in tos)
+    elif tos:
+        listing += ("<div class=k>this will NOT sell the positions opened in TOS ("
+                    + ", ".join(f"{esc(p['symbol'].strip())} × {p['qty']}" for p in tos)
+                    + ") — the account is short "
+                    + ", ".join(f"{esc(s['symbol'].strip())} × {s['qty']}" for s in st["shorts"])
+                    + ", a spread: close it in TOS</div>")
     back_field = "<input type=hidden name=back value='order'>" if back == "order" else ""
     body = (f"<div class=card>{listing}</div>"
             f"<form method=post action='{a['flatten_confirm']}'>"
             f"<input type=hidden name=nonce value='{nonce}'>{back_field}"
-            f"<button class='big exit'>CONFIRM — FLATTEN</button></form>"
+            f"<button class='big exit'>CONFIRM — FLATTEN SPX</button></form>"
             f"<form method=get action='{a['order'] if back == 'order' else a['account']}'>"
             "<button class='big cancel'>cancel</button></form>"
             f"<div class=k>confirm window {int(CONFIRM_TTL_S)}s, single use</div>")
-    return _page("FLATTEN — are you sure", body)
+    return _page("FLATTEN SPX — are you sure", body)
 
 
 def _render_confirm_lock(service: ExecService, nonce: str, a: dict[str, str],

@@ -164,7 +164,7 @@ class TestTheCard:
         assert "aria-label='target in dollars' value='18.9'" in card
         assert f"{v['at_stop_usd']:+,.2f}".replace("+", "+$").replace("-", "-$") in card
         assert ">SET<" in card
-        assert "action='/exec/flatten'" in card and ">FLATTEN<" in card
+        assert "action='/exec/flatten'" in card and ">FLATTEN SPX<" in card
         assert "action='/exec/stop'" not in card and ">STOP<" not in card     # no STOP (2026-09-30)
         # no footer, no explanatory line under the controls
         assert "tailnet only" not in card
@@ -199,7 +199,7 @@ class TestTheCard:
         assert "C6400 × 1 · in 2.10 · selling" in card
         assert "market sell sent" in card and "4 s ago" in card
         assert "reason</td><td>spx-stop" in card and "stop · target</td><td>cancelled" in card
-        assert "FLATTEN AGAIN" in card and ">SET<" not in card and ">STOP<" not in card
+        assert "FLATTEN SPX AGAIN" in card and ">SET<" not in card and ">STOP<" not in card
 
     def test_a_close_folds_into_its_own_card_at_the_foot(self, page, holding, broker, clock):
         """Steve, 2026-09-30: "after a position has closed for whatever
@@ -244,7 +244,7 @@ class TestTheCard:
     def test_stop_on_is_said_and_stop_is_not_offered_again(self, page, holding):
         holding.stop()
         card = panel_of(text(page.get("/exec/order")))
-        assert "STOP IS ON" in card and ">STOP<" not in card and ">FLATTEN<" in card
+        assert "STOP IS ON" in card and ">STOP<" not in card and ">FLATTEN SPX<" in card
 
     def test_paper_mode_is_the_badge(self, service, chain_page_paper):
         body = text(chain_page_paper.get("/exec/order"))

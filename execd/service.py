@@ -1210,10 +1210,51 @@ class ExecService:
                                 intent_id=pos.intent_id, qty=pos.qty)
             return self._market_close(pos, reason=reason, force=True)
 
+    def _take_tos_positions_for_flatten(self, errors: list[dict[str, Any]]) -> list[str]:
+        """The long SPX positions opened in TOS, taken on as this service's
+        so FLATTEN SPX sells them (st-ld7i); none while any SPX short is held.
+        Returns the symbols left unsold."""
+        tos = {s: p for s, p in self._foreign_positions.items() if p.qty > 0}
+        if not tos:
+            return []
+        if self._shorts:
+            shorts = ", ".join(f"{s.strip()} × {q}" for s, q in self._shorts.items())
+            detail = (f"the account is short {shorts} — a spread placed in TOS; selling its "
+                      f"longs would leave the short naked, so the positions opened in TOS "
+                      f"are not sold: close the spread in TOS")
+            self.journal.record("refused", kind="flatten-tos", symbols=sorted(tos),
+                                detail=detail)
+            errors.append({"symbol": ", ".join(s.strip() for s in tos), "detail": detail})
+            return sorted(tos)
+        now = self.clock()
+        for sym, held in tos.items():
+            try:
+                right = parse_occ(sym).right
+            except ValueError:
+                continue
+            pos = OpenPosition(
+                symbol=sym, qty=held.qty, entry_price=held.avg_price,
+                intent_id=f"tos:{sym.strip()}", right=right, opened_at=now,
+                entry_commission_usd=round(COMMISSION_PER_CONTRACT_USD * held.qty, 2))
+            self._open[sym] = pos
+            self._foreign_positions.pop(sym, None)
+            self.journal.record("position_adopted", symbol=sym, qty=held.qty,
+                                entry_price=held.avg_price, intent_id=pos.intent_id,
+                                detail="opened in TOS; taken on by FLATTEN SPX to be sold")
+        return []
+
     def flatten(self, reason: str = "flatten") -> dict[str, Any]:
         """Close everything at market, taking both halves of every bracket
         off first. Legal while STOPped, while stood down, and at any hour —
-        the whole point of the switch is that it never traps him."""
+        the whole point of the switch is that it never traps him.
+
+        FLATTEN SPX (Steve, 2026-10-02, st-ld7i: "change 'flatten' to include
+        all SPX positions"): the long SPX positions opened in TOS are sold
+        too, each taken on as a position of this service's and closed the
+        same way, so its close is booked and carded. One guard stays: while
+        the account is short any SPX option — a spread placed in TOS — the
+        TOS longs are NOT sold, said so: selling a fly's wings left its short
+        body naked (finding 30, st-isx3)."""
         with self._lock:
             if (r := self.arming.permits_exit()) is not None:
                 self.journal.record("refused", kind="flatten", refused=r.to_dict())
@@ -1225,6 +1266,7 @@ class ExecService:
                                 positions=[p.symbol for p in self._open.values()])
             closed: list[dict[str, Any]] = []
             errors: list[dict[str, Any]] = []
+            spared = self._take_tos_positions_for_flatten(errors)
             for pos in list(self._open.values()):
                 try:
                     # force: an exit already in flight is cancelled and replaced
@@ -1236,7 +1278,7 @@ class ExecService:
                     errors.append({"symbol": pos.symbol, "detail": str(exc)})
             self.journal.record("flattened", closed=len(closed), errors=len(errors),
                                 reason=reason)
-            return {"refused": None, "closed": closed, "errors": errors}
+            return {"refused": None, "closed": closed, "errors": errors, "spared": spared}
 
     # ── the live exit loop ───────────────────────────────────────────────
     def observe(self, spx: float) -> dict[str, Any]:

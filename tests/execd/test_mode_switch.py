@@ -217,15 +217,15 @@ class TestButtons:
 
     def test_flatten_only_while_a_position_is_open(self, page, svc):
         for path in ("/exec/account", "/exec/order"):
-            assert ">FLATTEN<" not in text(page.get(path)), path
-        assert ">FLATTEN<" not in page.get("/exec/order/state").json["panel_body_html"]
+            assert ">FLATTEN SPX<" not in text(page.get(path)), path
+        assert ">FLATTEN SPX<" not in page.get("/exec/order/state").json["panel_body_html"]
         page_send(page, {"side": "call", "strike": "6400"})
         assert svc.status()["positions"]
-        assert ">FLATTEN<" in text(page.get("/exec/account"))
-        assert ">FLATTEN<" in page.get("/exec/order/state").json["panel_body_html"]
+        assert ">FLATTEN SPX<" in text(page.get("/exec/account"))
+        assert ">FLATTEN SPX<" in page.get("/exec/order/state").json["panel_body_html"]
         svc.flatten()
-        assert ">FLATTEN<" not in text(page.get("/exec/account"))
-        assert ">FLATTEN<" not in page.get("/exec/order/state").json["panel_body_html"]
+        assert ">FLATTEN SPX<" not in text(page.get("/exec/account"))
+        assert ">FLATTEN SPX<" not in page.get("/exec/order/state").json["panel_body_html"]
 
 
 class TestPaperAndLiveNeverMix:

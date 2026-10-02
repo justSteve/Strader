@@ -259,14 +259,25 @@ class TestTheBrokerIsTheAuthorityOnPosition:
         armed.reconcile()
         assert broker._orders[stop_id].status is OrderStatus.CANCELED
 
-    def test_flatten_leaves_a_position_the_service_never_opened(self, armed, broker):
-        """'Close everything' means everything THIS service holds. What Steve
-        holds by hand in the same account is his (finding 30, st-isx3)."""
+    def test_flatten_spx_sells_a_long_opened_in_tos(self, armed, broker):
+        """FLATTEN SPX (Steve, 2026-10-02, st-ld7i): every SPX position, the
+        ones he opened in TOS included — booked and carded as a close."""
         broker.set_position(PUT, qty=2, avg_price=1.85)
         out = armed.flatten(reason="test")
-        assert out["closed"] == []
-        assert broker.positions()[0].symbol == PUT
-        assert armed.status()["foreign_positions"][0]["symbol"] == PUT
+        assert len(out["closed"]) == 1 and out["spared"] == []
+        assert broker.positions() == []
+        closed, = armed.journal.events("closed")
+        assert closed["symbol"] == PUT and closed["intent_id"] == f"tos:{PUT.strip()}"
+
+    def test_flatten_spx_leaves_his_longs_while_a_short_is_held(self, armed, broker):
+        """What finding 30 (st-isx3) guards: a fly's wings sold, its short
+        body left naked. Any SPX short held and the TOS longs stay, said so."""
+        broker.set_position(PUT, qty=2, avg_price=1.85)
+        broker.set_position("SPXW  260826P06290000", qty=-2, avg_price=1.20)
+        out = armed.flatten(reason="test")
+        assert out["closed"] == [] and out["spared"] == [PUT]
+        assert "short" in out["errors"][0]["detail"]
+        assert {p.symbol for p in broker.positions()} == {PUT, "SPXW  260826P06290000"}
 
     def test_reconcile_survives_a_broker_that_cannot_be_reached(self, armed, broker):
         armed.place(entry())

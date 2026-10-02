@@ -430,7 +430,7 @@ class TestFlatten:
         assert armed.flatten()["closed"][0]["closed"] is True
 
     def test_flatten_with_nothing_open_is_a_no_op_not_an_error(self, armed):
-        assert armed.flatten() == {"refused": None, "closed": [], "errors": []}
+        assert armed.flatten() == {"refused": None, "closed": [], "errors": [], "spared": []}
 
     def test_flatten_on_a_locked_service_raises_rather_than_pretending(self, service):
         with pytest.raises(Refused) as exc:

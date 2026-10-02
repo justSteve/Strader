@@ -582,8 +582,10 @@ def test_page_refused_is_plain():
 # ── what the account holds that is not this service's (st-isx3, st-7ah8) ─
 
 class TestNotThisServices:
-    def test_his_own_legs_are_shown_and_flatten_says_it_will_not_sell_them(
+    def test_his_own_legs_are_shown_and_flatten_spx_sells_them_too(
             self, page, service, broker, mono):
+        """FLATTEN SPX (Steve, 2026-10-02, st-ld7i): "change 'flatten' to
+        include all SPX positions" — a long opened in TOS is sold too."""
         service.unlock({"t": 1})
         broker.set_position(PUT, qty=1, avg_price=1.85)          # his, not the service's
         service.place(entry())                                     # the service's own
@@ -593,10 +595,26 @@ class TestNotThisServices:
         r = page.post("/exec/flatten")
         confirm = text(r)
         assert "this will sell" in confirm and "SELL SPXW  260826C06400000 × 1" in confirm
-        assert "this will NOT sell" in confirm and "SPXW  260826P06300000 × 1" in confirm
+        assert "SELL SPXW  260826P06300000 × 1</b> at market — opened in TOS" in confirm
         nonce = confirm.split("name=nonce value='")[1].split("'")[0]
         landing(page, page.post("/exec/flatten/confirm", data={"nonce": nonce}))
-        assert [p.symbol for p in broker.positions()] == [PUT]   # his leg untouched
+        assert [p.symbol for p in broker.positions()] == []      # both sold
+
+    def test_with_a_short_held_flatten_spx_does_not_sell_his_longs(
+            self, page, service, broker, mono):
+        """A spread placed in TOS: selling its longs would leave the short
+        naked (finding 30, st-isx3) — the confirm says so and they stay."""
+        service.unlock({"t": 1})
+        broker.set_position(PUT, qty=1, avg_price=1.85)
+        broker.set_position("SPXW  260826P06290000", qty=-1, avg_price=1.20)
+        service.place(entry())
+        confirm = text(page.post("/exec/flatten"))
+        assert "this will NOT sell the positions opened in TOS" in confirm
+        assert "a spread: close it in TOS" in confirm
+        nonce = confirm.split("name=nonce value='")[1].split("'")[0]
+        landing(page, page.post("/exec/flatten/confirm", data={"nonce": nonce}))
+        assert sorted(p.symbol for p in broker.positions()) == sorted(
+            [PUT, "SPXW  260826P06290000"])
 
     def test_a_short_is_shown_in_bold(self, page, service, broker):
         service.unlock({"t": 1})
