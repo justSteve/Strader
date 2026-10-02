@@ -78,12 +78,13 @@ import base64
 import json
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Iterator, Mapping, Sequence
 
 import httpx
 
@@ -595,6 +596,8 @@ class SchwabBroker:
         self._sleep = sleep
         self._client = httpx.Client(base_url=API, timeout=timeout_s, transport=transport)
         self._lock = threading.RLock()
+        #: the orders listing pinned by :meth:`listing`, per thread (st-ikqb)
+        self._pin = threading.local()
         # in-memory only, per app, keyed on the refresh token they were derived
         # from: two apps mean two access tokens with two lifetimes.
         self._access: dict[App, tuple[str, str, int]] = {}   # app → (refresh, access, expires_at)
@@ -726,6 +729,8 @@ class SchwabBroker:
     def _send(self, method: str, path: str, token: str,
               params: Mapping[str, Any] | None, json: Any) -> httpx.Response:
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+        if method != "GET":
+            self._pin.orders = None          # a write makes a pinned listing stale
         try:
             return self._client.request(method, path, params=params, json=json, headers=headers)
         except httpx.HTTPError as exc:
@@ -788,6 +793,26 @@ class SchwabBroker:
         stale, correctly."""
         body = self._json(self._request("GET", "/marketdata/v1/quotes",
                                         params={"symbols": symbol}), "quotes")
+        return self._quote_from(symbol, body)
+
+    def quotes(self, symbols: Sequence[str]) -> dict[str, Quote | BrokerError]:
+        """Several symbols in ONE ``GET /marketdata/v1/quotes?symbols=a,b``
+        (st-ikqb: the SEND path asked for its option and ``$SPX`` five times,
+        one symbol a round trip). Each symbol maps to its Quote, or to the
+        BrokerError :meth:`quote` would have raised for it; a failed request
+        raises, as :meth:`quote` does."""
+        syms = list(dict.fromkeys(symbols))
+        body = self._json(self._request("GET", "/marketdata/v1/quotes",
+                                        params={"symbols": ",".join(syms)}), "quotes")
+        out: dict[str, Quote | BrokerError] = {}
+        for sym in syms:
+            try:
+                out[sym] = self._quote_from(sym, body)
+            except BrokerError as exc:
+                out[sym] = exc
+        return out
+
+    def _quote_from(self, symbol: str, body: Any) -> Quote:
         entry = body.get(symbol) if isinstance(body, dict) else None
         if not isinstance(entry, dict) or "quote" not in entry:
             detail = ""
@@ -928,6 +953,7 @@ class SchwabBroker:
         cred = self._credential(app)
         token = self._bearer(app, cred)
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+        self._pin.orders = None              # a write makes a pinned listing stale
         try:
             r = self._client.request("PUT", path, json=build_order(intent), headers=headers)
         except httpx.HTTPError as exc:
@@ -1215,7 +1241,32 @@ class SchwabBroker:
         return fills
 
     # ── internals ────────────────────────────────────────────────────────
+    @contextmanager
+    def listing(self) -> Iterator[None]:
+        """One ``GET .../orders`` for everything read inside the block on this
+        thread (st-ikqb): ``orders()`` and ``fills_since()`` each listed the
+        account's orders, and a reconcile asks both, a round trip apart, for
+        the same body. Fetched on the first read inside the block, so a
+        failure surfaces where the read is, as it always did; any write
+        inside the block (a stop placed, an order cancelled) drops it and
+        the next read lists again."""
+        if getattr(self._pin, "active", False):
+            yield
+            return
+        self._pin.active, self._pin.orders = True, None
+        try:
+            yield
+        finally:
+            self._pin.active, self._pin.orders = False, None
+
     def _orders_raw(self) -> list[dict[str, Any]]:
+        if not getattr(self._pin, "active", False):
+            return self._orders_raw_fetch()
+        if self._pin.orders is None:
+            self._pin.orders = self._orders_raw_fetch()
+        return list(self._pin.orders)
+
+    def _orders_raw_fetch(self) -> list[dict[str, Any]]:
         """Spec-derived: ``GET .../orders?fromEnteredTime&toEnteredTime`` →
         ``[Order]``. Both times are required by the API."""
         h = self.account_hash()

@@ -56,10 +56,11 @@ from __future__ import annotations
 import math
 import threading
 import time
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 from .arming import Arming, ArmState
 from .bounds import (
@@ -495,6 +496,8 @@ class ExecService:
                                mode=config.mode, broker=config.broker)
         self.arming = Arming(state / "STOP", clock=clock)
         self._lock = threading.RLock()
+        #: the SEND's one quote read, per thread (st-ikqb): see :meth:`_quote_snapshot`
+        self._snap = threading.local()
         #: the ACCT_ACTIVITY doorbell and the transport it logs in through,
         #: set by ``__main__`` for the Schwab broker only (st-8bls).
         self.stream: Any = None
@@ -988,7 +991,7 @@ class ExecService:
         no quote at all — rather than the 0.0 that ``last or mid`` used to
         hand back, which every caller then compared to a stop as if it were
         the index at zero (finding 32, st-xv5e)."""
-        q = self.broker.quote(self.config.index_symbol)
+        q = self._quote(self.config.index_symbol)
         mark = q.last or q.mid
         if not (isinstance(mark, (int, float)) and math.isfinite(mark) and mark > 0):
             raise BrokerError(
@@ -1053,7 +1056,8 @@ class ExecService:
             if intent.is_entry:
                 self._place_started[intent.intent_id] = started
                 try:
-                    return self._place_entry(intent, page_query=page_query)
+                    with self._quote_snapshot([intent.symbol, self.config.index_symbol]):
+                        return self._place_entry(intent, page_query=page_query)
                 finally:
                     self._place_started.pop(intent.intent_id, None)
             return self._place_exit(intent)
@@ -1459,7 +1463,9 @@ class ExecService:
         is a journal nobody reads. Never raises: a broker that cannot be reached
         leaves every belief in place and says so.
         """
-        with self._lock:
+        listing = getattr(self.broker, "listing", None)
+        with self._lock, (listing() if callable(listing) else nullcontext()):
+            # one orders listing for orders() and the fill sweep (st-ikqb)
             self._last_reconcile_at = self.clock()
             try:
                 broker_orders = {o.order_id: o for o in self.broker.orders()}
@@ -4320,9 +4326,49 @@ class ExecService:
         return round((float(exit_price) - pos.entry_price) * CONTRACT_MULTIPLIER * n, 2)
 
     # ── internals: plumbing ──────────────────────────────────────────────
+    @contextmanager
+    def _quote_snapshot(self, symbols: list[str]) -> Iterator[None]:
+        """Every quote read inside the block, on this thread, from ONE read of
+        ``symbols`` (st-ikqb). The SEND path read its option three times and
+        ``$SPX`` twice, a round trip each — 1.6 s of the 2.6 s from click to
+        send on 2026-10-02 11:02 CT, the ES moving four points meanwhile. One
+        read at the top of the send, taken a breath before the PUT, serves
+        the bounds, the mark the stop is struck from, and the last look at
+        the bid. A broker with ``quotes`` answers it in one request; one
+        without is asked per symbol, once. A symbol whose read failed raises
+        its BrokerError on every read, as the per-call read did."""
+        many = getattr(self.broker, "quotes", None)
+        snap: dict[str, Quote | BrokerError] = {}
+        if callable(many):
+            try:
+                snap = dict(many(symbols))
+            except BrokerError as exc:
+                snap = {sym: exc for sym in symbols}
+        else:
+            for sym in dict.fromkeys(symbols):
+                try:
+                    snap[sym] = self.broker.quote(sym)
+                except BrokerError as exc:
+                    snap[sym] = exc
+        self._snap.quotes = snap
+        try:
+            yield
+        finally:
+            self._snap.quotes = None
+
+    def _quote(self, symbol: str) -> Quote:
+        """The snapshot's quote inside :meth:`_quote_snapshot`, else the broker's."""
+        snap = getattr(self._snap, "quotes", None)
+        if snap is not None and symbol in snap:
+            q = snap[symbol]
+            if isinstance(q, BrokerError):
+                raise q
+            return q
+        return self.broker.quote(symbol)
+
     def _quote_view(self, symbol: str) -> QuoteView | None:
         try:
-            q = self.broker.quote(symbol)
+            q = self._quote(symbol)
         except BrokerError:
             return None
         return QuoteView(q.bid, q.ask, q.age_s(self.clock()))

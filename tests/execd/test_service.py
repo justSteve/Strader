@@ -210,47 +210,47 @@ class TestTheProtectiveStop:
         assert sent_orders(broker) == []
 
     def test_an_entry_whose_cut_is_crossed_while_it_is_priced_is_struck_again_at_the_send(
-            self, armed, broker, monkeypatch):
+            self, armed, broker):
         """Finding 32 (st-xv5e): cycle 1 on 2026-09-14 passed the consistency
-        check on one mark, the broker previewed, and the send read a fresh
-        mark already through the cut — the position was born past it. Every
-        entry's stop is dollars now (st-a54y), struck again from the mark
-        the send goes out on (st-7p5u), so the priced level being crossed
-        moves the level with the index and the ticket's stop rests."""
-        real_mark = armed.spx_mark
-        calls = {"n": 0}
-
-        def mark():
-            calls["n"] += 1
-            if calls["n"] == 2:
-                # the index moves through the cut between the checks and the send
-                broker.set_quote("$SPX", bid=SPX_NOW - 12.75, ask=SPX_NOW - 12.25,
-                                 last=SPX_NOW - 12.5)
-            return real_mark()
-
-        monkeypatch.setattr(armed, "spx_mark", mark)
-        out = armed.place(entry(stop_spx=SPX_NOW - 2.0))
+        check on one mark and the send read a fresh mark already through the
+        cut — the position was born past it. Every entry's stop is dollars
+        now (st-a54y), struck again from the mark the send goes out on
+        (st-7p5u), so the priced level being crossed moves the level with the
+        index and the ticket's stop rests. Since st-ikqb the send reads the
+        index once, so the move happens where it can: between the ticket and
+        the SEND."""
+        intent = entry(stop_spx=SPX_NOW - 2.0)                 # priced at SPX_NOW
+        broker.set_quote("$SPX", bid=SPX_NOW - 12.75, ask=SPX_NOW - 12.25,
+                         last=SPX_NOW - 12.5)                  # then the index moves
+        out = armed.place(intent)
         assert out["refused"] is None
         line, = armed.journal.events("stop_restruck")
         assert line["stop_spx_priced"] == SPX_NOW - 2.0
         assert line["stop_spx"] < SPX_NOW - 12.5           # behind the send's mark
         assert out["stop_order"]["price"] == 1.50          # the ticket's price
 
-    def test_a_mark_lost_before_the_send_refuses_it(self, armed, broker, monkeypatch):
-        real_mark = armed.spx_mark
-        calls = {"n": 0}
+    def test_a_send_reads_each_symbol_once_and_a_missing_mark_refuses_it(
+            self, armed, broker, monkeypatch):
+        """st-ikqb: the SEND read its option three times and $SPX twice, a
+        broker round trip each, 1.6 s of the 2.6 s click-to-send at 11:02 CT
+        2026-10-02. One read now serves the bounds, the strike of the stop
+        and the last look at the bid — and a mark absent from that read
+        refuses the send, as a lost per-call read did."""
+        reads: list[str] = []
+        real_quote = broker.quote
 
-        def mark():
-            calls["n"] += 1
-            if calls["n"] == 2:
-                broker._quotes.pop("$SPX", None)
-            return real_mark()
+        def quote(symbol):
+            reads.append(symbol)
+            return real_quote(symbol)
 
-        monkeypatch.setattr(armed, "spx_mark", mark)
-        out = armed.place(entry())
+        monkeypatch.setattr(broker, "quote", quote)
+        assert armed.place(entry())["refused"] is None
+        assert sorted(reads) == sorted([CALL, "$SPX"])
+        sent = len(sent_orders(broker))
+        broker._quotes.pop("$SPX", None)
+        out = armed.place(entry(intent_id="t-002"))
         assert out["refused"]["bound"] == "protective_stop"
-        assert "at the send" in out["refused"]["reason"]
-        assert sent_orders(broker) == []
+        assert len(sent_orders(broker)) == sent                # nothing more went out
 
     def test_a_broker_that_refuses_the_resting_stop_is_loud(self, armed, broker, monkeypatch):
         """The position is live and unprotected. That must be in the journal

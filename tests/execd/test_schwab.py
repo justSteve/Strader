@@ -1346,3 +1346,39 @@ class TestRefreshedTradingGrant:
         (tmp_path / "trading.json").write_text(json.dumps({"token": {"token": {}}}))
         assert trading_payload(self._vault(100), tmp_path)["token"]["token"][
             "refresh_token"] == "old"
+
+
+class TestOneReadForTheSend:
+    """st-ikqb: the SEND path's quotes in one request, and a reconcile's
+    orders and fills from one listing."""
+
+    def test_quotes_reads_several_symbols_in_one_request(self, broker, fake):
+        out = broker.quotes([CALL, "$SPX", CALL, "SPXW  260904C09999000"])
+        reads = [c for c in fake.calls if c[1] == "/marketdata/v1/quotes"]
+        assert len(reads) == 1
+        assert reads[0][2]["symbols"] == f"{CALL},$SPX,SPXW  260904C09999000"
+        assert out[CALL] == broker.quote(CALL)
+        assert out["$SPX"].last == broker.quote("$SPX").last
+        assert isinstance(out["SPXW  260904C09999000"], BrokerError)   # absent: its own error
+
+    def test_a_listing_serves_orders_and_fills_from_one_get(self, broker, fake):
+        def gets() -> int:
+            return sum(1 for c in fake.calls
+                       if c[0] == "GET" and c[1] == f"/trader/v1/accounts/{ACCT_HASH}/orders")
+        with broker.listing():
+            broker.orders()
+            broker.fills_since(NOW - timedelta(hours=1))
+            assert gets() == 1
+        broker.orders()
+        assert gets() == 2                                  # outside the block, fresh
+
+    def test_a_write_inside_the_listing_drops_it(self, broker, fake):
+        def gets() -> int:
+            return sum(1 for c in fake.calls
+                       if c[0] == "GET" and c[1] == f"/trader/v1/accounts/{ACCT_HASH}/orders")
+        with broker.listing():
+            broker.orders()
+            broker._request("POST", f"/trader/v1/accounts/{ACCT_HASH}/orders",
+                            json=build_order(intent()), ok=(201,))
+            assert len(broker.orders()) == 1                # the order just placed is seen
+            assert gets() == 2
