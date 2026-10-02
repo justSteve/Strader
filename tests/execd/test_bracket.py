@@ -987,6 +987,24 @@ class TestThePage:
         assert armed.journal.events("entry_resolved")[-1]["outcome"] == "canceled"
         assert armed.status()["day"]["open_positions"] == 0
 
+    def test_plain_cancel_pulls_the_working_entry_and_leaves_the_form_alone(
+            self, page, armed, broker):
+        """Steve, 2026-10-02 (st-a566): "add a 'cancel' button to a working
+        order." CANCEL sits first on the card; it pulls the order through the
+        same confirmed cancel and the form comes back unprimed."""
+        broker.rest_limits = True
+        r = page_send(page, {"side": "call", "delta": "0.3", "lots": "1"})
+        landing = page.get(r.headers["Location"]).get_data(as_text=True)
+        assert landing.index(">CANCEL<") < landing.index(">CANCEL AND RE-PRICE<")
+        assert "name=reprice value='0'" in landing
+        w = armed.status()["working"][0]
+        r = page.post("/exec/order/cancel", data={"order_id": w["order_id"], "reprice": "0"})
+        where = r.headers["Location"]
+        assert where.startswith("/exec/order?") and "side=" not in where and "delta=" not in where
+        assert f"Cancelled {w['order_id']}" in text(page.get(where))
+        assert armed.status()["working"] == []
+        assert armed.journal.events("entry_resolved")[-1]["outcome"] == "canceled"
+
     def test_cancelling_an_entry_the_desk_sent_lands_on_the_bare_form(self, page, armed, broker):
         broker.rest_limits = True
         out = armed.place(entry(intent_id="desk-1"))
