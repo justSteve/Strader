@@ -508,6 +508,9 @@ class ExecService:
         self._lock = threading.RLock()
         #: the SEND's one quote read, per thread (st-ikqb): see :meth:`_quote_snapshot`
         self._snap = threading.local()
+        #: why the stop is being moved, for the ``stop_adjusted`` line: set
+        #: by the caller around its move, under the lock (st-xsa5)
+        self._move_cause: str | None = None
         #: the reconcile's positions read, run beside its orders read (st-840g)
         self._reads = ThreadPoolExecutor(max_workers=1, thread_name_prefix="execd-read")
         #: the ACCT_ACTIVITY doorbell and the transport it logs in through,
@@ -3851,7 +3854,10 @@ class ExecService:
         line = dict(symbol=pos.symbol, intent_id=pos.intent_id, net_usd=net, tier=tier,
                     lock_usd=round(lock, 2), stop_was=pos.stop_price, stop_to=price, bid=bid)
         self.journal.record("trail", **line)
-        res = self._adjust(pos.symbol, stop_price=price, target_price=None)
+        why = (f"trail: +${lock:,.2f} locked" if tier == 0
+               else f"trail step {tier}: +${lock:,.2f} locked, ${b.trail_gap_usd:g} behind")
+        with self._moving_because(why):
+            res = self._adjust(pos.symbol, stop_price=price, target_price=None)
         if res.get("refused") is None:
             pos.trail_tier = tier
             pos.trail_retry_at = None
@@ -3896,7 +3902,8 @@ class ExecService:
                             stop_off=off, stop_was=pos.stop_price, stop_to=want,
                             moved=want != pos.stop_price)
         if want != pos.stop_price:
-            self._adjust(pos.symbol, stop_price=want, target_price=None)
+            with self._moving_because(f"from the mid at the fill: {mid:.2f} less {off:g}"):
+                self._adjust(pos.symbol, stop_price=want, target_price=None)
 
     def _stop_from_mark_at_rest(self, pos: OpenPosition, walked: float) -> float:
         """The first stop of an entry sent alone, struck from the mid at the
@@ -4040,8 +4047,9 @@ class ExecService:
             self.journal.record("request", kind="adjust", symbol=symbol,
                                 stop_price=stop_price, target_price=target_price,
                                 stop_spx=stop_spx, target_spx=target_spx)
-            out = self._adjust(symbol, stop_price=stop_price, target_price=target_price,
-                               stop_spx=stop_spx, target_spx=target_spx)
+            with self._moving_because("by hand"):
+                out = self._adjust(symbol, stop_price=stop_price, target_price=target_price,
+                                   stop_spx=stop_spx, target_spx=target_spx)
             if out.get("refused") is None:
                 self._last_adjust = (key, self.clock(), out)
             return out
@@ -4226,7 +4234,7 @@ class ExecService:
                                 old_price=price, new_price=price, old_order_id=order_id,
                                 new_order_id=order_id, old_stop_spx=old_level,
                                 new_stop_spx=level, given="spx", level_only=True,
-                                bid=bid, qty=pos.qty)
+                                bid=bid, qty=pos.qty, cause=self._move_cause)
             return {"moved": True, "level_only": True, "old_price": price, "new_price": price,
                     "order_id": order_id, "stop_spx": level, "old_stop_spx": old_level,
                     "given": "spx"}
@@ -4350,7 +4358,7 @@ class ExecService:
                                 old_price=old_price, new_price=new_price,
                                 old_order_id=old_id, new_order_id=pos.stop_order_id,
                                 old_stop_spx=old_spx, new_stop_spx=pos.stop_spx,
-                                given=given, bid=bid, qty=pos.qty)
+                                given=given, bid=bid, qty=pos.qty, cause=self._move_cause)
             return {"moved": True, "old_price": old_price, "new_price": new_price,
                     "order_id": pos.stop_order_id, "stop_spx": pos.stop_spx,
                     "old_stop_spx": old_spx, "given": given}
@@ -4426,7 +4434,8 @@ class ExecService:
                             old_price=old_price, new_price=new_price,
                             old_order_id=old_id, new_order_id=result.order_id,
                             replaced=True, given=given, bid=bid, qty=pos.qty,
-                            **({"old_stop_spx": old_spx, "new_stop_spx": pos.stop_spx}
+                            **({"old_stop_spx": old_spx, "new_stop_spx": pos.stop_spx,
+                                "cause": self._move_cause}
                                if leg == "stop" else
                                {"old_target_spx": old_spx, "new_target_spx": pos.target_spx}))
         # the sibling, read back: still resting, or taken off by the replace?
@@ -4503,6 +4512,20 @@ class ExecService:
         return round((float(exit_price) - pos.entry_price) * CONTRACT_MULTIPLIER * n, 2)
 
     # ── internals: plumbing ──────────────────────────────────────────────
+    @contextmanager
+    def _moving_because(self, cause: str) -> Iterator[None]:
+        """Every stop move made inside the block carries ``cause`` on its
+        ``stop_adjusted`` line — the trail, the mid at the fill, his hand —
+        so the traffic pane can say why a stop moved (Steve, 2026-10-02,
+        st-xsa5: "oh - those were changed by rule? i haven't updated any via
+        a form." … "yes, add the cause to each stop move")."""
+        with self._lock:
+            was, self._move_cause = self._move_cause, cause
+            try:
+                yield
+            finally:
+                self._move_cause = was
+
     @contextmanager
     def _quote_snapshot(self, symbols: list[str]) -> Iterator[None]:
         """Every quote read inside the block, on this thread, from ONE read of

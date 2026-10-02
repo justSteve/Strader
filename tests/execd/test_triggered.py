@@ -415,6 +415,7 @@ class TestTheTrailingStop:
         assert moved["tier"] == 0 and moved["lock_usd"] == 30.0
         at_stop = svc.valuation(pos)["at_stop_usd"]
         assert 30.0 <= at_stop < 35.0                    # +$30, up to one tick
+        assert svc.journal.events("stop_adjusted")[-1]["cause"] == "trail: +$30.00 locked"
         assert svc.trail() == []                          # a tier moves once
 
     def test_each_hundred_past_that_locks_current_less_fifty(self, svc, mb):

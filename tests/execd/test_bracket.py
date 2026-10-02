@@ -490,6 +490,7 @@ class TestAdjust:
     def test_both_legs_move_by_cancel_then_rest(self, holding, broker):
         before = pos_of(holding)
         out = holding.adjust(CALL, stop_price=1.80, target_price=25.00)
+        assert holding.journal.events("stop_adjusted")[-1]["cause"] == "by hand"   # st-xsa5
         assert out["refused"] is None
         assert out["stop"]["moved"] and out["target"]["moved"]
         assert (out["stop"]["old_price"], out["stop"]["new_price"]) == (1.50, 1.80)

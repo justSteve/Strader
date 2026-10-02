@@ -239,3 +239,12 @@ class TestEveryStopMoveIsALine:
                          "intent_id": "x", "symbol": "SPXW  261002C07720000",
                          "detail": "broker refused the entry stop"}])
         assert "tl-fail" in render_html(buf) and "STOP NOT RESTING" in render_html(buf)
+
+
+def test_a_stop_move_says_why():
+    """st-xsa5: "yes, add the cause to each stop move"."""
+    from execd.traffic import stop_line
+    e = {"event": "stop_adjusted", "ts": "2026-10-02T17:09:27+00:00", "old_price": 9.4,
+         "new_price": 10.1, "new_stop_spx": 7723.31, "cause": "trail: +$30.00 locked"}
+    assert stop_line(e).plain() == \
+        "12:09:27 ← STOP moved 9.40 → 10.10 (SPX 7723.31) — trail: +$30.00 locked"

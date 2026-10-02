@@ -216,6 +216,8 @@ def stop_line(e: Mapping[str, Any]) -> Line | None:
             words += f" to {float(new):.2f}"
         if e.get("new_stop_spx") is not None:
             words += f" (SPX {float(e['new_stop_spx']):.2f})"
+        if e.get("cause"):
+            words += f" — {e['cause']}"       # why it moved (st-xsa5)
         return Line(at, "in", words)
     if ev == "stop_under_bid":
         return Line(at, "in", f"STOP {float(e['stop_was']):.2f} was at or over the "
