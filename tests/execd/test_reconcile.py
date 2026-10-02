@@ -961,3 +961,55 @@ class TestOrdersPlacedInTOSAreJournaled:
         broker._orders["tos-5"] = dc_replace(broker._orders["tos-5"],
                                              submitted_at=clock() - timedelta(days=1))
         assert armed.reconcile()["outside"] == []
+
+
+class TestATOSRoundTripIsAClosedCard:
+    """Steve, 2026-10-02 (st-rg8k): "i'm looking at the newly installed form
+    but don't see an update to the orders listed under 'closed today'." The
+    12:13/12:14 CT 7720C round trip placed in TOS: in 9.90, out 9.30."""
+
+    def test_the_buy_and_its_sell_pair_into_one_close(self):
+        from execd.panel import tos_closes
+        lines = [
+            {"event": "outside_order", "order_id": "1008157998671", "status": "FILLED",
+             "side": "SELL_TO_CLOSE", "symbol": CALL, "qty": 1, "filled_qty": 1,
+             "fill_price": 9.30, "entered_at": "2026-10-02T17:14:57+00:00",
+             "legs": [{"symbol": CALL, "instruction": "SELL_TO_CLOSE", "qty": 1}]},
+            {"event": "outside_order", "order_id": "1008157998405", "status": "FILLED",
+             "side": "BUY_TO_OPEN", "symbol": CALL, "qty": 1, "filled_qty": 1,
+             "fill_price": 9.90, "entered_at": "2026-10-02T17:13:02+00:00"},
+            {"event": "outside_order", "order_id": "x", "status": "REJECTED",
+             "side": "SELL_TO_CLOSE", "symbol": CALL, "qty": 1, "fill_price": None},
+        ]
+        close, = tos_closes(lines)
+        assert (close["entry_price"], close["exit_price"]) == (9.90, 9.30)
+        assert close["pnl_usd"] == -60.0 and close["net_pnl_usd"] == -61.30
+        assert close["kind"] == "tos" and close["remaining_qty"] == 0
+
+    def test_an_open_not_yet_closed_is_not_a_card(self):
+        from execd.panel import tos_closes
+        assert tos_closes([{"order_id": "b", "status": "FILLED", "side": "BUY_TO_OPEN",
+                            "symbol": CALL, "qty": 1, "fill_price": 9.9}]) == []
+
+    def test_the_closed_stack_shows_it(self, armed, broker, clock):
+        from execd.panel import closed_html, journal_facts
+        TestOrdersPlacedInTOSAreJournaled.tos(broker, clock, "t-b", "BUY_TO_OPEN",
+                                              OrderStatus.FILLED, fill=9.90)
+        TestOrdersPlacedInTOSAreJournaled.tos(broker, clock, "t-s", "SELL_TO_CLOSE",
+                                              OrderStatus.FILLED, fill=9.30, price=9.00)
+        armed.reconcile()
+        html = closed_html(journal_facts(armed), clock())
+        assert "closed today" in html and "-$61.30" in html and "placed in TOS" in html
+
+
+class TestABracketsLegsAreItsOwn:
+    def test_a_leg_under_a_send_the_journal_names_is_not_outside(self, armed, broker, clock):
+        """10:34 CT 2026-10-02: the triggered 7745P was rejected whole; its
+        legs, never named in the journal, read as orders placed in TOS."""
+        from dataclasses import replace as dc_replace
+        armed.journal.record("placed", intent_id="p-1", kind="entry",
+                             order={"order_id": "root-1", "status": "REJECTED"})
+        TestOrdersPlacedInTOSAreJournaled.tos(broker, clock, "leg-9", "SELL_TO_CLOSE",
+                                              OrderStatus.REJECTED)
+        broker._orders["leg-9"] = dc_replace(broker._orders["leg-9"], root_id="root-1")
+        assert armed.reconcile()["outside"] == []

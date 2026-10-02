@@ -160,6 +160,9 @@ class OrderResult:
     #: tell a leg Steve moved in TOS from one he cancelled [st-5n3s]
     raw_status: str = ""
     closed_at: datetime | None = None   # when the broker closed it, if it says
+    #: the top-level order this one came in under — a bracket leg's parent
+    #: SEND — when the broker lists it as a child (st-rg8k); "" for its own
+    root_id: str = ""
 
     @property
     def is_replaced(self) -> bool:

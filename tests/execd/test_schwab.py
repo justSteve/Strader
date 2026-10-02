@@ -1382,3 +1382,28 @@ class TestOneReadForTheSend:
                             json=build_order(intent()), ok=(201,))
             assert len(broker.orders()) == 1                # the order just placed is seen
             assert gets() == 2
+
+
+def test_a_listed_leg_carries_the_order_it_came_in_under(broker, fake):
+    """st-rg8k: a bracket's legs carry their parent SEND's id, so a leg the
+    journal never named is still known as the service's own."""
+    fake.orders[900] = {"orderId": 900, "orderStrategyType": "TRIGGER", "status": "REJECTED",
+                        "orderType": "LIMIT", "price": 29.0, "quantity": 1,
+                        "enteredTime": "2026-09-04T15:34:30+0000",
+                        "orderLegCollection": [{"legId": 1, "instruction": "BUY_TO_OPEN",
+                                                "quantity": 1, "instrument": {
+                                                    "symbol": CALL, "assetType": "OPTION"}}],
+                        "childOrderStrategies": [{"orderStrategyType": "OCO",
+                                                  "childOrderStrategies": [{
+                                                      "orderId": 902, "status": "REJECTED",
+                                                      "orderType": "STOP", "stopPrice": 28.6,
+                                                      "quantity": 1,
+                                                      "enteredTime": "2026-09-04T15:34:30+0000",
+                                                      "orderLegCollection": [{
+                                                          "legId": 1,
+                                                          "instruction": "SELL_TO_CLOSE",
+                                                          "quantity": 1, "instrument": {
+                                                              "symbol": CALL,
+                                                              "assetType": "OPTION"}}]}]}]}
+    by_id = {o.order_id: o for o in broker.orders()}
+    assert by_id["902"].root_id == "900" and by_id["900"].root_id == "900"

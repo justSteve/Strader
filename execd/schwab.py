@@ -1284,17 +1284,23 @@ class SchwabBroker:
         # (co-8mb1z): the legs are what the service tracks, so they are
         # listed as orders of their own; a parent with no legs of its own
         # is not an order anything here acts on.
+        # Each carries the top-level order it came in under as ``_rootOrderId``
+        # (the service's own SEND, for a bracket's legs): a leg of a bracket the
+        # service sent is its own, though the journal never named the leg —
+        # the 10:34 CT 2026-10-02 bracket was rejected whole, and its legs read
+        # as orders placed in TOS (st-rg8k).
         out: list[dict[str, Any]] = []
 
-        def walk(o: Any) -> None:
+        def walk(o: Any, root: str) -> None:
             if not isinstance(o, dict):
                 return
             if o.get("orderLegCollection"):
-                out.append(o)
+                out.append({**o, "_rootOrderId": root})
             for child in o.get("childOrderStrategies") or []:
-                walk(child)
+                walk(child, root)
         for o in body:
-            walk(o)
+            if isinstance(o, dict):
+                walk(o, str(o.get("orderId") or ""))
         return out
 
     def _get_order(self, account_hash: str, order_id: str) -> OrderResult:
@@ -1342,6 +1348,7 @@ class SchwabBroker:
             legs=legs, strategy="" if strategy == "NONE" else strategy,
             raw_status=raw_status,
             closed_at=_iso(o.get("closeTime"), self.clock()) if o.get("closeTime") else None,
+            root_id=str(o.get("_rootOrderId") or ""),
         )
 
 

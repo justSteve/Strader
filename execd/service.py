@@ -1604,12 +1604,15 @@ class ExecService:
         if not fresh:
             return []
         if self._own_ids is None or any(o.order_id not in self._own_ids
+                                        and o.root_id not in self._own_ids
                                         and o.order_id not in self._outside_seen for o in fresh):
             self._read_own_ids()             # a new id: the journal may name it since
         out: list[str] = []
         for o in fresh:
             status = o.raw_status or o.status.value
-            if o.order_id in (self._own_ids or ()) or self._outside_seen.get(o.order_id) == status:
+            own = self._own_ids or set()
+            if o.order_id in own or (o.root_id and o.root_id in own) \
+                    or self._outside_seen.get(o.order_id) == status:
                 continue
             first = o.order_id not in self._outside_seen
             self._outside_seen[o.order_id] = status
@@ -1618,7 +1621,10 @@ class ExecService:
                 side=o.legs[0].instruction if len(o.legs) == 1 else o.side.value,
                 symbol=o.symbol, qty=o.qty, order_type=o.order_type.value, price=o.price,
                 filled_qty=o.filled_qty, fill_price=o.fill_price,
-                entered_at=o.submitted_at.isoformat(), strategy=o.strategy or None,
+                entered_at=o.submitted_at.isoformat(),
+                closed_at=o.closed_at.isoformat() if o.closed_at else None,
+                root_order_id=o.root_id if o.root_id and o.root_id != o.order_id else None,
+                strategy=o.strategy or None,
                 legs=[leg.to_dict() for leg in o.legs] if o.legs else None,
                 detail=("an order at the broker this service did not send (TOS) — recorded "
                         "as the broker shows it; not booked, not adopted"

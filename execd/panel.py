@@ -183,8 +183,12 @@ def journal_facts(service: ExecService) -> dict[str, Any]:
     #: says what the stop was, so "did my .3 register?" is on the card
     stops: dict[str, float] = {}
     limits: dict[str, float] = {}
+    #: orders placed in TOS, the last line per order (st-rg8k)
+    outside: dict[str, dict[str, Any]] = {}
     for e in service.journal.read():
         ev = e.get("event")
+        if ev == "outside_order" and e.get("order_id"):
+            outside[str(e["order_id"])] = e
         ts = _parse_ts(e.get("ts"))
         iid = str(e.get("intent_id") or "")
         if ev == "order_raw" and e.get("order_id") and isinstance(e.get("body"), dict):
@@ -217,8 +221,56 @@ def journal_facts(service: ExecService) -> dict[str, Any]:
         elif ev == "closed":
             last_close = e
             closes.append(e)
+    # the TOS round trips join the closed stack; not ``last_close``, which is
+    # the card's own stage
+    closes.extend(tos_closes(outside.values()))
     return {"sent": sent, "exit_sent": exit_sent, "filled": filled, "last_close": last_close,
             "closes": closes, "order_types": order_types, "stops": stops, "limits": limits}
+
+
+def tos_closes(lines: Any) -> list[dict[str, Any]]:
+    """Orders placed in TOS (``outside_order``, st-rg8k) as the closed card
+    reads them. Steve, 2026-10-02: "i'm looking at the newly installed form
+    but don't see an update to the orders listed under 'closed today'." Each
+    FILLED close is matched to the FILLED opens on its contract, oldest
+    first, contract by contract; the money is the fill prices less the
+    commission each side pays. A single-leg order only — a spread placed in
+    TOS has no one price to pair — and an open not yet closed is not here.
+    The card's time is the broker's close time of the closing order."""
+    from .broker import COMMISSION_PER_CONTRACT_USD as FEE
+    fills = sorted((e for e in lines if e.get("status") == "FILLED" and len(e.get("legs") or ()) <= 1
+                    and e.get("fill_price") is not None and e.get("symbol")),
+                   key=lambda e: str(e.get("closed_at") or e.get("entered_at") or ""))
+    opens: dict[str, list[list[Any]]] = {}       # symbol → [[line, qty left], ...]
+    out: list[dict[str, Any]] = []
+    for e in fills:
+        side, sym = str(e.get("side") or ""), str(e["symbol"])
+        qty = int(e.get("filled_qty") or e.get("qty") or 0)
+        if side.endswith("_TO_OPEN"):
+            opens.setdefault(sym, []).append([e, qty])
+            continue
+        if not side.endswith("_TO_CLOSE"):
+            continue
+        book = opens.get(sym) or []
+        while qty > 0 and book:
+            first, left = book[0]
+            n = min(qty, left)
+            long = str(first.get("side")).startswith("BUY")
+            per = (float(e["fill_price"]) - float(first["fill_price"])) * (1 if long else -1)
+            gross = round(per * 100 * n, 2)
+            out.append({"event": "closed", "kind": "tos",
+                        "intent_id": f"tos-{first['order_id']}", "symbol": sym, "qty": n,
+                        "entry_price": float(first["fill_price"]),
+                        "exit_price": float(e["fill_price"]), "pnl_usd": gross,
+                        "net_pnl_usd": round(gross - 2 * FEE * n, 2), "remaining_qty": 0,
+                        "order_id": f"{first['order_id']} → {e['order_id']}",
+                        "ts": e.get("closed_at") or e.get("entered_at") or e.get("ts")})
+            qty -= n
+            if n == left:
+                book.pop(0)
+            else:
+                book[0][1] = left - n
+    return out
 
 
 def stage_of(st: Mapping[str, Any], facts: Mapping[str, Any], *,
@@ -487,7 +539,7 @@ def body_exiting(service, st, facts, actions, now) -> str:
 REASON_WORDS = {"protective-stop": "stop", "resting-stop": "stop", "target": "target",
                 "take-profit": "target", "spx-stop": "stop at its SPX level",
                 "spx-exit": "close-at SPX level", "spx-target": "target at its SPX level",
-                "flatten": "FLATTEN"}
+                "flatten": "FLATTEN", "tos": "placed in TOS"}
 
 
 def reason_words(c: Mapping[str, Any], order_types: Mapping[str, str]) -> str:
