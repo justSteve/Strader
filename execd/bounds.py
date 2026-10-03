@@ -167,6 +167,14 @@ class Bounds:
     trail_arm_lock_usd: float = 30.0
     trail_step_usd: float = 100.0
     trail_gap_usd: float = 50.0
+    #: The entry carries its protective stop as its one triggered child, and
+    #: the take-profit is placed after the fill (Steve, 2026-10-03, st-zv1l:
+    #: "I'm fine with leaving the take profit clause until after a fill but
+    #: i'd prefer having that stop loss on right away"). Off: the entry goes
+    #: alone and the stop rests at the fill (st-jdk7, since 2026-10-02, when
+    #: Schwab filled a triggered OCO's MARK stop the second it came to life).
+    #: Opt-in until a live 1-lot shows the stop-only child resting.
+    stop_with_entry: bool = False
 
     def problems(self) -> list[str]:
         out: list[str] = []
@@ -196,6 +204,8 @@ class Bounds:
                        "a lock at or past the arm would rest the stop at the bid")
         if self.take_profit_basis not in ("premium", "risk"):
             out.append(f"take_profit_basis must be 'premium' or 'risk', not {self.take_profit_basis!r}")
+        if not isinstance(self.stop_with_entry, bool):
+            out.append(f"stop_with_entry must be true or false, not {self.stop_with_entry!r}")
         if self.take_profit_multiple <= 0:
             out.append(f"take_profit_multiple must be positive, not {self.take_profit_multiple}")
         elif self.take_profit_basis == "premium" and self.take_profit_multiple <= 1:
@@ -255,6 +265,7 @@ class Bounds:
             "trail_arm_lock_usd": self.trail_arm_lock_usd,
             "trail_step_usd": self.trail_step_usd,
             "trail_gap_usd": self.trail_gap_usd,
+            "stop_with_entry": self.stop_with_entry,
         }
 
 

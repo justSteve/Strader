@@ -281,8 +281,8 @@ class MockBroker:
         #: entry order id → its bracket, once the entry filled (the OCO
         #: children a triggered order brought to life), or the bracket's
         #: intents still waiting on the entry (co-8mb1z)
-        self._children: dict[str, tuple[str, str]] = {}
-        self._pending_children: dict[str, tuple[OrderIntent, OrderIntent]] = {}
+        self._children: dict[str, tuple[str, str | None]] = {}
+        self._pending_children: dict[str, tuple[OrderIntent, OrderIntent | None]] = {}
 
         #: every call, in order, as ``(method, kwargs)`` — the audit a test reads.
         self.calls: list[tuple[str, dict[str, Any]]] = []
@@ -484,23 +484,31 @@ class MockBroker:
         return stop, target
 
     def place_triggered(self, entry: OrderIntent, stop: OrderIntent,
-                        target: OrderIntent) -> OrderResult:
+                        target: OrderIntent | None = None) -> OrderResult:
         """The entry with its bracket attached as a trigger child: the OCO
-        pair comes alive when the entry fills (co-8mb1z)."""
+        pair comes alive when the entry fills (co-8mb1z). ``target`` ``None``
+        is the stop-only child (st-zv1l): the stop alone comes alive."""
         self._record("place_triggered", intent_id=entry.intent_id)
         order = self.place(entry)
         if order.is_filled:
-            s, t = self.place_oco(stop, target)
-            self._children[order.order_id] = (s.order_id, t.order_id)
+            self._children[order.order_id] = self._activate_children(stop, target)
         elif order.is_working:
             self._pending_children[order.order_id] = (stop, target)
         return order
+
+    def _activate_children(self, stop: OrderIntent,
+                           target: OrderIntent | None) -> tuple[str, str | None]:
+        if target is None:
+            return self.place(stop).order_id, None
+        s, t = self.place_oco(stop, target)
+        return s.order_id, t.order_id
 
     def children_of(self, order_id: str) -> tuple[OrderResult | None, OrderResult | None]:
         ids = self._children.get(order_id)
         if ids is None:
             return None, None
-        return self._orders.get(ids[0]), self._orders.get(ids[1])
+        return (self._orders.get(ids[0]),
+                self._orders.get(ids[1]) if ids[1] is not None else None)
 
     def replace_order(self, order_id: str, intent: OrderIntent) -> OrderResult:
         """Replace a resting exit leg with a new price: the old one is
@@ -594,8 +602,7 @@ class MockBroker:
         self._apply_fill(filled)
         pending = self._pending_children.pop(order_id, None)
         if pending is not None:
-            s, t = self.place_oco(*pending)
-            self._children[order_id] = (s.order_id, t.order_id)
+            self._children[order_id] = self._activate_children(*pending)
         partner = self._oco.pop(order_id, None)
         if partner is not None:
             self._oco.pop(partner, None)

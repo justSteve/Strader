@@ -527,7 +527,7 @@ def build_oco(stop_intent: OrderIntent, target_intent: OrderIntent) -> dict[str,
 
 
 def build_triggered(entry: OrderIntent, stop_intent: OrderIntent,
-                    target_intent: OrderIntent) -> dict[str, Any]:
+                    target_intent: OrderIntent | None) -> dict[str, Any]:
     """Entry, stop and target as ONE order (co-8mb1z; Steve, 2026-09-25: "My
     intent is to ensure that Stop Loss is in place as soon as the order is
     filled -- confirm yes to create all 3 at once"). The entry is the
@@ -537,10 +537,20 @@ def build_triggered(entry: OrderIntent, stop_intent: OrderIntent,
 
     **Spec-derived, not yet live-verified**: schwab-py's documented
     first-triggers-OCO (``lib/schwab-py/docs/order-builder.rst`` lines
-    81-155, ``one_triggers_other(..., one_cancels_other(...))``)."""
+    81-155, ``one_triggers_other(..., one_cancels_other(...))``).
+
+    ``target_intent`` ``None`` is the stop-only child (Steve, 2026-10-03,
+    st-zv1l: "I'm fine with leaving the take profit clause until after a fill
+    but i'd prefer having that stop loss on right away"): the entry's one
+    child is the SELL STOP itself, a SINGLE order — schwab-py's
+    ``first_triggers_second`` — and no OCO. The target is placed after the
+    fill. Whether Schwab rests this child or fills it at activation, as it
+    did the OCO's MARK stop at 11:02:21 CT 2026-10-02 (st-jdk7), is what the
+    first live one measures."""
     body = build_order(entry)
     body["orderStrategyType"] = "TRIGGER"
-    body["childOrderStrategies"] = [build_oco(stop_intent, target_intent)]
+    body["childOrderStrategies"] = [build_order(stop_intent) if target_intent is None
+                                    else build_oco(stop_intent, target_intent)]
     return body
 
 
@@ -907,8 +917,9 @@ class SchwabBroker:
         )
 
     def place_triggered(self, entry: OrderIntent, stop_intent: OrderIntent,
-                        target_intent: OrderIntent) -> OrderResult:
+                        target_intent: OrderIntent | None = None) -> OrderResult:
         """The entry with its OCO bracket attached (:func:`build_triggered`),
+        or its stop alone when ``target_intent`` is ``None`` (st-zv1l),
         answered like :meth:`place` — the result is the entry's."""
         return self.place(entry, body=build_triggered(entry, stop_intent, target_intent))
 

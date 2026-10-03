@@ -117,8 +117,8 @@ class PaperBroker:
         self.oco_enabled = True
         #: entry → its live bracket's ids, and entry → the bracket's intents
         #: still waiting on the entry to fill (a triggered order, co-8mb1z)
-        self._children: dict[str, tuple[str, str]] = {}
-        self._pending_children: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
+        self._children: dict[str, tuple[str, str | None]] = {}
+        self._pending_children: dict[str, tuple[dict[str, Any], dict[str, Any] | None]] = {}
         self._load()
 
     # ── pass-through: every read, and the broker's own preview ───────────
@@ -174,7 +174,7 @@ class PaperBroker:
             return stop, target
 
     def place_triggered(self, entry: OrderIntent, stop: OrderIntent,
-                        target: OrderIntent) -> OrderResult:
+                        target: OrderIntent | None = None) -> OrderResult:
         """The entry with its bracket as a trigger child, as it goes to
         Schwab live (co-8mb1z): the OCO pair rests the moment the entry
         fills — now, or when the book fills it later. Defined here, never
@@ -182,10 +182,14 @@ class PaperBroker:
         with self._lock:
             order = self.place(entry)
             if order.is_filled:
-                s, t = self.place_oco(stop, target)
-                self._children[order.order_id] = (s.order_id, t.order_id)
+                if target is None:          # the stop-only child (st-zv1l)
+                    self._children[order.order_id] = (self.place(stop).order_id, None)
+                else:
+                    s, t = self.place_oco(stop, target)
+                    self._children[order.order_id] = (s.order_id, t.order_id)
             elif order.status is OrderStatus.WORKING:
-                self._pending_children[order.order_id] = (stop.to_dict(), target.to_dict())
+                self._pending_children[order.order_id] = (
+                    stop.to_dict(), target.to_dict() if target is not None else None)
             self._save()
             return self._orders[order.order_id]
 
@@ -195,7 +199,8 @@ class PaperBroker:
             ids = self._children.get(order_id)
             if ids is None:
                 return None, None
-            return self._orders.get(ids[0]), self._orders.get(ids[1])
+            return (self._orders.get(ids[0]),
+                    self._orders.get(ids[1]) if ids[1] is not None else None)
 
     def replace_order(self, order_id: str, intent: OrderIntent) -> OrderResult:
         """A resting exit leg at a new price, keeping its OCO link — the
@@ -226,11 +231,16 @@ class PaperBroker:
                 raise BrokerError(f"paper: no such order: {order_id}")
             return {**order.to_dict(), "paper": True, "oco_partner": self._oco.get(order_id)}
 
-    def _activate(self, entry_id: str, pending: tuple[dict[str, Any], dict[str, Any]]) -> tuple[str, str]:
-        """The bracket a triggered entry carried, resting now that it filled."""
+    def _activate(self, entry_id: str, pending: tuple[dict[str, Any], dict[str, Any] | None]
+                  ) -> tuple[str, str | None]:
+        """The bracket a triggered entry carried, resting now that it filled
+        — the stop alone when it carried no target (st-zv1l)."""
         stop = OrderIntent.from_dict(pending[0])
-        target = OrderIntent.from_dict(pending[1])
         s = self._new(stop, OrderStatus.WORKING, price=stop.stop_price)
+        if pending[1] is None:
+            self._orders[s.order_id] = s
+            return s.order_id, None
+        target = OrderIntent.from_dict(pending[1])
         t = self._new(target, OrderStatus.WORKING, price=target.limit)
         self._orders[s.order_id] = s
         self._orders[t.order_id] = t
@@ -478,7 +488,7 @@ class PaperBroker:
             raise BrokerError(f"paper: the book at {self.book_path} cannot be read: {exc}") from exc
         self._seq = int(data.get("seq", 0))
         self._oco = {str(k): str(v) for k, v in (data.get("oco") or {}).items()}
-        self._children = {str(k): (str(v[0]), str(v[1]))
+        self._children = {str(k): (str(v[0]), str(v[1]) if v[1] is not None else None)
                           for k, v in (data.get("children") or {}).items()}
         self._pending_children = {str(k): (v[0], v[1])
                                   for k, v in (data.get("pending_children") or {}).items()}

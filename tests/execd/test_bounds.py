@@ -295,6 +295,7 @@ class TestConfiguration:
             "require_protective_stop",
             "take_profit_multiple", "take_profit_basis",
             "trail_arm_usd", "trail_arm_lock_usd", "trail_step_usd", "trail_gap_usd",
+            "stop_with_entry",
         }
 
     def test_the_trail_defaults_are_steves_rule(self):

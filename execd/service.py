@@ -2749,11 +2749,14 @@ class ExecService:
         self.journal.record("sending", kind="entry", spx=spx, **send.to_dict(),
                             stop_off=intent.stop_off,
                             **({"stop_price": bracket[0].stop_price,
-                                "target_price": bracket[1].limit} if bracket else {}))
+                                "target_price": bracket[1].limit if bracket[1] else None,
+                                "carried": "stop" if bracket[1] is None else "bracket"}
+                               if bracket else {}))
         try:
             if bracket is not None:
                 # entry, stop and target as ONE order: the pair is alive at
-                # the broker the moment the entry fills (co-8mb1z)
+                # the broker the moment the entry fills (co-8mb1z) — or the
+                # stop alone, the target after the fill (st-zv1l)
                 order = self.broker.place_triggered(intent, *bracket)
             else:
                 order = self.broker.place(intent)
@@ -3683,7 +3686,8 @@ class ExecService:
         return out
 
     def _triggered_bracket(self, intent: OrderIntent, spx: float, *,
-                           base: float | None = None) -> tuple[OrderIntent, OrderIntent] | None:
+                           base: float | None = None,
+                           ) -> tuple[OrderIntent, OrderIntent | None] | None:
         """The stop and target to send WITH the entry, or ``None`` to send the
         entry alone (co-8mb1z; Steve, 2026-09-25: "My intent is to ensure
         that Stop Loss is in place as soon as the order is filled -- confirm
@@ -3701,10 +3705,17 @@ class ExecService:
         broker has no triggered orders (Alpaca here), when the contract is
         already held or working (an add; ``_add_to_position`` puts one
         bracket on for the whole size), or when either price cannot be
-        derived."""
-        if not self.config.triggered_bracket:
+        derived.
+
+        ``(stop, None)`` — the stop alone as the entry's child, the target
+        placed after the fill — when ``Bounds.stop_with_entry`` is on and the
+        whole bracket is not (Steve, 2026-10-03, st-zv1l)."""
+        stop_only = not self.config.triggered_bracket and self.bounds.stop_with_entry
+        if not (self.config.triggered_bracket or stop_only):
             return None             # the entry alone; the pair after the fill (st-jdk7)
-        if not (self._oco() and callable(getattr(self.broker, "place_triggered", None))):
+        if not callable(getattr(self.broker, "place_triggered", None)):
+            return None
+        if not (stop_only or self._oco()):
             return None
         if intent.symbol in self._open or any(
                 w.symbol == intent.symbol for w in self._working.values()):
@@ -3716,8 +3727,8 @@ class ExecService:
             stop_price = protective_stop_price(base if base is not None else intent.limit,
                                                intent.delta, spx, intent.stop_spx)
             b = self.bounds
-            target_price = take_profit_price(intent.limit, b.take_profit_multiple,
-                                             b.take_profit_basis, stop_price=stop_price)
+            target_price = None if stop_only else take_profit_price(
+                intent.limit, b.take_profit_multiple, b.take_profit_basis, stop_price=stop_price)
         except ValueError:
             return None
         base = intent.intent_id
@@ -3725,6 +3736,8 @@ class ExecService:
                            side=Side.SELL_TO_CLOSE, qty=intent.qty, order_type=OrderType.STOP,
                            stop_price=stop_price, source="protective-stop",
                            engine_sha=self.config.sha)
+        if stop_only:
+            return stop, None
         target = OrderIntent(intent_id=f"{base}:target:{intent.qty}", symbol=intent.symbol,
                              side=Side.SELL_TO_CLOSE, qty=intent.qty, order_type=OrderType.LIMIT,
                              limit=target_price, source="take-profit", engine_sha=self.config.sha)
@@ -3793,6 +3806,17 @@ class ExecService:
                 closed_qty=min(_filled_qty_of(fired), pos.qty), reason=kind, why=why)
             done = {**fired.to_dict(), "closed": closed}
             return (done, None) if leg == "stop" else (None, done)
+        # The entry carried its stop alone (st-zv1l): booked as the
+        # position's stop, then the target placed. Read by the service's
+        # switch, not the order — an entry sent under the other setting and
+        # read after a restart that flipped it is read as the setting says.
+        stop_only = not self.config.triggered_bracket
+        if stop_only and target is None and stop is not None and stop.is_working \
+                and stop.qty == pos.qty:
+            self._bracket_read(pos)
+            booked = self._book_stop(pos, float(stop.price or 0.0), stop, spx=spx,
+                                     kind="triggered")
+            return booked, self._target_after_carried_stop(pos, spx)
         whole = (stop is not None and target is not None and stop.is_working
                  and target.is_working and stop.qty == pos.qty and target.qty == pos.qty)
         if whole:
@@ -3810,7 +3834,8 @@ class ExecService:
         # grace a missing leg gets; past it, a child the broker still does
         # not list is taken as never made (st-yt25).
         since = pos.bracket_unread_since or self.clock()
-        missing = [leg for leg, o in (("stop", stop), ("target", target)) if o is None]
+        missing = [leg for leg, o in (("stop", stop), ("target", target))
+                   if o is None and not (leg == "target" and stop_only)]
         if missing and (self.clock() - since).total_seconds() < LEG_SETTLE_S:
             return self._bracket_unread(pos, entry_order_id, limit,
                                         f"the {' and '.join(missing)} the entry carried is "
@@ -3841,6 +3866,54 @@ class ExecService:
                             detail="the bracket sent with the entry is not resting whole and "
                                    "what it carried is off — placing it here")
         return None
+
+    def _target_after_carried_stop(self, pos: OpenPosition,
+                                   spx: float | None) -> dict[str, Any] | None:
+        """The take-profit of an entry that carried its stop alone (st-zv1l).
+
+        Schwab refuses a target sent beside a lone stop as an oversell
+        (2026-09-25 12:15 CT), so the carried stop comes off and the two go
+        back on as ONE OCO pair, the stop struck from the mid at the fill as
+        any stop rested at a fill is (st-qbh6). The cancel is confirmed
+        before the pair is sent; the stop is off for that one round trip,
+        and the journal's ``canceled`` and ``stop_placed`` lines time it. A
+        carried stop that will not come off stays as the protection and the
+        target is not placed — ``target_unprotected``, a warning."""
+        carried = pos.stop_price
+        if carried is None:
+            return None
+        price = self._stop_from_mark_at_rest(pos, carried)
+        b = self.bounds
+        try:
+            target = take_profit_price(pos.entry_price, b.take_profit_multiple,
+                                       b.take_profit_basis, stop_price=price)
+        except ValueError as exc:
+            self.journal.record("target_unprotected", symbol=pos.symbol,
+                                intent_id=pos.intent_id, qty=pos.qty,
+                                basis=b.take_profit_basis, multiple=b.take_profit_multiple,
+                                detail=f"no take-profit can be derived: {exc}")
+            return None
+        if not self._oco():
+            return self._rest_target_at(pos, target, kind="entry")
+        if not self._clear_other_leg(pos, "stop"):
+            if pos.symbol in self._open:
+                self.journal.record("target_unprotected", symbol=pos.symbol,
+                                    intent_id=pos.intent_id, qty=pos.qty, target_price=target,
+                                    stop_order_id=pos.stop_order_id,
+                                    detail="the stop the entry carried would not come off, so "
+                                           "it stays as the protection and no take-profit "
+                                           "rests beside it")
+            return None
+        if price != carried and (level := self._stop_spx_for(pos, price)) is not None:
+            self.journal.record("stop_level_restruck", symbol=pos.symbol,
+                                intent_id=pos.intent_id, stop_price=price,
+                                stop_spx_was=pos.stop_spx, stop_spx=level)
+            pos.stop_spx = level
+        out = self._rest_pair(pos, price, target, spx=spx, kind="entry")
+        if out["stop"] is None and pos.symbol in self._open and not pos.stop_order_id:
+            # the pair was refused: the stop goes back on alone
+            self._rest_stop_at(pos, price, spx=spx, kind="entry")
+        return out["target"]
 
     def _bracket_unread(self, pos: OpenPosition, entry_order_id: str, limit: float | None,
                         detail: str, *, seen: dict[str, Any] | None = None) -> str:

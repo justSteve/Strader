@@ -69,3 +69,15 @@ require_protective_stop: true
 # with the entry, before any fill exists.
 take_profit_multiple: 5.0
 take_profit_basis: premium
+
+# The entry carries its protective stop (Steve, 2026-10-03, st-zv1l: "I'm
+# fine with leaving the take profit clause until after a fill but i'd prefer
+# having that stop loss on right away"). true: the entry goes to Schwab with
+# the stop as its one triggered child — alive the moment the entry fills —
+# and the take-profit is placed after the fill (the stop comes off and the
+# two go back on as one OCO pair, struck from the mid at the fill). false:
+# the entry goes alone and the stop and target rest together at the fill
+# (st-jdk7). Off until a live 1-lot shows the child resting rather than
+# filling at activation, as the OCO bracket's MARK stop did at 11:02 CT
+# 2026-10-02. Takes effect on a restart of the service.
+stop_with_entry: false
