@@ -226,6 +226,43 @@ hstat "tape health"     "$REPO/data/corpus/_capture_health.json"     180 "writte
 hstat "gex health"      "$REPO/data/corpus/_gexbot_health.json"      180 "same writer as tape health; idle outside 08:30-15:05 CT is normal"
 hstat "feed health"     "$DAY_DIR/_footprint_health.json"            90  "every push and every 30 s while waiting (Phase 2b)"
 
+# EXECD CREDENTIAL — ASKED OF THE SERVICE, NOT READ FROM A FILE. [st-4ie6]
+#
+# 2026-10-05: tap-in raised "[ALERT] the trading token expired at 06:49" from
+# _schwab_token_health.json, a file written at 06:30 — a claim about a token,
+# relayed as if measured. execd's /status says what it actually holds: whether
+# a trading credential is in memory, its last known wall, and the market leg.
+# LOCKED with a past trading wall is "cannot trade now"; whether the token on
+# disk was refreshed since is not visible here (tokens/ is gated) — say so.
+printf '\n'
+xstat() {           # xstat <label> <port>
+    local label="$1" port="$2" body
+    body="$(curl -s -m 3 "http://127.0.0.1:$port/status" 2>/dev/null || true)"
+    if [[ -z "$body" ]]; then
+        printf '%-22s %-8s %-10s %s\n' "$label" "NOANSWER" "-" "127.0.0.1:$port/status did not answer"
+        return
+    fi
+    python3 - "$label" "$body" <<'PY' 2>/dev/null || printf '%-22s %-8s %-10s %s\n' "$1" "UNPARSED" "-" "/status answered but did not parse"
+import json, sys
+from datetime import datetime
+from zoneinfo import ZoneInfo
+label, d = sys.argv[1], json.loads(sys.argv[2])
+ct = ZoneInfo("America/Chicago")
+def t(iso):
+    if not iso: return "-"
+    return datetime.fromisoformat(iso).astimezone(ct).strftime("%m-%d %H:%M CT")
+arm = d.get("arming", {}); cred = d.get("credential", {}); mkt = cred.get("market", {})
+wall = cred.get("last_known_trading_wall")
+past = bool(wall) and datetime.fromisoformat(wall) <= datetime.now(ct)
+state = arm.get("state", "-")
+trade = "armed" if cred.get("armed") else ("no trading credential in memory" + ("; trading wall PASSED" if past else ""))
+print(f"{label:<22} {state:<8} {'-':<10} trading: {trade} (wall {t(wall)}) · "
+      f"market: {'armed' if mkt.get('armed') else 'NOT armed'} (wall {t(mkt.get('refresh_wall'))}) · "
+      f"asked {d.get('now_ct', '-')}" + (" · token on disk may be refreshed since — tokens/ is gated; unlock tells" if past else ""))
+PY
+}
+xstat "execd schwab" 8778
+
 printf '\n'
 fsize "ES tape"      "$DAY_DIR/databento_glbx_es.jsonl"
 fsize "MBP-1 quotes" "$DAY_DIR/databento_glbx_es_mbp1.jsonl"
