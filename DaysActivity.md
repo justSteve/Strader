@@ -1,78 +1,47 @@
-# DaysActivity - 2026-10-02
+# DaysActivity - 2026-10-06
 
-## 21:03 - Session Handoff [execd: stop-after-fill, fast SEND, TOS journal, CLOSE, FLATTEN SPX]
+## 13:20 - Session Handoff [Emission Review, Fuel History As-Of, Context Log, Trail Best-Water]
 
-**Summary**: Parsed Mancini for Fri 10-02 (60 levels, 7 commentary). Diagnosed the 11:02 7730C stop-out from the journal, the ES tape and Schwab's Message Center: the triggered bracket's STP 7.50 MARK child filled when the entry activated it, with the mark at 8.15. The entry now goes out alone and the stop goes on after the fill. Profiled and cut the click-to-SEND path from 8 broker calls to about 2–3. Removed the below-bid price floor. TOS orders are now journaled and shown as closed cards. The traffic pane shows newest first and every stop rest, move (with its cause) and fill. Added a per-position CLOSE. FLATTEN became FLATTEN SPX. execd runs 87dc301; 3b585b2 is pushed but not installed.
+**Summary**: Parsed the 10-05 and 10-06 Mancini letters. Built the Emission Review procedure: packet tool, `/emission-review` skill, cards delivered to Desk, first card 10-06 Bar 232. The feeder now writes a context log (Fuel, GEX), and Fuel's level history is computed as of each bar from our own tape. The old history came from a level_state file loaded once and was stale on 28 of 34 lines today. Past Fuel lines were corrected, with the page's original kept beside each. Fixed execd so the trail's valuations feed the position's best/worst record.
 
 **Open Work**:
-- st-lax0 (P1, next): FLATTEN SPX must close every SPX position the way it opened — spreads closed as one reversed multi-leg order, shorts bought to close. Steve 21:00 CT: "an endpoint rendered via our form's open positions card shall close all open spx positions without regard to how they opened." The spec is on the bead. It replaces the st-ld7i shorts guard. Needs BUY_TO_CLOSE and a multi-leg Schwab body, and Schwab's acceptance of multi-leg pricing measured first.
-- st-jdk7 Spurious Mark Stop: built (a0165a7) and installed. Live trades on the new install show the stop resting after the fill (12:56, 13:08, 13:26 CT). Close once Steve agrees. Cause on Schwab's side unverified; Steve may post the request body to the schwab-py Discord.
-- 3b585b2 FLATTEN SPX is pushed but not installed; Steve runs `bash deploy/install.sh --execd`.
-- Two false outside_order lines (the 10:34 rejected bracket's legs, 1008154065058/059) stay in today's journal; the root_id fix stops recurrences.
-- Schwab refresh token walls 2026-10-05 ~06:49 CT (Monday before the open); re-auth over the weekend.
+- **Feeder restart pending.** Commits 6d4b8fe and a348567 (context log, tape Fuel history) are on disk. The running feeder still has the old code and prints stale Fuel history until it restarts: tonight at CT midnight, or Steve's `sudo systemctl restart strader-footprint-feed.service` after hours. After the restart, confirm "history from the tape since …" appears in the feeder log and `data/derived/live-context/<day>.jsonl` grows.
+- **execd install pending.** 2127a47 (trail feeds best/worst, st-rp3e) needs `bash deploy/install.sh --execd` while flat. Earlier uninstalled execd commits per CurrentStatus are still there (3b585b2 FLATTEN SPX, 760ccf5 stop_with_entry, off by default).
+- **Tape Divergence (st-mr8r).** On every run-log day before 10-01 the live bars and the tape rebuild disagree (3–7% volume, zero matching bars). Either live dropped trades or the tape was amended afterwards. Determine which; `live_parity_check` is the instrument.
+- **Desk** has a standing brief and the Bar 232 card in `zgent-bridge/Desk/inbox`, both expects_reply false. Steve does the Q&A there.
+- **Bridge watch** was not started this session (tap-in flagged it).
+- st-lax0 (FLATTEN SPX closes spreads as spreads) is still the next execd build.
+
+**Tried**:
+- Re-reading level_state every 5 min → shrank the staleness window but kept a second process, data source and clock, and stayed unreproducible afterwards. Replaced by `market/orderflow/level_history.py`, which runs the tracker's own compute_interactions on tape candles cut at the bar's close. Matches the tracker on 51 of 52 levels; the 52nd is one touch apart because the tracker counts its forming candle.
+- Backfill GEX picked by `ts_pull_utc` → 33 of 327 bars mismatched live, because pulls land seconds after their stamp. A 10 s arrival lag gives 1 mismatch (sweep: 0 s 33, 8 s 7, 10 s 1, 12 s 4, 20 s 23).
+- Backfill before 10-01 → refused. The tape does not rebuild the bars the page drew, so context would attach to the wrong bars (st-mr8r).
+- Steve's "phantom stop" (12:55 7830P) → a real MARK trigger, not a phantom. The trail's $30 lock put the stop $0.30 under the bid, about 0.45 SPX pts. SPX printed the stop's level (7825.45) and the mark was $7.90.
+- Schwab gate refuses any Bash command that names `/var/lib/execd/`, even `ls`. The Read tool reads the journal; the execd view log is at `/var/moo/surface/execd/`.
 
 **Files Changed**:
-execd/bounds.py
-execd/broker.py
-execd/orderpage.py
-execd/page.py
-execd/panel.py
-execd/paper.py
-execd/schwab.py
+tools/emission_review.py
+tools/backfill_context_log.py
+.claude/skills/emission-review/SKILL.md
+market/orderflow/context_log.py
+market/orderflow/level_history.py
+market/orderflow/fuel.py
+scripts/live_footprint_feed.py
+scripts/surface_liveness.sh
 execd/service.py
-execd/traffic.py
-execd/README.md
-tests/execd/test_bounds.py
-tests/execd/test_bracket.py
-tests/execd/test_mode_switch.py
-tests/execd/test_orderform.py
-tests/execd/test_page.py
-tests/execd/test_panel.py
-tests/execd/test_reconcile.py
-tests/execd/test_schwab.py
-tests/execd/test_service.py
-tests/execd/test_traffic.py
-tests/execd/test_triggered.py
-tests/execd/scenario/harness.py
-tests/execd/scenario/test_audit_defects.py
-tests/execd/scenario/test_page_flow.py
-tests/execd/scenario/test_rearm.py
-tests/execd/scenario/test_seed_0930.py
+tests/test_emission_review.py
+tests/test_backfill_context_log.py
+tests/market/orderflow/test_level_history.py
+tests/market/orderflow/test_fuel.py
+tests/scripts/test_live_footprint_feed.py
 tests/execd/scenario/test_sequences.py
-runbook/mancini/commentary/2026-10-02.jsonl
+docs/emission-reviews/2026-10-06/bar-232.md
+docs/emission-reviews/2026-10-06/bar-232.json
+docs/emission-reviews/2026-10-06/page-fuel-as-shown.jsonl
+knowledge/log.md
+docs/a2a/inbox.md
+runbook/mancini/commentary/2026-10-05.jsonl
+runbook/mancini/commentary/2026-10-06.jsonl
 CurrentStatus.md
 
 ---
-
-## 06:59 - Session Handoff [held push released, Mancini 10-01, execd rulings + order-form rebuild, bridge watch]
-
-**Summary**: Released the push held behind st-5n3s (56 commits). Ran the Mancini parse for Thu 10-01 (57 levels, 7 commentary). Built Steve's two 10-01 execd rulings: dollar-only entry stop, and a refusal for a stop at or above the bid. Built the Desk view log, the order-form rebuild (strike sort, SEND traffic pane, strike pin, paper/live separation), and entry pricing at min(mid+0.05, ask) with a 0.30/contract default stop and re-arm after a stop-out. After reading today's two seconds-long stop-outs in the journal, added stop struck from the mid at fill, the broker preview dropped from SEND, and room-from-mark on the ticket. Everything is pushed. The last install Steve ran was 1e55681 (unlock 13:56 CT). dc39327 and 687b2c9 are NOT installed.
-
-**Open Work**:
-- Install: `bash deploy/install.sh --execd` while flat. It picks up dc39327 and 687b2c9: pricing, 0.30 stop, re-arm, stop-from-mark, no preview, room cue. Steve's /etc/execd/bounds.yaml still carries `preview_cost_tolerance_usd`; it is now a retired key and is ignored.
-- Asked Steve, no answer yet (Deferred): should the Alpaca paper path also strike its stop from the mark? It still uses the fill price.
-- Asked Steve, no answer yet (Deferred): restart the bridge watch? It hit the 2h background cap and the harness said not to re-arm. The `--until-event` + run_in_background design (st-4cmi) therefore needs a re-arm the harness allows. The bridge is unwatched until the next tap-in.
-- Mancini fetch: today's 06:58 blob (10-01) was a 683-char non-letter and was skipped correctly. st-znw6 is still in progress.
-- Carried in_progress (untouched): st-8l4k, st-8qqw, st-92m7, st-9r51, st-c6ii, st-fsf3, st-gnv5, st-x3tx, st-znw6, st-2nyb, st-3qio, st-5n3s, st-9dyz, st-eww7, st-g0jo, st-ow3p, st-q9re, st-v6p5, st-ygy1.
-- Research, not started: st-peqp (large-lot definition); PIVOT_FILTER_TICKS calibration.
-
-**Tried**:
-- The push hold was carried for 3 days as a status line ("held behind st-5n3s review group"), never asked → Steve: "those needed pushed, didn't they?" A hold must be put to him as a one-line ask, not inherited.
-- Monitor caps at 30 min, so the bridge watch woke the session every 30 min → `--until-event` under Bash run_in_background (2h). The 2h kill notice says not to restart at max timeout, so the re-arm loop does not work as designed.
-- Stop-outs 12:47 and 14:32 (P7680, -$31.30 / -$41.30, 9 s and 5 s): the entry paid the ask, the stop was struck from the fill but triggers on MARK, so the real room was the distance minus half-spread minus drift. The preview took ~1 s of 3 s click-to-fill and was a contributor, not the cause.
-
-**Files Changed**:
-tools/bridge_inbox.py
-tests/tools/test_bridge_inbox.py
-.claude/skills/tap-in/SKILL.md
-execd/ (orderform, orderpage, service, schwab, paper, bounds, bounds.example.yaml, panel, README, view log)
-strader/intent/execd.py
-deploy/install.sh
-deploy/systemd/ (execd units: view-log dirs)
-docs/execution-engine-operations-manual.md
-tests/execd/ (incl. scenario/test_sequences.py, test_page_flow.py, conftest.py)
-docs/a2a/inbox.md
-runbook/mancini/ (parsed/charts for 2026-10-01, via run.py)
-
----
-
