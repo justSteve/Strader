@@ -1,0 +1,183 @@
+{
+ "day": "2026-10-06",
+ "bar_label": 232,
+ "bar_index": 231,
+ "source": "bridge",
+ "source_note": "what the page received, context lines included",
+ "generated_ct": "2026-10-06 09:51 CT",
+ "bar": {
+  "start_ct": "09:38:04",
+  "close_ct": "09:38:33",
+  "o": 7874.25,
+  "h": 7875.25,
+  "l": 7873.0,
+  "c": 7875.0,
+  "vol": 2001,
+  "delta": -99,
+  "dur_s": 29.577,
+  "poc": 7874.25
+ },
+ "emissions": [
+  {
+   "type": "Fuel",
+   "text": "long @ 7879.00 — touched 0x / defended 0x, untouched · 3 lid rejections in 40m · 22.2K sold at the level, underwater on reclaim · no absorbed dips · thin x0.06 above, no shelf within 15 pts",
+   "context_only": true,
+   "fields": {
+    "level": 7879.0,
+    "read": "long",
+    "history": {
+     "n_touches": 0,
+     "n_defenses": 0,
+     "first_touch": null,
+     "state": "untouched"
+    },
+    "underwater_vol": 22197,
+    "lid_rejections": 3,
+    "window_min": 40.5,
+    "absorbed_swings": 0,
+    "absorbed_delta": 0,
+    "thin_ratio": 0.06,
+    "shelf_price": null
+   }
+  }
+ ],
+ "canon": {
+  "Fuel": {
+   "read": "knowledge/trapped-seller-fuel.md",
+   "measured": "unmeasured — canon §Validation: a display of what the tape shows, not a graded signal, until the postmortem measurement exists"
+  }
+ },
+ "prior": {
+  "bars": 10,
+  "from_ct": "09:32:19",
+  "net_pts": 4.25,
+  "high": 7876.75,
+  "low": 7868.25,
+  "delta_sum": 1811,
+  "deltas": [
+   414,
+   -282,
+   310,
+   20,
+   167,
+   531,
+   224,
+   324,
+   183,
+   -80
+  ]
+ },
+ "mancini_near": [
+  {
+   "price": 7886.0,
+   "dist_pts": 11.0,
+   "kind": "resistance",
+   "label": "major",
+   "intent": "unstated",
+   "setup": "none"
+  },
+  {
+   "price": 7879.0,
+   "dist_pts": 4.0,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "setup": "none"
+  },
+  {
+   "price": 7871.0,
+   "dist_pts": -4.0,
+   "kind": "resistance",
+   "label": "",
+   "intent": "unstated",
+   "setup": "none"
+  },
+  {
+   "price": 7867.0,
+   "dist_pts": -8.0,
+   "kind": "resistance",
+   "label": "major · target — backtests where we broke down August 17th; also named as a short spot",
+   "intent": "watch",
+   "setup": "breakout_target"
+  }
+ ],
+ "gex": {
+  "ts": "2026-10-06T14:37:10Z",
+  "age_s": 83.8,
+  "spot": 7822.86,
+  "flip": 7815.0,
+  "pos": 7830.0,
+  "neg": 7775.0,
+  "one_pos": 7850.0,
+  "one_neg": 7655.0,
+  "regime": "pos",
+  "net_gex_oi": 42786.771,
+  "basis": null,
+  "dflip": null,
+  "touch": []
+ },
+ "basis_approx": 52.14,
+ "vol_40m": 166445,
+ "hindsight": {
+  "from_close": 7875.0,
+  "+5": {
+   "close_chg": 4.5,
+   "max_up": 4.75,
+   "max_down": -0.25,
+   "delta_sum": 873,
+   "until_ct": "09:41:47"
+  },
+  "+10": {
+   "close_chg": 7.75,
+   "max_up": 8.0,
+   "max_down": -0.25,
+   "delta_sum": 1980,
+   "until_ct": "09:44:41"
+  },
+  "+20": {
+   "close_chg": 5.5,
+   "max_up": 8.75,
+   "max_down": -0.25,
+   "delta_sum": 2222,
+   "until_ct": "09:50:36"
+  }
+ },
+ "later_emissions": [
+  {
+   "bar_label": 237,
+   "close_ct": "09:41:47",
+   "type": "SetupRecognition",
+   "text": "failed_breakout forming @ 7879.00 (resistance ∩ mancini): stages so far: flush"
+  },
+  {
+   "bar_label": 241,
+   "close_ct": "09:44:00",
+   "type": "SetupRecognition",
+   "text": "failed_breakout forming @ 7879.00 (resistance ∩ mancini): stages so far: flush+stall"
+  },
+  {
+   "bar_label": 242,
+   "close_ct": "09:44:41",
+   "type": "Fuel",
+   "text": "long @ 7886.00 — touched 0x / defended 0x, untouched · 3 lid rejections in 40m · 14.5K sold at the level, underwater on reclaim · dips bought +3230 over 3 higher lows · thin x0.03 above, no shelf within 15 pts"
+  },
+  {
+   "bar_label": 244,
+   "close_ct": "09:45:30",
+   "type": "SetupRecognition",
+   "text": "failed_breakout forming @ 7879.00 (resistance ∩ mancini): stages so far: flush+stall+flip"
+  },
+  {
+   "bar_label": 250,
+   "close_ct": "09:48:58",
+   "type": "SetupRecognition",
+   "text": "failed_breakout confirmed @ 7879.00 (resistance ∩ mancini): confirmed on opposite delta"
+  },
+  {
+   "bar_label": 252,
+   "close_ct": "09:50:36",
+   "type": "Fuel",
+   "text": "short @ 7879.00 — touched 0x / defended 0x, untouched · 4 lid rejections in 40m · 24.1K bought at the level, underwater on loss · no absorbed pops · thin x0.45 to 7876"
+  }
+ ]
+}
