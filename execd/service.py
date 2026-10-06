@@ -3968,6 +3968,12 @@ class ExecService:
             return None
         v = self.valuation(pos)
         net, bid = v.get("net_if_closed_usd"), v.get("bid")
+        # Every valuation the service acts on is a sample of the position's
+        # best/worst, not only the page's status polls [st-rp3e]: on 10-06 the
+        # trail armed at +58.70 while the closed line said best +48.70, below the
+        # arm, because no poll landed on that bid. With no page open, nothing
+        # sampled at all.
+        pos.mark_water(net, now)
         if net is None or bid is None or net < b.trail_arm_usd:
             return None
         tier = int((net - b.trail_arm_usd) // b.trail_step_usd)

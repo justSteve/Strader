@@ -461,6 +461,18 @@ class TestTrail:
             sorted(e["stop_to"] for e in scn.events("trail"))
         close, = scn.closes()
         assert close["kind"] in ("protective-stop", "spx-stop") and close["pnl_usd"] > 0
+        # the best the close records is at least every net the trail acted on
+        # [st-rp3e: 10-06 the trail armed at +58.70, the close said best +48.70]
+        assert close["best_net_usd"] >= max(e["net_usd"] for e in scn.events("trail"))
+
+    def test_the_trails_valuation_marks_the_best_with_no_page_polling(self, make):
+        scn = make(ramp((0, 6380), (10, 6380), (100, 6392), (130, 6392)))
+        t = scn.ticket("call", delta=0.5)
+        scn.send(t)
+        pos = scn.position(t.contract.symbol)
+        pos.best_net_usd = pos.worst_net_usd = None     # nothing sampled yet
+        scn.service._trail_one(pos, scn.service.bounds)
+        assert pos.best_net_usd is not None and pos.best_at is not None
 
 
 # ── the SPX-mark exit loop ───────────────────────────────────────────────
