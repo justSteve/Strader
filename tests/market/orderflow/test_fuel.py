@@ -292,8 +292,18 @@ def test_history_loader_retries_until_rows_arrive():
     ev = tr.on_bar(bar(20, 7737, 7738, 7736, 7737))    # past 15 min: retry, rows land
     assert len(calls) == 2
     assert ev and "touched 7x / defended 3x" in ev["reason"]
-    tr.on_bar(bar(40, 7737, 7738, 7736, 7737))         # loaded: no more calls
+    tr.on_bar(bar(22, 7737, 7738, 7736, 7737))         # loaded, inside 5 min: no call
     assert len(calls) == 2
+    # Loaded is NOT frozen [st-2rsz]: the tracker rewrites the file all session,
+    # and 10-06 7879 read "untouched" an hour after its first touch.
+    store[7739.0] = {"n_touches": 9, "n_defenses": 4}
+    ev = tr.on_bar(bar(26, 7737, 7738, 7736, 7737))    # past 5 min: refreshed
+    assert len(calls) == 3
+    assert ev and "touched 9x / defended 4x" in ev["reason"]
+    store.clear()
+    ev = tr.on_bar(bar(32, 7737, 7738, 7736, 7737))    # empty read keeps last good
+    assert len(calls) == 4
+    assert ev and "touched 9x / defended 4x" in ev["reason"]
 
 
 def test_flapping_between_adjacent_levels_is_rate_limited():

@@ -42,6 +42,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from market.orderflow.context_log import read_last_run  # noqa: E402
 CT = ZoneInfo("America/Chicago")
 BRIDGE = "http://127.0.0.1:7788"
 OUT_ROOT = REPO / "docs" / "emission-reviews"
@@ -102,7 +104,27 @@ def from_run_log(day: _date) -> tuple[list[dict], dict]:
             bars.append({**r, "ev": []})
         elif r.get("k") == "ev" and r.get("bar_i") is not None and r["bar_i"] < len(bars):
             bars[r["bar_i"]]["ev"].append(r)
+    # Context lines, from the feeder's separate log [st-2rsz]: Fuel goes back on
+    # the bar's emissions as the page showed it (after the recognitions), GEX and
+    # basis back on the bar. Absent for days before that log existed.
+    ctx = read_last_run(context_log_path(day))
+    for i, c in ctx.items():
+        if i < len(bars) and c.get("t1") == bars[i]["t1"]:
+            if c.get("fuel"):
+                bars[i]["ev"].append({**c["fuel"], "context": True})
+            for k in ("gex", "bs"):
+                if c.get(k):
+                    bars[i][k] = c[k]
+    meta["_ctx_rows"] = len(ctx)
+    cp = context_log_path(day)
+    heads = ([json.loads(x) for x in cp.open(encoding="utf-8") if '"k":"run"' in x]
+             if cp.exists() else [])
+    meta["_ctx_backfill"] = bool(heads and heads[-1].get("backfill"))
     return bars, meta
+
+
+def context_log_path(day: _date) -> Path:
+    return REPO / "data" / "derived" / "live-context" / f"{day}.jsonl"
 
 
 def mancini_near(day: _date, price: float) -> list[dict]:
@@ -144,9 +166,18 @@ def build(day: _date, label: int) -> dict:
         source, note = "bridge", "what the page received, context lines included"
     else:
         bars, meta = from_run_log(day)
-        source = "run-log"
-        note = ("feeder run log — recognition emissions only; context lines "
-                "(Fuel, GEX) were page-only and are NOT in this record")
+        if meta.get("_ctx_rows") and meta.get("_ctx_backfill"):
+            source = "run-log+backfill"
+            note = ("feeder run log plus a BACKFILLED context log — Fuel's tape components exact, "
+                    "its level history not reproducible (reads 'no level history'), GEX matched live "
+                    "on 326 of 327 bars when measured (tools/backfill_context_log.py)")
+        elif meta.get("_ctx_rows"):
+            source = "run-log+context"
+            note = "feeder run log plus its context log — recognitions, Fuel and GEX as the page showed them"
+        else:
+            source = "run-log"
+            note = ("feeder run log — recognition emissions only; no context log for this "
+                    "day, so context lines (Fuel, GEX) are NOT in this record")
     i = label - 1
     if not 0 <= i < len(bars):
         sys.exit(f"Bar {label} not in {day}: the session holds bars 1–{len(bars)}")

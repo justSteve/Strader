@@ -676,3 +676,54 @@ def test_drop_counters_report_without_changing_what_is_dropped():
 
     assert [t.sequence for t in counted] == [t.sequence for t in plain]
     assert counts == {"dupes": 1, "late": 1, "bad": 1}
+
+
+# --- context log: Fuel/GEX recorded durably, beside the run log [st-2rsz] ---
+
+def test_context_log_records_fuel_and_the_run_log_never_sees_it(tmp_path):
+    from market.orderflow.context_log import ContextLogWriter, read_last_run
+
+    class _Fuel:                     # fires on every third bar, like an engagement
+        def __init__(self):
+            self.n = 0
+
+        def on_bar(self, bar):
+            self.n += 1
+            return ({"type": "Fuel", "context": True, "level": 7879.0,
+                     "reason": f"long @ 7879.00 — bar {self.n}"} if self.n % 3 == 0 else None)
+
+    class _EvRunLog(_RecRunLog):
+        def __init__(self):
+            super().__init__()
+            self.ev_types = []
+
+        def on_bar(self, bar_i, bar, events):
+            super().on_bar(bar_i, bar, events)
+            self.ev_types += [getattr(e, "type", None) or type(e).__name__ for e in events]
+
+    driver, pending, it = _drive_fixture(tmp_path)
+    path = tmp_path / "ctx" / "2026-10-06.jsonl"
+    ctx = ContextLogWriter(path, day=_date(2026, 10, 6), started=datetime(2026, 10, 6, 8, 16))
+    runlog, pubs = _EvRunLog(), []
+    feed.drive_and_publish(it, driver, pending, runlog, lambda b, m, f: pubs.extend(b),
+                           meta={"day": "x"}, fuel=_Fuel(), ctxlog=ctx, push_every_n=1)
+    rows = read_last_run(path)
+    paged = {i: e for i, b in enumerate(pubs) if "t0" in b
+             for e in b["ev"] if e.get("type") == "Fuel"}
+    assert rows and set(rows) == set(paged), "every Fuel the page got is in the context log"
+    for i, r in rows.items():
+        assert r["fuel"]["reason"] == paged[i]["reason"]
+        assert r["t1"] == pubs[i]["t1"]
+    assert "Fuel" not in runlog.ev_types, "the parity record stays recognition-only"
+    assert ctx._fh is None, "closed with the run log"
+
+
+def test_context_log_write_failure_never_raises(tmp_path):
+    from market.orderflow.context_log import ContextLogWriter
+
+    blocker = tmp_path / "not-a-dir"
+    blocker.write_text("x")
+    w = ContextLogWriter(blocker / "d.jsonl", day=_date(2026, 10, 6), started=datetime.now())
+    bars = list(build_bars(iter(read_corpus_day(_write_day(tmp_path, _synthetic_rows(300)))), n=100))
+    w.on_bar(0, bars[0], fuel={"type": "Fuel"})      # dead writer: a no-op, no raise
+    w.close()

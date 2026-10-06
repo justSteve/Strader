@@ -340,13 +340,24 @@ class FuelTracker:
 
     def _compute(self, level: float, bar) -> dict:
         read = self._side or self._approach_side(level, bar)
-        if not self.history and self._loader is not None:
+        # Re-read the level-state file on a cadence for the WHOLE session, not
+        # only until it first yields rows [st-2rsz]. The tracker rewrites it
+        # every minute; loading it once froze each level's touch count at the
+        # first load. 2026-10-06 Bar 232 printed "touched 0x / defended 0x,
+        # untouched" for 7879 at 09:38 CT when the tracker had recorded its
+        # first touch and a defended close at 08:55. Empty-then-arrive keeps
+        # the 15-minute retry; once rows exist they refresh every 5 minutes of
+        # bar time, and an empty or failed read keeps the last good map.
+        if self._loader is not None:
             if self._next_load_ts is None or bar.end_ts >= self._next_load_ts:
-                self._next_load_ts = bar.end_ts + timedelta(minutes=15)
-                self.history = self._loader() or {}
-                if self.history:
-                    logger.info("fuel: level history arrived — %d rows",
-                                len(self.history))
+                had = bool(self.history)
+                fresh = self._loader() or {}
+                if fresh:
+                    self.history = fresh
+                    if not had:
+                        logger.info("fuel: level history arrived — %d rows", len(fresh))
+                self._next_load_ts = bar.end_ts + timedelta(
+                    minutes=5 if self.history else 15)
         hist_row = self.history.get(level)
         hist = _history_phrase(hist_row)
         uw = _underwater(self._window, level, read, self.k)

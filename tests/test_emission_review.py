@@ -72,3 +72,21 @@ def test_unfilled_card_is_refused_and_filled_one_delivered(run_log, tmp_path):
     assert out.name.endswith("__Strader__emission-review-2026-10-01-bar-004.md")
     assert text.startswith("---\nfrom: Strader\nto: Desk\n")
     assert "expects_reply: false" in text
+
+
+def test_past_day_merges_the_context_log(run_log):
+    ctx = run_log / "data" / "derived" / "live-context"
+    ctx.mkdir(parents=True)
+    t = "2026-10-06T09:00:00-05:00"
+    ctx.joinpath("2026-10-01.jsonl").write_text("\n".join(json.dumps(r) for r in [
+        {"k": "run", "started": "first"},
+        {"k": "ctx", "i": 3, "t1": t, "fuel": {"type": "Fuel", "reason": "stale run"}},
+        {"k": "run", "started": "second"},
+        {"k": "ctx", "i": 3, "t1": t, "fuel": {"type": "Fuel", "reason": "long @ 103"},
+         "gex": {"spot": 50.0, "regime": "pos"}},
+    ]))
+    p = er.build(date(2026, 10, 1), 4)
+    assert p["source"] == "run-log+context"
+    assert [(e["type"], e["text"], e["context_only"]) for e in p["emissions"]] == [
+        ("SweepPrint", "buy sweep", False), ("Fuel", "long @ 103", True)]
+    assert p["gex"]["regime"] == "pos" and p["basis_approx"] == 53.0

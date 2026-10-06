@@ -22,10 +22,21 @@ It writes `docs/emission-reviews/<day>/bar-NNN.{json,md}` — the card with its
 data sections filled in and every commentary section marked
 `<!-- REVIEW: fill -->`.
 
-Read the `source` line. `run-log` means the day has rolled off the bridge, so
-**context lines (Fuel, GEX) are missing**. If Steve is asking about a Fuel line,
-say that the record doesn't hold it. Never review a bar as "quiet" because the
-run log has no context lines for it.
+Read the `source` line. It says which record the card was built from:
+
+- `bridge`: today, exactly what the page received.
+- `run-log+context`: a past day, with Fuel and GEX from the feeder's context log
+  (st-2rsz) as the page showed them.
+- `run-log+backfill`: a past day whose context was rebuilt by
+  `tools/backfill_context_log.py`. Fuel's tape components are exact, but its level
+  history isn't reproducible, so it reads "no level history". Don't grade the
+  history component from it.
+- `run-log`: no context at all; Fuel and GEX are **missing**. Never review a bar
+  as "quiet" because of that.
+
+A Fuel history phrase printed before the st-2rsz restart (the night of 10-06) can be stale. The
+line loaded the level-state file once. Check it against
+`data/level_state/<day>.json` events up to the bar's time before grading.
 
 ## Step 2 — Read what the emission means
 

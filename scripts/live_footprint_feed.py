@@ -84,6 +84,8 @@ from market.orderflow.replay import (                           # noqa: E402
     TradeDeduper, es_day_path, trade_from_row,
 )
 from market.orderflow.run_log import RunLogWriter, run_log_path  # noqa: E402
+from market.orderflow.context_log import (  # noqa: E402
+    ContextLogWriter, NullContextLog, context_log_path)
 from market.signals.orderflow_config import TICK, VOLUME_BAR_N  # noqa: E402
 
 logger = logging.getLogger("live_footprint_feed")
@@ -613,6 +615,12 @@ def main() -> int:
         reorder_lag=args.reorder_lag, catch_up=bool(args.catch_up_only),
         started=datetime.now(),
     ) if not (args.no_run_log or args.dry_run) else _NullRunLog()
+    # Fuel / GEX / basis as the page saw them, beside the run log and never in
+    # it [st-2rsz] — the Emission Review lookback reads a past day's context
+    # lines from here once the bridge has rolled over. Same on/off as the run log.
+    ctxlog = ContextLogWriter(
+        context_log_path(day), day=day, started=datetime.now(),
+    ) if not (args.no_run_log or args.dry_run) else NullContextLog()
 
     logger.info("live footprint feed — day=%s bar_n=%d reorder_lag=%.1fs bridge=%s "
                 "anchors=%d (%d mancini levels: %d support, %d resistance)",
@@ -802,7 +810,7 @@ def main() -> int:
     # CT (six bars held; overnight bars close ten minutes apart), and any
     # burst's last bars always lagged one bar. [st-fgno]
     drive_and_publish(live_drive(_closed_bars(), driver, live_anchors),
-                      driver, pending_trades, runlog, _publish, meta=meta, gex=gex,
+                      driver, pending_trades, runlog, _publish, meta=meta, gex=gex, ctxlog=ctxlog,
                       basis=basis, fuel=fuel, push_every_n=1)
     return 0
 
@@ -853,7 +861,7 @@ def _install_stop_handler() -> None:
 
 
 def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
-                      *, meta: dict | None = None, gex=None, basis=None, fuel=None,
+                      *, meta: dict | None = None, gex=None, basis=None, fuel=None, ctxlog=None,
                       push_every_s: float = 1.0, push_every_n: int = 25) -> dict:
     """Consume (bar_i, bar, bar_trades, events) from `drive_iter`, publish bars
     in coalesced batches, and — WHATEVER ends the stream — flush the engine and
@@ -867,6 +875,7 @@ def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
 
     Returns a summary dict {sent, n_ev, final, stopped_by}.
     """
+    ctxlog = ctxlog if ctxlog is not None else NullContextLog()
     sent = 0
     batch: list[dict] = []
     last_push = time.monotonic()
@@ -900,10 +909,12 @@ def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
             # Fuel context [st-aq1n]: after the run log, payload-only — the
             # emissions row renders it; the recognition record never holds it.
             ev_out = events
+            fuel_ev = None
             if fuel is not None:
                 fuel_ev = fuel.on_bar(bar)
                 if fuel_ev is not None:
                     ev_out = [*events, fuel_ev | {"bar_i": bar_i}]
+            ctxlog.on_bar(bar_i, bar, gex=gex_ctx, bs=bs, fuel=fuel_ev)
             batch.append(bar_payload(bar, bar_trades, ev_out, gex=gex_ctx, bs=bs, day=day))
             now = time.monotonic()
             # Push promptly — a bar the page has not seen is a bar Steve is not
@@ -938,6 +949,7 @@ def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
             runlog.on_final(final)
         finally:
             runlog.close()
+            ctxlog.close()
         if batch or final:
             publish(batch, meta if first else None, final or None)
             sent += len(batch)
