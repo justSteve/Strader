@@ -4,7 +4,7 @@
  "bar_index": 231,
  "source": "bridge",
  "source_note": "what the page received, context lines included",
- "generated_ct": "2026-10-06 09:51 CT",
+ "generated_ct": "2026-10-06 11:04 CT",
  "bar": {
   "start_ct": "09:38:04",
   "close_ct": "09:38:33",
@@ -20,16 +20,18 @@
  "emissions": [
   {
    "type": "Fuel",
-   "text": "long @ 7879.00 — touched 0x / defended 0x, untouched · 3 lid rejections in 40m · 22.2K sold at the level, underwater on reclaim · no absorbed dips · thin x0.06 above, no shelf within 15 pts",
+   "text": "long @ 7879.00 — touched 6x / defended 3x since Tue 08:55 CT, reclaimed · 3 lid rejections in 40m · 22.2K sold at the level, underwater on reclaim · no absorbed dips · thin x0.06 above, no shelf within 15 pts",
    "context_only": true,
    "fields": {
     "level": 7879.0,
     "read": "long",
     "history": {
-     "n_touches": 0,
-     "n_defenses": 0,
-     "first_touch": null,
-     "state": "untouched"
+     "n_touches": 6,
+     "n_defenses": 3,
+     "first_touch": "2026-10-06T13:55:00+00:00",
+     "state": "reclaimed",
+     "asof": "2026-10-06T14:35:00+00:00",
+     "source": "tape"
     },
     "underwater_vol": 22197,
     "lid_rejections": 3,
@@ -37,7 +39,9 @@
     "absorbed_swings": 0,
     "absorbed_delta": 0,
     "thin_ratio": 0.06,
-    "shelf_price": null
+    "shelf_price": null,
+    "as_shown": "long @ 7879.00 — touched 0x / defended 0x, untouched · 3 lid rejections in 40m · 22.2K sold at the level, underwater on reclaim · no absorbed dips · thin x0.06 above, no shelf within 15 pts",
+    "as_shown_known": true
    }
   }
  ],
@@ -159,7 +163,7 @@
    "bar_label": 242,
    "close_ct": "09:44:41",
    "type": "Fuel",
-   "text": "long @ 7886.00 — touched 0x / defended 0x, untouched · 3 lid rejections in 40m · 14.5K sold at the level, underwater on reclaim · dips bought +3230 over 3 higher lows · thin x0.03 above, no shelf within 15 pts"
+   "text": "long @ 7886.00 — touched 3x / defended 2x since Tue 09:05 CT, tested-held · 3 lid rejections in 40m · 14.5K sold at the level, underwater on reclaim · dips bought +3230 over 3 higher lows · thin x0.03 above, no shelf within 15 pts *(history corrected; page showed a stale phrase)*"
   },
   {
    "bar_label": 244,
@@ -177,7 +181,7 @@
    "bar_label": 252,
    "close_ct": "09:50:36",
    "type": "Fuel",
-   "text": "short @ 7879.00 — touched 0x / defended 0x, untouched · 4 lid rejections in 40m · 24.1K bought at the level, underwater on loss · no absorbed pops · thin x0.45 to 7876"
+   "text": "short @ 7879.00 — touched 9x / defended 4x since Tue 08:55 CT, broken · 4 lid rejections in 40m · 24.1K bought at the level, underwater on loss · no absorbed pops · thin x0.45 to 7876 *(history corrected; page showed a stale phrase)*"
   }
  ]
 }

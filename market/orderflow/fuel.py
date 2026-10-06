@@ -262,8 +262,15 @@ class FuelTracker:
     def __init__(self, levels: list[float], *,
                  history: dict[float, dict] | None = None,
                  history_loader=None,
+                 history_fn=None,
                  knobs: FuelKnobs = FuelKnobs()):
-        """``history_loader``: optional zero-arg callable returning the
+        """``history_fn``: callable(bar_end_ts) -> {price: row}, the history AS
+        OF the bar being judged. When given it is the ONLY history source: the
+        feeder passes ``level_history.TapeLevelHistory.as_of`` [st-ygoz], so a
+        printed touch count can never be older than its bar. ``history`` and
+        ``history_loader`` remain for callers without a tape.
+
+        ``history_loader``: optional zero-arg callable returning the
         level-history map. The level-state artifact generates at 08:20 CT —
         AFTER a feeder that boots at midnight or pre-open — so while
         ``history`` is empty the tracker retries the loader at most every 15
@@ -272,6 +279,7 @@ class FuelTracker:
         self.levels = sorted({float(p) for p in levels})
         self.history = history or {}
         self._loader = history_loader
+        self._history_fn = history_fn
         self._next_load_ts = None
         self.k = knobs
         self._window: list = []          # bars inside knobs.window_s of newest
@@ -348,7 +356,9 @@ class FuelTracker:
         # first touch and a defended close at 08:55. Empty-then-arrive keeps
         # the 15-minute retry; once rows exist they refresh every 5 minutes of
         # bar time, and an empty or failed read keeps the last good map.
-        if self._loader is not None:
+        if self._history_fn is not None:
+            self.history = self._history_fn(bar.end_ts) or {}
+        elif self._loader is not None:
             if self._next_load_ts is None or bar.end_ts >= self._next_load_ts:
                 had = bool(self.history)
                 fresh = self._loader() or {}
@@ -402,7 +412,10 @@ class FuelTracker:
             "history": ({"n_touches": hist_row.get("n_touches"),
                          "n_defenses": hist_row.get("n_defenses"),
                          "first_touch": hist_row.get("first_touch"),
-                         "state": hist_row.get("state")} if hist_row else None),
+                         "state": hist_row.get("state"),
+                         # provenance: which candles the count covers [st-ygoz]
+                         "asof": hist_row.get("asof"),
+                         "source": hist_row.get("source", "level_state")} if hist_row else None),
             "underwater_vol": uw,
             "lid_rejections": lid,
             "window_min": round(win_min, 1),

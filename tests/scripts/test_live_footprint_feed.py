@@ -727,3 +727,29 @@ def test_context_log_write_failure_never_raises(tmp_path):
     bars = list(build_bars(iter(read_corpus_day(_write_day(tmp_path, _synthetic_rows(300)))), n=100))
     w.on_bar(0, bars[0], fuel={"type": "Fuel"})      # dead writer: a no-op, no raise
     w.close()
+
+
+def test_level_history_gets_each_bars_trades_before_fuel_judges_it(tmp_path):
+    """[st-ygoz] Fuel's history is read AS OF the bar, so the bar's own trades
+    must be in the history when Fuel computes — never one bar behind."""
+    class _Hist:
+        def __init__(self):
+            self.n, self.last = 0, None
+
+        def add(self, t):
+            self.n += 1
+            self.last = t.ts
+
+    hist = _Hist()
+    seen = []
+
+    class _Fuel:
+        def on_bar(self, bar):
+            seen.append((hist.last, bar.end_ts))
+            return None
+
+    driver, pending, it = _drive_fixture(tmp_path)
+    feed.drive_and_publish(it, driver, pending, _RecRunLog(), lambda b, m, f: None,
+                           meta={"day": "x"}, fuel=_Fuel(), level_hist=hist, push_every_n=1)
+    assert seen and all(last == end for last, end in seen), "history holds the bar's last trade"
+    assert hist.n == 600

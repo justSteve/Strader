@@ -123,6 +123,39 @@ def from_run_log(day: _date) -> tuple[list[dict], dict]:
     return bars, meta
 
 
+def correct_fuel(day: _date, bars: list[dict], *, from_page: bool) -> None:
+    """Put the CORRECTED Fuel line on each bar, and what the page printed beside it.
+
+    Before st-ygoz the page's Fuel history phrase came from a file loaded once
+    per run, so it could be hours stale: on 10-06, 28 of 34 lines. The
+    corrected line (as-of-bar history from the tape, tools/backfill_context_log.py)
+    is what the card reviews. The page's own line rides along as ``as_shown``
+    whenever it differs, because Steve may have acted on it. ``as_shown`` comes
+    from the bridge (``from_page``) or from ``<day>.shown.jsonl``; when neither
+    holds it, the card says the page's line for that bar is not recorded.
+    """
+    base = REPO / "data" / "derived" / "live-context"
+    fixed = read_last_run(base / f"{day}.jsonl")
+    shown: dict[int, dict] = {}
+    sp = base / f"{day}.shown.jsonl"
+    if sp.exists():
+        for line in sp.open(encoding="utf-8"):
+            r = json.loads(line)
+            shown[r["i"]] = r["fuel"]
+    for i, b in enumerate(bars):
+        page = next((e for e in b.get("ev", []) if e.get("type") == "Fuel"), None)
+        if from_page and page is not None:
+            shown.setdefault(i, page)
+        c = fixed.get(i)
+        if not c or c.get("t1") != b["t1"] or not c.get("fuel"):
+            continue
+        new = {**c["fuel"], "context": True}
+        old = shown.get(i)
+        new["as_shown"] = (old.get("reason") if old else None)
+        new["as_shown_known"] = old is not None
+        b["ev"] = [e for e in b.get("ev", []) if e.get("type") != "Fuel"] + [new]
+
+
 def context_log_path(day: _date) -> Path:
     return REPO / "data" / "derived" / "live-context" / f"{day}.jsonl"
 
@@ -163,14 +196,15 @@ def build(day: _date, label: int) -> dict:
     src = from_bridge(day) if day == today_ct() else None
     if src:
         bars, meta = src
-        source, note = "bridge", "what the page received, context lines included"
+        source, note = "bridge", ("the page's bars and recognitions as received; Fuel history "
+                                  "corrected to as-of-bar where the page's was stale (st-ygoz)")
     else:
         bars, meta = from_run_log(day)
         if meta.get("_ctx_rows") and meta.get("_ctx_backfill"):
             source = "run-log+backfill"
             note = ("feeder run log plus a BACKFILLED context log — Fuel's tape components exact, "
-                    "its level history not reproducible (reads 'no level history'), GEX matched live "
-                    "on 326 of 327 bars when measured (tools/backfill_context_log.py)")
+                    "its level history CORRECTED to as-of-bar from the tape (st-ygoz), GEX matched "
+                    "live on 326 of 327 bars when measured (tools/backfill_context_log.py)")
         elif meta.get("_ctx_rows"):
             source = "run-log+context"
             note = "feeder run log plus its context log — recognitions, Fuel and GEX as the page showed them"
@@ -178,6 +212,7 @@ def build(day: _date, label: int) -> dict:
             source = "run-log"
             note = ("feeder run log — recognition emissions only; no context log for this "
                     "day, so context lines (Fuel, GEX) are NOT in this record")
+    correct_fuel(day, bars, from_page=source == "bridge")
     i = label - 1
     if not 0 <= i < len(bars):
         sys.exit(f"Bar {label} not in {day}: the session holds bars 1–{len(bars)}")
@@ -218,7 +253,10 @@ def build(day: _date, label: int) -> dict:
                        if (datetime.fromisoformat(b["t1"]) - datetime.fromisoformat(x["t1"])).total_seconds() <= 2400),
         "hindsight": hindsight(bars, i),
         "later_emissions": [{"bar_label": j + 1, "close_ct": ct(bars[j]["t1"]),
-                             "type": e.get("type"), "text": e.get("reason", "")}
+                             "type": e.get("type"),
+                             "text": e.get("reason", "") + (
+                                 " *(history corrected; page showed a stale phrase)*"
+                                 if e.get("as_shown_known") and e.get("as_shown") != e.get("reason") else "")}
                             for j in range(i + 1, min(len(bars), i + 1 + HINDSIGHT[-1]))
                             for e in bars[j].get("ev", [])],
     }
@@ -232,12 +270,21 @@ def card(p: dict) -> str:
          "",
          f"*ES {b['c']} at the close of the bar · source: {p['source']} ({p['source_note']}) · "
          f"packet {p['generated_ct']} · [st-rf95]*", "",
-         "## The emission (verbatim)", ""]
+         "## The emission", ""]
     if not p["emissions"]:
         L.append("_No emission on this bar._")
     for e in p["emissions"]:
         tag = " · context line, not a recognition" if e["context_only"] else ""
         L.append(f"- **{e['type']}**{tag}: {e['text']}")
+        f = e["fields"]
+        if e["type"] == "Fuel" and "as_shown_known" in f:
+            if not f["as_shown_known"]:
+                L.append("  - *Page showed:* not recorded for this bar. Before the st-ygoz fix its "
+                         "history phrase came from a file loaded once per run and may have been stale.")
+            elif f["as_shown"] != e["text"]:
+                L.append(f"  - *Page showed:* {f['as_shown']}")
+                L.append("  - *The history phrase above is corrected to what was true at this bar's "
+                         "close (st-ygoz); the page's phrase was stale.*")
     L += ["", "## Bias the emission is calling", "", "<!-- REVIEW: fill -->", "",
           "## How much it should matter", "", "<!-- REVIEW: fill -->", "",
           "## What would confirm · what would negate", "", "<!-- REVIEW: fill -->", "",

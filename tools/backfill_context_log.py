@@ -23,12 +23,17 @@ holds what the page actually received. Read before quoting a backfilled line.
     backfill assumes a fixed arrival lag. Measured mismatches over 327 bars by lag:
     0 s 33 · 4 s 23 · 8 s 7 · **10 s 1** · 12 s 4 · 20 s 23. 10 s it is. The
     residue is a pull that landed unusually fast or slow.
-  * Not reproducible: Fuel's level HISTORY ("touched Nx / defended Nx"). It
-    came from the level-state file, which the tracker rewrites all session, and
-    touch counts are not stored with times, so the history at 09:38 cannot be
-    recovered from the end-of-day file. Before st-2rsz the live line was frozen
-    at its first load anyway. Backfilled Fuel therefore runs with no history
-    and says "no level history". It never invents a count.
+  * Fuel's level HISTORY ("touched Nx / defended Nx since ..., <state>") is
+    CORRECTED, not reproduced. The page's version came from the level-state
+    file, loaded once per run and never re-read, so it could be hours stale
+    (10-06 Bar 232: "untouched" for a level touched an hour earlier). The
+    backfill computes it as of each bar from the tape with the tracker's own
+    machine (``market/orderflow/level_history.py``, st-ygoz), the same code the
+    feeder uses from the st-ygoz restart on. Measured against the tracker's
+    record for 10-06: 51 of 52 levels identical, the 52nd one touch apart (the
+    tracker counts its forming candle). What the page actually printed is kept
+    separately, where it was recorded: ``<day>.shown.jsonl`` (``--save-shown``,
+    today only, from the bridge).
   * Days whose tape no longer rebuilds the live bars are REFUSED, not
     approximated. Measured 2026-10-06: every run-log day before 10-01 rebuilds
     3–7% more volume than its live bars held, with zero bar boundaries in
@@ -59,6 +64,8 @@ from market.corpus.paths import gexbot_path                       # noqa: E402
 from market.orderflow.bars import build_bars                      # noqa: E402
 from market.orderflow.context_log import context_log_path         # noqa: E402
 from market.orderflow.fuel import FuelTracker                     # noqa: E402
+from market.orderflow import level_history                        # noqa: E402
+from scripts.live_footprint_feed import take_bar_trades           # noqa: E402
 from market.orderflow.gex_context import GexContext               # noqa: E402
 from market.orderflow.replay import read_corpus_day               # noqa: E402
 from market.orderflow.run_log import code_revision, read_runs, run_log_path  # noqa: E402
@@ -88,7 +95,19 @@ def rebuild(day: _date) -> tuple[dict, list[dict]]:
         sys.exit(f"no run log for {day} — nothing to align a backfill to")
     run = runs[-1]
     mancini = [float(p) for p in run.meta.get("mancini") or []]
-    bars = list(build_bars(iter(read_corpus_day(day)), n=run.bar_n))
+    # Tee the trades exactly as the feeder does, so each bar's own trades are
+    # known: the level history is fed them before Fuel judges the bar [st-ygoz].
+    pending: list = []
+
+    def tee(it):
+        for t in it:
+            pending.append(t)
+            yield t
+
+    bars, bar_trades = [], []
+    for bar in build_bars(tee(iter(read_corpus_day(day))), n=run.bar_n):
+        bars.append(bar)
+        bar_trades.append(take_bar_trades(bar, pending))
     # Alignment is the precondition for every row: a backfill whose bar i is not
     # the live bar i would attach context to the wrong bar on the card.
     n = min(len(bars), len(run.bars))
@@ -102,8 +121,10 @@ def rebuild(day: _date) -> tuple[dict, list[dict]]:
         fuel_shown = datetime.fromisoformat(run.started).replace(tzinfo=None) >= FUEL_SINCE
     except ValueError:
         fuel_shown = day > FUEL_SINCE.date()
-    # no history: see docstring
-    fuel = FuelTracker(mancini) if (mancini and fuel_shown) else None
+    level_hist = (level_history.for_day(day, prior_trades=level_history.corpus_prior_trades)
+                  if (mancini and fuel_shown) else None)
+    fuel = (FuelTracker(mancini, history_fn=level_hist.as_of if level_hist else None)
+            if (mancini and fuel_shown) else None)
     rows = []
     for i, bar in enumerate(bars[:n]):
         g = None
@@ -113,6 +134,9 @@ def rebuild(day: _date) -> tuple[dict, list[dict]]:
             if g:   # age as live measured it: from the real close, not the shifted one
                 g = g | {"age_s": round((bar.end_ts - datetime.fromisoformat(
                     g["ts"].replace("Z", "+00:00"))).total_seconds(), 1)}
+        if level_hist is not None:
+            for t in bar_trades[i]:
+                level_hist.add(t)
         f = fuel.on_bar(bar) if fuel is not None else None
         if f is not None:
             f = f | {"bar_i": i}
@@ -130,7 +154,8 @@ def rebuild(day: _date) -> tuple[dict, list[dict]]:
                            "run predates Fuel (5122fe8)" if not fuel_shown else
                            "no Mancini set in this run — the page showed no Fuel either"),
               "code": code_revision(),
-              "note": "rebuilt from run log + corpus; Fuel level history not reproducible"}
+              "note": "rebuilt from run log + corpus; Fuel level history computed as of each bar "
+                      "from the tape (st-ygoz) — CORRECTED, not what the page printed"}
     return header, rows
 
 
@@ -162,15 +187,37 @@ def verify_against_bridge(day: _date, rows: list[dict]) -> int:
     return bad + gex_bad
 
 
+def save_shown(day: _date) -> Path:
+    """What the page printed, before a restart replaces it: every Fuel line the
+    bridge holds for ``day``, verbatim. A correction is only honest beside the
+    original Steve may have acted on."""
+    with urllib.request.urlopen("http://127.0.0.1:7788/bars?since=0", timeout=10) as r:
+        d = json.load(r)
+    if (d.get("meta") or {}).get("day") != day.isoformat():
+        sys.exit("the bridge is not serving that day — the page's lines for it are not held anywhere")
+    out = context_log_path(day).with_suffix(".shown.jsonl")
+    rows = [{"k": "shown", "i": i, "t1": b["t1"], "fuel": e}
+            for i, b in enumerate(d["bars"]) for e in b.get("ev", []) if e.get("type") == "Fuel"]
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("".join(json.dumps(r, separators=(",", ":")) + "\n" for r in rows), encoding="utf-8")
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--day", required=True)
     ap.add_argument("--force", action="store_true", help="overwrite an existing context log")
+    ap.add_argument("--save-shown", action="store_true",
+                    help="today only: save the Fuel lines exactly as the page received them "
+                         "(from the bridge) to <day>.shown.jsonl, then exit")
     ap.add_argument("--verify-bridge", action="store_true",
                     help="compare to the bridge (today only) and write nothing")
     a = ap.parse_args()
     logging.basicConfig(level=logging.WARNING)
     day = _date.fromisoformat(a.day)
+    if a.save_shown:
+        print(save_shown(day))
+        return 0
     header, rows = rebuild(day)
     if a.verify_bridge:
         return 1 if verify_against_bridge(day, rows) else 0

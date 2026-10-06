@@ -75,7 +75,8 @@ from market.orderflow.anchors import (  # noqa: E402
     LiveAnchors, kinds_to_records, levels_from_arg, mancini_kinds_for, mancini_levels_for)
 from market.orderflow.tradesource import iter_trades  # noqa: E402
 from strader.market_calendar import prior_trading_day  # noqa: E402
-from market.orderflow.fuel import FuelTracker, load_level_history  # noqa: E402
+from market.orderflow.fuel import FuelTracker  # noqa: E402
+from market.orderflow import level_history  # noqa: E402
 from market.orderflow.gex_context import GexContext                # noqa: E402
 from market.orderflow.bars import build_bars                    # noqa: E402
 from market.orderflow.fill import bar_fill_steps, session_delta  # noqa: E402
@@ -576,14 +577,20 @@ def main() -> int:
     # Trapped-seller fuel [st-aq1n]: display context computed per closed bar
     # when price engages a Mancini level. Never in the run log (parity), never
     # able to raise into the feed (fuel.py owns that contract).
-    fuel = None
+    #
+    # Level history AS OF each bar, from this feeder's own tape [st-ygoz]. It
+    # replaced the level_state file, which was loaded once and printed
+    # "untouched" for 7879 at 09:38 on 10-06, an hour after its first touch. Pre-seeded
+    # with the letter window before today's tape (the prior evening), then fed
+    # each closed bar's trades before Fuel judges that bar.
+    fuel, level_hist = None, None
     if not args.no_fuel and mancini:
-        fuel_hist = load_level_history(day)
-        fuel = FuelTracker(mancini, history=fuel_hist,
-                           history_loader=lambda: load_level_history(day))
-        logger.info("fuel: watching %d levels, history rows for %d%s",
-                    len(mancini), len(fuel_hist),
-                    "" if fuel_hist else " (retrying after the 08:20 tracker runs)")
+        level_hist = level_history.for_day(day, prior_trades=level_history.corpus_prior_trades)
+        fuel = FuelTracker(mancini, history_fn=level_hist.as_of if level_hist else None)
+        logger.info("fuel: watching %d levels; history %s", len(mancini),
+                    f"from the tape since {level_hist.window_start.isoformat()} "
+                    f"({len(level_hist.levels)} ladder levels)" if level_hist
+                    else "UNAVAILABLE — no parse for the day, lines will say 'no level history'")
 
     meta = {"day": day.isoformat(), "bar_n": args.bar_n, "tick": TICK,
             "source": "live", "started": datetime.now().isoformat(timespec="seconds"),
@@ -811,7 +818,7 @@ def main() -> int:
     # burst's last bars always lagged one bar. [st-fgno]
     drive_and_publish(live_drive(_closed_bars(), driver, live_anchors),
                       driver, pending_trades, runlog, _publish, meta=meta, gex=gex, ctxlog=ctxlog,
-                      basis=basis, fuel=fuel, push_every_n=1)
+                      basis=basis, fuel=fuel, level_hist=level_hist, push_every_n=1)
     return 0
 
 
@@ -862,6 +869,7 @@ def _install_stop_handler() -> None:
 
 def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
                       *, meta: dict | None = None, gex=None, basis=None, fuel=None, ctxlog=None,
+                      level_hist=None,
                       push_every_s: float = 1.0, push_every_n: int = 25) -> dict:
     """Consume (bar_i, bar, bar_trades, events) from `drive_iter`, publish bars
     in coalesced batches, and — WHATEVER ends the stream — flush the engine and
@@ -910,6 +918,9 @@ def drive_and_publish(drive_iter, driver, pending_trades: list, runlog, publish,
             # emissions row renders it; the recognition record never holds it.
             ev_out = events
             fuel_ev = None
+            if level_hist is not None:      # history first, so Fuel reads it as of THIS bar
+                for t in bar_trades:
+                    level_hist.add(t)
             if fuel is not None:
                 fuel_ev = fuel.on_bar(bar)
                 if fuel_ev is not None:

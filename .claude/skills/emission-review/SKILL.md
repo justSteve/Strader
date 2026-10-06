@@ -34,9 +34,12 @@ Read the `source` line. It says which record the card was built from:
 - `run-log`: no context at all; Fuel and GEX are **missing**. Never review a bar
   as "quiet" because of that.
 
-A Fuel history phrase printed before the st-2rsz restart (the night of 10-06) can be stale. The
-line loaded the level-state file once. Check it against
-`data/level_state/<day>.json` events up to the bar's time before grading.
+Fuel's history phrase on the page was stale before the st-ygoz restart (the night of 10-06),
+on 28 of that day's 34 lines. The card leads with the CORRECTED line (history as of the
+bar's close, from the tape) and shows the page's line beside it as *Page showed*. Grade
+from the corrected line. Where the two differ, say what the page told Steve at the time,
+because he may have acted on it. Before you deliver a card for a past day, run
+`tools/backfill_context_log.py --day <day> --force` if its context log predates st-ygoz.
 
 ## Step 2 — Read what the emission means
 

@@ -90,3 +90,26 @@ def test_past_day_merges_the_context_log(run_log):
     assert [(e["type"], e["text"], e["context_only"]) for e in p["emissions"]] == [
         ("SweepPrint", "buy sweep", False), ("Fuel", "long @ 103", True)]
     assert p["gex"]["regime"] == "pos" and p["basis_approx"] == 53.0
+
+
+def test_card_leads_with_corrected_fuel_and_keeps_what_the_page_showed(run_log):
+    ctx = run_log / "data" / "derived" / "live-context"
+    ctx.mkdir(parents=True)
+    t = "2026-10-06T09:00:00-05:00"
+    ctx.joinpath("2026-10-01.jsonl").write_text("\n".join(json.dumps(r) for r in [
+        {"k": "run", "started": "x", "backfill": True},
+        {"k": "ctx", "i": 3, "t1": t, "fuel": {"type": "Fuel",
+                                                "reason": "long @ 103 — touched 6x / defended 3x · lid"}},
+        {"k": "ctx", "i": 5, "t1": t, "fuel": {"type": "Fuel", "reason": "long @ 105 — touched 1x · lid"}},
+    ]))
+    ctx.joinpath("2026-10-01.shown.jsonl").write_text(json.dumps(
+        {"k": "shown", "i": 3, "t1": t,
+         "fuel": {"type": "Fuel", "reason": "long @ 103 — touched 0x / defended 0x, untouched · lid"}}))
+    p = er.build(date(2026, 10, 1), 4)
+    fuel = [e for e in p["emissions"] if e["type"] == "Fuel"][0]
+    assert "touched 6x" in fuel["text"]
+    assert "untouched" in fuel["fields"]["as_shown"]
+    card = er.card(p)
+    assert "*Page showed:* long @ 103 — touched 0x" in card
+    p6 = er.build(date(2026, 10, 1), 6)          # no record of what the page showed
+    assert "not recorded for this bar" in er.card(p6)
