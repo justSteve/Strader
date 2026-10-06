@@ -86,6 +86,8 @@ class TestSelection:
         assert Selection.from_args({"expiry": "1"}, today=DAY).expiry == dt.date(2026, 8, 27)
         assert Selection.from_args({"expiry": "next"}, today=dt.date(2026, 8, 28)).expiry == dt.date(2026, 8, 31)
         assert Selection.from_args({"expiry": "2026-09-14"}, today=DAY).expiry == dt.date(2026, 9, 14)
+        # a tab left open overnight: yesterday's expiry is today's, not a 400
+        assert Selection.from_args({"expiry": "2026-08-25"}, today=DAY).expiry == DAY
         assert next_weekday(dt.date(2026, 9, 11)) == dt.date(2026, 9, 14)
 
     def test_as_query_drops_defaults_and_honours_overrides(self):

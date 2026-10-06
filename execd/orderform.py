@@ -239,9 +239,13 @@ def _parse_expiry(word: str, today: date) -> date:
     if w in ("1", "1dte", "tomorrow", "next"):
         return next_weekday(today)
     try:
-        return date.fromisoformat(w)
+        d = date.fromisoformat(w)
     except ValueError:
         return today
+    # A page left open overnight still carries yesterday's expiry, and Schwab
+    # answers a chain asked for a past date with "HTTP 400 Check Param
+    # Values". An expired date means today's.
+    return today if d < today else d
 
 
 def next_weekday(d: date) -> date:
